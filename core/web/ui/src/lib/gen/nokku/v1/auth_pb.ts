@@ -129,15 +129,11 @@ export type GetLoginOptionsResponse = Message<"nokku.v1.GetLoginOptionsResponse"
   workspaceName: string;
 
   /**
-   * Mail is configured and SSO is not enforced.
-   *
    * @generated from field: bool magic_link = 2;
    */
   magicLink: boolean;
 
   /**
-   * SSO is not enforced.
-   *
    * @generated from field: bool passkey = 3;
    */
   passkey: boolean;
@@ -238,17 +234,10 @@ export const CancelEmailChangeResponseSchema: GenMessage<CancelEmailChangeRespon
   messageDesc(file_nokku_v1_auth, 12);
 
 /**
- * Every call runs in the workspace the request's host names. There is no
- * password: a user signs in with a passkey, a mailed link, or the
- * workspace's OIDC provider.
- *
  * @generated from service nokku.v1.AuthService
  */
 export const AuthService: GenService<{
   /**
-   * Mails a sign-in link to a user of this workspace. Always answers OK, so
-   * it never tells whether an address exists.
-   *
    * @generated from rpc nokku.v1.AuthService.RequestMagicLink
    */
   requestMagicLink: {
@@ -257,8 +246,6 @@ export const AuthService: GenService<{
     output: typeof RequestMagicLinkResponseSchema;
   },
   /**
-   * Spends the token from a sign-in or signup link and signs this browser in.
-   *
    * @generated from rpc nokku.v1.AuthService.ConsumeMagicLink
    */
   consumeMagicLink: {
@@ -267,8 +254,6 @@ export const AuthService: GenService<{
     output: typeof ConsumeMagicLinkResponseSchema;
   },
   /**
-   * Public so a stale session can still clear its cookie.
-   *
    * @generated from rpc nokku.v1.AuthService.Logout
    */
   logout: {
@@ -277,8 +262,6 @@ export const AuthService: GenService<{
     output: typeof LogoutResponseSchema;
   },
   /**
-   * What the login page may offer in this workspace.
-   *
    * @generated from rpc nokku.v1.AuthService.GetLoginOptions
    */
   getLoginOptions: {
@@ -287,8 +270,6 @@ export const AuthService: GenService<{
     output: typeof GetLoginOptionsResponseSchema;
   },
   /**
-   * Takes the token mailed to the new address and switches the account to it.
-   *
    * @generated from rpc nokku.v1.AuthService.ConfirmEmailChange
    */
   confirmEmailChange: {
@@ -297,9 +278,6 @@ export const AuthService: GenService<{
     output: typeof ConfirmEmailChangeResponseSchema;
   },
   /**
-   * Takes the token mailed to the old address. Drops a pending change, or
-   * puts the old address back when the change already happened.
-   *
    * @generated from rpc nokku.v1.AuthService.CancelEmailChange
    */
   cancelEmailChange: {

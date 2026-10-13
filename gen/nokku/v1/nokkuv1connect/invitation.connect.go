@@ -44,9 +44,6 @@ const (
 // InvitationServiceClient is a client for the nokku.v1.InvitationService service.
 type InvitationServiceClient interface {
 	GetInvitation(context.Context, *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error)
-	// Mails a signup link to the address. The account only exists once that
-	// link is used. A passkey signup goes through the passkey endpoints with
-	// the same fields instead. Always answers OK.
 	AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error)
 }
 
@@ -104,9 +101,6 @@ func (c *invitationServiceClient) AcceptInvitation(ctx context.Context, req *v1.
 // InvitationServiceHandler is an implementation of the nokku.v1.InvitationService service.
 type InvitationServiceHandler interface {
 	GetInvitation(context.Context, *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error)
-	// Mails a signup link to the address. The account only exists once that
-	// link is used. A passkey signup goes through the passkey endpoints with
-	// the same fields instead. Always answers OK.
 	AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error)
 }
 

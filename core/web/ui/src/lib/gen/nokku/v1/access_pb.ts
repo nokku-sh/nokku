@@ -15,38 +15,25 @@ export const file_nokku_v1_access: GenFile = /*@__PURE__*/
   fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIl0KBkFjY2VzcxIOCgZwdWJsaWMYASABKAgSDAoEc2VsZhgCIAEoCBIlCgRyb2xlGAMgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZRIOCgZkYWVtb24YBCABKAgqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzYghlZGl0aW9uc3DoBw", [file_google_protobuf_descriptor]);
 
 /**
- * Access declares who may call an RPC. An RPC without it is denied, so new
- * RPCs fail closed. The workspace is always known, the request's host names
- * it, so every check below runs inside one workspace.
- *
  * @generated from message nokku.v1.Access
  */
 export type Access = Message<"nokku.v1.Access"> & {
   /**
-   * Skips authentication entirely.
-   *
    * @generated from field: bool public = 1;
    */
   public: boolean;
 
   /**
-   * Open to any authenticated caller but daemons. The handler scopes to the
-   * caller or checks rights itself.
-   *
    * @generated from field: bool self = 2;
    */
   self: boolean;
 
   /**
-   * The least role the caller's user or service account needs.
-   *
    * @generated from field: nokku.v1.WorkspaceRole role = 3;
    */
   role: WorkspaceRole;
 
   /**
-   * Daemons may call it. With nothing else set, only daemons may.
-   *
    * @generated from field: bool daemon = 4;
    */
   daemon: boolean;
@@ -60,10 +47,6 @@ export const AccessSchema: GenMessage<Access> = /*@__PURE__*/
   messageDesc(file_nokku_v1_access, 0);
 
 /**
- * WorkspaceRole values are ordered, each includes everything before it. The
- * backend compares and stores the numbers, so a role added in between means
- * renumbering the stored rows too.
- *
  * @generated from enum nokku.v1.WorkspaceRole
  */
 export enum WorkspaceRole {

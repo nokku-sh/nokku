@@ -24,24 +24,18 @@ const (
 )
 
 type Recording struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	// Empty once the daemon is deleted, the recording stays.
-	DaemonId  *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	Username  *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
-	SizeBytes *int64                 `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
-	Complete  *bool                  `protobuf:"varint,5,opt,name=complete" json:"complete,omitempty"`
-	StartedAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
-	EndedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
-	// The daemon's name when the session ran.
-	DaemonName *string `protobuf:"bytes,8,opt,name=daemon_name,json=daemonName" json:"daemon_name,omitempty"`
-	// Who was logged in: the subject of the certificate principal the host
-	// matched. Empty for a recording from a daemon that did not say.
-	SubjectId *string `protobuf:"bytes,9,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
-	Principal *string `protobuf:"bytes,10,opt,name=principal" json:"principal,omitempty"`
-	// The subject's email, or the name of a service account, when the session
-	// ran. It stays when the account is deleted.
-	SubjectName   *string `protobuf:"bytes,11,opt,name=subject_name,json=subjectName" json:"subject_name,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	Username      *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
+	SizeBytes     *int64                 `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
+	Complete      *bool                  `protobuf:"varint,5,opt,name=complete" json:"complete,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
+	DaemonName    *string                `protobuf:"bytes,8,opt,name=daemon_name,json=daemonName" json:"daemon_name,omitempty"`
+	SubjectId     *string                `protobuf:"bytes,9,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
+	Principal     *string                `protobuf:"bytes,10,opt,name=principal" json:"principal,omitempty"`
+	SubjectName   *string                `protobuf:"bytes,11,opt,name=subject_name,json=subjectName" json:"subject_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -252,15 +246,11 @@ func (*UploadRecordingRequest_Chunk) isUploadRecordingRequest_Msg() {}
 func (*UploadRecordingRequest_Final) isUploadRecordingRequest_Msg() {}
 
 type RecordingMeta struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	RecordingId *string                `protobuf:"bytes,1,opt,name=recording_id,json=recordingId" json:"recording_id,omitempty"`
-	Username    *string                `protobuf:"bytes,2,opt,name=username" json:"username,omitempty"`
-	// When the session began, for a recording that is uploaded after it. Unset
-	// or in the future means now.
-	StartedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
-	// The certificate principal the host matched at login, as the backend built
-	// it. Empty from a daemon that predates the field.
-	Principal     *string `protobuf:"bytes,4,opt,name=principal" json:"principal,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RecordingId   *string                `protobuf:"bytes,1,opt,name=recording_id,json=recordingId" json:"recording_id,omitempty"`
+	Username      *string                `protobuf:"bytes,2,opt,name=username" json:"username,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
+	Principal     *string                `protobuf:"bytes,4,opt,name=principal" json:"principal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

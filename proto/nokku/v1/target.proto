@@ -30,7 +30,6 @@ service TargetService {
   rpc DeleteTarget(DeleteTargetRequest) returns (DeleteTargetResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // A member may only ask for itself. Viewers ask for anyone and also get the accounts.
   rpc GetSubjectAccess(GetSubjectAccessRequest) returns (GetSubjectAccessResponse) {
     option (access) = {role: WORKSPACE_ROLE_MEMBER};
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -50,13 +49,10 @@ service TargetService {
   rpc SyncTargetUsers(SyncTargetUsersRequest) returns (SyncTargetUsersResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // GetAccessGraph rolls every grant up to subject, login account and target
-  // tag, so a workspace of any size draws as one overview.
   rpc GetAccessGraph(GetAccessGraphRequest) returns (GetAccessGraphResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  // ListAccessGraphTargets is the drill-down into one tag of the graph.
   rpc ListAccessGraphTargets(ListAccessGraphTargetsRequest) returns (ListAccessGraphTargetsResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -104,8 +100,6 @@ message Target {
   map<string, string> metadata = 11;
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
-  // When a host without a daemon last ran nk sync. Unset with a daemon, that
-  // one has last_seen_at.
   google.protobuf.Timestamp last_sync_at = 14;
 }
 
@@ -126,8 +120,6 @@ message CreateTargetRequest {
   string host_public_key = 4;
   repeated string endpoints = 5;
   repeated string tags = 6;
-  // Seeded once with the target, like the grants of an enroll token. Edits
-  // in the web app win from then on.
   repeated JoinTokenGrant grants = 7 [(buf.validate.field).repeated.max_items = 32];
 }
 message CreateTargetResponse {
@@ -144,7 +136,6 @@ message UpdateTargetRequest {
   }];
   string description = 4 [(buf.validate.field).string.max_len = 1000];
   string host_public_key = 5;
-  // Endpoints and tags are replaced as sent. Leaving one out clears it.
   repeated string endpoints = 6;
   repeated string tags = 7;
 }
@@ -200,15 +191,10 @@ message GetTargetFiltersResponse {
   repeated string accounts = 2;
 }
 
-// AccessGraphFilter narrows the graph to the grants that match every set
-// field. Unset fields match everything.
 message AccessGraphFilter {
-  // A user, team or service account. A user also matches the grants their
-  // teams hold.
   string subject_id = 1 [(buf.validate.field).string.uuid = true];
   string target_id = 2 [(buf.validate.field).string.uuid = true];
   string username = 3 [(buf.validate.field).string.max_len = 32];
-  // Set but empty means untagged targets.
   string tag = 4 [(buf.validate.field).string.max_len = 256];
 }
 
@@ -216,12 +202,9 @@ message GetAccessGraphRequest {
   AccessGraphFilter filter = 1;
 }
 
-// Every count is a number of distinct targets with a matching grant.
 message GetAccessGraphResponse {
-  // The subjects holding a matching grant, plus the filter's own subject.
   repeated AccessGraphSubject subjects = 1;
   repeated AccessGraphAccount accounts = 2;
-  // Every tag in the workspace, matched or not.
   repeated AccessGraphTag tags = 3;
   repeated AccessGraphGrant grants = 4;
   repeated AccessGraphReach reach = 5;
@@ -234,7 +217,6 @@ message AccessGraphSubject {
   string name = 3;
   string email = 4; // users only
   int32 member_count = 5; // teams only
-  // Targets this subject holds a grant on itself, team grants not included.
   int32 targets = 6;
 }
 
@@ -243,7 +225,6 @@ message AccessGraphAccount {
   int32 targets = 2;
 }
 
-// A target with several tags counts under each of them.
 message AccessGraphTag {
   string tag = 1; // empty is the untagged bucket
   int32 targets = 2;
@@ -266,7 +247,6 @@ message AccessGraphReach {
 
 message ListAccessGraphTargetsRequest {
   AccessGraphFilter filter = 1;
-  // Empty lists the untagged targets.
   string tag = 2 [(buf.validate.field).string.max_len = 256];
   int32 limit = 3 [(buf.validate.field).int32 = {
     gte: 1
@@ -284,6 +264,5 @@ message ListAccessGraphTargetsResponse {
 message AccessGraphTarget {
   string id = 1;
   string name = 2;
-  // Whether a grant matching the filter exists on it.
   bool matched = 3;
 }

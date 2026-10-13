@@ -40,7 +40,6 @@ const (
 
 // DashboardServiceClient is a client for the nokku.v1.DashboardService service.
 type DashboardServiceClient interface {
-	// One call for the whole overview, so the status line never mixes stale counts.
 	GetDashboard(context.Context, *v1.GetDashboardRequest) (*v1.GetDashboardResponse, error)
 }
 
@@ -81,7 +80,6 @@ func (c *dashboardServiceClient) GetDashboard(ctx context.Context, req *v1.GetDa
 
 // DashboardServiceHandler is an implementation of the nokku.v1.DashboardService service.
 type DashboardServiceHandler interface {
-	// One call for the whole overview, so the status line never mixes stale counts.
 	GetDashboard(context.Context, *v1.GetDashboardRequest) (*v1.GetDashboardResponse, error)
 }
 

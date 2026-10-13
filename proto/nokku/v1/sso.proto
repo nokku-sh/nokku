@@ -6,18 +6,14 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
-// A provider signs people into this workspace and may create accounts, so
-// only the owner changes one.
 service SSOService {
   rpc ListSSOProviders(ListSSOProvidersRequest) returns (ListSSOProvidersResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  // Creates or replaces the provider with that id.
   rpc PutSSOProvider(PutSSOProviderRequest) returns (PutSSOProviderResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
-  // Also unlinks every identity the provider vouched for.
   rpc DeleteSSOProvider(DeleteSSOProviderRequest) returns (DeleteSSOProviderResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
@@ -30,7 +26,6 @@ message SSOProvider {
   string issuer_url = 4;
   string client_id = 5;
   repeated string scopes = 6;
-  // Create an account on first sign-in.
   bool jit_provisioning = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;

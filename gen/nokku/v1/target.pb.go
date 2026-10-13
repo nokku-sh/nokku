@@ -230,8 +230,6 @@ type Target struct {
 	Metadata      map[string]string      `protobuf:"bytes,11,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	// When a host without a daemon last ran nk sync. Unset with a daemon, that
-	// one has last_seen_at.
 	LastSyncAt    *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=last_sync_at,json=lastSyncAt" json:"last_sync_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -461,9 +459,7 @@ type CreateTargetRequest struct {
 	HostPublicKey *string                `protobuf:"bytes,4,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
 	Endpoints     []string               `protobuf:"bytes,5,rep,name=endpoints" json:"endpoints,omitempty"`
 	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
-	// Seeded once with the target, like the grants of an enroll token. Edits
-	// in the web app win from then on.
-	Grants        []*JoinTokenGrant `protobuf:"bytes,7,rep,name=grants" json:"grants,omitempty"`
+	Grants        []*JoinTokenGrant      `protobuf:"bytes,7,rep,name=grants" json:"grants,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -598,9 +594,8 @@ type UpdateTargetRequest struct {
 	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 	HostPublicKey *string                `protobuf:"bytes,5,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
-	// Endpoints and tags are replaced as sent. Leaving one out clears it.
-	Endpoints     []string `protobuf:"bytes,6,rep,name=endpoints" json:"endpoints,omitempty"`
-	Tags          []string `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
+	Endpoints     []string               `protobuf:"bytes,6,rep,name=endpoints" json:"endpoints,omitempty"`
+	Tags          []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1278,17 +1273,12 @@ func (x *GetTargetFiltersResponse) GetAccounts() []string {
 	return nil
 }
 
-// AccessGraphFilter narrows the graph to the grants that match every set
-// field. Unset fields match everything.
 type AccessGraphFilter struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// A user, team or service account. A user also matches the grants their
-	// teams hold.
-	SubjectId *string `protobuf:"bytes,1,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
-	TargetId  *string `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
-	Username  *string `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
-	// Set but empty means untagged targets.
-	Tag           *string `protobuf:"bytes,4,opt,name=tag" json:"tag,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubjectId     *string                `protobuf:"bytes,1,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
+	TargetId      *string                `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
+	Username      *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
+	Tag           *string                `protobuf:"bytes,4,opt,name=tag" json:"tag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1395,17 +1385,14 @@ func (x *GetAccessGraphRequest) GetFilter() *AccessGraphFilter {
 	return nil
 }
 
-// Every count is a number of distinct targets with a matching grant.
 type GetAccessGraphResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The subjects holding a matching grant, plus the filter's own subject.
-	Subjects []*AccessGraphSubject `protobuf:"bytes,1,rep,name=subjects" json:"subjects,omitempty"`
-	Accounts []*AccessGraphAccount `protobuf:"bytes,2,rep,name=accounts" json:"accounts,omitempty"`
-	// Every tag in the workspace, matched or not.
-	Tags          []*AccessGraphTag   `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty"`
-	Grants        []*AccessGraphGrant `protobuf:"bytes,4,rep,name=grants" json:"grants,omitempty"`
-	Reach         []*AccessGraphReach `protobuf:"bytes,5,rep,name=reach" json:"reach,omitempty"`
-	Targets       *int32              `protobuf:"varint,6,opt,name=targets" json:"targets,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subjects      []*AccessGraphSubject  `protobuf:"bytes,1,rep,name=subjects" json:"subjects,omitempty"`
+	Accounts      []*AccessGraphAccount  `protobuf:"bytes,2,rep,name=accounts" json:"accounts,omitempty"`
+	Tags          []*AccessGraphTag      `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty"`
+	Grants        []*AccessGraphGrant    `protobuf:"bytes,4,rep,name=grants" json:"grants,omitempty"`
+	Reach         []*AccessGraphReach    `protobuf:"bytes,5,rep,name=reach" json:"reach,omitempty"`
+	Targets       *int32                 `protobuf:"varint,6,opt,name=targets" json:"targets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1483,14 +1470,13 @@ func (x *GetAccessGraphResponse) GetTargets() int32 {
 }
 
 type AccessGraphSubject struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Kind        *SubjectKind           `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
-	Name        *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	Email       *string                `protobuf:"bytes,4,opt,name=email" json:"email,omitempty"`                                 // users only
-	MemberCount *int32                 `protobuf:"varint,5,opt,name=member_count,json=memberCount" json:"member_count,omitempty"` // teams only
-	// Targets this subject holds a grant on itself, team grants not included.
-	Targets       *int32 `protobuf:"varint,6,opt,name=targets" json:"targets,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Kind          *SubjectKind           `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
+	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	Email         *string                `protobuf:"bytes,4,opt,name=email" json:"email,omitempty"`                                 // users only
+	MemberCount   *int32                 `protobuf:"varint,5,opt,name=member_count,json=memberCount" json:"member_count,omitempty"` // teams only
+	Targets       *int32                 `protobuf:"varint,6,opt,name=targets" json:"targets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1619,7 +1605,6 @@ func (x *AccessGraphAccount) GetTargets() int32 {
 	return 0
 }
 
-// A target with several tags counts under each of them.
 type AccessGraphTag struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Tag           *string                `protobuf:"bytes,1,opt,name=tag" json:"tag,omitempty"` // empty is the untagged bucket
@@ -1803,12 +1788,11 @@ func (x *AccessGraphReach) GetTargets() int32 {
 }
 
 type ListAccessGraphTargetsRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Filter *AccessGraphFilter     `protobuf:"bytes,1,opt,name=filter" json:"filter,omitempty"`
-	// Empty lists the untagged targets.
-	Tag           *string `protobuf:"bytes,2,opt,name=tag" json:"tag,omitempty"`
-	Limit         *int32  `protobuf:"varint,3,opt,name=limit" json:"limit,omitempty"`
-	Offset        *int32  `protobuf:"varint,4,opt,name=offset" json:"offset,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Filter        *AccessGraphFilter     `protobuf:"bytes,1,opt,name=filter" json:"filter,omitempty"`
+	Tag           *string                `protobuf:"bytes,2,opt,name=tag" json:"tag,omitempty"`
+	Limit         *int32                 `protobuf:"varint,3,opt,name=limit" json:"limit,omitempty"`
+	Offset        *int32                 `protobuf:"varint,4,opt,name=offset" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1925,11 +1909,10 @@ func (x *ListAccessGraphTargetsResponse) GetTotal() int32 {
 }
 
 type AccessGraphTarget struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name  *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	// Whether a grant matching the filter exists on it.
-	Matched       *bool `protobuf:"varint,3,opt,name=matched" json:"matched,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Matched       *bool                  `protobuf:"varint,3,opt,name=matched" json:"matched,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

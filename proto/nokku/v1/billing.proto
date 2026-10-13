@@ -24,7 +24,6 @@ service BillingService {
     option (access) = {self: true};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  // Self-hosted only. Takes effect at once, no restart.
   rpc ActivateLicense(ActivateLicenseRequest) returns (ActivateLicenseResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
@@ -77,7 +76,6 @@ message GetLicenseResponse {
   google.protobuf.Timestamp expires_at = 3;
 }
 
-// The license covers the whole instance.
 message ActivateLicenseRequest {
   string key = 1 [(buf.validate.field).string = {
     min_len: 1

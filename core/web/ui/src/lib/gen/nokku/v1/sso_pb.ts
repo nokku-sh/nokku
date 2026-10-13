@@ -51,8 +51,6 @@ export type SSOProvider = Message<"nokku.v1.SSOProvider"> & {
   scopes: string[];
 
   /**
-   * Create an account on first sign-in.
-   *
    * @generated from field: bool jit_provisioning = 7;
    */
   jitProvisioning: boolean;
@@ -207,9 +205,6 @@ export const DeleteSSOProviderResponseSchema: GenMessage<DeleteSSOProviderRespon
   messageDesc(file_nokku_v1_sso, 6);
 
 /**
- * A provider signs people into this workspace and may create accounts, so
- * only the owner changes one.
- *
  * @generated from service nokku.v1.SSOService
  */
 export const SSOService: GenService<{
@@ -222,8 +217,6 @@ export const SSOService: GenService<{
     output: typeof ListSSOProvidersResponseSchema;
   },
   /**
-   * Creates or replaces the provider with that id.
-   *
    * @generated from rpc nokku.v1.SSOService.PutSSOProvider
    */
   putSSOProvider: {
@@ -232,8 +225,6 @@ export const SSOService: GenService<{
     output: typeof PutSSOProviderResponseSchema;
   },
   /**
-   * Also unlinks every identity the provider vouched for.
-   *
    * @generated from rpc nokku.v1.SSOService.DeleteSSOProvider
    */
   deleteSSOProvider: {

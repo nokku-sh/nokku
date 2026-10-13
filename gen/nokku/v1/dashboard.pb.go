@@ -59,33 +59,24 @@ func (*GetDashboardRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetDashboardResponse struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	Targets *int32                 `protobuf:"varint,1,opt,name=targets" json:"targets,omitempty"`
-	// Targets behind a daemon that is connected right now.
-	TargetsOnline *int32 `protobuf:"varint,2,opt,name=targets_online,json=targetsOnline" json:"targets_online,omitempty"`
-	// Targets without a daemon, kept in sync with nk sync.
-	TargetsManual *int32 `protobuf:"varint,3,opt,name=targets_manual,json=targetsManual" json:"targets_manual,omitempty"`
-	Daemons       *int32 `protobuf:"varint,4,opt,name=daemons" json:"daemons,omitempty"`
-	DaemonsOnline *int32 `protobuf:"varint,5,opt,name=daemons_online,json=daemonsOnline" json:"daemons_online,omitempty"`
-	// Waiting for approval, newest first, at most 5.
-	PendingDaemons []*Daemon `protobuf:"bytes,6,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
-	// Accepted but not connected, at most 5.
-	OfflineDaemons []*Daemon `protobuf:"bytes,7,rep,name=offline_daemons,json=offlineDaemons" json:"offline_daemons,omitempty"`
-	Users          *int32    `protobuf:"varint,8,opt,name=users" json:"users,omitempty"`
-	// Active CAs that expire first, at most 3.
-	SoonestCas     []*CertificateAuthority `protobuf:"bytes,9,rep,name=soonest_cas,json=soonestCas" json:"soonest_cas,omitempty"`
-	RecordingBytes *int64                  `protobuf:"varint,10,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
-	// -1 is unlimited.
-	RecordingQuotaBytes *int64         `protobuf:"varint,11,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
-	LiveSessions        []*LiveSession `protobuf:"bytes,12,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
-	// Audit events per hour for the last 24 hours, oldest first.
-	Activity []int32 `protobuf:"varint,13,rep,packed,name=activity" json:"activity,omitempty"`
-	// Failed calls per hour, same buckets as activity.
-	Failures []int32 `protobuf:"varint,14,rep,packed,name=failures" json:"failures,omitempty"`
-	// Notable successful changes in the last 24 hours, newest first.
-	RecentChanges []*EventLog `protobuf:"bytes,15,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState  `protogen:"open.v1"`
+	Targets             *int32                  `protobuf:"varint,1,opt,name=targets" json:"targets,omitempty"`
+	TargetsOnline       *int32                  `protobuf:"varint,2,opt,name=targets_online,json=targetsOnline" json:"targets_online,omitempty"`
+	TargetsManual       *int32                  `protobuf:"varint,3,opt,name=targets_manual,json=targetsManual" json:"targets_manual,omitempty"`
+	Daemons             *int32                  `protobuf:"varint,4,opt,name=daemons" json:"daemons,omitempty"`
+	DaemonsOnline       *int32                  `protobuf:"varint,5,opt,name=daemons_online,json=daemonsOnline" json:"daemons_online,omitempty"`
+	PendingDaemons      []*Daemon               `protobuf:"bytes,6,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
+	OfflineDaemons      []*Daemon               `protobuf:"bytes,7,rep,name=offline_daemons,json=offlineDaemons" json:"offline_daemons,omitempty"`
+	Users               *int32                  `protobuf:"varint,8,opt,name=users" json:"users,omitempty"`
+	SoonestCas          []*CertificateAuthority `protobuf:"bytes,9,rep,name=soonest_cas,json=soonestCas" json:"soonest_cas,omitempty"`
+	RecordingBytes      *int64                  `protobuf:"varint,10,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
+	RecordingQuotaBytes *int64                  `protobuf:"varint,11,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
+	LiveSessions        []*LiveSession          `protobuf:"bytes,12,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
+	Activity            []int32                 `protobuf:"varint,13,rep,packed,name=activity" json:"activity,omitempty"`
+	Failures            []int32                 `protobuf:"varint,14,rep,packed,name=failures" json:"failures,omitempty"`
+	RecentChanges       []*EventLog             `protobuf:"bytes,15,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *GetDashboardResponse) Reset() {
@@ -223,17 +214,13 @@ func (x *GetDashboardResponse) GetRecentChanges() []*EventLog {
 	return nil
 }
 
-// A shell open right now, from the browser terminal or a recorded SSH login.
 type LiveSession struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Id         *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	DaemonId   *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	DaemonName *string                `protobuf:"bytes,3,opt,name=daemon_name,json=daemonName" json:"daemon_name,omitempty"`
-	// The login account on the server.
-	Username *string `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
-	// Set for browser terminals.
-	UserId *string `protobuf:"bytes,5,opt,name=user_id,json=userId" json:"user_id,omitempty"`
-	// Set for recorded sessions.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	DaemonName    *string                `protobuf:"bytes,3,opt,name=daemon_name,json=daemonName" json:"daemon_name,omitempty"`
+	Username      *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
+	UserId        *string                `protobuf:"bytes,5,opt,name=user_id,json=userId" json:"user_id,omitempty"`
 	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
 	Recording     *bool                  `protobuf:"varint,7,opt,name=recording" json:"recording,omitempty"`
 	Web           *bool                  `protobuf:"varint,8,opt,name=web" json:"web,omitempty"`

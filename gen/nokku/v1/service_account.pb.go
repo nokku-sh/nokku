@@ -24,13 +24,12 @@ const (
 )
 
 type ServiceAccount struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Role        *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	Tags        []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
-	// The last time any of its tokens was used.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
 	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
@@ -125,10 +124,9 @@ func (x *ServiceAccount) GetUpdatedAt() *timestamppb.Timestamp {
 }
 
 type ServiceAccountToken struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Label *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
-	// Unset never expires.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Label         *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
 	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
@@ -290,13 +288,11 @@ func (x *GetServiceAccountResponse) GetServiceAccount() *ServiceAccount {
 }
 
 type CreateServiceAccountRequest struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Name        *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Description *string                `protobuf:"bytes,2,opt,name=description" json:"description,omitempty"`
-	// Unset is the member. A service account never manages people, so the
-	// editor is the most it can be.
-	Role          *WorkspaceRole `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	Tags          []string       `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,2,opt,name=description" json:"description,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -404,14 +400,12 @@ func (x *CreateServiceAccountResponse) GetServiceAccount() *ServiceAccount {
 }
 
 type UpdateServiceAccountRequest struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	// Unset keeps the role.
-	Role *WorkspaceRole `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	// Tags are replaced as sent. Leaving them out clears them.
-	Tags          []string `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -737,10 +731,9 @@ type CreateServiceAccountTokenRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	ServiceAccountId *string                `protobuf:"bytes,1,opt,name=service_account_id,json=serviceAccountId" json:"service_account_id,omitempty"`
 	Label            *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
-	// Unset never expires.
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ExpiresAt        *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CreateServiceAccountTokenRequest) Reset() {

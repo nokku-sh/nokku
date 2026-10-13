@@ -58,18 +58,12 @@ const (
 
 // CertificateServiceClient is a client for the nokku.v1.CertificateService service.
 type CertificateServiceClient interface {
-	// Members read CAs because nk needs the CA of a server it has not synced yet.
 	GetCertificateAuthority(context.Context, *v1.GetCertificateAuthorityRequest) (*v1.GetCertificateAuthorityResponse, error)
 	CreateCertificateAuthority(context.Context, *v1.CreateCertificateAuthorityRequest) (*v1.CreateCertificateAuthorityResponse, error)
 	UpdateCertificateAuthority(context.Context, *v1.UpdateCertificateAuthorityRequest) (*v1.UpdateCertificateAuthorityResponse, error)
-	// Members read CAs because nk needs the CA of a server it has not synced yet.
 	ListCertificateAuthorities(context.Context, *v1.ListCertificateAuthoritiesRequest) (*v1.ListCertificateAuthoritiesResponse, error)
 	DeleteCertificateAuthority(context.Context, *v1.DeleteCertificateAuthorityRequest) (*v1.DeleteCertificateAuthorityResponse, error)
 	RolloverCertificateAuthority(context.Context, *v1.RolloverCertificateAuthorityRequest) (*v1.RolloverCertificateAuthorityResponse, error)
-	// Signs a user certificate for the caller, for one server. It names the
-	// accounts the caller is granted there at that moment, so it works nowhere
-	// else and a revoked grant ends with it. Daemons get host certificates from
-	// DaemonControlService.
 	SignSSHCertificate(context.Context, *v1.SignSSHCertificateRequest) (*v1.SignSSHCertificateResponse, error)
 }
 
@@ -207,18 +201,12 @@ func (c *certificateServiceClient) SignSSHCertificate(ctx context.Context, req *
 
 // CertificateServiceHandler is an implementation of the nokku.v1.CertificateService service.
 type CertificateServiceHandler interface {
-	// Members read CAs because nk needs the CA of a server it has not synced yet.
 	GetCertificateAuthority(context.Context, *v1.GetCertificateAuthorityRequest) (*v1.GetCertificateAuthorityResponse, error)
 	CreateCertificateAuthority(context.Context, *v1.CreateCertificateAuthorityRequest) (*v1.CreateCertificateAuthorityResponse, error)
 	UpdateCertificateAuthority(context.Context, *v1.UpdateCertificateAuthorityRequest) (*v1.UpdateCertificateAuthorityResponse, error)
-	// Members read CAs because nk needs the CA of a server it has not synced yet.
 	ListCertificateAuthorities(context.Context, *v1.ListCertificateAuthoritiesRequest) (*v1.ListCertificateAuthoritiesResponse, error)
 	DeleteCertificateAuthority(context.Context, *v1.DeleteCertificateAuthorityRequest) (*v1.DeleteCertificateAuthorityResponse, error)
 	RolloverCertificateAuthority(context.Context, *v1.RolloverCertificateAuthorityRequest) (*v1.RolloverCertificateAuthorityResponse, error)
-	// Signs a user certificate for the caller, for one server. It names the
-	// accounts the caller is granted there at that moment, so it works nowhere
-	// else and a revoked grant ends with it. Daemons get host certificates from
-	// DaemonControlService.
 	SignSSHCertificate(context.Context, *v1.SignSSHCertificateRequest) (*v1.SignSSHCertificateResponse, error)
 }
 

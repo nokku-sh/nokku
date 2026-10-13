@@ -271,8 +271,6 @@ export const GetLicenseResponseSchema: GenMessage<GetLicenseResponse> = /*@__PUR
   messageDesc(file_nokku_v1_billing, 11);
 
 /**
- * The license covers the whole instance.
- *
  * @generated from message nokku.v1.ActivateLicenseRequest
  */
 export type ActivateLicenseRequest = Message<"nokku.v1.ActivateLicenseRequest"> & {
@@ -347,8 +345,6 @@ export const BillingService: GenService<{
     output: typeof GetLicenseResponseSchema;
   },
   /**
-   * Self-hosted only. Takes effect at once, no restart.
-   *
    * @generated from rpc nokku.v1.BillingService.ActivateLicense
    */
   activateLicense: {

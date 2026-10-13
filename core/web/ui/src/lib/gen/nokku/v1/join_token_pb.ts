@@ -77,9 +77,6 @@ export type JoinToken = Message<"nokku.v1.JoinToken"> & {
   lastUsedAt?: Timestamp | undefined;
 
   /**
-   * Enroll tokens only. Copied onto the target once, when the daemon is
-   * created. Edits in the web app win from then on.
-   *
    * @generated from field: repeated string tags = 12;
    */
   tags: string[];
@@ -90,10 +87,6 @@ export type JoinToken = Message<"nokku.v1.JoinToken"> & {
   grants: JoinTokenGrant[];
 
   /**
-   * An ephemeral daemon is deleted retire_after after it was last seen, and
-   * deletes itself when stopped. A new one of the same name and token
-   * replaces one that is offline.
-   *
    * @generated from field: bool ephemeral = 14;
    */
   ephemeral: boolean;
@@ -112,8 +105,6 @@ export const JoinTokenSchema: GenMessage<JoinToken> = /*@__PURE__*/
   messageDesc(file_nokku_v1_join_token, 0);
 
 /**
- * Who may log in as one Linux account on every target the token enrolls.
- *
  * @generated from message nokku.v1.JoinTokenGrant
  */
 export type JoinTokenGrant = Message<"nokku.v1.JoinTokenGrant"> & {
@@ -180,15 +171,11 @@ export type CreateJoinTokenRequest = Message<"nokku.v1.CreateJoinTokenRequest"> 
   caId: string;
 
   /**
-   * Invite tokens only. Unset is the member.
-   *
    * @generated from field: nokku.v1.WorkspaceRole role = 7;
    */
   role: WorkspaceRole;
 
   /**
-   * Enroll tokens only.
-   *
    * @generated from field: repeated string tags = 8;
    */
   tags: string[];
@@ -204,8 +191,6 @@ export type CreateJoinTokenRequest = Message<"nokku.v1.CreateJoinTokenRequest"> 
   ephemeral: boolean;
 
   /**
-   * Requires ephemeral. Unset is 15 minutes.
-   *
    * @generated from field: google.protobuf.Duration retire_after = 11;
    */
   retireAfter?: Duration | undefined;
@@ -331,9 +316,6 @@ export const JoinTokenKindSchema: GenEnum<JoinTokenKind> = /*@__PURE__*/
   enumDesc(file_nokku_v1_join_token, 0);
 
 /**
- * Join tokens bring things in: an enroll token a daemon, an invite token a
- * person. They are redeemed and counted, they never authenticate a call.
- *
  * @generated from service nokku.v1.JoinTokenService
  */
 export const JoinTokenService: GenService<{

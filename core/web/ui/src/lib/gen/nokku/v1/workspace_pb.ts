@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/workspace.proto.
  */
 export const file_nokku_v1_workspace: GenFile = /*@__PURE__*/
-  fileDesc("Chhub2trdS92MS93b3Jrc3BhY2UucHJvdG8SCG5va2t1LnYxItcBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEc2x1ZxgCIAEoCRIMCgRuYW1lGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEi0KCHNldHRpbmdzGAUgASgLMhsubm9ra3UudjEuV29ya3NwYWNlU2V0dGluZ3MSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiXwoRV29ya3NwYWNlU2V0dGluZ3MSNQoVZGVmYXVsdF9kYWVtb25fY29uZmlnGAEgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEhMKC2VuZm9yY2Vfc3NvGAQgASgIIhUKE0dldFdvcmtzcGFjZVJlcXVlc3QiPgoUR2V0V29ya3NwYWNlUmVzcG9uc2USJgoJd29ya3NwYWNlGAEgASgLMhMubm9ra3UudjEuV29ya3NwYWNlIoABChZVcGRhdGVXb3Jrc3BhY2VSZXF1ZXN0EhgKBG5hbWUYASABKAlCCrpIB3IFEAMYgAISHQoLZGVzY3JpcHRpb24YAiABKAlCCLpIBXIDGOgHEi0KCHNldHRpbmdzGAMgASgLMhsubm9ra3UudjEuV29ya3NwYWNlU2V0dGluZ3MiQQoXVXBkYXRlV29ya3NwYWNlUmVzcG9uc2USJgoJd29ya3NwYWNlGAEgASgLMhMubm9ra3UudjEuV29ya3NwYWNlIhgKFkRlbGV0ZVdvcmtzcGFjZVJlcXVlc3QiGQoXRGVsZXRlV29ya3NwYWNlUmVzcG9uc2UirQEKFkNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QSPQoEc2x1ZxgBIAEoCUIvukgscioQARg/MiReW2EtejAtOV0oW2EtejAtOS1dezAsNjF9W2EtejAtOV0pPyQSGAoEbmFtZRgCIAEoCUIKukgHcgUQAxiAAhIcCgtvd25lcl9lbWFpbBgDIAEoCUIHukgEcgJgARIcCgpvd25lcl9uYW1lGAQgASgJQgi6SAVyAxiAAiImChdDcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRILCgN1cmwYASABKAkiGQoXU3Vic2NyaWJlQ2hhbmdlc1JlcXVlc3QiQAoYU3Vic2NyaWJlQ2hhbmdlc1Jlc3BvbnNlEhAKCHNlcnZpY2VzGAEgAygJEhIKCmV2ZXJ5dGhpbmcYAiABKAgihQEKEExpc3RVc2Vyc1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSLwoEcm9sZRgEIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGVCCLpIBYIBAhABIkEKEUxpc3RVc2Vyc1Jlc3BvbnNlEh0KBXVzZXJzGAEgAygLMg4ubm9ra3UudjEuVXNlchINCgV0b3RhbBgCIAEoBSIrCg5HZXRVc2VyUmVxdWVzdBIZCgd1c2VyX2lkGAEgASgJQgi6SAVyA7ABASIvCg9HZXRVc2VyUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm5va2t1LnYxLlVzZXIiaQoVVXBkYXRlVXNlclJvbGVSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBEjUKBHJvbGUYAiABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQg66SAuCAQgYARgCGAMYBCIYChZVcGRhdGVVc2VyUm9sZVJlc3BvbnNlIkEKFFNldFVzZXJBY3RpdmVSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBEg4KBmFjdGl2ZRgCIAEoCCIXChVTZXRVc2VyQWN0aXZlUmVzcG9uc2UiLgoRRGVsZXRlVXNlclJlcXVlc3QSGQoHdXNlcl9pZBgBIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVXNlclJlc3BvbnNlIjoKGFRyYW5zZmVyT3duZXJzaGlwUmVxdWVzdBIeCgxuZXdfb3duZXJfaWQYASABKAlCCLpIBXIDsAEBIhsKGVRyYW5zZmVyT3duZXJzaGlwUmVzcG9uc2Uy+wcKEFdvcmtzcGFjZVNlcnZpY2USWAoMR2V0V29ya3NwYWNlEh0ubm9ra3UudjEuR2V0V29ya3NwYWNlUmVxdWVzdBoeLm5va2t1LnYxLkdldFdvcmtzcGFjZVJlc3BvbnNlIgmQAgHC8xgCEAESXgoPVXBkYXRlV29ya3NwYWNlEiAubm9ra3UudjEuVXBkYXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLlVwZGF0ZVdvcmtzcGFjZVJlc3BvbnNlIgbC8xgCGAUSXgoPRGVsZXRlV29ya3NwYWNlEiAubm9ra3UudjEuRGVsZXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZVdvcmtzcGFjZVJlc3BvbnNlIgbC8xgCGAUSTwoJTGlzdFVzZXJzEhoubm9ra3UudjEuTGlzdFVzZXJzUmVxdWVzdBobLm5va2t1LnYxLkxpc3RVc2Vyc1Jlc3BvbnNlIgmQAgHC8xgCGAISSQoHR2V0VXNlchIYLm5va2t1LnYxLkdldFVzZXJSZXF1ZXN0Ghkubm9ra3UudjEuR2V0VXNlclJlc3BvbnNlIgmQAgHC8xgCGAISWwoOVXBkYXRlVXNlclJvbGUSHy5ub2trdS52MS5VcGRhdGVVc2VyUm9sZVJlcXVlc3QaIC5ub2trdS52MS5VcGRhdGVVc2VyUm9sZVJlc3BvbnNlIgbC8xgCGAQSWAoNU2V0VXNlckFjdGl2ZRIeLm5va2t1LnYxLlNldFVzZXJBY3RpdmVSZXF1ZXN0Gh8ubm9ra3UudjEuU2V0VXNlckFjdGl2ZVJlc3BvbnNlIgbC8xgCGAQSTwoKRGVsZXRlVXNlchIbLm5va2t1LnYxLkRlbGV0ZVVzZXJSZXF1ZXN0Ghwubm9ra3UudjEuRGVsZXRlVXNlclJlc3BvbnNlIgbC8xgCGAQSZAoRVHJhbnNmZXJPd25lcnNoaXASIi5ub2trdS52MS5UcmFuc2Zlck93bmVyc2hpcFJlcXVlc3QaIy5ub2trdS52MS5UcmFuc2Zlck93bmVyc2hpcFJlc3BvbnNlIgbC8xgCGAUSXgoPQ3JlYXRlV29ya3NwYWNlEiAubm9ra3UudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLkNyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlIgbC8xgCCAESYwoQU3Vic2NyaWJlQ2hhbmdlcxIhLm5va2t1LnYxLlN1YnNjcmliZUNoYW5nZXNSZXF1ZXN0GiIubm9ra3UudjEuU3Vic2NyaWJlQ2hhbmdlc1Jlc3BvbnNlIgbC8xgCEAEwAWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_daemon]);
+  fileDesc("Chhub2trdS92MS93b3Jrc3BhY2UucHJvdG8SCG5va2t1LnYxItcBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEc2x1ZxgCIAEoCRIMCgRuYW1lGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEi0KCHNldHRpbmdzGAUgASgLMhsubm9ra3UudjEuV29ya3NwYWNlU2V0dGluZ3MSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiXwoRV29ya3NwYWNlU2V0dGluZ3MSNQoVZGVmYXVsdF9kYWVtb25fY29uZmlnGAEgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEhMKC2VuZm9yY2Vfc3NvGAIgASgIIhUKE0dldFdvcmtzcGFjZVJlcXVlc3QiPgoUR2V0V29ya3NwYWNlUmVzcG9uc2USJgoJd29ya3NwYWNlGAEgASgLMhMubm9ra3UudjEuV29ya3NwYWNlIoABChZVcGRhdGVXb3Jrc3BhY2VSZXF1ZXN0EhgKBG5hbWUYASABKAlCCrpIB3IFEAMYgAISHQoLZGVzY3JpcHRpb24YAiABKAlCCLpIBXIDGOgHEi0KCHNldHRpbmdzGAMgASgLMhsubm9ra3UudjEuV29ya3NwYWNlU2V0dGluZ3MiQQoXVXBkYXRlV29ya3NwYWNlUmVzcG9uc2USJgoJd29ya3NwYWNlGAEgASgLMhMubm9ra3UudjEuV29ya3NwYWNlIhgKFkRlbGV0ZVdvcmtzcGFjZVJlcXVlc3QiGQoXRGVsZXRlV29ya3NwYWNlUmVzcG9uc2UirQEKFkNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QSPQoEc2x1ZxgBIAEoCUIvukgscioQARg/MiReW2EtejAtOV0oW2EtejAtOS1dezAsNjF9W2EtejAtOV0pPyQSGAoEbmFtZRgCIAEoCUIKukgHcgUQAxiAAhIcCgtvd25lcl9lbWFpbBgDIAEoCUIHukgEcgJgARIcCgpvd25lcl9uYW1lGAQgASgJQgi6SAVyAxiAAiImChdDcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRILCgN1cmwYASABKAkiGQoXU3Vic2NyaWJlQ2hhbmdlc1JlcXVlc3QiQAoYU3Vic2NyaWJlQ2hhbmdlc1Jlc3BvbnNlEhAKCHNlcnZpY2VzGAEgAygJEhIKCmV2ZXJ5dGhpbmcYAiABKAgihQEKEExpc3RVc2Vyc1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSLwoEcm9sZRgEIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGVCCLpIBYIBAhABIkEKEUxpc3RVc2Vyc1Jlc3BvbnNlEh0KBXVzZXJzGAEgAygLMg4ubm9ra3UudjEuVXNlchINCgV0b3RhbBgCIAEoBSIrCg5HZXRVc2VyUmVxdWVzdBIZCgd1c2VyX2lkGAEgASgJQgi6SAVyA7ABASIvCg9HZXRVc2VyUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm5va2t1LnYxLlVzZXIiaQoVVXBkYXRlVXNlclJvbGVSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBEjUKBHJvbGUYAiABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQg66SAuCAQgYARgCGAMYBCIYChZVcGRhdGVVc2VyUm9sZVJlc3BvbnNlIkEKFFNldFVzZXJBY3RpdmVSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBEg4KBmFjdGl2ZRgCIAEoCCIXChVTZXRVc2VyQWN0aXZlUmVzcG9uc2UiLgoRRGVsZXRlVXNlclJlcXVlc3QSGQoHdXNlcl9pZBgBIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVXNlclJlc3BvbnNlIjoKGFRyYW5zZmVyT3duZXJzaGlwUmVxdWVzdBIeCgxuZXdfb3duZXJfaWQYASABKAlCCLpIBXIDsAEBIhsKGVRyYW5zZmVyT3duZXJzaGlwUmVzcG9uc2Uy+wcKEFdvcmtzcGFjZVNlcnZpY2USWAoMR2V0V29ya3NwYWNlEh0ubm9ra3UudjEuR2V0V29ya3NwYWNlUmVxdWVzdBoeLm5va2t1LnYxLkdldFdvcmtzcGFjZVJlc3BvbnNlIgmQAgHC8xgCEAESXgoPVXBkYXRlV29ya3NwYWNlEiAubm9ra3UudjEuVXBkYXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLlVwZGF0ZVdvcmtzcGFjZVJlc3BvbnNlIgbC8xgCGAUSXgoPRGVsZXRlV29ya3NwYWNlEiAubm9ra3UudjEuRGVsZXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZVdvcmtzcGFjZVJlc3BvbnNlIgbC8xgCGAUSTwoJTGlzdFVzZXJzEhoubm9ra3UudjEuTGlzdFVzZXJzUmVxdWVzdBobLm5va2t1LnYxLkxpc3RVc2Vyc1Jlc3BvbnNlIgmQAgHC8xgCGAISSQoHR2V0VXNlchIYLm5va2t1LnYxLkdldFVzZXJSZXF1ZXN0Ghkubm9ra3UudjEuR2V0VXNlclJlc3BvbnNlIgmQAgHC8xgCGAISWwoOVXBkYXRlVXNlclJvbGUSHy5ub2trdS52MS5VcGRhdGVVc2VyUm9sZVJlcXVlc3QaIC5ub2trdS52MS5VcGRhdGVVc2VyUm9sZVJlc3BvbnNlIgbC8xgCGAQSWAoNU2V0VXNlckFjdGl2ZRIeLm5va2t1LnYxLlNldFVzZXJBY3RpdmVSZXF1ZXN0Gh8ubm9ra3UudjEuU2V0VXNlckFjdGl2ZVJlc3BvbnNlIgbC8xgCGAQSTwoKRGVsZXRlVXNlchIbLm5va2t1LnYxLkRlbGV0ZVVzZXJSZXF1ZXN0Ghwubm9ra3UudjEuRGVsZXRlVXNlclJlc3BvbnNlIgbC8xgCGAQSZAoRVHJhbnNmZXJPd25lcnNoaXASIi5ub2trdS52MS5UcmFuc2Zlck93bmVyc2hpcFJlcXVlc3QaIy5ub2trdS52MS5UcmFuc2Zlck93bmVyc2hpcFJlc3BvbnNlIgbC8xgCGAUSXgoPQ3JlYXRlV29ya3NwYWNlEiAubm9ra3UudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLkNyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlIgbC8xgCCAESYwoQU3Vic2NyaWJlQ2hhbmdlcxIhLm5va2t1LnYxLlN1YnNjcmliZUNoYW5nZXNSZXF1ZXN0GiIubm9ra3UudjEuU3Vic2NyaWJlQ2hhbmdlc1Jlc3BvbnNlIgbC8xgCEAEwAWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_daemon]);
 
 /**
  * @generated from message nokku.v1.Workspace
@@ -31,8 +31,6 @@ export type Workspace = Message<"nokku.v1.Workspace"> & {
   id: string;
 
   /**
-   * The subdomain on the hosted service.
-   *
    * @generated from field: string slug = 2;
    */
   slug: string;
@@ -80,9 +78,7 @@ export type WorkspaceSettings = Message<"nokku.v1.WorkspaceSettings"> & {
   defaultDaemonConfig?: DaemonConfig | undefined;
 
   /**
-   * Only the workspace's OIDC providers may sign users in.
-   *
-   * @generated from field: bool enforce_sso = 4;
+   * @generated from field: bool enforce_sso = 2;
    */
   enforceSso: boolean;
 };
@@ -231,8 +227,6 @@ export const CreateWorkspaceRequestSchema: GenMessage<CreateWorkspaceRequest> = 
  */
 export type CreateWorkspaceResponse = Message<"nokku.v1.CreateWorkspaceResponse"> & {
   /**
-   * Where the new workspace lives.
-   *
    * @generated from field: string url = 1;
    */
   url: string;
@@ -259,22 +253,15 @@ export const SubscribeChangesRequestSchema: GenMessage<SubscribeChangesRequest> 
   messageDesc(file_nokku_v1_workspace, 10);
 
 /**
- * With neither field set nothing changed. The server sends one of those to
- * open the stream and whenever it has been silent for a while.
- *
  * @generated from message nokku.v1.SubscribeChangesResponse
  */
 export type SubscribeChangesResponse = Message<"nokku.v1.SubscribeChangesResponse"> & {
   /**
-   * Full names of the services to ask again, like nokku.v1.TargetService.
-   *
    * @generated from field: repeated string services = 1;
    */
   services: string[];
 
   /**
-   * Anything may have changed.
-   *
    * @generated from field: bool everything = 2;
    */
   everything: boolean;
@@ -508,9 +495,6 @@ export const TransferOwnershipResponseSchema: GenMessage<TransferOwnershipRespon
   messageDesc(file_nokku_v1_workspace, 23);
 
 /**
- * The workspace is the tenant. Users live inside it, so this service also
- * manages them. A self-hosted server has exactly one workspace.
- *
  * @generated from service nokku.v1.WorkspaceService
  */
 export const WorkspaceService: GenService<{
@@ -531,8 +515,6 @@ export const WorkspaceService: GenService<{
     output: typeof UpdateWorkspaceResponseSchema;
   },
   /**
-   * Refused on a self-hosted server.
-   *
    * @generated from rpc nokku.v1.WorkspaceService.DeleteWorkspace
    */
   deleteWorkspace: {
@@ -557,8 +539,6 @@ export const WorkspaceService: GenService<{
     output: typeof GetUserResponseSchema;
   },
   /**
-   * Never touches the owner, see TransferOwnership.
-   *
    * @generated from rpc nokku.v1.WorkspaceService.UpdateUserRole
    */
   updateUserRole: {
@@ -567,9 +547,6 @@ export const WorkspaceService: GenService<{
     output: typeof UpdateUserRoleResponseSchema;
   },
   /**
-   * A deactivated user keeps their grants and history but cannot sign in or
-   * get certificates.
-   *
    * @generated from rpc nokku.v1.WorkspaceService.SetUserActive
    */
   setUserActive: {
@@ -586,8 +563,6 @@ export const WorkspaceService: GenService<{
     output: typeof DeleteUserResponseSchema;
   },
   /**
-   * The caller becomes an admin.
-   *
    * @generated from rpc nokku.v1.WorkspaceService.TransferOwnership
    */
   transferOwnership: {
@@ -596,9 +571,6 @@ export const WorkspaceService: GenService<{
     output: typeof TransferOwnershipResponseSchema;
   },
   /**
-   * Public signup on the hosted service's root host. Creates the workspace
-   * and its owner and mails the owner a sign-in link. Refused elsewhere.
-   *
    * @generated from rpc nokku.v1.WorkspaceService.CreateWorkspace
    */
   createWorkspace: {
@@ -607,10 +579,6 @@ export const WorkspaceService: GenService<{
     output: typeof CreateWorkspaceResponseSchema;
   },
   /**
-   * Tells a client that keeps a view open when to read again. A message
-   * carries no data, only which services answer differently now. The server
-   * ends the stream after a while, the client opens it again.
-   *
    * @generated from rpc nokku.v1.WorkspaceService.SubscribeChanges
    */
   subscribeChanges: {

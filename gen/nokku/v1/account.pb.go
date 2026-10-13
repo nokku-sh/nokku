@@ -24,20 +24,17 @@ const (
 )
 
 type User struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	Id      *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name    *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Email   *string                `protobuf:"bytes,3,opt,name=email" json:"email,omitempty"`
-	Picture *string                `protobuf:"bytes,4,opt,name=picture" json:"picture,omitempty"`
-	Role    *WorkspaceRole         `protobuf:"varint,5,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	Active  *bool                  `protobuf:"varint,6,opt,name=active" json:"active,omitempty"`
-	// The address an email change is waiting on, empty when none is pending.
-	PendingEmail *string                `protobuf:"bytes,7,opt,name=pending_email,json=pendingEmail" json:"pending_email,omitempty"`
-	CreatedAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt    *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	// An identity provider provisions the account over SCIM and owns its
-	// address.
-	ScimManaged   *bool `protobuf:"varint,10,opt,name=scim_managed,json=scimManaged" json:"scim_managed,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Email         *string                `protobuf:"bytes,3,opt,name=email" json:"email,omitempty"`
+	Picture       *string                `protobuf:"bytes,4,opt,name=picture" json:"picture,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,5,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Active        *bool                  `protobuf:"varint,6,opt,name=active" json:"active,omitempty"`
+	PendingEmail  *string                `protobuf:"bytes,7,opt,name=pending_email,json=pendingEmail" json:"pending_email,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	ScimManaged   *bool                  `protobuf:"varint,10,opt,name=scim_managed,json=scimManaged" json:"scim_managed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -143,9 +140,8 @@ func (x *User) GetScimManaged() bool {
 }
 
 type AccountCredential struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	// passkey, oidc
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Type          *string                `protobuf:"bytes,2,opt,name=type" json:"type,omitempty"`
 	Provider      *string                `protobuf:"bytes,3,opt,name=provider" json:"provider,omitempty"`
 	Subject       *string                `protobuf:"bytes,4,opt,name=subject" json:"subject,omitempty"`
@@ -236,8 +232,7 @@ func (x *AccountCredential) GetLastUsedAt() *timestamppb.Timestamp {
 }
 
 type AccountSession struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The token id, what RemoveSession takes.
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Kind          *string                `protobuf:"bytes,2,opt,name=kind" json:"kind,omitempty"`
 	Method        *string                `protobuf:"bytes,3,opt,name=method" json:"method,omitempty"`

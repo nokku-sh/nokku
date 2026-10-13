@@ -179,9 +179,6 @@ export type Target = Message<"nokku.v1.Target"> & {
   updatedAt?: Timestamp | undefined;
 
   /**
-   * When a host without a daemon last ran nk sync. Unset with a daemon, that
-   * one has last_seen_at.
-   *
    * @generated from field: google.protobuf.Timestamp last_sync_at = 14;
    */
   lastSyncAt?: Timestamp | undefined;
@@ -265,9 +262,6 @@ export type CreateTargetRequest = Message<"nokku.v1.CreateTargetRequest"> & {
   tags: string[];
 
   /**
-   * Seeded once with the target, like the grants of an enroll token. Edits
-   * in the web app win from then on.
-   *
    * @generated from field: repeated nokku.v1.JoinTokenGrant grants = 7;
    */
   grants: JoinTokenGrant[];
@@ -327,8 +321,6 @@ export type UpdateTargetRequest = Message<"nokku.v1.UpdateTargetRequest"> & {
   hostPublicKey: string;
 
   /**
-   * Endpoints and tags are replaced as sent. Leaving one out clears it.
-   *
    * @generated from field: repeated string endpoints = 6;
    */
   endpoints: string[];
@@ -594,16 +586,10 @@ export const GetTargetFiltersResponseSchema: GenMessage<GetTargetFiltersResponse
   messageDesc(file_nokku_v1_target, 20);
 
 /**
- * AccessGraphFilter narrows the graph to the grants that match every set
- * field. Unset fields match everything.
- *
  * @generated from message nokku.v1.AccessGraphFilter
  */
 export type AccessGraphFilter = Message<"nokku.v1.AccessGraphFilter"> & {
   /**
-   * A user, team or service account. A user also matches the grants their
-   * teams hold.
-   *
    * @generated from field: string subject_id = 1;
    */
   subjectId: string;
@@ -619,8 +605,6 @@ export type AccessGraphFilter = Message<"nokku.v1.AccessGraphFilter"> & {
   username: string;
 
   /**
-   * Set but empty means untagged targets.
-   *
    * @generated from field: string tag = 4;
    */
   tag: string;
@@ -651,14 +635,10 @@ export const GetAccessGraphRequestSchema: GenMessage<GetAccessGraphRequest> = /*
   messageDesc(file_nokku_v1_target, 22);
 
 /**
- * Every count is a number of distinct targets with a matching grant.
- *
  * @generated from message nokku.v1.GetAccessGraphResponse
  */
 export type GetAccessGraphResponse = Message<"nokku.v1.GetAccessGraphResponse"> & {
   /**
-   * The subjects holding a matching grant, plus the filter's own subject.
-   *
    * @generated from field: repeated nokku.v1.AccessGraphSubject subjects = 1;
    */
   subjects: AccessGraphSubject[];
@@ -669,8 +649,6 @@ export type GetAccessGraphResponse = Message<"nokku.v1.GetAccessGraphResponse"> 
   accounts: AccessGraphAccount[];
 
   /**
-   * Every tag in the workspace, matched or not.
-   *
    * @generated from field: repeated nokku.v1.AccessGraphTag tags = 3;
    */
   tags: AccessGraphTag[];
@@ -732,8 +710,6 @@ export type AccessGraphSubject = Message<"nokku.v1.AccessGraphSubject"> & {
   memberCount: number;
 
   /**
-   * Targets this subject holds a grant on itself, team grants not included.
-   *
    * @generated from field: int32 targets = 6;
    */
   targets: number;
@@ -769,8 +745,6 @@ export const AccessGraphAccountSchema: GenMessage<AccessGraphAccount> = /*@__PUR
   messageDesc(file_nokku_v1_target, 25);
 
 /**
- * A target with several tags counts under each of them.
- *
  * @generated from message nokku.v1.AccessGraphTag
  */
 export type AccessGraphTag = Message<"nokku.v1.AccessGraphTag"> & {
@@ -869,8 +843,6 @@ export type ListAccessGraphTargetsRequest = Message<"nokku.v1.ListAccessGraphTar
   filter?: AccessGraphFilter | undefined;
 
   /**
-   * Empty lists the untagged targets.
-   *
    * @generated from field: string tag = 2;
    */
   tag: string;
@@ -932,8 +904,6 @@ export type AccessGraphTarget = Message<"nokku.v1.AccessGraphTarget"> & {
   name: string;
 
   /**
-   * Whether a grant matching the filter exists on it.
-   *
    * @generated from field: bool matched = 3;
    */
   matched: boolean;
@@ -991,8 +961,6 @@ export const TargetService: GenService<{
     output: typeof DeleteTargetResponseSchema;
   },
   /**
-   * A member may only ask for itself. Viewers ask for anyone and also get the accounts.
-   *
    * @generated from rpc nokku.v1.TargetService.GetSubjectAccess
    */
   getSubjectAccess: {
@@ -1033,9 +1001,6 @@ export const TargetService: GenService<{
     output: typeof SyncTargetUsersResponseSchema;
   },
   /**
-   * GetAccessGraph rolls every grant up to subject, login account and target
-   * tag, so a workspace of any size draws as one overview.
-   *
    * @generated from rpc nokku.v1.TargetService.GetAccessGraph
    */
   getAccessGraph: {
@@ -1044,8 +1009,6 @@ export const TargetService: GenService<{
     output: typeof GetAccessGraphResponseSchema;
   },
   /**
-   * ListAccessGraphTargets is the drill-down into one tag of the graph.
-   *
    * @generated from rpc nokku.v1.TargetService.ListAccessGraphTargets
    */
   listAccessGraphTargets: {

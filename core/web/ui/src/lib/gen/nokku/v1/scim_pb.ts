@@ -70,8 +70,6 @@ export const CreateSCIMTokenRequestSchema: GenMessage<CreateSCIMTokenRequest> = 
  */
 export type CreateSCIMTokenResponse = Message<"nokku.v1.CreateSCIMTokenResponse"> & {
   /**
-   * token is the bearer secret, shown once at creation.
-   *
    * @generated from field: string token = 1;
    */
   token: string;
@@ -155,9 +153,6 @@ export const DeleteSCIMTokenResponseSchema: GenMessage<DeleteSCIMTokenResponse> 
   messageDesc(file_nokku_v1_scim, 6);
 
 /**
- * A token creates accounts and switches them off, so only the owner issues
- * or revokes one.
- *
  * @generated from service nokku.v1.SCIMService
  */
 export const SCIMService: GenService<{

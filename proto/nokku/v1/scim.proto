@@ -6,8 +6,6 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
-// A token creates accounts and switches them off, so only the owner issues
-// or revokes one.
 service SCIMService {
   rpc CreateSCIMToken(CreateSCIMTokenRequest) returns (CreateSCIMTokenResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
@@ -35,7 +33,7 @@ message CreateSCIMTokenRequest {
   }];
 }
 message CreateSCIMTokenResponse {
-  string token = 1; // token is the bearer secret, shown once at creation.
+  string token = 1;
   SCIMToken entry = 2;
   string base_url = 3;
 }

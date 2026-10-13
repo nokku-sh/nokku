@@ -66,11 +66,8 @@ type ServiceAccountServiceClient interface {
 	CreateServiceAccount(context.Context, *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error)
 	UpdateServiceAccount(context.Context, *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error)
 	DeleteServiceAccount(context.Context, *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error)
-	// The secret is shown once, in the response.
 	CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error)
 	ListServiceAccountTokens(context.Context, *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error)
-	// The token stops working with the call. The account and its other tokens
-	// stay.
 	RevokeServiceAccountToken(context.Context, *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error)
 }
 
@@ -230,11 +227,8 @@ type ServiceAccountServiceHandler interface {
 	CreateServiceAccount(context.Context, *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error)
 	UpdateServiceAccount(context.Context, *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error)
 	DeleteServiceAccount(context.Context, *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error)
-	// The secret is shown once, in the response.
 	CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error)
 	ListServiceAccountTokens(context.Context, *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error)
-	// The token stops working with the call. The account and its other tokens
-	// stay.
 	RevokeServiceAccountToken(context.Context, *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error)
 }
 

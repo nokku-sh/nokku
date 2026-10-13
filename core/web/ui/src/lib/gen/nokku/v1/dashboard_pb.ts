@@ -44,15 +44,11 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   targets: number;
 
   /**
-   * Targets behind a daemon that is connected right now.
-   *
    * @generated from field: int32 targets_online = 2;
    */
   targetsOnline: number;
 
   /**
-   * Targets without a daemon, kept in sync with nk sync.
-   *
    * @generated from field: int32 targets_manual = 3;
    */
   targetsManual: number;
@@ -68,15 +64,11 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   daemonsOnline: number;
 
   /**
-   * Waiting for approval, newest first, at most 5.
-   *
    * @generated from field: repeated nokku.v1.Daemon pending_daemons = 6;
    */
   pendingDaemons: Daemon[];
 
   /**
-   * Accepted but not connected, at most 5.
-   *
    * @generated from field: repeated nokku.v1.Daemon offline_daemons = 7;
    */
   offlineDaemons: Daemon[];
@@ -87,8 +79,6 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   users: number;
 
   /**
-   * Active CAs that expire first, at most 3.
-   *
    * @generated from field: repeated nokku.v1.CertificateAuthority soonest_cas = 9;
    */
   soonestCas: CertificateAuthority[];
@@ -99,8 +89,6 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   recordingBytes: bigint;
 
   /**
-   * -1 is unlimited.
-   *
    * @generated from field: int64 recording_quota_bytes = 11;
    */
   recordingQuotaBytes: bigint;
@@ -111,22 +99,16 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   liveSessions: LiveSession[];
 
   /**
-   * Audit events per hour for the last 24 hours, oldest first.
-   *
    * @generated from field: repeated int32 activity = 13;
    */
   activity: number[];
 
   /**
-   * Failed calls per hour, same buckets as activity.
-   *
    * @generated from field: repeated int32 failures = 14;
    */
   failures: number[];
 
   /**
-   * Notable successful changes in the last 24 hours, newest first.
-   *
    * @generated from field: repeated nokku.v1.EventLog recent_changes = 15;
    */
   recentChanges: EventLog[];
@@ -140,8 +122,6 @@ export const GetDashboardResponseSchema: GenMessage<GetDashboardResponse> = /*@_
   messageDesc(file_nokku_v1_dashboard, 1);
 
 /**
- * A shell open right now, from the browser terminal or a recorded SSH login.
- *
  * @generated from message nokku.v1.LiveSession
  */
 export type LiveSession = Message<"nokku.v1.LiveSession"> & {
@@ -161,22 +141,16 @@ export type LiveSession = Message<"nokku.v1.LiveSession"> & {
   daemonName: string;
 
   /**
-   * The login account on the server.
-   *
    * @generated from field: string username = 4;
    */
   username: string;
 
   /**
-   * Set for browser terminals.
-   *
    * @generated from field: string user_id = 5;
    */
   userId: string;
 
   /**
-   * Set for recorded sessions.
-   *
    * @generated from field: google.protobuf.Timestamp started_at = 6;
    */
   startedAt?: Timestamp | undefined;
@@ -204,8 +178,6 @@ export const LiveSessionSchema: GenMessage<LiveSession> = /*@__PURE__*/
  */
 export const DashboardService: GenService<{
   /**
-   * One call for the whole overview, so the status line never mixes stale counts.
-   *
    * @generated from rpc nokku.v1.DashboardService.GetDashboard
    */
   getDashboard: {

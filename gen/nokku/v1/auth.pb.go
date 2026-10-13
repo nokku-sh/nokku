@@ -301,11 +301,9 @@ func (*GetLoginOptionsRequest) Descriptor() ([]byte, []int) {
 type GetLoginOptionsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceName *string                `protobuf:"bytes,1,opt,name=workspace_name,json=workspaceName" json:"workspace_name,omitempty"`
-	// Mail is configured and SSO is not enforced.
-	MagicLink *bool `protobuf:"varint,2,opt,name=magic_link,json=magicLink" json:"magic_link,omitempty"`
-	// SSO is not enforced.
-	Passkey       *bool              `protobuf:"varint,3,opt,name=passkey" json:"passkey,omitempty"`
-	Providers     []*SSOProviderInfo `protobuf:"bytes,4,rep,name=providers" json:"providers,omitempty"`
+	MagicLink     *bool                  `protobuf:"varint,2,opt,name=magic_link,json=magicLink" json:"magic_link,omitempty"`
+	Passkey       *bool                  `protobuf:"varint,3,opt,name=passkey" json:"passkey,omitempty"`
+	Providers     []*SSOProviderInfo     `protobuf:"bytes,4,rep,name=providers" json:"providers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

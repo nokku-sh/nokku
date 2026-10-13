@@ -26,8 +26,6 @@ export type Recording = Message<"nokku.v1.Recording"> & {
   id: string;
 
   /**
-   * Empty once the daemon is deleted, the recording stays.
-   *
    * @generated from field: string daemon_id = 2;
    */
   daemonId: string;
@@ -58,16 +56,11 @@ export type Recording = Message<"nokku.v1.Recording"> & {
   endedAt?: Timestamp | undefined;
 
   /**
-   * The daemon's name when the session ran.
-   *
    * @generated from field: string daemon_name = 8;
    */
   daemonName: string;
 
   /**
-   * Who was logged in: the subject of the certificate principal the host
-   * matched. Empty for a recording from a daemon that did not say.
-   *
    * @generated from field: string subject_id = 9;
    */
   subjectId: string;
@@ -78,9 +71,6 @@ export type Recording = Message<"nokku.v1.Recording"> & {
   principal: string;
 
   /**
-   * The subject's email, or the name of a service account, when the session
-   * ran. It stays when the account is deleted.
-   *
    * @generated from field: string subject_name = 11;
    */
   subjectName: string;
@@ -143,17 +133,11 @@ export type RecordingMeta = Message<"nokku.v1.RecordingMeta"> & {
   username: string;
 
   /**
-   * When the session began, for a recording that is uploaded after it. Unset
-   * or in the future means now.
-   *
    * @generated from field: google.protobuf.Timestamp started_at = 3;
    */
   startedAt?: Timestamp | undefined;
 
   /**
-   * The certificate principal the host matched at login, as the backend built
-   * it. Empty from a daemon that predates the field.
-   *
    * @generated from field: string principal = 4;
    */
   principal: string;

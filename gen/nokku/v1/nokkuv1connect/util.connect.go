@@ -56,14 +56,11 @@ const (
 // UtilServiceClient is a client for the nokku.v1.UtilService service.
 type UtilServiceClient interface {
 	GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error)
-	// Who runs this server, for legal links and support contacts. Public, the
-	// login pages need it too.
 	GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error)
 	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
-	// The caller's own events.
 	ListMyActivity(context.Context, *v1.ListMyActivityRequest) (*v1.ListMyActivityResponse, error)
 }
 
@@ -206,14 +203,11 @@ func (c *utilServiceClient) ListMyActivity(ctx context.Context, req *v1.ListMyAc
 // UtilServiceHandler is an implementation of the nokku.v1.UtilService service.
 type UtilServiceHandler interface {
 	GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error)
-	// Who runs this server, for legal links and support contacts. Public, the
-	// login pages need it too.
 	GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error)
 	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
-	// The caller's own events.
 	ListMyActivity(context.Context, *v1.ListMyActivityRequest) (*v1.ListMyActivityResponse, error)
 }
 

@@ -54,19 +54,11 @@ const (
 
 // AuthServiceClient is a client for the nokku.v1.AuthService service.
 type AuthServiceClient interface {
-	// Mails a sign-in link to a user of this workspace. Always answers OK, so
-	// it never tells whether an address exists.
 	RequestMagicLink(context.Context, *v1.RequestMagicLinkRequest) (*v1.RequestMagicLinkResponse, error)
-	// Spends the token from a sign-in or signup link and signs this browser in.
 	ConsumeMagicLink(context.Context, *v1.ConsumeMagicLinkRequest) (*v1.ConsumeMagicLinkResponse, error)
-	// Public so a stale session can still clear its cookie.
 	Logout(context.Context, *v1.LogoutRequest) (*v1.LogoutResponse, error)
-	// What the login page may offer in this workspace.
 	GetLoginOptions(context.Context, *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error)
-	// Takes the token mailed to the new address and switches the account to it.
 	ConfirmEmailChange(context.Context, *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error)
-	// Takes the token mailed to the old address. Drops a pending change, or
-	// puts the old address back when the change already happened.
 	CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error)
 }
 
@@ -187,19 +179,11 @@ func (c *authServiceClient) CancelEmailChange(ctx context.Context, req *v1.Cance
 
 // AuthServiceHandler is an implementation of the nokku.v1.AuthService service.
 type AuthServiceHandler interface {
-	// Mails a sign-in link to a user of this workspace. Always answers OK, so
-	// it never tells whether an address exists.
 	RequestMagicLink(context.Context, *v1.RequestMagicLinkRequest) (*v1.RequestMagicLinkResponse, error)
-	// Spends the token from a sign-in or signup link and signs this browser in.
 	ConsumeMagicLink(context.Context, *v1.ConsumeMagicLinkRequest) (*v1.ConsumeMagicLinkResponse, error)
-	// Public so a stale session can still clear its cookie.
 	Logout(context.Context, *v1.LogoutRequest) (*v1.LogoutResponse, error)
-	// What the login page may offer in this workspace.
 	GetLoginOptions(context.Context, *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error)
-	// Takes the token mailed to the new address and switches the account to it.
 	ConfirmEmailChange(context.Context, *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error)
-	// Takes the token mailed to the old address. Drops a pending change, or
-	// puts the old address back when the change already happened.
 	CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error)
 }
 

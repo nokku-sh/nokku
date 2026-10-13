@@ -4,24 +4,13 @@ package nokku.v1;
 
 import "google/protobuf/descriptor.proto";
 
-// Access declares who may call an RPC. An RPC without it is denied, so new
-// RPCs fail closed. The workspace is always known, the request's host names
-// it, so every check below runs inside one workspace.
 message Access {
-  // Skips authentication entirely.
   bool public = 1;
-  // Open to any authenticated caller but daemons. The handler scopes to the
-  // caller or checks rights itself.
   bool self = 2;
-  // The least role the caller's user or service account needs.
   WorkspaceRole role = 3;
-  // Daemons may call it. With nothing else set, only daemons may.
   bool daemon = 4;
 }
 
-// WorkspaceRole values are ordered, each includes everything before it. The
-// backend compares and stores the numbers, so a role added in between means
-// renumbering the stored rows too.
 enum WorkspaceRole {
   WORKSPACE_ROLE_UNSPECIFIED = 0;
   WORKSPACE_ROLE_MEMBER = 1;

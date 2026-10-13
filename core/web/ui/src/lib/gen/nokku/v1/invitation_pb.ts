@@ -102,9 +102,6 @@ export const AcceptInvitationResponseSchema: GenMessage<AcceptInvitationResponse
   messageDesc(file_nokku_v1_invitation, 3);
 
 /**
- * An invite link is how a person gets an account in a workspace. Both calls
- * are public, the visitor has no account yet.
- *
  * @generated from service nokku.v1.InvitationService
  */
 export const InvitationService: GenService<{
@@ -117,10 +114,6 @@ export const InvitationService: GenService<{
     output: typeof GetInvitationResponseSchema;
   },
   /**
-   * Mails a signup link to the address. The account only exists once that
-   * link is used. A passkey signup goes through the passkey endpoints with
-   * the same fields instead. Always answers OK.
-   *
    * @generated from rpc nokku.v1.InvitationService.AcceptInvitation
    */
   acceptInvitation: {

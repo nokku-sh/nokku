@@ -79,7 +79,7 @@ type Daemon struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Online        *bool                  `protobuf:"varint,3,opt,name=online" json:"online,omitempty"` // Derived from last_seen_at: seen by a core instance in the last 30 seconds.
+	Online        *bool                  `protobuf:"varint,3,opt,name=online" json:"online,omitempty"`
 	Status        *DaemonStatus          `protobuf:"varint,4,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
 	Config        *DaemonConfig          `protobuf:"bytes,5,opt,name=config" json:"config,omitempty"`
 	Metadata      map[string]string      `protobuf:"bytes,6,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -183,22 +183,15 @@ func (x *Daemon) GetLastSeenAt() *timestamppb.Timestamp {
 	return nil
 }
 
-// What a session on the daemon's host may do, and the one place that says so.
-// Every user certificate permits the same things, a CA opens or closes
-// nothing.
 type DaemonConfig struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	RecordSessions *bool                  `protobuf:"varint,1,opt,name=record_sessions,json=recordSessions" json:"record_sessions,omitempty"`
-	// Port forwarding with -L, -R and -D.
-	AllowForwarding      *bool `protobuf:"varint,2,opt,name=allow_forwarding,json=allowForwarding" json:"allow_forwarding,omitempty"`
-	AllowAgentForwarding *bool `protobuf:"varint,3,opt,name=allow_agent_forwarding,json=allowAgentForwarding" json:"allow_agent_forwarding,omitempty"`
-	// Lets a -R forward listen on more than the loopback address.
-	GatewayPorts *bool `protobuf:"varint,4,opt,name=gateway_ports,json=gatewayPorts" json:"gateway_ports,omitempty"`
-	// Set by the core from the enroll token, never by an admin. An ephemeral
-	// daemon deletes itself from the core when it is stopped.
-	Ephemeral     *bool `protobuf:"varint,5,opt,name=ephemeral" json:"ephemeral,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	RecordSessions       *bool                  `protobuf:"varint,1,opt,name=record_sessions,json=recordSessions" json:"record_sessions,omitempty"`
+	AllowForwarding      *bool                  `protobuf:"varint,2,opt,name=allow_forwarding,json=allowForwarding" json:"allow_forwarding,omitempty"`
+	AllowAgentForwarding *bool                  `protobuf:"varint,3,opt,name=allow_agent_forwarding,json=allowAgentForwarding" json:"allow_agent_forwarding,omitempty"`
+	GatewayPorts         *bool                  `protobuf:"varint,4,opt,name=gateway_ports,json=gatewayPorts" json:"gateway_ports,omitempty"`
+	Ephemeral            *bool                  `protobuf:"varint,5,opt,name=ephemeral" json:"ephemeral,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *DaemonConfig) Reset() {
@@ -947,11 +940,9 @@ func (*CloseSessionResponse) Descriptor() ([]byte, []int) {
 }
 
 type EnrollDaemonRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Token *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
-	// The host's own report, same keys as SyncDaemonRequest.metadata. The
-	// hostname in it may become the daemon's name.
-	Metadata      map[string]string `protobuf:"bytes,2,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
+	Metadata      map[string]string      `protobuf:"bytes,2,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1076,9 +1067,6 @@ func (x *EnrollDaemonResponse) GetAccessToken() string {
 	return ""
 }
 
-// Who may log in as one Linux account. A host lets a certificate in when it
-// carries one of these principals, compared as whole strings. Each one names
-// a subject, this server and this account.
 type AccountPrincipals struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Username       *string                `protobuf:"bytes,1,opt,name=username" json:"username,omitempty"`
@@ -1131,8 +1119,6 @@ func (x *AccountPrincipals) GetCertPrincipals() []string {
 	return nil
 }
 
-// The sizes are bounded here. The backend drops entries that are not valid
-// instead of failing the sync, a host with one odd account must still sync.
 type SyncDaemonRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Users []string               `protobuf:"bytes,1,rep,name=users" json:"users,omitempty"`
@@ -1195,14 +1181,13 @@ func (x *SyncDaemonRequest) GetMetadata() map[string]string {
 }
 
 type SyncDaemonResponse struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	Status       *DaemonStatus          `protobuf:"varint,1,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
-	Config       *DaemonConfig          `protobuf:"bytes,2,opt,name=config" json:"config,omitempty"`
-	Principals   []*AccountPrincipals   `protobuf:"bytes,3,rep,name=principals" json:"principals,omitempty"`
-	StateVersion *int64                 `protobuf:"varint,4,opt,name=state_version,json=stateVersion" json:"state_version,omitempty"`
-	CaPublicKey  *string                `protobuf:"bytes,5,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
-	// Keys the daemon trusts next to ca_public_key, each until its deadline.
-	RetiredCaKeys []*RetiredCAKey `protobuf:"bytes,6,rep,name=retired_ca_keys,json=retiredCaKeys" json:"retired_ca_keys,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        *DaemonStatus          `protobuf:"varint,1,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
+	Config        *DaemonConfig          `protobuf:"bytes,2,opt,name=config" json:"config,omitempty"`
+	Principals    []*AccountPrincipals   `protobuf:"bytes,3,rep,name=principals" json:"principals,omitempty"`
+	StateVersion  *int64                 `protobuf:"varint,4,opt,name=state_version,json=stateVersion" json:"state_version,omitempty"`
+	CaPublicKey   *string                `protobuf:"bytes,5,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
+	RetiredCaKeys []*RetiredCAKey        `protobuf:"bytes,6,rep,name=retired_ca_keys,json=retiredCaKeys" json:"retired_ca_keys,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1683,7 +1668,6 @@ func (x *Heartbeat) GetStateVersion() int64 {
 	return 0
 }
 
-// StateUpdate tells the daemon to re-sync now.
 type StateUpdate struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields

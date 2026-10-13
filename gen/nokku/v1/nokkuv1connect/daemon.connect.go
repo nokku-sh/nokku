@@ -87,10 +87,8 @@ type DaemonServiceClient interface {
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
 	ListSessions(context.Context, *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error)
-	// A web session only opens the transport, sshd still checks the cert against synced grants.
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error)
-	// The handler checks the grant on the daemon named in the first message.
 	Relay(context.Context) (*connect.BidiStreamForClientSimple[v1.RelayRequest, v1.RelayResponse], error)
 }
 
@@ -246,10 +244,8 @@ type DaemonServiceHandler interface {
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
 	ListSessions(context.Context, *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error)
-	// A web session only opens the transport, sshd still checks the cert against synced grants.
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error)
-	// The handler checks the grant on the daemon named in the first message.
 	Relay(context.Context, *connect.BidiStream[v1.RelayRequest, v1.RelayResponse]) error
 }
 
@@ -372,15 +368,12 @@ func (UnimplementedDaemonServiceHandler) Relay(context.Context, *connect.BidiStr
 
 // DaemonControlServiceClient is a client for the nokku.v1.DaemonControlService service.
 type DaemonControlServiceClient interface {
-	// Public, the enroll token and the DPoP proof are the gate.
 	EnrollDaemon(context.Context, *v1.EnrollDaemonRequest) (*v1.EnrollDaemonResponse, error)
 	SyncDaemon(context.Context, *v1.SyncDaemonRequest) (*v1.SyncDaemonResponse, error)
 	Connect(context.Context) (*connect.BidiStreamForClientSimple[v1.ConnectRequest, v1.ConnectResponse], error)
 	DaemonRelay(context.Context) (*connect.BidiStreamForClientSimple[v1.DaemonRelayRequest, v1.DaemonRelayResponse], error)
-	// Signs the daemon's host key for its own target.
 	SignHostCertificate(context.Context, *v1.SignHostCertificateRequest) (*v1.SignHostCertificateResponse, error)
 	UploadRecording(context.Context) (*connect.ClientStreamForClientSimple[v1.UploadRecordingRequest, v1.UploadRecordingResponse], error)
-	// Removes the calling daemon.
 	UnenrollDaemon(context.Context, *v1.UnenrollDaemonRequest) (*v1.UnenrollDaemonResponse, error)
 }
 
@@ -504,15 +497,12 @@ func (c *daemonControlServiceClient) UnenrollDaemon(ctx context.Context, req *v1
 
 // DaemonControlServiceHandler is an implementation of the nokku.v1.DaemonControlService service.
 type DaemonControlServiceHandler interface {
-	// Public, the enroll token and the DPoP proof are the gate.
 	EnrollDaemon(context.Context, *v1.EnrollDaemonRequest) (*v1.EnrollDaemonResponse, error)
 	SyncDaemon(context.Context, *v1.SyncDaemonRequest) (*v1.SyncDaemonResponse, error)
 	Connect(context.Context, *connect.BidiStream[v1.ConnectRequest, v1.ConnectResponse]) error
 	DaemonRelay(context.Context, *connect.BidiStream[v1.DaemonRelayRequest, v1.DaemonRelayResponse]) error
-	// Signs the daemon's host key for its own target.
 	SignHostCertificate(context.Context, *v1.SignHostCertificateRequest) (*v1.SignHostCertificateResponse, error)
 	UploadRecording(context.Context, *connect.ClientStream[v1.UploadRecordingRequest]) (*v1.UploadRecordingResponse, error)
-	// Removes the calling daemon.
 	UnenrollDaemon(context.Context, *v1.UnenrollDaemonRequest) (*v1.UnenrollDaemonResponse, error)
 }
 

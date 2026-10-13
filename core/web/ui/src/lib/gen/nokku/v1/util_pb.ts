@@ -67,9 +67,6 @@ export const GetInstanceInfoRequestSchema: GenMessage<GetInstanceInfoRequest> = 
   messageDesc(file_nokku_v1_util, 2);
 
 /**
- * Empty fields are not configured. Self-hosted servers usually leave the
- * operator fields empty.
- *
  * @generated from message nokku.v1.GetInstanceInfoResponse
  */
 export type GetInstanceInfoResponse = Message<"nokku.v1.GetInstanceInfoResponse"> & {
@@ -104,25 +101,16 @@ export type GetInstanceInfoResponse = Message<"nokku.v1.GetInstanceInfoResponse"
   imprintUrl: string;
 
   /**
-   * self_hosted or saas
-   *
    * @generated from field: string mode = 7;
    */
   mode: string;
 
   /**
-   * Whether this host offers workspace signup, true only on the hosted
-   * service's root host.
-   *
    * @generated from field: bool signup = 8;
    */
   signup: boolean;
 
   /**
-   * Pin of the private CA the server's certificate comes from, in the form
-   * nk --pin and NOKKUD_API_PIN take. Empty when every machine trusts the
-   * certificate already.
-   *
    * @generated from field: string ca_pin = 9;
    */
   caPin: string;
@@ -305,9 +293,6 @@ export const EventLogSchema: GenMessage<EventLog> = /*@__PURE__*/
   messageDesc(file_nokku_v1_util, 9);
 
 /**
- * AuditLogFilter is shared by listing and export, so an export always matches
- * what the list shows.
- *
  * @generated from message nokku.v1.AuditLogFilter
  */
 export type AuditLogFilter = Message<"nokku.v1.AuditLogFilter"> & {
@@ -327,8 +312,6 @@ export type AuditLogFilter = Message<"nokku.v1.AuditLogFilter"> & {
   actorKinds: string[];
 
   /**
-   * Exact action names, a trailing * matches by prefix, e.g. "Delete*".
-   *
    * @generated from field: repeated string actions = 4;
    */
   actions: string[];
@@ -403,8 +386,6 @@ export type ListAuditLogsResponse = Message<"nokku.v1.ListAuditLogsResponse"> & 
   total: number;
 
   /**
-   * How long the workspace's plan keeps events.
-   *
    * @generated from field: int32 retention_days = 3;
    */
   retentionDays: number;
@@ -537,9 +518,6 @@ export const ListMyActivityResponseSchema: GenMessage<ListMyActivityResponse> = 
   messageDesc(file_nokku_v1_util, 16);
 
 /**
- * AuditOutcome FAILED matches every failed call, DENIED only the ones an auth
- * or permission check stopped.
- *
  * @generated from enum nokku.v1.AuditOutcome
  */
 export enum AuditOutcome {
@@ -583,9 +561,6 @@ export const UtilService: GenService<{
     output: typeof GetVersionResponseSchema;
   },
   /**
-   * Who runs this server, for legal links and support contacts. Public, the
-   * login pages need it too.
-   *
    * @generated from rpc nokku.v1.UtilService.GetInstanceInfo
    */
   getInstanceInfo: {
@@ -626,8 +601,6 @@ export const UtilService: GenService<{
     output: typeof ExportAuditLogsResponseSchema;
   },
   /**
-   * The caller's own events.
-   *
    * @generated from rpc nokku.v1.UtilService.ListMyActivity
    */
   listMyActivity: {

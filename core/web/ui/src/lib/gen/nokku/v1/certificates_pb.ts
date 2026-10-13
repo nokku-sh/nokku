@@ -14,11 +14,9 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/certificates.proto.
  */
 export const file_nokku_v1_certificates: GenFile = /*@__PURE__*/
-  fileDesc("Chtub2trdS92MS9jZXJ0aWZpY2F0ZXMucHJvdG8SCG5va2t1LnYxIrsGChRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEhIKCnB1YmxpY19rZXkYBSABKAkSLgoKbm90X2JlZm9yZRgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLQoJbm90X2FmdGVyGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglpc19hY3RpdmUYCiABKAgSEgoKaXNfZGVmYXVsdBgLIAEoCBIQCghrZXlfYml0cxgMIAEoBRIuCghrZXlfdHlwZRgNIAEoDjIcLm5va2t1LnYxLkNlcnRpZmljYXRlS2V5VHlwZRI3ChFhbGxvd2VkX2tleV90eXBlcxgOIAMoDjIcLm5va2t1LnYxLkNlcnRpZmljYXRlS2V5VHlwZRIrCghsaWZldGltZRgPIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIzChB1c2VyX2RlZmF1bHRfdHRsGBAgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi8KDHVzZXJfbWF4X3R0bBgRIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIzChBob3N0X2RlZmF1bHRfdHRsGBQgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi8KDGhvc3RfbWF4X3R0bBgVIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIuCgpjcmVhdGVkX2F0GBYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GBcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIbChNwcmV2aW91c19wdWJsaWNfa2V5GBkgASgJEjoKFnByZXZpb3VzX3RydXN0ZWRfdW50aWwYGiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDWZvcmNlX2NvbW1hbmQYGyABKAkSFgoOc291cmNlX2FkZHJlc3MYHCABKAkilQUKIUNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxI6CghrZXlfdHlwZRgDIAEoDjIcLm5va2t1LnYxLkNlcnRpZmljYXRlS2V5VHlwZUIKukgHggEEEAEgABIQCghrZXlfYml0cxgEIAEoBRISCgppc19kZWZhdWx0GAUgASgIEjcKEWFsbG93ZWRfa2V5X3R5cGVzGAYgAygOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlEkEKCGxpZmV0aW1lGAcgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhS6SBGqAQ4iBQiAg5hLMgUIoLOgARJGChB1c2VyX2RlZmF1bHRfdHRsGAggASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJCCgx1c2VyX21heF90dGwYCSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkYKEGhvc3RfZGVmYXVsdF90dGwYCiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkIKDGhvc3RfbWF4X3R0bBgLIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSHwoNZm9yY2VfY29tbWFuZBgOIAEoCUIIukgFcgMYgAgSIAoOc291cmNlX2FkZHJlc3MYDyABKAlCCLpIBXIDGIAIImMKIkNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiNgoeR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASJgCh9HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IiMKIUxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVxdWVzdCJlCiJMaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1Jlc3BvbnNlEj8KF2NlcnRpZmljYXRlX2F1dGhvcml0aWVzGAEgAygLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHki8AQKIVVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESGAoEbmFtZRgCIAEoCUIKukgHcgUQARiAAhIdCgtkZXNjcmlwdGlvbhgDIAEoCUIIukgFcgMY6AcSEQoJaXNfYWN0aXZlGAQgASgIEhIKCmlzX2RlZmF1bHQYBSABKAgSNwoRYWxsb3dlZF9rZXlfdHlwZXMYBiADKA4yHC5ub2trdS52MS5DZXJ0aWZpY2F0ZUtleVR5cGUSQQoIbGlmZXRpbWUYByABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CFLpIEaoBDiIFCICDmEsyBQigs6ABEkYKEHVzZXJfZGVmYXVsdF90dGwYCCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkIKDHVzZXJfbWF4X3R0bBgJIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSRgoQaG9zdF9kZWZhdWx0X3R0bBgKIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSQgoMaG9zdF9tYXhfdHRsGAsgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBIfCg1mb3JjZV9jb21tYW5kGA4gASgJQgi6SAVyAxiACBIgCg5zb3VyY2VfYWRkcmVzcxgPIAEoCUIIukgFcgMYgAgiYwoiVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZRI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYASABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSI5CiFEZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIiQKIkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UilgEKI1JvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIQCghrZXlfYml0cxgCIAEoBRIuCghrZXlfdHlwZRgDIAEoDjIcLm5va2t1LnYxLkNlcnRpZmljYXRlS2V5VHlwZRIXCg9yZXZva2VfcHJldmlvdXMYBCABKAgiZQokUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IpYBChlTaWduU1NIQ2VydGlmaWNhdGVSZXF1ZXN0Eh4KCnB1YmxpY19rZXkYASABKAlCCrpIB3IFEAEYkE4SOQoDdHRsGAIgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBIeCgl0YXJnZXRfaWQYAyABKAlCC7pICMgBAXIDsAEBIp8BChpTaWduU1NIQ2VydGlmaWNhdGVSZXNwb25zZRINCgVjYV9pZBgBIAEoCRIPCgdjYV9uYW1lGAIgASgJEhUKDWNhX3B1YmxpY19rZXkYAyABKAkSGgoSc2lnbmVkX2NlcnRpZmljYXRlGAQgASgJEi4KCmV4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wKpoBChJDZXJ0aWZpY2F0ZUtleVR5cGUSJAogQ0VSVElGSUNBVEVfS0VZX1RZUEVfVU5TUEVDSUZJRUQQABIcChhDRVJUSUZJQ0FURV9LRVlfVFlQRV9SU0EQARIeChpDRVJUSUZJQ0FURV9LRVlfVFlQRV9FQ0RTQRACEiAKHENFUlRJRklDQVRFX0tFWV9UWVBFX0VEMjU1MTkQAzKIBwoSQ2VydGlmaWNhdGVTZXJ2aWNlEnkKF0dldENlcnRpZmljYXRlQXV0aG9yaXR5Eigubm9ra3UudjEuR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Gikubm9ra3UudjEuR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZSIJkAIBwvMYAhgBEn8KGkNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5Eisubm9ra3UudjEuQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Giwubm9ra3UudjEuQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZSIGwvMYAhgDEn8KGlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5Eisubm9ra3UudjEuVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Giwubm9ra3UudjEuVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZSIGwvMYAhgDEoIBChpMaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllcxIrLm5va2t1LnYxLkxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVxdWVzdBosLm5va2t1LnYxLkxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVzcG9uc2UiCZACAcLzGAIYARJ/ChpEZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiBsLzGAIYAxKFAQocUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eRItLm5va2t1LnYxLlJvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Gi4ubm9ra3UudjEuUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIgbC8xgCGAMSZwoSU2lnblNTSENlcnRpZmljYXRlEiMubm9ra3UudjEuU2lnblNTSENlcnRpZmljYXRlUmVxdWVzdBokLm5va2t1LnYxLlNpZ25TU0hDZXJ0aWZpY2F0ZVJlc3BvbnNlIgbC8xgCEAFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chtub2trdS92MS9jZXJ0aWZpY2F0ZXMucHJvdG8SCG5va2t1LnYxIrsGChRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEhIKCnB1YmxpY19rZXkYBCABKAkSLgoKbm90X2JlZm9yZRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLQoJbm90X2FmdGVyGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIRCglpc19hY3RpdmUYByABKAgSEgoKaXNfZGVmYXVsdBgIIAEoCBIQCghrZXlfYml0cxgJIAEoBRIuCghrZXlfdHlwZRgKIAEoDjIcLm5va2t1LnYxLkNlcnRpZmljYXRlS2V5VHlwZRI3ChFhbGxvd2VkX2tleV90eXBlcxgLIAMoDjIcLm5va2t1LnYxLkNlcnRpZmljYXRlS2V5VHlwZRIrCghsaWZldGltZRgMIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIzChB1c2VyX2RlZmF1bHRfdHRsGA0gASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi8KDHVzZXJfbWF4X3R0bBgOIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIzChBob3N0X2RlZmF1bHRfdHRsGA8gASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi8KDGhvc3RfbWF4X3R0bBgQIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIuCgpjcmVhdGVkX2F0GBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GBIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIbChNwcmV2aW91c19wdWJsaWNfa2V5GBMgASgJEjoKFnByZXZpb3VzX3RydXN0ZWRfdW50aWwYFCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDWZvcmNlX2NvbW1hbmQYFSABKAkSFgoOc291cmNlX2FkZHJlc3MYFiABKAkilQUKIUNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxI6CghrZXlfdHlwZRgDIAEoDjIcLm5va2t1LnYxLkNlcnRpZmljYXRlS2V5VHlwZUIKukgHggEEEAEgABIQCghrZXlfYml0cxgEIAEoBRISCgppc19kZWZhdWx0GAUgASgIEjcKEWFsbG93ZWRfa2V5X3R5cGVzGAYgAygOMhwubm9ra3UudjEuQ2VydGlmaWNhdGVLZXlUeXBlEkEKCGxpZmV0aW1lGAcgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhS6SBGqAQ4iBQiAg5hLMgUIoLOgARJGChB1c2VyX2RlZmF1bHRfdHRsGAggASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJCCgx1c2VyX21heF90dGwYCSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkYKEGhvc3RfZGVmYXVsdF90dGwYCiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkIKDGhvc3RfbWF4X3R0bBgLIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSHwoNZm9yY2VfY29tbWFuZBgMIAEoCUIIukgFcgMYgAgSIAoOc291cmNlX2FkZHJlc3MYDSABKAlCCLpIBXIDGIAIImMKIkNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiNgoeR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASJgCh9HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IiMKIUxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVxdWVzdCJlCiJMaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1Jlc3BvbnNlEj8KF2NlcnRpZmljYXRlX2F1dGhvcml0aWVzGAEgAygLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHki8AQKIVVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESGAoEbmFtZRgCIAEoCUIKukgHcgUQARiAAhIdCgtkZXNjcmlwdGlvbhgDIAEoCUIIukgFcgMY6AcSEQoJaXNfYWN0aXZlGAQgASgIEhIKCmlzX2RlZmF1bHQYBSABKAgSNwoRYWxsb3dlZF9rZXlfdHlwZXMYBiADKA4yHC5ub2trdS52MS5DZXJ0aWZpY2F0ZUtleVR5cGUSQQoIbGlmZXRpbWUYByABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CFLpIEaoBDiIFCICDmEsyBQigs6ABEkYKEHVzZXJfZGVmYXVsdF90dGwYCCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkIKDHVzZXJfbWF4X3R0bBgJIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSRgoQaG9zdF9kZWZhdWx0X3R0bBgKIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSQgoMaG9zdF9tYXhfdHRsGAsgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBIfCg1mb3JjZV9jb21tYW5kGAwgASgJQgi6SAVyAxiACBIgCg5zb3VyY2VfYWRkcmVzcxgNIAEoCUIIukgFcgMYgAgiYwoiVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZRI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYASABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSI5CiFEZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIiQKIkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UilgEKI1JvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIQCghrZXlfYml0cxgCIAEoBRIuCghrZXlfdHlwZRgDIAEoDjIcLm5va2t1LnYxLkNlcnRpZmljYXRlS2V5VHlwZRIXCg9yZXZva2VfcHJldmlvdXMYBCABKAgiZQokUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IpYBChlTaWduU1NIQ2VydGlmaWNhdGVSZXF1ZXN0Eh4KCnB1YmxpY19rZXkYASABKAlCCrpIB3IFEAEYkE4SOQoDdHRsGAIgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBIeCgl0YXJnZXRfaWQYAyABKAlCC7pICMgBAXIDsAEBIp8BChpTaWduU1NIQ2VydGlmaWNhdGVSZXNwb25zZRINCgVjYV9pZBgBIAEoCRIPCgdjYV9uYW1lGAIgASgJEhUKDWNhX3B1YmxpY19rZXkYAyABKAkSGgoSc2lnbmVkX2NlcnRpZmljYXRlGAQgASgJEi4KCmV4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wKpoBChJDZXJ0aWZpY2F0ZUtleVR5cGUSJAogQ0VSVElGSUNBVEVfS0VZX1RZUEVfVU5TUEVDSUZJRUQQABIcChhDRVJUSUZJQ0FURV9LRVlfVFlQRV9SU0EQARIeChpDRVJUSUZJQ0FURV9LRVlfVFlQRV9FQ0RTQRACEiAKHENFUlRJRklDQVRFX0tFWV9UWVBFX0VEMjU1MTkQAzKIBwoSQ2VydGlmaWNhdGVTZXJ2aWNlEnkKF0dldENlcnRpZmljYXRlQXV0aG9yaXR5Eigubm9ra3UudjEuR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Gikubm9ra3UudjEuR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZSIJkAIBwvMYAhgBEn8KGkNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5Eisubm9ra3UudjEuQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Giwubm9ra3UudjEuQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZSIGwvMYAhgDEn8KGlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5Eisubm9ra3UudjEuVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Giwubm9ra3UudjEuVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZSIGwvMYAhgDEoIBChpMaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllcxIrLm5va2t1LnYxLkxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVxdWVzdBosLm5va2t1LnYxLkxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVzcG9uc2UiCZACAcLzGAIYARJ/ChpEZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiBsLzGAIYAxKFAQocUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eRItLm5va2t1LnYxLlJvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Gi4ubm9ra3UudjEuUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIgbC8xgCGAMSZwoSU2lnblNTSENlcnRpZmljYXRlEiMubm9ra3UudjEuU2lnblNTSENlcnRpZmljYXRlUmVxdWVzdBokLm5va2t1LnYxLlNpZ25TU0hDZXJ0aWZpY2F0ZVJlc3BvbnNlIgbC8xgCEAFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
- * Certificate Authority messages ---------------------------------------------
- *
  * @generated from message nokku.v1.CertificateAuthority
  */
 export type CertificateAuthority = Message<"nokku.v1.CertificateAuthority"> & {
@@ -38,106 +36,97 @@ export type CertificateAuthority = Message<"nokku.v1.CertificateAuthority"> & {
   description: string;
 
   /**
-   * @generated from field: string public_key = 5;
+   * @generated from field: string public_key = 4;
    */
   publicKey: string;
 
   /**
-   * @generated from field: google.protobuf.Timestamp not_before = 8;
+   * @generated from field: google.protobuf.Timestamp not_before = 5;
    */
   notBefore?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp not_after = 9;
+   * @generated from field: google.protobuf.Timestamp not_after = 6;
    */
   notAfter?: Timestamp | undefined;
 
   /**
-   * @generated from field: bool is_active = 10;
+   * @generated from field: bool is_active = 7;
    */
   isActive: boolean;
 
   /**
-   * @generated from field: bool is_default = 11;
+   * @generated from field: bool is_default = 8;
    */
   isDefault: boolean;
 
   /**
-   * @generated from field: int32 key_bits = 12;
+   * @generated from field: int32 key_bits = 9;
    */
   keyBits: number;
 
   /**
-   * @generated from field: nokku.v1.CertificateKeyType key_type = 13;
+   * @generated from field: nokku.v1.CertificateKeyType key_type = 10;
    */
   keyType: CertificateKeyType;
 
   /**
-   * @generated from field: repeated nokku.v1.CertificateKeyType allowed_key_types = 14;
+   * @generated from field: repeated nokku.v1.CertificateKeyType allowed_key_types = 11;
    */
   allowedKeyTypes: CertificateKeyType[];
 
   /**
-   * @generated from field: google.protobuf.Duration lifetime = 15;
+   * @generated from field: google.protobuf.Duration lifetime = 12;
    */
   lifetime?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration user_default_ttl = 16;
+   * @generated from field: google.protobuf.Duration user_default_ttl = 13;
    */
   userDefaultTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration user_max_ttl = 17;
+   * @generated from field: google.protobuf.Duration user_max_ttl = 14;
    */
   userMaxTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration host_default_ttl = 20;
+   * @generated from field: google.protobuf.Duration host_default_ttl = 15;
    */
   hostDefaultTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration host_max_ttl = 21;
+   * @generated from field: google.protobuf.Duration host_max_ttl = 16;
    */
   hostMaxTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 22;
+   * @generated from field: google.protobuf.Timestamp created_at = 17;
    */
   createdAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 23;
+   * @generated from field: google.protobuf.Timestamp updated_at = 18;
    */
   updatedAt?: Timestamp | undefined;
 
   /**
-   * The key this CA had before its last rollover. Certificates it signed stay
-   * trusted until previous_trusted_until. Both are unset after an emergency
-   * rollover.
-   *
-   * @generated from field: string previous_public_key = 25;
+   * @generated from field: string previous_public_key = 19;
    */
   previousPublicKey: string;
 
   /**
-   * @generated from field: google.protobuf.Timestamp previous_trusted_until = 26;
+   * @generated from field: google.protobuf.Timestamp previous_trusted_until = 20;
    */
   previousTrustedUntil?: Timestamp | undefined;
 
   /**
-   * Runs instead of whatever the user asks for. Empty means no restriction.
-   *
-   * @generated from field: string force_command = 27;
+   * @generated from field: string force_command = 21;
    */
   forceCommand: string;
 
   /**
-   * Addresses and CIDRs a login may come from, separated by commas. Empty
-   * means any.
-   *
-   * @generated from field: string source_address = 28;
+   * @generated from field: string source_address = 22;
    */
   sourceAddress: string;
 };
@@ -209,12 +198,12 @@ export type CreateCertificateAuthorityRequest = Message<"nokku.v1.CreateCertific
   hostMaxTtl?: Duration | undefined;
 
   /**
-   * @generated from field: string force_command = 14;
+   * @generated from field: string force_command = 12;
    */
   forceCommand: string;
 
   /**
-   * @generated from field: string source_address = 15;
+   * @generated from field: string source_address = 13;
    */
   sourceAddress: string;
 };
@@ -367,12 +356,12 @@ export type UpdateCertificateAuthorityRequest = Message<"nokku.v1.UpdateCertific
   hostMaxTtl?: Duration | undefined;
 
   /**
-   * @generated from field: string force_command = 14;
+   * @generated from field: string force_command = 12;
    */
   forceCommand: string;
 
   /**
-   * @generated from field: string source_address = 15;
+   * @generated from field: string source_address = 13;
    */
   sourceAddress: string;
 };
@@ -451,8 +440,6 @@ export type RolloverCertificateAuthorityRequest = Message<"nokku.v1.RolloverCert
   keyType: CertificateKeyType;
 
   /**
-   * Stop trusting the replaced key at once. For a key that may have leaked.
-   *
    * @generated from field: bool revoke_previous = 4;
    */
   revokePrevious: boolean;
@@ -497,8 +484,6 @@ export type SignSSHCertificateRequest = Message<"nokku.v1.SignSSHCertificateRequ
   ttl?: Duration | undefined;
 
   /**
-   * The server the certificate is for. Its certificate authority signs.
-   *
    * @generated from field: string target_id = 3;
    */
   targetId: string;
@@ -584,8 +569,6 @@ export const CertificateKeyTypeSchema: GenEnum<CertificateKeyType> = /*@__PURE__
  */
 export const CertificateService: GenService<{
   /**
-   * Members read CAs because nk needs the CA of a server it has not synced yet.
-   *
    * @generated from rpc nokku.v1.CertificateService.GetCertificateAuthority
    */
   getCertificateAuthority: {
@@ -610,8 +593,6 @@ export const CertificateService: GenService<{
     output: typeof UpdateCertificateAuthorityResponseSchema;
   },
   /**
-   * Members read CAs because nk needs the CA of a server it has not synced yet.
-   *
    * @generated from rpc nokku.v1.CertificateService.ListCertificateAuthorities
    */
   listCertificateAuthorities: {
@@ -636,11 +617,6 @@ export const CertificateService: GenService<{
     output: typeof RolloverCertificateAuthorityResponseSchema;
   },
   /**
-   * Signs a user certificate for the caller, for one server. It names the
-   * accounts the caller is granted there at that moment, so it works nowhere
-   * else and a revoked grant ends with it. Daemons get host certificates from
-   * DaemonControlService.
-   *
    * @generated from rpc nokku.v1.CertificateService.SignSSHCertificate
    */
   signSSHCertificate: {

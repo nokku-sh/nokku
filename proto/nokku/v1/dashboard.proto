@@ -9,7 +9,6 @@ import "nokku/v1/daemon.proto";
 import "nokku/v1/util.proto";
 
 service DashboardService {
-  // One call for the whole overview, so the status line never mixes stale counts.
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -20,41 +19,28 @@ message GetDashboardRequest {}
 
 message GetDashboardResponse {
   int32 targets = 1;
-  // Targets behind a daemon that is connected right now.
   int32 targets_online = 2;
-  // Targets without a daemon, kept in sync with nk sync.
   int32 targets_manual = 3;
   int32 daemons = 4;
   int32 daemons_online = 5;
-  // Waiting for approval, newest first, at most 5.
   repeated Daemon pending_daemons = 6;
-  // Accepted but not connected, at most 5.
   repeated Daemon offline_daemons = 7;
   int32 users = 8;
-  // Active CAs that expire first, at most 3.
   repeated CertificateAuthority soonest_cas = 9;
   int64 recording_bytes = 10;
-  // -1 is unlimited.
   int64 recording_quota_bytes = 11;
   repeated LiveSession live_sessions = 12;
-  // Audit events per hour for the last 24 hours, oldest first.
   repeated int32 activity = 13;
-  // Failed calls per hour, same buckets as activity.
   repeated int32 failures = 14;
-  // Notable successful changes in the last 24 hours, newest first.
   repeated EventLog recent_changes = 15;
 }
 
-// A shell open right now, from the browser terminal or a recorded SSH login.
 message LiveSession {
   string id = 1;
   string daemon_id = 2;
   string daemon_name = 3;
-  // The login account on the server.
   string username = 4;
-  // Set for browser terminals.
   string user_id = 5;
-  // Set for recorded sessions.
   google.protobuf.Timestamp started_at = 6;
   bool recording = 7;
   bool web = 8;

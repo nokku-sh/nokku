@@ -24,9 +24,8 @@ const (
 )
 
 type Workspace struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	// The subdomain on the hosted service.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Slug          *string                `protobuf:"bytes,2,opt,name=slug" json:"slug,omitempty"`
 	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
@@ -119,10 +118,9 @@ func (x *Workspace) GetUpdatedAt() *timestamppb.Timestamp {
 type WorkspaceSettings struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	DefaultDaemonConfig *DaemonConfig          `protobuf:"bytes,1,opt,name=default_daemon_config,json=defaultDaemonConfig" json:"default_daemon_config,omitempty"`
-	// Only the workspace's OIDC providers may sign users in.
-	EnforceSso    *bool `protobuf:"varint,4,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	EnforceSso          *bool                  `protobuf:"varint,2,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *WorkspaceSettings) Reset() {
@@ -494,9 +492,8 @@ func (x *CreateWorkspaceRequest) GetOwnerName() string {
 }
 
 type CreateWorkspaceResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Where the new workspace lives.
-	Url           *string `protobuf:"bytes,1,opt,name=url" json:"url,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           *string                `protobuf:"bytes,1,opt,name=url" json:"url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -574,14 +571,10 @@ func (*SubscribeChangesRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{10}
 }
 
-// With neither field set nothing changed. The server sends one of those to
-// open the stream and whenever it has been silent for a while.
 type SubscribeChangesResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Full names of the services to ask again, like nokku.v1.TargetService.
-	Services []string `protobuf:"bytes,1,rep,name=services" json:"services,omitempty"`
-	// Anything may have changed.
-	Everything    *bool `protobuf:"varint,2,opt,name=everything" json:"everything,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Services      []string               `protobuf:"bytes,1,rep,name=services" json:"services,omitempty"`
+	Everything    *bool                  `protobuf:"varint,2,opt,name=everything" json:"everything,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1192,7 +1185,7 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x80\x01\n" +
 	"\x11WorkspaceSettings\x12J\n" +
 	"\x15default_daemon_config\x18\x01 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\x12\x1f\n" +
-	"\venforce_sso\x18\x04 \x01(\bR\n" +
+	"\venforce_sso\x18\x02 \x01(\bR\n" +
 	"enforceSso\"\x15\n" +
 	"\x13GetWorkspaceRequest\"I\n" +
 	"\x14GetWorkspaceResponse\x121\n" +

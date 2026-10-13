@@ -56,9 +56,6 @@ export type TargetAccount = Message<"nokku.v1.TargetAccount"> & {
   createdAt?: Timestamp | undefined;
 
   /**
-   * When the host first reported the account. Unset means the host has not
-   * reported it, so grants on it open nothing until it exists there.
-   *
    * @generated from field: google.protobuf.Timestamp seen_at = 8;
    */
   seenAt?: Timestamp | undefined;
@@ -310,8 +307,6 @@ export const RemoveTargetAccountResponseSchema: GenMessage<RemoveTargetAccountRe
   messageDesc(file_nokku_v1_target_account, 12);
 
 /**
- * SubjectKind is who a grant is for.
- *
  * @generated from enum nokku.v1.SubjectKind
  */
 export enum SubjectKind {
@@ -343,10 +338,6 @@ export const SubjectKindSchema: GenEnum<SubjectKind> = /*@__PURE__*/
   enumDesc(file_nokku_v1_target_account, 0);
 
 /**
- * A target account is a local account on a target, like root or deploy. A
- * grant lets a subject log in as it. The certificate principal a login
- * carries is built from the subject, the target and the account.
- *
  * @generated from service nokku.v1.TargetAccountService
  */
 export const TargetAccountService: GenService<{

@@ -52,8 +52,6 @@ export type User = Message<"nokku.v1.User"> & {
   active: boolean;
 
   /**
-   * The address an email change is waiting on, empty when none is pending.
-   *
    * @generated from field: string pending_email = 7;
    */
   pendingEmail: string;
@@ -69,9 +67,6 @@ export type User = Message<"nokku.v1.User"> & {
   updatedAt?: Timestamp | undefined;
 
   /**
-   * An identity provider provisions the account over SCIM and owns its
-   * address.
-   *
    * @generated from field: bool scim_managed = 10;
    */
   scimManaged: boolean;
@@ -94,8 +89,6 @@ export type AccountCredential = Message<"nokku.v1.AccountCredential"> & {
   id: string;
 
   /**
-   * passkey, oidc
-   *
    * @generated from field: string type = 2;
    */
   type: string;
@@ -138,8 +131,6 @@ export const AccountCredentialSchema: GenMessage<AccountCredential> = /*@__PURE_
  */
 export type AccountSession = Message<"nokku.v1.AccountSession"> & {
   /**
-   * The token id, what RemoveSession takes.
-   *
    * @generated from field: string id = 1;
    */
   id: string;
@@ -493,10 +484,6 @@ export const AccountService: GenService<{
     output: typeof UpdateAccountResponseSchema;
   },
   /**
-   * Starts an email change. The address stays the old one until the link
-   * sent to the new address is used with AuthService.ConfirmEmailChange.
-   * Refused for accounts an identity provider manages.
-   *
    * @generated from rpc nokku.v1.AccountService.RequestEmailChange
    */
   requestEmailChange: {
@@ -521,8 +508,6 @@ export const AccountService: GenService<{
     output: typeof RenameCredentialResponseSchema;
   },
   /**
-   * Removes a passkey or a linked identity. The last way in stays.
-   *
    * @generated from rpc nokku.v1.AccountService.RemoveCredential
    */
   removeCredential: {
@@ -547,8 +532,6 @@ export const AccountService: GenService<{
     output: typeof RemoveSessionResponseSchema;
   },
   /**
-   * Refused for the owner, ownership moves first.
-   *
    * @generated from rpc nokku.v1.AccountService.DeleteAccount
    */
   deleteAccount: {

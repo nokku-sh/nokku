@@ -8,8 +8,6 @@ import "nokku/v1/access.proto";
 import "nokku/v1/account.proto";
 import "nokku/v1/daemon.proto";
 
-// The workspace is the tenant. Users live inside it, so this service also
-// manages them. A self-hosted server has exactly one workspace.
 service WorkspaceService {
   rpc GetWorkspace(GetWorkspaceRequest) returns (GetWorkspaceResponse) {
     option (access) = {self: true};
@@ -18,7 +16,6 @@ service WorkspaceService {
   rpc UpdateWorkspace(UpdateWorkspaceRequest) returns (UpdateWorkspaceResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
-  // Refused on a self-hosted server.
   rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (DeleteWorkspaceResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
@@ -30,30 +27,21 @@ service WorkspaceService {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  // Never touches the owner, see TransferOwnership.
   rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse) {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
   }
-  // A deactivated user keeps their grants and history but cannot sign in or
-  // get certificates.
   rpc SetUserActive(SetUserActiveRequest) returns (SetUserActiveResponse) {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
   }
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
   }
-  // The caller becomes an admin.
   rpc TransferOwnership(TransferOwnershipRequest) returns (TransferOwnershipResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
-  // Public signup on the hosted service's root host. Creates the workspace
-  // and its owner and mails the owner a sign-in link. Refused elsewhere.
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {
     option (access) = {public: true};
   }
-  // Tells a client that keeps a view open when to read again. A message
-  // carries no data, only which services answer differently now. The server
-  // ends the stream after a while, the client opens it again.
   rpc SubscribeChanges(SubscribeChangesRequest) returns (stream SubscribeChangesResponse) {
     option (access) = {self: true};
   }
@@ -61,7 +49,6 @@ service WorkspaceService {
 
 message Workspace {
   string id = 1;
-  // The subdomain on the hosted service.
   string slug = 2;
   string name = 3;
   string description = 4;
@@ -72,8 +59,7 @@ message Workspace {
 
 message WorkspaceSettings {
   nokku.v1.DaemonConfig default_daemon_config = 1;
-  // Only the workspace's OIDC providers may sign users in.
-  bool enforce_sso = 4;
+  bool enforce_sso = 2;
 }
 
 message GetWorkspaceRequest {}
@@ -110,17 +96,13 @@ message CreateWorkspaceRequest {
   string owner_name = 4 [(buf.validate.field).string.max_len = 256];
 }
 message CreateWorkspaceResponse {
-  // Where the new workspace lives.
   string url = 1;
 }
 
 message SubscribeChangesRequest {}
-// With neither field set nothing changed. The server sends one of those to
-// open the stream and whenever it has been silent for a while.
+
 message SubscribeChangesResponse {
-  // Full names of the services to ask again, like nokku.v1.TargetService.
   repeated string services = 1;
-  // Anything may have changed.
   bool everything = 2;
 }
 

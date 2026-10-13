@@ -72,24 +72,14 @@ const (
 type WorkspaceServiceClient interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
-	// Refused on a self-hosted server.
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
-	// Never touches the owner, see TransferOwnership.
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
-	// A deactivated user keeps their grants and history but cannot sign in or
-	// get certificates.
 	SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error)
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
-	// The caller becomes an admin.
 	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
-	// Public signup on the hosted service's root host. Creates the workspace
-	// and its owner and mails the owner a sign-in link. Refused elsewhere.
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
-	// Tells a client that keeps a view open when to read again. A message
-	// carries no data, only which services answer differently now. The server
-	// ends the stream after a while, the client opens it again.
 	SubscribeChanges(context.Context, *v1.SubscribeChangesRequest) (*connect.ServerStreamForClient[v1.SubscribeChangesResponse], error)
 }
 
@@ -290,24 +280,14 @@ func (c *workspaceServiceClient) SubscribeChanges(ctx context.Context, req *v1.S
 type WorkspaceServiceHandler interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
-	// Refused on a self-hosted server.
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
-	// Never touches the owner, see TransferOwnership.
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
-	// A deactivated user keeps their grants and history but cannot sign in or
-	// get certificates.
 	SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error)
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
-	// The caller becomes an admin.
 	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
-	// Public signup on the hosted service's root host. Creates the workspace
-	// and its owner and mails the owner a sign-in link. Refused elsewhere.
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
-	// Tells a client that keeps a view open when to read again. A message
-	// carries no data, only which services answer differently now. The server
-	// ends the stream after a while, the client opens it again.
 	SubscribeChanges(context.Context, *v1.SubscribeChangesRequest, *connect.ServerStream[v1.SubscribeChangesResponse]) error
 }
 

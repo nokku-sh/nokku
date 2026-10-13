@@ -33,8 +33,6 @@ export type Daemon = Message<"nokku.v1.Daemon"> & {
   name: string;
 
   /**
-   * Derived from last_seen_at: seen by a core instance in the last 30 seconds.
-   *
    * @generated from field: bool online = 3;
    */
   online: boolean;
@@ -78,10 +76,6 @@ export const DaemonSchema: GenMessage<Daemon> = /*@__PURE__*/
   messageDesc(file_nokku_v1_daemon, 0);
 
 /**
- * What a session on the daemon's host may do, and the one place that says so.
- * Every user certificate permits the same things, a CA opens or closes
- * nothing.
- *
  * @generated from message nokku.v1.DaemonConfig
  */
 export type DaemonConfig = Message<"nokku.v1.DaemonConfig"> & {
@@ -91,8 +85,6 @@ export type DaemonConfig = Message<"nokku.v1.DaemonConfig"> & {
   recordSessions: boolean;
 
   /**
-   * Port forwarding with -L, -R and -D.
-   *
    * @generated from field: bool allow_forwarding = 2;
    */
   allowForwarding: boolean;
@@ -103,16 +95,11 @@ export type DaemonConfig = Message<"nokku.v1.DaemonConfig"> & {
   allowAgentForwarding: boolean;
 
   /**
-   * Lets a -R forward listen on more than the loopback address.
-   *
    * @generated from field: bool gateway_ports = 4;
    */
   gatewayPorts: boolean;
 
   /**
-   * Set by the core from the enroll token, never by an admin. An ephemeral
-   * daemon deletes itself from the core when it is stopped.
-   *
    * @generated from field: bool ephemeral = 5;
    */
   ephemeral: boolean;
@@ -416,9 +403,6 @@ export type EnrollDaemonRequest = Message<"nokku.v1.EnrollDaemonRequest"> & {
   token: string;
 
   /**
-   * The host's own report, same keys as SyncDaemonRequest.metadata. The
-   * hostname in it may become the daemon's name.
-   *
    * @generated from field: map<string, string> metadata = 2;
    */
   metadata: { [key: string]: string };
@@ -469,10 +453,6 @@ export const EnrollDaemonResponseSchema: GenMessage<EnrollDaemonResponse> = /*@_
   messageDesc(file_nokku_v1_daemon, 17);
 
 /**
- * Who may log in as one Linux account. A host lets a certificate in when it
- * carries one of these principals, compared as whole strings. Each one names
- * a subject, this server and this account.
- *
  * @generated from message nokku.v1.AccountPrincipals
  */
 export type AccountPrincipals = Message<"nokku.v1.AccountPrincipals"> & {
@@ -495,9 +475,6 @@ export const AccountPrincipalsSchema: GenMessage<AccountPrincipals> = /*@__PURE_
   messageDesc(file_nokku_v1_daemon, 18);
 
 /**
- * The sizes are bounded here. The backend drops entries that are not valid
- * instead of failing the sync, a host with one odd account must still sync.
- *
  * @generated from message nokku.v1.SyncDaemonRequest
  */
 export type SyncDaemonRequest = Message<"nokku.v1.SyncDaemonRequest"> & {
@@ -556,8 +533,6 @@ export type SyncDaemonResponse = Message<"nokku.v1.SyncDaemonResponse"> & {
   caPublicKey: string;
 
   /**
-   * Keys the daemon trusts next to ca_public_key, each until its deadline.
-   *
    * @generated from field: repeated nokku.v1.RetiredCAKey retired_ca_keys = 6;
    */
   retiredCaKeys: RetiredCAKey[];
@@ -722,8 +697,6 @@ export const HeartbeatSchema: GenMessage<Heartbeat> = /*@__PURE__*/
   messageDesc(file_nokku_v1_daemon, 28);
 
 /**
- * StateUpdate tells the daemon to re-sync now.
- *
  * @generated from message nokku.v1.StateUpdate
  */
 export type StateUpdate = Message<"nokku.v1.StateUpdate"> & {
@@ -1069,8 +1042,6 @@ export const DaemonService: GenService<{
     output: typeof ListSessionsResponseSchema;
   },
   /**
-   * A web session only opens the transport, sshd still checks the cert against synced grants.
-   *
    * @generated from rpc nokku.v1.DaemonService.CreateSession
    */
   createSession: {
@@ -1087,8 +1058,6 @@ export const DaemonService: GenService<{
     output: typeof CloseSessionResponseSchema;
   },
   /**
-   * The handler checks the grant on the daemon named in the first message.
-   *
    * @generated from rpc nokku.v1.DaemonService.Relay
    */
   relay: {
@@ -1100,15 +1069,10 @@ export const DaemonService: GenService<{
   serviceDesc(file_nokku_v1_daemon, 0);
 
 /**
- * DaemonControlService is everything a daemon calls. Nobody else may call it
- * and a daemon may call nothing else.
- *
  * @generated from service nokku.v1.DaemonControlService
  */
 export const DaemonControlService: GenService<{
   /**
-   * Public, the enroll token and the DPoP proof are the gate.
-   *
    * @generated from rpc nokku.v1.DaemonControlService.EnrollDaemon
    */
   enrollDaemon: {
@@ -1141,8 +1105,6 @@ export const DaemonControlService: GenService<{
     output: typeof DaemonRelayResponseSchema;
   },
   /**
-   * Signs the daemon's host key for its own target.
-   *
    * @generated from rpc nokku.v1.DaemonControlService.SignHostCertificate
    */
   signHostCertificate: {
@@ -1159,8 +1121,6 @@ export const DaemonControlService: GenService<{
     output: typeof UploadRecordingResponseSchema;
   },
   /**
-   * Removes the calling daemon.
-   *
    * @generated from rpc nokku.v1.DaemonControlService.UnenrollDaemon
    */
   unenrollDaemon: {

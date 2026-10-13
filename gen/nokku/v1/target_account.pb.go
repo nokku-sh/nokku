@@ -23,7 +23,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// SubjectKind is who a grant is for.
 type SubjectKind int32
 
 const (
@@ -85,11 +84,9 @@ type TargetAccount struct {
 	TeamIds           []string               `protobuf:"bytes,5,rep,name=team_ids,json=teamIds" json:"team_ids,omitempty"`
 	ServiceAccountIds []string               `protobuf:"bytes,6,rep,name=service_account_ids,json=serviceAccountIds" json:"service_account_ids,omitempty"`
 	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	// When the host first reported the account. Unset means the host has not
-	// reported it, so grants on it open nothing until it exists there.
-	SeenAt        *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=seen_at,json=seenAt" json:"seen_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SeenAt            *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=seen_at,json=seenAt" json:"seen_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *TargetAccount) Reset() {

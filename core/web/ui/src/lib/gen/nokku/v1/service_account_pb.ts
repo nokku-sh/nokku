@@ -47,8 +47,6 @@ export type ServiceAccount = Message<"nokku.v1.ServiceAccount"> & {
   tags: string[];
 
   /**
-   * The last time any of its tokens was used.
-   *
    * @generated from field: google.protobuf.Timestamp last_used_at = 6;
    */
   lastUsedAt?: Timestamp | undefined;
@@ -86,8 +84,6 @@ export type ServiceAccountToken = Message<"nokku.v1.ServiceAccountToken"> & {
   label: string;
 
   /**
-   * Unset never expires.
-   *
    * @generated from field: google.protobuf.Timestamp expires_at = 3;
    */
   expiresAt?: Timestamp | undefined;
@@ -159,9 +155,6 @@ export type CreateServiceAccountRequest = Message<"nokku.v1.CreateServiceAccount
   description: string;
 
   /**
-   * Unset is the member. A service account never manages people, so the
-   * editor is the most it can be.
-   *
    * @generated from field: nokku.v1.WorkspaceRole role = 3;
    */
   role: WorkspaceRole;
@@ -216,15 +209,11 @@ export type UpdateServiceAccountRequest = Message<"nokku.v1.UpdateServiceAccount
   description: string;
 
   /**
-   * Unset keeps the role.
-   *
    * @generated from field: nokku.v1.WorkspaceRole role = 4;
    */
   role: WorkspaceRole;
 
   /**
-   * Tags are replaced as sent. Leaving them out clears them.
-   *
    * @generated from field: repeated string tags = 5;
    */
   tags: string[];
@@ -358,8 +347,6 @@ export type CreateServiceAccountTokenRequest = Message<"nokku.v1.CreateServiceAc
   label: string;
 
   /**
-   * Unset never expires.
-   *
    * @generated from field: google.protobuf.Timestamp expires_at = 3;
    */
   expiresAt?: Timestamp | undefined;
@@ -464,10 +451,6 @@ export const RevokeServiceAccountTokenResponseSchema: GenMessage<RevokeServiceAc
   messageDesc(file_nokku_v1_service_account, 17);
 
 /**
- * A service account is an identity for automation. It holds any number of
- * tokens, each with its own label and expiry, so a new one can be rolled out
- * before the old one is revoked.
- *
  * @generated from service nokku.v1.ServiceAccountService
  */
 export const ServiceAccountService: GenService<{
@@ -512,8 +495,6 @@ export const ServiceAccountService: GenService<{
     output: typeof DeleteServiceAccountResponseSchema;
   },
   /**
-   * The secret is shown once, in the response.
-   *
    * @generated from rpc nokku.v1.ServiceAccountService.CreateServiceAccountToken
    */
   createServiceAccountToken: {
@@ -530,9 +511,6 @@ export const ServiceAccountService: GenService<{
     output: typeof ListServiceAccountTokensResponseSchema;
   },
   /**
-   * The token stops working with the call. The account and its other tokens
-   * stay.
-   *
    * @generated from rpc nokku.v1.ServiceAccountService.RevokeServiceAccountToken
    */
   revokeServiceAccountToken: {

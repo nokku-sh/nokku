@@ -74,27 +74,22 @@ func (JoinTokenKind) EnumDescriptor() ([]byte, []int) {
 }
 
 type JoinToken struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Kind        *JoinTokenKind         `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.JoinTokenKind" json:"kind,omitempty"`
-	Label       *string                `protobuf:"bytes,3,opt,name=label" json:"label,omitempty"`
-	ExpiresAt   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	MaxUses     *int32                 `protobuf:"varint,5,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
-	Uses        *int32                 `protobuf:"varint,6,opt,name=uses" json:"uses,omitempty"`
-	AutoApprove *bool                  `protobuf:"varint,7,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
-	CaId        *string                `protobuf:"bytes,8,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	Role        *WorkspaceRole         `protobuf:"varint,9,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	LastUsedAt  *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
-	// Enroll tokens only. Copied onto the target once, when the daemon is
-	// created. Edits in the web app win from then on.
-	Tags   []string          `protobuf:"bytes,12,rep,name=tags" json:"tags,omitempty"`
-	Grants []*JoinTokenGrant `protobuf:"bytes,13,rep,name=grants" json:"grants,omitempty"`
-	// An ephemeral daemon is deleted retire_after after it was last seen, and
-	// deletes itself when stopped. A new one of the same name and token
-	// replaces one that is offline.
-	Ephemeral     *bool                `protobuf:"varint,14,opt,name=ephemeral" json:"ephemeral,omitempty"`
-	RetireAfter   *durationpb.Duration `protobuf:"bytes,15,opt,name=retire_after,json=retireAfter" json:"retire_after,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Kind          *JoinTokenKind         `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.JoinTokenKind" json:"kind,omitempty"`
+	Label         *string                `protobuf:"bytes,3,opt,name=label" json:"label,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	MaxUses       *int32                 `protobuf:"varint,5,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
+	Uses          *int32                 `protobuf:"varint,6,opt,name=uses" json:"uses,omitempty"`
+	AutoApprove   *bool                  `protobuf:"varint,7,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
+	CaId          *string                `protobuf:"bytes,8,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,9,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
+	Tags          []string               `protobuf:"bytes,12,rep,name=tags" json:"tags,omitempty"`
+	Grants        []*JoinTokenGrant      `protobuf:"bytes,13,rep,name=grants" json:"grants,omitempty"`
+	Ephemeral     *bool                  `protobuf:"varint,14,opt,name=ephemeral" json:"ephemeral,omitempty"`
+	RetireAfter   *durationpb.Duration   `protobuf:"bytes,15,opt,name=retire_after,json=retireAfter" json:"retire_after,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -234,7 +229,6 @@ func (x *JoinToken) GetRetireAfter() *durationpb.Duration {
 	return nil
 }
 
-// Who may log in as one Linux account on every target the token enrolls.
 type JoinTokenGrant struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Username          *string                `protobuf:"bytes,1,opt,name=username" json:"username,omitempty"`
@@ -304,21 +298,18 @@ func (x *JoinTokenGrant) GetServiceAccountIds() []string {
 }
 
 type CreateJoinTokenRequest struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Kind        *JoinTokenKind         `protobuf:"varint,1,opt,name=kind,enum=nokku.v1.JoinTokenKind" json:"kind,omitempty"`
-	Label       *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
-	Ttl         *durationpb.Duration   `protobuf:"bytes,3,opt,name=ttl" json:"ttl,omitempty"`
-	MaxUses     *int32                 `protobuf:"varint,4,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
-	AutoApprove *bool                  `protobuf:"varint,5,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
-	CaId        *string                `protobuf:"bytes,6,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	// Invite tokens only. Unset is the member.
-	Role *WorkspaceRole `protobuf:"varint,7,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	// Enroll tokens only.
-	Tags      []string          `protobuf:"bytes,8,rep,name=tags" json:"tags,omitempty"`
-	Grants    []*JoinTokenGrant `protobuf:"bytes,9,rep,name=grants" json:"grants,omitempty"`
-	Ephemeral *bool             `protobuf:"varint,10,opt,name=ephemeral" json:"ephemeral,omitempty"`
-	// Requires ephemeral. Unset is 15 minutes.
-	RetireAfter   *durationpb.Duration `protobuf:"bytes,11,opt,name=retire_after,json=retireAfter" json:"retire_after,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          *JoinTokenKind         `protobuf:"varint,1,opt,name=kind,enum=nokku.v1.JoinTokenKind" json:"kind,omitempty"`
+	Label         *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
+	Ttl           *durationpb.Duration   `protobuf:"bytes,3,opt,name=ttl" json:"ttl,omitempty"`
+	MaxUses       *int32                 `protobuf:"varint,4,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
+	AutoApprove   *bool                  `protobuf:"varint,5,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
+	CaId          *string                `protobuf:"bytes,6,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,7,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Tags          []string               `protobuf:"bytes,8,rep,name=tags" json:"tags,omitempty"`
+	Grants        []*JoinTokenGrant      `protobuf:"bytes,9,rep,name=grants" json:"grants,omitempty"`
+	Ephemeral     *bool                  `protobuf:"varint,10,opt,name=ephemeral" json:"ephemeral,omitempty"`
+	RetireAfter   *durationpb.Duration   `protobuf:"bytes,11,opt,name=retire_after,json=retireAfter" json:"retire_after,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

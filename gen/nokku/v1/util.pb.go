@@ -24,8 +24,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// AuditOutcome FAILED matches every failed call, DENIED only the ones an auth
-// or permission check stopped.
 type AuditOutcome int32
 
 const (
@@ -243,25 +241,17 @@ func (*GetInstanceInfoRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_util_proto_rawDescGZIP(), []int{2}
 }
 
-// Empty fields are not configured. Self-hosted servers usually leave the
-// operator fields empty.
 type GetInstanceInfoResponse struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	OperatorName *string                `protobuf:"bytes,1,opt,name=operator_name,json=operatorName" json:"operator_name,omitempty"`
-	SupportEmail *string                `protobuf:"bytes,2,opt,name=support_email,json=supportEmail" json:"support_email,omitempty"`
-	WebsiteUrl   *string                `protobuf:"bytes,3,opt,name=website_url,json=websiteUrl" json:"website_url,omitempty"`
-	TermsUrl     *string                `protobuf:"bytes,4,opt,name=terms_url,json=termsUrl" json:"terms_url,omitempty"`
-	PrivacyUrl   *string                `protobuf:"bytes,5,opt,name=privacy_url,json=privacyUrl" json:"privacy_url,omitempty"`
-	ImprintUrl   *string                `protobuf:"bytes,6,opt,name=imprint_url,json=imprintUrl" json:"imprint_url,omitempty"`
-	// self_hosted or saas
-	Mode *string `protobuf:"bytes,7,opt,name=mode" json:"mode,omitempty"`
-	// Whether this host offers workspace signup, true only on the hosted
-	// service's root host.
-	Signup *bool `protobuf:"varint,8,opt,name=signup" json:"signup,omitempty"`
-	// Pin of the private CA the server's certificate comes from, in the form
-	// nk --pin and NOKKUD_API_PIN take. Empty when every machine trusts the
-	// certificate already.
-	CaPin         *string `protobuf:"bytes,9,opt,name=ca_pin,json=caPin" json:"ca_pin,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OperatorName  *string                `protobuf:"bytes,1,opt,name=operator_name,json=operatorName" json:"operator_name,omitempty"`
+	SupportEmail  *string                `protobuf:"bytes,2,opt,name=support_email,json=supportEmail" json:"support_email,omitempty"`
+	WebsiteUrl    *string                `protobuf:"bytes,3,opt,name=website_url,json=websiteUrl" json:"website_url,omitempty"`
+	TermsUrl      *string                `protobuf:"bytes,4,opt,name=terms_url,json=termsUrl" json:"terms_url,omitempty"`
+	PrivacyUrl    *string                `protobuf:"bytes,5,opt,name=privacy_url,json=privacyUrl" json:"privacy_url,omitempty"`
+	ImprintUrl    *string                `protobuf:"bytes,6,opt,name=imprint_url,json=imprintUrl" json:"imprint_url,omitempty"`
+	Mode          *string                `protobuf:"bytes,7,opt,name=mode" json:"mode,omitempty"`
+	Signup        *bool                  `protobuf:"varint,8,opt,name=signup" json:"signup,omitempty"`
+	CaPin         *string                `protobuf:"bytes,9,opt,name=ca_pin,json=caPin" json:"ca_pin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -727,14 +717,11 @@ func (x *EventLog) GetTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
-// AuditLogFilter is shared by listing and export, so an export always matches
-// what the list shows.
 type AuditLogFilter struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Search     *string                `protobuf:"bytes,1,opt,name=search" json:"search,omitempty"`
-	ActorIds   []string               `protobuf:"bytes,2,rep,name=actor_ids,json=actorIds" json:"actor_ids,omitempty"`
-	ActorKinds []string               `protobuf:"bytes,3,rep,name=actor_kinds,json=actorKinds" json:"actor_kinds,omitempty"`
-	// Exact action names, a trailing * matches by prefix, e.g. "Delete*".
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Search        *string                `protobuf:"bytes,1,opt,name=search" json:"search,omitempty"`
+	ActorIds      []string               `protobuf:"bytes,2,rep,name=actor_ids,json=actorIds" json:"actor_ids,omitempty"`
+	ActorKinds    []string               `protobuf:"bytes,3,rep,name=actor_kinds,json=actorKinds" json:"actor_kinds,omitempty"`
 	Actions       []string               `protobuf:"bytes,4,rep,name=actions" json:"actions,omitempty"`
 	Target        *string                `protobuf:"bytes,5,opt,name=target" json:"target,omitempty"`
 	Outcome       *AuditOutcome          `protobuf:"varint,6,opt,name=outcome,enum=nokku.v1.AuditOutcome" json:"outcome,omitempty"`
@@ -891,11 +878,10 @@ func (x *ListAuditLogsRequest) GetFilter() *AuditLogFilter {
 }
 
 type ListAuditLogsResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Logs  []*EventLog            `protobuf:"bytes,1,rep,name=logs" json:"logs,omitempty"`
-	Total *int32                 `protobuf:"varint,2,opt,name=total" json:"total,omitempty"`
-	// How long the workspace's plan keeps events.
-	RetentionDays *int32 `protobuf:"varint,3,opt,name=retention_days,json=retentionDays" json:"retention_days,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Logs          []*EventLog            `protobuf:"bytes,1,rep,name=logs" json:"logs,omitempty"`
+	Total         *int32                 `protobuf:"varint,2,opt,name=total" json:"total,omitempty"`
+	RetentionDays *int32                 `protobuf:"varint,3,opt,name=retention_days,json=retentionDays" json:"retention_days,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

@@ -137,7 +137,7 @@ func (x *CreateSCIMTokenRequest) GetLabel() string {
 
 type CreateSCIMTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"` // token is the bearer secret, shown once at creation.
+	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
 	Entry         *SCIMToken             `protobuf:"bytes,2,opt,name=entry" json:"entry,omitempty"`
 	BaseUrl       *string                `protobuf:"bytes,3,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
 	unknownFields protoimpl.UnknownFields

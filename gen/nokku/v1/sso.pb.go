@@ -24,14 +24,13 @@ const (
 )
 
 type SSOProvider struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	ProviderId *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
-	Name       *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Enabled    *bool                  `protobuf:"varint,3,opt,name=enabled" json:"enabled,omitempty"`
-	IssuerUrl  *string                `protobuf:"bytes,4,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
-	ClientId   *string                `protobuf:"bytes,5,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
-	Scopes     []string               `protobuf:"bytes,6,rep,name=scopes" json:"scopes,omitempty"`
-	// Create an account on first sign-in.
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProviderId      *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
+	Name            *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Enabled         *bool                  `protobuf:"varint,3,opt,name=enabled" json:"enabled,omitempty"`
+	IssuerUrl       *string                `protobuf:"bytes,4,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
+	ClientId        *string                `protobuf:"bytes,5,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
+	Scopes          []string               `protobuf:"bytes,6,rep,name=scopes" json:"scopes,omitempty"`
 	JitProvisioning *bool                  `protobuf:"varint,7,opt,name=jit_provisioning,json=jitProvisioning" json:"jit_provisioning,omitempty"`
 	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`

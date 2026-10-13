@@ -6,9 +6,6 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
-// A target account is a local account on a target, like root or deploy. A
-// grant lets a subject log in as it. The certificate principal a login
-// carries is built from the subject, the target and the account.
 service TargetAccountService {
   rpc ListTargetAccounts(ListTargetAccountsRequest) returns (ListTargetAccountsResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
@@ -31,7 +28,6 @@ service TargetAccountService {
   }
 }
 
-// SubjectKind is who a grant is for.
 enum SubjectKind {
   SUBJECT_KIND_UNSPECIFIED = 0;
   SUBJECT_KIND_USER = 1;
@@ -47,8 +43,6 @@ message TargetAccount {
   repeated string team_ids = 5;
   repeated string service_account_ids = 6;
   google.protobuf.Timestamp created_at = 7;
-  // When the host first reported the account. Unset means the host has not
-  // reported it, so grants on it open nothing until it exists there.
   google.protobuf.Timestamp seen_at = 8;
 }
 

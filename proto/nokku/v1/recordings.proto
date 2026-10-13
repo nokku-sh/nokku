@@ -22,21 +22,15 @@ service RecordingService {
 
 message Recording {
   string id = 1;
-  // Empty once the daemon is deleted, the recording stays.
   string daemon_id = 2;
   string username = 3;
   int64 size_bytes = 4;
   bool complete = 5;
   google.protobuf.Timestamp started_at = 6;
   google.protobuf.Timestamp ended_at = 7;
-  // The daemon's name when the session ran.
   string daemon_name = 8;
-  // Who was logged in: the subject of the certificate principal the host
-  // matched. Empty for a recording from a daemon that did not say.
   string subject_id = 9;
   string principal = 10;
-  // The subject's email, or the name of a service account, when the session
-  // ran. It stays when the account is deleted.
   string subject_name = 11;
 }
 
@@ -51,11 +45,7 @@ message UploadRecordingRequest {
 message RecordingMeta {
   string recording_id = 1 [(buf.validate.field).string.uuid = true];
   string username = 2 [(buf.validate.field).string.max_len = 32];
-  // When the session began, for a recording that is uploaded after it. Unset
-  // or in the future means now.
   google.protobuf.Timestamp started_at = 3;
-  // The certificate principal the host matched at login, as the backend built
-  // it. Empty from a daemon that predates the field.
   string principal = 4 [(buf.validate.field).string.max_len = 160];
 }
 

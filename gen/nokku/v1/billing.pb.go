@@ -623,7 +623,6 @@ func (x *GetLicenseResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
-// The license covers the whole instance.
 type ActivateLicenseRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           *string                `protobuf:"bytes,1,opt,name=key" json:"key,omitempty"`

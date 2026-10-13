@@ -60,7 +60,6 @@ type BillingServiceClient interface {
 	CreateCheckout(context.Context, *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error)
 	CancelSubscription(context.Context, *v1.CancelSubscriptionRequest) (*v1.CancelSubscriptionResponse, error)
 	GetLicense(context.Context, *v1.GetLicenseRequest) (*v1.GetLicenseResponse, error)
-	// Self-hosted only. Takes effect at once, no restart.
 	ActivateLicense(context.Context, *v1.ActivateLicenseRequest) (*v1.ActivateLicenseResponse, error)
 }
 
@@ -187,7 +186,6 @@ type BillingServiceHandler interface {
 	CreateCheckout(context.Context, *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error)
 	CancelSubscription(context.Context, *v1.CancelSubscriptionRequest) (*v1.CancelSubscriptionResponse, error)
 	GetLicense(context.Context, *v1.GetLicenseRequest) (*v1.GetLicenseResponse, error)
-	// Self-hosted only. Takes effect at once, no restart.
 	ActivateLicense(context.Context, *v1.ActivateLicenseRequest) (*v1.ActivateLicenseResponse, error)
 }
 

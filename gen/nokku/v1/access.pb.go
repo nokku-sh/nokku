@@ -22,9 +22,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// WorkspaceRole values are ordered, each includes everything before it. The
-// backend compares and stores the numbers, so a role added in between means
-// renumbering the stored rows too.
 type WorkspaceRole int32
 
 const (
@@ -83,20 +80,12 @@ func (WorkspaceRole) EnumDescriptor() ([]byte, []int) {
 	return file_nokku_v1_access_proto_rawDescGZIP(), []int{0}
 }
 
-// Access declares who may call an RPC. An RPC without it is denied, so new
-// RPCs fail closed. The workspace is always known, the request's host names
-// it, so every check below runs inside one workspace.
 type Access struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Skips authentication entirely.
-	Public *bool `protobuf:"varint,1,opt,name=public" json:"public,omitempty"`
-	// Open to any authenticated caller but daemons. The handler scopes to the
-	// caller or checks rights itself.
-	Self *bool `protobuf:"varint,2,opt,name=self" json:"self,omitempty"`
-	// The least role the caller's user or service account needs.
-	Role *WorkspaceRole `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	// Daemons may call it. With nothing else set, only daemons may.
-	Daemon        *bool `protobuf:"varint,4,opt,name=daemon" json:"daemon,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Public        *bool                  `protobuf:"varint,1,opt,name=public" json:"public,omitempty"`
+	Self          *bool                  `protobuf:"varint,2,opt,name=self" json:"self,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Daemon        *bool                  `protobuf:"varint,4,opt,name=daemon" json:"daemon,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

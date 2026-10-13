@@ -66,17 +66,12 @@ const (
 type AccountServiceClient interface {
 	GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error)
 	UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error)
-	// Starts an email change. The address stays the old one until the link
-	// sent to the new address is used with AuthService.ConfirmEmailChange.
-	// Refused for accounts an identity provider manages.
 	RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error)
 	ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error)
 	RenameCredential(context.Context, *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error)
-	// Removes a passkey or a linked identity. The last way in stays.
 	RemoveCredential(context.Context, *v1.RemoveCredentialRequest) (*v1.RemoveCredentialResponse, error)
 	ListAccountSessions(context.Context, *v1.ListAccountSessionsRequest) (*v1.ListAccountSessionsResponse, error)
 	RemoveSession(context.Context, *v1.RemoveSessionRequest) (*v1.RemoveSessionResponse, error)
-	// Refused for the owner, ownership moves first.
 	DeleteAccount(context.Context, *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error)
 }
 
@@ -249,17 +244,12 @@ func (c *accountServiceClient) DeleteAccount(ctx context.Context, req *v1.Delete
 type AccountServiceHandler interface {
 	GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error)
 	UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error)
-	// Starts an email change. The address stays the old one until the link
-	// sent to the new address is used with AuthService.ConfirmEmailChange.
-	// Refused for accounts an identity provider manages.
 	RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error)
 	ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error)
 	RenameCredential(context.Context, *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error)
-	// Removes a passkey or a linked identity. The last way in stays.
 	RemoveCredential(context.Context, *v1.RemoveCredentialRequest) (*v1.RemoveCredentialResponse, error)
 	ListAccountSessions(context.Context, *v1.ListAccountSessionsRequest) (*v1.ListAccountSessionsResponse, error)
 	RemoveSession(context.Context, *v1.RemoveSessionRequest) (*v1.RemoveSessionResponse, error)
-	// Refused for the owner, ownership moves first.
 	DeleteAccount(context.Context, *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error)
 }
 

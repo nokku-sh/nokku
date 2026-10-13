@@ -6,16 +6,11 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
-// An invite link is how a person gets an account in a workspace. Both calls
-// are public, the visitor has no account yet.
 service InvitationService {
   rpc GetInvitation(GetInvitationRequest) returns (GetInvitationResponse) {
     option (access) = {public: true};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  // Mails a signup link to the address. The account only exists once that
-  // link is used. A passkey signup goes through the passkey endpoints with
-  // the same fields instead. Always answers OK.
   rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse) {
     option (access) = {public: true};
   }

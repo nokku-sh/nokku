@@ -77,16 +77,12 @@ type TargetServiceClient interface {
 	CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error)
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
-	// A member may only ask for itself. Viewers ask for anyone and also get the accounts.
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetMyAccess(context.Context, *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
 	GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error)
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
-	// GetAccessGraph rolls every grant up to subject, login account and target
-	// tag, so a workspace of any size draws as one overview.
 	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
-	// ListAccessGraphTargets is the drill-down into one tag of the graph.
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
 }
 
@@ -315,16 +311,12 @@ type TargetServiceHandler interface {
 	CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error)
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
-	// A member may only ask for itself. Viewers ask for anyone and also get the accounts.
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetMyAccess(context.Context, *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
 	GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error)
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
-	// GetAccessGraph rolls every grant up to subject, login account and target
-	// tag, so a workspace of any size draws as one overview.
 	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
-	// ListAccessGraphTargets is the drill-down into one tag of the graph.
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
 }
 

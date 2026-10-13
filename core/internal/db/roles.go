@@ -25,7 +25,7 @@ func RoleDescription(r nokkuv1.WorkspaceRole) string {
 	case nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN:
 		return "Also manage members, invites, and tokens"
 	case nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER:
-		return "Also workspace settings, SSO, domains, SCIM, billing, ownership transfer, and deleting the workspace"
+		return "Also workspace settings, SSO, SCIM, billing, ownership transfer, and deleting the workspace"
 	}
 	return ""
 }

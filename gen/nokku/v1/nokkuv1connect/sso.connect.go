@@ -47,9 +47,7 @@ const (
 // SSOServiceClient is a client for the nokku.v1.SSOService service.
 type SSOServiceClient interface {
 	ListSSOProviders(context.Context, *v1.ListSSOProvidersRequest) (*v1.ListSSOProvidersResponse, error)
-	// Creates or replaces the provider with that id.
 	PutSSOProvider(context.Context, *v1.PutSSOProviderRequest) (*v1.PutSSOProviderResponse, error)
-	// Also unlinks every identity the provider vouched for.
 	DeleteSSOProvider(context.Context, *v1.DeleteSSOProviderRequest) (*v1.DeleteSSOProviderResponse, error)
 }
 
@@ -123,9 +121,7 @@ func (c *sSOServiceClient) DeleteSSOProvider(ctx context.Context, req *v1.Delete
 // SSOServiceHandler is an implementation of the nokku.v1.SSOService service.
 type SSOServiceHandler interface {
 	ListSSOProviders(context.Context, *v1.ListSSOProvidersRequest) (*v1.ListSSOProvidersResponse, error)
-	// Creates or replaces the provider with that id.
 	PutSSOProvider(context.Context, *v1.PutSSOProviderRequest) (*v1.PutSSOProviderResponse, error)
-	// Also unlinks every identity the provider vouched for.
 	DeleteSSOProvider(context.Context, *v1.DeleteSSOProviderRequest) (*v1.DeleteSSOProviderResponse, error)
 }
 
