@@ -7,6 +7,6 @@ Each part has its own policy. It says what is in scope and how to run that part 
 | Part             | Policy                                         |
 | ---------------- | ---------------------------------------------- |
 | Core and web app | [core/SECURITY.md](./core/SECURITY.md)         |
-| Daemon           | [nokkud/SECURITY.md](./nokkud/SECURITY.md)     |
-| CLI              | [nk/SECURITY.md](./nk/SECURITY.md)             |
+| Daemon           | [daemon/SECURITY.md](./daemon/SECURITY.md)     |
+| CLI              | [cli/SECURITY.md](./cli/SECURITY.md)           |
 | Shared packages  | [internal/SECURITY.md](./internal/SECURITY.md) |

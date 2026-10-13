@@ -23,8 +23,8 @@ Your servers keep working when the core is down. They enforce what they last syn
 | Part       | Folder              | What it does                                           |
 | ---------- | ------------------- | ------------------------------------------------------ |
 | **Core**   | `core` (this one)   | Users, access, certificate authorities, SSO, audit log |
-| **Daemon** | [`nokkud`](../nokkud) | Runs on a server and keeps its SSH access in sync      |
-| **CLI**    | [`nk`](../nk)         | Signs you in on your machine, then plain `ssh` works   |
+| **Daemon** | [`daemon`](../daemon) | Runs on a server and keeps its SSH access in sync      |
+| **CLI**    | [`cli`](../cli)       | Signs you in on your machine, then plain `ssh` works   |
 
 ## Quick start
 

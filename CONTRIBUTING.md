@@ -7,8 +7,8 @@ one pull request.
 | Folder      | What it is                                          |
 | ----------- | --------------------------------------------------- |
 | `core/`     | Backend and web application, binary `nokku`         |
-| `nokkud/`   | The daemon for servers                              |
-| `nk/`       | The CLI                                             |
+| `daemon/`   | The daemon for servers, `nokkud`                    |
+| `cli/`      | The CLI, `nk`                                       |
 | `internal/` | Go packages `nokkud` and `nk` share                 |
 | `proto/`    | The API schema, `gen/` is the Go code built from it |
 
@@ -30,14 +30,14 @@ The core ships backend and frontends together, so it needs a bit more:
 ## Tasks
 
 Run `task --list` in the repo root. Tasks of one part carry its name,
-`task core:dev` or `task nk:build`. Inside a part the same task runs without
+`task core:dev` or `task cli:build`. Inside a part the same task runs without
 the prefix, `cd core && task dev`.
 
 ## The CLI and the daemon
 
 ```bash
-task nk:build
-task nokkud:build
+task cli:build
+task daemon:build
 ```
 
 `nk` is built into `~/.local/bin/`, `nokkud` is installed to `/usr/local/bin`.

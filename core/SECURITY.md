@@ -35,7 +35,7 @@ Only the latest release gets security fixes. Older releases are not patched. On 
 
 ### Out of scope
 
-- The [`nk`](../nk/SECURITY.md) CLI and the [`nokkud`](../nokkud/SECURITY.md) daemon. Each has its own policy in its folder.
+- The [`nk`](../cli/SECURITY.md) CLI and the [`nokkud`](../daemon/SECURITY.md) daemon. Each has its own policy in its folder.
 - The SSH protocol itself, and vulnerabilities in OpenSSH or `sshd`
 - Operating system, container runtime and database engine issues
 - The infrastructure behind the hosted service, and outages of third-party providers

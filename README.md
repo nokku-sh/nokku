@@ -15,8 +15,8 @@ It has three parts. Each has its own README with setup and usage.
 | Part       | Folder               | What it does                                           |
 | ---------- | -------------------- | ------------------------------------------------------ |
 | **Core**   | [`core`](./core)     | Users, access, certificate authorities, SSO, audit log |
-| **Daemon** | [`nokkud`](./nokkud) | Runs on a server and keeps its SSH access in sync      |
-| **CLI**    | [`nk`](./nk)         | Signs you in on your machine, then plain `ssh` works   |
+| **Daemon** | [`daemon`](./daemon) | Runs on a server and keeps its SSH access in sync      |
+| **CLI**    | [`cli`](./cli)       | Signs you in on your machine, then plain `ssh` works   |
 
 The guides are at [nokku.sh/docs](https://nokku.sh/docs).
 
@@ -36,7 +36,7 @@ Everything is one Go module. A change to the API and the code that uses it is on
 task gen     # regenerate code after a change in proto/ or the SQL queries
 task lint    # tidy, vet, test and lint everything
 task test    # unit tests
-task --list  # the rest, tasks of one part are prefixed (core:dev, nk:build)
+task --list  # the rest, tasks of one part are prefixed (core:dev, cli:build)
 ```
 
 [CONTRIBUTING.md](./CONTRIBUTING.md) has the setup.

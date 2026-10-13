@@ -4,12 +4,12 @@ includes:
   core:
     taskfile: ./core
     dir: ./core
-  nokkud:
-    taskfile: ./nokkud
-    dir: ./nokkud
-  nk:
-    taskfile: ./nk
-    dir: ./nk
+  daemon:
+    taskfile: ./daemon
+    dir: ./daemon
+  cli:
+    taskfile: ./cli
+    dir: ./cli
 
 tasks:
   gen:

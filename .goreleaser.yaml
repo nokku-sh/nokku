@@ -31,7 +31,7 @@ builds:
   - &client
     <<: *build
     id: nokkud
-    main: ./nokkud
+    main: ./daemon/cmd/nokkud
     binary: nokkud
     ldflags:
       - -s -w
@@ -45,7 +45,7 @@ builds:
 
   - <<: *client
     id: nk
-    main: ./nk
+    main: ./cli/cmd/nk
     binary: nk
     goos:
       - linux
@@ -55,7 +55,7 @@ builds:
   # binaries only build on a Mac.
   - <<: *client
     id: nk-darwin
-    main: ./nk
+    main: ./cli/cmd/nk
     binary: nk
     env: [CGO_ENABLED=1]
     tags: [enclave]
@@ -65,7 +65,7 @@ builds:
       - amd64
       - arm64
     hooks:
-      pre: ./nk/internal/enclave/build.sh
+      pre: ./cli/internal/enclave/build.sh
     skip: '{{ ne .Runtime.Goos "darwin" }}'
 
 kos:
@@ -86,7 +86,7 @@ kos:
 dockers_v2:
   - ids: [nokkud]
     images: [ghcr.io/nokku-sh/nokkud]
-    dockerfile: nokkud/Dockerfile
+    dockerfile: daemon/Dockerfile
     tags:
       - "{{ .Version }}"
       - "{{ if not .Prerelease }}latest{{ end }}"
@@ -144,17 +144,17 @@ archives:
     formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
     files:
-      - src: nokkud/packaging/systemd/nokkud.service
+      - src: daemon/packaging/systemd/nokkud.service
         dst: nokkud.service
-      - src: nokkud/packaging/openrc/nokkud.openrc
+      - src: daemon/packaging/openrc/nokkud.openrc
         dst: nokkud.openrc # needs to be renamed for OpenRC
-      - src: nokkud/packaging/ufw/nokkud
+      - src: daemon/packaging/ufw/nokkud
         dst: nokkud.ufw
-      - src: nokkud/packaging/firewalld/nokkud.xml
+      - src: daemon/packaging/firewalld/nokkud.xml
         dst: nokkud.firewalld.xml
-      - src: nokkud/packaging/install.sh
+      - src: daemon/packaging/install.sh
         dst: install.sh
-      - src: nokkud/packaging/scripts/postinstall.sh
+      - src: daemon/packaging/scripts/postinstall.sh
         dst: postinstall.sh
 
 nfpms:
@@ -163,7 +163,7 @@ nfpms:
     ids: [nk]
     package_name: nk
     vendor: "MizuchiLabs"
-    homepage: "https://github.com/nokku-sh/nokku/tree/main/nk"
+    homepage: "https://github.com/nokku-sh/nokku/tree/main/cli"
     description: "Nokku SSH companion"
     maintainer: "Nokku <support@mizuchi.dev>"
     license: Apache-2.0
@@ -177,20 +177,20 @@ nfpms:
     id: nokkud
     ids: [nokkud]
     package_name: nokkud
-    homepage: "https://github.com/nokku-sh/nokku/tree/main/nokkud"
+    homepage: "https://github.com/nokku-sh/nokku/tree/main/daemon"
     description: "Nokku Daemon - SSH certificate management daemon"
     scripts:
-      postinstall: nokkud/packaging/scripts/postinstall.sh
-      preremove: nokkud/packaging/scripts/preremove.sh
-      postremove: nokkud/packaging/scripts/postremove.sh
+      postinstall: daemon/packaging/scripts/postinstall.sh
+      preremove: daemon/packaging/scripts/preremove.sh
+      postremove: daemon/packaging/scripts/postremove.sh
     contents:
-      - src: nokkud/packaging/systemd/nokkud.service
+      - src: daemon/packaging/systemd/nokkud.service
         dst: /usr/share/nokkud/systemd/nokkud.service
-      - src: nokkud/packaging/openrc/nokkud.openrc
+      - src: daemon/packaging/openrc/nokkud.openrc
         dst: /usr/share/nokkud/openrc/nokkud.openrc
-      - src: nokkud/packaging/ufw/nokkud
+      - src: daemon/packaging/ufw/nokkud
         dst: /usr/share/nokkud/ufw/nokkud
-      - src: nokkud/packaging/firewalld/nokkud.xml
+      - src: daemon/packaging/firewalld/nokkud.xml
         dst: /usr/share/nokkud/firewalld/nokkud.xml
 
 checksum:
