@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
@@ -124,37 +123,30 @@ func checkAccount(ctx context.Context, r *Report, s *state.State) {
 	}
 	r.add(sec, "servers", StatusInfo, strconv.Itoa(len(s.Targets)))
 
-	if reachable(ctx, s) {
+	switch err := probe(ctx, s); {
+	case err == nil:
 		r.add(sec, "Nokku", StatusOK, s.APIURL)
-	} else {
+	case errors.Is(err, dpopclient.ErrAPIURLMismatch):
+		r.add(sec, "Nokku", StatusFail, err.Error())
+	default:
 		r.add(sec, "Nokku", StatusWarn, "cannot reach "+s.APIURL+", ssh keeps working with cached access")
 	}
 }
 
 // Diagnostic only, a plain HTTP request with a short timeout.
-func reachable(ctx context.Context, s *state.State) bool {
+func probe(ctx context.Context, s *state.State) error {
 	roots, err := trust.Pool([]byte(s.APICA))
 	if err != nil {
-		return false
+		return err
 	}
 	httpc, err := dpopclient.NewHTTPClient(roots, 3*time.Second)
 	if err != nil {
-		return false
+		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-
-	u := strings.TrimRight(s.APIURL, "/") + "/auth/device/nonce"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return false
-	}
-	resp, err := httpc.Do(req)
-	if err != nil {
-		return false
-	}
-	_ = resp.Body.Close()
-	return true
+	_, err = dpopclient.FetchNonce(ctx, httpc, s.APIURL)
+	return err
 }
 
 func checkSSH(r *Report, s *state.State) {

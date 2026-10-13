@@ -15,8 +15,6 @@ import (
 	"unicode"
 
 	"github.com/mizuchilabs/kata/buildinfo"
-
-	"github.com/nokku-sh/nokku/internal/dpopclient"
 )
 
 // A real device flow answer is a few hundred bytes.
@@ -47,13 +45,6 @@ func (c *Client) ensureSession(ctx context.Context, interactive bool) error {
 
 func (c *Client) deviceLogin(ctx context.Context) error {
 	slog.Debug("starting device flow", "api", c.State.APIURL)
-
-	// Fetch the nonce and canonical URL up front, so the first approved poll carries a valid proof. Best effort.
-	if c.dpop != nil {
-		if nonce, serverURL, err := dpopclient.FetchNonce(ctx, c.httpc, c.State.APIURL); err == nil {
-			c.dpop.Learn(nonce, serverURL)
-		}
-	}
 
 	d, err := c.beginDeviceAuth(ctx)
 	if err != nil {
@@ -123,7 +114,7 @@ func (c *Client) pollDeviceToken(
 	ticker := time.NewTicker(wait)
 	defer ticker.Stop()
 
-	bootstrapped, nonceRetried := false, false
+	nonceRetried := false
 
 	for {
 		body, doErr := c.postForm(ctx, "/auth/device/token", url.Values{"device_code": {deviceCode}})
@@ -161,20 +152,10 @@ func (c *Client) pollDeviceToken(
 			nonceRetried = true
 			continue
 		case "invalid_dpop_proof":
-			// The configured URL can differ from the canonical one proofs bind to, so learn it and retry once.
-			if bootstrapped || c.dpop == nil {
-				return "", 0, errors.New(
-					"sign-in failed, Nokku rejected this machine's proof. " +
-						"Check that the clock is right and run nk login again",
-				)
-			}
-			bootstrapped = true
-			nonce, serverURL, nerr := dpopclient.FetchNonce(ctx, c.httpc, c.State.APIURL)
-			if nerr != nil {
-				return "", 0, nerr
-			}
-			c.dpop.Learn(nonce, serverURL)
-			continue
+			return "", 0, errors.New(
+				"sign-in failed, Nokku rejected this machine's proof. " +
+					"Check that the clock is right and run nk login again",
+			)
 		case "slow_down":
 			// RFC 8628 section 3.5. The server counts violations per grant and its interval keeps growing.
 			wait += 5 * time.Second
@@ -198,7 +179,6 @@ func (c *Client) pollDeviceToken(
 	}
 }
 
-// The proof binds to the canonical API URL the server advertises, not the configured one the request goes to.
 func (c *Client) postForm(
 	ctx context.Context,
 	path string,
@@ -215,7 +195,7 @@ func (c *Client) postForm(
 	req.Header.Set("User-Agent", buildinfo.UserAgent("nk"))
 
 	if c.dpop != nil {
-		proof, perr := c.dpop.Proof(http.MethodPost, c.dpop.HtuBase()+path)
+		proof, perr := c.dpop.Proof(ctx, http.MethodPost, path)
 		if perr != nil {
 			return nil, perr
 		}
@@ -230,7 +210,7 @@ func (c *Client) postForm(
 
 	// Learn before the status check, the rejection carries the nonce the retry needs.
 	if c.dpop != nil {
-		c.dpop.LearnHeaders(resp.Header)
+		c.dpop.Learn(resp.Header.Get("DPoP-Nonce"))
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxDeviceResponse))

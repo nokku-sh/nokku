@@ -108,7 +108,7 @@ func systemTrusts(ctx context.Context, api string) bool {
 	if err != nil {
 		return false
 	}
-	_, _, err = dpopclient.FetchNonce(ctx, httpc, api)
+	_, err = dpopclient.FetchNonce(ctx, httpc, api)
 	return !trust.Untrusted(err)
 }
 

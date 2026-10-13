@@ -20,27 +20,17 @@ import (
 	"github.com/go-jose/go-jose/v4/cryptosigner"
 )
 
-// ProoferOptions configures a Proofer.
-type ProoferOptions struct {
-	// Now injects the clock for tests.
-	Now func() time.Time
-}
-
 // Proofer signs DPoP proofs with an ECDSA P-256 [crypto.Signer]. The signer
 // must sign digests directly (both the TPM and software signers do).
 type Proofer struct {
 	signer jose.Signer
-	now    func() time.Time
 }
 
 // NewProofer builds a proofer around key.
-func NewProofer(key crypto.Signer, opts ProoferOptions) (*Proofer, error) {
+func NewProofer(key crypto.Signer) (*Proofer, error) {
 	pub, ok := key.Public().(*ecdsa.PublicKey)
 	if !ok || pub.Curve != elliptic.P256() {
 		return nil, errors.New("dpop: signer must be an ECDSA P-256 key")
-	}
-	if opts.Now == nil {
-		opts.Now = time.Now
 	}
 	signerOpts := (&jose.SignerOptions{}).WithType("dpop+jwt")
 	signerOpts.EmbedJWK = true
@@ -51,7 +41,7 @@ func NewProofer(key crypto.Signer, opts ProoferOptions) (*Proofer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dpop: build signer: %w", err)
 	}
-	return &Proofer{signer: signer, now: opts.Now}, nil
+	return &Proofer{signer: signer}, nil
 }
 
 // ATH returns the base64url-encoded SHA-256 hash of token, the "ath" claim.
@@ -71,7 +61,7 @@ func (p *Proofer) Sign(htm, htu, ath, nonce string) (string, error) {
 	claims := map[string]any{
 		"htm": htm,
 		"htu": htu,
-		"iat": p.now().Unix(),
+		"iat": time.Now().Unix(),
 		"jti": jti,
 	}
 	if nonce != "" {
@@ -92,8 +82,7 @@ func (p *Proofer) Sign(htm, htu, ath, nonce string) (string, error) {
 	return jws.CompactSerialize()
 }
 
-// newJTI returns a fresh, unique proof identifier. A CSPRNG failure is fatal:
-// a predictable jti would weaken replay detection.
+// A CSPRNG failure is fatal, a predictable jti would weaken replay detection.
 func newJTI() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

@@ -29,16 +29,14 @@ import (
 // exercise the client's poll loop: pending polls skip DPoP checks, the
 // approved poll verifies the proof (nonce, htu, replay), use_dpop_nonce
 // advertises only a DPoP-Nonce header, and the replay store persists across
-// logins. The canonical URL (what proofs must bind to) differs from the
-// server's listen URL, like a dev deployment where NOKKU_BASE_URL points at
-// the Vite dev port while the CLI talks to the raw API port.
+// logins. baseURL is the URL the server knows itself by. It is the listen URL
+// unless a test moves it.
 type fakeDeviceFlow struct {
 	mu         sync.Mutex
 	grants     map[string]*fakeGrant // by device code
 	replay     map[string]bool
 	nonce      string
-	baseURL    string // canonical URL proofs must bind to
-	listenURL  string // where the endpoints are actually reached
+	baseURL    string
 	violations map[string]int
 	lastPoll   map[string]time.Time
 }
@@ -64,8 +62,7 @@ func newFakeDeviceFlow(t *testing.T) (*fakeDeviceFlow, *httptest.Server) {
 	mux.HandleFunc("POST /auth/device/token", f.poll)
 	mux.HandleFunc("GET /auth/device/nonce", f.nonceEndpoint)
 	srv := httptest.NewServer(mux)
-	f.listenURL = srv.URL
-	f.baseURL = "http://localhost:5173"
+	f.baseURL = srv.URL
 	t.Cleanup(srv.Close)
 	return f, srv
 }
@@ -118,7 +115,7 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 		if derr != "" {
 			// Mirror the server's advertisement: the canonical URL rides
 			// every proof failure, the nonce on all of them too.
-			w.Header().Set(dpopclient.APIURLHeader, f.baseURL)
+			w.Header().Set("Nokku-Api-Url", f.baseURL)
 			w.Header().Set("DPoP-Nonce", f.nonce)
 			writeOAuthErr(w, derr)
 			return
@@ -134,7 +131,7 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 func (f *fakeDeviceFlow) nonceEndpoint(w http.ResponseWriter, _ *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	w.Header().Set(dpopclient.APIURLHeader, f.baseURL)
+	w.Header().Set("Nokku-Api-Url", f.baseURL)
 	w.Header().Set("DPoP-Nonce", f.nonce)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -199,7 +196,7 @@ func newTestProofer(t *testing.T) *dpop.Proofer {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	p, err := dpop.NewProofer(key, dpop.ProoferOptions{})
+	p, err := dpop.NewProofer(key)
 	require.NoError(t, err)
 	return p
 }
@@ -325,8 +322,7 @@ func TestPollDeviceTokenRetriesNonceWithoutWaiting(t *testing.T) {
 	assert.Less(t, time.Since(start), 5*time.Second, "the retry waited for the poll interval")
 }
 
-// Learning the canonical URL fixes a proof bound to the wrong one. A proof that
-// is still refused after that, like one from a wrong clock, ends the login.
+// A refused proof, like one from a wrong clock, ends the login. No other URL is tried.
 func TestPollDeviceTokenGivesUpOnARejectedProof(t *testing.T) {
 	t.Parallel()
 	var polls atomic.Int32
@@ -348,7 +344,21 @@ func TestPollDeviceTokenGivesUpOnARejectedProof(t *testing.T) {
 
 	_, _, err := c.pollDeviceToken(t.Context(), "dev", 30)
 	require.ErrorContains(t, err, "Check that the clock is right")
-	assert.EqualValues(t, 2, polls.Load(), "one retry after learning the canonical URL, then stop")
+	assert.EqualValues(t, 1, polls.Load(), "a rejected proof is final")
+}
+
+// A proof only verifies for the URL the server knows itself by, so a login through another URL stops at once.
+func TestDeviceLoginRefusesAServerAtAnotherURL(t *testing.T) {
+	f, srv := newFakeDeviceFlow(t)
+	f.baseURL = "https://nokku.example.com"
+	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
+	c.dpop = dpopclient.New(newTestProofer(t), srv.Client(), func() string { return "" },
+		dpopclient.Options{BaseURL: srv.URL})
+
+	err := c.deviceLogin(t.Context())
+	require.ErrorIs(t, err, dpopclient.ErrAPIURLMismatch)
+	require.ErrorContains(t, err, "https://nokku.example.com", "the error names the URL to use")
+	assert.Empty(t, f.grants, "no device flow was started")
 }
 
 // The code and the link are printed, and the answer is read into memory.

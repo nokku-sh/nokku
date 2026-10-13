@@ -13,5 +13,5 @@ func NewProofer(opts tpm.SignerOptions) (*dpop.Proofer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return dpop.NewProofer(signer, dpop.ProoferOptions{})
+	return dpop.NewProofer(signer)
 }

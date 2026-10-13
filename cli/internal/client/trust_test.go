@@ -45,7 +45,7 @@ func TestPinServerKeepsCA(t *testing.T) {
 	assert.True(t, keeps(c.State.APICA, pin))
 	assert.Equal(t, c.State.APICA, state.Load().APICA, "the CA is kept for the next run")
 
-	_, _, err := dpopclient.FetchNonce(t.Context(), c.httpc, srv.URL)
+	_, err := dpopclient.FetchNonce(t.Context(), c.httpc, srv.URL)
 	require.NoError(t, err, "the client verifies the server with the kept CA")
 
 	httpc := c.httpc
