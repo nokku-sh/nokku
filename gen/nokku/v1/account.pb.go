@@ -1119,10 +1119,10 @@ const file_nokku_v1_account_proto_rawDesc = "" +
 	"lastSeenAt\"\x13\n" +
 	"\x11GetAccountRequest\"8\n" +
 	"\x12GetAccountResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\"N\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\"[\n" +
 	"\x14UpdateAccountRequest\x12\x1c\n" +
-	"\x04name\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x04name\x12\x18\n" +
-	"\apicture\x18\x02 \x01(\tR\apicture\";\n" +
+	"\x04name\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x04name\x12%\n" +
+	"\apicture\x18\x02 \x01(\tB\v\xbaH\br\x06\x18\x80\x10\x90\x01\x01R\apicture\";\n" +
 	"\x15UpdateAccountResponse\x12\"\n" +
 	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\"A\n" +
 	"\x19RequestEmailChangeRequest\x12$\n" +

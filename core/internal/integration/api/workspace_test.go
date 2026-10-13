@@ -13,6 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/storage"
 )
 
 func TestTransferOwnership(t *testing.T) {
@@ -43,6 +44,43 @@ func TestTransferOwnership(t *testing.T) {
 	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, role(member), "a member takes over")
 	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN, role(owner), "the old owner steps down to admin")
 	assert.Equal(t, member.ID, seedOwner(t, cfg).ID)
+}
+
+// A write to the owner row after the new owner joined puts it behind that row. One statement that swaps both roles
+// then makes the new owner first and trips the index that allows a single owner.
+func TestTransferOwnershipAfterTheOwnerRowMoved(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ws := seedWorkspace(t, cfg)
+	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	owner := seedOwner(t, cfg)
+	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+		_, err := q.UpdateUser(t.Context(), &db.UpdateUserParams{ID: owner.ID, Name: new("renamed")})
+		return err
+	})
+
+	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
+		srv.Client(), srv.URL, header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
+	)
+	_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &member.ID})
+	require.NoError(t, err)
+	assert.Equal(t, member.ID, seedOwner(t, cfg).ID)
+}
+
+func TestDeleteUserRemovesTheAvatar(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ws := seedWorkspace(t, cfg)
+	user := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	avatar := storage.AvatarPath(user.ID)
+	_, err := cfg.Storage.Store(t.Context(), avatar, []byte("jpeg"), storage.StoreOptions{ContentType: "image/jpeg"})
+	require.NoError(t, err)
+
+	admin := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
+		header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
+	_, err = admin.DeleteUser(t.Context(), &nokkuv1.DeleteUserRequest{UserId: &user.ID})
+	require.NoError(t, err)
+
+	_, err = cfg.Storage.Reader(t.Context(), avatar)
+	assert.Error(t, err, "the photo outlived the account")
 }
 
 // Admins manage users below them and never the owner or themselves.

@@ -44,6 +44,11 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, tok, err := f.svc.AuthenticateToken(r.Context(), raw)
+	// A provider reads 401 as a broken token. A lookup that failed is ours to answer for, and it retries a 500.
+	if err != nil && !IsCredentialError(err) {
+		writeScimError(w, scimerrors.ScimErrorInternal)
+		return
+	}
 	if err != nil || p.Kind != actor.KindSCIM {
 		writeScimError(w, scimerrors.ScimError{Status: http.StatusUnauthorized, Detail: "invalid token"})
 		return

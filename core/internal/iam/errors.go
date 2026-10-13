@@ -34,3 +34,16 @@ var (
 	errReplay          = fmt.Errorf("%w: replayed proof", errInvalidProof)
 	errBindingMismatch = fmt.Errorf("%w: jkt mismatch", errInvalidProof)
 )
+
+// IsCredentialError tells a refused credential from a failure to check one. Only the first may end a session.
+func IsCredentialError(err error) bool {
+	for _, target := range []error{
+		errNoSession, errSessionExpired, errInvalidCredentials, ErrInactive, ErrNotFound,
+		ErrDPoPRequired, ErrDPoPNonce, errInvalidProof,
+	} {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
+}

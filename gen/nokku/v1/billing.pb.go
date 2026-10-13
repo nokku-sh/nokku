@@ -753,9 +753,9 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\x0eBillingService\x12R\n" +
 	"\n" +
 	"GetBilling\x12\x1b.nokku.v1.GetBillingRequest\x1a\x1c.nokku.v1.GetBillingResponse\"\t\xc2\xf3\x18\x02\x18\x04\x90\x02\x01\x12U\n" +
-	"\fCreatePortal\x12\x1d.nokku.v1.CreatePortalRequest\x1a\x1e.nokku.v1.CreatePortalResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12[\n" +
-	"\x0eCreateCheckout\x12\x1f.nokku.v1.CreateCheckoutRequest\x1a .nokku.v1.CreateCheckoutResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12g\n" +
-	"\x12CancelSubscription\x12#.nokku.v1.CancelSubscriptionRequest\x1a$.nokku.v1.CancelSubscriptionResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12R\n" +
+	"\fCreatePortal\x12\x1d.nokku.v1.CreatePortalRequest\x1a\x1e.nokku.v1.CreatePortalResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12[\n" +
+	"\x0eCreateCheckout\x12\x1f.nokku.v1.CreateCheckoutRequest\x1a .nokku.v1.CreateCheckoutResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12g\n" +
+	"\x12CancelSubscription\x12#.nokku.v1.CancelSubscriptionRequest\x1a$.nokku.v1.CancelSubscriptionResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12R\n" +
 	"\n" +
 	"GetLicense\x12\x1b.nokku.v1.GetLicenseRequest\x1a\x1c.nokku.v1.GetLicenseResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12^\n" +
 	"\x0fActivateLicense\x12 .nokku.v1.ActivateLicenseRequest\x1a!.nokku.v1.ActivateLicenseResponse\"\x06\xc2\xf3\x18\x02\x18\x05B\x8d\x01\n" +

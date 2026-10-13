@@ -147,16 +147,10 @@ var subjectKinds = map[string]nokkuv1.SubjectKind{
 }
 
 func subjectKind(k nokkuv1.SubjectKind) (string, bool) {
-	switch k {
-	case nokkuv1.SubjectKind_SUBJECT_KIND_USER:
-		return db.SubjectKindUser, true
-	case nokkuv1.SubjectKind_SUBJECT_KIND_TEAM:
-		return db.SubjectKindTeam, true
-	case nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT:
-		return db.SubjectKindServiceAccount, true
-	case nokkuv1.SubjectKind_SUBJECT_KIND_UNSPECIFIED:
-		return "", false
-	default:
-		return "", false
+	for name, kind := range subjectKinds {
+		if kind == k {
+			return name, true
+		}
 	}
+	return "", false
 }

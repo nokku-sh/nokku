@@ -13,6 +13,23 @@ import (
 	nokku "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
+const clearDefaultCA = `-- name: ClearDefaultCA :exec
+UPDATE ssh_cas
+SET
+  is_default = FALSE,
+  updated_at = NOW()
+WHERE
+  is_default
+  AND id <> $1
+`
+
+// Runs before MarkDefaultCA. The partial unique index is checked row by row, so one statement that swaps
+// both can see two defaults. See Queries.SetDefaultCA.
+func (q *Queries) ClearDefaultCA(ctx context.Context, caID string) error {
+	_, err := q.db.Exec(ctx, clearDefaultCA, caID)
+	return err
+}
+
 const createCA = `-- name: CreateCA :one
 INSERT INTO
   ssh_cas (
@@ -482,6 +499,20 @@ func (q *Queries) ListCAs(ctx context.Context) ([]*SSHCA, error) {
 	return items, nil
 }
 
+const markDefaultCA = `-- name: MarkDefaultCA :exec
+UPDATE ssh_cas
+SET
+  is_default = TRUE,
+  updated_at = NOW()
+WHERE
+  id = $1
+`
+
+func (q *Queries) MarkDefaultCA(ctx context.Context, caID string) error {
+	_, err := q.db.Exec(ctx, markDefaultCA, caID)
+	return err
+}
+
 const replaceCA = `-- name: ReplaceCA :one
 UPDATE ssh_cas
 SET
@@ -557,22 +588,6 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, 
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const setDefaultCA = `-- name: SetDefaultCA :exec
-UPDATE ssh_cas
-SET
-  is_default = (id = $1),
-  updated_at = NOW()
-WHERE
-  id = $1
-  OR is_default
-`
-
-// One statement, so the partial unique index never sees two defaults.
-func (q *Queries) SetDefaultCA(ctx context.Context, caID string) error {
-	_, err := q.db.Exec(ctx, setDefaultCA, caID)
-	return err
 }
 
 const updateCA = `-- name: UpdateCA :one

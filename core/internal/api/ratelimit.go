@@ -65,7 +65,6 @@ func clientIP(r *http.Request) (string, error) {
 func isAuthRoute(path string) bool {
 	return strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
 		strings.HasPrefix(path, "/nokku.v1.InvitationService/") ||
-		path == nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure ||
 		strings.HasPrefix(path, "/auth/") ||
 		strings.HasPrefix(path, "/oidc/") ||
 		strings.HasPrefix(path, "/passkey/")

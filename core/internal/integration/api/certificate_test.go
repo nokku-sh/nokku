@@ -216,3 +216,33 @@ func TestCARestrictions(t *testing.T) {
 	assert.Empty(t, cleared.GetCertificateAuthority().GetSourceAddress())
 	assert.Equal(t, "/usr/local/bin/backup", cleared.GetCertificateAuthority().GetForceCommand())
 }
+
+// The default moves in both directions. One statement that swaps it depends on which row Postgres visits first.
+func TestDefaultCAMoves(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
+	admin := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth)
+	defaults := func() []string {
+		res, err := admin.ListCertificateAuthorities(t.Context(), &nokkuv1.ListCertificateAuthoritiesRequest{})
+		require.NoError(t, err)
+		var ids []string
+		for _, ca := range res.GetCertificateAuthorities() {
+			if ca.GetIsDefault() {
+				ids = append(ids, ca.GetId())
+			}
+		}
+		return ids
+	}
+
+	first := seedDefaultCA(t, srv, adminAuth).GetId()
+	second := seedDefaultCA(t, srv, adminAuth).GetId()
+	assert.Equal(t, []string{second}, defaults(), "a new default takes it from the old one")
+
+	_, err := admin.UpdateCertificateAuthority(t.Context(), &nokkuv1.UpdateCertificateAuthorityRequest{
+		Id: &first, IsDefault: new(true),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{first}, defaults(), "the default moves back to an older CA")
+}

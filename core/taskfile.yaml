@@ -68,11 +68,6 @@ tasks:
       - golangci-lint run --fix
       - cd web; pnpm fmt; pnpm lint
 
-  debug:
-    desc: Run profiler
-    cmds:
-      - go tool pprof -http=:8081 http://127.0.0.1:3000/debug/pprof/profile\?seconds\=10
-
   snapshot:
     desc: Build snapshot
     # .goreleaser.yaml is in the repo root.

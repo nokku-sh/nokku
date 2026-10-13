@@ -107,7 +107,11 @@ func (s *Service) HasSMTP() bool {
 	return s.SMTPHost != ""
 }
 
-func (s *Service) SendMagicLinkEmail(ctx context.Context, userID, email, link, expiry string) error {
+func (s *Service) SendMagicLinkEmail(
+	ctx context.Context,
+	userID, email, link string,
+	expiry time.Duration,
+) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   userID,
 		to:       email,
@@ -116,13 +120,13 @@ func (s *Service) SendMagicLinkEmail(ctx context.Context, userID, email, link, e
 		data: linkTemplateData{
 			Operator:   s.Operator,
 			LinkURL:    link,
-			Expiration: expiry,
+			Expiration: lifetime(expiry),
 		},
 	})
 }
 
 // SendOwnerLinkEmail keys the cooldown by the address, every hosted signup makes a new owner.
-func (s *Service) SendOwnerLinkEmail(ctx context.Context, email, link, expiry string) error {
+func (s *Service) SendOwnerLinkEmail(ctx context.Context, email, link string, expiry time.Duration) error {
 	return s.SendMagicLinkEmail(ctx, email, email, link, expiry)
 }
 
@@ -133,7 +137,11 @@ func (s *Service) OwnerLinkOnCooldown(ctx context.Context, email string) bool {
 }
 
 // SendEmailChangeConfirm goes to the new address, the account only switches once the link is used.
-func (s *Service) SendEmailChangeConfirm(ctx context.Context, userID, email, link, expiry string) error {
+func (s *Service) SendEmailChangeConfirm(
+	ctx context.Context,
+	userID, email, link string,
+	expiry time.Duration,
+) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   userID,
 		to:       email,
@@ -142,7 +150,7 @@ func (s *Service) SendEmailChangeConfirm(ctx context.Context, userID, email, lin
 		data: linkTemplateData{
 			Operator:   s.Operator,
 			LinkURL:    link,
-			Expiration: expiry,
+			Expiration: lifetime(expiry),
 		},
 	})
 }
@@ -154,7 +162,11 @@ func (s *Service) EmailChangeOnCooldown(ctx context.Context, userID string) bool
 }
 
 // SendSignupLinkEmail goes to someone without an account yet, so the cooldown is keyed by the address.
-func (s *Service) SendSignupLinkEmail(ctx context.Context, email, name, workspace, link, expiry string) error {
+func (s *Service) SendSignupLinkEmail(
+	ctx context.Context,
+	email, name, workspace, link string,
+	expiry time.Duration,
+) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   email,
 		to:       email,
@@ -165,7 +177,7 @@ func (s *Service) SendSignupLinkEmail(ctx context.Context, email, name, workspac
 			UserName:   name,
 			Workspace:  workspace,
 			LinkURL:    link,
-			Expiration: expiry,
+			Expiration: lifetime(expiry),
 		},
 	})
 }
@@ -173,7 +185,8 @@ func (s *Service) SendSignupLinkEmail(ctx context.Context, email, name, workspac
 // SendEmailChangeNotice only shows the new address masked, the reader may not be the one who asked.
 func (s *Service) SendEmailChangeNotice(
 	ctx context.Context,
-	userID, email, newEmail, cancelURL, expiry string,
+	userID, email, newEmail, cancelURL string,
+	expiry time.Duration,
 ) error {
 	local, domain, _ := strings.Cut(newEmail, "@")
 	return s.sendTemplate(ctx, sendRequest{
@@ -185,7 +198,7 @@ func (s *Service) SendEmailChangeNotice(
 			Operator:   s.Operator,
 			NewEmail:   local[:min(1, len(local))] + "***@" + domain,
 			CancelURL:  cancelURL,
-			Expiration: expiry,
+			Expiration: lifetime(expiry),
 		},
 	})
 }
@@ -289,4 +302,19 @@ func renderFile(path string, data any, parse func(string) (executor, error)) (st
 		return "", fmt.Errorf("failed to execute template %s: %w", path, err)
 	}
 	return buf.String(), nil
+}
+
+// lifetime words how long a link works in its largest whole unit, "24 hours" and not "24h0m0s".
+func lifetime(d time.Duration) string {
+	n, unit := int(d/time.Minute), "minute"
+	switch {
+	case d >= 48*time.Hour && d%(24*time.Hour) == 0:
+		n, unit = int(d/(24*time.Hour)), "day"
+	case d >= time.Hour && d%time.Hour == 0:
+		n, unit = int(d/time.Hour), "hour"
+	}
+	if n != 1 {
+		unit += "s"
+	}
+	return fmt.Sprintf("%d %s", n, unit)
 }

@@ -145,18 +145,22 @@ WITH
         )
       )
       AND (
-        $6::TEXT IS NULL
-        OR target = $6
+        $6::TEXT[] IS NULL
+        OR action <> ALL ($6::TEXT[])
+      )
+      AND (
+        $7::TEXT IS NULL
+        OR target = $7
       )
       -- Failed is every failed call, denied only those an auth or permission check stopped.
       AND (
-        $7::TEXT IS NULL
+        $8::TEXT IS NULL
         OR (
-          $7 = 'succeeded'
+          $8 = 'succeeded'
           AND ok
         )
         OR (
-          $7 = 'denied'
+          $8 = 'denied'
           AND NOT ok
           AND (
             action = 'LoginDenied'
@@ -164,23 +168,23 @@ WITH
           )
         )
         OR (
-          $7 = 'failed'
+          $8 = 'failed'
           AND NOT ok
         )
       )
       AND (
-        $8::TEXT IS NULL
-        OR action ILIKE '%' || $8 || '%'
-        OR actor_name ILIKE '%' || $8 || '%'
-        OR target ILIKE '%' || $8 || '%'
-      )
-      AND (
-        $9::timestamptz IS NULL
-        OR timestamp >= $9
+        $9::TEXT IS NULL
+        OR action ILIKE '%' || $9 || '%'
+        OR actor_name ILIKE '%' || $9 || '%'
+        OR target ILIKE '%' || $9 || '%'
       )
       AND (
         $10::timestamptz IS NULL
-        OR timestamp < $10
+        OR timestamp >= $10
+      )
+      AND (
+        $11::timestamptz IS NULL
+        OR timestamp < $11
       )
   )
 SELECT
@@ -202,16 +206,17 @@ OFFSET
 `
 
 type ListAuditLogsParams struct {
-	Offset     int32      `json:"offset"`
-	Limit      int32      `json:"limit"`
-	ActorIds   []string   `json:"actorIds"`
-	ActorKinds []string   `json:"actorKinds"`
-	Actions    []string   `json:"actions"`
-	Target     *string    `json:"target"`
-	Outcome    *string    `json:"outcome"`
-	Search     *string    `json:"search"`
-	StartDate  *time.Time `json:"startDate"`
-	EndDate    *time.Time `json:"endDate"`
+	Offset          int32      `json:"offset"`
+	Limit           int32      `json:"limit"`
+	ActorIds        []string   `json:"actorIds"`
+	ActorKinds      []string   `json:"actorKinds"`
+	Actions         []string   `json:"actions"`
+	ExcludedActions []string   `json:"excludedActions"`
+	Target          *string    `json:"target"`
+	Outcome         *string    `json:"outcome"`
+	Search          *string    `json:"search"`
+	StartDate       *time.Time `json:"startDate"`
+	EndDate         *time.Time `json:"endDate"`
 }
 
 type ListAuditLogsRow struct {
@@ -238,6 +243,7 @@ func (q *Queries) ListAuditLogs(ctx context.Context, arg *ListAuditLogsParams) (
 		arg.ActorIds,
 		arg.ActorKinds,
 		arg.Actions,
+		arg.ExcludedActions,
 		arg.Target,
 		arg.Outcome,
 		arg.Search,

@@ -80,6 +80,15 @@ func (s *daemonControlService) EnrollDaemon(
 	if err != nil {
 		return nil, errInternal
 	}
+	// The call is public, so the audit interceptor has no actor for it.
+	s.cfg.Audit.Record(ctx, &audit.Event{
+		Action:    "EnrollDaemon",
+		ActorID:   out.DaemonID,
+		ActorKind: string(actor.KindDaemon),
+		ActorName: out.Name,
+		Target:    out.DaemonID,
+		OK:        true,
+	})
 
 	return &nokkuv1.EnrollDaemonResponse{
 		Id:          &out.DaemonID,
@@ -180,10 +189,11 @@ func (s *daemonControlService) UploadRecording(
 	}
 
 	// Asked before the row exists, so a refused upload leaves nothing behind. The daemon tries again later.
-	if !s.cfg.Record.MakeRoom(ctx, actor.WorkspaceIDFromContext(ctx), meta.GetRecordingId(), 0) {
+	workspaceID := actor.WorkspaceIDFromContext(ctx)
+	if !s.cfg.Record.MakeRoom(ctx, workspaceID, meta.GetRecordingId(), 0) {
 		return nil, errRecordingStorageFull
 	}
-	rec, workspaceID, err := s.resolveUpload(ctx, daemonID, meta)
+	rec, err := s.resolveUpload(ctx, daemonID, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +250,12 @@ receive:
 		}
 	}
 	interrupted := stream.Err() != nil && !errors.Is(stream.Err(), io.EOF)
-	if err = w.Close(); err != nil {
+	if !complete && size < rec.SizeBytes {
+		// An earlier try stored more than this one. Committing would replace it with less.
+		abort()
+		_ = w.Close()
+		size = rec.SizeBytes
+	} else if err = w.Close(); err != nil {
 		slog.Error("commit recording object", "recording_id", rec.ID, "error", err)
 		// Nothing of this upload is stored, what an earlier try left still is.
 		ended, size, complete = errInternal, rec.SizeBytes, false
@@ -291,20 +306,14 @@ func (s *daemonControlService) resolveUpload(
 	ctx context.Context,
 	daemonID string,
 	rm *nokkuv1.RecordingMeta,
-) (*db.Recording, string, error) {
+) (*db.Recording, error) {
 	var rec *db.Recording
-	var workspaceID string
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		daemon, err := q.GetDaemon(ctx, daemonID)
-		if err != nil {
-			return err
-		}
-		workspaceID = daemon.WorkspaceID
-
 		existing, err := q.GetRecording(ctx, rm.GetRecordingId())
 		if err == nil {
 			if existing.DaemonID == nil || *existing.DaemonID != daemonID {
-				return errors.New("recording belongs to another daemon")
+				// This code tells the daemon not to send the file again, it would block every later one.
+				return newError(connect.CodeInvalidArgument, "recording belongs to another daemon")
 			}
 			if existing.Complete {
 				return newError(connect.CodeInvalidArgument, "recording is already finalized")
@@ -343,9 +352,9 @@ func (s *daemonControlService) resolveUpload(
 		})
 		return err
 	}); err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	return rec, workspaceID, nil
+	return rec, nil
 }
 
 // UnenrollDaemon removes the calling daemon and the session it called with.
@@ -386,6 +395,9 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci connect.Cal
 		if errors.Is(err, iam.ErrDPoPNonce) {
 			svc.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
 			return "", newError(connect.CodeUnauthenticated, "stale DPoP nonce")
+		}
+		if !iam.IsCredentialError(err) {
+			return "", err
 		}
 		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")
 	}

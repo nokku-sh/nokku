@@ -69,6 +69,11 @@ func (s *workspaceService) DeleteWorkspace(
 		return nil, errSingleWorkspace
 	}
 	ws := actor.WorkspaceIDFromContext(ctx)
+	// Avatars are stored by user id, so the ids are read while the rows exist.
+	userIDs, err := s.cfg.Conn.Tenant().ListUserIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.cfg.Billing.Cancel(ctx, ws, true, ""); err != nil {
 		return nil, errInternal
 	}
@@ -76,7 +81,19 @@ func (s *workspaceService) DeleteWorkspace(
 		return nil, err
 	}
 	s.cfg.Record.PurgeWorkspace(ctx, ws)
+	s.purgeAvatars(ctx, userIDs)
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
+}
+
+// purgeAvatars runs detached like PurgeWorkspace, a big workspace would outlast the request.
+func (s *workspaceService) purgeAvatars(ctx context.Context, userIDs []string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
+	go func() {
+		defer cancel()
+		for _, id := range userIDs {
+			deleteAvatar(ctx, s.cfg, id)
+		}
+	}()
 }
 
 // CreateWorkspace is the hosted signup. The workspace is deleted again when nobody uses the sign-in link.
@@ -108,7 +125,6 @@ func (s *workspaceService) CreateWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	audit.SetTarget(ctx, ws.ID)
 
 	wsCtx := actor.WithWorkspace(ctx, actor.Workspace{
 		ID: ws.ID, Slug: ws.Slug, BaseURL: s.cfg.Tenant.BaseURL(ws.Slug),
@@ -121,10 +137,19 @@ func (s *workspaceService) CreateWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	if err := s.cfg.Email.SendOwnerLinkEmail(ctx, addr, link, (24 * time.Hour).String()); err != nil {
+	if err := s.cfg.Email.SendOwnerLinkEmail(ctx, addr, link, iam.BootstrapTTL); err != nil {
 		slog.Error("signup mail not sent", "error", err, "workspace_id", ws.ID)
 		return nil, errMailNotSent
 	}
+	// The call is public, so the audit interceptor has no actor for it.
+	s.cfg.Audit.Record(wsCtx, &audit.Event{
+		Action:    "CreateWorkspace",
+		ActorID:   owner.ID,
+		ActorKind: string(actor.KindUser),
+		ActorName: addr,
+		Target:    ws.ID,
+		OK:        true,
+	})
 	return &nokkuv1.CreateWorkspaceResponse{Url: new(s.cfg.Tenant.BaseURL(ws.Slug))}, nil
 }
 
@@ -221,6 +246,7 @@ func (s *workspaceService) DeleteUser(
 	}); err != nil {
 		return nil, err
 	}
+	deleteAvatar(ctx, s.cfg, req.GetUserId())
 	return &nokkuv1.DeleteUserResponse{}, nil
 }
 
@@ -249,12 +275,11 @@ func (s *workspaceService) TransferOwnership(
 	}
 	// A transaction on purpose. A missing new owner means the old one already lost the role, the rollback gives it back.
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		n, err := q.TransferOwnership(ctx, req.GetNewOwnerId())
+		ok, err := q.TransferOwnership(ctx, req.GetNewOwnerId())
 		if err != nil {
 			return err
 		}
-		// One row means only the old owner changed, the new one does not exist.
-		if n != 2 {
+		if !ok {
 			return newError(connect.CodeNotFound, "the new owner must be an active user of this workspace")
 		}
 		return nil

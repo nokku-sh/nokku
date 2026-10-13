@@ -91,14 +91,17 @@ func (s *joinTokenService) CreateJoinToken(
 
 	var created *db.JoinToken
 	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if created, err = q.CreateJoinToken(ctx, params); err != nil {
+		if created, err = q.CreateJoinToken(ctx, params); db.IsForeignKeyViolation(err) {
+			return newError(connect.CodeInvalidArgument, "the certificate authority does not exist")
+		}
+		if err != nil {
 			return err
 		}
-		return addJoinTokenGrants(ctx, q, created.ID, req.GetGrants())
+		if err = addJoinTokenGrants(ctx, q, created.ID, req.GetGrants()); db.IsForeignKeyViolation(err) {
+			return newError(connect.CodeInvalidArgument, "a grant names a subject that does not exist")
+		}
+		return err
 	})
-	if db.IsForeignKeyViolation(err) {
-		return nil, newError(connect.CodeInvalidArgument, "a grant names a subject that does not exist")
-	}
 	if err != nil {
 		return nil, err
 	}

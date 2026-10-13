@@ -14,6 +14,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
+	nokkudaemon "github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/namegen"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
@@ -286,7 +287,7 @@ func (s *targetService) SyncTargetUsers(
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
 			TargetID:    req.GetTargetId(),
-			Usernames:   req.GetUsernames(),
+			Usernames:   nokkudaemon.ValidUsers(req.GetUsernames()),
 			MaxAccounts: db.MaxTargetAccounts,
 		}); err != nil {
 			return err
@@ -421,7 +422,7 @@ func (s *targetService) GetMyAccess(
 	default:
 		return nil, newError(
 			connect.CodePermissionDenied,
-			"unsupported principal kind; daemons sync through SyncDaemon",
+			"unsupported principal kind. Daemons sync through SyncDaemon.",
 		)
 	}
 

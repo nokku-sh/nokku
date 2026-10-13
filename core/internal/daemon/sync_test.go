@@ -8,13 +8,13 @@ import (
 
 func TestValidUsers(t *testing.T) {
 	t.Parallel()
-	got := validUsers([]string{
+	got := ValidUsers([]string{
 		"root", "john.doe", "_svc", "machine$",
 		"", "1user", "bad name", `corp\john`, "john@corp", "-flag",
 		"a23456789012345678901234567890123",
 	})
 	assert.Equal(t, []string{"root", "john.doe", "_svc", "machine$"}, got)
-	assert.Empty(t, validUsers(nil))
+	assert.Empty(t, ValidUsers(nil))
 }
 
 func TestValidEndpoints(t *testing.T) {

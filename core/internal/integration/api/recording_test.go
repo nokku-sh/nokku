@@ -483,3 +483,55 @@ func TestRecordingUploadsShareTheCap(t *testing.T) {
 	_, err = open.CloseAndReceive()
 	require.NoError(t, err)
 }
+
+// A recording belongs to the daemon that started it. The answer tells another daemon to drop its file, a retry
+// would block every later upload of that host.
+func TestUploadForAnotherDaemonsRecordingIsRefused(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	otherKey, other := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+	require.NoError(t, uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, 1))
+
+	err := uploadMiB(t, cfg, srv, otherKey, other.GetAccessToken(), id, 1)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
+	assert.EqualValues(t, 1<<20, storedBytes(t, cfg, id), "the refused upload touched what was stored")
+}
+
+// A retry that is cut earlier than the upload before it must not replace the longer part.
+func TestShorterRetryKeepsTheLongerUpload(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+	// cut sends chunks and dies, then waits until the handler closed the recording again.
+	cut := func(chunks int) *db.Recording {
+		var before time.Time
+		if rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id); err == nil && rec.EndedAt != nil {
+			before = *rec.EndedAt
+		}
+		ctx, die := context.WithCancel(t.Context())
+		stream := openUpload(ctx, t, cfg, srv, key, enrolled.GetAccessToken(), id)
+		for range chunks {
+			require.NoError(t, sendChunk(stream, make([]byte, 32<<10)))
+		}
+		time.Sleep(300 * time.Millisecond)
+		die()
+		var rec *db.Recording
+		require.Eventually(t, func() bool {
+			var err error
+			rec, err = cfg.Conn.Sys().GetRecording(t.Context(), id)
+			return err == nil && rec.EndedAt != nil && rec.EndedAt.After(before)
+		}, 5*time.Second, 20*time.Millisecond, "the recording was never closed")
+		return rec
+	}
+
+	const long = 3 * (32 << 10)
+	assert.EqualValues(t, long, cut(3).SizeBytes)
+
+	rec := cut(1)
+	assert.EqualValues(t, long, rec.SizeBytes, "the shorter retry set the size")
+	assert.False(t, rec.Complete)
+	assert.EqualValues(t, long, storedBytes(t, cfg, id), "the shorter retry replaced the longer upload")
+}

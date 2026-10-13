@@ -76,7 +76,13 @@ SELECT
   NOW()
 FROM
   targets t
-  CROSS JOIN unnest(@usernames::TEXT[]) AS d (username)
+  -- A name reported twice would hit the same row twice, which ON CONFLICT refuses.
+  CROSS JOIN (
+    SELECT DISTINCT
+      username
+    FROM
+      unnest(@usernames::TEXT[]) AS u (username)
+  ) AS d
 WHERE
   t.id = @target_id
   AND (

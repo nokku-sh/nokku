@@ -177,7 +177,13 @@ SELECT
   NOW()
 FROM
   targets t
-  CROSS JOIN unnest($1::TEXT[]) AS d (username)
+  -- A name reported twice would hit the same row twice, which ON CONFLICT refuses.
+  CROSS JOIN (
+    SELECT DISTINCT
+      username
+    FROM
+      unnest($1::TEXT[]) AS u (username)
+  ) AS d
 WHERE
   t.id = $2
   AND (

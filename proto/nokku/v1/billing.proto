@@ -12,13 +12,13 @@ service BillingService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreatePortal(CreatePortalRequest) returns (CreatePortalResponse) {
-    option (access) = {self: true};
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
   rpc CreateCheckout(CreateCheckoutRequest) returns (CreateCheckoutResponse) {
-    option (access) = {self: true};
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
   rpc CancelSubscription(CancelSubscriptionRequest) returns (CancelSubscriptionResponse) {
-    option (access) = {self: true};
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
   rpc GetLicense(GetLicenseRequest) returns (GetLicenseResponse) {
     option (access) = {self: true};

@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -43,11 +42,13 @@ func (s *Server) Start(ctx context.Context) error {
 	proto := new(http.Protocols)
 	proto.SetHTTP1(true)
 	proto.SetHTTP2(true)
-	// A proxy in front forwards without TLS, and nk and nokkud behind it still need HTTP/2.
 	proto.SetUnencryptedHTTP2(true)
+
+	// Requests outlive the root ctx by the shutdown grace. Streams, relays and web terminals end with it.
+	base, stop := context.WithCancel(context.WithoutCancel(ctx))
+	defer stop()
 	server := &http.Server{
-		// Streams, relays and web terminals end with the root ctx, nothing else stops them.
-		BaseContext:       func(net.Listener) context.Context { return ctx },
+		BaseContext:       func(net.Listener) context.Context { return base },
 		Addr:              "0.0.0.0:" + s.cfg.Port,
 		Handler:           s.Handler(ctx),
 		Protocols:         proto,
@@ -80,7 +81,12 @@ func (s *Server) Start(ctx context.Context) error {
 	case <-ctx.Done():
 		graceCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return server.Shutdown(graceCtx)
+		err := server.Shutdown(graceCtx)
+		if errors.Is(err, context.DeadlineExceeded) {
+			slog.Warn("shutdown grace ran out, cutting the requests still open")
+			return nil
+		}
+		return err
 
 	case err := <-serverErr:
 		return fmt.Errorf("server error: %w", err)
@@ -91,10 +97,11 @@ func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption
 	interceptors := []connect.Interceptor{
 		newTelemetry(ctx), // Outermost, so it sees the mapped code and the calls turned down before the handler.
 		newTimeoutInterceptor(),
-		newAuthNInterceptor(s.cfg),
+		newStreamEndInterceptor(ctx),
+		&authNInterceptor{cfg: s.cfg},
 		s.cfg.Audit, // Audit wraps authorization so denied calls are recorded too.
 		errorInterceptor{},
-		newAuthZInterceptor(s.cfg),
+		&authorizationInterceptor{cfg: s.cfg},
 		entitlement.NewGuardInterceptor(s.cfg.Entitlements),
 		validate.NewInterceptor(),
 	}
@@ -127,7 +134,7 @@ func (s *Server) Handler(ctx context.Context) http.Handler {
 
 // handler is the mux behind the middleware every request passes through.
 func (s *Server) handler() http.Handler {
-	return newChain(
+	return chain(
 		s.withHTTPS,
 		s.withRateLimit,
 		s.withHeaders,
@@ -136,7 +143,7 @@ func (s *Server) handler() http.Handler {
 		s.withRecover,
 		s.withRequestMeta,
 		s.withTenant,
-	).then(s.mux)
+	)(s.mux.ServeHTTP)
 }
 
 // withRequestMeta is the one place that sets the address and headers session rows and audit events read.
@@ -195,10 +202,17 @@ func (s *Server) registerServices(ctx context.Context) {
 	// Public, a client reads it before it trusts the certificate.
 	s.mux.Handle("GET "+webpki.Path, s.cfg.WebPKI)
 
-	protec := newChain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
+	protec := chain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
 	s.mux.Handle("GET /avatars/{id}", serveAvatar(s.cfg))
-	s.mux.Handle("POST /upload/avatar", protec.thenFunc(uploadAvatar(s.cfg)))
-	s.mux.Handle("GET /terminal/ws", protec.thenFunc((&terminalHandler{cfg: s.cfg}).handleWebSocket))
+	s.mux.Handle("POST /upload/avatar", protec(uploadAvatar(s.cfg)))
+
+	terminal := &terminalHandler{cfg: s.cfg}
+	s.mux.Handle("GET /terminal/ws", protec(func(w http.ResponseWriter, r *http.Request) {
+		// A terminal is a stream, it ends with the root ctx like the RPC ones.
+		rctx, release := endWith(r.Context(), ctx)
+		defer release()
+		terminal.handleWebSocket(w, r.WithContext(rctx))
+	}))
 
 	if s.cfg.SaaS {
 		s.mux.Handle("POST /webhooks/stripe", s.cfg.Billing.WebhookHandler())
@@ -208,12 +222,4 @@ func (s *Server) registerServices(ctx context.Context) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-
-	if s.cfg.Debug {
-		s.mux.HandleFunc("/debug/pprof/", pprof.Index)
-		s.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		s.mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	}
 }

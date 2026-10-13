@@ -31,7 +31,47 @@ SELECT
       users u
     WHERE
       u.active
-  )::INTEGER AS users;
+  )::INTEGER AS users,
+  d.total AS daemons,
+  d.online AS daemons_online
+FROM
+  (
+    SELECT
+      COUNT(*)::INTEGER AS total,
+      (COUNT(*) FILTER (
+        WHERE
+          status <> 1 -- pending
+          AND last_seen_at > @seen_after::TIMESTAMPTZ
+      ))::INTEGER AS online
+    FROM
+      daemons
+  ) AS d;
+
+-- name: ListPendingDaemons :many
+-- The id is a uuidv7, so this is newest first.
+SELECT
+  *
+FROM
+  daemons
+WHERE
+  status = 1 -- pending
+ORDER BY
+  id DESC
+LIMIT
+  5;
+
+-- name: ListOfflineDaemons :many
+SELECT
+  *
+FROM
+  daemons
+WHERE
+  status = 2 -- accepted
+  AND COALESCE(last_seen_at <= @seen_after::TIMESTAMPTZ, TRUE)
+ORDER BY
+  id ASC
+LIMIT
+  5;
 
 -- name: ListSoonestCAs :many
 SELECT

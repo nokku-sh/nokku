@@ -96,6 +96,14 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.Equal(t, hostKey, got.GetTarget().GetHostPublicKey(), "host key kept")
 	assert.ElementsMatch(t, []string{"root", "deploy", "ops"}, usernames(), "earlier users are never deleted")
 
+	// A host can name a login twice, and one odd name must not cost the others.
+	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
+		TargetId:  &targetID,
+		Usernames: []string{"backup", "ops", "backup", "not a login"},
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"root", "deploy", "ops", "backup"}, usernames())
+
 	viewer := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
 		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)))
 	_, err = viewer.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{

@@ -16,7 +16,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
-	"github.com/nokku-sh/nokku/core/internal/storage"
 )
 
 type accountService struct {
@@ -82,9 +81,16 @@ func (s *accountService) RequestEmailChange(
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	base := ws.BaseURL + "/email-change?"
 	newEmail := strings.ToLower(strings.TrimSpace(req.GetNewEmail()))
-	err = s.cfg.Email.SendEmailChangeConfirm(ctx, u.ID, newEmail, base+"token="+confirm, iam.EmailChangeTTL.String())
+	err = s.cfg.Email.SendEmailChangeConfirm(ctx, u.ID, newEmail, base+"token="+confirm, iam.EmailChangeTTL)
 	if err == nil {
-		err = s.cfg.Email.SendEmailChangeNotice(ctx, u.ID, u.Email, newEmail, base+"cancel=1&token="+cancel, "7 days")
+		err = s.cfg.Email.SendEmailChangeNotice(
+			ctx,
+			u.ID,
+			u.Email,
+			newEmail,
+			base+"cancel=1&token="+cancel,
+			iam.EmailRevertTTL,
+		)
 	}
 	if err != nil {
 		// Without both mails the change must not stay pending.
@@ -213,9 +219,7 @@ func (s *accountService) DeleteAccount(
 	case err != nil:
 		return nil, errInternal
 	}
-	if err := s.cfg.Storage.Delete(ctx, storage.AvatarPath(userID)); err != nil {
-		slog.Warn("failed to delete avatar", "error", err)
-	}
+	deleteAvatar(ctx, s.cfg, userID)
 	// The session cookie is HttpOnly, only a server response can clear it.
 	if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {
 		setCookie(ci, s.cfg.IAM.ClearSessionCookie())

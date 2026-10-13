@@ -81,7 +81,10 @@ message GetAccountResponse {
 
 message UpdateAccountRequest {
   string name = 1 [(buf.validate.field).string.max_len = 256];
-  string picture = 2;
+  string picture = 2 [(buf.validate.field).string = {
+    max_len: 2048
+    uri_ref: true
+  }];
 }
 message UpdateAccountResponse {
   User user = 1;

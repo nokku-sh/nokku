@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	tokenLogin     = "login"
-	magicLinkTTL   = 15 * time.Minute
-	bootstrapTTL   = 24 * time.Hour
+	tokenLogin   = "login"
+	magicLinkTTL = 15 * time.Minute
+	// BootstrapTTL is how long an owner link works, the signup mail says so.
+	BootstrapTTL   = 24 * time.Hour
 	mailTimeout    = 30 * time.Second
 	loginVerifyURL = "/login/verify?token="
 	inviteURL      = "/invite/verify?token="
@@ -70,7 +71,7 @@ func (s *Service) mailLoginLink(ctx context.Context, email string) error {
 	if link == "" {
 		return nil
 	}
-	if err := s.sendMagicLink(sendCtx, u.ID, u.Email, link, magicLinkTTL.String()); err != nil {
+	if err := s.sendMagicLink(sendCtx, u.ID, u.Email, link, magicLinkTTL); err != nil {
 		s.dropUnsent(ctx, hash, err)
 	}
 	return nil
@@ -114,7 +115,7 @@ func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, e
 		}); err != nil {
 			return err
 		}
-		link, _, err = s.putLoginToken(ctx, q, u.ID, bootstrapTTL)
+		link, _, err = s.putLoginToken(ctx, q, u.ID, BootstrapTTL)
 		return err
 	})
 	return link, err
@@ -170,7 +171,7 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 	if err != nil {
 		return err
 	}
-	err = s.sendSignupLink(ctx, email, name, workspace, link, magicLinkTTL.String())
+	err = s.sendSignupLink(ctx, email, name, workspace, link, magicLinkTTL)
 	if err == nil {
 		return nil
 	}

@@ -113,11 +113,12 @@ func (s *certificateService) UpdateCertificateAuthority(
 	req *nokkuv1.UpdateCertificateAuthorityRequest,
 ) (*nokkuv1.UpdateCertificateAuthorityResponse, error) {
 	params := &db.UpdateCAParams{
-		CaID:            req.GetId(),
-		Name:            req.Name,
-		Description:     req.Description,
-		IsActive:        req.IsActive,
-		AllowedKeyTypes: req.GetAllowedKeyTypes(),
+		CaID:        req.GetId(),
+		Name:        req.Name,
+		Description: req.Description,
+		IsActive:    req.IsActive,
+		// An update replaces the list, empty allows every key type. The query keeps the old one for nil.
+		AllowedKeyTypes: append([]nokkuv1.CertificateKeyType{}, req.GetAllowedKeyTypes()...),
 		Lifetime:        optDuration(req.GetLifetime()),
 		UserDefaultTtl:  optDuration(req.GetUserDefaultTtl()),
 		UserMaxTtl:      optDuration(req.GetUserMaxTtl()),

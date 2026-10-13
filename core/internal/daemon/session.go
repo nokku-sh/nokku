@@ -168,6 +168,19 @@ func (p *Pool) GetSession(sessionID string) *Session {
 	return p.sessions[sessionID]
 }
 
+// SessionDaemons names the daemons with a browser terminal open on this server, in every workspace.
+func (p *Pool) SessionDaemons() []string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	var ids []string
+	for id, o := range p.owned {
+		if len(o.sessions) > 0 {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 func (p *Pool) ListSessions(daemonID string) []*nokkuv1.DaemonSession {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

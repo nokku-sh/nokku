@@ -446,7 +446,12 @@ func (q *Queries) TouchDaemons(ctx context.Context, daemonIds []string) error {
 const updateDaemon = `-- name: UpdateDaemon :one
 UPDATE daemons
 SET
-  status = COALESCE($1, status),
+  -- 0 is unset and keeps the status. The column comes first, sqlc types the parameter by its first use.
+  status = CASE
+    WHEN status = $1
+    OR $1 = 0 THEN status
+    ELSE $1
+  END,
   config = COALESCE($2, config),
   metadata = COALESCE($3, metadata),
   updated_at = NOW()

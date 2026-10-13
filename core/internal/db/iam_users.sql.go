@@ -121,6 +121,27 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) error {
 	return err
 }
 
+const demoteOwner = `-- name: DemoteOwner :execrows
+
+UPDATE users
+SET
+  role = 4, -- admin
+  updated_at = NOW()
+WHERE
+  role = 5
+`
+
+// owner
+// Runs before PromoteOwner. The partial unique index on the owner is checked row by row, so one statement
+// that swaps both can see two owners. See Queries.TransferOwnership.
+func (q *Queries) DemoteOwner(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, demoteOwner)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getOwner = `-- name: GetOwner :one
 SELECT
   id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
@@ -202,6 +223,33 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 	return &i, err
 }
 
+const listUserIDs = `-- name: ListUserIDs :many
+SELECT
+  id
+FROM
+  users
+`
+
+func (q *Queries) ListUserIDs(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsers = `-- name: ListUsers :many
 
 SELECT
@@ -278,6 +326,26 @@ func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*ListU
 	return items, nil
 }
 
+const promoteOwner = `-- name: PromoteOwner :execrows
+
+UPDATE users
+SET
+  role = 5, -- owner
+  updated_at = NOW()
+WHERE
+  id = $1
+  AND active
+`
+
+// owner
+func (q *Queries) PromoteOwner(ctx context.Context, newOwnerID string) (int64, error) {
+	result, err := q.db.Exec(ctx, promoteOwner, newOwnerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setUserActive = `-- name: SetUserActive :exec
 
 UPDATE users
@@ -332,35 +400,6 @@ func (q *Queries) SetUserEmail(ctx context.Context, arg *SetUserEmailParams) (*U
 		&i.UpdatedAt,
 	)
 	return &i, err
-}
-
-const transferOwnership = `-- name: TransferOwnership :execrows
-
-UPDATE users
-SET
-  role = CASE
-    WHEN id = $1 THEN 5 -- owner
-    ELSE 4 -- admin
-  END,
-  updated_at = NOW()
-WHERE
-  (
-    role = 5
-    OR (
-      id = $1
-      AND active
-    )
-  )
-`
-
-// owner
-// One statement, so the partial unique index on the owner never sees two.
-func (q *Queries) TransferOwnership(ctx context.Context, newOwnerID string) (int64, error) {
-	result, err := q.db.Exec(ctx, transferOwnership, newOwnerID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }
 
 const updateUser = `-- name: UpdateUser :one

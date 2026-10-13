@@ -43,29 +43,17 @@ func (s *daemonService) UpdateDaemon(
 	ctx context.Context,
 	req *nokkuv1.UpdateDaemonRequest,
 ) (*nokkuv1.UpdateDaemonResponse, error) {
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		base, err := q.GetDaemon(ctx, req.GetId())
-		if err != nil {
-			return err
-		}
-		// A config replaces the stored one wholesale, proto.Merge cannot turn a scalar off.
-		config := req.GetConfig()
-		if config == nil {
-			config = base.Config
-		}
+	// A config replaces the stored one wholesale, proto.Merge cannot turn a scalar off. Unset keeps it.
+	config := req.GetConfig()
+	if config != nil {
 		// Ephemeral is the token's call, the row carries it. See Daemon.EffectiveConfig.
 		config.Ephemeral = nil
-		// The query takes the status as a value, so an unset one would overwrite an accept or reject with zero.
-		status := req.GetStatus()
-		if status == nokkuv1.DaemonStatus_DAEMON_STATUS_UNSPECIFIED {
-			status = base.Status
-		}
-		_, err = q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
-			DaemonID: req.GetId(),
-			Status:   status,
-			Config:   config,
-		})
-		return err
+	}
+	// One statement and no read, so two updates in a row cannot write each other's old values back.
+	if _, err := s.cfg.Conn.Tenant().UpdateDaemon(ctx, &db.UpdateDaemonParams{
+		DaemonID: req.GetId(),
+		Status:   req.GetStatus(),
+		Config:   config,
 	}); err != nil {
 		return nil, err
 	}

@@ -47,7 +47,8 @@ func (s *teamService) UpdateTeam(
 		TeamID:      req.GetId(),
 		Name:        req.Name,
 		Description: req.Description,
-		Tags:        req.GetTags(),
+		// An update replaces the tags. The query keeps the old ones for nil.
+		Tags: append([]string{}, req.GetTags()...),
 	})
 	if err != nil {
 		return nil, err

@@ -31,11 +31,11 @@ func newMailbox() *mailbox {
 // deps are the mail functions of a service that delivers into m.
 func (m *mailbox) deps() iam.Deps {
 	return iam.Deps{
-		SendMagicLink: func(_ context.Context, _, _, link, _ string) error {
+		SendMagicLink: func(_ context.Context, _, _, link string, _ time.Duration) error {
 			m.links <- link
 			return nil
 		},
-		SendSignupLink: func(_ context.Context, _, _, _, link, _ string) error {
+		SendSignupLink: func(_ context.Context, _, _, _, link string, _ time.Duration) error {
 			m.links <- link
 			return nil
 		},
@@ -95,7 +95,7 @@ func TestMagicLinkSignIn(t *testing.T) {
 // The mail service holds back a second link inside its cooldown. A link nobody got must not stay valid.
 func TestUnsentMagicLinkIsDropped(t *testing.T) {
 	mail := newMailbox()
-	e := newTestEnvWith(t, iam.Deps{SendMagicLink: func(_ context.Context, _, _, l, _ string) error {
+	e := newTestEnvWith(t, iam.Deps{SendMagicLink: func(_ context.Context, _, _, l string, _ time.Duration) error {
 		mail.links <- l
 		return emailverify.ErrCooldown
 	}})
@@ -167,7 +167,7 @@ func TestSignupLinkCreatesInvitedUser(t *testing.T) {
 func TestUnsentSignupLinkIsAnError(t *testing.T) {
 	var link string
 	sendErr := errors.New("smtp send: 535 Authentication Failed")
-	e := newTestEnvWith(t, iam.Deps{SendSignupLink: func(_ context.Context, _, _, _, l, _ string) error {
+	e := newTestEnvWith(t, iam.Deps{SendSignupLink: func(_ context.Context, _, _, _, l string, _ time.Duration) error {
 		link = l
 		return sendErr
 	}})

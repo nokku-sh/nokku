@@ -145,15 +145,24 @@ WHERE
 RETURNING
   *;
 
--- name: SetDefaultCA :exec
--- One statement, so the partial unique index never sees two defaults.
+-- name: ClearDefaultCA :exec
+-- Runs before MarkDefaultCA. The partial unique index is checked row by row, so one statement that swaps
+-- both can see two defaults. See Queries.SetDefaultCA.
 UPDATE ssh_cas
 SET
-  is_default = (id = @ca_id),
+  is_default = FALSE,
   updated_at = NOW()
 WHERE
-  id = @ca_id
-  OR is_default;
+  is_default
+  AND id <> @ca_id;
+
+-- name: MarkDefaultCA :exec
+UPDATE ssh_cas
+SET
+  is_default = TRUE,
+  updated_at = NOW()
+WHERE
+  id = @ca_id;
 
 -- name: DeleteCA :one
 DELETE FROM ssh_cas

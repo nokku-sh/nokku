@@ -100,7 +100,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		// Never deletes, a host that cannot enumerate users must not change who has access.
 		if err := q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
 			TargetID:    target.ID,
-			Usernames:   validUsers(in.Users),
+			Usernames:   ValidUsers(in.Users),
 			MaxAccounts: db.MaxTargetAccounts,
 		}); err != nil {
 			return err
@@ -143,8 +143,8 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 // usernameRE is the username pattern of the protos, keep them in sync.
 var usernameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9._-]*\$?$`)
 
-// validUsers drops per entry, a host with one odd account must still sync.
-func validUsers(names []string) []string {
+// ValidUsers drops per entry, a host with one odd account must still sync.
+func ValidUsers(names []string) []string {
 	return slices.DeleteFunc(slices.Clone(names), func(name string) bool {
 		return len(name) > 32 || !usernameRE.MatchString(name)
 	})

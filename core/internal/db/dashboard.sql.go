@@ -87,7 +87,21 @@ SELECT
       users u
     WHERE
       u.active
-  )::INTEGER AS users
+  )::INTEGER AS users,
+  d.total AS daemons,
+  d.online AS daemons_online
+FROM
+  (
+    SELECT
+      COUNT(*)::INTEGER AS total,
+      (COUNT(*) FILTER (
+        WHERE
+          status <> 1 -- pending
+          AND last_seen_at > $1::TIMESTAMPTZ
+      ))::INTEGER AS online
+    FROM
+      daemons
+  ) AS d
 `
 
 type DashboardCountsRow struct {
@@ -95,6 +109,8 @@ type DashboardCountsRow struct {
 	TargetsOnline int32 `json:"targetsOnline"`
 	TargetsManual int32 `json:"targetsManual"`
 	Users         int32 `json:"users"`
+	Daemons       int32 `json:"daemons"`
+	DaemonsOnline int32 `json:"daemonsOnline"`
 }
 
 func (q *Queries) DashboardCounts(ctx context.Context, seenAfter time.Time) (*DashboardCountsRow, error) {
@@ -105,8 +121,57 @@ func (q *Queries) DashboardCounts(ctx context.Context, seenAfter time.Time) (*Da
 		&i.TargetsOnline,
 		&i.TargetsManual,
 		&i.Users,
+		&i.Daemons,
+		&i.DaemonsOnline,
 	)
 	return &i, err
+}
+
+const listOfflineDaemons = `-- name: ListOfflineDaemons :many
+SELECT
+  id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, join_token_id, retire_after, updated_at, created_at
+FROM
+  daemons
+WHERE
+  status = 2 -- accepted
+  AND COALESCE(last_seen_at <= $1::TIMESTAMPTZ, TRUE)
+ORDER BY
+  id ASC
+LIMIT
+  5
+`
+
+func (q *Queries) ListOfflineDaemons(ctx context.Context, seenAfter time.Time) ([]*Daemon, error) {
+	rows, err := q.db.Query(ctx, listOfflineDaemons, seenAfter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Daemon
+	for rows.Next() {
+		var i Daemon
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Name,
+			&i.Status,
+			&i.LastSeenAt,
+			&i.KeyThumbprint,
+			&i.Config,
+			&i.Metadata,
+			&i.JoinTokenID,
+			&i.RetireAfter,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listOpenRecordings = `-- name: ListOpenRecordings :many
@@ -153,6 +218,53 @@ func (q *Queries) ListOpenRecordings(ctx context.Context, seenAfter time.Time) (
 			&i.Username,
 			&i.StartedAt,
 			&i.DaemonName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingDaemons = `-- name: ListPendingDaemons :many
+SELECT
+  id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, join_token_id, retire_after, updated_at, created_at
+FROM
+  daemons
+WHERE
+  status = 1 -- pending
+ORDER BY
+  id DESC
+LIMIT
+  5
+`
+
+// The id is a uuidv7, so this is newest first.
+func (q *Queries) ListPendingDaemons(ctx context.Context) ([]*Daemon, error) {
+	rows, err := q.db.Query(ctx, listPendingDaemons)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Daemon
+	for rows.Next() {
+		var i Daemon
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Name,
+			&i.Status,
+			&i.LastSeenAt,
+			&i.KeyThumbprint,
+			&i.Config,
+			&i.Metadata,
+			&i.JoinTokenID,
+			&i.RetireAfter,
+			&i.UpdatedAt,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

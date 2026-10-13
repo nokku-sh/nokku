@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"image"
 	_ "image/gif" // register GIF decoder
@@ -25,6 +26,13 @@ const (
 	maxAvatarSize = 5 << 20 // 5MB
 	maxParts      = 10
 )
+
+// deleteAvatar only warns, the account is gone either way.
+func deleteAvatar(ctx context.Context, cfg *config.Config, userID string) {
+	if err := cfg.Storage.Delete(ctx, storage.AvatarPath(userID)); err != nil {
+		slog.Warn("failed to delete avatar", "error", err, "user_id", userID)
+	}
+}
 
 func resizePicture(src image.Image) image.Image {
 	dst := image.NewRGBA(image.Rect(0, 0, 256, 256))

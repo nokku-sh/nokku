@@ -147,7 +147,6 @@ func TestIsAuthRoute(t *testing.T) {
 		{"/nokku.v1.AuthService/RequestMagicLink", true},
 		{"/nokku.v1.AuthService/ConsumeMagicLink", true},
 		{"/nokku.v1.InvitationService/AcceptInvitation", true},
-		{"/nokku.v1.WorkspaceService/CreateWorkspace", true},
 
 		// Other RPCs stay on the general limit.
 		{"/nokku.v1.AccountService/GetAccount", false},

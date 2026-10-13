@@ -108,6 +108,21 @@ func TestSCIMAuth(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, ca.do(http.MethodGet, "/Users", nil, nil), "bogus token")
 }
 
+// A lookup that fails is no bad token. A provider that gets a 401 takes its credentials for broken, a 500 it retries.
+func TestSCIMAnswers500WhenTheLookupFails(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.scim(t, e.org(t))
+	// A canceled request never reaches the database, like one that arrives while it is away.
+	ctx, cancel := context.WithCancel(anon(t.Context(), c.ws))
+	cancel()
+
+	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Users", nil)
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	rec := httptest.NewRecorder()
+	c.svc.SCIMHandler().ServeHTTP(rec, req.WithContext(ctx))
+	assert.Equal(t, http.StatusInternalServerError, rec.Code, "got %s", rec.Body.String())
+}
+
 func TestSCIMUserLifecycle(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

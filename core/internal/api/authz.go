@@ -47,12 +47,6 @@ type authorizationInterceptor struct {
 	cfg *config.Config
 }
 
-func newAuthZInterceptor(
-	cfg *config.Config,
-) *authorizationInterceptor {
-	return &authorizationInterceptor{cfg: cfg}
-}
-
 func (a *authorizationInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		if err := a.authorize(ctx, req.Spec().Procedure); err != nil {

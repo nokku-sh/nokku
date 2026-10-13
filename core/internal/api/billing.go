@@ -73,9 +73,6 @@ func (s *billingService) CreateCheckout(
 	if !s.cfg.SaaS {
 		return nil, errBillingDisabled
 	}
-	if err := requireOwner(ctx); err != nil {
-		return nil, err
-	}
 	user, err := s.cfg.IAM.GetUser(ctx)
 	if err != nil {
 		return nil, err
@@ -104,9 +101,6 @@ func (s *billingService) CreatePortal(
 	if !s.cfg.SaaS {
 		return nil, errBillingDisabled
 	}
-	if err := requireOwner(ctx); err != nil {
-		return nil, err
-	}
 	url, err := s.cfg.Billing.Portal(ctx, actor.WorkspaceIDFromContext(ctx))
 	if err != nil {
 		return nil, errInternal
@@ -122,9 +116,6 @@ func (s *billingService) CancelSubscription(
 ) (*nokkuv1.CancelSubscriptionResponse, error) {
 	if !s.cfg.SaaS {
 		return nil, errBillingDisabled
-	}
-	if err := requireOwner(ctx); err != nil {
-		return nil, err
 	}
 	if err := s.cfg.Billing.Cancel(
 		ctx,
@@ -182,13 +173,6 @@ func (s *billingService) ActivateLicense(
 		return nil, errInternal
 	}
 	return &nokkuv1.ActivateLicenseResponse{}, nil
-}
-
-func requireOwner(ctx context.Context) error {
-	if callerRole(ctx) != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
-		return connect.NewError(connect.CodePermissionDenied, errors.New("workspace owner required"))
-	}
-	return nil
 }
 
 // featuresProto returns the whole catalog so clients can render locked features.

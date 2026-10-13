@@ -83,7 +83,12 @@ WHERE
 -- name: UpdateDaemon :one
 UPDATE daemons
 SET
-  status = COALESCE(sqlc.narg('status'), status),
+  -- 0 is unset and keeps the status. The column comes first, sqlc types the parameter by its first use.
+  status = CASE
+    WHEN status = @status
+    OR @status = 0 THEN status
+    ELSE @status
+  END,
   config = COALESCE(sqlc.narg('config'), config),
   metadata = COALESCE(sqlc.narg('metadata'), metadata),
   updated_at = NOW()

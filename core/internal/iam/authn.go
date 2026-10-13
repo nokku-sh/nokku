@@ -4,8 +4,11 @@ package iam
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -57,8 +60,11 @@ func (s *Service) AuthenticateToken(
 		p.Role = u.Role
 	case actor.KindServiceAccount:
 		sa, err := s.conn.Tenant().GetServiceAccount(ctx, p.ID)
-		if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return actor.Principal{}, db.AccessToken{}, errInvalidCredentials
+		}
+		if err != nil {
+			return actor.Principal{}, db.AccessToken{}, err
 		}
 		p.Name = sa.Name
 		p.Role = sa.Role

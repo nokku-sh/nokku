@@ -29,24 +29,16 @@ func (s *invitationService) GetInvitation(
 	if err != nil {
 		return nil, err
 	}
-	name, err := workspaceName(ctx, s.cfg.Conn)
+	// Read from the row, so a rename shows at once.
+	ws, err := s.cfg.Conn.Tenant().GetWorkspace(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &nokkuv1.GetInvitationResponse{
-		WorkspaceName: &name,
+		WorkspaceName: &ws.Name,
 		Role:          token.Role,
 		ExpiresAt:     db.SafeTimestamp(token.ExpiresAt),
 	}, nil
-}
-
-// workspaceName reads the name from the row, so a rename shows at once.
-func workspaceName(ctx context.Context, conn *db.Connection) (string, error) {
-	ws, err := conn.Tenant().GetWorkspace(ctx)
-	if err != nil {
-		return "", err
-	}
-	return ws.Name, nil
 }
 
 // AcceptInvitation mails a signup link. The account exists once it is used.

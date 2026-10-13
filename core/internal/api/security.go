@@ -22,6 +22,7 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("CSRF check failed"))
 	}))
+	protected := cop.Handler(h)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Webhooks and SSO callbacks come from external servers, their protection is the single-use flow state.
@@ -31,7 +32,7 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 			return
 		}
 
-		cop.Handler(h).ServeHTTP(w, r)
+		protected.ServeHTTP(w, r)
 	})
 }
 

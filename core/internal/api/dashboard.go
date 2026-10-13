@@ -15,18 +15,19 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-const (
-	dashboardListCap    = 5
-	dashboardChangesCap = 8
-)
+const dashboardChangesCap = 8
 
 // routineActions happen on every login or session, they would drown the changes an operator wants to see.
 var routineActions = []string{
+	"Login",
+	"SessionIssued",
 	"SignSSHCertificate",
 	"CreateSession",
 	"CloseSession",
+	"RelayOpen",
+	"RelayClose",
 	"UploadRecording",
-	"SyncTargetUsers",
+	"GetRecording",
 }
 
 type dashboardService struct {
@@ -44,7 +45,9 @@ func (s *dashboardService) GetDashboard(
 
 	var (
 		counts     *db.DashboardCountsRow
-		daemons    []*db.ListDaemonsRow
+		pending    []*db.Daemon
+		offline    []*db.Daemon
+		terminals  []*db.GetDaemonsByIDsRow
 		cas        []*db.SSHCA
 		recordings []*db.ListOpenRecordingsRow
 		hours      []*db.AuditActivityByHourRow
@@ -54,10 +57,17 @@ func (s *dashboardService) GetDashboard(
 		if counts, err = q.DashboardCounts(ctx, seenAfter); err != nil {
 			return err
 		}
-		if daemons, err = q.ListDaemons(ctx, &db.ListDaemonsParams{
-			SeenAfter: seenAfter,
-		}); err != nil {
+		if pending, err = q.ListPendingDaemons(ctx); err != nil {
 			return err
+		}
+		if offline, err = q.ListOfflineDaemons(ctx, seenAfter); err != nil {
+			return err
+		}
+		// The pool holds the terminals of every workspace, the query keeps the daemons of this one.
+		if ids := s.cfg.Pool.SessionDaemons(); len(ids) > 0 {
+			if terminals, err = q.GetDaemonsByIDs(ctx, ids); err != nil {
+				return err
+			}
 		}
 		if cas, err = q.ListSoonestCAs(ctx); err != nil {
 			return err
@@ -79,31 +89,20 @@ func (s *dashboardService) GetDashboard(
 		TargetsOnline:       &counts.TargetsOnline,
 		TargetsManual:       &counts.TargetsManual,
 		Users:               &counts.Users,
-		Daemons:             new(int32(len(daemons))), //nolint:gosec // a workspace has far fewer daemons
+		Daemons:             &counts.Daemons,
+		DaemonsOnline:       &counts.DaemonsOnline,
 		RecordingBytes:      &usedBytes,
 		RecordingQuotaBytes: new(s.cfg.Entitlements.Resolve(ctx, wsID).RecordingStorageBytes),
 		SoonestCas:          db.CAsToProto(cas),
 		Activity:            make([]int32, 24),
 		Failures:            make([]int32, 24),
 	}
-
-	var online int32
-	for _, row := range daemons {
-		d := &row.Daemon
-		switch {
-		case d.Status == nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING:
-			res.PendingDaemons = append(res.PendingDaemons, d.ToProto())
-		case db.SeenRecently(d.LastSeenAt):
-			online++
-		case d.Status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED:
-			res.OfflineDaemons = append(res.OfflineDaemons, d.ToProto())
-		}
+	for _, d := range pending {
+		res.PendingDaemons = append(res.PendingDaemons, d.ToProto())
 	}
-	res.DaemonsOnline = &online
-	// ListDaemons sorts by uuidv7 id, so the newest pending daemons are last.
-	slices.Reverse(res.GetPendingDaemons())
-	res.PendingDaemons = res.GetPendingDaemons()[:min(len(res.GetPendingDaemons()), dashboardListCap)]
-	res.OfflineDaemons = res.GetOfflineDaemons()[:min(len(res.GetOfflineDaemons()), dashboardListCap)]
+	for _, d := range offline {
+		res.OfflineDaemons = append(res.OfflineDaemons, d.ToProto())
+	}
 
 	for _, h := range hours {
 		i := int(h.Hour.Sub(since) / time.Hour)
@@ -113,25 +112,23 @@ func (s *dashboardService) GetDashboard(
 		res.Activity[i], res.Failures[i] = h.Events, h.Failures
 	}
 
-	res.LiveSessions = s.liveSessions(daemons, recordings)
+	res.LiveSessions = s.liveSessions(terminals, recordings)
 	res.RecentChanges = s.recentChanges(ctx, wsID, now.Add(-24*time.Hour))
 	return res, nil
 }
 
 // liveSessions merges browser terminals with open recordings. A recorded terminal is in both, the recording marks it.
 func (s *dashboardService) liveSessions(
-	daemons []*db.ListDaemonsRow,
+	terminals []*db.GetDaemonsByIDsRow,
 	recordings []*db.ListOpenRecordingsRow,
 ) []*nokkuv1.LiveSession {
-	names := make(map[string]string, len(daemons))
 	var live []*nokkuv1.LiveSession
-	for _, row := range daemons {
-		names[row.Daemon.ID] = row.Daemon.Name
-		for _, ws := range s.cfg.Pool.ListSessions(row.Daemon.ID) {
+	for _, d := range terminals {
+		for _, ws := range s.cfg.Pool.ListSessions(d.ID) {
 			live = append(live, &nokkuv1.LiveSession{
 				Id:         ws.SessionId,
-				DaemonId:   &row.Daemon.ID,
-				DaemonName: &row.Daemon.Name,
+				DaemonId:   &d.ID,
+				DaemonName: &d.Name,
 				Username:   ws.Username,
 				UserId:     ws.UserId,
 				Web:        new(true),
@@ -168,23 +165,14 @@ func (s *dashboardService) recentChanges(
 	since time.Time,
 ) []*nokkuv1.EventLog {
 	events, _, err := s.cfg.Audit.List(ctx, &db.ListAuditLogsParams{
-		Outcome:   new("succeeded"),
-		StartDate: &since,
-		Limit:     50,
+		ExcludedActions: routineActions,
+		Outcome:         new("succeeded"),
+		StartDate:       &since,
+		Limit:           dashboardChangesCap,
 	})
 	if err != nil {
 		slog.Error("dashboard recent changes", "workspace_id", wsID, "error", err)
 		return nil
 	}
-	var logs []*nokkuv1.EventLog
-	for _, e := range events {
-		if slices.Contains(routineActions, e.Action) {
-			continue
-		}
-		logs = append(logs, e.ToProto())
-		if len(logs) == dashboardChangesCap {
-			break
-		}
-	}
-	return logs
+	return eventLogs(events)
 }

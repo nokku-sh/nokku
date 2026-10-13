@@ -2,6 +2,7 @@ package api
 
 import (
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ func TestCreateWorkspaceRefusesAnAddressOnCooldown(t *testing.T) {
 	t.Setenv("NOKKU_SMTP_HOST", "")
 	mail, err := email.New(t.Context(), "https://nokku.test")
 	require.NoError(t, err)
-	require.NoError(t, mail.SendOwnerLinkEmail(t.Context(), "ada@acme.test", "https://acme.nokku.test", "24h"))
+	require.NoError(t, mail.SendOwnerLinkEmail(t.Context(), "ada@acme.test", "https://acme.nokku.test", time.Hour))
 
 	svc := &workspaceService{cfg: &config.Config{SaaS: true, Email: mail}}
 	_, err = svc.CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{

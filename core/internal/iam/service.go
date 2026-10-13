@@ -71,9 +71,9 @@ type Deps struct {
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
 
 	// SendMagicLink mails a sign-in link. Unset, the login page offers none.
-	SendMagicLink func(ctx context.Context, userID, email, link, expiry string) error
+	SendMagicLink func(ctx context.Context, userID, email, link string, expiry time.Duration) error
 	// SendSignupLink mails the link that creates an invited account.
-	SendSignupLink func(ctx context.Context, email, name, workspace, link, expiry string) error
+	SendSignupLink func(ctx context.Context, email, name, workspace, link string, expiry time.Duration) error
 	// SendNewLogin tells an account about a sign-in from a device new to it.
 	SendNewLogin func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
 }
@@ -91,8 +91,8 @@ type Service struct {
 	// spent holds the ids of flows that ended in a login, see spendFlow.
 	spent *cache.Memory
 
-	sendMagicLink  func(ctx context.Context, userID, email, link, expiry string) error
-	sendSignupLink func(ctx context.Context, email, name, workspace, link, expiry string) error
+	sendMagicLink  func(ctx context.Context, userID, email, link string, expiry time.Duration) error
+	sendSignupLink func(ctx context.Context, email, name, workspace, link string, expiry time.Duration) error
 	sendNewLogin   func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
 
 	DPoP    *DPoPVerifier

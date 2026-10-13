@@ -3,10 +3,13 @@
 package api_test
 
 import (
+	"context"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +19,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/core/internal/api"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -70,4 +74,74 @@ func TestUnknownServiceIsNotFound(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+// A deploy lets a request that is under way finish, and ends the streams at once.
+func TestShutdownLetsARequestFinish(t *testing.T) {
+	cfg, _ := newTestAPI(t)
+	member := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	_, port, err := net.SplitHostPort(free.Addr().String())
+	require.NoError(t, err)
+	require.NoError(t, free.Close())
+	second := *cfg
+	second.Port = port
+	base := "http://127.0.0.1:" + port
+
+	ctx, shutdown := context.WithCancel(context.WithoutCancel(t.Context()))
+	defer shutdown()
+	stopped := make(chan error, 1)
+	go func() { stopped <- api.New(&second).Start(ctx) }()
+	require.Eventually(t, func() bool {
+		resp, err := http.Get(base + "/healthz")
+		if err != nil {
+			return false
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode == http.StatusOK
+	}, 5*time.Second, 20*time.Millisecond, "the server never listened")
+
+	// The deadline only matters when the stream does not end with the shutdown.
+	streamCtx, giveUp := context.WithTimeout(t.Context(), 3*time.Second)
+	defer giveUp()
+	streamCtx, call := connect.NewClientContext(streamCtx)
+	call.RequestHeader().Set("Authorization", "Bearer "+member)
+	stream, err := nokkuv1connect.NewWorkspaceServiceClient(http.DefaultClient, base).
+		SubscribeChanges(streamCtx, &nokkuv1.SubscribeChangesRequest{})
+	require.NoError(t, err)
+	defer stream.Close()
+	require.True(t, stream.Receive(), "the stream never opened: %v", stream.Err())
+
+	// The body arrives after the shutdown began, so the handler runs inside the grace.
+	body, send := io.Pipe()
+	req, err := http.NewRequestWithContext(
+		t.Context(), http.MethodPost, base+nokkuv1connect.WorkspaceServiceGetWorkspaceProcedure, body,
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+member)
+	status := make(chan int, 1)
+	go func() {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			status <- 0
+			return
+		}
+		_ = resp.Body.Close()
+		status <- resp.StatusCode
+	}()
+	time.Sleep(200 * time.Millisecond)
+	shutdown()
+
+	for stream.Receive() {
+	}
+	require.NoError(t, streamCtx.Err(), "a stream outlived the root ctx")
+
+	_, err = send.Write([]byte("{}"))
+	require.NoError(t, err)
+	require.NoError(t, send.Close())
+	assert.Equal(t, http.StatusOK, <-status, "a request under way was cut by the shutdown")
+	assert.NoError(t, <-stopped)
 }

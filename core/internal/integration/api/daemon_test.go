@@ -123,6 +123,25 @@ func TestEnrollDaemon(t *testing.T) {
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, got.GetDaemon().GetStatus(),
 		"a config change leaves the status alone")
 
+	// A status alone leaves the config where it was.
+	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+		Id:     new(res.GetId()),
+		Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
+	})
+	require.NoError(t, err)
+	got, err = daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(res.GetId())})
+	require.NoError(t, err)
+	assert.True(t, proto.Equal(want, got.GetDaemon().GetConfig()),
+		"a status change leaves the config alone, got %v", got.GetDaemon().GetConfig())
+
+	// The call is public, so the handler writes the audit row itself.
+	require.Eventually(t, func() bool {
+		rows, _ := cfg.Conn.Tenant().ListAuditLogs(wsCtx(t, cfg), &db.ListAuditLogsParams{
+			Target: new(res.GetId()), Actions: []string{"EnrollDaemon"}, Limit: 1,
+		})
+		return len(rows) == 1
+	}, 5*time.Second, 20*time.Millisecond, "no audit row for the enrollment")
+
 	// The same key enrolls into the same daemon, even with the token used up.
 	again, err := enroll(created.GetSecret(), key)
 	require.NoError(t, err)
@@ -486,7 +505,11 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 }
 
 // seedDefaultCA gives the workspace the CA an enrollment falls back to.
-func seedDefaultCA(t *testing.T, srv *httptest.Server, adminAuth connect.ClientOption) string {
+func seedDefaultCA(
+	t *testing.T,
+	srv *httptest.Server,
+	adminAuth connect.ClientOption,
+) *nokkuv1.CertificateAuthority {
 	t.Helper()
 	created, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
 		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
@@ -495,7 +518,7 @@ func seedDefaultCA(t *testing.T, srv *httptest.Server, adminAuth connect.ClientO
 			IsDefault: new(true),
 		})
 	require.NoError(t, err)
-	return created.GetCertificateAuthority().GetPublicKey()
+	return created.GetCertificateAuthority()
 }
 
 // An enrollment that names no CA falls back to the workspace default, and gets none while there is no default.
@@ -561,7 +584,7 @@ func TestSyncDaemonReport(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	caKey := seedDefaultCA(t, srv, adminAuth)
+	caKey := seedDefaultCA(t, srv, adminAuth).GetPublicKey()
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 
@@ -601,7 +624,7 @@ func TestSignHostCertificate(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	caKey := seedDefaultCA(t, srv, adminAuth)
+	caKey := seedDefaultCA(t, srv, adminAuth).GetPublicKey()
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 
 	hostKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

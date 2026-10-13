@@ -62,6 +62,12 @@ LIMIT
 OFFSET
   sqlc.narg('offset');
 
+-- name: ListUserIDs :many
+SELECT
+  id
+FROM
+  users;
+
 -- name: CountActiveUsers :one
 -- Names the workspace, billing counts seats as nokku_system.
 SELECT
@@ -102,23 +108,24 @@ WHERE
   id = @id
   AND role <> 5; -- owner
 
--- name: TransferOwnership :execrows
--- One statement, so the partial unique index on the owner never sees two.
+-- name: DemoteOwner :execrows
+-- Runs before PromoteOwner. The partial unique index on the owner is checked row by row, so one statement
+-- that swaps both can see two owners. See Queries.TransferOwnership.
 UPDATE users
 SET
-  role = CASE
-    WHEN id = @new_owner_id THEN 5 -- owner
-    ELSE 4 -- admin
-  END,
+  role = 4, -- admin
   updated_at = NOW()
 WHERE
-  (
-    role = 5
-    OR (
-      id = @new_owner_id
-      AND active
-    )
-  );
+  role = 5; -- owner
+
+-- name: PromoteOwner :execrows
+UPDATE users
+SET
+  role = 5, -- owner
+  updated_at = NOW()
+WHERE
+  id = @new_owner_id
+  AND active;
 
 -- name: SetUserEmail :one
 UPDATE users

@@ -58,6 +58,10 @@ WITH
         )
       )
       AND (
+        sqlc.narg('excluded_actions')::TEXT[] IS NULL
+        OR action <> ALL (sqlc.narg('excluded_actions')::TEXT[])
+      )
+      AND (
         sqlc.narg('target')::TEXT IS NULL
         OR target = sqlc.narg('target')
       )

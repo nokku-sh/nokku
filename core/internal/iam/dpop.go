@@ -135,7 +135,8 @@ func (v *DPoPVerifier) Verify(
 	// The iat check takes a proof for 2*dpopMaxSkew at most. The third is slack for a wall clock that steps back.
 	added, err := replay.SetNX(ctx, string(jti[:]), nil, 3*dpopMaxSkew)
 	if err != nil {
-		return "", fmt.Errorf("%w: replay store: %w", errInvalidProof, err)
+		// The proof may be fine, so this is no errInvalidProof.
+		return "", fmt.Errorf("dpop replay store: %w", err)
 	}
 	if !added {
 		return "", errReplay

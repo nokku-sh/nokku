@@ -45,7 +45,7 @@ func TestSendTemplate_CallsSender(t *testing.T) {
 		"Ada",
 		"Acme",
 		"https://acme.nokku.sh/invite/verify?token=secret",
-		"15 minutes",
+		15*time.Minute,
 	)
 	if err != nil {
 		t.Fatalf("SendSignupLinkEmail: %v", err)
@@ -74,11 +74,11 @@ func TestSendTemplate_Cooldown(t *testing.T) {
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", "10m"); err != nil {
+	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", 10*time.Minute); err != nil {
 		t.Fatalf("first send: %v", err)
 	}
 
-	err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", "10m")
+	err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", 10*time.Minute)
 	if !errors.Is(err, ErrCooldown) {
 		t.Fatalf("second send = %v, want ErrCooldown", err)
 	}
@@ -93,7 +93,7 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 	ctx := t.Context()
 
 	// Different templates for the same user must not share a cooldown key.
-	if err := svc.SendSignupLinkEmail(ctx, "a@b.io", "Ada", "Acme", "u", "10m"); err != nil {
+	if err := svc.SendSignupLinkEmail(ctx, "a@b.io", "Ada", "Acme", "u", 10*time.Minute); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.SendNewLoginEmail(ctx, "user-1", "a@b.io", "d1", "Chrome", "Vienna"); err != nil {
@@ -106,7 +106,7 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 		"Ada",
 		"Acme",
 		"u",
-		"10m",
+		10*time.Minute,
 	); !errors.Is(
 		err,
 		ErrCooldown,
@@ -124,19 +124,19 @@ func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m"); err != nil {
+	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute); err != nil {
 		t.Fatal(err)
 	}
 	if svc.EmailChangeOnCooldown(ctx, "user-1") {
 		t.Fatal("a sign-in link counts as an email change")
 	}
-	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", "1h"); err != nil {
+	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", time.Hour); err != nil {
 		t.Fatalf("confirmation blocked by the sign-in link: %v", err)
 	}
 	if !svc.EmailChangeOnCooldown(ctx, "user-1") {
 		t.Error("no cooldown after a confirmation went out")
 	}
-	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", "1h"); !errors.Is(err, ErrCooldown) {
+	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", time.Hour); !errors.Is(err, ErrCooldown) {
 		t.Errorf("second confirmation = %v, want ErrCooldown", err)
 	}
 	if len(sender.sent) != 2 {
@@ -153,13 +153,13 @@ func TestSendOwnerLinkEmail_CooldownPerAddress(t *testing.T) {
 	if svc.OwnerLinkOnCooldown(ctx, "a@b.io") {
 		t.Fatal("cooldown before any link went out")
 	}
-	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", "24h"); err != nil {
+	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
 	if !svc.OwnerLinkOnCooldown(ctx, "a@b.io") {
 		t.Error("no cooldown after the link went out")
 	}
-	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", "24h"); !errors.Is(err, ErrCooldown) {
+	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", 24*time.Hour); !errors.Is(err, ErrCooldown) {
 		t.Errorf("second link to the address = %v, want ErrCooldown", err)
 	}
 	if svc.OwnerLinkOnCooldown(ctx, "c@b.io") {
@@ -175,11 +175,11 @@ func TestSendTemplate_CooldownPerUser(t *testing.T) {
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m"); err != nil {
+	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute); err != nil {
 		t.Fatal(err)
 	}
 	// A different user must not be blocked by user-1's cooldown.
-	if err := svc.SendMagicLinkEmail(ctx, "user-2", "b@b.io", "u", "10m"); err != nil {
+	if err := svc.SendMagicLinkEmail(ctx, "user-2", "b@b.io", "u", 10*time.Minute); err != nil {
 		t.Fatalf("other user blocked by cooldown: %v", err)
 	}
 }
@@ -189,13 +189,13 @@ func TestSendTemplate_SendErrorPropagatesWithoutCooldown(t *testing.T) {
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m")
+	err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute)
 	if err == nil || !strings.Contains(err.Error(), "smtp down") {
 		t.Fatalf("error = %v, want smtp down", err)
 	}
 
 	// Failed sends must not set the cooldown, so a retry is possible.
-	err = svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", "10m")
+	err = svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute)
 	if errors.Is(err, ErrCooldown) {
 		t.Fatal("failed send set cooldown, retry impossible")
 	}
@@ -215,7 +215,7 @@ func TestSendTemplate_FullCooldownStoreSendsAnyway(t *testing.T) {
 
 	for range 2 {
 		if err := svc.SendMagicLinkEmail(
-			t.Context(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", "15 minutes",
+			t.Context(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", 15*time.Minute,
 		); err != nil {
 			t.Fatalf("SendMagicLinkEmail with a full cooldown store: %v", err)
 		}
@@ -228,7 +228,7 @@ func TestSendTemplate_FullCooldownStoreSendsAnyway(t *testing.T) {
 func TestSendTemplate_MissingUserID(t *testing.T) {
 	svc := newTestService(&mockSender{})
 
-	err := svc.SendMagicLinkEmail(t.Context(), "", "a@b.io", "u", "10m")
+	err := svc.SendMagicLinkEmail(t.Context(), "", "a@b.io", "u", 10*time.Minute)
 	if err == nil {
 		t.Fatal("missing user id: want error")
 	}
@@ -288,7 +288,7 @@ func TestSendTemplate_TextPartKeepsURLs(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
 	link := "https://app.nokku.sh/email-change?cancel=1&token=t"
-	if err := svc.SendEmailChangeNotice(t.Context(), "user-1", "a@b.io", "new@b.io", link, "7 days"); err != nil {
+	if err := svc.SendEmailChangeNotice(t.Context(), "user-1", "a@b.io", "new@b.io", link, 7*24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
 	msg := sender.sent[0]
@@ -307,7 +307,7 @@ func TestSendTemplate_ConcurrentSendsOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 20 {
 		wg.Go(func() {
-			_ = svc.SendMagicLinkEmail(t.Context(), "user-1", "a@b.io", "u", "10m")
+			_ = svc.SendMagicLinkEmail(t.Context(), "user-1", "a@b.io", "u", 10*time.Minute)
 		})
 	}
 	wg.Wait()
@@ -321,4 +321,22 @@ type countingSender struct{ n atomic.Int32 }
 func (c *countingSender) Send(context.Context, message) error {
 	c.n.Add(1)
 	return nil
+}
+
+func TestLifetime(t *testing.T) {
+	tests := []struct {
+		d    time.Duration
+		want string
+	}{
+		{15 * time.Minute, "15 minutes"},
+		{time.Hour, "1 hour"},
+		{90 * time.Minute, "90 minutes"},
+		{24 * time.Hour, "24 hours"},
+		{7 * 24 * time.Hour, "7 days"},
+	}
+	for _, tt := range tests {
+		if got := lifetime(tt.d); got != tt.want {
+			t.Errorf("lifetime(%s) = %q, want %q", tt.d, got, tt.want)
+		}
+	}
 }
