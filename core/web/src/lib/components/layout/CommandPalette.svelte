@@ -10,6 +10,7 @@
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { auth } from '#lib/api/auth.svelte.js';
 	import { useConnect, useServers } from '#lib/api/connect.svelte.js';
 	import { daemon } from '#lib/api/daemons.svelte.js';
 	import { serviceAccount } from '#lib/api/service_account.svelte.js';
@@ -49,6 +50,7 @@
 
 	const me = user.self();
 	const can = user.can();
+	const options = auth.options();
 	const info = util.instanceInfo();
 	const support = $derived(supportRoute(info.data?.supportEmail));
 	const connect = useConnect();
@@ -93,7 +95,7 @@
 				title: 'Invite people',
 				icon: UserPlus,
 				url: '/access/users?new=1',
-				show: can.admin,
+				show: can.admin && !!options.data?.magicLink,
 				keywords: 'user member add'
 			},
 			{ title: 'Create team', icon: Users, url: '/access/teams?new=1', show: can.edit },

@@ -271,6 +271,31 @@ func TestLastCredentialStays(t *testing.T) {
 	_ = actor.KindUser
 }
 
+// Enforced SSO takes no link, so an invite must not make an account that cannot sign in.
+func TestEnforcedSSOKeepsTheInvite(t *testing.T) {
+	mail := newMailbox()
+	e := newTestEnvWith(t, mail.deps())
+	o := e.org(t)
+	ctx := anon(t.Context(), o.ws)
+	invite := e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 1)
+	email := "new@" + testDomain()
+
+	require.NoError(t, e.svc.RequestSignupLink(ctx, invite, email, "New"))
+	token := linkToken(t, mail.link(t))
+	e.setEnforceSSO(t, o.ws, true)
+
+	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, "late@"+testDomain(), ""), iam.ErrSSORequired)
+	_, _, err := e.svc.ConsumeMagicLink(ctx, token)
+	require.ErrorIs(t, err, iam.ErrSSORequired)
+	assert.Nil(t, e.userByEmail(t, o.ws, email), "an account that cannot sign in was made")
+	_, err = e.svc.LookupInvite(ctx, invite)
+	require.NoError(t, err, "the invite was spent")
+
+	e.setEnforceSSO(t, o.ws, false)
+	_, _, err = e.svc.ConsumeMagicLink(ctx, token)
+	require.NoError(t, err, "the refused link was spent")
+}
+
 // The environment names the issuer and the client. Whether the provider is on and who it lets in is the admin's.
 func TestBootstrapKeepsWhatTheAdminSet(t *testing.T) {
 	e := newTestEnv(t)

@@ -362,7 +362,7 @@ type RedeemJoinTokenByIDParams struct {
 	Kind nokku.JoinTokenKind `json:"kind"`
 }
 
-// For a signup whose invite was checked earlier. The mailed link or the passkey ceremony is the proof by then.
+// For a signup whose invite was checked earlier. The mailed link is the proof by then.
 func (q *Queries) RedeemJoinTokenByID(ctx context.Context, arg *RedeemJoinTokenByIDParams) (*JoinToken, error) {
 	row := q.db.QueryRow(ctx, redeemJoinTokenByID, arg.ID, arg.Kind)
 	var i JoinToken

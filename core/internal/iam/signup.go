@@ -15,7 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// signupData rides in a signup token or a passkey ceremony until the account exists.
+// signupData rides in a signup token until the account exists.
 type signupData struct {
 	Name     string                `json:"name"`
 	Role     nokkuv1.WorkspaceRole `json:"role"`
@@ -62,10 +62,18 @@ func (s *Service) createUser(
 	p db.CreateUserWithIDParams,
 	inviteID string,
 ) (*db.User, error) {
-	p.ID = cmp.Or(p.ID, uuid.NewV7().String())
+	p.ID = uuid.NewV7().String()
 	p.Email = normalizeEmail(p.Email)
 	p.Role = cmp.Or(p.Role, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	if inviteID != "" {
+		// An invited account signs in with its signup link, and enforced SSO takes none.
+		ws, err := q.GetWorkspace(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if ws.Settings.GetEnforceSso() {
+			return nil, ErrSSORequired
+		}
 		tok, err := q.RedeemJoinTokenByID(ctx, &db.RedeemJoinTokenByIDParams{
 			ID:   inviteID,
 			Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE,

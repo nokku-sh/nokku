@@ -141,6 +141,9 @@ func (s *Service) RequestSignupLink(ctx context.Context, invite, email, name str
 		if err != nil {
 			return err
 		}
+		if ws.Settings.GetEnforceSso() {
+			return ErrSSORequired
+		}
 		workspace = ws.Name
 		if _, err := q.GetUserByEmail(ctx, email); err == nil {
 			return ErrEmailTaken

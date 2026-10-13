@@ -15,9 +15,11 @@
 		/** Where an expired link sends people to ask for a new one. */
 		retryHref: string;
 		retryLabel: string;
+		/** Where a link that worked lands. */
+		next?: string;
 	}
 
-	let { title, retryHref, retryLabel }: Props = $props();
+	let { title, retryHref, retryLabel, next = '/' }: Props = $props();
 
 	const token = page.url.searchParams.get('token');
 	const consume = auth.consumeMagicLink();
@@ -25,7 +27,7 @@
 	// Fetched on open, not on a button, since the mailed link is the whole proof.
 	$effect(() => {
 		if (token && consume.isIdle) {
-			consume.mutate({ token }, { onSuccess: () => void goto('/') });
+			consume.mutate({ token }, { onSuccess: () => void goto(next) });
 		}
 	});
 

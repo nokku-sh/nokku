@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { auth } from '#lib/api/auth.svelte.js';
 	import { session } from '#lib/api/session.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { util } from '#lib/api/workspaces.svelte.js';
@@ -24,6 +25,7 @@
 	let { workspace, connected, users }: Props = $props();
 
 	const can = user.can();
+	const options = auth.options();
 	// A CLI session is what nk login leaves behind.
 	const sessions = session.list();
 	const signedIn = $derived((sessions.data ?? []).some((s) => s.kind === 'cli'));
@@ -109,11 +111,16 @@
 	<p class="text-sm text-muted-foreground">
 		Grant access per server account, to people or whole teams.
 	</p>
-	{#if can.admin}
+	{#if can.admin && options.data?.magicLink}
 		<Button variant="outline" class="self-start" onclick={() => (inviteOpen = true)}>
 			<UserPlus data-icon="inline-start" />
 			Invite people
 		</Button>
+	{:else if can.admin && options.data?.emailConfigured === false}
+		<p class="text-sm text-muted-foreground">
+			Invitations are mailed, and this server sends no email yet. Set it up, or let people in
+			through an identity provider.
+		</p>
 	{/if}
 {/snippet}
 

@@ -8,39 +8,22 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
-	"uuid"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/db"
-	emailverify "github.com/nokku-sh/nokku/core/internal/email"
 )
 
 const (
 	challengeTTL       = 5 * time.Minute
 	ceremonyCookieName = "webauthn_session"
-	maxSignupEmail     = 254
-	maxSignupName      = 256
 	// A relying party is built per workspace host and kept for a while.
 	relyingPartyTTL = time.Hour
 )
-
-// passkeySignupState reserves the account id, the user row only exists once the ceremony verifies.
-type passkeySignupState struct {
-	Session  *webauthn.SessionData `json:"session"`
-	ID       string                `json:"id"`
-	Email    string                `json:"email"`
-	Name     string                `json:"name"`
-	Role     nokkuv1.WorkspaceRole `json:"role"`
-	InviteID string                `json:"invite_id"`
-}
 
 type webUser struct {
 	user  *db.User
@@ -53,10 +36,9 @@ func (u *webUser) WebAuthnDisplayName() string                { return u.user.Na
 func (u *webUser) WebAuthnCredentials() []webauthn.Credential { return u.creds }
 
 type passkeyFlow struct {
-	svc    *Service
-	rps    *cache.Local[*webauthn.WebAuthn]
-	state  *sealed[webauthn.SessionData]
-	signup *sealed[passkeySignupState]
+	svc   *Service
+	rps   *cache.Local[*webauthn.WebAuthn]
+	state *sealed[webauthn.SessionData]
 }
 
 func newPasskeyFlow(svc *Service) *passkeyFlow {
@@ -65,9 +47,6 @@ func newPasskeyFlow(svc *Service) *passkeyFlow {
 		rps: cache.NewLocal[*webauthn.WebAuthn](relyingPartyTTL),
 		state: &sealed[webauthn.SessionData]{
 			svc: svc, cookie: ceremonyCookieName, use: "webauthn:session", ttl: challengeTTL,
-		},
-		signup: &sealed[passkeySignupState]{
-			svc: svc, cookie: ceremonyCookieName, use: "webauthn:signup", ttl: challengeTTL,
 		},
 	}
 }
@@ -240,111 +219,6 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "name": name})
 }
 
-// BeginSignup starts the passkey ceremony of an invited person. The invite is spent when it finishes.
-func (f *passkeyFlow) BeginSignup(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	wa, err := f.rp(ctx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	invite, err := f.svc.LookupInvite(ctx, r.PostFormValue("invite"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid or expired invitation")
-		return
-	}
-	email := normalizeEmail(r.PostFormValue("email"))
-	if err := emailverify.Verify(ctx, email, f.svc.strict); err != nil {
-		writeError(w, http.StatusBadRequest, "please enter a valid email address")
-		return
-	}
-	name := strings.TrimSpace(r.PostFormValue("name"))
-	if name == "" {
-		name, _, _ = strings.Cut(email, "@")
-	}
-	// Both travel in the ceremony cookie.
-	if len(email) > maxSignupEmail || len(name) > maxSignupName {
-		writeError(w, http.StatusBadRequest, "name or email is too long")
-		return
-	}
-	if _, err := f.svc.GetUserByEmail(ctx, email); err == nil {
-		writeError(w, http.StatusConflict, "an account with this email already exists")
-		return
-	}
-
-	st := passkeySignupState{
-		ID: uuid.NewV7().String(), Email: email, Name: name, Role: deref(invite.Role), InviteID: invite.ID,
-	}
-	creation, session, err := wa.BeginRegistration(&webUser{user: &db.User{ID: st.ID, Email: email, Name: name}})
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "registration failed")
-		return
-	}
-	st.Session = session
-	if _, err := f.signup.put(w, st); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	WriteJSON(w, http.StatusOK, creation)
-}
-
-// FinishSignup creates the account, spends the invite and signs the browser in.
-func (f *passkeyFlow) FinishSignup(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	wa, err := f.rp(ctx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	st, flowID, err := f.signup.take(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid or expired ceremony")
-		return
-	}
-	cred, err := wa.FinishRegistration(&webUser{user: &db.User{ID: st.ID, Email: st.Email}}, *st.Session, r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "registration verification failed")
-		return
-	}
-
-	var u *db.User
-	err = f.svc.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		u, err = f.svc.createUser(ctx, q, db.CreateUserWithIDParams{
-			ID: st.ID, Email: st.Email, Name: st.Name, Role: st.Role,
-		}, st.InviteID)
-		if err != nil {
-			return err
-		}
-		_, err = savePasskey(ctx, q, u.ID, cred)
-		return err
-	})
-	switch {
-	case errors.Is(err, ErrEmailTaken):
-		writeError(w, http.StatusConflict, "an account with this email already exists")
-		return
-	case errors.Is(err, ErrInviteSpent):
-		writeError(w, http.StatusBadRequest, "invalid or expired invitation")
-		return
-	case errors.Is(err, ErrSeatLimit):
-		writeError(w, http.StatusForbidden, "this workspace has no seats left")
-		return
-	case err != nil:
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	f.svc.record(
-		ctx,
-		event{Action: actionUserCreated, Kind: actor.KindUser, Method: MethodPasskey, UserID: u.ID, Email: u.Email},
-	)
-	f.svc.spendFlow(ctx, flowID)
-	http.SetCookie(w, f.clearedCeremonyCookie())
-	f.signIn(w, r, u, cred)
-}
-
 func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
 	wa, err := f.rp(r.Context())
 	if err != nil {
@@ -396,10 +270,10 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, f.clearedCeremonyCookie())
 	f.svc.spendFlow(ctx, flowID)
 	f.svc.touchCredential(ctx, passkeyCredentialID(cred))
-	f.signIn(w, r, wu.user, cred)
+	f.signIn(w, r, wu.user)
 }
 
-func (f *passkeyFlow) signIn(w http.ResponseWriter, r *http.Request, u *db.User, _ *webauthn.Credential) {
+func (f *passkeyFlow) signIn(w http.ResponseWriter, r *http.Request, u *db.User) {
 	ctx := r.Context()
 	cookie, err := f.svc.completeLogin(ctx, u, MethodPasskey)
 	switch {

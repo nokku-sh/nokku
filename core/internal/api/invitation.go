@@ -13,7 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// invitationService is the mailed way into a workspace. The passkey way is /passkey/signup with the same invite.
+// invitationService is the only way an invite becomes an account. The mailed link proves the address.
 type invitationService struct {
 	cfg *config.Config
 }
@@ -55,7 +55,7 @@ func (s *invitationService) AcceptInvitation(
 	req *nokkuv1.AcceptInvitationRequest,
 ) (*nokkuv1.AcceptInvitationResponse, error) {
 	if !s.cfg.Email.HasSMTP() {
-		return nil, newError(connect.CodeUnimplemented, "this server sends no mail, sign up with a passkey")
+		return nil, newError(connect.CodeUnimplemented, "this server sends no mail, so it takes no invitations")
 	}
 	err := s.cfg.IAM.RequestSignupLink(ctx, req.GetToken(), req.GetEmail(), req.GetName())
 	switch {
@@ -67,6 +67,8 @@ func (s *invitationService) AcceptInvitation(
 		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
 	case errors.Is(err, iam.ErrMailNotSent):
 		return nil, errMailNotSent
+	case errors.Is(err, iam.ErrSSORequired):
+		return nil, errSSORequired
 	case err != nil:
 		return nil, err
 	}

@@ -69,4 +69,10 @@ func TestCreateJoinTokenWithGrants(t *testing.T) {
 		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("dev"), UserIds: []string{member.ID}}},
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "grants on an invite, got %v", err)
+
+	// The test server sends no mail, and an invite ends in a mailed link.
+	_, err = tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
+		Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE.Enum(),
+	})
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "an invite without mail, got %v", err)
 }

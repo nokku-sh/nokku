@@ -63,6 +63,17 @@ func (s *joinTokenService) CreateJoinToken(
 			len(req.GetTags()) > 0 || len(req.GetGrants()) > 0 {
 			return nil, newError(connect.CodeInvalidArgument, "invite tokens take only a role")
 		}
+		// An invite ends in a mailed link. Without mail or under required SSO it would be a dead one.
+		if !s.cfg.Email.HasSMTP() {
+			return nil, newError(connect.CodeFailedPrecondition, "invitations need email, set NOKKU_SMTP_HOST first")
+		}
+		ws, err := s.cfg.Conn.Tenant().GetWorkspace(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if ws.Settings.GetEnforceSso() {
+			return nil, errSSORequired
+		}
 		role := cmp.Or(req.GetRole(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 		if !db.CanAssign(callerRole(ctx), role) {
 			return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")

@@ -18,8 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
@@ -224,7 +222,7 @@ func TestDeviceFloodStaysInItsStore(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	d := newPasskeyDevice()
-	d.signUp(t, e, o.ws, e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 0), "flood@"+testDomain())
+	d.enroll(t, e, o.ws, "flood@"+testDomain())
 	ctx := anon(t.Context(), o.ws)
 
 	// The store holds 10 000 entries, two per grant.

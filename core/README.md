@@ -224,7 +224,7 @@ Lost every passkey? Run `./nokku admin-link` on the server, with the same enviro
 | `NOKKU_SMTP_PASSWORD`  |         | Password. A login the relay rejects fails the start |
 | `NOKKU_EMAIL_SENDER`   |         | From address, required with SMTP          |
 
-Any SMTP relay works. Without email, people sign in with passkeys or an identity provider, and invitations are links you hand over yourself.
+Any SMTP relay works. Without email, people sign in with passkeys or an identity provider, and nobody can be invited. An invitation ends in a mailed link that proves the address, so new accounts then only come from an identity provider.
 
 </details>
 

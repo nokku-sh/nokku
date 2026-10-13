@@ -12,9 +12,6 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	// Cross-origin posts are rejected for every route by the server's withCSRF.
 	mux.HandleFunc("POST /passkey/login/begin", svc.Passkey.BeginLogin)
 	mux.HandleFunc("POST /passkey/login/finish", svc.Passkey.FinishLogin)
-	// Signup takes an invite, see InvitationService for the mailed way in.
-	mux.HandleFunc("POST /passkey/signup/begin", svc.Passkey.BeginSignup)
-	mux.HandleFunc("POST /passkey/signup/finish", svc.Passkey.FinishSignup)
 
 	// BeginRegistration checks the principal itself, so no RequireLogin.
 	optAuth := newChain(svc.Middleware)

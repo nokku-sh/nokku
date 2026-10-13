@@ -2,6 +2,7 @@
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
+	import { auth } from '#lib/api/auth.svelte.js';
 	import { users } from '#lib/api/workspaces.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { roles } from '#lib/api/roles.svelte.js';
@@ -37,6 +38,9 @@
 	const me = user.self();
 	const canManage = $derived(atLeast(me.data?.role, WorkspaceRole.ADMIN));
 	const can = user.can();
+	// An invitation ends in a mailed link, which takes mail and a workspace that lets people in by one.
+	const options = auth.options();
+	const canInvite = $derived(canManage && !!options.data?.magicLink);
 
 	const pager = usePagination();
 	const list = users.list(() => ({
@@ -150,10 +154,12 @@
 </script>
 
 <UserSheet />
-<InviteSheet bind:open={create.open} />
+{#if canInvite}
+	<InviteSheet bind:open={create.open} />
+{/if}
 
 <PageHeader title="Users" description="Everyone in this workspace, their role and their teams">
-	{#if canManage}
+	{#if canInvite}
 		<Button onclick={() => (create.open = true)}>
 			<PlusIcon data-icon="inline-start" />
 			Invite people

@@ -119,7 +119,7 @@ RETURNING
   *;
 
 -- name: RedeemJoinTokenByID :one
--- For a signup whose invite was checked earlier. The mailed link or the passkey ceremony is the proof by then.
+-- For a signup whose invite was checked earlier. The mailed link is the proof by then.
 UPDATE join_tokens
 SET
   uses = uses + 1,
