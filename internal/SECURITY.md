@@ -35,8 +35,9 @@ This is optional but appreciated.
 The following are in scope for security reports:
 
 - `dpop`: DPoP proof signing, claims, and the embedded JWK.
-- `dpopclient`: the DPoP interceptors, nonce and canonical-URL learning, the
-  retry on a stale nonce, and the TLS 1.3 HTTP/2 transport.
+- `dpopclient`: the DPoP interceptors, nonce learning, the binding of proofs
+  to the configured API URL, the retry on a stale nonce, and the TLS 1.3
+  HTTP/2 transport.
 - `trust`: fetching the CA a server advertises, the pin check, and the
   verification that follows.
 - `id`: the machine fingerprint and how it hides the raw machine ID.

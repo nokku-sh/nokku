@@ -11,22 +11,29 @@ exactly one implementation. The core does not use them.
   `dpop+jwt` proofs with an ECDSA P-256 signer, embedding the public JWK so
   the server can bind a session to the key thumbprint without pre-registration.
 - **dpopclient** - the DPoP-authenticated connect client stack (interceptors,
-  nonce and canonical-URL learning, one retry on a stale nonce) and the
-  HTTP/2-only TLS 1.3 transport both binaries share. It always verifies the
-  server.
+  nonce learning, one retry on a stale nonce) and the HTTP/2-only TLS 1.3
+  transport both binaries share. It always verifies the server and never
+  follows a redirect. Proofs bind to the configured API URL and nothing else,
+  so a client has to reach the server by the name in `NOKKU_BASE_URL`. A
+  server that says it lives at another URL is refused with
+  `ErrAPIURLMismatch`, which names the URL to use.
 - **trust** - trust in a server whose certificate comes from a private CA.
   The client fetches the CA the server advertises at `/ca.crt`, keeps it only
   when it matches a pin it got out of band, and verifies the usual way from
   then on. There is no way to skip verification.
-- **id** - stable machine fingerprint from the hardware machine ID
-  (hostname fallback), HMAC'd so the raw identifier is never exposed. Used
-  only as the software signing key's wrap password.
+- **id** - stable machine fingerprint from the hardware machine ID, HMAC'd so
+  the raw identifier is never exposed. The hostname stands in only on a
+  machine that has no ID or a placeholder one. An ID that cannot be read is
+  an error, never a guess. Used only as the software signing key's wrap
+  password.
 - **tpm** - machine-bound ECDSA P-256 signing identities. `Signer` is a
   persisted identity, TPM-backed when a TPM 2.0 is usable with a
   machine-wrapped software fallback otherwise. `NewSigner` loads or creates
   it and `SignerOptions.Salt` namespaces the key per binary and purpose.
   `SignerOptions.Enclave` plugs in another hardware key store, such as the
   macOS Secure Enclave, tried after the TPM and before the software key.
+  A `.lock` file beside the state file keeps two processes from creating
+  different keys at once.
 
 ## Salts
 
@@ -68,7 +75,7 @@ cannot log in.
 
 The software fallback wraps the key with a key derived from the machine's
 public fingerprint (`id.MachineID`). That stops a key file copied to another
-machine from working; it is not encryption against anyone who can read the
+machine from working. It is not encryption against anyone who can read the
 file on the machine itself. Leave `SignerOptions.Recreate` unset where the
 identity is bound to a server-side registration, so a TPM clear or a re-image
 makes the caller re-enroll instead of silently presenting a new key.
