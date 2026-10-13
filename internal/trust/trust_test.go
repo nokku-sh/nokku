@@ -15,6 +15,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // serve starts a TLS server that advertises bundle at CAPath, or nothing
@@ -41,9 +44,7 @@ func ownCert(srv *httptest.Server) []byte {
 func foreignCA(t *testing.T) *x509.Certificate {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tmpl := &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
 		Subject:               pkix.Name{CommonName: "someone else"},
@@ -54,13 +55,9 @@ func foreignCA(t *testing.T) *x509.Certificate {
 		KeyUsage:              x509.KeyUsageCertSign,
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	cert, err := x509.ParseCertificate(der)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return cert
 }
 
@@ -69,28 +66,21 @@ func TestBootstrap(t *testing.T) {
 	pin := Pin(srv.Certificate())
 
 	ca, err := Bootstrap(t.Context(), srv.URL, strings.ToUpper(pin))
-	if err != nil {
-		t.Fatalf("Bootstrap: %v", err)
-	}
+	require.NoError(t, err)
 	pool, err := Pool(ca)
-	if err != nil || pool == nil {
-		t.Fatalf("Pool: %v", err)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, pool)
 	// The kept CA is enough for an ordinary verified request.
 	httpc := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}}
 	resp, err := httpc.Get(srv.URL + CAPath)
-	if err != nil {
-		t.Fatalf("verified request with the kept CA: %v", err)
-	}
+	require.NoError(t, err, "verified request with the kept CA")
 	_ = resp.Body.Close()
 }
 
 func TestBootstrapRefusesWrongPin(t *testing.T) {
 	srv := serve(t, ownCert)
 	_, err := Bootstrap(t.Context(), srv.URL, Pin(foreignCA(t)))
-	if err == nil || !strings.Contains(err.Error(), "matches the pin") {
-		t.Fatalf("a pin of another CA must be refused, got %v", err)
-	}
+	require.ErrorContains(t, err, "matches the pin", "a pin of another CA must be refused")
 }
 
 // Whoever sits in between can copy the public CA of the real server, but has
@@ -101,50 +91,40 @@ func TestBootstrapRefusesCAWithoutItsCertificate(t *testing.T) {
 		return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: other.Raw})
 	})
 	_, err := Bootstrap(t.Context(), srv.URL, Pin(other))
-	if err == nil || !strings.Contains(err.Error(), "does not come from the pinned CA") {
-		t.Fatalf("an advertised CA the server has no certificate from must be refused, got %v", err)
-	}
+	require.ErrorContains(t, err, "does not come from the pinned CA",
+		"an advertised CA the server has no certificate from must be refused")
 }
 
 func TestAdvertisedNoCA(t *testing.T) {
 	srv := serve(t, func(*httptest.Server) []byte { return nil })
-	if _, err := Advertised(t.Context(), srv.URL); !errors.Is(err, ErrNoCA) {
-		t.Fatalf("err = %v, want ErrNoCA", err)
-	}
-	if _, err := Advertised(t.Context(), "http://localhost:1"); err == nil {
-		t.Fatal("plain http has no CA to fetch")
-	}
+	_, err := Advertised(t.Context(), srv.URL)
+	require.ErrorIs(t, err, ErrNoCA)
+	_, err = Advertised(t.Context(), "http://localhost:1")
+	require.Error(t, err, "plain http has no CA to fetch")
 }
 
 func TestUntrusted(t *testing.T) {
 	srv := serve(t, ownCert)
 	_, err := (&http.Client{Transport: &http.Transport{}}).Get(srv.URL)
-	if !Untrusted(err) {
-		t.Fatalf("an unknown issuer must count as untrusted, got %v", err)
-	}
-	if Untrusted(errors.New("connection refused")) {
-		t.Fatal("a plain network error is not a trust problem")
-	}
+	assert.True(t, Untrusted(err), "an unknown issuer must count as untrusted, got %v", err)
+	assert.False(t, Untrusted(errors.New("connection refused")), "a plain network error is not a trust problem")
 }
 
 func TestParsePin(t *testing.T) {
 	good := "sha256:" + strings.Repeat("ab", 32)
-	if got, err := ParsePin("  SHA256:" + strings.Repeat("AB", 32) + "\n"); err != nil || got != good {
-		t.Fatalf("ParsePin = %q, %v", got, err)
-	}
+	got, err := ParsePin("  SHA256:" + strings.Repeat("AB", 32) + "\n")
+	require.NoError(t, err)
+	assert.Equal(t, good, got)
 	for _, bad := range []string{"", strings.Repeat("ab", 32), "sha256:abcd", "sha256:" + strings.Repeat("zz", 32)} {
-		if _, err := ParsePin(bad); err == nil {
-			t.Fatalf("ParsePin(%q) must fail", bad)
-		}
+		_, err = ParsePin(bad)
+		require.Error(t, err, "ParsePin(%q) must fail", bad)
 	}
 }
 
 func TestPoolWithoutCAsIsSystemRoots(t *testing.T) {
 	pool, err := Pool([]byte("  \n"))
-	if err != nil || pool == nil {
-		t.Fatalf("Pool = %v, %v, want the system roots", pool, err)
-	}
-	if _, err = Pool([]byte("not pem")); err == nil {
-		t.Fatal("CA data without a certificate must fail")
-	}
+	require.NoError(t, err)
+	assert.NotNil(t, pool, "want the system roots")
+	_, err = Pool([]byte("not pem"))
+	require.Error(t, err, "CA data without a certificate must fail")
 }
