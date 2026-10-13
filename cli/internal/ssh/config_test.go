@@ -38,6 +38,7 @@ func TestRenderSSHConfig(t *testing.T) {
 		"Match originalhost web exec \"nk prepare t-1\"\n\nHost web\n    User alice\n    ProxyCommand nk proxy t-1 %p\n    HostKeyAlias t-1\n",
 		"    CertificateFile " + configValue(paths.SSHCertificate("t-1")) + "\n",
 		"    IdentityAgent " + configValue(paths.AgentSocket()) + "\n",
+		"    ForwardAgent no\n    ForwardX11 no\n", // a Host * of the user never forwards to a target
 		"Host nokku/t-2\n", // names that differ only by case fall back to the id
 		"Host nokku/t-3\n",
 	} {

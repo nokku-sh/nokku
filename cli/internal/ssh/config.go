@@ -104,6 +104,8 @@ Host %s
     IdentitiesOnly yes
     PasswordAuthentication no
     StrictHostKeyChecking yes
+    ForwardAgent no
+    ForwardX11 no
     ServerAliveInterval 60
     LogLevel ERROR
 
