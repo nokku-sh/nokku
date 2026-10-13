@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -452,6 +453,7 @@ func TestForwardSocketsBelongToTheUser(t *testing.T) {
 	}
 	const nobody = 65534
 	sysUser := &account{Name: "nobody", UID: nobody, GID: nobody, Home: "/"}
+	helperForEveryone(t)
 
 	ln, err := listenAs(sysUser, "127.0.0.1:0")
 	require.NoError(t, err)
@@ -465,6 +467,27 @@ func TestForwardSocketsBelongToTheUser(t *testing.T) {
 
 	_, err = listenAs(sysUser, "127.0.0.1:1")
 	require.Error(t, err, "the user bound a privileged port")
+}
+
+// The go tool builds the test binary in a directory only its own user can enter. nokkud itself is in /usr/bin.
+func helperForEveryone(t *testing.T) {
+	t.Helper()
+	//nolint:usetesting // t.TempDir() sits under a 0700 directory
+	dir, err := os.MkdirTemp("", "nokkud-helper-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	require.NoError(t, os.Chmod(dir, 0o755))
+
+	bin := filepath.Join(dir, filepath.Base(os.Args[0]))
+	data, err := os.ReadFile(os.Args[0])
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(bin, data, 0o755))
+
+	inPlace := helperArgv
+	t.Cleanup(func() { helperArgv = inPlace })
+	helperArgv = func(name string, args ...string) ([]string, error) {
+		return append([]string{bin, "-test.run=^TestHelperProcess$", "--", name}, args...), nil
+	}
 }
 
 // The uid column of /proc/net/tcp is the owner a firewall matches on.
