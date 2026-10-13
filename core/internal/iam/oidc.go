@@ -60,12 +60,18 @@ func newOIDCFlow(svc *Service) *oidcFlow {
 	}
 }
 
-// Login links the identity to the signed-in user when there is one.
+// Login signs in, or with link=true links the identity to the signed-in user.
 func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cfg, err := h.svc.loginProvider(ctx, r.URL.Query().Get("provider"))
 	if err != nil {
 		fail(w, r, "provider not configured")
+		return
+	}
+	// A refused link must not go on as a sign-in, that could make a second account.
+	linkUserID, err := linkUserIDFor(ctx, r)
+	if err != nil {
+		fail(w, r, "link refused")
 		return
 	}
 	provider, err := h.discover(ctx, cfg.OIDC.IssuerURL)
@@ -80,7 +86,7 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 		Nonce:        nonce,
 		PKCEVerifier: oauth2.GenerateVerifier(),
 		ReturnTo:     safeReturnTo(r.URL.Query().Get("return_to")),
-		LinkUserID:   linkUserIDFor(ctx, r),
+		LinkUserID:   linkUserID,
 	}
 	key, err := h.state.put(w, st)
 	if err != nil {

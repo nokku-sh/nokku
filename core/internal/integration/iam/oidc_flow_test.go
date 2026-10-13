@@ -5,6 +5,7 @@ package iam_test
 // End-to-end OIDC against mockoidc. Discovery is hand-served so attacks can swap in a crafted id_token.
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -119,10 +120,15 @@ type oidcFlowRun struct {
 
 func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *iam.Service) *oidcFlowRun {
 	t.Helper()
-
 	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil)
+	return h.startOIDCFlowFrom(t, svc, login.WithContext(anon(login.Context(), h.org.ws)))
+}
+
+// startOIDCFlowFrom takes the login request, for a flow somebody signed in starts.
+func (h *oidcIDPHarness) startOIDCFlowFrom(t *testing.T, svc *iam.Service, login *http.Request) *oidcFlowRun {
+	t.Helper()
 	loginRec := httptest.NewRecorder()
-	svc.OIDC.Login(loginRec, login.WithContext(anon(login.Context(), h.org.ws)))
+	svc.OIDC.Login(loginRec, login)
 
 	authorizeURL := loginRec.Header().Get("Location")
 	if authorizeURL == "" {
@@ -375,22 +381,7 @@ func TestOIDCFlowNeverMatchesTheOwnerByEmail(t *testing.T) {
 
 	// Signed in, the owner links it themselves.
 	h.user()
-	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil).
-		WithContext(as(t.Context(), h.org.ws, owner))
-	loginRec := httptest.NewRecorder()
-	svc.OIDC.Login(loginRec, login)
-	authorizeURL := loginRec.Header().Get("Location")
-	u, err := url.Parse(authorizeURL)
-	if err != nil {
-		t.Fatalf("parse authorize redirect: %v", err)
-	}
-	h.lastNonce = u.Query().Get("nonce")
-	resp, err := noRedirectClient().Get(authorizeURL)
-	if err != nil {
-		t.Fatalf("authorize: %v", err)
-	}
-	defer resp.Body.Close()
-	f := &oidcFlowRun{idp: h, loginRec: loginRec, callbackUR: resp.Header.Get("Location")}
+	f := h.startOIDCFlowFrom(t, svc, linkRequest(as(t.Context(), h.org.ws, owner)))
 	wantSSOSuccess(t, f.callback(t, svc, ""))
 	if c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject); c == nil ||
 		c.UserID != owner.ID {
@@ -459,31 +450,22 @@ func signIDToken(t *testing.T, key *rsa.PrivateKey, kid string, claims map[strin
 	return s
 }
 
+// linkRequest is what the profile page's link button sends.
+func linkRequest(ctx context.Context) *http.Request {
+	r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/oidc/login?provider="+testProviderID+"&link=true", nil)
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	return r
+}
+
 func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
-	// A signed-in user who starts the flow links the identity to their account.
+	// A signed-in user who asks for it links the identity to their account.
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
 	existing := e.user(t, h.org.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	h.user()
 
-	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil).
-		WithContext(as(t.Context(), h.org.ws, existing))
-	loginRec := httptest.NewRecorder()
-	svc.OIDC.Login(loginRec, login)
-
-	resp, err := noRedirectClient().Get(loginRec.Header().Get("Location"))
-	if err != nil {
-		t.Fatalf("authorize: %v", err)
-	}
-	defer resp.Body.Close()
-
-	cb := httptest.NewRequest(http.MethodGet, resp.Header.Get("Location"), nil)
-	for _, c := range loginRec.Result().Cookies() {
-		cb.AddCookie(c)
-	}
-	cbRec := httptest.NewRecorder()
-	svc.OIDC.Callback(cbRec, cb.WithContext(anon(cb.Context(), h.org.ws)))
-	wantSSOSuccess(t, cbRec)
+	f := h.startOIDCFlowFrom(t, svc, linkRequest(as(t.Context(), h.org.ws, existing)))
+	wantSSOSuccess(t, f.callback(t, svc, ""))
 
 	if c := e.oidcCredential(
 		t,
@@ -516,5 +498,38 @@ func wantSSOSuccess(t *testing.T, rec *httptest.ResponseRecorder) {
 	if got := rec.Header().Get("Location"); got != "/" {
 		t.Fatalf("expected redirect to returnTo, got code=%d location=%q body=%s",
 			rec.Code, got, rec.Body.String())
+	}
+}
+
+// A live session alone never links. Whoever signs in at the provider gets their own account, not the session's.
+func TestOIDCFlowPlainLoginNeverLinks(t *testing.T) {
+	h := newOIDCIdP(t)
+	e, svc := h.setup(t, true)
+	bob := e.user(t, h.org.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	h.user()
+
+	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil)
+	f := h.startOIDCFlowFrom(t, svc, login.WithContext(as(t.Context(), h.org.ws, bob)))
+	wantSSOSuccess(t, f.callback(t, svc, ""))
+
+	c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject)
+	if c == nil || c.UserID == bob.ID {
+		t.Fatalf("credential = %v, want one that is not bob's", c)
+	}
+	if n := e.sessions(t, h.org.ws, bob.ID); n != 0 {
+		t.Errorf("the provider's user got %d sessions as bob", n)
+	}
+}
+
+// A link that cannot be honored stops, it does not go on as a plain sign-in.
+func TestOIDCFlowRefusedLinkStops(t *testing.T) {
+	h := newOIDCIdP(t)
+	_, svc := h.setup(t, true)
+
+	rec := httptest.NewRecorder()
+	svc.OIDC.Login(rec, linkRequest(anon(t.Context(), h.org.ws)))
+	wantSSOFailure(t, rec)
+	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "link+refused") {
+		t.Errorf("redirect = %q, want the link refused message", loc)
 	}
 }

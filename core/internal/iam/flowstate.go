@@ -35,19 +35,26 @@ const (
 	providerCacheTTL    = 10 * time.Minute
 )
 
-var errFlowState = errors.New("iam: invalid or expired flow state")
+var (
+	errFlowState   = errors.New("iam: invalid or expired flow state")
+	errLinkRefused = errors.New("iam: linking needs a session and a same-origin request")
+)
 
 // providerContext is how oauth2 and go-oidc pick up the guarded client.
 func (s *Service) providerContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, s.idp)
 }
 
-// linkUserIDFor never links on cross-site navigations, which carry the Lax session cookie past the CSRF guard.
-func linkUserIDFor(ctx context.Context, r *http.Request) string {
-	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
-		return ""
+// linkUserIDFor only links for the profile page's own request. The Lax session cookie rides on any navigation.
+func linkUserIDFor(ctx context.Context, r *http.Request) (string, error) {
+	if r.URL.Query().Get("link") != "true" {
+		return "", nil
 	}
-	return actor.SubjectFromContext(ctx)
+	userID := actor.SubjectFromContext(ctx)
+	if userID == "" || r.Header.Get("Sec-Fetch-Site") != "same-origin" {
+		return "", errLinkRefused
+	}
+	return userID, nil
 }
 
 // sealed keeps the state of a browser flow in an encrypted cookie, so starting a flow stores nothing on the server.

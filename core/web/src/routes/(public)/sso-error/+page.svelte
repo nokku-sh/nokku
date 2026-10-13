@@ -53,6 +53,11 @@
 			description:
 				'The workspace owner connects an identity provider by hand. Sign in with your passkey or a sign-in link, then link the provider under Profile, Security.'
 		},
+		'link refused': {
+			title: 'Could not link the provider',
+			description:
+				'Linking starts from Profile, Security while you are signed in. Sign in and try again from there.'
+		},
 		unknown: {
 			title: 'Authentication failed',
 			description: 'Something went wrong during sign-in. Please try again.'

@@ -105,29 +105,40 @@ func TestSealedFlowState(t *testing.T) {
 	}
 }
 
-// A signed-in user starting an SSO login from a cross-site navigation must not enter linking mode.
+// Only the profile page's own link request enters linking mode. A plain login never does, signed in or not.
 func TestLinkUserIDFor(t *testing.T) {
 	const uid = "01a05a0f-d857-723f-a3ed-c43125834aa5"
-	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: uid, Kind: actor.KindUser})
+	signedIn := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: uid, Kind: actor.KindUser})
 
 	tests := []struct {
-		name    string
-		site    string
-		wantUID string
+		name     string
+		query    string
+		site     string
+		signedIn bool
+		wantUID  string
+		wantErr  bool
 	}{
-		{"same origin navigation", "same-origin", uid},
-		{"direct navigation", "none", uid},
-		{"no fetch metadata (older browser)", "", uid},
-		{"cross-site navigation", "cross-site", ""},
+		{"link from the profile page", "?link=true", "same-origin", true, uid, false},
+		{"plain login while signed in", "", "same-origin", true, "", false},
+		{"plain login typed into the address bar", "", "none", true, "", false},
+		{"link from a sibling workspace", "?link=true", "same-site", true, "", true},
+		{"link from another site", "?link=true", "cross-site", true, "", true},
+		{"link without fetch metadata", "?link=true", "", true, "", true},
+		{"link without a session", "?link=true", "same-origin", false, "", true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := httptest.NewRequest(http.MethodGet, "/oidc/login", nil)
+			r := httptest.NewRequest(http.MethodGet, "/oidc/login"+test.query, nil)
 			if test.site != "" {
 				r.Header.Set("Sec-Fetch-Site", test.site)
 			}
-			if got := linkUserIDFor(ctx, r); got != test.wantUID {
-				t.Errorf("linkUserIDFor = %q, want %q", got, test.wantUID)
+			ctx := t.Context()
+			if test.signedIn {
+				ctx = signedIn
+			}
+			got, err := linkUserIDFor(ctx, r)
+			if got != test.wantUID || (err != nil) != test.wantErr {
+				t.Errorf("linkUserIDFor = %q, %v, want %q, error %v", got, err, test.wantUID, test.wantErr)
 			}
 		})
 	}
