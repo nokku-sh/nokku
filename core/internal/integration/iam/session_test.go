@@ -462,3 +462,23 @@ func TestExpiredTokenIsDeletedOnUse(t *testing.T) {
 	}))
 	assert.Empty(t, left, "the expired key is still listed")
 }
+
+// A session secret is random and may start like a key. It is still a session.
+func TestSessionSecretMayStartLikeAKey(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	raw := "nk_" + nkcrypto.RandomString(30)
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		_, err := q.CreateAccessToken(t.Context(), &db.CreateAccessTokenParams{
+			TokenHash: nkcrypto.HashToken(raw),
+			SubjectID: &o.owner.ID,
+			Kind:      string(actor.KindUser),
+			Method:    string(iam.MethodPasskey),
+		})
+		return err
+	}))
+
+	p, _, err := e.svc.AuthenticateToken(anon(t.Context(), o.ws), raw)
+	require.NoError(t, err, "a session starting with nk_ was taken for a bad key")
+	assert.Equal(t, o.owner.ID, p.ID)
+}

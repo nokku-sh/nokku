@@ -67,6 +67,11 @@ func NewKey(prefix string) (raw string, hash HashedToken) {
 	return raw, HashToken(raw)
 }
 
+// HasKeyPrefix tells a key from a session secret, which is random and may start with "nk_".
+func HasKeyPrefix(raw string) bool {
+	return strings.HasPrefix(raw, KeyPrefixServiceAccount) || strings.HasPrefix(raw, KeyPrefixSCIM)
+}
+
 // CheckKey is a format check, not authentication.
 func CheckKey(raw string) bool {
 	if len(raw) <= keyCheckLen || !strings.HasPrefix(raw, "nk_") {

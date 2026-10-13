@@ -48,6 +48,10 @@ func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToke
 	case actor.KindSCIM:
 		token, tokenHash = crypto.NewKey(crypto.KeyPrefixSCIM)
 	case actor.KindUser, actor.KindCLI, actor.KindDaemon:
+		// verifyToken would take a secret with a key prefix for a key with a bad checksum.
+		for crypto.HasKeyPrefix(token) {
+			token, tokenHash = crypto.NewSecret()
+		}
 	}
 	now := s.now()
 	params := &db.CreateAccessTokenParams{
@@ -215,7 +219,7 @@ func (s *Service) verifyToken(ctx context.Context, token string) (db.AccessToken
 	if token == "" {
 		return db.AccessToken{}, errNoSession
 	}
-	if strings.HasPrefix(token, "nk_") && !crypto.CheckKey(token) {
+	if crypto.HasKeyPrefix(token) && !crypto.CheckKey(token) {
 		return db.AccessToken{}, errInvalidCredentials
 	}
 	tok, err := s.conn.Tenant().GetAccessToken(ctx, crypto.HashToken(token))
