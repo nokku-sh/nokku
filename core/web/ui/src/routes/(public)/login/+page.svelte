@@ -19,12 +19,16 @@
 
 	let email = $state('');
 	let passkeyBusy = $state(false);
+	let ownerRecovery = $state(false);
 
 	// The provider is the only way in once SSO is required, so the rest is left out rather than greyed out.
+	// Only the owner keeps the passkey and the email link, to get in when the provider is broken.
 	const providers = $derived(options.data?.providers ?? []);
 	const providersOnly = $derived(
 		!!options.data && !options.data.magicLink && !options.data.passkey
 	);
+	const showMagicLink = $derived(options.data?.magicLink || ownerRecovery);
+	const showPasskey = $derived(options.data?.passkey || ownerRecovery);
 
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
@@ -79,7 +83,7 @@
 		title={`Sign in to ${options.data?.workspaceName || 'Nokku'}`}
 		description="Welcome back, pick up where you left off"
 	>
-		{#if options.data?.magicLink}
+		{#if showMagicLink}
 			<form class="flex flex-col gap-4" onsubmit={submit}>
 				<Field.Field>
 					<Field.Label for="email">Email</Field.Label>
@@ -101,7 +105,7 @@
 			</form>
 		{/if}
 
-		{#if options.data?.magicLink && (options.data.passkey || providers.length)}
+		{#if showMagicLink && (showPasskey || providers.length)}
 			<Field.Separator>Or continue with</Field.Separator>
 		{/if}
 
@@ -116,9 +120,9 @@
 		{/if}
 
 		<div class="flex flex-col gap-3">
-			{#if options.data?.passkey}
+			{#if showPasskey}
 				<Button
-					variant={options.data.magicLink ? 'secondary' : 'default'}
+					variant={showMagicLink ? 'secondary' : 'default'}
 					onclick={withPasskey}
 					disabled={passkeyBusy}
 				>
@@ -138,6 +142,11 @@
 					{p.name || p.providerId}
 				</Button>
 			{/each}
+			{#if providersOnly && !ownerRecovery}
+				<Button variant="link" size="sm" onclick={() => (ownerRecovery = true)}>
+					Workspace owner? Sign in without the provider
+				</Button>
+			{/if}
 		</div>
 
 		{#if providers.length}

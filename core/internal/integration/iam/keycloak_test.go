@@ -296,7 +296,7 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 	if u == nil {
 		t.Fatal("JIT provisioned user missing after keycloak login")
 	}
-	if c := e.credential(t, o.ws, iam.MethodOIDC, "keycloak", ""); c != nil && c.UserID != u.ID {
+	if c := e.oidcCredential(t, o.ws, "keycloak", ""); c != nil && c.UserID != u.ID {
 		t.Error("credential linked to someone else")
 	}
 

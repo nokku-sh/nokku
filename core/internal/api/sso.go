@@ -61,6 +61,9 @@ func (s *ssoService) PutSSOProvider(
 			JITProvisioning: req.GetJitProvisioning(),
 		},
 	})
+	if errors.Is(err, iam.ErrSecretRequired) {
+		return nil, newError(connect.CodeInvalidArgument, "enter the client secret again when the issuer URL changes")
+	}
 	if err != nil {
 		return nil, err
 	}

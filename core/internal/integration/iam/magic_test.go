@@ -113,12 +113,19 @@ func TestMagicLinkHonorsEnforcedSSO(t *testing.T) {
 	e := newTestEnvWith(t, mail.deps())
 	o := e.org(t)
 	ctx := anon(t.Context(), o.ws)
+	member := e.user(t, o.ws, "member@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	e.setEnforceSSO(t, o.ws, true)
 
-	require.NoError(t, e.svc.RequestMagicLink(ctx, o.owner.Email))
+	require.NoError(t, e.svc.RequestMagicLink(ctx, member.Email))
 	_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, mail.link(t)))
 	require.ErrorIs(t, err, iam.ErrSSORequired)
-	assert.Zero(t, e.sessions(t, o.ws, o.owner.ID))
+	assert.Zero(t, e.sessions(t, o.ws, member.ID))
+
+	// The owner keeps the link, or a broken provider locks the workspace for good.
+	require.NoError(t, e.svc.RequestMagicLink(ctx, o.owner.Email))
+	_, _, err = e.svc.ConsumeMagicLink(ctx, linkToken(t, mail.link(t)))
+	require.NoError(t, err)
+	assert.Equal(t, 1, e.sessions(t, o.ws, o.owner.ID))
 }
 
 func TestSignupLinkCreatesInvitedUser(t *testing.T) {

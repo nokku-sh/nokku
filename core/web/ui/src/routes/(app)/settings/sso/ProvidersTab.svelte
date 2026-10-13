@@ -136,8 +136,8 @@
 		<Card.Header>
 			<Card.Title>Require single sign-on</Card.Title>
 			<Card.Description>
-				Passkeys and email links stop working for everyone. Only accounts that sign in through a
-				provider get in, so turn it on after your own sign-in works.
+				Passkeys and email links stop working for everyone but the owner. The owner keeps both to
+				fix a broken provider, so protect the owner's mailbox and passkey.
 			</Card.Description>
 			<Card.Action>
 				<Switch
@@ -149,7 +149,7 @@
 							? confirm({
 									title: 'Require single sign-on?',
 									description:
-										'From now on only your identity providers sign people in. Make sure your own account has signed in through one, or you lock yourself out.',
+										'From now on only your identity providers sign people in. The owner can still use a passkey or an email link.',
 									confirmText: 'Require it',
 									onConfirm: () => setEnforced(true)
 								})

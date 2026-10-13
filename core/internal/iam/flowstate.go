@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"golang.org/x/oauth2"
 
@@ -138,10 +139,21 @@ func claimString(m map[string]any, keys ...string) string {
 	return ""
 }
 
-// safeReturnTo only lets same-origin absolute paths through.
+// claimIsFalse also takes the string some providers send for a boolean.
+func claimIsFalse(v any) bool {
+	switch v := v.(type) {
+	case bool:
+		return !v
+	case string:
+		return strings.EqualFold(v, "false")
+	}
+	return false
+}
+
+// safeReturnTo only lets same-origin absolute paths through. Browsers drop tabs and newlines, which turns "/\t/host" into "//host".
 func safeReturnTo(p string) string {
 	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || len(p) > maxReturnTo ||
-		strings.HasPrefix(p, "/\\") || strings.ContainsAny(p, "\r\n") {
+		strings.HasPrefix(p, "/\\") || strings.ContainsFunc(p, unicode.IsControl) {
 		return ""
 	}
 	return p

@@ -132,3 +132,19 @@ func TestLinkUserIDFor(t *testing.T) {
 		})
 	}
 }
+
+func TestSafeReturnTo(t *testing.T) {
+	for _, ok := range []string{"/", "/secrets/42?tab=audit", "/a/b#c"} {
+		if got := safeReturnTo(ok); got != ok {
+			t.Errorf("safeReturnTo(%q) = %q, want it kept", ok, got)
+		}
+	}
+	for _, bad := range []string{
+		"", "https://evil.example", "//evil.example", "/\\evil.example",
+		"/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "/\x00x", "/" + strings.Repeat("x", maxReturnTo),
+	} {
+		if got := safeReturnTo(bad); got != "" {
+			t.Errorf("safeReturnTo(%q) = %q, want it dropped", bad, got)
+		}
+	}
+}

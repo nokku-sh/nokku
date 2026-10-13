@@ -209,7 +209,7 @@ A self-hosted core is one workspace. It is created on the first start, together 
 
 Other OIDC providers are added in the web app.
 
-Lost every passkey? Run `./nokku admin-link` on the server, with the same environment the server runs with. It prints a fresh sign-in link for the owner.
+Lost every passkey? Run `./nokku admin-link` on the server, with the same environment the server runs with. It prints a fresh sign-in link for the owner. The link works even when single sign-on is required, see [SECURITY.md](./SECURITY.md#the-owner-account) for every way into the owner account.
 
 </details>
 

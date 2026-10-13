@@ -86,11 +86,10 @@ func (h *oidcIDPHarness) token(w http.ResponseWriter, r *http.Request) {
 	}
 	body := rec.Body.Bytes()
 	if h.mint != nil && rec.Code == http.StatusOK {
-		var tr struct {
-			IDToken string `json:"id_token"`
-		}
-		if json.Unmarshal(body, &tr) == nil && tr.IDToken != "" {
-			tr.IDToken = h.mint()
+		// The rest of the answer stays, or the exchange fails before the id_token is looked at.
+		var tr map[string]any
+		if json.Unmarshal(body, &tr) == nil && tr["id_token"] != nil {
+			tr["id_token"] = h.mint()
 			body, _ = json.Marshal(tr)
 		}
 	}
@@ -205,7 +204,7 @@ func TestOIDCFlowHappyPath(t *testing.T) {
 	if u.Role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER || u.Name != "" && u.Name != "Alice" {
 		t.Errorf("JIT user = %+v", u)
 	}
-	if c := e.credential(t, h.org.ws, iam.MethodOIDC, testProviderID, oidcTestSubject); c == nil || c.UserID != u.ID {
+	if c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject); c == nil || c.UserID != u.ID {
 		t.Error("oidc credential not linked")
 	}
 	if n := e.sessions(t, h.org.ws, u.ID); n != 1 {
@@ -324,6 +323,81 @@ func TestOIDCFlowIDTokenBadSignature(t *testing.T) {
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
 }
 
+// A provider that calls the address unverified can neither claim an account with it nor create one.
+func TestOIDCFlowUnverifiedEmail(t *testing.T) {
+	h := newOIDCIdP(t)
+	h.user()
+	h.mintBadToken(t, map[string]any{"email_verified": false})
+	e, svc := h.setup(t, true)
+
+	rec := h.runOIDCFlow(t, svc, "")
+	wantSSOFailure(t, rec)
+	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "email+not+verified") {
+		t.Errorf("error redirect = %q, want the unverified email message", loc)
+	}
+	if e.userByEmail(t, h.org.ws, h.email) != nil {
+		t.Error("an unverified address was provisioned")
+	}
+}
+
+// Entra sends no email_verified at all.
+func TestOIDCFlowMissingEmailVerified(t *testing.T) {
+	h := newOIDCIdP(t)
+	h.user()
+	h.mintBadToken(t, map[string]any{"email_verified": nil})
+	e, svc := h.setup(t, true)
+
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	if e.userByEmail(t, h.org.ws, h.email) == nil {
+		t.Error("a provider without the claim could not sign in")
+	}
+}
+
+// Whoever picks their own address at the provider must not become the owner.
+func TestOIDCFlowNeverMatchesTheOwnerByEmail(t *testing.T) {
+	h := newOIDCIdP(t)
+	e, svc := h.setup(t, true)
+	owner := h.org.owner
+	h.email = owner.Email
+	h.user()
+
+	rec := h.runOIDCFlow(t, svc, "")
+	wantSSOFailure(t, rec)
+	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "owner+link+required") {
+		t.Errorf("error redirect = %q, want the owner link message", loc)
+	}
+	if c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject); c != nil {
+		t.Error("the identity was linked to the owner by email")
+	}
+	if n := e.sessions(t, h.org.ws, owner.ID); n != 0 {
+		t.Errorf("sessions issued = %d, want 0", n)
+	}
+
+	// Signed in, the owner links it themselves.
+	h.user()
+	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil).
+		WithContext(as(t.Context(), h.org.ws, owner))
+	loginRec := httptest.NewRecorder()
+	svc.OIDC.Login(loginRec, login)
+	authorizeURL := loginRec.Header().Get("Location")
+	u, err := url.Parse(authorizeURL)
+	if err != nil {
+		t.Fatalf("parse authorize redirect: %v", err)
+	}
+	h.lastNonce = u.Query().Get("nonce")
+	resp, err := noRedirectClient().Get(authorizeURL)
+	if err != nil {
+		t.Fatalf("authorize: %v", err)
+	}
+	defer resp.Body.Close()
+	f := &oidcFlowRun{idp: h, loginRec: loginRec, callbackUR: resp.Header.Get("Location")}
+	wantSSOSuccess(t, f.callback(t, svc, ""))
+	if c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject); c == nil ||
+		c.UserID != owner.ID {
+		t.Errorf("credential linked to %v, want the owner", c)
+	}
+}
+
 func (h *oidcIDPHarness) mintBadToken(t *testing.T, override map[string]any) {
 	t.Helper()
 	h.mint = func() string {
@@ -411,10 +485,9 @@ func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
 	svc.OIDC.Callback(cbRec, cb.WithContext(anon(cb.Context(), h.org.ws)))
 	wantSSOSuccess(t, cbRec)
 
-	if c := e.credential(
+	if c := e.oidcCredential(
 		t,
 		h.org.ws,
-		iam.MethodOIDC,
 		testProviderID,
 		oidcTestSubject,
 	); c == nil ||

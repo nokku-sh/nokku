@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/oauth2"
@@ -43,6 +45,8 @@ type oidcIdentity struct {
 	Name            string
 	Picture         string
 	JITProvisioning bool
+	// EmailUnverified is set when the provider says so. A missing claim counts as verified, Entra never sends it.
+	EmailUnverified bool
 	// LinkUserID skips the email lookup and links to that signed-in user.
 	LinkUserID string
 }
@@ -165,6 +169,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		Name:            claimString(claims, "name"),
 		Picture:         claimString(claims, "picture"),
 		JITProvisioning: cfg.OIDC.JITProvisioning,
+		EmailUnverified: claimIsFalse(claims["email_verified"]),
 		LinkUserID:      st.LinkUserID,
 	}
 	u, err := h.resolve(r.Context(), id)
@@ -173,7 +178,14 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 			Action: actionLoginDenied, Method: MethodOIDC, UserID: id.LinkUserID, Email: id.Email, Detail: err.Error(),
 		})
 		slog.Warn("sso login rejected", "error", err, "provider", cfg.ProviderID)
-		fail(w, r, "identity rejected")
+		switch {
+		case errors.Is(err, errEmailUnverified):
+			fail(w, r, "email not verified")
+		case errors.Is(err, errOwnerLink):
+			fail(w, r, "owner link required")
+		default:
+			fail(w, r, "identity rejected")
+		}
 		return
 	}
 	cookie, err := h.svc.completeLogin(r.Context(), u, MethodOIDC)
@@ -197,6 +209,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 }
 
 // resolve trusts a matching email and may create the account, the workspace owner configured the provider.
+// The owner is never matched by email. A provider user who can pick their address would take the workspace.
 func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, error) {
 	var u *db.User
 	created := false
@@ -222,6 +235,8 @@ func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, erro
 			u, err = q.GetUser(ctx, id.LinkUserID)
 		case id.Email == "":
 			return errIdentityRejected
+		case id.EmailUnverified:
+			return errEmailUnverified
 		default:
 			email := normalizeEmail(id.Email)
 			u, err = q.GetUserByEmail(ctx, email)
@@ -234,6 +249,8 @@ func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, erro
 					Email: email, Name: id.Name, Picture: nonEmpty(id.Picture),
 				}, "")
 				created = err == nil
+			case err == nil && u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER:
+				return errOwnerLink
 			case err == nil && id.Name != "" && u.Name != id.Name:
 				// The provider owns the name.
 				u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Name: &id.Name})

@@ -98,6 +98,17 @@ Then set `KMS_URI` to the same value and start the core.
 
 With a KMS nothing has to be rotated by hand. The core rotates the data key every `KEYSET_ROTATE_INTERVAL`, and wraps the keyset again every `KEYSET_REWRAP_INTERVAL`, which picks up a key rotation inside the KMS.
 
+### The owner account
+
+A workspace has exactly one owner, and nobody else can hand the workspace on. Whoever signs in as the owner has all of it, so know every way in:
+
+- **A passkey.** Always works for the owner, also when single sign-on is required.
+- **An email sign-in link.** Always works for the owner too. Whoever reads the owner's mailbox is the owner, so give that mailbox a strong second factor. Without `NOKKU_SMTP_HOST` no links are mailed.
+- **The link in the log.** Until the owner has a passkey or a linked provider, every start prints a 24 hour sign-in link, and `./nokku admin-link` prints one on demand. Anyone who reads the server's log or runs commands on the machine can become the owner. Keep both to people you trust with the workspace, and add a passkey right after the first sign-in.
+- **A linked identity provider.** A provider never becomes the owner by matching the email address. The owner links it once while signed in, under **Profile, Security**. After that, whoever controls that account at the provider is the owner.
+
+Requiring single sign-on closes passkeys and email links for everyone else. It leaves them open for the owner on purpose, so a broken provider can still be fixed.
+
 ### Network
 
 - **The core is only reached over TLS.** It answers https on its port with a CA of its own. Plain HTTP on the same port is served only to a trusted proxy that holds the certificate, `compose.prod.yml` runs Caddy for this. Anyone else who asks in plain HTTP is sent to https. `nk` and `nokkud` never skip certificate verification. A private CA reaches them through a pin, see the README.

@@ -43,6 +43,16 @@
 			description:
 				'Your identity provider account is not set up to sign in here yet. Contact your workspace admin.'
 		},
+		'email not verified': {
+			title: 'Email not verified',
+			description:
+				'Your identity provider has not verified your email address. Verify it there, then try again.'
+		},
+		'owner link required': {
+			title: 'Link this sign-in first',
+			description:
+				'The workspace owner connects an identity provider by hand. Sign in with your passkey or a sign-in link, then link the provider under Profile, Security.'
+		},
 		unknown: {
 			title: 'Authentication failed',
 			description: 'Something went wrong during sign-in. Please try again.'

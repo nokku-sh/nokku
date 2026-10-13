@@ -9,6 +9,8 @@ import (
 	"time"
 	"uuid"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
@@ -94,7 +96,10 @@ func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) 
 		if err != nil {
 			return nil, err
 		}
-		if enforced {
+		// The owner keeps the passkey and the sign-in link as the way in to fix a broken provider.
+		breakGlass := u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER &&
+			(method == MethodPasskey || method == MethodMagicLink)
+		if enforced && !breakGlass {
 			return deny(ErrSSORequired, "sso enforced")
 		}
 	}

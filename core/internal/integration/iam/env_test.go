@@ -188,17 +188,16 @@ func (e *testEnv) userByEmail(t *testing.T, ws actor.Workspace, email string) *d
 	return u
 }
 
-func (e *testEnv) credential(
+func (e *testEnv) oidcCredential(
 	t *testing.T,
 	ws actor.Workspace,
-	typ iam.Method,
 	provider, subject string,
 ) *db.Credential {
 	t.Helper()
 	var c *db.Credential
 	err := e.in(t, ws, func(q *db.Queries) (err error) {
 		c, err = q.FindCredentialBySubject(t.Context(), &db.FindCredentialBySubjectParams{
-			Type:     string(typ),
+			Type:     string(iam.MethodOIDC),
 			Provider: provider,
 			Subject:  subject,
 		})

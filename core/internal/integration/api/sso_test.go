@@ -98,6 +98,20 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, issuer, stored.GetProvider().GetIssuerUrl())
 
+	// The stored secret stays with its issuer.
+	moved := &nokkuv1.PutSSOProviderRequest{
+		ProviderId: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new("http://other.lab:8080"),
+		ClientId: new("nokku"),
+	}
+	_, err = sso.PutSSOProvider(t.Context(), moved)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a new issuer without the secret: %v", err)
+	moved.ClientSecret = new("fresh")
+	_, err = sso.PutSSOProvider(t.Context(), moved)
+	require.NoError(t, err, "a new issuer with its secret")
+	moved.ClientSecret = nil
+	_, err = sso.PutSSOProvider(t.Context(), moved)
+	require.NoError(t, err, "the same issuer keeps the stored secret")
+
 	_, err = sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("lab")})
 	require.NoError(t, err)
 }

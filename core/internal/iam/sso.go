@@ -67,7 +67,7 @@ func (s *Service) loginProvider(ctx context.Context, providerID string) (*SSOPro
 	return p, nil
 }
 
-// PutSSOProvider keeps the stored client secret when the new one is empty.
+// PutSSOProvider keeps the stored client secret when the new one is empty, unless the issuer changed.
 func (s *Service) PutSSOProvider(ctx context.Context, p SSOProvider) (*SSOProvider, error) {
 	var out *SSOProvider
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -82,6 +82,10 @@ func putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProv
 		row, err := q.GetSSOProvider(ctx, p.ProviderID)
 		if err == nil {
 			if prev, err := ssoProviderFromRow(row); err == nil {
+				// The secret goes to the issuer's token endpoint, so a new issuer must not inherit it.
+				if prev.OIDC.IssuerURL != p.OIDC.IssuerURL {
+					return nil, ErrSecretRequired
+				}
 				p.OIDC.ClientSecret = prev.OIDC.ClientSecret
 			}
 		} else if !errors.Is(err, pgx.ErrNoRows) {

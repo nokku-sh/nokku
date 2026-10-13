@@ -20,10 +20,13 @@ var (
 	ErrEmailRejected      = errors.New("iam: email rejected")
 	ErrMailNotSent        = errors.New("iam: mail not sent")
 	ErrSSORequired        = errors.New("iam: single sign-on is required for this workspace")
+	ErrSecretRequired     = errors.New("iam: a new issuer needs the client secret again")
 	errNoSession          = errors.New("iam: no session token")
 	errSessionExpired     = errors.New("iam: session expired")
 	errIdentityLinked     = errors.New("iam: identity already linked to another account")
 	errIdentityRejected   = errors.New("iam: identity rejected")
+	errEmailUnverified    = errors.New("iam: the provider has not verified the email")
+	errOwnerLink          = errors.New("iam: the owner links an identity while signed in")
 	// ErrDPoPRequired is advertised with a DPoP-Nonce header so the client signs and retries (RFC 9449 section 8).
 	ErrDPoPRequired    = errors.New("iam: dpop proof required")
 	errInvalidProof    = errors.New("iam: invalid dpop proof")

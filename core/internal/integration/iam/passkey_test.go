@@ -236,3 +236,27 @@ func TestPasskeyRegistrationBelongsToItsAccount(t *testing.T) {
 	assert.Equal(t, 1, e.sessions(t, o.ws, alice.ID))
 	assert.Zero(t, e.sessions(t, o.ws, mallory.ID))
 }
+
+// Enforced SSO leaves the owner the passkey, the way in to fix a broken provider.
+func TestEnforcedSSOLeavesTheOwnerThePasskey(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	member := nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER
+	ownerKey, memberKey := newPasskeyDevice(), newPasskeyDevice()
+	next := ownerKey.signUp(t, e, o.ws, e.invite(t, o.ws, member, 0), "next-owner@"+testDomain())
+	memberKey.signUp(t, e, o.ws, e.invite(t, o.ws, member, 0), "member@"+testDomain())
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		_, err := q.TransferOwnership(t.Context(), next.ID)
+		return err
+	}))
+	e.setEnforceSSO(t, o.ws, true)
+	ctx := anon(t.Context(), o.ws)
+
+	answer, cookies := memberKey.assertion(t, e.svc, o.ws)
+	refused := post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
+	assert.Equal(t, http.StatusForbidden, refused.Code, "a member got past enforced SSO: %s", refused.Body.String())
+
+	answer, cookies = ownerKey.assertion(t, e.svc, o.ws)
+	login := post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
+	assert.Equal(t, http.StatusOK, login.Code, "the owner is locked out: %s", login.Body.String())
+}
