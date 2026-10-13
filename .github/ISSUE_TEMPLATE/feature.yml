@@ -1,0 +1,37 @@
+name: Feature request
+description: An idea or something Nokku should do better
+type: Feature
+labels: [enhancement, triage]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: Part
+      description: Pick every part this touches. Not sure is fine too.
+      multiple: true
+      options:
+        - Core (nokku, API and web app)
+        - Daemon (nokkud)
+        - CLI (nk)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The problem or the workflow, not the solution yet.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: A command, a setting, a screen. Rough is fine.
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: How you handle it today

@@ -1,0 +1,64 @@
+name: Bug report
+description: Something is broken or behaves differently than the docs say
+type: Bug
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Found a security problem? Please do not file it here, use [private reporting](https://github.com/nokku-sh/nokku/security/advisories/new) instead.
+
+  - type: dropdown
+    id: part
+    attributes:
+      label: Part
+      description: Pick every part that is involved. Not sure is fine too.
+      multiple: true
+      options:
+        - Core (nokku, API and web app)
+        - Daemon (nokkud)
+        - CLI (nk)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. nk login
+        2. ssh deploy@web-1
+        3. Permission denied (publickey)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `nk --version`, `nokkud --version` or `nokku --version`.
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and install method
+      placeholder: Debian 13, deb package from Cloudsmith
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: For `nk` problems paste the output of `nk doctor`. Remove tokens, license keys and hostnames you want to keep private.
+      render: shell

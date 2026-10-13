@@ -1,0 +1,31 @@
+name: Issue labels
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions: {}
+
+jobs:
+  part:
+    name: Part
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      # Issue forms can only set fixed labels, so the Part dropdown is read from the body.
+      - name: Label the parts picked in the form
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          picked=$(printf '%s\n' "$BODY" | tr -d '\r' | awk '/^### /{on = ($0 == "### Part")} on' | tr '[:upper:]' '[:lower:]')
+          labels=()
+          for part in core daemon cli; do
+            if grep -qw "$part" <<<"$picked"; then labels+=("$part"); fi
+          done
+          if [ ${#labels[@]} -eq 0 ]; then exit 0; fi
+          gh issue edit "$NUMBER" --add-label "$(IFS=,; echo "${labels[*]}")"
