@@ -42,16 +42,6 @@ func (s *Service) providerContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, s.idp)
 }
 
-func endFlowBinding() *http.Cookie {
-	return &http.Cookie{ //nolint:gosec // Secure is not needed to match a cookie for deletion
-		Name:     flowCookieName,
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	}
-}
-
 // linkUserIDFor never links on cross-site navigations, which carry the Lax session cookie past the CSRF guard.
 func linkUserIDFor(ctx context.Context, r *http.Request) string {
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {

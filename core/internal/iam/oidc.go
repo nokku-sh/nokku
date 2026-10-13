@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -194,7 +195,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.svc.spendFlow(r.Context(), flowID)
-	http.SetCookie(w, endFlowBinding())
+	http.SetCookie(w, h.svc.newCookie(flowCookieName, "", time.Unix(0, 0)))
 	http.SetCookie(w, cookie)
 	if c := h.svc.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
 		http.SetCookie(w, c)
