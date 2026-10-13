@@ -13,11 +13,11 @@ pnpm fmt            # format with oxfmt
 pnpm lint           # oxlint
 ```
 
-The dev server needs a backend. Run `task backend` from the repo root and point the proxy at it.
+The dev server needs a backend. Run `task core:dev` from the repo root, it starts both and the app is on the backend's port.
 
 ## Generated code
 
-`src/lib/gen` holds the generated API client for the Nokku protos. Never edit it by hand. Regenerate with `task gen` from the repo root, which runs buf against the protos version `go.mod` pins.
+`src/lib/gen` holds the generated API client for the Nokku protos. Never edit it by hand. Regenerate with `task gen` from the repo root, which runs buf against `proto/`.
 
 ## UI conventions
 

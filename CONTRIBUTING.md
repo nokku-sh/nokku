@@ -57,8 +57,8 @@ cd core
 docker compose -f compose.dev.yml up -d postgres
 ```
 
-Set the required environment (the `.envrc` in `core/` and Task env vars cover
-the defaults, e.g. `DB_URL`). Then run backend and frontends together:
+Set `NOKKU_SECRET` to any 32 characters or more. The database defaults already
+match the dev PostgreSQL. Then run backend and frontend together:
 
 ```bash
 task dev

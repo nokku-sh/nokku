@@ -176,7 +176,7 @@ If you installed a package, remove the package instead of the binary. On Windows
 
 - [Documentation](https://nokku.sh/docs)
 - [SECURITY.md](./SECURITY.md), for how `nk` protects your key and for reporting a vulnerability
-- [CONTRIBUTING.md](./CONTRIBUTING.md), for building from source
+- [CONTRIBUTING.md](../CONTRIBUTING.md), for building from source
 
 ## Hosting
 

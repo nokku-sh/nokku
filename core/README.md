@@ -304,4 +304,4 @@ A core that holds a key asks `license.nokku.sh` once a day for the renewed one. 
 
 - [Documentation](https://nokku.sh/docs), with guides for servers, access, SSO and certificates
 - [SECURITY.md](./SECURITY.md), for hardening and for reporting a vulnerability
-- [CONTRIBUTING.md](./CONTRIBUTING.md), for building from source
+- [CONTRIBUTING.md](../CONTRIBUTING.md), for building from source
