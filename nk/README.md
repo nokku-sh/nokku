@@ -21,7 +21,8 @@ There are no new SSH commands to learn. Once you are signed in, you connect with
 Install it:
 
 ```bash
-curl -fsSL https://get.nokku.sh/nk | sh
+curl -fsSL https://get.nokku.sh/nk | sh      # Linux and macOS
+irm https://get.nokku.sh/nk.ps1 | iex        # Windows, in PowerShell
 ```
 
 Sign in and connect:
@@ -45,8 +46,11 @@ Run `nk doctor` when something does not work. It checks the connection to the co
 The installer picks the right way for your system:
 
 - **Linux:** it adds the Cloudsmith repository and installs your distro's package (deb, rpm or apk).
-- **macOS and other distros:** it downloads the release binary from GitHub to `~/.local/bin`. Pass `--system` to use `/usr/local/bin`.
-- **A pinned version:** pass `--version <x.y.z>` or set `NK_VERSION=<x.y.z>`.
+- **macOS, other distros and machines without root:** it downloads the release binary from GitHub to `~/.local/bin`. Pass `--system` to use `/usr/local/bin`.
+- **Windows:** it downloads the release binary from GitHub to `%LOCALAPPDATA%\Programs\nk` and adds that folder to your PATH. No admin rights needed.
+- **A pinned version:** pass `--version <x.y.z>` or set `NK_VERSION=<x.y.z>`. On Windows only the variable works.
+
+Every binary download is checked against the release checksums. When [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) is installed, the signature on the checksum file is verified too. Packages are verified by your package manager with the repository key.
 
 Prefer to add the package repository yourself? The [package repository](https://broadcasts.cloudsmith.com/nokku/nk) has the apt, dnf and apk instructions.
 
@@ -166,7 +170,7 @@ rm -f ~/.local/bin/nk      # or /usr/local/bin/nk after a --system install
 rm -rf ~/.config/nk
 ```
 
-If you installed a package, remove the package instead of the binary.
+If you installed a package, remove the package instead of the binary. On Windows, delete `%LOCALAPPDATA%\Programs\nk` and `%USERPROFILE%\.config\nk`.
 
 ## More
 
