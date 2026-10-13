@@ -68,7 +68,7 @@ func TestMagicLinkSignIn(t *testing.T) {
 	a, b := e.org(t), e.org(t)
 	ctx := anon(t.Context(), a.ws)
 
-	require.NoError(t, e.svc.RequestMagicLink(ctx, " "+a.owner.Email))
+	e.svc.RequestMagicLink(ctx, " "+a.owner.Email)
 	link := mail.link(t)
 	assert.Contains(t, link, testBaseURL+loginVerifyURL, "the link points at the workspace host")
 	token := linkToken(t, link)
@@ -85,25 +85,32 @@ func TestMagicLinkSignIn(t *testing.T) {
 	_, _, err = e.svc.ConsumeMagicLink(ctx, token)
 	require.ErrorIs(t, err, iam.ErrInvalidToken, "a spent link signed in again")
 
-	require.NoError(t, e.svc.RequestMagicLink(ctx, "nobody@"+testDomain()))
+	e.svc.RequestMagicLink(ctx, "nobody@"+testDomain())
 	mail.empty(t, "an unknown address gets no mail")
 
-	require.NoError(t, e.svc.RequestMagicLink(anon(t.Context(), b.ws), a.owner.Email))
+	e.svc.RequestMagicLink(anon(t.Context(), b.ws), a.owner.Email)
 	mail.empty(t, "an address of workspace a gets no mail from workspace b")
 }
 
 // The mail service holds back a second link inside its cooldown. A link nobody got must not stay valid.
 func TestUnsentMagicLinkIsDropped(t *testing.T) {
-	var link string
+	mail := newMailbox()
 	e := newTestEnvWith(t, iam.Deps{SendMagicLink: func(_ context.Context, _, _, l, _ string) error {
-		link = l
+		mail.links <- l
 		return emailverify.ErrCooldown
 	}})
 	o := e.org(t)
 	ctx := anon(t.Context(), o.ws)
 
-	require.NoError(t, e.svc.RequestMagicLink(ctx, o.owner.Email))
-	require.NotEmpty(t, link, "the mail service was not asked")
+	e.svc.RequestMagicLink(ctx, o.owner.Email)
+	link := mail.link(t)
+	// The mail goes out detached, so the drop lands a moment after the request.
+	require.Eventually(t, func() bool {
+		var n int
+		err := e.conn.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM one_time_tokens WHERE user_id = $1", o.owner.ID).
+			Scan(&n)
+		return err == nil && n == 0
+	}, 5*time.Second, 20*time.Millisecond, "the unsent link stayed")
 	_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, link))
 	require.ErrorIs(t, err, iam.ErrInvalidToken, "a link that was never mailed signed in")
 }
@@ -116,13 +123,13 @@ func TestMagicLinkHonorsEnforcedSSO(t *testing.T) {
 	member := e.user(t, o.ws, "member@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	e.setEnforceSSO(t, o.ws, true)
 
-	require.NoError(t, e.svc.RequestMagicLink(ctx, member.Email))
+	e.svc.RequestMagicLink(ctx, member.Email)
 	_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, mail.link(t)))
 	require.ErrorIs(t, err, iam.ErrSSORequired)
 	assert.Zero(t, e.sessions(t, o.ws, member.ID))
 
 	// The owner keeps the link, or a broken provider locks the workspace for good.
-	require.NoError(t, e.svc.RequestMagicLink(ctx, o.owner.Email))
+	e.svc.RequestMagicLink(ctx, o.owner.Email)
 	_, _, err = e.svc.ConsumeMagicLink(ctx, linkToken(t, mail.link(t)))
 	require.NoError(t, err)
 	assert.Equal(t, 1, e.sessions(t, o.ws, o.owner.ID))

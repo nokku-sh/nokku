@@ -21,21 +21,32 @@ const (
 	tokenLogin     = "login"
 	magicLinkTTL   = 15 * time.Minute
 	bootstrapTTL   = 24 * time.Hour
+	mailTimeout    = 30 * time.Second
 	loginVerifyURL = "/login/verify?token="
 	inviteURL      = "/invite/verify?token="
 )
 
-// RequestMagicLink never tells the caller whether the address exists.
-func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
+// RequestMagicLink runs detached, so neither the answer nor how long it takes tells whether the address exists.
+func (s *Service) RequestMagicLink(ctx context.Context, email string) {
 	if s.sendMagicLink == nil {
-		return nil
+		return
 	}
-	email = normalizeEmail(email)
+	ctx = context.WithoutCancel(ctx)
+	go func() {
+		if err := s.mailLoginLink(ctx, normalizeEmail(email)); err != nil {
+			slog.Warn("sign-in link not made", "error", err)
+		}
+	}()
+}
+
+func (s *Service) mailLoginLink(ctx context.Context, email string) error {
+	sendCtx, cancel := context.WithTimeout(ctx, mailTimeout)
+	defer cancel()
 	var u *db.User
 	var link string
 	var hash crypto.HashedToken
-	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
-		found, err := q.GetUserByEmail(ctx, email)
+	err := s.conn.TenantTx(sendCtx, func(q *db.Queries) error {
+		found, err := q.GetUserByEmail(sendCtx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -45,7 +56,7 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 		if !found.Active {
 			return nil
 		}
-		link, hash, err = s.putLoginToken(ctx, q, found.ID, magicLinkTTL)
+		link, hash, err = s.putLoginToken(sendCtx, q, found.ID, magicLinkTTL)
 		u = found
 		return err
 	})
@@ -59,7 +70,7 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 	if link == "" {
 		return nil
 	}
-	if err := s.sendMagicLink(ctx, u.ID, u.Email, link, magicLinkTTL.String()); err != nil {
+	if err := s.sendMagicLink(sendCtx, u.ID, u.Email, link, magicLinkTTL.String()); err != nil {
 		s.dropUnsent(ctx, hash, err)
 	}
 	return nil

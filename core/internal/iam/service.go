@@ -179,7 +179,7 @@ func (s *Service) notifyNewDevice(ctx context.Context, u *db.User, deviceID, nam
 	if s.sendNewLogin == nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mailTimeout)
 	go func() {
 		defer cancel()
 		if err := s.sendNewLogin(ctx, u.ID, u.Email, deviceID, name, ip); err != nil {

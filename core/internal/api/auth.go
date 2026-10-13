@@ -66,9 +66,7 @@ func (s *authService) RequestMagicLink(
 	ctx context.Context,
 	req *nokkuv1.RequestMagicLinkRequest,
 ) (*nokkuv1.RequestMagicLinkResponse, error) {
-	if err := s.cfg.IAM.RequestMagicLink(ctx, req.GetEmail()); err != nil {
-		return nil, err
-	}
+	s.cfg.IAM.RequestMagicLink(ctx, req.GetEmail())
 	return &nokkuv1.RequestMagicLinkResponse{}, nil
 }
 
