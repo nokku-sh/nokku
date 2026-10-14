@@ -63,7 +63,7 @@ func TestServerAgentForwardingKeyList(t *testing.T) {
 	sess := agentForwardedSession(t, ca)
 
 	// The helper flag goes through the shell, the daemon's env whitelist refuses GO_* from clients.
-	helper := "GO_WANT_AGENT_HELPER_PROCESS=1 " + helperProcessCommand(t, "agent")
+	helper := "GO_WANT_AGENT_HELPER_PROCESS=1 GORACE=atexit_sleep_ms=0 " + helperProcessCommand(t, "agent")
 	out, err := sess.Output(helper)
 	must.NoError(err, "agent helper: %s", out)
 	is.Equal("keys=1\n", string(out))

@@ -24,8 +24,13 @@ import (
 
 func init() {
 	helperArgv = func(name string, args ...string) ([]string, error) {
-		return append([]string{os.Args[0], "-test.run=^TestHelperProcess$", "--", name}, args...), nil
+		return append(testHelperArgv(os.Args[0], name), args...), nil
 	}
+}
+
+// helperCmd clears the env, so GORACE goes in through env(1). A race build otherwise sleeps 1s on every exit.
+func testHelperArgv(bin, name string) []string {
+	return []string{"/usr/bin/env", "GORACE=atexit_sleep_ms=0", bin, "-test.run=^TestHelperProcess$", "--", name}
 }
 
 // Not a test: the binary re-entered as a helper, see the helperArgv override in init.

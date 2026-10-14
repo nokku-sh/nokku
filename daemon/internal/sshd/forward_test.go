@@ -483,7 +483,7 @@ func helperForEveryone(t *testing.T) {
 	inPlace := helperArgv
 	t.Cleanup(func() { helperArgv = inPlace })
 	helperArgv = func(name string, args ...string) ([]string, error) {
-		return append([]string{bin, "-test.run=^TestHelperProcess$", "--", name}, args...), nil
+		return append(testHelperArgv(bin, name), args...), nil
 	}
 }
 
