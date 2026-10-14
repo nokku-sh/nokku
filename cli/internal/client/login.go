@@ -61,7 +61,7 @@ func (c *Client) deviceLogin(ctx context.Context) error {
 	fmt.Fprintf(os.Stderr, "Confirm the code %s there. Waiting...\n", d.UserCode)
 	_ = openBrowser(d.VerificationURI)
 
-	token, expiresIn, err := c.pollDeviceToken(ctx, d.DeviceCode, d.Interval)
+	token, expiresIn, err := c.pollDeviceToken(ctx, d.DeviceCode, time.Duration(d.Interval)*time.Second)
 	if err != nil {
 		return err
 	}
@@ -106,13 +106,12 @@ func (c *Client) beginDeviceAuth(ctx context.Context) (deviceAuth, error) {
 func (c *Client) pollDeviceToken(
 	ctx context.Context,
 	deviceCode string,
-	interval int,
+	wait time.Duration,
 ) (token string, expiresIn int, err error) {
 	// Cap the total wait at the grant TTL.
 	timeout := time.NewTimer(15 * time.Minute)
 	defer timeout.Stop()
 
-	wait := time.Duration(interval) * time.Second
 	if wait <= 0 {
 		wait = 5 * time.Second
 	}

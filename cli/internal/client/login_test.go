@@ -27,6 +27,8 @@ import (
 
 // fakeDeviceFlow mirrors iam.DeviceFlow closely enough for the poll loop, DPoP checks and replay store included.
 type fakeDeviceFlow struct {
+	// interval stands in for the server's one second, so a test polls in milliseconds.
+	interval   time.Duration
 	mu         sync.Mutex
 	grants     map[string]*fakeGrant // by device code
 	replay     map[string]bool
@@ -46,6 +48,7 @@ type fakeGrant struct {
 func newFakeDeviceFlow(t *testing.T) (*fakeDeviceFlow, *httptest.Server) {
 	t.Helper()
 	f := &fakeDeviceFlow{
+		interval:   20 * time.Millisecond,
 		grants:     map[string]*fakeGrant{},
 		replay:     map[string]bool{},
 		nonce:      "test-nonce",
@@ -92,8 +95,8 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 	}
 	switch g.status {
 	case "pending":
-		// pollTrack: the required interval grows by 5s per too-fast poll.
-		required := time.Second + time.Duration(f.violations[code])*5*time.Second
+		// pollTrack: the required interval grows by 5s per too-fast poll. Half of it, so ticker jitter never counts.
+		required := f.interval/2 + time.Duration(f.violations[code])*5*time.Second
 		now := time.Now()
 		if last := f.lastPoll[code]; !last.IsZero() && now.Sub(last) < required {
 			f.violations[code]++
@@ -200,11 +203,11 @@ func runDeviceLogin(t *testing.T, c *Client, f *fakeDeviceFlow) (string, error) 
 	require.NoError(t, err)
 
 	go func() {
-		time.Sleep(1500 * time.Millisecond)
+		time.Sleep(3 * f.interval / 2)
 		f.approve(d.DeviceCode)
 	}()
 
-	token, _, err := c.pollDeviceToken(context.Background(), d.DeviceCode, d.Interval)
+	token, _, err := c.pollDeviceToken(context.Background(), d.DeviceCode, f.interval)
 	return token, err
 }
 
@@ -261,7 +264,7 @@ func TestPollDeviceTokenStopsOnFinalAnswers(t *testing.T) {
 		"expired":            {http.StatusBadRequest, `{"error":"expired_token"}`, "sign-in code expired, run nk login again"},
 		"unknown code":       {http.StatusBadRequest, `{"error":"server_error"}`, "device authorization failed: server_error"},
 		"oauth error on 200": {http.StatusOK, `{"error":"access_denied"}`, "sign-in was denied in the browser"},
-		"http error":         {http.StatusBadGateway, "bad gateway", "device authorization: HTTP 502: bad gateway"},
+		"http error":         {http.StatusForbidden, "forbidden", "device authorization: HTTP 403: forbidden"},
 		"empty answer":       {http.StatusOK, `{}`, "device authorization: unexpected response"},
 		"not json":           {http.StatusOK, "<html>", "device authorization: unexpected response"},
 		"proof rejected": {
@@ -282,10 +285,44 @@ func TestPollDeviceTokenStopsOnFinalAnswers(t *testing.T) {
 			t.Cleanup(srv.Close)
 			c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
 
-			_, _, err := c.pollDeviceToken(t.Context(), "dev", 1)
+			_, _, err := c.pollDeviceToken(t.Context(), "dev", time.Millisecond)
 			require.EqualError(t, err, tc.want)
 		})
 	}
+}
+
+func TestPollDeviceTokenOutlastsABlip(t *testing.T) {
+	t.Parallel()
+	var polls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if polls.Add(1) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		writeJSON(w, map[string]any{"access_token": "tok"})
+	}))
+	t.Cleanup(srv.Close)
+	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
+
+	token, _, err := c.pollDeviceToken(t.Context(), "dev", time.Millisecond)
+	require.NoError(t, err, "one 503 ended the sign-in")
+	assert.Equal(t, "tok", token)
+}
+
+func TestPollDeviceTokenGivesUpOnAServerThatStaysDown(t *testing.T) {
+	t.Parallel()
+	var polls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		polls.Add(1)
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte("bad gateway"))
+	}))
+	t.Cleanup(srv.Close)
+	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
+
+	_, _, err := c.pollDeviceToken(t.Context(), "dev", time.Millisecond)
+	require.EqualError(t, err, "device authorization: HTTP 502: bad gateway")
+	assert.EqualValues(t, pollRetries+1, polls.Load())
 }
 
 // A stale nonce is retried at once, the fresh one came with the rejection.
@@ -304,7 +341,7 @@ func TestPollDeviceTokenRetriesNonceWithoutWaiting(t *testing.T) {
 	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
 
 	start := time.Now()
-	token, expiresIn, err := c.pollDeviceToken(t.Context(), "dev", 30)
+	token, expiresIn, err := c.pollDeviceToken(t.Context(), "dev", 30*time.Second)
 	require.NoError(t, err)
 	assert.Equal(t, "tok", token)
 	assert.Equal(t, 60, expiresIn)
@@ -332,7 +369,7 @@ func TestPollDeviceTokenGivesUpOnARejectedProof(t *testing.T) {
 	c.dpop = dpopclient.New(newTestProofer(t), srv.Client(), func() string { return "" },
 		dpopclient.Options{BaseURL: srv.URL})
 
-	_, _, err := c.pollDeviceToken(t.Context(), "dev", 30)
+	_, _, err := c.pollDeviceToken(t.Context(), "dev", 30*time.Second)
 	require.ErrorContains(t, err, "Check that the clock is right")
 	assert.EqualValues(t, 1, polls.Load(), "a rejected proof is final")
 }
