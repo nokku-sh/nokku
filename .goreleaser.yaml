@@ -70,8 +70,9 @@ builds:
 
 kos:
   - build: nokku
-    repositories: [ghcr.io/nokku-sh/nokku]
     main: ./core/cmd/nokku
+    base_image: gcr.io/distroless/static-debian13:nonroot
+    repositories: [ghcr.io/nokku-sh/nokku]
     bare: true
     preserve_import_paths: false
     sbom: spdx
