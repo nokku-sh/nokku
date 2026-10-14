@@ -1,8 +1,5 @@
 version: "3"
 
-env:
-  IMAGE: ghcr.io/nokku-sh/nokku
-
 tasks:
   dev:
     desc: Run backend and frontend concurrently, the app is on the backend's port
@@ -69,19 +66,24 @@ tasks:
       - cd web; pnpm fmt; pnpm lint
 
   snapshot:
-    desc: Build snapshot
+    desc: Build a snapshot of the core image, then scan it
+    env:
+      NOKKU_ONLY: core
+      IMAGE: ghcr.io/nokku-sh/nokku
     # .goreleaser.yaml is in the repo root.
     dir: ..
     cmds:
-      - goreleaser --snapshot --clean --skip=validate,sign,sbom,archive
+      - goreleaser release --snapshot --clean --skip=validate,sign,sbom,archive,nfpm,docker
       - docker tag goreleaser.ko.local:latest $IMAGE:nightly
       - grype $IMAGE:nightly
 
-  snapshot:push:
-    desc: Build and push snapshot to registry
-    deps: [snapshot]
+  snapshot:bin:
+    desc: Build snapshot binaries of the core only
+    env:
+      NOKKU_ONLY: core
+    dir: ..
     cmds:
-      - docker push $IMAGE:nightly
+      - goreleaser build --snapshot --clean {{.CLI_ARGS}}
 
   migrate:new:
     desc: Create a new migration file (pass a name, e.g. "add_users_last_login")

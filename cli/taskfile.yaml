@@ -15,6 +15,15 @@ tasks:
       - mkdir -p ~/.local/bin
       - CGO_ENABLED=1 go build -tags enclave -ldflags="-s -w" -trimpath -o ~/.local/bin/ ./cmd/nk
 
+  snapshot:bin:
+    desc: Build snapshot binaries of nk only, the darwin ones only build on a Mac
+    env:
+      NOKKU_ONLY: cli
+    # .goreleaser.yaml is in the repo root.
+    dir: ..
+    cmds:
+      - goreleaser build --snapshot --clean {{.CLI_ARGS}}
+
   lint:
     desc: Run go vet & lint
     cmds:

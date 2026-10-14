@@ -7,9 +7,11 @@ before:
     - go mod download
     - go mod verify
 
+# NOKKU_ONLY=core|daemon|cli limits the builds to one app, for local snapshots.
 builds:
   - &build
     id: nokku
+    skip: '{{ and (isEnvSet "NOKKU_ONLY") (ne .Env.NOKKU_ONLY "core") }}'
     main: ./core/cmd/nokku
     binary: nokku
     env: [CGO_ENABLED=0]
@@ -31,6 +33,7 @@ builds:
   - &client
     <<: *build
     id: nokkud
+    skip: '{{ and (isEnvSet "NOKKU_ONLY") (ne .Env.NOKKU_ONLY "daemon") }}'
     main: ./daemon/cmd/nokkud
     binary: nokkud
     ldflags:
@@ -45,6 +48,7 @@ builds:
 
   - <<: *client
     id: nk
+    skip: '{{ and (isEnvSet "NOKKU_ONLY") (ne .Env.NOKKU_ONLY "cli") }}'
     main: ./cli/cmd/nk
     binary: nk
     goos:
@@ -66,7 +70,7 @@ builds:
       - arm64
     hooks:
       pre: ./cli/internal/enclave/build.sh
-    skip: '{{ ne .Runtime.Goos "darwin" }}'
+    skip: '{{ or (ne .Runtime.Goos "darwin") (and (isEnvSet "NOKKU_ONLY") (ne .Env.NOKKU_ONLY "cli")) }}'
 
 kos:
   - build: nokku

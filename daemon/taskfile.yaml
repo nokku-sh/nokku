@@ -28,3 +28,24 @@ tasks:
             go test "$pkg" -run='^$' -fuzz="^${target}$" -fuzztime="{{.FUZZTIME}}"
           done
         done
+
+  snapshot:
+    desc: Build a snapshot of the daemon image, then scan it
+    env:
+      NOKKU_ONLY: daemon
+      IMAGE: ghcr.io/nokku-sh/nokkud
+    # .goreleaser.yaml is in the repo root.
+    dir: ..
+    cmds:
+      - goreleaser release --snapshot --clean --skip=validate,sign,sbom,archive,nfpm,ko
+      # dockers_v2 tags snapshot images per arch, e.g. 0.0.1-next-amd64
+      - docker tag $IMAGE:$(jq -r .version dist/metadata.json)-{{ARCH}} $IMAGE:nightly
+      - grype --only-fixed $IMAGE:nightly
+
+  snapshot:bin:
+    desc: Build snapshot binaries of the daemon only
+    env:
+      NOKKU_ONLY: daemon
+    dir: ..
+    cmds:
+      - goreleaser build --snapshot --clean {{.CLI_ARGS}}
