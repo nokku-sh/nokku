@@ -1,13 +1,15 @@
 # Built by GoReleaser, which puts the binary for each platform in the build context. For a local build:
 #   CGO_ENABLED=0 go build -o nokkud ./cmd/nokkud && docker build --build-arg BINARY=nokkud -t nokkud:dev .
-FROM alpine:3.24.2
+FROM debian:13.7-slim
 
 ARG TARGETPLATFORM
 ARG BINARY=$TARGETPLATFORM/nokkud
 
-# getent is what the daemon resolves accounts with, tini reaps the shells sessions leave behind.
-RUN apk add --no-cache ca-certificates musl-utils tini \
- && adduser -D -s /bin/sh dev
+# tini reaps the shells sessions leave behind. getent, which the daemon resolves accounts with, ships in libc-bin.
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd -m -s /bin/bash dev
 
 COPY $BINARY /usr/bin/nokkud
 
@@ -16,4 +18,4 @@ COPY $BINARY /usr/bin/nokkud
 VOLUME /var/lib/nokkud
 EXPOSE 4022
 
-ENTRYPOINT ["/sbin/tini", "--", "nokkud"]
+ENTRYPOINT ["/usr/bin/tini", "--", "nokkud"]
