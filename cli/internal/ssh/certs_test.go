@@ -96,8 +96,7 @@ func TestCertFresh(t *testing.T) {
 	}
 }
 
-// A certificate signed before a grant does not name the new account, so it
-// counts as stale and gets renewed.
+// A certificate signed before a grant misses the new account, so it counts as stale.
 func TestCertFreshNeedsEveryGrantedAccount(t *testing.T) {
 	setupSSHDir(t)
 	signer := newSigner(t)
@@ -145,6 +144,15 @@ func TestCertValidAndCleanup(t *testing.T) {
 
 	assert.True(t, CertValid(keep, ca, 0))
 	assert.False(t, CertValid(drop, ca, 0))
+
+	rotated := state.CA{
+		PublicKey:            string(ssh.MarshalAuthorizedKey(newSigner(t).PublicKey())),
+		PreviousPublicKey:    ca.PublicKey,
+		PreviousTrustedUntil: now.Add(time.Hour),
+	}
+	assert.True(t, CertValid(keep, rotated, 0), "the server still trusts the replaced key, offline ssh keeps working")
+	rotated.PreviousTrustedUntil = now.Add(-time.Minute)
+	assert.False(t, CertValid(keep, rotated, 0), "after the grace period")
 
 	require.NoError(t, CleanupCerts([]state.Target{keep}))
 	files, err := paths.SSHCertificates()

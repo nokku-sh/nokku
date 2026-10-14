@@ -10,9 +10,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// TestRelayStreamRead drains a chunk larger than the caller's buffer: a
-// single relay message may arrive in many small Read calls. This is the
-// relayStream contract that matters for ssh framing.
+// A relay message may arrive over many small Read calls, ssh framing depends on it.
 func TestRelayStreamRead(t *testing.T) {
 	t.Parallel()
 

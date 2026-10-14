@@ -49,9 +49,6 @@ type Client struct {
 }
 
 func New(s *state.State) (*Client, error) {
-	if err := ssh.SetupKey(s.RequireTPM); err != nil {
-		return nil, err
-	}
 	c := &Client{State: s}
 	if !s.IsServiceAccount() {
 		proofer, err := dpopclient.NewProofer(tpm.SignerOptions{
@@ -89,7 +86,7 @@ func (c *Client) dial() error {
 		})
 		auth = c.dpop
 	}
-	opts := connect.WithInterceptors(auth)
+	opts := connect.WithInterceptors(callTimeout, auth)
 	c.auth = nokkuv1connect.NewAuthServiceClient(c.httpc, s.APIURL, opts)
 	c.certs = nokkuv1connect.NewCertificateServiceClient(c.httpc, s.APIURL, opts)
 	c.targets = nokkuv1connect.NewTargetServiceClient(c.httpc, s.APIURL, opts)
@@ -141,9 +138,7 @@ func (c *Client) sync(ctx context.Context, interactive bool) error {
 	if err := c.ensureSession(ctx, interactive); err != nil {
 		return err
 	}
-	syncCtx, cancel := context.WithTimeout(ctx, syncTimeout)
-	defer cancel()
-	res, err := c.targets.GetMyAccess(syncCtx, &nokkuv1.GetMyAccessRequest{})
+	res, err := c.targets.GetMyAccess(ctx, &nokkuv1.GetMyAccessRequest{})
 	if err != nil {
 		return err
 	}
@@ -151,7 +146,12 @@ func (c *Client) sync(ctx context.Context, interactive bool) error {
 	cache := state.FromAccess(res)
 	cache.Server = c.State.APIURL
 	cache.SyncedAt = time.Now()
-	if err = ssh.CleanupCerts(cache.Targets); err != nil {
+	keep := cache.Targets
+	if id := cache.SubjectID(); id == "" || id != c.State.SubjectID() {
+		// A certificate names its subject. One signed in as someone else must not use it.
+		keep = nil
+	}
+	if err = ssh.CleanupCerts(keep); err != nil {
 		return err
 	}
 	c.State.Cache = cache
@@ -161,16 +161,13 @@ func (c *Client) sync(ctx context.Context, interactive bool) error {
 	return ssh.WriteConfigs(c.State)
 }
 
-// Logout is best effort, the local state goes either way.
-func (c *Client) Logout(ctx context.Context) {
+// Logout revokes the session on the core. The caller removes the local state either way.
+func (c *Client) Logout(ctx context.Context) error {
 	if c.State.IsServiceAccount() || c.State.SessionToken == "" {
-		return
+		return nil
 	}
-	ctx, cancel := context.WithTimeout(ctx, syncTimeout)
-	defer cancel()
-	if _, err := c.auth.Logout(ctx, &nokkuv1.LogoutRequest{}); err != nil {
-		slog.Debug("revoke session on the core", "err", err)
-	}
+	_, err := c.auth.Logout(ctx, &nokkuv1.LogoutRequest{})
+	return err
 }
 
 // EnsureCert keeps the certificate on disk when signing fails, so ssh works offline while it is valid.
@@ -193,9 +190,7 @@ func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.C
 	if c.State.TTL > 0 {
 		req.Ttl = durationpb.New(c.State.TTL)
 	}
-	signCtx, cancel := context.WithTimeout(ctx, syncTimeout)
-	defer cancel()
-	res, err := c.certs.SignSSHCertificate(signCtx, req)
+	res, err := c.certs.SignSSHCertificate(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -269,6 +264,24 @@ func (c *Client) DeleteTarget(ctx context.Context, t *state.Target) error {
 		Id: new(t.ID),
 	})
 	return err
+}
+
+// ListAllTargets is for nk sync and rm. The access sync only carries the targets the subject may log in to.
+func (c *Client) ListAllTargets(ctx context.Context) ([]state.Target, error) {
+	var out []state.Target
+	for offset := int32(0); ; offset += lookupLimit {
+		res, err := c.targets.ListTargets(ctx, &nokkuv1.ListTargetsRequest{
+			Limit:  new(int32(lookupLimit)),
+			Offset: new(offset),
+		})
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, state.Targets(res.GetTargets())...)
+		if n := len(res.GetTargets()); n < lookupLimit || int(offset)+n >= int(res.GetTotal()) {
+			return out, nil
+		}
+	}
 }
 
 // ListSSHCAs is for a new target, the access sync only carries the CAs of targets the subject can reach.

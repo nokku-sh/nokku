@@ -44,8 +44,10 @@ done
 `
 
 type Host struct {
-	Accounts   []string
-	HostKey    string
+	// Accounts are capped at maxLocalAccounts.
+	Accounts []string
+	HostKey  string
+	// Principals leave out the files of accounts past the cap, they are not stale.
 	Principals []string
 }
 
@@ -63,9 +65,13 @@ func ParseProbe(out string) (Host, error) {
 		}
 	}
 
+	accounts := localAccounts(sections[sectionPasswd])
+	capped := accounts[min(len(accounts), maxLocalAccounts):]
 	h := Host{
-		Accounts:   localAccounts(sections[sectionPasswd]),
-		Principals: sections[sectionPrincipals],
+		Accounts: accounts[:min(len(accounts), maxLocalAccounts)],
+		Principals: slices.DeleteFunc(sections[sectionPrincipals], func(name string) bool {
+			return slices.Contains(capped, name)
+		}),
 	}
 	if keys := sections[sectionHostKey]; len(keys) > 0 {
 		h.HostKey = strings.TrimSpace(keys[0])
@@ -91,8 +97,7 @@ func localAccounts(passwd []string) []string {
 		accounts = append(accounts, fields[0])
 	}
 	slices.Sort(accounts)
-	accounts = slices.Compact(accounts)
-	return accounts[:min(len(accounts), maxLocalAccounts)]
+	return slices.Compact(accounts)
 }
 
 func noLoginShell(shell string) bool {

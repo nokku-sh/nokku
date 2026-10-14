@@ -1,14 +1,12 @@
 package ssh
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/nokku-sh/nokku/cli/internal/state"
@@ -24,7 +22,7 @@ type dialResult struct {
 	err  error
 }
 
-// Proxy dials all endpoints at once and races the relay for a daemon target, so a dead private address never delays.
+// Proxy races all endpoints and, for a daemon target, the relay. A private address must show the target's host key.
 func Proxy(ctx context.Context, target *state.Target, port string, relay RelayDialer, forceRelay bool) error {
 	if forceRelay && target.Manual() {
 		return fmt.Errorf("%s has no daemon, so it cannot be reached through the relay", target.Name)
@@ -43,7 +41,14 @@ func Proxy(ctx context.Context, target *state.Target, port string, relay RelayDi
 		for _, ep := range target.Endpoints {
 			pending++
 			go func() {
-				conn, err := dialer.DialContext(dialCtx, "tcp", endpointAddr(ep, port))
+				addr := endpointAddr(ep, port)
+				if needsVerify(target, addr) {
+					if err := verifyHost(dialCtx, addr, target); err != nil {
+						results <- dialResult{err: err}
+						return
+					}
+				}
+				conn, err := dialer.DialContext(dialCtx, "tcp", addr)
 				results <- dialResult{conn, err}
 			}()
 		}
@@ -100,22 +105,21 @@ func endpointAddr(endpoint, port string) string {
 	return net.JoinHostPort(endpoint, port)
 }
 
+// pipe ends once the server closes. Waiting on stdin too would hold ssh until it writes again.
 func pipe(ctx context.Context, conn io.ReadWriteCloser) error {
 	defer func() { _ = conn.Close() }()
 	// Closing is the only way to unblock the copies on cancel.
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stop()
 
-	var wg sync.WaitGroup
-	var outErr, inErr error
-	wg.Go(func() { _, outErr = io.Copy(os.Stdout, conn) })
-	wg.Go(func() {
-		_, inErr = io.Copy(conn, os.Stdin)
+	stdin := os.Stdin
+	go func() {
+		_, _ = io.Copy(conn, stdin)
 		// Half-close so sshd sees EOF but can keep sending.
 		if hc, ok := conn.(interface{ CloseWrite() error }); ok {
 			_ = hc.CloseWrite()
 		}
-	})
-	wg.Wait()
-	return cmp.Or(outErr, inErr)
+	}()
+	_, err := io.Copy(os.Stdout, conn)
+	return err
 }

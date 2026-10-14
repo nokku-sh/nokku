@@ -47,15 +47,22 @@ func TestParseProbeWithoutHostKey(t *testing.T) {
 	assert.ErrorContains(t, err, "no ssh host key")
 }
 
-func TestLocalAccountsCap(t *testing.T) {
+func TestAccountsPastTheCap(t *testing.T) {
 	t.Parallel()
-	var lines []string
+	var out strings.Builder
+	out.WriteString(sectionPasswd + "\n")
 	for i := range 250 {
-		lines = append(lines, fmt.Sprintf("user%03d:x:%d:%d::/home/u:/bin/bash", i, 1000+i, 1000+i))
+		fmt.Fprintf(&out, "user%03d:x:%d:%d::/home/u:/bin/bash\n", i, 1000+i, 1000+i)
 	}
-	accounts := localAccounts(lines)
-	assert.Len(t, accounts, maxLocalAccounts)
-	assert.Equal(t, "user199", accounts[199])
+	out.WriteString(sectionHostKey + "\nssh-ed25519 AAAA\n" + sectionPrincipals + "\nuser010\nuser240\ngone\n")
+
+	h, err := ParseProbe(out.String())
+	require.NoError(t, err)
+	assert.Len(t, h.Accounts, maxLocalAccounts)
+	assert.Equal(t, "user199", h.Accounts[199])
+
+	p := NewPlan("ca-key", nil, h)
+	assert.Equal(t, []string{"/etc/ssh/nokku_principals/gone"}, p.Stale, "an account past the cap keeps its file")
 }
 
 func TestNewPlan(t *testing.T) {
@@ -91,8 +98,7 @@ func TestScriptIsValidShell(t *testing.T) {
 	require.NoError(t, err, "generated script must parse: %s", out)
 }
 
-// runRemoveScript runs RemoveScript against a fake /etc/ssh, with id, sshd,
-// and systemctl stubbed on PATH. It returns the fake dir.
+// runRemoveScript runs RemoveScript on a fake /etc/ssh with id, sshd and systemctl stubbed, and returns the dir.
 func runRemoveScript(t *testing.T, sshdExit int) (dir, out string, err error) {
 	t.Helper()
 	if _, lookErr := exec.LookPath("sh"); lookErr != nil {

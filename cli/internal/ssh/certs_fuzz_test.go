@@ -7,8 +7,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// FuzzCheckCert must never panic, and anything it accepts must be a
-// certificate from the CA that is valid now.
+// FuzzCheckCert never panics, and what it accepts is a certificate from the CA that is valid now.
 func FuzzCheckCert(f *testing.F) {
 	signer := newSigner(f)
 	caKey := string(ssh.MarshalAuthorizedKey(signer.PublicKey()))

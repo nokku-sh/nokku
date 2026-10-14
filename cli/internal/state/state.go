@@ -34,6 +34,14 @@ type CA struct {
 	PreviousTrustedUntil time.Time `json:"previous_trusted_until,omitzero"`
 }
 
+// KeysChangedAt is when TrustedKeys last changed, at a rotation or at the end of its grace period.
+func (ca CA) KeysChangedAt() time.Time {
+	if time.Now().After(ca.PreviousTrustedUntil) && ca.PreviousTrustedUntil.After(ca.RotatedAt) {
+		return ca.PreviousTrustedUntil
+	}
+	return ca.RotatedAt
+}
+
 // TrustedKeys returns the current key and, while it is still trusted, the one it replaced.
 func (ca CA) TrustedKeys() []string {
 	keys := []string{strings.TrimSpace(ca.PublicKey)}
@@ -59,9 +67,9 @@ type Target struct {
 // Manual reports whether the target has no daemon and is synced by hand.
 func (t Target) Manual() bool { return t.DaemonID == "" }
 
-// NeedsSync means the server of a manual target has not seen ca's current key yet and rejects its certificates.
+// NeedsSync means the server of a manual target lacks ca's current key, or still trusts the one it replaced.
 func (t Target) NeedsSync(ca *CA) bool {
-	return t.Manual() && ca != nil && ca.RotatedAt.After(t.LastManualSync())
+	return t.Manual() && ca != nil && ca.KeysChangedAt().After(t.LastManualSync())
 }
 
 // LastManualSync is when an operator last ran nk sync, zero when never.
@@ -79,6 +87,8 @@ type Config struct {
 	APICAInstalled   bool      `json:"api_ca_installed,omitzero"`
 	SessionToken     string    `json:"session_token,omitempty"`
 	SessionExpiresAt time.Time `json:"session_expires_at,omitzero"`
+	// TTL is kept from --ttl, ssh runs nk proxy and nk prepare without flags.
+	TTL time.Duration `json:"ttl,omitzero"`
 }
 
 // Cache is the last access snapshot, kept in cache.json for offline use.
@@ -101,7 +111,6 @@ type State struct {
 
 	// Read from NK_TOKEN only, never argv, so it stays out of shell history and the process list.
 	Token      string
-	TTL        time.Duration
 	RequireTPM bool
 	// Pin names the private CA of the API, see internal/trust.
 	Pin string
@@ -154,6 +163,17 @@ func (s *State) SyncFailedWithin(d time.Duration) bool {
 }
 
 func (s *State) IsServiceAccount() bool { return s.Token != "" }
+
+// SubjectID is empty when the snapshot names no subject.
+func (c Cache) SubjectID() string {
+	switch {
+	case c.User != nil:
+		return "user:" + c.User.ID
+	case c.ServiceAccount != nil:
+		return "sa:" + c.ServiceAccount.ID
+	}
+	return ""
+}
 
 func (s *State) SessionValid() bool {
 	if s.IsServiceAccount() {

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -32,28 +33,75 @@ func testState() *state.State {
 
 func TestFindTarget(t *testing.T) {
 	t.Parallel()
-	s := testState()
+	targets := slices.Concat(testState().Targets, []state.Target{
+		{ID: "t-5", Name: "nat-a", Endpoints: []string{"1.2.3.4:2201"}},
+		{ID: "t-6", Name: "nat-b", Endpoints: []string{"1.2.3.4:2202"}},
+	})
+	aliases := map[string]string{"t-1": "nokku/web"}
 
-	got, err := findTarget(s, "web")
-	require.NoError(t, err)
-	assert.Equal(t, "t-1", got.ID, "by name")
-
-	got, err = findTarget(s, "10.0.0.5")
-	require.NoError(t, err)
-	assert.Equal(t, "t-1", got.ID, "by endpoint host, ignoring its port")
-
-	got, err = findTarget(s, "10.0.0.9")
-	require.NoError(t, err)
-	assert.Nil(t, got, "an unknown host is a new target")
-
-	_, err = findTarget(s, "db")
-	require.ErrorContains(t, err, "daemon")
-
-	_, err = findTarget(s, "10.0.0.7")
-	require.ErrorContains(t, err, "several targets")
-	got, err = findTarget(s, "dup")
-	require.NoError(t, err)
-	assert.Equal(t, "t-3", got.ID, "the name settles a shared endpoint")
+	tests := []struct {
+		name   string
+		dest   remote
+		wantID string
+		wantAt remote
+		errMsg string
+	}{
+		{"by name, at its endpoint", remote{host: "web"}, "t-1", remote{host: "10.0.0.5", port: "2222"}, ""},
+		{"by nk ls alias", remote{host: "nokku/web"}, "t-1", remote{host: "10.0.0.5", port: "2222"}, ""},
+		{
+			"--port beats the endpoint port",
+			remote{host: "web", port: "22"},
+			"t-1",
+			remote{host: "10.0.0.5", port: "22"},
+			"",
+		},
+		{"by host, at the stored port", remote{host: "10.0.0.5"}, "t-1", remote{host: "10.0.0.5", port: "2222"}, ""},
+		{"by host and port", remote{host: "10.0.0.5", port: "2222"}, "t-1", remote{host: "10.0.0.5", port: "2222"}, ""},
+		{
+			"another port is another server",
+			remote{host: "10.0.0.5", port: "22"},
+			"",
+			remote{host: "10.0.0.5", port: "22"},
+			"",
+		},
+		{
+			"no port on an endpoint means 22",
+			remote{host: "10.0.0.7", port: "2222"},
+			"",
+			remote{host: "10.0.0.7", port: "2222"},
+			"",
+		},
+		{"unknown host is a new target", remote{host: "10.0.0.9"}, "", remote{host: "10.0.0.9"}, ""},
+		{"the name settles a shared endpoint", remote{host: "dup"}, "t-3", remote{host: "10.0.0.7"}, ""},
+		{
+			"the port settles a shared IP",
+			remote{host: "1.2.3.4", port: "2202"},
+			"t-6",
+			remote{host: "1.2.3.4", port: "2202"},
+			"",
+		},
+		{"a shared IP without a port", remote{host: "1.2.3.4"}, "", remote{}, "several targets"},
+		{"a shared endpoint", remote{host: "10.0.0.7"}, "", remote{}, "several targets"},
+		{"a daemon target", remote{host: "db"}, "", remote{}, "daemon"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, at, err := findTarget(targets, aliases, tt.dest)
+			if tt.errMsg != "" {
+				require.ErrorContains(t, err, tt.errMsg)
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantID == "" {
+				assert.Nil(t, got, "no target matches")
+			} else {
+				require.NotNil(t, got, "a target matches")
+				assert.Equal(t, tt.wantID, got.ID)
+			}
+			assert.Equal(t, tt.wantAt, at, "where nk connects")
+		})
+	}
 }
 
 func TestResolveCA(t *testing.T) {
@@ -150,8 +198,7 @@ func TestSyncResultJSON(t *testing.T) {
 	assert.Contains(t, string(b), `"grants":{"root":["me","team:ops"]}`, "as typed, ids stay out")
 }
 
-// urfave splits a slice flag at commas unless told otherwise, which would
-// tear the subjects of one account apart.
+// urfave splits a slice flag at commas unless told not to, tearing one account's subjects apart.
 func TestSyncKeepsTheSubjectsOfAGrantTogether(t *testing.T) {
 	t.Parallel()
 	var got []string

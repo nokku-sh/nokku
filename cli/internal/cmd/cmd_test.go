@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,10 +35,14 @@ func runFlags(t *testing.T, args ...string) (*state.State, error) {
 		s   *state.State
 		err error
 	)
-	root := Root()
-	root.Action = func(_ context.Context, cmd *cli.Command) error {
+	load := func(_ context.Context, cmd *cli.Command) error {
 		s, err = loadState(cmd)
 		return nil
+	}
+	root := Root()
+	root.Action = load
+	for _, sub := range root.Commands {
+		sub.Action = load
 	}
 	require.NoError(t, root.Run(t.Context(), append([]string{"nk"}, args...)))
 	return s, err
@@ -126,4 +131,21 @@ func TestLoadStateRejectsNonServiceToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, s.IsServiceAccount())
 	assert.True(t, s.SessionValid())
+}
+
+func TestLoadStateKeepsTTL(t *testing.T) {
+	setHome(t)
+	require.NoError(t, (&state.State{APIURL: "https://app.nokku.sh", TTL: time.Hour}).Save())
+
+	s, err := runFlags(t)
+	require.NoError(t, err)
+	assert.Equal(t, time.Hour, s.TTL, "without --ttl the stored one stays")
+
+	s, err = runFlags(t, "--ttl", "0")
+	require.NoError(t, err)
+	assert.Zero(t, s.TTL, "0 goes back to the CA default")
+
+	s, err = runFlags(t, "--ttl", "2h", "ls")
+	require.NoError(t, err)
+	assert.Equal(t, 2*time.Hour, s.TTL, "a root flag before a subcommand counts")
 }

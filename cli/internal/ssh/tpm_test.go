@@ -13,11 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 )
 
-// TestSetupTPMKey exercises the TPM identity lifecycle against a real TPM:
-// only the public key touches disk, and the key is deterministic across
-// runs. Manual test, run with:
-//
-//	NK_TPM_E2E=1 XDG_CONFIG_HOME=$(mktemp -d) go test -run TestSetupTPMKey ./internal/ssh/
+// Manual, against a real TPM: NK_TPM_E2E=1 XDG_CONFIG_HOME=$(mktemp -d) go test -run TestSetupTPMKey ./internal/ssh/.
 func TestSetupTPMKey(t *testing.T) {
 	if os.Getenv("NK_TPM_E2E") == "" {
 		t.Skip("manual test: NK_TPM_E2E=1 XDG_CONFIG_HOME=$(mktemp -d)")

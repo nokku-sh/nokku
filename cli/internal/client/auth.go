@@ -7,6 +7,18 @@ import (
 	"connectrpc.com/connect"
 )
 
+// callTimeout bounds every unary call. The relay is a stream and lives as long as the ssh session.
+var callTimeout = connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		if _, ok := ctx.Deadline(); !ok {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, syncTimeout)
+			defer cancel()
+		}
+		return next(ctx, req)
+	}
+})
+
 type bearerAuth struct {
 	token string
 	ua    string

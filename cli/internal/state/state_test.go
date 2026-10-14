@@ -35,7 +35,8 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	assert.Equal(t, "sess", loaded.SessionToken)
 	assert.True(t, loaded.SessionExpiresAt.Equal(expires))
 	assert.Equal(t, s.Cache, loaded.Cache)
-	assert.Zero(t, loaded.TTL, "flags are never persisted")
+	assert.Equal(t, time.Hour, loaded.TTL, "--ttl is kept for the nk that ssh runs")
+	assert.Empty(t, loaded.Token, "a token is never persisted")
 
 	raw, err := os.ReadFile(paths.ConfigFile())
 	require.NoError(t, err)
@@ -53,8 +54,7 @@ func TestSessionValid(t *testing.T) {
 	assert.False(t, (&State{SessionToken: "tok", SessionExpiresAt: time.Now().Add(-time.Minute)}).SessionValid())
 }
 
-// The fallback after a failed sync reads the disk again, and by then the
-// state may point at another server.
+// The fallback after a failed sync reads the disk again, and by then the state may name another server.
 func TestLoadCacheLeavesOutAnotherServer(t *testing.T) {
 	setHome(t)
 	snapshot := Cache{Server: "https://a.example", Targets: []Target{{ID: "t", Name: "web"}}, User: &User{ID: "u"}}
@@ -73,4 +73,22 @@ func TestLoadCacheLeavesOutAnotherServer(t *testing.T) {
 	old := &State{APIURL: "https://a.example"}
 	require.NoError(t, old.LoadCache())
 	assert.True(t, old.HasCachedData(), "a snapshot from before the field existed keeps ssh working offline")
+}
+
+func TestNeedsSyncAfterRollover(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	ca := &CA{RotatedAt: now.Add(-10 * 24 * time.Hour), PreviousTrustedUntil: now.Add(-3 * 24 * time.Hour)}
+	synced := func(at time.Time) Target {
+		return Target{Metadata: map[string]string{"last_manual_sync": at.Format(time.RFC3339)}}
+	}
+
+	assert.True(t, synced(now.Add(-20*24*time.Hour)).NeedsSync(ca), "synced before the rotation")
+	during := synced(now.Add(-5 * 24 * time.Hour))
+	assert.True(t, during.NeedsSync(ca), "synced in the grace period, the retired key is still on the host")
+	assert.False(t, synced(now.Add(-time.Hour)).NeedsSync(ca), "synced after the grace period")
+
+	open := &CA{RotatedAt: ca.RotatedAt, PreviousTrustedUntil: now.Add(time.Hour)}
+	assert.False(t, during.NeedsSync(open), "the grace period is not over yet")
+	assert.False(t, Target{DaemonID: "d"}.NeedsSync(ca), "the daemon keeps its own host up to date")
 }

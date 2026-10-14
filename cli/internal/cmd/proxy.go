@@ -43,7 +43,7 @@ func proxyCMD() *cli.Command {
 				return err
 			}
 			// Built on first use, so a fresh snapshot with a valid cert never touches the TPM or the core.
-			core := sync.OnceValues(func() (*client.Client, error) { return client.New(s) })
+			core := sync.OnceValues(func() (*client.Client, error) { return newClient(s) })
 
 			// The daemon enforces revocation, so a young snapshot only delays new grants and a fan-out syncs once.
 			stale := time.Since(s.SyncedAt) > proxyFreshFor && !s.SyncFailedWithin(syncRetryAfter)
@@ -131,7 +131,7 @@ func renewCert(ctx context.Context, cmd *cli.Command) error {
 	if ssh.CertValid(*target, *ca, 0) && s.SyncFailedWithin(syncRetryAfter) {
 		return nil
 	}
-	c, err := client.New(s)
+	c, err := newClient(s)
 	if err != nil {
 		return err
 	}

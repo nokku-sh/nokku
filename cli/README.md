@@ -61,6 +61,7 @@ Prefer to add the package repository yourself? The [package repository](https://
 - A revoke applies at once, because the server enforces it.
 - When the core is unreachable, `nk` fails fast and works from cached data and the certificates you still hold.
 - Direct addresses and the Nokku relay are tried in parallel, so an unreachable private address never slows a connection down.
+- When there is another way in, a private address must show the server's own host key first. Another machine at that address on your network, like a NAS at home, is skipped.
 
 ## Where your key lives
 
@@ -99,9 +100,9 @@ What it does:
 - It connects as root with your own `ssh`, so your keys and SSH config apply and a password is asked at most once.
 - It writes the Nokku CA, an sshd drop-in and one principals file per account.
 - It checks the result with `sshd -t` and rolls every file back if sshd rejects it.
-- Nokku only hears about the sync once the server is written.
+- Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
 
-Run it again whenever access changes.
+Run it again whenever access changes. `nk sync` and `nk rm` find a server by its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
 
 A new server can start with access in place, so nobody has to open the web app after the first sync:
 
@@ -123,7 +124,7 @@ For scripts, `--json` prints one object with the target, the files written and t
 nk rm web        # or the address, like nk sync
 ```
 
-It removes the drop-in, the CA and the principals files over the same root `ssh`, reloads sshd, and only then deletes the target in Nokku. If sshd rejects its config without the drop-in, everything is put back and the target stays. Pass `--keep-host` when the server is already gone.
+It checks the pinned host key first, then removes the drop-in, the CA and the principals files over the same root `ssh`, reloads sshd, and only then deletes the target in Nokku. If sshd rejects its config without the drop-in, everything is put back and the target stays. Pass `--keep-host` when the server is already gone.
 
 ## Commands
 
@@ -140,10 +141,10 @@ It removes the drop-in, the CA and the principals files over the same root `ssh`
 
 | Command     | Flags                                                                                      |
 | ----------- | ------------------------------------------------------------------------------------------ |
-| `nk ls`     | `--json` for machine-readable output                                                       |
+| `nk ls`     | `--json` for machine-readable output, with the `host` ssh knows each server by             |
 | `nk doctor` | `--fix` to repair permissions and regenerate files, `--json` for output                    |
 | `nk sync`   | `--name`, `--ca`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json` |
-| `nk rm`     | `--port`, `--keep-host` to leave the server untouched                                      |
+| `nk rm`     | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                 |
 
 ## Configuration
 
@@ -151,7 +152,7 @@ It removes the drop-in, the CA and the principals files over the same root `ssh`
 | --------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `--api`         | `NK_API_URL`        | Address of the core                                                                                                        |
 |                 | `NK_TOKEN`          | Service account key (`nk_sa_...`) for CI. Environment only, never a flag                                                   |
-| `--ttl`         | `NK_TTL`            | Requested SSH certificate lifetime                                                                                         |
+| `--ttl`         | `NK_TTL`            | Requested SSH certificate lifetime, kept for later connections. `0` goes back to the CA default                            |
 | `--require-tpm` | `NK_REQUIRE_TPM`    | Require a TPM 2.0 or the Secure Enclave, refuse the software key fallback                                                  |
 |                 | `NK_SECURE_ENCLAVE` | Set to `1` on macOS to keep new keys in the Secure Enclave. Experimental                                                   |
 | `--pin`         | `NK_API_PIN`        | Fingerprint of the core's private CA, `sha256:...`. The web app shows it under **Profile, Security**. Without it `nk` asks |

@@ -3,12 +3,10 @@
 package client
 
 import (
-	"context"
-
 	"golang.org/x/sys/windows"
 )
 
-func openBrowser(_ context.Context, url string) error {
+func openBrowser(url string) error {
 	ptr, err := windows.UTF16PtrFromString(url)
 	if err != nil {
 		return err

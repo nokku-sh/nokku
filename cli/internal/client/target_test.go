@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,8 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// captureTargetService records the requests and answers a create with the
-// target the core would have made.
+// captureTargetService records the requests and answers a create like the core would.
 type captureTargetService struct {
 	nokkuv1connect.UnimplementedTargetServiceHandler
 
@@ -131,4 +131,43 @@ func TestListSSHCAs(t *testing.T) {
 	assert.Equal(t, "default", cas[0].Name)
 	assert.True(t, cas[0].Default)
 	assert.Equal(t, "ssh-ed25519 AAAA", cas[0].PublicKey)
+}
+
+type pagedTargetService struct {
+	nokkuv1connect.UnimplementedTargetServiceHandler
+
+	total int
+}
+
+func (s pagedTargetService) ListTargets(
+	_ context.Context,
+	req *nokkuv1.ListTargetsRequest,
+) (*nokkuv1.ListTargetsResponse, error) {
+	res := nokkuv1.ListTargetsResponse{Total: new(int32(s.total))}
+	for i := int(req.GetOffset()); i < min(s.total, int(req.GetOffset()+req.GetLimit())); i++ {
+		res.Targets = append(res.Targets, &nokkuv1.Target{
+			Id:   new(fmt.Sprintf("0199a0a0-0000-7000-8000-%012d", i)),
+			CaId: new("0199a0a0-0000-7000-8000-000000000001"),
+			Name: new(fmt.Sprintf("t%d", i)),
+		})
+	}
+	return &res, nil
+}
+
+func TestListAllTargetsPages(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.Handle(nokkuv1connect.NewTargetServiceHandler(pagedTargetService{total: 2*lookupLimit + 3}))
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	c := &Client{State: &state.State{APIURL: server.URL}}
+	c.targets = nokkuv1connect.NewTargetServiceClient(http.DefaultClient, server.URL)
+
+	targets, err := c.ListAllTargets(t.Context())
+	require.NoError(t, err)
+	require.Len(t, targets, 2*lookupLimit+3, "every page is read")
+	assert.Equal(t, "t0", targets[0].Name)
+	assert.Equal(t, fmt.Sprintf("t%d", 2*lookupLimit+2), targets[len(targets)-1].Name)
 }

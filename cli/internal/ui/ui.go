@@ -42,6 +42,11 @@ func Plain(s string) string {
 	}, s)
 }
 
+// PlainLine is Plain for a value that must stay on one line, like a name.
+func PlainLine(s string) string {
+	return strings.ReplaceAll(Plain(s), "\n", "")
+}
+
 // HumanizeDuration formats a non-negative duration like "3h12m", "45s", or "900ms".
 func HumanizeDuration(d time.Duration) string {
 	if d < 0 {

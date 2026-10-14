@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 	"unicode"
@@ -17,8 +18,12 @@ import (
 	"github.com/mizuchilabs/kata/buildinfo"
 )
 
-// A real device flow answer is a few hundred bytes.
-const maxDeviceResponse = 64 << 10
+const (
+	// A real device flow answer is a few hundred bytes.
+	maxDeviceResponse = 64 << 10
+	// Polls in a row that may fail on the network or the server before the sign-in gives up.
+	pollRetries = 3
+)
 
 // RFC 8628 device authorization response.
 type deviceAuth struct {
@@ -51,10 +56,10 @@ func (c *Client) deviceLogin(ctx context.Context) error {
 		return err
 	}
 
-	// The link already carries the code, the code is shown to compare.
-	fmt.Printf("\nSign in to Nokku in your browser. If it does not open, visit:\n  %s\n", d.VerificationURI)
-	fmt.Printf("Confirm the code %s there. Waiting...\n", d.UserCode)
-	_ = openBrowser(ctx, d.VerificationURI)
+	// The link already carries the code, the code is shown to compare. Stderr keeps it out of --json.
+	fmt.Fprintf(os.Stderr, "\nSign in to Nokku in your browser. If it does not open, visit:\n  %s\n", d.VerificationURI)
+	fmt.Fprintf(os.Stderr, "Confirm the code %s there. Waiting...\n", d.UserCode)
+	_ = openBrowser(d.VerificationURI)
 
 	token, expiresIn, err := c.pollDeviceToken(ctx, d.DeviceCode, d.Interval)
 	if err != nil {
@@ -115,6 +120,7 @@ func (c *Client) pollDeviceToken(
 	defer ticker.Stop()
 
 	nonceRetried := false
+	failures := 0
 
 	for {
 		body, doErr := c.postForm(ctx, "/auth/device/token", url.Values{"device_code": {deviceCode}})
@@ -129,40 +135,42 @@ func (c *Client) pollDeviceToken(
 		if doErr == nil && decodeErr == nil && out.AccessToken != "" {
 			return out.AccessToken, out.ExpiresIn, nil
 		}
-		if decodeErr != nil || out.Error == "" {
-			// A transport error or an HTTP error without an RFC 8628 code won't fix itself on retry.
+		retry := ctx.Err() == nil && transient(doErr) && failures < pollRetries
+		if retry {
+			failures++
+		} else {
+			failures = 0
+		}
+		slog.Debug("device flow poll", "api", c.State.APIURL, "response", out.Error, "err", doErr)
+		switch {
+		case retry:
+			// One blip in a wait of minutes is no reason to start over.
+		case decodeErr != nil || out.Error == "":
+			// An HTTP error without an RFC 8628 code won't fix itself on retry.
 			if doErr != nil {
 				return "", 0, doErr
 			}
 			// Never echo the body, a malformed response can still carry a token.
 			return "", 0, errors.New("device authorization: unexpected response")
-		}
-
-		slog.Debug("device flow poll", "api", c.State.APIURL, "response", out.Error)
-		switch out.Error {
-		case "authorization_pending":
-			// keep polling
-		case "use_dpop_nonce":
-			// postForm learned the fresh nonce, so retry at once. A second rejection in a row is final.
-			if nonceRetried {
-				return "", 0, errors.New(
-					"sign-in failed, Nokku rejected the retry with a fresh nonce, run nk login again",
-				)
-			}
+		case out.Error == "authorization_pending":
+		case out.Error == "use_dpop_nonce" && !nonceRetried:
+			// postForm learned the fresh nonce, so retry at once.
 			nonceRetried = true
 			continue
-		case "invalid_dpop_proof":
+		case out.Error == "use_dpop_nonce":
+			return "", 0, errors.New("sign-in failed, Nokku rejected the retry with a fresh nonce, run nk login again")
+		case out.Error == "invalid_dpop_proof":
 			return "", 0, errors.New(
 				"sign-in failed, Nokku rejected this machine's proof. " +
 					"Check that the clock is right and run nk login again",
 			)
-		case "slow_down":
+		case out.Error == "slow_down":
 			// RFC 8628 section 3.5. The server counts violations per grant and its interval keeps growing.
 			wait += 5 * time.Second
 			ticker.Reset(wait)
-		case "access_denied":
+		case out.Error == "access_denied":
 			return "", 0, errors.New("sign-in was denied in the browser")
-		case "expired_token":
+		case out.Error == "expired_token":
 			return "", 0, errors.New("sign-in code expired, run nk login again")
 		default:
 			return "", 0, errors.New("device authorization failed: " + out.Error)
@@ -179,11 +187,33 @@ func (c *Client) pollDeviceToken(
 	}
 }
 
+// transient is a failure of the network or the server, not an answer about the grant.
+func transient(err error) bool {
+	if err == nil {
+		return false
+	}
+	if se, ok := errors.AsType[*statusError](err); ok {
+		return se.code >= http.StatusInternalServerError
+	}
+	return true
+}
+
+type statusError struct {
+	code int
+	body string
+}
+
+func (e *statusError) Error() string {
+	return fmt.Sprintf("device authorization: HTTP %d: %s", e.code, e.body)
+}
+
 func (c *Client) postForm(
 	ctx context.Context,
 	path string,
 	form url.Values,
 ) (body []byte, err error) {
+	ctx, cancel := context.WithTimeout(ctx, syncTimeout)
+	defer cancel()
 	encoded := form.Encode()
 	u := strings.TrimRight(c.State.APIURL, "/") + path
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(encoded))
@@ -218,11 +248,7 @@ func (c *Client) postForm(
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return data, fmt.Errorf(
-			"device authorization: HTTP %d: %s",
-			resp.StatusCode,
-			strings.TrimSpace(string(data)),
-		)
+		return data, &statusError{code: resp.StatusCode, body: strings.TrimSpace(string(data))}
 	}
 	return data, nil
 }

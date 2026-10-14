@@ -23,8 +23,7 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
-// TestRepairKeepsCertsWithoutCache covers the destructive case: a missing
-// cache leaves no CAs, which must not read as "every certificate is stale".
+// A missing cache leaves no CAs, which must not read as every certificate being stale.
 func TestRepairKeepsCertsWithoutCache(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

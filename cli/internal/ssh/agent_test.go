@@ -29,14 +29,12 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 )
 
-// nopCloser hands the signer a transport whose Close does nothing, so the
-// test that created the simulator keeps ownership of it.
+// nopCloser keeps the simulator owned by the test that created it.
 type nopCloser struct{ transport.TPMCloser }
 
 func (nopCloser) Close() error { return nil }
 
-// e2eSigner builds a TPM-backed signer for the interop test: the real device
-// when available, the in-process simulator otherwise.
+// e2eSigner uses the real TPM when there is one and the simulator otherwise.
 func e2eSigner(t *testing.T) tpm.Signer {
 	t.Helper()
 
@@ -63,9 +61,7 @@ func e2eSigner(t *testing.T) tpm.Signer {
 	return signer
 }
 
-// TestAgentSSHDInterop proves the TPM identity flow end to end against a real
-// sshd: the ssh client authenticates with a certificate whose private key
-// only exists inside the TPM, served through the embedded agent.
+// The TPM identity against a real sshd. The certificate's private key only exists in the TPM, behind the agent.
 func TestAgentSSHDInterop(t *testing.T) {
 	sshd, err := exec.LookPath("sshd")
 	if err != nil {
@@ -153,8 +149,7 @@ func TestAgentSSHDInterop(t *testing.T) {
 	))
 	require.NoError(t, err, "ssh with TPM agent failed:\n%s", out)
 
-	// Without the agent there is no usable private key on disk: auth must
-	// fail, proving the identity is not derivable from what is stored.
+	// Without the agent no usable private key is on disk, so auth fails.
 	out, err = sshCmd(env, append(baseArgs,
 		"-o", "IdentityAgent=none",
 		current.Username+"@127.0.0.1", "true",
@@ -162,10 +157,7 @@ func TestAgentSSHDInterop(t *testing.T) {
 	assert.Error(t, err, "ssh without agent unexpectedly succeeded:\n%s", out)
 }
 
-// TestAgentSSHDInteropSoftwareKey proves the machine-wrapped software key
-// works end to end against a real sshd through the production agent and the
-// exact IdentityFile/IdentityAgent shape GenerateSSHConfig emits: the private
-// key never appears in an IdentityFile, only the public key and the agent.
+// The software key against a real sshd, through the agent and the IdentityFile and IdentityAgent nk writes.
 func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 	sshd, err := exec.LookPath("sshd")
 	if err != nil {
@@ -178,8 +170,7 @@ func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 
 	setupSSHDir(t)
 
-	// Force the software path: create the identity with an unusable TPM, so
-	// the signer never touches the real device.
+	// An unusable TPM forces the software path, so the real device is never touched.
 	soft, err := tpm.NewSigner(tpm.SignerOptions{
 		Salt:      []byte(sshSalt),
 		StatePath: paths.SSHSignerFile(),
@@ -256,8 +247,7 @@ func sshCmd(env, args []string) (string, error) {
 	return string(out), err
 }
 
-// startSSHD launches a same-user sshd trusting the test CA and returns its
-// port.
+// startSSHD launches a same-user sshd trusting the test CA and returns its port.
 func startSSHD(t *testing.T, sshd, dir, caFile string) string {
 	t.Helper()
 
@@ -363,8 +353,7 @@ func TestAgentSignOnlyAndShutdown(t *testing.T) {
 	}
 }
 
-// Two agents starting at once must not both listen. The loser used to remove
-// the winner's socket and unlink it again on its own exit.
+// Two agents starting at once must not both listen, or the loser removes the winner's socket.
 func TestAgentSocketHasOneOwner(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("named pipes are exclusive already")

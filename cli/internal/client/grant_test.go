@@ -22,8 +22,7 @@ const (
 	otherID = "0199a0a0-0000-7000-8000-00000000000d"
 )
 
-// The fakes answer like the core's substring search, so a lookup has to
-// pick the exact match out of near misses.
+// The fakes answer like the core's substring search, so a lookup must pick the exact match.
 type fakeUsers struct {
 	nokkuv1connect.UnimplementedWorkspaceServiceHandler
 }

@@ -25,12 +25,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// fakeDeviceFlow mirrors nokku's iam.DeviceFlow semantics closely enough to
-// exercise the client's poll loop: pending polls skip DPoP checks, the
-// approved poll verifies the proof (nonce, htu, replay), use_dpop_nonce
-// advertises only a DPoP-Nonce header, and the replay store persists across
-// logins. baseURL is the URL the server knows itself by. It is the listen URL
-// unless a test moves it.
+// fakeDeviceFlow mirrors iam.DeviceFlow closely enough for the poll loop, DPoP checks and replay store included.
 type fakeDeviceFlow struct {
 	mu         sync.Mutex
 	grants     map[string]*fakeGrant // by device code
@@ -113,8 +108,7 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 	case "approved":
 		jkt, derr := f.verifyProof(r)
 		if derr != "" {
-			// Mirror the server's advertisement: the canonical URL rides
-			// every proof failure, the nonce on all of them too.
+			// Like the server, the canonical URL and the nonce ride every proof failure.
 			w.Header().Set("Nokku-Api-Url", f.baseURL)
 			w.Header().Set("DPoP-Nonce", f.nonce)
 			writeOAuthErr(w, derr)
@@ -136,9 +130,7 @@ func (f *fakeDeviceFlow) nonceEndpoint(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// verifyProof checks the DPoP claims the server checks at issuance. The
-// signature itself is not verified, the loop behavior under test does not
-// depend on it.
+// verifyProof checks the claims the server checks at issuance, not the signature.
 func (f *fakeDeviceFlow) verifyProof(r *http.Request) (string, string) {
 	proof := r.Header.Get("DPoP")
 	if proof == "" {
@@ -201,8 +193,7 @@ func newTestProofer(t *testing.T) *dpop.Proofer {
 	return p
 }
 
-// runDeviceLogin drives the same path deviceLogin uses, with the approval
-// injected shortly after the flow starts, like a user clicking accept.
+// runDeviceLogin drives deviceLogin's path and approves shortly after, like a user clicking accept.
 func runDeviceLogin(t *testing.T, c *Client, f *fakeDeviceFlow) (string, error) {
 	t.Helper()
 	d, err := c.beginDeviceAuth(context.Background())
@@ -242,8 +233,7 @@ func TestDeviceFlowTwoConsecutiveLogins(t *testing.T) {
 	}
 }
 
-// The link is handed to the OS opener, which also launches files and custom
-// schemes. A core must only be able to send a web page.
+// The OS opener also launches files and custom schemes, so a core may only send a web page.
 func TestDeviceFlowRejectsNonWebLink(t *testing.T) {
 	f, srv := newFakeDeviceFlow(t)
 	f.baseURL = "file:///etc/passwd"

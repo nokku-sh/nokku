@@ -20,6 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/client"
 	"github.com/nokku-sh/nokku/cli/internal/manual"
 	"github.com/nokku-sh/nokku/cli/internal/paths"
+	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 )
@@ -69,7 +70,6 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	s := c.State
 	dryRun := cmd.Bool("dry-run")
 	asJSON := cmd.Bool(jsonFlag.Name)
 	// With --json stdout carries only the result, progress goes to stderr.
@@ -78,8 +78,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 		progress = os.Stderr
 	}
 
-	dest := remote{host: host, port: cmd.String("port")}
-	target, err := findRemoteTarget(ctx, s, dest)
+	target, dest, err := findRemoteTarget(ctx, c, remote{host: host, port: cmd.String("port")})
 	if err != nil {
 		return err
 	}
@@ -97,11 +96,9 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 			// The web app owns access from the first sync on, so a rerun never undoes a change made there.
 			warnf("%s is already a target, --grant and --tag only apply to a new one", target.Name)
 		}
-		if target.Name == host && len(target.Endpoints) > 0 {
-			// Reached by name, so connect to where the target lives.
-			dest = endpointRemote(target.Endpoints[0], dest.port)
+		if ca, err = targetCA(ctx, c, target.CAID); err != nil {
+			return err
 		}
-		ca = s.CAByID(target.CAID)
 	}
 	if ca == nil || strings.TrimSpace(ca.PublicKey) == "" {
 		return fmt.Errorf("the certificate authority of %s is missing, run nk login and try again", target.Name)
@@ -114,11 +111,13 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	grants := map[string][]string{}
+	created := false
 	if target.ID == "" && !dryRun {
 		target.HostPublicKey = h.HostKey
 		if target, err = c.CreateTarget(ctx, target, cmd.StringSlice("tag"), seeds); err != nil {
 			return err
 		}
+		created = true
 		fmt.Fprintf(progress, "Added target %s\n", ui.Bold(target.Name))
 	}
 	if target.ID != "" {
@@ -129,7 +128,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	plan := manual.NewPlan(strings.Join(ca.TrustedKeys(), "\n"), grants, h)
 
 	if !dryRun {
-		if err = applyPlan(ctx, c, target, dest, h, plan, progress); err != nil {
+		if err = applyPlan(ctx, c, target, created, dest, h, plan, progress); err != nil {
 			return err
 		}
 	}
@@ -150,7 +149,7 @@ func probe(
 	seeds []client.Grant,
 	acceptKey bool,
 ) (manual.Host, error) {
-	out, err := dest.run(ctx, manual.ProbeCommand, "")
+	out, err := dest.run(ctx, "sh -s", manual.ProbeCommand)
 	if err != nil {
 		return manual.Host{}, err
 	}
@@ -235,6 +234,7 @@ func applyPlan(
 	ctx context.Context,
 	c *client.Client,
 	target *state.Target,
+	created bool,
 	dest remote,
 	h manual.Host,
 	plan manual.Plan,
@@ -243,7 +243,15 @@ func applyPlan(
 	out, err := dest.run(ctx, "sh -s", plan.Script())
 	fmt.Fprint(progress, ui.Dim(ui.Plain(manual.Output(out))))
 	if err != nil {
-		return fmt.Errorf("writing to %s failed, nothing was reported to Nokku: %w", dest.host, err)
+		if !created {
+			return fmt.Errorf("writing to %s failed, nothing was reported to Nokku: %w", dest.host, err)
+		}
+		// A new target exists before its host is written, so a failed write takes it back. Also after Ctrl-C.
+		if delErr := c.DeleteTarget(context.WithoutCancel(ctx), target); delErr != nil {
+			return fmt.Errorf("writing to %s failed and the new target %s is still in Nokku, "+
+				"remove it with nk rm %s --keep-host: %w", dest.host, target.Name, target.Name, errors.Join(err, delErr))
+		}
+		return fmt.Errorf("writing to %s failed, the new target %s was removed again: %w", dest.host, target.Name, err)
 	}
 	if err = c.ReportTarget(ctx, target, h.Accounts, h.HostKey); err != nil {
 		return fmt.Errorf("the host is up to date, but reporting to Nokku failed, run nk sync again: %w", err)
@@ -280,6 +288,10 @@ func rmCMD() *cli.Command {
 		Flags: []cli.Flag{
 			portFlag,
 			&cli.BoolFlag{Name: "keep-host", Usage: "Delete the target only and leave the server as it is"},
+			&cli.BoolFlag{
+				Name:  "accept-host-key",
+				Usage: "Go on when the host key changed since the last sync",
+			},
 		},
 		Action: targetDelete,
 	}
@@ -296,20 +308,20 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	dest := remote{host: host, port: cmd.String("port")}
-	target, err := findRemoteTarget(ctx, c.State, dest)
+	target, dest, err := findRemoteTarget(ctx, c, remote{host: host, port: cmd.String("port")})
 	if err != nil {
 		return err
 	}
 	if target == nil {
-		return fmt.Errorf("no target matches %s, run nk ls to see yours", host)
+		return fmt.Errorf("no target matches %s, check the name in the Nokku web app", host)
 	}
 
 	if !cmd.Bool("keep-host") {
-		if target.Name == host && len(target.Endpoints) > 0 {
-			dest = endpointRemote(target.Endpoints[0], dest.port)
-		}
 		fmt.Printf("Connecting with: %s\n", dest)
+		// The address may lead to another machine by now, which must keep its own config.
+		if _, err = probe(ctx, dest, target.HostPublicKey, nil, cmd.Bool("accept-host-key")); err != nil {
+			return err
+		}
 		out, runErr := dest.run(ctx, "sh -s", manual.RemoveScript)
 		fmt.Print(ui.Dim(ui.Plain(manual.Output(out))))
 		if runErr != nil {
@@ -348,33 +360,82 @@ func rootHost(cmd *cli.Command) (string, error) {
 	return host, nil
 }
 
-// A target stores the real address, so an ssh alias alone never matches and each sync would add it again.
-func findRemoteTarget(ctx context.Context, s *state.State, dest remote) (*state.Target, error) {
-	target, err := findTarget(s, dest.host)
-	if target != nil || err != nil {
-		return target, err
+// findRemoteTarget also returns where to connect. The access snapshot misses targets the operator may not log in to.
+func findRemoteTarget(ctx context.Context, c *client.Client, dest remote) (*state.Target, remote, error) {
+	targets, err := c.ListAllTargets(ctx)
+	if err != nil {
+		return nil, dest, fmt.Errorf("listing targets: %w", err)
 	}
-	return findTarget(s, dest.resolve(ctx).host)
+	aliases := ssh.HostAliases(c.State)
+	target, at, err := findTarget(targets, aliases, dest)
+	if target != nil || err != nil {
+		return target, at, err
+	}
+	// An ssh alias never matches a stored address, so resolve it, but keep connecting through the alias.
+	target, _, err = findTarget(targets, aliases, dest.resolve(ctx))
+	return target, dest, err
 }
 
-func findTarget(s *state.State, host string) (*state.Target, error) {
-	var matches []*state.Target
-	for i := range s.Targets {
-		t := &s.Targets[i]
-		if t.Name == host ||
-			slices.ContainsFunc(t.Endpoints, func(ep string) bool { return endpointHost(ep) == host }) {
-			matches = append(matches, t)
+// A name or an nk ls alias wins over an address. A name is reached at its first endpoint.
+func findTarget(targets []state.Target, aliases map[string]string, dest remote) (*state.Target, remote, error) {
+	type match struct {
+		t  *state.Target
+		at remote
+	}
+	var named, reached []match
+	for i := range targets {
+		t := &targets[i]
+		if t.Name == dest.host || aliases[t.ID] == dest.host {
+			at := dest
+			if len(t.Endpoints) > 0 {
+				at = endpointRemote(t.Endpoints[0], dest.port)
+			}
+			named = append(named, match{t, at})
+		} else if at, ok := endpointMatch(t, dest); ok {
+			reached = append(reached, match{t, at})
 		}
+	}
+	matches := named
+	if len(matches) == 0 {
+		matches = reached
 	}
 	switch {
 	case len(matches) == 0:
-		return nil, nil //nolint:nilnil // no match means a new server
+		return nil, dest, nil
 	case len(matches) > 1:
-		return nil, fmt.Errorf("%s matches several targets, pass the target name", host)
-	case !matches[0].Manual():
-		return nil, fmt.Errorf("%s runs the Nokku daemon, this command is for servers without it", matches[0].Name)
+		return nil, dest, fmt.Errorf("%s matches several targets, pass the target name or --port", dest.host)
+	case !matches[0].t.Manual():
+		return nil, dest, fmt.Errorf(
+			"%s runs the Nokku daemon, this command is for servers without it", matches[0].t.Name,
+		)
 	}
-	return matches[0], nil
+	return matches[0].t, matches[0].at, nil
+}
+
+// endpointMatch compares the port only when dest knows one. An endpoint without a port is on 22.
+func endpointMatch(t *state.Target, dest remote) (remote, bool) {
+	for _, ep := range t.Endpoints {
+		r := endpointRemote(ep, "")
+		if r.host == dest.host && (dest.port == "" || cmp.Or(r.port, "22") == dest.port) {
+			return remote{host: r.host, port: cmp.Or(dest.port, r.port)}, true
+		}
+	}
+	return remote{}, false
+}
+
+// targetCA falls back to the core, the access snapshot only has the CAs of targets the operator may log in to.
+func targetCA(ctx context.Context, c *client.Client, id string) (*state.CA, error) {
+	if ca := c.State.CAByID(id); ca != nil {
+		return ca, nil
+	}
+	cas, err := c.ListSSHCAs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing certificate authorities: %w", err)
+	}
+	if i := slices.IndexFunc(cas, func(ca state.CA) bool { return ca.ID == id }); i >= 0 {
+		return &cas[i], nil
+	}
+	return nil, nil //nolint:nilnil // the caller names the missing CA
 }
 
 // Created on the core only once the host key is read. The local state only knows the CAs of existing targets.
@@ -442,13 +503,6 @@ func resolveCA(cas []state.CA, ref string) (state.CA, error) {
 		return found[0], nil
 	}
 	return state.CA{}, fmt.Errorf("several certificate authorities are named %q, pass the id", ref)
-}
-
-func endpointHost(ep string) string {
-	if h, _, err := net.SplitHostPort(ep); err == nil {
-		return h
-	}
-	return ep
 }
 
 // endpointRemote uses the endpoint's own port unless --port was set.

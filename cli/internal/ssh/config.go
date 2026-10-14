@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/mizuchilabs/kata/fsutil"
@@ -140,7 +141,12 @@ func nkCommand() string {
 		bin = found
 	}
 	// ssh expands % tokens and hands the line to a shell, so what a quoted path cannot carry falls back to PATH.
-	if strings.ContainsAny(bin, "\"$`%\\\n") {
+	unsafe := "\"$`%\\\n"
+	if runtime.GOOS == "windows" {
+		// Every Windows path has a backslash, and no shell reads the line there.
+		unsafe = "\"$`%\n"
+	}
+	if strings.ContainsAny(bin, unsafe) {
 		return "nk"
 	}
 	if strings.ContainsAny(bin, " \t") {

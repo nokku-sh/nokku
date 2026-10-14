@@ -17,8 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/trust"
 )
 
-// privateServer is a core whose certificate no system root knows. It
-// advertises that certificate as its CA.
+// privateServer is a core whose certificate no system root knows, and it advertises it as its CA.
 func privateServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	var srv *httptest.Server
@@ -61,8 +60,7 @@ func TestPinServerRefusesWrongPin(t *testing.T) {
 	assert.Empty(t, c.State.APICA)
 }
 
-// Without a terminal nobody can compare a fingerprint, so nothing is trusted
-// and the error says how to get there.
+// Without a terminal nobody can compare a fingerprint, so nothing is trusted and the error says what to do.
 func TestSyncUntrustedServerWithoutPin(t *testing.T) {
 	setTestDirs(t)
 	srv := privateServer(t)
@@ -74,23 +72,22 @@ func TestSyncUntrustedServerWithoutPin(t *testing.T) {
 	assert.Empty(t, c.State.APICA)
 }
 
-// output is what fn prints.
+// output is what fn prints to stderr, where prompts and notices go.
 func output(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
-	stdout := os.Stdout
-	os.Stdout = w //nolint:reassign // test isolation
+	stderr := os.Stderr
+	os.Stderr = w //nolint:reassign // test isolation
 	fn()
-	os.Stdout = stdout //nolint:reassign // test isolation
+	os.Stderr = stderr //nolint:reassign // test isolation
 	require.NoError(t, w.Close())
 	out, err := io.ReadAll(r)
 	require.NoError(t, err)
 	return string(out)
 }
 
-// A sign-out from a script cannot answer a question, so the CA stays and
-// the output says so. A CA that nk never installed is not mentioned.
+// A scripted sign-out cannot answer, so the CA stays and the output says so.
 func TestOfferRemovalWithoutATerminal(t *testing.T) {
 	installed := &state.State{APIURL: "https://nokku.test", APICAInstalled: true}
 	assert.Contains(t, output(t, func() { OfferRemoval(installed) }),

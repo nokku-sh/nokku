@@ -16,8 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// software runs the whole bridge with an in-memory CryptoKit key. CI runners
-// are VMs without an enclave, so this is as far as an automated test gets.
+// software runs the bridge with an in-memory CryptoKit key, CI VMs have no enclave.
 var software = backend{create: true, software: true}
 
 func TestBridgeSignsDigest(t *testing.T) {
@@ -61,8 +60,7 @@ func TestCreateNeedsOptIn(t *testing.T) {
 	require.ErrorContains(t, err, envEnable)
 }
 
-// TestSignerOverBridge runs the bridge under tpm.NewSigner, the way nk uses
-// it: create, self-test, persist the blob, reopen.
+// TestSignerOverBridge runs the bridge under tpm.NewSigner like nk does: create, self-test, persist, reopen.
 func TestSignerOverBridge(t *testing.T) {
 	opts := tpm.SignerOptions{
 		Salt:      []byte("test-signer"),
@@ -78,8 +76,7 @@ func TestSignerOverBridge(t *testing.T) {
 	assert.Equal(t, s1.Public(), s2.Public(), "the identity changed after reopening")
 }
 
-// TestEnclaveOnThisMachine reports what the hardware does. It only fails when
-// an enclave claims to be available and then cannot sign.
+// Fails only when an enclave claims to be there and then cannot sign.
 func TestEnclaveOnThisMachine(t *testing.T) {
 	if !Available() {
 		t.Skip("no Secure Enclave on this machine")

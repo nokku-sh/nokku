@@ -9,7 +9,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/smallstep/truststore"
 	"golang.org/x/term"
@@ -57,18 +56,12 @@ func (c *Client) confirmServer(ctx context.Context, interactive bool, cause erro
 		return err
 	}
 
-	fmt.Printf("\nThe certificate of %s comes from a CA this machine does not know.\n\n", api)
+	fmt.Fprintf(os.Stderr, "\nThe certificate of %s comes from a CA this machine does not know.\n\n", api)
 	for _, cert := range certs {
-		// The name is not verified yet, and a control character starts an escape sequence.
-		name := strings.Map(func(r rune) rune {
-			if unicode.IsControl(r) {
-				return -1
-			}
-			return r
-		}, cert.Subject.CommonName)
-		fmt.Printf("  %s\n  %s\n\n", name, ui.Bold(trust.Pin(cert)))
+		// The name is not verified yet.
+		fmt.Fprintf(os.Stderr, "  %s\n  %s\n\n", ui.PlainLine(cert.Subject.CommonName), ui.Bold(trust.Pin(cert)))
 	}
-	fmt.Println("Compare the pin with the one in the Nokku web app, under Profile, Security or Settings.")
+	fmt.Fprintln(os.Stderr, "Compare the pin with the one in the Nokku web app, under Profile, Security or Settings.")
 	if !ask("Trust this CA for "+api+"?", false) {
 		return errors.New("the server is not trusted, nothing was sent to it")
 	}
@@ -95,7 +88,7 @@ func (c *Client) keepCA(ctx context.Context, pin string) error {
 	if err = c.dial(); err != nil {
 		return err
 	}
-	fmt.Printf("%s Trusting the CA of %s\n", ui.Green("✔"), api)
+	fmt.Fprintf(os.Stderr, "%s Trusting the CA of %s\n", ui.Green("✔"), api)
 	if !systemTrusts(ctx, api) && offerInstall(api, ca) {
 		c.State.APICAInstalled = true
 		return c.State.Save()
@@ -121,9 +114,9 @@ func offerInstall(api string, ca []byte) bool {
 		api,
 		"/",
 	) + trust.CAPath + " if the browser warns about the certificate."
-	fmt.Println("Your browser has to trust this CA too, or the sign-in page shows a certificate warning.")
+	fmt.Fprintln(os.Stderr, "Your browser has to trust this CA too, or the sign-in page shows a certificate warning.")
 	if !ask("Install it into the system trust store? This may ask for your password.", true) {
-		fmt.Println(manual)
+		fmt.Fprintln(os.Stderr, manual)
 		return false
 	}
 	certs, err := trust.ParseBundle(ca)
@@ -132,14 +125,14 @@ func offerInstall(api string, ca []byte) bool {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, ui.Yellow(fmt.Sprintf("warning: the CA was not installed: %v", err)))
-		fmt.Println(manual)
+		fmt.Fprintln(os.Stderr, manual)
 		return false
 	}
-	fmt.Printf("%s Installed. Restart the browser if it still warns.\n", ui.Green("✔"))
+	fmt.Fprintf(os.Stderr, "%s Installed. Restart the browser if it still warns.\n", ui.Green("✔"))
 	// Some browsers keep a certificate database of their own, which only certutil can write.
 	if _, err = truststore.NewNSSTrust(); err != nil && !errors.Is(err, truststore.ErrTrustNotSupported) {
-		fmt.Println("certutil is not installed, so only the system trust store has the CA. " +
-			"Most browsers read it. " + manual)
+		fmt.Fprintln(os.Stderr, "certutil is not installed, so only the system trust store has the CA. "+
+			"Most browsers read it. "+manual)
 	}
 	return true
 }
@@ -150,12 +143,20 @@ func OfferRemoval(s *state.State) {
 		return
 	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		fmt.Printf("The CA of %s stays in the system trust store, the web app in your browser needs it.\n", s.APIURL)
+		fmt.Fprintf(
+			os.Stderr,
+			"The CA of %s stays in the system trust store, the web app in your browser needs it.\n",
+			s.APIURL,
+		)
 		return
 	}
-	fmt.Printf("The CA of %s is in the system trust store, the web app in your browser needs it.\n", s.APIURL)
+	fmt.Fprintf(
+		os.Stderr,
+		"The CA of %s is in the system trust store, the web app in your browser needs it.\n",
+		s.APIURL,
+	)
 	if !ask("Remove it too? This may ask for your password.", false) {
-		fmt.Println("It stays.")
+		fmt.Fprintln(os.Stderr, "It stays.")
 		return
 	}
 	certs, err := trust.ParseBundle([]byte(s.APICA))
@@ -166,7 +167,7 @@ func OfferRemoval(s *state.State) {
 		fmt.Fprintln(os.Stderr, ui.Yellow(fmt.Sprintf("warning: the CA was not removed: %v", err)))
 		return
 	}
-	fmt.Printf("%s Removed the CA\n", ui.Green("✔"))
+	fmt.Fprintf(os.Stderr, "%s Removed the CA\n", ui.Green("✔"))
 }
 
 func ask(question string, def bool) bool {
@@ -174,7 +175,7 @@ func ask(question string, def bool) bool {
 	if def {
 		hint = "[Y/n]"
 	}
-	fmt.Printf("%s %s ", question, hint)
+	fmt.Fprintf(os.Stderr, "%s %s ", question, hint)
 	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 	switch strings.ToLower(strings.TrimSpace(line)) {
 	case "y", "yes":

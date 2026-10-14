@@ -7,8 +7,8 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"uuid"
 
+	"github.com/nokku-sh/nokku/cli/internal/state"
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
@@ -95,7 +95,7 @@ func (c *Client) resolveGrant(ctx context.Context, account string, subjects []st
 }
 
 func (c *Client) userID(ctx context.Context, email string) (string, error) {
-	if isID(email) {
+	if state.ValidID(email) {
 		return email, nil
 	}
 	res, err := c.users.ListUsers(ctx, &nokkuv1.ListUsersRequest{
@@ -115,7 +115,7 @@ func (c *Client) userID(ctx context.Context, email string) (string, error) {
 }
 
 func (c *Client) teamID(ctx context.Context, name string) (string, error) {
-	if isID(name) {
+	if state.ValidID(name) {
 		return name, nil
 	}
 	res, err := c.teams.ListTeams(ctx, &nokkuv1.ListTeamsRequest{
@@ -135,7 +135,7 @@ func (c *Client) teamID(ctx context.Context, name string) (string, error) {
 }
 
 func (c *Client) serviceAccountID(ctx context.Context, name string) (string, error) {
-	if isID(name) {
+	if state.ValidID(name) {
 		return name, nil
 	}
 	res, err := c.serviceAccounts.ListServiceAccounts(ctx, &nokkuv1.ListServiceAccountsRequest{
@@ -163,9 +163,4 @@ func oneID(ids []string, kind, name string) (string, error) {
 		return ids[0], nil
 	}
 	return "", fmt.Errorf("several %ss are named %q, pass the id", kind, name)
-}
-
-func isID(s string) bool {
-	u, err := uuid.Parse(s)
-	return err == nil && u.String() == s
 }

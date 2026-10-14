@@ -53,9 +53,12 @@ func CheckCert(data []byte, caKey string, margin time.Duration) error {
 	return nil
 }
 
+// CertValid takes a certificate of the key a rollover replaced too, the server trusts it during the grace period.
 func CertValid(target state.Target, ca state.CA, margin time.Duration) bool {
 	data, err := os.ReadFile(paths.SSHCertificate(target.ID))
-	return err == nil && CheckCert(data, ca.PublicKey, margin) == nil
+	return err == nil && slices.ContainsFunc(ca.TrustedKeys(), func(key string) bool {
+		return CheckCert(data, key, margin) == nil
+	})
 }
 
 // CertFresh ends at half the certificate's life, so a core outage finds an active user with half a lifetime left.

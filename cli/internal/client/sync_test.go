@@ -23,8 +23,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// fakeCore implements the two connect services the CLI syncs against:
-// GetMyAccess for the snapshot and SignSSHCertificate for issuance.
+// fakeCore serves GetMyAccess and SignSSHCertificate, the two calls the CLI syncs against.
 type fakeCore struct {
 	nokkuv1connect.UnimplementedTargetServiceHandler
 	nokkuv1connect.UnimplementedCertificateServiceHandler
@@ -52,8 +51,7 @@ func (f *fakeCore) SignSSHCertificate(
 	return f.sign(f.test, req)
 }
 
-// fakeCA signs test SSH certificates and exposes its public key in
-// authorized_keys form, like the core CAs do.
+// fakeCA signs test certificates and shows its key in authorized_keys form, like a core CA.
 type fakeCA struct {
 	signer cryptossh.Signer
 	pubKey string
@@ -71,8 +69,7 @@ func newFakeCA(t *testing.T) *fakeCA {
 	}
 }
 
-// signCert signs the given key into a user certificate valid from an hour
-// ago until validFor from now.
+// signCert signs key into a user certificate valid from an hour ago until validFor from now.
 func (f *fakeCA) signCert(t *testing.T, key cryptossh.PublicKey, validFor time.Duration) string {
 	t.Helper()
 	cert := &cryptossh.Certificate{
@@ -98,8 +95,7 @@ const (
 	targetID = "0199a0a0-0000-7000-8000-000000000003"
 )
 
-// setTestDirs points home at a fresh temp dir and creates what EnsureDirs
-// would create at startup.
+// setTestDirs points home at a temp dir and creates what EnsureDirs would.
 func setTestDirs(t *testing.T) {
 	t.Helper()
 	home := t.TempDir()
@@ -167,6 +163,22 @@ func TestSyncCommitsAccessSnapshot(t *testing.T) {
 	content, err := os.ReadFile(paths.SSHConfigFile())
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "Host prod\n")
+}
+
+func TestSyncDropsCertificatesOfAnotherSubject(t *testing.T) {
+	setTestDirs(t)
+	ca := newFakeCA(t)
+	c := newSyncTestClient(t, &fakeCore{access: accessResponse(ca.pubKey)})
+	certPath := paths.SSHCertificate(targetID)
+
+	c.State.User = &state.User{ID: "user-1"}
+	require.NoError(t, os.WriteFile(certPath, []byte("cert"), 0o600))
+	require.NoError(t, c.Sync(t.Context(), false))
+	assert.FileExists(t, certPath, "the same subject keeps its certificates")
+
+	c.State.User = &state.User{ID: "user-2"}
+	require.NoError(t, c.Sync(t.Context(), false))
+	assert.NoFileExists(t, certPath, "the next user signed in on this account must not use them")
 }
 
 func TestSyncUnauthenticatedNonInteractive(t *testing.T) {
@@ -275,9 +287,7 @@ func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 		"the written certificate must pass local validation")
 }
 
-// A certificate past half of its life is renewed while it still works, so a
-// core outage never finds it about to expire. When signing fails the old
-// one stays.
+// Renewed past half its life, so an outage never finds it near expiry. A failed renewal keeps the old one.
 func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	setTestDirs(t)
 	ca := newFakeCA(t)

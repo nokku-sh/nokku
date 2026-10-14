@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -143,9 +142,6 @@ func TestIncludeKeepsSymlink(t *testing.T) {
 }
 
 func TestNKCommandIsAbsolute(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("windows paths fall back to a PATH lookup")
-	}
 	self, err := os.Executable()
 	require.NoError(t, err)
 	assert.Equal(t, self, nkCommand(), "ProxyCommand must name this binary")
@@ -159,9 +155,7 @@ func writtenConfig(t *testing.T, st *state.State) string {
 	return string(out)
 }
 
-// nk's Include sits on top of ~/.ssh/config, so its Host block would win. A
-// name the user already sends somewhere stays theirs, whoever names a server
-// like it.
+// nk's Include sits on top, so a name the user already sends somewhere stays theirs.
 func TestOwnSSHConfigKeepsItsNames(t *testing.T) {
 	setupSSHDir(t)
 	sshDir := filepath.Dir(paths.SSHUserConfig())
@@ -202,8 +196,7 @@ Match originalhost gitbox,mirror user git
 	writtenConfig(t, st)
 	out := writtenConfig(t, st)
 
-	// JUMP differs from the user's jump only by case. ssh's Match does not
-	// tell those apart, and neither does a person.
+	// JUMP differs from jump only by case, which neither ssh's Match nor a person tells apart.
 	for _, taken := range []string{"bastion", "JUMP", "prod-db", "mirror", "nas"} {
 		assert.NotContains(t, out, "\nHost "+taken+"\n", "%s is the user's own name", taken)
 		assert.Contains(t, out, "\nHost nokku/"+taken+"\n", "%s stays reachable under the prefix", taken)
@@ -221,8 +214,25 @@ Match originalhost gitbox,mirror user git
 	}, HostAliases(st), "nk ls shows the names ssh knows")
 }
 
-// Two servers never share a Host line, and names that differ only by case
-// count as one.
+func TestIncludeEndsItsBlocks(t *testing.T) {
+	setupSSHDir(t)
+	sshDir := filepath.Dir(paths.SSHUserConfig())
+	require.NoError(t, os.MkdirAll(sshDir, 0o700))
+	require.NoError(t, os.WriteFile(paths.SSHUserConfig(), []byte(`Host web
+Include extra
+    HostName 203.0.113.7
+`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(sshDir, "extra"), []byte("Host db\n    User admin\n"), 0o600))
+
+	st := &state.State{Targets: []state.Target{
+		{ID: "t-1", Name: "web", Usernames: []string{"root"}},
+		{ID: "t-2", Name: "db", Usernames: []string{"root"}},
+	}}
+	assert.Equal(t, map[string]string{"t-1": "nokku/web", "t-2": "db"}, HostAliases(st),
+		"the HostName after the Include belongs to web, like ssh reads it")
+}
+
+// Two servers never share a Host line, and names that differ only by case count as one.
 func TestHostLinesAreNeverShared(t *testing.T) {
 	setupSSHDir(t)
 	st := &state.State{

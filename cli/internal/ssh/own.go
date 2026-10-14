@@ -58,7 +58,7 @@ func (b *ownBlock) matches(name string) bool {
 
 type ownReader struct {
 	blocks ownHosts
-	// cur outlives an Include, the way ssh keeps its active block.
+	// cur carries into an Include and is back after it, the way ssh keeps its active block.
 	cur   *ownBlock
 	files int
 }
@@ -101,11 +101,13 @@ func (r *ownReader) read(file string, depth int) {
 				r.cur.dest = true
 			}
 		case "include":
+			outer := r.cur
 			for _, arg := range args {
 				for _, f := range includedFiles(arg) {
 					r.read(f, depth+1)
 				}
 			}
+			r.cur = outer
 		}
 	}
 }

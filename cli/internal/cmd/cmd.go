@@ -16,6 +16,7 @@ import (
 
 	"github.com/nokku-sh/nokku/cli/internal/client"
 	"github.com/nokku-sh/nokku/cli/internal/paths"
+	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 	"github.com/nokku-sh/nokku/internal/trust"
@@ -60,7 +61,7 @@ func Root() *cli.Command {
 			},
 			&cli.DurationFlag{
 				Name:    "ttl",
-				Usage:   "Certificate TTL",
+				Usage:   "Certificate TTL, kept for later ssh connections. 0 goes back to the default",
 				Sources: cli.EnvVars("NK_TTL"),
 			},
 			&cli.BoolFlag{
@@ -90,7 +91,6 @@ func Root() *cli.Command {
 func loadState(cmd *cli.Command) (*state.State, error) {
 	s := state.Load()
 	s.Token = os.Getenv("NK_TOKEN")
-	s.TTL = cmd.Duration("ttl")
 	s.RequireTPM = cmd.Bool("require-tpm")
 	s.Pin = cmd.String("pin")
 
@@ -101,6 +101,10 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 		// Another server never gets this session or shows its targets.
 		s.Config = state.Config{APIURL: api}
 		s.Cache = state.Cache{}
+	}
+	if cmd.IsSet("ttl") {
+		// Saved with the next sync. 0 goes back to the default of the CA.
+		s.TTL = cmd.Duration("ttl")
 	}
 	if plainHTTP(s.APIURL) {
 		return nil, fmt.Errorf("%s is not encrypted, Nokku is only reached over https", s.APIURL)
@@ -134,7 +138,7 @@ func connect(ctx context.Context, cmd *cli.Command) (*client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := client.New(s)
+	c, err := newClient(s)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +146,14 @@ func connect(ctx context.Context, cmd *cli.Command) (*client.Client, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+// newClient sets up the ssh identity first. nk logout uses client.New, it has no use for one.
+func newClient(s *state.State) (*client.Client, error) {
+	if err := ssh.SetupKey(s.RequireTPM); err != nil {
+		return nil, err
+	}
+	return client.New(s)
 }
 
 func warnf(format string, args ...any) {

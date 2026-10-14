@@ -6,13 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// The link comes from the core, so it must reach the opener as one
-// argument and never pass through a shell.
+// The link comes from the core, so it reaches the opener as one argument and never a shell.
 func TestOpenBrowserPassesTheLinkAsOneArgument(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "args")
@@ -24,9 +24,11 @@ func TestOpenBrowserPassesTheLinkAsOneArgument(t *testing.T) {
 	t.Setenv("NK_TEST_OUT", out)
 
 	link := `https://app.nokku.sh/device?user_code=AB-CD&next=$(id);'"`
-	require.NoError(t, openBrowser(t.Context(), link))
+	require.NoError(t, openBrowser(link))
 
-	got, err := os.ReadFile(out)
-	require.NoError(t, err)
-	assert.Equal(t, "1\n"+link+"\n", string(got))
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		got, err := os.ReadFile(out)
+		require.NoError(c, err)
+		assert.Equal(c, "1\n"+link+"\n", string(got))
+	}, 5*time.Second, 10*time.Millisecond)
 }

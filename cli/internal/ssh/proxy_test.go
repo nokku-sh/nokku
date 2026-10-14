@@ -17,18 +17,20 @@ import (
 
 const blackhole = "127.0.0.1:1"
 
-// relayStubConn EOFs on read, so pipe completes without a real peer.
-type relayStubConn struct{ stub *relayStub }
+// relayStubConn answers a half-close with EOF, like sshd does once it has seen the client's EOF.
+type relayStubConn struct{ halfClosed chan struct{} }
 
-func (c *relayStubConn) Read([]byte) (int, error)    { return 0, io.EOF }
+func (c *relayStubConn) Read([]byte) (int, error) {
+	<-c.halfClosed
+	return 0, io.EOF
+}
 func (c *relayStubConn) Write(p []byte) (int, error) { return len(p), nil }
-func (c *relayStubConn) CloseWrite() error           { c.stub.halfClosed = true; return nil }
+func (c *relayStubConn) CloseWrite() error           { close(c.halfClosed); return nil }
 func (c *relayStubConn) Close() error                { return nil }
 
 type relayStub struct {
-	calls      int
-	halfClosed bool
-	err        error
+	calls int
+	err   error
 }
 
 func (s *relayStub) dial(context.Context, *state.Target) (io.ReadWriteCloser, error) {
@@ -36,21 +38,28 @@ func (s *relayStub) dial(context.Context, *state.Target) (io.ReadWriteCloser, er
 	if s.err != nil {
 		return nil, s.err
 	}
-	return &relayStubConn{stub: s}, nil
+	return &relayStubConn{halfClosed: make(chan struct{})}, nil
 }
 
-// stdinEOF swaps [os.Stdin] for a closed pipe so the stdin copy ends at once.
-func stdinEOF(t *testing.T) {
+// swapStdin replaces [os.Stdin] with a pipe and returns its write end.
+func swapStdin(t *testing.T) *os.File {
 	t.Helper()
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
-	require.NoError(t, w.Close())
 	old := os.Stdin
 	os.Stdin = r //nolint:reassign // test isolation
 	t.Cleanup(func() {
 		os.Stdin = old //nolint:reassign // test isolation
+		_ = w.Close()
 		_ = r.Close()
 	})
+	return w
+}
+
+// stdinEOF closes stdin at once, so the stdin copy ends.
+func stdinEOF(t *testing.T) {
+	t.Helper()
+	require.NoError(t, swapStdin(t).Close())
 }
 
 func TestProxyDaemonFallsBackToRelay(t *testing.T) {
@@ -58,14 +67,11 @@ func TestProxyDaemonFallsBackToRelay(t *testing.T) {
 	stub := &relayStub{}
 	target := &state.Target{Name: "prod", DaemonID: "d", Endpoints: []string{blackhole}}
 
-	require.NoError(t, Proxy(t.Context(), target, "22", stub.dial, false))
+	require.NoError(t, Proxy(t.Context(), target, "22", stub.dial, false), "stdin EOF half-closes the relay")
 	assert.Equal(t, 1, stub.calls)
-	assert.True(t, stub.halfClosed, "stdin EOF must half-close the relay stream")
 }
 
-// TestProxyRelayDoesNotWaitForSlowEndpoint covers the remote user whose
-// daemon only reports private addresses: the relay must win long before the
-// direct dial times out.
+// A daemon that only reports private addresses: the relay wins long before the direct dial times out.
 func TestProxyRelayDoesNotWaitForSlowEndpoint(t *testing.T) {
 	stdinEOF(t)
 	stub := &relayStub{}
@@ -148,6 +154,20 @@ func (brokenConn) Close() error                { return nil }
 func TestPipeReportsConnectionError(t *testing.T) {
 	stdinEOF(t)
 	require.ErrorIs(t, pipe(t.Context(), brokenConn{}), io.ErrUnexpectedEOF)
+}
+
+func TestPipeEndsWhenTheServerCloses(t *testing.T) {
+	swapStdin(t)
+	client, server := net.Pipe()
+	require.NoError(t, server.Close())
+
+	done := make(chan error, 1)
+	go func() { done <- pipe(t.Context(), client) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("pipe waited for stdin after the server closed")
+	}
 }
 
 func TestEndpointAddr(t *testing.T) {

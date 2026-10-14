@@ -22,7 +22,7 @@ func loginCMD() *cli.Command {
 			if err != nil {
 				return err
 			}
-			c, err := client.New(s)
+			c, err := newClient(s)
 			if err != nil {
 				return err
 			}
@@ -48,8 +48,12 @@ func logoutCMD() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			s, loadErr := loadState(cmd)
 			if loadErr == nil {
-				if c, cerr := client.New(s); cerr == nil {
-					c.Logout(ctx)
+				c, err := client.New(s)
+				if err == nil {
+					err = c.Logout(ctx)
+				}
+				if err != nil {
+					warnf("the session could not be revoked on the server, it stays valid until it expires: %v", err)
 				}
 			}
 			ssh.StopAgent(ctx)
