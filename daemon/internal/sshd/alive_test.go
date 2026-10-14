@@ -77,7 +77,8 @@ func TestServerMaxStartups(t *testing.T) {
 func TestServerMaxStartupsReleasedAfterHandshake(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { s.localStartups = make(chan struct{}, 1) })
+	slots := make(chan struct{}, 1)
+	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { s.localStartups = slots })
 	defer closeFn()
 
 	auth := userCert(t, ca, testPrincipal)
@@ -86,6 +87,8 @@ func TestServerMaxStartupsReleasedAfterHandshake(t *testing.T) {
 	first, err := dial(t, addr, user, auth)
 	must.NoError(err, "first connection")
 	defer first.Close()
+	// The client sees auth success before the server goroutine releases the slot.
+	must.Eventually(func() bool { return len(slots) == 0 }, 5*time.Second, 5*time.Millisecond, "slot never released")
 
 	second, err := dial(t, addr, user, auth)
 	must.NoError(err, "second connection while the first was authenticated and idle")
