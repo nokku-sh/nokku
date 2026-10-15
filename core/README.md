@@ -111,7 +111,7 @@ The core makes a CA of its own and issues its certificate from it. There is noth
 
 By default the core takes any machine in a private network for its proxy and believes the client address it names. Without a proxy, set `NOKKU_TRUSTED_PROXIES=127.0.0.1` so it believes none.
 
-No machine knows that CA at first. The start log shows its pin. The web app shows it too: the full `nk login` command is under **Profile, Security**, and the bare pin under **Settings**. Before your first sign-in, run this on your own machine with the pin from the log:
+No machine knows that CA at first. The start log shows its pin. The web app shows it too: the full `nk login` command, pin included, is under **Profile, Security**. Before your first sign-in, run this on your own machine with the pin from the log:
 
 ```bash
 nk --api https://nokku.lan:3000 --pin sha256:... login

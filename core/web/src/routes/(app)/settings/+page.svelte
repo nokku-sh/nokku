@@ -1,189 +1,261 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
-	import StatTile from '#lib/components/blocks/StatTile.svelte';
-	import { daemon } from '#lib/api/daemons.svelte.js';
-	import { roles } from '#lib/api/roles.svelte.js';
-	import { target } from '#lib/api/targets.svelte.js';
-	import { team } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { users, util, workspace } from '#lib/api/workspaces.svelte.js';
+	import NokkuCaret from '#lib/assets/nokku_caret.svelte';
+	import LoadError from '#lib/components/blocks/LoadError.svelte';
+	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
+	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
+	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import DangerZone from '#lib/components/sheets/DangerZone.svelte';
 	import DetailList from '#lib/components/sheets/DetailList.svelte';
-	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import Avatar from '#lib/components/blocks/Avatar.svelte';
-	import PageHeader from '#lib/components/layout/PageHeader.svelte';
-	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
+	import { DocsURL } from '#lib/config.js';
 	import { WorkspaceSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
-	import { roleIcon, roleLabel } from '#lib/roles.js';
+	import { roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Bot, CircleUser, Server, Users } from '@lucide/svelte';
+	import { RotateCw } from '@lucide/svelte';
+
+	const ADMINS_SHOWN = 5;
 
 	const ws = workspace.get();
 	const baseUrl = workspace.baseUrl();
-	const me = user.self();
 	const info = util.instanceInfo();
+	const me = user.self();
+	const can = user.can();
 	const draft = useDraft(WorkspaceSchema, () => ws.data);
 	const model = $derived(draft.current);
-	const isOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
-	// A hosted workspace can go, a self-hosted one is the whole server.
-	const deletable = $derived(isOwner && info.data?.mode === 'saas');
+	const hosted = $derived(info.data?.mode === 'saas');
 
-	const ownerQuery = users.list(() => ({ role: WorkspaceRole.OWNER, limit: 1 }));
-	const owner = $derived(ownerQuery.data?.users[0]);
-	const roleList = roles.list();
-	const myRole = $derived(roleList.data?.find((r) => r.role === me.data?.role));
-	const MyRoleIcon = $derived(roleIcon(me.data?.role || WorkspaceRole.MEMBER));
+	// Waits for the role, so nobody fires a query their role would refuse.
+	const ownerQuery = users.list(
+		() => ({ role: WorkspaceRole.OWNER, limit: 1 }),
+		() => can.view
+	);
+	const adminQuery = users.list(
+		() => ({ role: WorkspaceRole.ADMIN, limit: ADMINS_SHOWN }),
+		() => can.view
+	);
+	const people = $derived([...(ownerQuery.data?.users ?? []), ...(adminQuery.data?.users ?? [])]);
+	const moreAdmins = $derived((adminQuery.data?.total ?? 0) - (adminQuery.data?.users.length ?? 0));
+	const peopleFailed = $derived(ownerQuery.isError || adminQuery.isError);
+	const peopleLoading = $derived(!ownerQuery.data || !adminQuery.data);
+	const retryPeople = () => Promise.all([ownerQuery.refetch(), adminQuery.refetch()]);
 
-	const one = () => ({ limit: 1 });
-	const counts = [
-		{ label: 'Users', icon: CircleUser, href: '/access/users', query: users.list(one) },
-		{ label: 'Teams', icon: Users, href: '/access/teams', query: team.list(one) },
-		{ label: 'Targets', icon: Server, href: '/infrastructure/targets', query: target.list(one) },
-		{ label: 'Daemons', icon: Bot, href: '/infrastructure/daemons', query: daemon.list(one) }
-	];
+	const MyRoleIcon = $derived(roleIcon(me.data?.role));
+	const youAre = $derived.by(() => {
+		const role = me.data?.role;
+		if (role === WorkspaceRole.OWNER) return "You're the owner";
+		const slug = roleSlug(role);
+		return `You're ${/^[aeiou]/.test(slug) ? 'an' : 'a'} ${slug}`;
+	});
 
 	const update = workspace.update();
 	const remove = workspace.delete();
 
+	const nameValid = () => (model?.name.trim().length ?? 0) >= 3;
 	// Settings are left out on purpose, the server keeps what isn't sent.
 	const autoSave = useAutoSave(() =>
-		update.mutateAsync({ name: model?.name, description: model?.description })
+		nameValid()
+			? update.mutateAsync({ name: model?.name.trim(), description: model?.description })
+			: Promise.reject(new Error('name too short'))
 	);
-	const save = () => isOwner && autoSave.save();
+	const save = () => can.own && nameValid() && autoSave.save();
 </script>
 
-<PageHeader
-	title="Workspace"
-	description="How this workspace is named, who runs it and what's in it"
-/>
+<PageHeader title="Workspace" description="Who runs this workspace and how to connect to it" />
 
-{#if !model || !ws.data}
-	<Skeleton class="h-40 w-full rounded-xl" />
-	<Skeleton class="h-24 w-full rounded-xl" />
+{#if ws.isError}
+	<LoadError
+		title="The workspace did not load"
+		description="Nothing changed, servers keep working as before."
+		onRetry={() => ws.refetch()}
+		class="h-[25vh] rounded-xl border-solid bg-card text-card-foreground"
+	/>
+{:else if !model || !ws.data || !me.data}
+	<Skeleton class="h-36 w-full rounded-xl" />
+	<div class="grid gap-4 md:grid-cols-2">
+		<Skeleton class="h-56 w-full rounded-xl" />
+		<Skeleton class="h-56 w-full rounded-xl" />
+	</div>
 {:else}
 	<Card.Root>
-		<Card.Content class="flex flex-col gap-5 sm:flex-row">
-			<Avatar id={model.id} class="size-16 shrink-0 rounded-xl" />
-			<Field.Group class="flex-1 gap-4">
-				<Field.Field>
-					<Field.Label for="ws-name">Name</Field.Label>
-					<Input
-						id="ws-name"
-						bind:value={model.name}
-						oninput={save}
-						disabled={!isOwner}
-						class="text-base font-medium"
-					/>
-				</Field.Field>
-				<Field.Field>
-					<Field.Label for="ws-description">Description</Field.Label>
-					<Textarea
-						id="ws-description"
-						bind:value={model.description}
-						oninput={save}
-						disabled={!isOwner}
-						rows={2}
-						placeholder="What this workspace is for, e.g. Production EU"
-					/>
-				</Field.Field>
-			</Field.Group>
+		<Card.Content class="flex items-start gap-4">
+			<div
+				class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-terminal text-brand-caret ring-1 ring-foreground/10 sm:size-14"
+			>
+				<NokkuCaret class="h-5 pl-0.5 sm:h-6" />
+			</div>
+			{#if can.own}
+				<Field.Group class="min-w-0 flex-1 gap-4">
+					<Field.Field data-invalid={!nameValid() || undefined}>
+						<Field.Label for="ws-name">Name</Field.Label>
+						<Input
+							id="ws-name"
+							bind:value={model.name}
+							oninput={save}
+							maxlength={256}
+							aria-invalid={!nameValid() || undefined}
+							class="text-base font-medium"
+						/>
+						{#if !nameValid()}
+							<Field.Error>Use at least 3 characters</Field.Error>
+						{/if}
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="ws-description">Description</Field.Label>
+						<Textarea
+							id="ws-description"
+							bind:value={model.description}
+							oninput={save}
+							maxlength={1000}
+							rows={2}
+							placeholder="What this workspace is for, e.g. Production EU"
+						/>
+					</Field.Field>
+				</Field.Group>
+			{:else}
+				<div class="flex min-w-0 flex-col gap-1 self-center">
+					<h2 class="text-xl font-semibold break-words">{model.name}</h2>
+					<p class="text-sm break-words text-muted-foreground">
+						{model.description || 'No description'}
+					</p>
+				</div>
+			{/if}
 		</Card.Content>
-		<Card.Footer class="border-t">
-			<SaveStatus
-				state={autoSave.saveState}
-				idleText={isOwner ? 'Changes save automatically' : 'Only the owner can change this'}
-			/>
-		</Card.Footer>
+		{#if can.own}
+			<Card.Footer class="border-t">
+				<SaveStatus
+					state={autoSave.saveState}
+					idleText="Shows in the sidebar for everyone. Changes save automatically"
+					onRetry={autoSave.retry}
+				/>
+			</Card.Footer>
+		{/if}
 	</Card.Root>
 
-	<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-		{#each counts as c (c.label)}
-			<StatTile
-				label={c.label}
-				icon={c.icon}
-				href={c.href}
-				loading={c.query.isLoading}
-				value={c.query.data?.total ?? 0}
-			/>
-		{/each}
-	</div>
-
-	<div class="grid gap-4 md:grid-cols-2">
+	<div class="grid gap-4 md:grid-cols-2 md:items-start">
 		<Card.Root>
 			<Card.Header>
-				<Card.Title class="text-base">People</Card.Title>
-				<Card.Description>Who owns the workspace and what you can do in it.</Card.Description>
+				<Card.Title><h2>Who runs it</h2></Card.Title>
+				<Card.Description>Ask them for access or a different role</Card.Description>
 			</Card.Header>
-			<Card.Content class="flex flex-col gap-2">
-				<Item.Root variant="muted" size="sm">
-					{#snippet child({ props })}
-						<a href={`/access/users?id=${owner?.id ?? ''}`} {...props}>
-							<Item.Media><UserAvatar user={owner} class="size-8" /></Item.Media>
-							<Item.Content>
-								<Item.Title>{owner?.name || owner?.email || '…'}</Item.Title>
-								<Item.Description>{owner?.email}</Item.Description>
-							</Item.Content>
-							<Item.Actions><Badge variant="secondary">Owner</Badge></Item.Actions>
-						</a>
-					{/snippet}
-				</Item.Root>
-				<Item.Root variant="muted" size="sm">
-					<Item.Media variant="icon"><MyRoleIcon /></Item.Media>
-					<Item.Content>
-						<Item.Title
-							>You are {roleLabel(me.data?.role || WorkspaceRole.MEMBER).toLowerCase()}</Item.Title
+			<Card.Content class="flex flex-col gap-3">
+				{#if peopleFailed}
+					<div
+						class="flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-sm"
+					>
+						<span class="text-muted-foreground">The owner and admins did not load</span>
+						<Button variant="ghost" size="sm" onclick={retryPeople}>
+							<RotateCw data-icon="inline-start" />
+							Try again
+						</Button>
+					</div>
+				{:else if peopleLoading}
+					<Skeleton class="h-28 w-full rounded-lg" />
+				{:else}
+					<Item.Group class="divide-y rounded-lg border">
+						{#each people as person (person.id)}
+							<Item.Root size="sm" class="rounded-none">
+								{#snippet child({ props })}
+									<a href={`/access/users?id=${person.id}`} {...props}>
+										<Item.Media><UserAvatar user={person} class="size-8" /></Item.Media>
+										<Item.Content class="min-w-0">
+											<Item.Title class="max-w-full">
+												<span class="truncate">{person.name || person.email.split('@')[0]}</span>
+											</Item.Title>
+											<Item.Description class="truncate">{person.email}</Item.Description>
+										</Item.Content>
+										<Item.Actions>
+											<Badge variant="secondary">{roleLabel(person.role)}</Badge>
+										</Item.Actions>
+									</a>
+								{/snippet}
+							</Item.Root>
+						{/each}
+					</Item.Group>
+					{#if moreAdmins > 0}
+						<a
+							href="/access/users?role=admin"
+							class="self-start text-sm text-primary hover:underline"
 						>
-						<Item.Description>{myRole?.description}</Item.Description>
-					</Item.Content>
-				</Item.Root>
+							{moreAdmins} more {moreAdmins === 1 ? 'admin' : 'admins'}
+						</a>
+					{/if}
+				{/if}
+				<p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+					<MyRoleIcon class="size-4" />
+					<span>{youAre}.</span>
+					<a
+						href={`${DocsURL}/guides/access/#roles`}
+						target="_blank"
+						rel="noopener"
+						class="text-primary hover:underline">What each role can do</a
+					>
+				</p>
 			</Card.Content>
 		</Card.Root>
 
 		<Card.Root>
 			<Card.Header>
-				<Card.Title class="text-base">Details</Card.Title>
-				<Card.Description>Handy for the CLI, the API and support.</Card.Description>
+				<Card.Title><h2>Connect</h2></Card.Title>
+				<Card.Description>
+					What <code class="font-mono">nk</code>, <code class="font-mono">nokkud</code> and support
+					ask for{info.data?.caPin ? '. The CA pin lets them trust this server' : ''}
+				</Card.Description>
 			</Card.Header>
-			<Card.Content>
+			<Card.Content class="flex flex-col gap-3">
 				<DetailList
 					items={[
-						{ label: 'Workspace ID', value: ws.data.id, mono: true, copy: true, wide: true },
 						{ label: 'Address', value: baseUrl.data, mono: true, copy: true, wide: true },
 						{ label: 'CA pin', value: info.data?.caPin, mono: true, copy: true, wide: true },
-						{ label: 'Created', value: formatTs(ws.data.createdAt) },
-						{ label: 'Updated', value: formatTs(ws.data.updatedAt, 'relative') }
+						{ label: 'Workspace ID', value: ws.data.id, mono: true, copy: true, wide: true },
+						{
+							label: 'Mode',
+							value: info.data?.mode && (hosted ? 'Hosted' : 'Self-hosted')
+						},
+						{ label: 'Created', value: formatTs(ws.data.createdAt) }
 					]}
 				/>
+				<p class="text-sm text-muted-foreground">
+					The full <code class="font-mono">nk login</code> command is under
+					<a href="/profile/security" class="text-primary hover:underline">Profile, Security</a>
+				</p>
 			</Card.Content>
 		</Card.Root>
 	</div>
 
-	{#if deletable}
+	{#if can.own && hosted}
 		<DangerZone
 			actions={[
 				{
 					title: 'Delete workspace',
 					description:
-						'Removes every user, team, target and certificate. Active subscriptions are canceled.',
+						'Removes every user, team, target, certificate, recording and the audit log. Active subscriptions are canceled. Export the audit log first if you need a record.',
 					label: 'Delete',
 					onClick: () =>
 						confirm({
 							title: 'Delete workspace?',
 							description:
-								'This permanently deletes the workspace and all its data. Active subscriptions for it are canceled immediately. This cannot be undone.',
+								'This permanently deletes the workspace with its recordings and audit log, and cancels any active subscription. Enrolled servers keep what they last synced, so certificates already signed work until they expire. Remove nokkud from them afterwards. This cannot be undone.',
+							confirmText: 'Delete workspace',
 							typeToConfirm: ws.data?.name,
 							onConfirm: () => remove.mutateAsync({})
 						})
 				}
 			]}
 		/>
+	{:else if can.own && info.data?.mode}
+		<p class="text-xs text-muted-foreground">
+			On a self-hosted core the workspace is the whole server, so it can't be deleted from here.
+		</p>
 	{/if}
 {/if}
