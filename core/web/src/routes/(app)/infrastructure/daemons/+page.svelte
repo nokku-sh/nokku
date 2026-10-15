@@ -12,10 +12,9 @@
 	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
-		AvatarCell,
 		DaemonStatusCell,
-		RecordingCell,
-		StatusCell,
+		IdentityCell,
+		StateCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
@@ -24,7 +23,16 @@
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { BotOff, CircleCheckBig, Clock, Rocket, Trash, Wifi, WifiOff } from '@lucide/svelte';
+	import {
+		BotOff,
+		CircleCheckBig,
+		Clock,
+		Rocket,
+		Trash,
+		Video,
+		Wifi,
+		WifiOff
+	} from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const statusOptions = [
@@ -64,15 +72,21 @@
 		columnHelper.accessor('name', {
 			header: 'Name',
 			cell: ({ row }) =>
-				renderComponent(AvatarCell, {
-					id: row.original.id,
-					name: row.original.name
+				renderComponent(IdentityCell, {
+					name: row.original.name,
+					detail: row.original.metadata?.hostname,
+					mono: true
 				})
 		}),
 		columnHelper.display({
 			id: 'recording',
 			header: 'Recording',
-			cell: ({ row }) => renderComponent(RecordingCell, { daemon: row.original })
+			meta: { hideBelow: 'md' },
+			// A setting, not an alarm. It changes in the daemon sheet.
+			cell: ({ row }) =>
+				row.original.config?.recordSessions
+					? renderComponent(StateCell, { label: 'Recording', tone: 'info', icon: Video })
+					: renderComponent(StateCell, { label: 'Off', tone: 'muted' })
 		}),
 		columnHelper.accessor('status', {
 			header: 'Status',
@@ -81,10 +95,14 @@
 		columnHelper.accessor('online', {
 			header: 'Online',
 			cell: ({ row }) =>
-				renderComponent(StatusCell, { status: row.original.online ? 'Online' : 'Offline' })
+				renderComponent(StateCell, {
+					label: row.original.online ? 'Online' : 'Offline',
+					icon: row.original.online ? Wifi : WifiOff
+				})
 		}),
 		columnHelper.accessor('lastSeenAt', {
 			header: 'Last seen',
+			meta: { hideBelow: 'md' },
 			cell: ({ row }) =>
 				renderComponent(TimeCell, {
 					ts: row.original.lastSeenAt,
@@ -104,6 +122,9 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
+					label: row.original.name,
+					id: row.original.id,
+					link: true,
 					deleteConfig: can.edit
 						? {
 								itemName: row.original.name,
@@ -166,6 +187,9 @@
 	data={daemons.data?.daemons ?? []}
 	rowCount={daemons.data?.total ?? 0}
 	isLoading={daemons.isLoading}
+	error={daemons.error}
+	onRetry={daemons.refetch}
+	rowLabel={(d) => d.name}
 	{columns}
 	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(d) => sheet.show(d.id)}

@@ -17,7 +17,7 @@ const statusWords: Record<string, Tone> = {
 	error: 'destructive',
 	failed: 'destructive',
 	denied: 'destructive',
-	offline: 'destructive',
+	offline: 'warning',
 	expired: 'destructive'
 };
 

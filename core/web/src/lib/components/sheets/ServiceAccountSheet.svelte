@@ -3,10 +3,11 @@
 	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
-	import { SERVICE_ACCOUNT_MAX_ROLE } from '#lib/roles.js';
+	import { roleLabel, SERVICE_ACCOUNT_MAX_ROLE } from '#lib/roles.js';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
 	import CreateServiceAccountTokenModal from '#lib/components/modals/CreateServiceAccountTokenModal.svelte';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
@@ -23,8 +24,8 @@
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs, toDate } from '#lib/utils.js';
 	import {
-		Bot,
 		FileText,
+		Info,
 		KeyRound,
 		Plus,
 		Settings2,
@@ -33,6 +34,7 @@
 		UserCog
 	} from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
+	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
 
@@ -117,7 +119,9 @@
 				save();
 			}
 		: undefined}
+	detail={entity?.description}
 	tabs={[
+		{ value: 'overview', label: 'Overview', icon: Info },
 		{ value: 'access', label: 'Access', icon: ShieldCheck },
 		{ value: 'tokens', label: 'Tokens', icon: KeyRound },
 		{ value: 'settings', label: 'Settings', icon: Settings2 }
@@ -126,25 +130,41 @@
 	onTabChange={(t) => (sheet.tab = t)}
 	saveState={autoSave.saveState}
 	saveHint={sheet.tab === 'settings'}
+	onRetry={autoSave.retry}
 	readonly={!can.edit}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
-		<div class="flex size-10 items-center justify-center rounded-lg bg-chart-5/15 text-chart-5">
-			<Bot class="size-5" />
-		</div>
+		<Monogram name={entity?.name ?? ''} class="size-10 text-sm" />
 	{/snippet}
 
 	{#snippet subtitle()}
 		<span>
-			{entity?.lastUsedAt ? `Last used ${formatTs(entity.lastUsedAt, 'relative')}` : 'Never used'}
+			{entity?.lastUsedAt
+				? `Last used ${formatTs(entity.lastUsedAt, 'relative')}`
+				: 'Never used'}{tokens.data
+				? ` · ${tokenList.length} ${tokenList.length === 1 ? 'token' : 'tokens'}`
+				: ''}
 		</span>
-		{#if tokens.data}
-			<span>· {tokenList.length} {tokenList.length === 1 ? 'token' : 'tokens'}</span>
-		{/if}
 	{/snippet}
 
 	{#if model && entity}
+		<Tabs.Content value="overview" class="flex flex-col divide-y">
+			<Section title="At a glance" icon={Info}>
+				<DetailList
+					items={[
+						{ label: 'Role', value: roleLabel(entity.role) },
+						{
+							label: 'Last used',
+							value: entity.lastUsedAt ? formatTs(entity.lastUsedAt, 'relative') : 'Never'
+						},
+						{ label: 'Tokens', value: tokens.data ? String(tokenList.length) : undefined },
+						{ label: 'Tags', value: entity.tags.join(', ') || undefined, mono: true }
+					]}
+				/>
+			</Section>
+		</Tabs.Content>
+
 		<Tabs.Content value="access" class="flex flex-col gap-5">
 			<SubjectAccess subjectId={entity.id} kind={SubjectKind.SERVICE_ACCOUNT} name={entity.name} />
 		</Tabs.Content>

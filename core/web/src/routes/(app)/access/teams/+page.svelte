@@ -13,7 +13,7 @@
 	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
-		AvatarCell,
+		IdentityCell,
 		MemberCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
@@ -59,10 +59,9 @@
 		columnHelper.accessor('name', {
 			header: 'Name',
 			cell: ({ row }) =>
-				renderComponent(AvatarCell, {
-					id: row.original.id,
+				renderComponent(IdentityCell, {
 					name: row.original.name,
-					description: row.original.description
+					detail: row.original.description
 				})
 		}),
 		columnHelper.accessor('memberCount', {
@@ -81,6 +80,9 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
+					label: row.original.name,
+					id: row.original.id,
+					link: true,
 					menuActions: [
 						{
 							label: can.edit ? 'Manage access' : 'View access',
@@ -120,6 +122,9 @@
 	data={teams.data?.teams ?? []}
 	rowCount={teams.data?.total ?? 0}
 	isLoading={teams.isLoading}
+	error={teams.error}
+	onRetry={teams.refetch}
+	rowLabel={(t) => t.name}
 	{columns}
 	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(t) => sheet.show(t.id)}

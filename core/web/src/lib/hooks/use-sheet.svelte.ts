@@ -16,6 +16,13 @@ function urlWith(params: Record<string, string | undefined>) {
 	return url;
 }
 
+/** A link that opens this entity's sheet, on the current page unless a path is given. */
+export function sheetLink(id: string, path = page.url.pathname): string {
+	const url = new URL(path, page.url.origin);
+	url.searchParams.set('id', id);
+	return url.href;
+}
+
 // useSheet keeps the open entity in `?id=` and its tab in `?tab=`, so links are shareable and Back closes the sheet.
 export function useSheet() {
 	const id = $derived(page.url.searchParams.get('id') ?? '');

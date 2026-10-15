@@ -7,6 +7,9 @@
 	import { Search } from '@lucide/svelte';
 	import { openPalette } from './CommandPalette.svelte';
 
+	// The palette answers both, the hint shows the one this keyboard has.
+	const mod = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl ';
+
 	// The URL as a shell path. Every prefix is a page, groups redirect to their first child.
 	const segments = $derived(
 		page.url.pathname
@@ -50,7 +53,7 @@
 		>
 			<Search data-icon="inline-start" />
 			<span class="hidden sm:inline">Search</span>
-			<Kbd.Root class="hidden sm:inline-flex">⌘K</Kbd.Root>
+			<Kbd.Root class="hidden sm:inline-flex">{mod}K</Kbd.Root>
 		</Button>
 	</div>
 </header>

@@ -13,7 +13,7 @@
 <Card.Root class="gap-3">
 	<Card.Header>
 		<Card.Title class="flex items-center gap-2">
-			Live now
+			<h2>Live now</h2>
 			{#if sessions.length}<Badge variant="success">{sessions.length}</Badge>{/if}
 		</Card.Title>
 		<Card.Description>Shells open on your servers right now.</Card.Description>
@@ -24,7 +24,7 @@
 		{:else if !sessions.length}
 			<p class="font-mono text-xs text-muted-foreground">
 				<span class="text-primary">$</span> who <br />
-				<span class="text-muted-foreground/70">nobody is connected</span>
+				nobody is connected
 			</p>
 		{:else}
 			<Item.Group class="divide-y rounded-lg border">

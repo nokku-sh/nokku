@@ -208,9 +208,7 @@
 		return [
 			...app,
 			['You', leaves(UserRoutes)] as const,
-			...Object.entries(SupportRoutes).map(
-				([name, routes]) => [name, leaves(support ? [...routes, support] : routes)] as const
-			)
+			['Support', leaves(support ? [...SupportRoutes, support] : SupportRoutes)] as const
 		];
 	});
 

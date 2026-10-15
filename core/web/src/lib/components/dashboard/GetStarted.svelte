@@ -2,18 +2,16 @@
 	import { auth } from '#lib/api/auth.svelte.js';
 	import { session } from '#lib/api/session.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { util } from '#lib/api/workspaces.svelte.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
-	import { DocsURL } from '#lib/config.js';
 	import { setupDismissed } from '#lib/store.svelte.js';
-	import { nkLoginCommand } from '#lib/utils.js';
 	import { Check, Rocket, UserPlus } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
+	import NkLogin from './NkLogin.svelte';
 
 	interface Props {
 		workspace: string;
@@ -29,9 +27,6 @@
 	// A CLI session is what nk login leaves behind.
 	const sessions = session.list();
 	const signedIn = $derived((sessions.data ?? []).some((s) => s.kind === 'cli'));
-
-	const info = util.instanceInfo();
-	const login = $derived(nkLoginCommand(info.data?.caPin));
 
 	const done = $derived([true, connected, signedIn, users > 1]);
 	const left = $derived(done.filter((d) => !d).length);
@@ -54,10 +49,13 @@
 				ok ? 'border-success bg-success text-success-foreground' : 'bg-background'
 			]}
 		>
-			{#if ok}<Check class="size-4" />{:else}{n}{/if}
+			{#if ok}<Check class="size-4" aria-hidden="true" />{:else}{n}{/if}
 		</span>
 		<div class="flex min-w-0 flex-col gap-3 pb-2">
-			<h3 class={['pt-1 font-medium', ok && 'text-muted-foreground line-through']}>{title}</h3>
+			<h3 class={['pt-1 font-medium', ok && 'text-muted-foreground line-through']}>
+				{#if ok}<span class="sr-only">Done:</span>{/if}
+				{title}
+			</h3>
 			{#if !ok}{@render body?.()}{/if}
 		</div>
 	</li>
@@ -98,13 +96,7 @@
 {/snippet}
 
 {#snippet terminal()}
-	<p class="text-sm text-muted-foreground">
-		Sign the CLI in once. After that plain <code class="font-mono">ssh</code> just works.
-	</p>
-	<CodeSnippet code={login} language="bash" />
-	<a href={DocsURL} target="_blank" rel="noopener" class="text-sm text-primary hover:underline">
-		Install nk
-	</a>
+	<NkLogin />
 {/snippet}
 
 {#snippet team()}
@@ -127,9 +119,10 @@
 {#if show}
 	<Card.Root>
 		<Card.Header>
-			<span class="spec-label">Getting started</span>
-			<Card.Title class="text-2xl font-semibold tracking-tight">
-				{connected ? 'Finish setting up' : 'Connect your first server'}
+			<Card.Title>
+				<h2 class="text-xl font-semibold tracking-tight">
+					{connected ? 'Finish setting up' : 'Connect your first server'}
+				</h2>
 			</Card.Title>
 			<Card.Description>
 				{#if connected}

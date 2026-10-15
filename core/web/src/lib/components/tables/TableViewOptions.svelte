@@ -13,14 +13,16 @@
 		class={buttonVariants({
 			variant: 'outline',
 			size: 'sm',
-			class: 'ms-auto hidden h-8 rounded-full border-dashed lg:flex'
+			class: 'h-8 rounded-full border-dashed'
 		})}
+		aria-label="Choose columns"
 	>
 		<Settings2Icon />
-		View
+		<span class="hidden sm:inline">View</span>
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content>
+	<DropdownMenu.Content align="end" class="w-48">
 		<DropdownMenu.Group>
+			<DropdownMenu.Label>Columns</DropdownMenu.Label>
 			{#each table
 				.getAllColumns()
 				.filter((col) => typeof col.accessorFn !== 'undefined' && col.getCanHide() && !['id', 'userId'].includes(col.id)) as column (column)}

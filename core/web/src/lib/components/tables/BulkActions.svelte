@@ -1,5 +1,4 @@
 <script lang="ts" generics="T">
-	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Separator } from '#lib/components/ui/separator/index.js';
 	import { XIcon } from '@lucide/svelte';
@@ -35,30 +34,26 @@
 </script>
 
 {#if count.selected > 0}
-	<div
-		class="fixed inset-x-0 bottom-16 z-50 flex justify-center px-4"
-		transition:slide={{ duration: 200 }}
-	>
+	<!-- Sticks to the bottom of the content column while the list scrolls under it. -->
+	<div class="sticky bottom-4 z-20 flex justify-center" transition:slide={{ duration: 200 }}>
 		<div
-			class="flex items-center gap-3 rounded-full border bg-background/95 px-4 py-2 backdrop-blur supports-backdrop-filter:bg-background/80"
+			class="flex max-w-full items-center gap-2 rounded-full border bg-popover py-1.5 pr-1.5 pl-4 text-popover-foreground"
+			role="region"
+			aria-label="Selection"
 		>
-			<div class="flex items-center gap-2 pr-3">
-				<Badge variant="secondary" class="size-7 rounded-full p-0 text-sm font-semibold">
-					{count.selected}
-				</Badge>
-				<span class="text-sm text-muted-foreground">
-					of {count.total} selected
-				</span>
-			</div>
+			<span class="shrink-0 text-sm whitespace-nowrap tabular-nums">
+				<span class="font-semibold">{count.selected}</span>
+				<span class="text-muted-foreground">of {count.total} selected</span>
+			</span>
 
-			<Separator orientation="vertical" class="h-6" />
+			<Separator orientation="vertical" class="mx-1 h-5" />
 
-			<div class="flex flex-1 items-center gap-2 overflow-x-auto">
+			<div class="no-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto">
 				{#each actions as action (action.label)}
 					<Button
 						variant={action.variant ?? 'ghost'}
 						size="sm"
-						class="h-8 {action.class ?? ''}"
+						class={action.class}
 						onclick={() => run(action)}
 						disabled={action.disabled}
 					>
@@ -70,14 +65,12 @@
 				{/each}
 			</div>
 
-			<Separator orientation="vertical" class="h-6" />
-
 			<Button
 				variant="ghost"
-				size="icon"
-				class="size-7 rounded-full"
+				size="icon-sm"
+				class="shrink-0 rounded-full"
+				aria-label="Clear selection"
 				onclick={onClear}
-				title="Clear selection"
 			>
 				<XIcon />
 			</Button>

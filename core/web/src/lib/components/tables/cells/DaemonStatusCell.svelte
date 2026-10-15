@@ -47,6 +47,7 @@
 		{#if can.edit}
 			<Button
 				size="xs"
+				variant="outline"
 				disabled={update.isPending}
 				onclick={() => update.mutate({ id: daemon.id, status: DaemonStatus.ACCEPTED })}
 			>

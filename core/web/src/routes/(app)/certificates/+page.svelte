@@ -16,9 +16,9 @@
 	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
-		BadgeCell,
-		CANameCell,
-		CAStatusCell,
+		IdentityCell,
+		MachineCell,
+		StateCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -28,7 +28,15 @@
 		type CertificateAuthority
 	} from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { enumLabel } from '#lib/utils.js';
-	import { KeyRound, Plus, Shield, ShieldAlert, Trash2 } from '@lucide/svelte';
+	import {
+		KeyRound,
+		Plus,
+		Shield,
+		ShieldAlert,
+		ShieldCheck,
+		ShieldOff,
+		Trash2
+	} from '@lucide/svelte';
 
 	const sheet = useSheet();
 	const can = user.can();
@@ -58,25 +66,35 @@
 	const columns = columnHelper.columns([
 		columnHelper.accessor('name', {
 			header: 'Name',
-			cell: ({ row }) => renderComponent(CANameCell, { ca: row.original })
+			cell: ({ row }) =>
+				renderComponent(IdentityCell, {
+					name: row.original.name,
+					tag: row.original.isDefault ? 'Default' : undefined,
+					detail: row.original.description
+				})
 		}),
 		columnHelper.accessor('isActive', {
 			header: 'Status',
-			cell: ({ row }) => renderComponent(CAStatusCell, { caItem: row.original })
+			// Turning a CA off happens in its sheet, with a confirm.
+			cell: ({ row }) =>
+				row.original.isActive
+					? renderComponent(StateCell, { label: 'Active', tone: 'success', icon: ShieldCheck })
+					: renderComponent(StateCell, { label: 'Inactive', tone: 'muted', icon: ShieldOff })
 		}),
 		columnHelper.accessor('keyType', {
 			header: 'Key',
+			meta: { hideBelow: 'md' },
 			cell: ({ row }) => {
-				let label = enumLabel(CertificateKeyType[row.original.keyType]);
+				let label = enumLabel(CertificateKeyType[row.original.keyType]).toLowerCase();
 				if (row.original.keyType !== CertificateKeyType.ED25519 && row.original.keyBits) {
-					label += ` ${row.original.keyBits}-bit`;
+					label += ` ${row.original.keyBits}`;
 				}
-				return renderComponent(BadgeCell, { value: label, variant: 'outline' });
+				return renderComponent(MachineCell, { value: label });
 			}
 		}),
 		columnHelper.accessor('notAfter', {
 			header: 'Valid until',
-			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.notAfter })
+			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.notAfter, warnWithin: 30 })
 		}),
 		columnHelper.accessor('createdAt', {
 			header: 'Created',
@@ -91,6 +109,9 @@
 			cell: ({ row }) => {
 				const item = row.original;
 				return renderComponent(ActionCell, {
+					label: item.name,
+					id: item.id,
+					link: true,
 					inlineActions: [
 						{
 							label: 'Sign',
@@ -164,6 +185,9 @@
 <DataTable
 	data={filteredCAs}
 	isLoading={caData.isLoading}
+	error={caData.error}
+	onRetry={caData.refetch}
+	rowLabel={(c) => c.name}
 	{columns}
 	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(c) => sheet.show(c.id)}

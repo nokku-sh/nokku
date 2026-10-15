@@ -14,8 +14,9 @@
 	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
-		AvatarCell,
+		IdentityCell,
 		TagsCell,
+		TextCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -67,29 +68,38 @@
 		columnHelper.accessor('name', {
 			header: 'Name',
 			cell: ({ row }) =>
-				renderComponent(AvatarCell, {
-					id: row.original.id,
+				renderComponent(IdentityCell, {
 					name: row.original.name,
-					description: row.original.description
+					// The address people ssh to, so it is the line under the name.
+					detail:
+						row.original.metadata?.hostname ||
+						row.original.endpoints[0] ||
+						row.original.description,
+					mono: !!(row.original.metadata?.hostname || row.original.endpoints[0])
 				})
 		}),
 		columnHelper.accessor('caId', {
 			header: 'CA',
-			cell: ({ row }) => {
-				return caData.data?.find((c) => c.id === row.original.caId)?.name;
-			}
+			meta: { hideBelow: 'md' },
+			cell: ({ row }) =>
+				renderComponent(TextCell, {
+					label: caData.data?.find((c) => c.id === row.original.caId)?.name ?? 'Default CA'
+				})
 		}),
 		columnHelper.display({
 			id: 'accounts',
 			header: 'Accounts',
 			cell: ({ row }) =>
-				renderComponent(TagsCell, { tags: row.original.accounts.map((p) => p.username) })
+				renderComponent(TagsCell, {
+					tags: row.original.accounts.map((p) => p.username),
+					mono: true,
+					noun: 'accounts'
+				})
 		}),
 		columnHelper.accessor('tags', {
 			header: 'Tags',
-			cell: ({ row }) => {
-				return renderComponent(TagsCell, { tags: row.original.tags });
-			}
+			meta: { hideBelow: 'md' },
+			cell: ({ row }) => renderComponent(TagsCell, { tags: row.original.tags })
 		}),
 		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
@@ -103,6 +113,9 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
+					label: row.original.name,
+					id: row.original.id,
+					link: true,
 					menuActions: [
 						{
 							label: can.edit ? 'Manage access' : 'View access',
@@ -155,6 +168,9 @@
 	data={targets.data?.targets ?? []}
 	rowCount={targets.data?.total ?? 0}
 	isLoading={targets.isLoading}
+	error={targets.error}
+	onRetry={targets.refetch}
+	rowLabel={(t) => t.name}
 	{columns}
 	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(t) => sheet.show(t.id)}

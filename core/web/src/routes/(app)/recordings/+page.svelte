@@ -13,7 +13,8 @@
 	import { user } from '#lib/api/user.svelte.js';
 	import {
 		ActionCell,
-		StatusCell,
+		MachineCell,
+		StateCell,
 		TextCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
@@ -24,7 +25,7 @@
 	import { plural } from '#lib/api/bulk.js';
 	import { formatBytes } from '#lib/utils.js';
 	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
-	import { Bot, Play, Trash2, Video } from '@lucide/svelte';
+	import { Bot, Trash2, Video } from '@lucide/svelte';
 
 	const pager = usePagination();
 	const can = user.can();
@@ -81,31 +82,25 @@
 		}),
 		columnHelper.accessor('username', {
 			header: 'Account',
-			cell: ({ row }) =>
-				renderComponent(TextCell, { label: row.original.username || '-', mono: true })
+			cell: ({ row }) => renderComponent(MachineCell, { value: row.original.username })
 		}),
 		columnHelper.accessor('sizeBytes', {
 			header: 'Size',
+			meta: { hideBelow: 'md' },
 			cell: ({ row }) => formatBytes(Number(row.original.sizeBytes))
 		}),
 		columnHelper.accessor('complete', {
 			header: 'Status',
 			cell: ({ row }) =>
-				renderComponent(StatusCell, {
-					status: row.original.complete ? 'complete' : 'truncated'
-				})
+				renderComponent(StateCell, { label: row.original.complete ? 'Complete' : 'Truncated' })
 		}),
 		columnHelper.display({
 			id: 'actions',
 			cell: ({ row }) =>
+				// The row itself plays, so the menu only holds what the click can't do.
 				renderComponent(ActionCell, {
-					inlineActions: [
-						{
-							label: 'Play',
-							icon: Play,
-							onClick: () => player.openWith({ ...row.original })
-						}
-					],
+					label: `recording of ${row.original.username}`,
+					id: row.original.id,
 					deleteConfig: can.edit
 						? {
 								itemName: `recording of ${row.original.username}`,
@@ -126,6 +121,9 @@
 	data={list.data?.recordings ?? []}
 	rowCount={list.data?.total ?? 0}
 	isLoading={list.isLoading}
+	error={list.error}
+	onRetry={list.refetch}
+	rowLabel={(r) => `recording of ${r.username || 'a session'}`}
 	{columns}
 	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(r) => player.openWith({ ...r })}

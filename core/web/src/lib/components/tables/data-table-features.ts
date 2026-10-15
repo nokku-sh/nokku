@@ -13,6 +13,11 @@ import {
 	tableFeatures
 } from '@tanstack/svelte-table';
 
+export type DataTableColumnMeta = {
+	/** Drops the column below this breakpoint, so phones keep what matters. */
+	hideBelow?: 'md' | 'lg';
+};
+
 export const features = tableFeatures({
 	columnFilteringFeature,
 	columnVisibilityFeature,
@@ -23,7 +28,8 @@ export const features = tableFeatures({
 	paginatedRowModel: createPaginatedRowModel(),
 	sortedRowModel: createSortedRowModel(),
 	filterFns: { includesString: filterFn_includesString },
-	sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text }
+	sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+	columnMeta: {} as DataTableColumnMeta
 });
 
 export type DataTableFeatures = typeof features;

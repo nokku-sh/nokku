@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
-	import { ChevronsUpDown, ChevronRight } from '@lucide/svelte';
+	import { ChevronsUpDown } from '@lucide/svelte';
 	import type { ComponentProps } from 'svelte';
 	import {
 		AppRoutes,
@@ -15,9 +15,8 @@
 	import { user } from '#lib/api/user.svelte.js';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { page } from '$app/state';
-	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
 	import NokkuCaret from '#lib/assets/nokku_caret.svelte';
-	import { headline, issuesOf } from '#lib/components/dashboard/issues.js';
+	import { headline, isFresh, issuesOf } from '#lib/components/dashboard/issues.js';
 	import { toneText } from '#lib/tone.js';
 
 	let { ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
@@ -34,7 +33,7 @@
 	const can = user.can();
 	const overview = dashboard.get(() => can.view);
 	const issues = $derived(overview.data && issuesOf(overview.data));
-	const status = $derived(headline(issues));
+	const status = $derived(headline(issues, isFresh(overview.data)));
 
 	const visibleRoutes = $derived(
 		Object.entries(AppRoutes)
@@ -42,9 +41,34 @@
 			.filter(([, routes]) => routes.length > 0)
 	);
 
-	const isRouteActive = (item: RouteItem) =>
-		currentRoute === item.url || (item.url !== '/' && currentRoute.startsWith(item.url + '/'));
+	// Only the deepest entry that holds the page is current, so /settings stays quiet on /settings/sso.
+	const activeUrl = $derived(
+		[...visibleRoutes.flatMap(([, routes]) => routes), ...(support ? [support] : [])]
+			.map((r) => r.url)
+			.filter((url) => currentRoute === url || (url !== '/' && currentRoute.startsWith(url + '/')))
+			.sort((a, b) => b.length - a.length)[0]
+	);
 </script>
+
+{#snippet entry(r: RouteItem)}
+	<Sidebar.MenuItem>
+		<Sidebar.MenuButton isActive={r.url === activeUrl}>
+			{#snippet child({ props })}
+				<a href={r.url} {...props}>
+					<r.icon />
+					<span>{r.title}</span>
+					{#if r.shortcut}
+						<!-- The jump key, for mouse users who never opened the palette. -->
+						<span
+							class="ml-auto hidden font-mono text-2xs text-muted-foreground pointer-fine:group-focus-within/menu-item:inline pointer-fine:group-hover/menu-item:inline"
+							aria-hidden="true">g {r.shortcut}</span
+						>
+					{/if}
+				</a>
+			{/snippet}
+		</Sidebar.MenuButton>
+	</Sidebar.MenuItem>
+{/snippet}
 
 <Sidebar.Root collapsible="offcanvas" {...restProps}>
 	<Sidebar.Header>
@@ -64,9 +88,7 @@
 								<span class="truncate font-medium">{ws.data?.name ?? 'Nokku'}</span>
 								{#if can.view}
 									<span class={['truncate font-mono text-xs', toneText[status.tone]]}>
-										<span class={[status.tone === 'success' && 'motion-safe:animate-breathe']}>
-											{status.mark}
-										</span>
+										<span aria-hidden="true">{status.mark}</span>
 										{status.text}
 									</span>
 								{:else}
@@ -88,85 +110,21 @@
 				<Sidebar.GroupLabel>{groupName}</Sidebar.GroupLabel>
 				<Sidebar.GroupContent>
 					<Sidebar.Menu>
-						{#each routes as r (r.title)}
-							{#if r.items && r.items.length > 0}
-								<Collapsible.Root open={isRouteActive(r)} class="group/collapsible">
-									<Sidebar.MenuItem>
-										<Collapsible.Trigger>
-											{#snippet child({ props })}
-												<Sidebar.MenuButton
-													{...props}
-													tooltipContent={r.title}
-													isActive={isRouteActive(r)}
-												>
-													<r.icon />
-													<span>{r.title}</span>
-													<ChevronRight
-														class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
-													/>
-												</Sidebar.MenuButton>
-											{/snippet}
-										</Collapsible.Trigger>
-										<Collapsible.Content>
-											<Sidebar.MenuSub>
-												{#each r.items as subItem (subItem.title)}
-													<Sidebar.MenuSubItem>
-														<Sidebar.MenuSubButton isActive={currentRoute === subItem.url}>
-															{#snippet child({ props })}
-																<a href={subItem.url} {...props}>
-																	<span>{subItem.title}</span>
-																</a>
-															{/snippet}
-														</Sidebar.MenuSubButton>
-													</Sidebar.MenuSubItem>
-												{/each}
-											</Sidebar.MenuSub>
-										</Collapsible.Content>
-									</Sidebar.MenuItem>
-								</Collapsible.Root>
-							{:else}
-								<Sidebar.MenuItem>
-									<Sidebar.MenuButton tooltipContent={r.title} isActive={isRouteActive(r)}>
-										{#snippet child({ props })}
-											<a href={r.url} {...props}>
-												<r.icon />
-												<span>{r.title}</span>
-											</a>
-										{/snippet}
-									</Sidebar.MenuButton>
-								</Sidebar.MenuItem>
-							{/if}
+						{#each routes as r (r.url)}
+							{@render entry(r)}
 						{/each}
 					</Sidebar.Menu>
 				</Sidebar.GroupContent>
 			</Sidebar.Group>
 		{/each}
-
-		<Sidebar.Group class="mt-auto">
-			{#each Object.entries(SupportRoutes) as [groupName, routes] (groupName)}
-				<Sidebar.GroupContent>
-					<Sidebar.GroupLabel>{groupName}</Sidebar.GroupLabel>
-					<Sidebar.Menu>
-						{#each support ? [...routes, support] : routes as r (r.title)}
-							<Sidebar.MenuItem>
-								<Sidebar.MenuButton tooltipContent={r.title} isActive={isRouteActive(r)}>
-									{#snippet child({ props })}
-										<a href={r.url} {...props}>
-											<r.icon />
-											<span>{r.title}</span>
-										</a>
-									{/snippet}
-								</Sidebar.MenuButton>
-							</Sidebar.MenuItem>
-						{/each}
-					</Sidebar.Menu>
-				</Sidebar.GroupContent>
-			{/each}
-		</Sidebar.Group>
 	</Sidebar.Content>
 
+	<!-- Help stays in view however long the nav gets. -->
 	<Sidebar.Footer>
 		<Sidebar.Menu>
+			{#each support ? [...SupportRoutes, support] : SupportRoutes as r (r.url)}
+				{@render entry(r)}
+			{/each}
 			<Sidebar.MenuItem>
 				<UserMenu side={sidebar.isMobile ? 'bottom' : 'right'}>
 					{#snippet trigger(props)}

@@ -17,7 +17,9 @@
 		ChevronsLeft,
 		ChevronsRight,
 		ChevronsUpDown,
+		CircleAlert,
 		FilterX,
+		RotateCw,
 		SearchXIcon,
 		type LucideIcon
 	} from '@lucide/svelte';
@@ -29,6 +31,7 @@
 		type RowData,
 		type Table
 	} from '@tanstack/svelte-table';
+	import type { Attachment } from 'svelte/attachments';
 	import type { Snippet } from 'svelte';
 	import { PersistedState } from 'runed';
 	import BulkActions from './BulkActions.svelte';
@@ -43,6 +46,9 @@
 		/** Set for server-side pagination, the query then reads `usePagination().args`. */
 		rowCount?: number;
 		isLoading?: boolean;
+		/** A failed load. Without it a broken query would read as an empty list. */
+		error?: Error | null;
+		onRetry?: () => unknown;
 		emptyState?: {
 			icon: LucideIcon;
 			title: string;
@@ -53,6 +59,8 @@
 		toolbar?: Snippet<[Table<DataTableFeatures, TData>]>;
 		/** Makes rows clickable, usually to open the entity sheet. */
 		onRowClick?: (row: TData) => void;
+		/** Names a row for screen readers, in its open action and its checkbox. */
+		rowLabel?: (row: TData) => string;
 	};
 
 	let {
@@ -61,13 +69,16 @@
 		bulkActions,
 		rowCount,
 		isLoading = false,
+		error,
+		onRetry,
 		emptyState = {
 			icon: SearchXIcon,
 			title: 'Nothing here yet',
 			description: 'No rows to show.'
 		},
 		toolbar,
-		onRowClick
+		onRowClick,
+		rowLabel
 	}: DataTableProps<TData> = $props();
 
 	// Clicks on controls inside a row keep their own behavior.
@@ -80,9 +91,35 @@
 	}
 
 	function rowKey(e: KeyboardEvent, row: TData) {
-		if (!onRowClick || e.target !== e.currentTarget || e.key !== 'Enter') return;
-		onRowClick(row);
+		if (!onRowClick || e.target !== e.currentTarget) return;
+		const tr = e.currentTarget as HTMLElement;
+		if (e.key === 'Enter') onRowClick(row);
+		else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			e.preventDefault();
+			const next = e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling;
+			(next as HTMLElement | null)?.focus();
+		}
 	}
+
+	const hidden = { md: 'hidden md:table-cell', lg: 'hidden lg:table-cell' };
+
+	// A table wider than its column fades at the edge that still hides columns.
+	const edgeFade: Attachment<HTMLElement> = (frame) => {
+		const scroller = frame.querySelector<HTMLElement>('[data-slot="table-container"]');
+		if (!scroller) return;
+		const update = () => {
+			const more = scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft > 1;
+			frame.toggleAttribute('data-fade-end', more);
+		};
+		const ro = new ResizeObserver(update);
+		ro.observe(scroller);
+		scroller.addEventListener('scroll', update, { passive: true });
+		update();
+		return () => {
+			ro.disconnect();
+			scroller.removeEventListener('scroll', update);
+		};
+	};
 
 	const hasSelection = $derived(!!bulkActions?.length);
 
@@ -147,7 +184,7 @@
 									renderComponent(Checkbox, {
 										checked: row.getIsSelected(),
 										onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
-										'aria-label': 'Select row'
+										'aria-label': rowLabel ? `Select ${rowLabel(row.original)}` : 'Select row'
 									}),
 								enableSorting: false,
 								enableHiding: false
@@ -192,7 +229,6 @@
 		}
 	});
 
-	const colSpan = $derived(table.getVisibleLeafColumns().length);
 	const pageCount = $derived(table.getPageCount());
 	const selectedCount = $derived(table.getFilteredSelectedRowModel().rows.length);
 	const total = $derived(table.getRowCount());
@@ -210,7 +246,25 @@
 		{@render toolbar(table)}
 	{/if}
 
-	{#if !isLoading && !data.length}
+	{#if error && !data.length}
+		<Empty.Root class="h-[25vh] rounded-xl border bg-card text-card-foreground">
+			<Empty.Header>
+				<Empty.Media variant="icon" class="bg-destructive/10 text-destructive">
+					<CircleAlert />
+				</Empty.Media>
+				<Empty.Title>Couldn't load this list</Empty.Title>
+				<Empty.Description>{error.message}</Empty.Description>
+			</Empty.Header>
+			{#if onRetry}
+				<Empty.Content>
+					<Button variant="outline" size="sm" onclick={onRetry}>
+						<RotateCw data-icon="inline-start" />
+						Try again
+					</Button>
+				</Empty.Content>
+			{/if}
+		</Empty.Root>
+	{:else if !isLoading && !data.length}
 		<Empty.Root class="h-[25vh] rounded-xl border bg-card text-card-foreground">
 			<Empty.Header>
 				<Empty.Media variant="icon">
@@ -236,15 +290,27 @@
 			{/if}
 		</Empty.Root>
 	{:else}
-		<div class="overflow-hidden rounded-md border">
+		{#if error}
+			<p class="flex items-center gap-2 text-sm text-destructive" role="alert">
+				<CircleAlert class="size-4 shrink-0" />
+				<span class="min-w-0">Couldn't refresh, showing the last loaded rows. {error.message}</span>
+				{#if onRetry}
+					<Button variant="ghost" size="sm" class="ml-auto" onclick={onRetry}>Try again</Button>
+				{/if}
+			</p>
+		{/if}
+
+		<div class="overflow-hidden rounded-xl border bg-card" {@attach edgeFade}>
 			<TableUI.Root>
 				<TableUI.Header>
 					{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-						<TableUI.Row>
+						<TableUI.Row class="hover:bg-transparent">
 							{#each headerGroup.headers as header (header.id)}
 								{@const sorted = header.column.getIsSorted()}
+								{@const below = header.column.columnDef.meta?.hideBelow}
 								<TableUI.Head
 									colspan={header.colSpan}
+									class={below && hidden[below]}
 									aria-sort={sorted ? (sorted === 'asc' ? 'ascending' : 'descending') : undefined}
 								>
 									{#if header.column.getCanSort()}
@@ -268,57 +334,62 @@
 									{/if}
 								</TableUI.Head>
 							{/each}
+							{#if onRowClick}
+								<TableUI.Head class="w-8"></TableUI.Head>
+							{/if}
 						</TableUI.Row>
 					{/each}
 				</TableUI.Header>
 				<TableUI.Body>
 					{#if isLoading}
 						{#each { length: 5 }, i (i)}
-							<TableUI.Row>
-								<TableUI.Cell colspan={colSpan}>
-									<Skeleton class="h-6 w-full" />
-								</TableUI.Cell>
+							<TableUI.Row class="hover:bg-transparent">
+								{#each table.getVisibleLeafColumns() as column (column.id)}
+									{@const below = column.columnDef.meta?.hideBelow}
+									<TableUI.Cell class={below && hidden[below]}>
+										<Skeleton class={['h-4', column.id === 'select' ? 'w-4' : 'w-3/4 max-w-40']} />
+									</TableUI.Cell>
+								{/each}
+								{#if onRowClick}<TableUI.Cell></TableUI.Cell>{/if}
 							</TableUI.Row>
 						{/each}
 					{:else}
 						{#each table.getRowModel().rows as row (row.id)}
 							<TableUI.Row
 								data-state={row.getIsSelected() && 'selected'}
-								class={onRowClick ? 'cursor-pointer' : undefined}
+								class={onRowClick &&
+									'group/row cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'}
 								tabindex={onRowClick ? 0 : undefined}
+								aria-label={onRowClick && rowLabel ? `Open ${rowLabel(row.original)}` : undefined}
 								onclick={(e) => rowClick(e, row.original)}
 								onkeydown={(e) => rowKey(e, row.original)}
 							>
 								{#each row.getVisibleCells() as cell (cell.id)}
-									<TableUI.Cell>
+									{@const below = cell.column.columnDef.meta?.hideBelow}
+									<TableUI.Cell class={below && hidden[below]}>
 										<FlexRender {cell} />
 									</TableUI.Cell>
 								{/each}
-							</TableUI.Row>
-						{:else}
-							<TableUI.Row>
-								<TableUI.Cell colspan={colSpan} class="h-24 text-center">No results.</TableUI.Cell>
+								{#if onRowClick}
+									<!-- Says "this opens" without a word, and only where the pointer or focus is. -->
+									<TableUI.Cell class="w-8 pr-3 text-muted-foreground">
+										<ChevronRight
+											class="size-4 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-visible/row:opacity-100"
+											aria-hidden="true"
+										/>
+									</TableUI.Cell>
+								{/if}
 							</TableUI.Row>
 						{/each}
 					{/if}
 				</TableUI.Body>
 			</TableUI.Root>
-
-			{#if selectedCount > 0 && bulkActions && bulkActions.length > 0}
-				<BulkActions
-					items={table.getSelectedRowModel().rows.map((row) => row.original)}
-					actions={bulkActions}
-					count={{ selected: selectedCount, total: table.getFilteredRowModel().rows.length }}
-					onClear={() => table.resetRowSelection()}
-				/>
-			{/if}
 		</div>
 
 		<div class="flex items-center justify-between px-2">
 			<div class="flex-1 text-sm text-muted-foreground">
-				{#if selectedCount > 0}
-					{selectedCount} of {table.getFilteredRowModel().rows.length} selected
-				{:else if total > 0}
+				<!-- The bulk bar says how many are selected, the footer keeps the total. -->
+				{#if total > 0}
 					{total} total
 				{/if}
 			</div>
@@ -391,5 +462,14 @@
 				</div>
 			{/if}
 		</div>
+
+		{#if selectedCount > 0 && bulkActions && bulkActions.length > 0}
+			<BulkActions
+				items={table.getSelectedRowModel().rows.map((row) => row.original)}
+				actions={bulkActions}
+				count={{ selected: selectedCount, total: table.getFilteredRowModel().rows.length }}
+				onClear={() => table.resetRowSelection()}
+			/>
+		{/if}
 	{/if}
 </div>

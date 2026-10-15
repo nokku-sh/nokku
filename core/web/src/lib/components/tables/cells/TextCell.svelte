@@ -2,20 +2,14 @@
 	type Props = {
 		label: string;
 		subLabel?: string;
-		/** For machine values like IPs, usernames and fingerprints. */
-		mono?: boolean;
 	};
-	let { label, subLabel, mono = false }: Props = $props();
+	let { label, subLabel }: Props = $props();
 </script>
 
-<div class="flex max-w-32 min-w-0 flex-col overflow-hidden">
-	<div class={['truncate text-sm', mono ? 'font-mono' : 'font-medium']} title={label}>
-		{label}
-	</div>
-
+<!-- Prose values. Machine values go in MachineCell. -->
+<div class="flex max-w-64 min-w-0 flex-col">
+	<span class="truncate text-sm font-medium" title={label}>{label}</span>
 	{#if subLabel}
-		<span class="truncate text-xs text-muted-foreground" title={subLabel}>
-			{subLabel}
-		</span>
+		<span class="truncate text-xs text-muted-foreground" title={subLabel}>{subLabel}</span>
 	{/if}
 </div>

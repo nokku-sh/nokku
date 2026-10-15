@@ -11,6 +11,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
+	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
 	import {
 		CertificateAuthoritySchema,
@@ -29,8 +30,7 @@
 		KeyRound,
 		PenLine,
 		Settings2,
-		Shield,
-		Star
+		ShieldOff
 	} from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
@@ -50,6 +50,26 @@
 
 	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
 	const save = () => autoSave.save();
+
+	// Turning a CA off stops new logins it signs, so that direction asks first.
+	function setActive(on: boolean) {
+		if (!model) return;
+		if (on) {
+			model.isActive = true;
+			save();
+			return;
+		}
+		void confirm({
+			title: `Turn off ${model.name}?`,
+			description: 'It signs no new certificates until you turn it back on.',
+			confirmText: 'Turn off',
+			onConfirm: () => {
+				if (!model) return;
+				model.isActive = false;
+				save();
+			}
+		});
+	}
 
 	const keyTypes = enumToArray(CertificateKeyType);
 	let signOpen = $state(false);
@@ -118,24 +138,24 @@
 	]}
 	tab={sheet.tab}
 	onTabChange={(t) => (sheet.tab = t)}
+	detail={entity?.description}
 	saveState={autoSave.saveState}
+	onRetry={autoSave.retry}
 	saveHint={sheet.tab === 'settings'}
 	readonly={!can.edit}
 	missing={query.isError}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
-		<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-			<Shield class="size-5" />
-		</div>
+		<Monogram name={entity?.name ?? ''} class="size-10 text-sm" />
 	{/snippet}
 
 	{#snippet subtitle()}
 		{#if model?.isDefault}
-			<Badge variant="warning"><Star data-icon="inline-start" />Default</Badge>
+			<Badge variant="muted">Default</Badge>
 		{/if}
 		{#if model && !model.isActive}
-			<Badge variant="destructive">Inactive</Badge>
+			<Badge variant="muted"><ShieldOff data-icon="inline-start" />Inactive</Badge>
 		{/if}
 	{/snippet}
 
@@ -219,12 +239,8 @@
 						</Field.Content>
 						<Switch
 							id="ca-active"
-							checked={model.isActive}
+							bind:checked={() => model.isActive, setActive}
 							disabled={!can.edit}
-							onCheckedChange={(v) => {
-								model.isActive = v;
-								save();
-							}}
 						/>
 					</Field.Field>
 				</Field.Group>
@@ -320,7 +336,7 @@
 							class="font-mono"
 							bind:value={model.sourceAddress}
 							disabled={!can.edit}
-							onchange={save}
+							oninput={save}
 							placeholder="10.0.0.0/8, 192.168.1.10"
 						/>
 						<Field.Description>

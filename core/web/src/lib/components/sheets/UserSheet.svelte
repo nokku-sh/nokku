@@ -11,12 +11,13 @@
 	import * as Command from '#lib/components/ui/command/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
+	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
-	import { confirm, useSheet } from '#lib/hooks/index.js';
+	import { confirm, useAutoSave, useSheet } from '#lib/hooks/index.js';
 	import { atLeast } from '#lib/roles.js';
-	import { Check, Crown, Info, Plus, ShieldCheck, UserCog, Users } from '@lucide/svelte';
+	import { Check, Crown, Info, Plus, Settings2, ShieldCheck, UserCog, Users } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import DangerZone, { type DangerAction } from './DangerZone.svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -25,6 +26,31 @@
 	const sheet = useSheet();
 	const query = users.get(() => sheet.id);
 	const person = $derived(query.data);
+
+	// Nothing here is typed, so the footer only tracks one-off changes like the role and teams.
+	const autoSave = useAutoSave(() => Promise.resolve());
+
+	// Admin rights reach the whole workspace, so a raise to admin asks first.
+	let pickerKey = $state(0);
+	function changeRole(role: WorkspaceRole) {
+		if (!person) return;
+		const userId = person.id;
+		const apply = () => autoSave.track(() => updateRole.mutateAsync({ userId, role }));
+		if (role < WorkspaceRole.ADMIN || role <= person.role) {
+			void apply().catch(() => {});
+			return;
+		}
+		void confirm({
+			title: `Make ${person.name || person.email} an admin?`,
+			description: 'Admins manage people, access and settings for the whole workspace.',
+			confirmText: 'Make admin',
+			destructive: false,
+			onConfirm: apply
+		}).then((ok) => {
+			// A cancelled pick would leave the select showing a role nobody has.
+			if (!ok) pickerKey++;
+		});
+	}
 	const me = user.self();
 	const can = user.can();
 
@@ -53,8 +79,11 @@
 
 	function toggleTeam(teamId: string) {
 		if (!person) return;
-		const mutation = teamIds.has(teamId) ? removeFromTeam : addToTeam;
-		mutation.mutate({ teamId, userId: person.id });
+		const vars = { teamId, userId: person.id };
+		const run: () => Promise<unknown> = teamIds.has(teamId)
+			? () => removeFromTeam.mutateAsync(vars)
+			: () => addToTeam.mutateAsync(vars);
+		void autoSave.track(run).catch(() => {});
 	}
 
 	const dangerActions = $derived.by<DangerAction[]>(() => {
@@ -110,12 +139,14 @@
 			});
 			actions.push({
 				title: 'Delete account',
-				description: 'Access is revoked right away. They can be invited again.',
+				description:
+					'Their access ends right away and cannot be restored. Inviting them again starts a new account.',
 				label: 'Delete',
 				onClick: () =>
 					confirm({
 						title: `Delete ${name}?`,
-						description: 'All their access here is revoked right away. This cannot be undone.',
+						description:
+							'Their access ends right away and cannot be restored. Inviting them again starts a new account.',
 						confirmText: 'Delete',
 						typeToConfirm: person.email,
 						onConfirm: async () => {
@@ -135,12 +166,19 @@
 	loading={!person}
 	missing={query.isError}
 	title={person?.name || person?.email || ''}
+	detail={person?.name ? person.email : undefined}
+	detailMono
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
-		{ value: 'access', label: 'Access', icon: ShieldCheck }
+		{ value: 'access', label: 'Access', icon: ShieldCheck },
+		{ value: 'settings', label: 'Settings', icon: Settings2 }
 	]}
 	tab={sheet.tab}
 	onTabChange={(t) => (sheet.tab = t)}
+	saveState={autoSave.saveState}
+	saveHint={sheet.tab === 'settings' && canManage}
+	onRetry={autoSave.retry}
+	readonly={!canManage}
 	meta={{ id: person?.id, createdAt: person?.createdAt, updatedAt: person?.updatedAt }}
 >
 	{#snippet media()}
@@ -148,7 +186,6 @@
 	{/snippet}
 
 	{#snippet subtitle()}
-		<span class="truncate">{person?.email}</span>
 		{#if person && !person.active}
 			<Badge variant="muted">Deactivated</Badge>
 		{/if}
@@ -162,22 +199,6 @@
 
 	{#if person}
 		<Tabs.Content value="overview" class="flex flex-col divide-y">
-			<Section
-				title="Workspace role"
-				icon={UserCog}
-				description={isOwner
-					? 'The owner can do everything. Ownership changes through a transfer.'
-					: 'What they may change in this workspace.'}
-			>
-				{#if !isOwner}
-					<RolePicker
-						value={person.role}
-						disabled={!canManage || updateRole.isPending}
-						onChange={(role) => updateRole.mutate({ userId: person.id, role })}
-					/>
-				{/if}
-			</Section>
-
 			<Section
 				title="Teams"
 				icon={Users}
@@ -223,17 +244,33 @@
 								removeLabel={`Remove from ${t.name}`}
 							>
 								{#snippet leading()}
-									<span
-										class="flex size-6 items-center justify-center rounded-full bg-chart-2/15 text-chart-2"
-									>
-										<Users class="size-3" />
-									</span>
+									<Monogram name={t.name} class="size-6 rounded-full text-2xs" />
 								{/snippet}
 							</Chip>
 						{/each}
 					</div>
 				{:else if !userTeams.isLoading}
 					<p class="text-sm text-muted-foreground">Not in any team yet.</p>
+				{/if}
+			</Section>
+		</Tabs.Content>
+
+		<Tabs.Content value="settings" class="flex flex-col divide-y">
+			<Section
+				title="Workspace role"
+				icon={UserCog}
+				description={isOwner
+					? 'The owner can do everything. Ownership changes through a transfer.'
+					: 'What they may change in this workspace.'}
+			>
+				{#if !isOwner}
+					{#key pickerKey}
+						<RolePicker
+							value={person.role}
+							disabled={!canManage || updateRole.isPending}
+							onChange={changeRole}
+						/>
+					{/key}
 				{/if}
 			</Section>
 

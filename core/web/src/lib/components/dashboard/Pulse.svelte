@@ -18,6 +18,11 @@
 		const h = 23 - i;
 		return h === 0 ? 'this hour' : `${h}h ago`;
 	};
+	const busiest = $derived(data ? data.activity.indexOf(Math.max(...data.activity)) : -1);
+	// The bars only speak to eyes, so the chart says its numbers out loud.
+	const summary = $derived(
+		`Audit events per hour over the last 24 hours. ${events} in total${failures ? `, ${failures} failed` : ''}${events && busiest >= 0 ? `. Busiest: ${label(busiest)}, ${data?.activity[busiest]} events` : ''}.`
+	);
 
 	let selected = $state<EventLog>();
 </script>
@@ -26,10 +31,11 @@
 
 <Card.Root class="gap-4">
 	<Card.Header>
-		<Card.Title>Last 24 hours</Card.Title>
+		<Card.Title><h2>Last 24 hours</h2></Card.Title>
 		<Card.Description>
-			{events} audit events{failures ? `, ${failures} failed` : ''}. Changes worth knowing about
-			below.
+			{events} audit events{failures ? `, ${failures} failed` : ''}{data?.recentChanges.length
+				? ', and the changes worth knowing about'
+				: ''}
 		</Card.Description>
 		<Card.Action>
 			<Button size="sm" variant="ghost" href="/audit">
@@ -43,7 +49,7 @@
 			<Skeleton class="h-16 w-full" />
 		{:else}
 			<div class="flex flex-col gap-1">
-				<div class="flex h-14 items-end gap-0.5" role="img" aria-label="Audit events per hour">
+				<div class="flex h-14 items-end gap-0.5" role="img" aria-label={summary}>
 					{#each data.activity as n, i (i)}
 						{@const failed = data.failures[i] ?? 0}
 						<div

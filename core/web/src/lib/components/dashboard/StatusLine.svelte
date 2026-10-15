@@ -57,8 +57,7 @@
 	</div>
 
 	<p class={['flex items-center gap-2 text-lg font-bold', onConsole[summary.tone]]} role="status">
-		<span class={[summary.tone === 'success' && 'motion-safe:animate-breathe']}>{summary.mark}</span
-		>
+		<span aria-hidden="true">{summary.mark}</span>
 		{summary.text}
 	</p>
 

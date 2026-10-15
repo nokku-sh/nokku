@@ -32,7 +32,7 @@
 		{#if log.target}
 			<button
 				type="button"
-				class="max-w-64 truncate text-left font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+				class="max-w-64 truncate rounded-sm text-left font-mono text-xs text-muted-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-2 hover:text-foreground hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 				title="Show only events for this target"
 				onclick={() => setParams({ target: log.target })}
 			>

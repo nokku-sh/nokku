@@ -2,10 +2,12 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 import { recentTargets } from '#lib/store.svelte.js';
+import { nkLoginCommand } from '#lib/utils.js';
 import { toast } from 'svelte-sonner';
 import { daemon } from './daemons.svelte';
 import { target } from './targets.svelte';
 import { user } from './user.svelte';
+import { util } from './workspaces.svelte';
 
 function remember(id: string) {
 	recentTargets.current = [id, ...recentTargets.current.filter((r) => r !== id)].slice(0, 6);
@@ -14,6 +16,7 @@ function remember(id: string) {
 // useConnect is the one way into a server from the UI: a web shell, or the ssh command for the user's own terminal.
 export function useConnect() {
 	const createSession = daemon.createSession();
+	const info = util.instanceInfo();
 
 	return {
 		get pending() {
@@ -32,7 +35,13 @@ export function useConnect() {
 		async copy(t: Pick<Target, 'id' | 'name'>, username: string) {
 			remember(t.id);
 			await navigator.clipboard.writeText(`ssh ${username}@${t.name}`);
-			toast.success('SSH command copied', { description: 'Run nk login first on a new machine.' });
+			toast.success('SSH command copied', {
+				description: 'On a new machine, sign in once with nk login first.',
+				action: {
+					label: 'Copy nk login',
+					onClick: () => navigator.clipboard.writeText(nkLoginCommand(info.data?.caPin))
+				}
+			});
 		}
 	};
 }

@@ -87,70 +87,69 @@
 	}
 </script>
 
-<div class="flex flex-col items-center justify-between gap-2 sm:flex-row">
-	<div class="flex flex-col items-center gap-2 sm:flex-row">
-		{#if hasSearch}
-			<InputGroup.Root class="max-w-xs sm:min-w-sm">
-				<InputGroup.Input
-					value={searchValue}
-					placeholder={searchPlaceholder}
-					aria-label="Search"
-					oninput={handleSearchInput}
-					{@attach focusOnSlash}
-				/>
-				<InputGroup.Addon align="inline-end">
-					{#if searchValue}
-						{#if searchResultCount !== undefined}
-							<span class="text-xs text-muted-foreground">
-								{searchResultCount}
-								{searchResultCount === 1 ? 'result' : 'results'}
-							</span>
-						{/if}
-						<InputGroup.Button
-							variant="ghost"
-							size="icon-xs"
-							aria-label="Clear search"
-							onclick={handleSearchClear}
-						>
-							<DeleteIcon />
-						</InputGroup.Button>
-					{:else}
-						<Kbd.Root class="hidden sm:inline-flex">/</Kbd.Root>
-					{/if}
-				</InputGroup.Addon>
-				<InputGroup.Addon>
-					<SearchIcon />
-				</InputGroup.Addon>
-			</InputGroup.Root>
-		{/if}
-
-		{#each filters ?? [] as filter (filter.param)}
-			<FilterPill
-				title={filter.title}
-				options={filter.options}
-				mode={filter.mode}
-				selected={filterValue(filter)}
-				onChange={(next) => updateUrlParam(filter.param, next.join(',') || undefined)}
+<!-- Phones get the search on its own line and the filters in one row that scrolls. -->
+<div class="flex flex-col gap-2 md:flex-row md:items-center">
+	{#if hasSearch}
+		<InputGroup.Root class="w-full md:w-80">
+			<InputGroup.Input
+				value={searchValue}
+				placeholder={searchPlaceholder}
+				aria-label="Search"
+				oninput={handleSearchInput}
+				{@attach focusOnSlash}
 			/>
-		{/each}
+			<InputGroup.Addon align="inline-end">
+				{#if searchValue}
+					{#if searchResultCount !== undefined}
+						<span class="text-xs text-muted-foreground tabular-nums">
+							{searchResultCount}
+							{searchResultCount === 1 ? 'result' : 'results'}
+						</span>
+					{/if}
+					<InputGroup.Button
+						variant="ghost"
+						size="icon-xs"
+						aria-label="Clear search"
+						onclick={handleSearchClear}
+					>
+						<DeleteIcon />
+					</InputGroup.Button>
+				{:else}
+					<Kbd.Root class="hidden pointer-fine:inline-flex">/</Kbd.Root>
+				{/if}
+			</InputGroup.Addon>
+			<InputGroup.Addon>
+				<SearchIcon />
+			</InputGroup.Addon>
+		</InputGroup.Root>
+	{/if}
 
-		{@render children?.()}
+	<div class="flex min-w-0 flex-1 items-center gap-2">
+		<div class="-m-1 no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto p-1">
+			{#each filters ?? [] as filter (filter.param)}
+				<FilterPill
+					title={filter.title}
+					options={filter.options}
+					mode={filter.mode}
+					selected={filterValue(filter)}
+					onChange={(next) => updateUrlParam(filter.param, next.join(',') || undefined)}
+				/>
+			{/each}
 
-		{#if isFiltered}
-			<Button
-				variant="ghost"
-				onclick={handleReset}
-				title="Reset filters"
-				aria-label="Reset filters"
-			>
-				<XIcon />
-			</Button>
-		{/if}
-	</div>
+			{@render children?.()}
 
-	<div class="flex items-center justify-end gap-2">
+			{#if isFiltered}
+				<Button variant="ghost" size="sm" class="shrink-0" onclick={handleReset}>
+					<XIcon data-icon="inline-start" />
+					Reset
+				</Button>
+			{/if}
+		</div>
+
 		{#if table}
-			<TableViewOptions {table} />
+			<div class="ml-auto shrink-0">
+				<TableViewOptions {table} />
+			</div>
 		{/if}
 	</div>
 </div>

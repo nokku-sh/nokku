@@ -24,7 +24,7 @@
 
 <Card.Root class="gap-3">
 	<Card.Header>
-		<Card.Title>Needs you</Card.Title>
+		<Card.Title><h2>Needs you</h2></Card.Title>
 		<Card.Description>Only what someone has to act on.</Card.Description>
 	</Card.Header>
 	<Card.Content>

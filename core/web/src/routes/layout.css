@@ -16,7 +16,7 @@
 	--card-foreground: oklch(0.21 0.016 260);
 	--popover: oklch(0.995 0.002 255);
 	--popover-foreground: oklch(0.21 0.016 260);
-	--primary: oklch(0.56 0.115 205);
+	--primary: oklch(0.52 0.115 205);
 	--primary-foreground: oklch(0.985 0.002 255);
 	--secondary: oklch(0.93 0.01 260);
 	--secondary-foreground: oklch(0.3 0.02 260);
@@ -28,27 +28,34 @@
 	--destructive-foreground: oklch(1 0 0);
 	--border: oklch(0.88 0.01 260);
 	--input: oklch(0.85 0.012 260);
-	--ring: oklch(0.56 0.115 205);
-	--success: oklch(0.56 0.13 150);
+	--ring: oklch(0.52 0.115 205);
+	/* Tones are dark enough to be text on paper, on a card and on their own 10% wash (AA). */
+	--success: oklch(0.5 0.13 150);
 	--success-foreground: oklch(0.985 0.002 255);
-	--warning: oklch(0.66 0.14 65);
-	--warning-foreground: oklch(0.22 0.04 65);
-	--info: oklch(0.56 0.13 245);
+	--warning: oklch(0.52 0.14 65);
+	--warning-foreground: oklch(0.985 0.002 255);
+	--info: oklch(0.5 0.13 245);
 	--info-foreground: oklch(0.985 0.002 255);
 	/* One hue family plus neutral steps. Data, not confetti. */
-	--chart-1: oklch(0.56 0.115 205);
+	--chart-1: oklch(0.52 0.115 205);
 	--chart-2: oklch(0.62 0.09 230);
 	--chart-3: oklch(0.55 0.05 260);
 	--chart-4: oklch(0.6 0.03 260);
 	--chart-5: oklch(0.5 0.08 180);
 	--sidebar: oklch(0.955 0.006 255);
 	--sidebar-foreground: oklch(0.3 0.02 260);
-	--sidebar-primary: oklch(0.56 0.115 205);
+	--sidebar-primary: oklch(0.52 0.115 205);
 	--sidebar-primary-foreground: oklch(0.985 0.002 255);
 	--sidebar-accent: oklch(0.92 0.01 260);
 	--sidebar-accent-foreground: oklch(0.21 0.016 260);
 	--sidebar-border: transparent;
-	--sidebar-ring: oklch(0.56 0.115 205);
+	--sidebar-ring: oklch(0.52 0.115 205);
+
+	/* Monogram tiles: one quiet tint per name, the hue comes from the component. */
+	--monogram-l: 0.93;
+	--monogram-c: 0.04;
+	--monogram-fg-l: 0.38;
+	--monogram-fg-c: 0.08;
 
 	/* The logo's own colors, from nokku-sh/logos. Fixed, not themed. */
 	--brand-caret: #15d1aa;
@@ -105,7 +112,8 @@
 	--muted-foreground: oklch(0.66 0.012 260);
 	--accent: oklch(0.25 0.03 205);
 	--accent-foreground: oklch(0.9 0.06 192);
-	--destructive: oklch(0.64 0.19 25);
+	/* Light enough to stay AA as text on its own 20% wash, which is how destructive buttons render. */
+	--destructive: oklch(0.7 0.19 25);
 	--destructive-foreground: oklch(1 0 0);
 	--border: oklch(0.255 0.02 262);
 	--input: oklch(0.32 0.02 262);
@@ -130,6 +138,10 @@
 	--sidebar-border: transparent;
 	--sidebar-ring: oklch(0.82 0.13 192);
 	--brand-dot: #d6dbe4;
+	--monogram-l: 0.3;
+	--monogram-c: 0.05;
+	--monogram-fg-l: 0.86;
+	--monogram-fg-c: 0.07;
 }
 
 @theme inline {
@@ -179,7 +191,8 @@
 	--color-terminal-ok: var(--ansi-10);
 	--color-terminal-warn: var(--ansi-11);
 	--color-terminal-err: var(--ansi-9);
-	--color-terminal-dim: var(--ansi-8);
+	/* ansi-8 stays true to the terminal palette, but is too faint for labels on the console. */
+	--color-terminal-dim: color-mix(in oklch, var(--terminal-foreground) 60%, var(--terminal));
 
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
@@ -257,6 +270,12 @@
 	color: var(--color-muted-foreground);
 }
 
+/* A tile told apart by its tint. Set --hue on the element, the theme sets the rest. */
+@utility monogram {
+	background-color: oklch(var(--monogram-l) var(--monogram-c) var(--hue, 255));
+	color: oklch(var(--monogram-fg-l) var(--monogram-fg-c) var(--hue, 255));
+}
+
 @utility no-scrollbar {
 	-webkit-overflow-scrolling: touch;
 	-ms-overflow-style: none;
@@ -315,10 +334,58 @@
 	--term-color-15: var(--ansi-15);
 }
 
-/* A viewport-sized backdrop blur tears into bands on fractionally scaled screens, so sheets only dim. */
-[data-slot='sheet-overlay'] {
+/* A viewport-sized backdrop blur tears into bands on fractionally scaled screens, so overlays only dim. */
+[data-slot='sheet-overlay'],
+[data-slot='dialog-overlay'],
+[data-slot='alert-dialog-overlay'] {
 	backdrop-filter: none;
 	background: rgb(0 0 0 / 0.2);
+}
+
+/* Menus are solid sheets, not glass. Text behind them never bleeds through. */
+[data-slot='dropdown-menu-content'],
+[data-slot='dropdown-menu-sub-content'],
+[data-slot='select-content'] {
+	background-color: var(--popover);
+	&::before {
+		backdrop-filter: none;
+	}
+}
+
+/* The current page is the one place the sidebar uses the signal. Hover stays grey. */
+[data-slot='sidebar-menu-button'][data-active]:not([data-active='false']) {
+	background-color: var(--accent);
+	color: var(--accent-foreground);
+	& > svg {
+		color: var(--primary);
+	}
+}
+
+/* Rows: a hover you can see on a card, and selection in the signal, not grey. */
+[data-slot='table-body'] > [data-slot='table-row'] {
+	&:hover {
+		background-color: var(--muted);
+	}
+	&[data-state='selected'] {
+		background-color: var(--accent);
+	}
+}
+
+/* A table that scrolls sideways fades at the edge that still hides columns. */
+[data-fade-end] > [data-slot='table-container'] {
+	mask-image: linear-gradient(to left, transparent, black 2.5rem);
+}
+
+/* A tab panel takes focus on Tab, so it shows where focus went. */
+[data-slot='tabs-content']:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 4px;
+	border-radius: var(--radius-sm);
+}
+
+/* foreground/60 on the muted track lands under AA. */
+[data-slot='tabs-trigger'][data-state='inactive']:not(:hover) {
+	color: var(--muted-foreground);
 }
 
 /* The forms plugin borders every text input. This one already sits inside its own field. */
@@ -348,4 +415,13 @@ body:has([data-slot='sheet-overlay'], [data-slot='dialog-overlay'])
 	margin: auto;
 	height: fit-content;
 	translate: none;
+}
+
+/* The menu content forces destructive items to teal with !important from the utilities layer.
+   Important rules in an earlier layer win, so base takes Delete back to red. */
+@layer base {
+	[data-slot='dropdown-menu-item'][data-variant='destructive'],
+	[data-slot='dropdown-menu-item'][data-variant='destructive'] * {
+		color: var(--destructive) !important;
+	}
 }

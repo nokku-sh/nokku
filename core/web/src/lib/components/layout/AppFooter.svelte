@@ -7,7 +7,7 @@
 </script>
 
 <footer
-	class="flex flex-col items-center justify-between gap-4 rounded-b-xl border-t bg-background/95 px-4 py-2 backdrop-blur supports-backdrop-filter:bg-background/80 sm:flex-row"
+	class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-b-xl border-t bg-background px-4 py-1 sm:py-2"
 >
 	<LegalLinks />
 
@@ -15,7 +15,7 @@
 		<div
 			class="flex h-8 items-center gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground sm:px-3"
 		>
-			<span class="italic opacity-70">
+			<span class="italic">
 				{#if version.data && version.data !== 'dev'}
 					v{version.data}
 				{:else}

@@ -17,8 +17,8 @@
 	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
-		BadgeCell,
 		RoleCell,
+		StateCell,
 		TeamCell,
 		UserCell
 	} from '#lib/components/tables/cells/index.js';
@@ -51,7 +51,7 @@
 
 	const remove = users.delete();
 	const removeMany = users.deleteMany();
-	const updateRole = users.updateRole();
+
 	const setActive = users.setActive();
 
 	// The owner and you are never in a bulk delete, the server refuses both.
@@ -92,28 +92,20 @@
 		columnHelper.accessor('role', {
 			header: 'Role',
 			enableColumnFilter: true,
-			cell: ({ row }) =>
-				renderComponent(RoleCell, {
-					role: row.original.role,
-					update:
-						canManage &&
-						row.original.role !== WorkspaceRole.OWNER &&
-						row.original.id !== me.data?.id
-							? (role) => updateRole.mutateAsync({ userId: row.original.id, role })
-							: undefined
-				})
+			cell: ({ row }) => renderComponent(RoleCell, { role: row.original.role })
 		}),
 		columnHelper.accessor('active', {
 			header: 'Status',
 			cell: ({ row }) =>
-				renderComponent(BadgeCell, {
-					value: row.original.active ? 'Active' : 'Deactivated',
-					variant: row.original.active ? 'secondary' : 'outline'
+				renderComponent(StateCell, {
+					label: row.original.active ? 'Active' : 'Deactivated',
+					tone: row.original.active ? 'success' : 'muted'
 				})
 		}),
 		columnHelper.display({
 			id: 'teams',
 			header: 'Teams',
+			meta: { hideBelow: 'md' },
 			cell: ({ row }) => renderComponent(TeamCell, { userId: row.original.id })
 		}),
 		columnHelper.display({
@@ -122,6 +114,9 @@
 				const u = row.original;
 				const protectedRow = u.role === WorkspaceRole.OWNER || u.id === me.data?.id || !canManage;
 				return renderComponent(ActionCell, {
+					label: u.name || u.email,
+					id: u.id,
+					link: true,
 					menuActions: [
 						{
 							label: can.edit ? 'Manage access' : 'View access',
@@ -171,9 +166,12 @@
 	data={list.data?.users ?? []}
 	rowCount={list.data?.total ?? 0}
 	isLoading={list.isLoading}
+	error={list.error}
+	onRetry={list.refetch}
 	{columns}
 	bulkActions={canManage ? bulkActions : []}
 	onRowClick={(u) => sheet.show(u.id)}
+	rowLabel={(u) => u.name || u.email}
 	emptyState={{
 		icon: CircleUser,
 		title: 'Nobody here yet',

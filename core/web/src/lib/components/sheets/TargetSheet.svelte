@@ -18,6 +18,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
@@ -31,7 +32,6 @@
 		Info,
 		Plus,
 		RefreshCw,
-		Server,
 		Settings2,
 		ShieldCheck,
 		SquareTerminal
@@ -173,26 +173,26 @@
 		: undefined}
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
-		{ value: 'access', label: 'Access', icon: ShieldCheck, count: accounts.length },
+		{ value: 'access', label: 'Access', icon: ShieldCheck },
 		{ value: 'settings', label: 'Settings', icon: Settings2 }
 	]}
 	tab={sheet.tab}
 	onTabChange={(t) => (sheet.tab = t)}
+	detail={entity?.metadata?.hostname || entity?.endpoints[0] || entity?.description}
+	detailMono={!!(entity?.metadata?.hostname || entity?.endpoints[0])}
 	saveState={autoSave.saveState}
 	saveHint={sheet.tab === 'settings'}
+	onRetry={autoSave.retry}
 	readonly={!can.edit}
 	actions={accounts.length ? connectMenu : undefined}
 	meta={{
 		id: entity?.id,
 		createdAt: entity?.createdAt,
-		updatedAt: entity?.updatedAt,
-		extra: [{ label: 'Daemon', value: entity?.daemonId, copy: true }]
+		updatedAt: entity?.updatedAt
 	}}
 >
 	{#snippet media()}
-		<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-			<Server class="size-5" />
-		</div>
+		<Monogram name={entity?.name ?? ''} class="size-10 text-sm" />
 	{/snippet}
 
 	{#snippet subtitle()}
@@ -200,15 +200,18 @@
 			<Badge variant="outline"><RefreshCw data-icon="inline-start" />Manual sync</Badge>
 		{:else}
 			<span class="flex items-center gap-1.5">
-				<StatusDot tone={online ? 'success' : 'muted'} live={online} />
+				<StatusDot tone={online ? 'success' : 'warning'} live={online} />
 				{online ? 'Online' : 'Offline'} via
-				<a href={`/infrastructure/daemons?id=${entity?.daemonId}`} class="hover:underline">
+				<a
+					href={`/infrastructure/daemons?id=${entity?.daemonId}`}
+					class="underline decoration-muted-foreground/40 decoration-dotted underline-offset-2 hover:decoration-current"
+				>
 					{linkedDaemon?.name ?? 'daemon'}
 				</a>
 			</span>
 		{/if}
 		{#each model?.tags ?? [] as tag (tag)}
-			<Badge variant="secondary">{tag}</Badge>
+			<Badge variant="outline" class="h-5 rounded-full px-2 font-normal">{tag}</Badge>
 		{/each}
 	{/snippet}
 
@@ -221,8 +224,8 @@
 						onclick={() => (sheet.tab = stat.tab)}
 						class="flex flex-col items-start rounded-lg border bg-card px-3 py-2 text-left transition-colors hover:bg-muted/50"
 					>
+						<span class="spec-label">{stat.label}</span>
 						<span class="text-xl font-semibold tabular-nums">{stat.value}</span>
-						<span class="text-xs text-muted-foreground">{stat.label}</span>
 					</button>
 				{/each}
 			</div>

@@ -61,7 +61,7 @@
 	{#if onRemove}
 		<button
 			type="button"
-			class="rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none pointer-fine:opacity-50 pointer-fine:group-hover/chip:opacity-100 pointer-fine:focus-visible:opacity-100"
+			class="rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none pointer-fine:opacity-50 pointer-fine:group-hover/chip:opacity-100 pointer-fine:focus-visible:opacity-100"
 			aria-label={removeLabel}
 			onclick={onRemove}
 		>

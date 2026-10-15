@@ -24,7 +24,7 @@
 				{...props}
 				type="button"
 				class={cn(
-					'-mx-1 inline-flex max-w-full min-w-0 cursor-copy items-center gap-1 rounded-sm px-1 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+					'-mx-1 inline-flex max-w-full min-w-0 cursor-copy items-center gap-1 rounded-sm px-1 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
 					mono && 'font-mono text-xs',
 					className
 				)}

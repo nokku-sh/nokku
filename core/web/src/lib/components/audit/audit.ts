@@ -147,12 +147,13 @@ export const outcomes = [
 	{ value: 'succeeded', label: 'Succeeded', icon: CircleCheck, enum: AuditOutcome.SUCCEEDED }
 ];
 
-export const actorKinds: { value: string; label: string; icon: LucideIcon }[] = [
-	{ value: 'user', label: 'People', icon: CircleUser },
-	{ value: 'cli', label: 'CLI', icon: Terminal },
-	{ value: 'service_account', label: 'Service accounts', icon: Bot },
-	{ value: 'daemon', label: 'Daemons', icon: Server },
-	{ value: 'scim', label: 'SCIM', icon: RefreshCw }
+/** `label` names the group in filters, `one` names a single actor in a row. */
+export const actorKinds: { value: string; label: string; one: string; icon: LucideIcon }[] = [
+	{ value: 'user', label: 'People', one: 'Person', icon: CircleUser },
+	{ value: 'cli', label: 'CLI', one: 'CLI', icon: Terminal },
+	{ value: 'service_account', label: 'Service accounts', one: 'Service account', icon: Bot },
+	{ value: 'daemon', label: 'Daemons', one: 'Daemon', icon: Server },
+	{ value: 'scim', label: 'SCIM', one: 'SCIM', icon: RefreshCw }
 ];
 export const kindOf = (kind: string) => actorKinds.find((k) => k.value === kind);
 

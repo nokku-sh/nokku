@@ -10,7 +10,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { focusOnSlash } from '#lib/hooks/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
-	import { Search, Server } from '@lucide/svelte';
+	import { Copy, Search, Server, SquareTerminal } from '@lucide/svelte';
 
 	let { showAll = false }: { showAll?: boolean } = $props();
 
@@ -27,8 +27,10 @@
 
 <Card.Root class="gap-3">
 	<Card.Header>
-		<Card.Title>Your servers</Card.Title>
-		<Card.Description>Click an account to open a shell, or copy its ssh command.</Card.Description>
+		<Card.Title><h2>Your servers</h2></Card.Title>
+		<Card.Description>
+			Click an account to open a shell here, or copy its ssh command for your own terminal.
+		</Card.Description>
 		<Card.Action>
 			<InputGroup.Root class="w-44 sm:w-56">
 				<InputGroup.Input
@@ -38,7 +40,9 @@
 					{@attach focusOnSlash}
 				/>
 				<InputGroup.Addon><Search /></InputGroup.Addon>
-				<InputGroup.Addon align="inline-end"><Kbd.Root>/</Kbd.Root></InputGroup.Addon>
+				<InputGroup.Addon align="inline-end" class="hidden pointer-fine:flex">
+					<Kbd.Root>/</Kbd.Root>
+				</InputGroup.Addon>
 			</InputGroup.Root>
 		</Card.Action>
 	</Card.Header>
@@ -53,7 +57,9 @@
 					<Empty.Media variant="icon"><Server /></Empty.Media>
 					<Empty.Title>{query ? 'No server matches' : 'No servers for you yet'}</Empty.Title>
 					<Empty.Description>
-						{query ? 'Try a name, host or account.' : 'An admin grants you an account on a target.'}
+						{query
+							? 'Try a name, host or account.'
+							: 'An admin gives you an account on a server. Once they do, it shows up here.'}
 					</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>
@@ -80,12 +86,17 @@
 											<Button
 												{...props}
 												size="xs"
-												variant="secondary"
+												variant={shell ? 'secondary' : 'outline'}
 												class="font-mono"
 												disabled={connect.pending}
 												onclick={() =>
 													shell ? connect.shell(t, username) : connect.copy(t, username)}
 											>
+												{#if shell}
+													<SquareTerminal data-icon="inline-start" />
+												{:else}
+													<Copy data-icon="inline-start" />
+												{/if}
 												{username}
 											</Button>
 										{/snippet}

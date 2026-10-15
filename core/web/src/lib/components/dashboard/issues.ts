@@ -14,9 +14,13 @@ export type Issue = {
 	approve?: Daemon[];
 };
 
-/** The one line that sums the issues up. Undefined issues means still loading. */
-export function headline(issues: Issue[] | undefined): { mark: string; text: string; tone: Tone } {
+/** The one line that sums the issues up. Undefined issues means still loading, fresh means nothing is enrolled yet. */
+export function headline(
+	issues: Issue[] | undefined,
+	fresh = false
+): { mark: string; text: string; tone: Tone } {
 	if (!issues) return { mark: '…', text: 'checking', tone: 'muted' };
+	if (!issues.length && fresh) return { mark: '○', text: 'no servers yet', tone: 'info' };
 	if (!issues.length) return { mark: '●', text: 'all good', tone: 'success' };
 	const n = issues.length;
 	const bad = issues[0].tone === 'destructive';
@@ -25,6 +29,11 @@ export function headline(issues: Issue[] | undefined): { mark: string; text: str
 		text: `${n} ${n === 1 ? 'thing needs' : 'things need'} you`,
 		tone: bad ? 'destructive' : 'warning'
 	};
+}
+
+/** Nothing enrolled yet, so there is nothing to be healthy about. */
+export function isFresh(d: GetDashboardResponse | undefined): boolean {
+	return !!d && d.targets === 0 && d.daemons === 0;
 }
 
 const DAY = 24 * 3600_000;
@@ -67,12 +76,14 @@ export function issuesOf(d: GetDashboardResponse): Issue[] {
 	for (const ca of d.soonestCas) {
 		const left = ca.notAfter ? timestampDate(ca.notAfter).getTime() - Date.now() : Infinity;
 		if (left > 14 * DAY) continue;
+		const urgent = left < 3 * DAY;
 		issues.push({
 			id: `ca-${ca.id}`,
-			tone: left < 3 * DAY ? 'destructive' : 'warning',
+			tone: urgent ? 'destructive' : 'warning',
 			title: `${ca.name} expires ${formatTs(ca.notAfter, 'relative')}`,
-			detail:
-				'It should have rolled over by now. Roll it over, or logins signed by it stop working.',
+			detail: urgent
+				? 'Roll it over now. Logins signed by it stop working when it expires.'
+				: 'Roll it over before then, or logins signed by it stop working.',
 			href: `/certificates?id=${ca.id}`
 		});
 	}

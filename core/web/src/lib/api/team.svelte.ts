@@ -52,12 +52,7 @@ export const team = {
 		}),
 	deleteMany: () =>
 		useBulkMutation(TeamService.method.deleteTeam, (n) => `${plural(n, 'team')} deleted`),
-	removeMember: () =>
-		useMutation(TeamService.method.removeTeamMember, {
-			onSuccess: () => toast.success('Member removed')
-		}),
-	addMember: () =>
-		useMutation(TeamService.method.addTeamMember, {
-			onSuccess: () => toast.success('Member added')
-		})
+	// No toasts, the sheet footer reports membership changes.
+	removeMember: () => useMutation(TeamService.method.removeTeamMember),
+	addMember: () => useMutation(TeamService.method.addTeamMember)
 };

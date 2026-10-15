@@ -44,7 +44,7 @@
 	>
 		{#each tiles as item (item.label)}
 			<div class={cn('flex min-w-0 flex-col gap-0.5 bg-card px-3 py-2', item.wide && 'col-span-2')}>
-				<dt class="text-2xs font-medium tracking-wide text-muted-foreground uppercase">
+				<dt class="spec-label">
 					{item.label}
 				</dt>
 				<dd class={cn('flex min-h-5 min-w-0 items-center', item.mono && 'font-mono text-xs')}>

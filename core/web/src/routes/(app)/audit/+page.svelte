@@ -5,7 +5,7 @@
 	import { util } from '#lib/api/workspaces.svelte.js';
 	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
 	import { DataTable, TableToolbar, createAppColumnHelper } from '#lib/components/tables/index.js';
-	import { TextCell, TimeCell } from '#lib/components/tables/cells/index.js';
+	import { MachineCell, TimeCell } from '#lib/components/tables/cells/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
@@ -21,6 +21,7 @@
 		actorKinds,
 		areas,
 		csv,
+		eventLabel,
 		outcomes,
 		quickViews,
 		setParams
@@ -85,7 +86,8 @@
 		}),
 		columnHelper.accessor('ip', {
 			header: 'Source',
-			cell: ({ row }) => renderComponent(TextCell, { label: row.original.ip || '-', mono: true })
+			meta: { hideBelow: 'md' },
+			cell: ({ row }) => renderComponent(MachineCell, { value: row.original.ip })
 		})
 	]);
 </script>
@@ -142,6 +144,9 @@
 	{columns}
 	rowCount={logs.data?.total ?? 0}
 	isLoading={logs.isLoading}
+	error={logs.error}
+	onRetry={logs.refetch}
+	rowLabel={(log) => `${eventLabel(log.action)} by ${log.actorName || 'unknown'}`}
 	onRowClick={(log) => (selected = log)}
 	emptyState={{
 		icon: FileClock,

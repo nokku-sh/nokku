@@ -13,7 +13,7 @@
 	} from '#lib/components/tables/index.js';
 	import {
 		ActionCell,
-		AvatarCell,
+		IdentityCell,
 		RoleCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
@@ -48,7 +48,6 @@
 
 	const deleteSA = serviceAccount.delete();
 	const deleteSAs = serviceAccount.deleteMany();
-	const updateSA = serviceAccount.update();
 
 	const bulkActions: BulkAction<ServiceAccount>[] = [
 		{
@@ -80,27 +79,24 @@
 		columnHelper.accessor('name', {
 			header: 'Name',
 			cell: ({ row }) =>
-				renderComponent(AvatarCell, {
-					id: row.original.id,
+				renderComponent(IdentityCell, {
 					name: row.original.name,
-					description: row.original.description
+					detail: row.original.description
 				})
 		}),
 		columnHelper.accessor('role', {
 			header: 'Role',
-			cell: ({ row }) =>
-				renderComponent(RoleCell, {
-					role: row.original.role,
-					max: SERVICE_ACCOUNT_MAX_ROLE,
-					// An update replaces the tags, so they go along.
-					update: can.edit
-						? (role) => updateSA.mutateAsync({ id: row.original.id, role, tags: row.original.tags })
-						: undefined
-				})
+			cell: ({ row }) => renderComponent(RoleCell, { role: row.original.role })
 		}),
 		columnHelper.accessor('lastUsedAt', {
 			header: 'Last used',
-			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.lastUsedAt })
+			meta: { hideBelow: 'md' },
+			cell: ({ row }) =>
+				renderComponent(TimeCell, {
+					ts: row.original.lastUsedAt,
+					fallback: 'Never',
+					emphasize: 'relative'
+				})
 		}),
 		columnHelper.accessor('updatedAt', {
 			header: 'Updated',
@@ -114,6 +110,9 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				return renderComponent(ActionCell, {
+					label: row.original.name,
+					id: row.original.id,
+					link: true,
 					menuActions: [
 						{
 							label: can.edit ? 'Manage access' : 'View access',
@@ -155,6 +154,9 @@
 	data={saData.data?.serviceAccounts ?? []}
 	rowCount={saData.data?.total ?? 0}
 	isLoading={saData.isLoading}
+	error={saData.error}
+	onRetry={saData.refetch}
+	rowLabel={(sa) => sa.name}
 	{columns}
 	bulkActions={can.edit ? bulkActions : []}
 	onRowClick={(sa) => sheet.show(sa.id)}

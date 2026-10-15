@@ -1,44 +1,53 @@
 <script lang="ts">
-	import { Badge } from '#lib/components/ui/badge/index.js';
-	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
+	import { Badge, badgeVariants } from '#lib/components/ui/badge/index.js';
+	import * as Popover from '#lib/components/ui/popover/index.js';
+	import { cn } from '#lib/utils.js';
 
 	type Props = {
 		tags: string[];
 		maxVisible?: number;
+		/** For machine values like login accounts. */
+		mono?: boolean;
+		/** What the chips are, for the "+n" label. */
+		noun?: string;
 	};
-	let { tags = [], maxVisible = 2, ...restProps }: Props = $props();
+	let { tags = [], maxVisible = 3, mono = false, noun = 'tags' }: Props = $props();
 
-	let visibleTags = $derived(tags.slice(0, maxVisible));
-	let hiddenTags = $derived(tags.slice(maxVisible));
-	let hasHidden = $derived(hiddenTags.length > 0);
+	// "+1" would take the room of the one chip it hides.
+	const visible = $derived(tags.length <= maxVisible + 1 ? tags : tags.slice(0, maxVisible));
+	const rest = $derived(tags.slice(visible.length));
+
+	const chip = $derived(cn('h-5 rounded-full px-2 font-normal', mono && 'font-mono'));
 </script>
 
-<div class="flex flex-wrap items-center gap-1" {...restProps}>
-	{#each visibleTags as tag}
-		<Badge variant="secondary" class="px-1.5 py-0.5 text-2xs leading-none font-normal">
-			{tag}
-		</Badge>
+{#snippet chips(list: string[])}
+	{#each list as tag (tag)}
+		<Badge variant="outline" class={chip}>{tag}</Badge>
 	{/each}
+{/snippet}
 
-	{#if hasHidden}
-		<HoverCard.Root>
-			<HoverCard.Trigger>
-				<Badge
-					variant="outline"
-					class="cursor-default px-1.5 py-0.5 text-2xs leading-none font-normal text-muted-foreground"
+{#if !tags.length}
+	<span class="text-sm text-muted-foreground">-</span>
+{:else}
+	<div class="flex items-center gap-1">
+		{@render chips(visible)}
+		{#if rest.length}
+			<Popover.Root>
+				<Popover.Trigger
+					class={cn(
+						badgeVariants({ variant: 'outline' }),
+						'h-5 cursor-pointer rounded-full px-2 font-normal text-muted-foreground hover:bg-muted hover:text-foreground'
+					)}
+					aria-label={`${rest.length} more ${noun}`}
 				>
-					+{hiddenTags.length}
-				</Badge>
-			</HoverCard.Trigger>
-			<HoverCard.Content class="w-auto p-2">
-				<div class="flex max-w-50 flex-wrap gap-1">
-					{#each hiddenTags as tag}
-						<Badge variant="secondary" class="px-1.5 py-0.5 text-2xs leading-none font-normal">
-							{tag}
-						</Badge>
-					{/each}
-				</div>
-			</HoverCard.Content>
-		</HoverCard.Root>
-	{/if}
-</div>
+					+{rest.length}
+				</Popover.Trigger>
+				<Popover.Content class="w-auto max-w-64 p-2" align="start">
+					<div class="flex flex-wrap gap-1">
+						{@render chips(rest)}
+					</div>
+				</Popover.Content>
+			</Popover.Root>
+		{/if}
+	</div>
+{/if}

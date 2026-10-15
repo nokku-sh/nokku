@@ -12,6 +12,7 @@
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
+	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
@@ -55,8 +56,11 @@
 	const save = () => autoSave.save();
 
 	function toggleMember(userId: string) {
-		const mutation = memberIds.has(userId) ? removeMember : addMember;
-		mutation.mutate({ teamId: sheet.id, userId });
+		const vars = { teamId: sheet.id, userId };
+		const run: () => Promise<unknown> = memberIds.has(userId)
+			? () => removeMember.mutateAsync(vars)
+			: () => addMember.mutateAsync(vars);
+		void autoSave.track(run).catch(() => {});
 	}
 
 	function askDelete() {
@@ -103,15 +107,15 @@
 	]}
 	tab={sheet.tab}
 	onTabChange={(t) => (sheet.tab = t)}
+	detail={entity?.description}
 	saveState={autoSave.saveState}
 	saveHint={sheet.tab === 'settings'}
+	onRetry={autoSave.retry}
 	readonly={!can.edit}
 	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
-		<div class="flex size-10 items-center justify-center rounded-lg bg-chart-2/15 text-chart-2">
-			<Users class="size-5" />
-		</div>
+		<Monogram name={entity?.name ?? ''} class="size-10 text-sm" />
 	{/snippet}
 
 	{#snippet subtitle()}
@@ -168,9 +172,7 @@
 								label={m.name || m.email}
 								href={`/access/users?id=${m.id}`}
 								title={m.email}
-								onRemove={can.edit
-									? () => removeMember.mutate({ teamId: entity.id, userId: m.id })
-									: undefined}
+								onRemove={can.edit ? () => toggleMember(m.id) : undefined}
 							>
 								{#snippet leading()}
 									<UserAvatar user={m} class="size-6" />

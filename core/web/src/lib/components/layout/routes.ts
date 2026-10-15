@@ -12,12 +12,9 @@ import {
 	IdCard,
 	KeyRound,
 	Mail,
-	Orbit,
 	Server,
 	ServerCog,
-	Settings,
 	Shield,
-	ShieldCheck,
 	SlidersHorizontal,
 	SquareTerminal,
 	User,
@@ -39,36 +36,57 @@ export type RouteItem = {
 	role?: WorkspaceRole;
 };
 
+// Groups hold four pages at most, so every entry is a link and nothing hides behind a toggle.
 export const AppRoutes: Record<string, RouteItem[]> = {
 	Overview: [
-		{ title: 'Dashboard', url: '/', icon: Gauge, shortcut: 'd' },
+		{ title: 'Dashboard', url: '/', icon: Gauge, shortcut: 'h' },
+		// Every member opens shells on their own servers here.
+		{ title: 'Sessions', url: '/sessions', icon: SquareTerminal, shortcut: 's' },
 		{
 			title: 'Topology',
 			url: '/topology',
 			icon: VectorSquare,
 			role: WorkspaceRole.VIEWER,
 			shortcut: 'o'
+		}
+	],
+	Access: [
+		{
+			title: 'Users',
+			url: '/access/users',
+			icon: CircleUser,
+			role: WorkspaceRole.VIEWER,
+			shortcut: 'u'
 		},
 		{
-			title: 'Access',
-			url: '/access',
-			icon: ShieldCheck,
+			title: 'Teams',
+			url: '/access/teams',
+			icon: Users,
 			role: WorkspaceRole.VIEWER,
-			items: [
-				{ title: 'Users', url: '/access/users', icon: CircleUser, shortcut: 'm' },
-				{ title: 'Teams', url: '/access/teams', icon: Users },
-				{ title: 'Service accounts', url: '/access/service-accounts', icon: Waypoints }
-			]
+			shortcut: 'm'
 		},
 		{
-			title: 'Infrastructure',
-			url: '/infrastructure',
-			icon: Orbit,
+			title: 'Service accounts',
+			url: '/access/service-accounts',
+			icon: Waypoints,
 			role: WorkspaceRole.VIEWER,
-			items: [
-				{ title: 'Targets', url: '/infrastructure/targets', icon: Server, shortcut: 't' },
-				{ title: 'Daemons', url: '/infrastructure/daemons', icon: Bot, shortcut: 'n' }
-			]
+			shortcut: 'v'
+		}
+	],
+	Infrastructure: [
+		{
+			title: 'Targets',
+			url: '/infrastructure/targets',
+			icon: Server,
+			role: WorkspaceRole.VIEWER,
+			shortcut: 't'
+		},
+		{
+			title: 'Daemons',
+			url: '/infrastructure/daemons',
+			icon: Bot,
+			role: WorkspaceRole.VIEWER,
+			shortcut: 'd'
 		},
 		{
 			title: 'Certificate authorities',
@@ -76,47 +94,52 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			icon: IdCard,
 			role: WorkspaceRole.VIEWER,
 			shortcut: 'c'
-		},
-		{
-			title: 'Sessions',
-			url: '/sessions',
-			icon: SquareTerminal,
-			role: WorkspaceRole.VIEWER,
-			shortcut: 'x'
-		},
+		}
+	],
+	Activity: [
 		{
 			title: 'Recordings',
 			url: '/recordings',
 			icon: Video,
 			role: WorkspaceRole.VIEWER,
 			shortcut: 'r'
-		}
-	],
-	Management: [
+		},
 		{
 			title: 'Audit log',
 			url: '/audit',
 			icon: FileClock,
-			shortcut: 'a',
-			role: WorkspaceRole.VIEWER
+			role: WorkspaceRole.VIEWER,
+			shortcut: 'a'
+		}
+	],
+	Settings: [
+		{
+			title: 'Workspace',
+			url: '/settings',
+			icon: SlidersHorizontal,
+			role: WorkspaceRole.VIEWER,
+			shortcut: 'w'
 		},
 		{
-			title: 'Settings',
-			url: '/settings',
-			icon: Settings,
+			title: 'Daemon defaults',
+			url: '/settings/daemons',
+			icon: ServerCog,
 			role: WorkspaceRole.VIEWER,
-			items: [
-				{ title: 'Workspace', url: '/settings', icon: SlidersHorizontal, shortcut: 's' },
-				{ title: 'Daemons', url: '/settings/daemons', icon: ServerCog },
-				{ title: 'Single sign-on', url: '/settings/sso', icon: KeyRound },
-				{
-					title: 'Billing',
-					url: '/settings/billing',
-					icon: CreditCard,
-					shortcut: 'b',
-					role: WorkspaceRole.ADMIN
-				}
-			]
+			shortcut: 'f'
+		},
+		{
+			title: 'Single sign-on',
+			url: '/settings/sso',
+			icon: KeyRound,
+			role: WorkspaceRole.VIEWER,
+			shortcut: 'i'
+		},
+		{
+			title: 'Billing',
+			url: '/settings/billing',
+			icon: CreditCard,
+			role: WorkspaceRole.ADMIN,
+			shortcut: 'b'
 		}
 	]
 };
@@ -128,16 +151,16 @@ export const UserRoutes: RouteItem[] = [
 		icon: User,
 		items: [
 			{ title: 'Profile', url: '/profile', icon: User, shortcut: 'p' },
-			{ title: 'Security', url: '/profile/security', icon: Shield },
-			{ title: 'Activity', url: '/profile/activity', icon: Activity }
+			{ title: 'Security', url: '/profile/security', icon: Shield, shortcut: 'k' },
+			{ title: 'Activity', url: '/profile/activity', icon: Activity, shortcut: 'l' }
 		]
 	}
 ];
 
 // Support is added at runtime, only when the server has a support email.
-export const SupportRoutes: Record<string, RouteItem[]> = {
-	Support: [{ title: 'Documentation', url: DocsURL, icon: BookText }]
-};
+export const SupportRoutes: RouteItem[] = [
+	{ title: 'Documentation', url: DocsURL, icon: BookText }
+];
 
 /** The pages without the groups that only hold children. A page without a role of its own takes the group's. */
 function leaves(items: RouteItem[], role?: WorkspaceRole): RouteItem[] {
@@ -148,6 +171,17 @@ function leaves(items: RouteItem[], role?: WorkspaceRole): RouteItem[] {
 }
 
 const pageRoutes = [...leaves(Object.values(AppRoutes).flat()), ...leaves(UserRoutes)];
+
+// A second page on the same letter would silently win the jump, so dev refuses to start with one.
+if (import.meta.env.DEV) {
+	const seen = new Map<string, string>();
+	for (const r of pageRoutes) {
+		if (!r.shortcut) continue;
+		const other = seen.get(r.shortcut);
+		if (other) throw new Error(`g ${r.shortcut} is taken by both ${other} and ${r.title}`);
+		seen.set(r.shortcut, r.title);
+	}
+}
 
 /** The nav entry for a path, used for titles, icons and crumbs. */
 export function routeFor(path: string): RouteItem | undefined {

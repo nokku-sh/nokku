@@ -9,8 +9,9 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
-	import Avatar from '#lib/components/blocks/Avatar.svelte';
+	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import {
 		DaemonConfigSchema,
 		DaemonSchema,
@@ -19,7 +20,7 @@
 	} from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Ban, Clock, Cpu, Server, ShieldCheck } from '@lucide/svelte';
+	import { Ban, Clock, Cpu, Info, Server, Settings2, ShieldCheck } from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -47,11 +48,24 @@
 
 	type Rule = keyof Omit<DaemonConfig, '$typeName' | '$unknown'>;
 
-	function setRule(key: Rule, value: boolean) {
+	function applyRule(key: Rule, value: boolean) {
 		const d = draft.current;
 		if (!d) return;
 		d.config = { ...(d.config ?? create(DaemonConfigSchema)), [key]: value };
 		autoSave.save();
+	}
+
+	// Recording is a privacy change for everyone who logs in there, so it asks first.
+	function setRule(key: Rule, value: boolean) {
+		if (key !== 'recordSessions' || !value) return applyRule(key, value);
+		void confirm({
+			title: `Record sessions on ${entity?.name ?? 'this daemon'}?`,
+			description:
+				'Every new SSH session it serves is recorded and kept encrypted for playback. Let the people who log in there know.',
+			confirmText: 'Start recording',
+			destructive: false,
+			onConfirm: () => applyRule(key, value)
+		});
 	}
 
 	const policy: { key: Rule; title: string; description: string }[] = [
@@ -105,8 +119,17 @@
 	missing={query.isError}
 	title={entity?.name ?? ''}
 	saveState={accepted ? autoSave.saveState : undefined}
-	saveHint
+	saveHint={sheet.tab === 'settings'}
 	readonly={!can.edit}
+	detail={entity?.metadata?.hostname}
+	detailMono
+	tabs={[
+		{ value: 'overview', label: 'Overview', icon: Info },
+		{ value: 'settings', label: 'Settings', icon: Settings2 }
+	]}
+	tab={sheet.tab}
+	onTabChange={(t) => (sheet.tab = t)}
+	onRetry={autoSave.retry}
 	meta={{
 		id: entity?.id,
 		createdAt: entity?.createdAt,
@@ -115,18 +138,19 @@
 	}}
 >
 	{#snippet media()}
-		<Avatar id={entity?.id} class="size-10" />
+		<Monogram name={entity?.name ?? ''} class="size-10 text-sm" />
 	{/snippet}
 
 	{#snippet subtitle()}
 		<span class="flex items-center gap-1.5">
-			<StatusDot tone={entity?.online ? 'success' : 'muted'} live={entity?.online} />
+			<!-- The same word and tone as the Online column in the table. -->
+			<StatusDot tone={entity?.online ? 'success' : 'warning'} live={entity?.online} />
 			{#if entity?.online}
 				Online
 			{:else}
-				{entity?.lastSeenAt
-					? `Last seen ${formatTs(entity.lastSeenAt, 'relative')}`
-					: 'Never connected'}
+				Offline, {entity?.lastSeenAt
+					? `last seen ${formatTs(entity.lastSeenAt, 'relative')}`
+					: 'never connected'}
 			{/if}
 		</span>
 		{#if pending}
@@ -139,7 +163,7 @@
 	{/snippet}
 
 	{#if entity && draft.current}
-		<div class="flex flex-col divide-y">
+		<Tabs.Content value="overview" class="flex flex-col divide-y">
 			{#if !accepted}
 				<div class="pb-5">
 					<Alert.Root variant={pending ? 'warning' : 'destructive'}>
@@ -151,7 +175,8 @@
 							{#if !can.edit}
 								It cannot connect or serve targets until an editor approves it.
 							{:else if pending}
-								Approve it only if you started it. It can serve targets once approved.
+								Check that you expect this host before you approve it. It can serve targets once
+								approved.
 							{:else}
 								It cannot connect or serve targets until you approve it.
 							{/if}
@@ -159,7 +184,7 @@
 						{#if can.edit}
 							<div class="col-start-2 mt-2 flex gap-2">
 								<Button size="sm" onclick={approve} disabled={update.isPending}>Approve</Button>
-								<Button size="sm" variant="outline" onclick={() => askDelete(pending)}>
+								<Button size="sm" variant="destructive" onclick={() => askDelete(pending)}>
 									{pending ? 'Reject' : 'Delete'}
 								</Button>
 							</div>
@@ -179,36 +204,18 @@
 						}))}
 					/>
 				</Section>
+			{:else}
+				<Section title="Host" icon={Cpu}>
+					<Empty.Root class="border border-dashed p-6">
+						<Empty.Header>
+							<Empty.Media variant="icon"><Cpu /></Empty.Media>
+							<Empty.Description>Host details show up once the daemon connects.</Empty.Description>
+						</Empty.Header>
+					</Empty.Root>
+				</Section>
 			{/if}
 
 			{#if accepted}
-				<Section
-					title="Session policy"
-					icon={ShieldCheck}
-					description="Pushed to the daemon on its next sync. Running sessions keep their current rules."
-				>
-					<Item.Group class="divide-y rounded-lg border">
-						{#each policy as rule (rule.key)}
-							<Item.Root size="sm" class="rounded-none">
-								<Item.Content>
-									<Item.Title>
-										<label for={`policy-${rule.key}`}>{rule.title}</label>
-									</Item.Title>
-									<Item.Description>{rule.description}</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<Switch
-										id={`policy-${rule.key}`}
-										checked={cfg?.[rule.key] ?? false}
-										disabled={!can.edit}
-										onCheckedChange={(v) => setRule(rule.key, v)}
-									/>
-								</Item.Actions>
-							</Item.Root>
-						{/each}
-					</Item.Group>
-				</Section>
-
 				<Section title="Targets" icon={Server} count={targets.data?.total}>
 					{#if targets.data?.targets.length}
 						<div class="flex flex-wrap gap-1.5">
@@ -236,21 +243,50 @@
 						</Empty.Root>
 					{/if}
 				</Section>
-
-				{#if can.edit}
-					<DangerZone
-						actions={[
-							{
-								title: 'Delete daemon',
-								description:
-									'Its targets stay, but nobody reaches them through this daemon anymore.',
-								label: 'Delete',
-								onClick: () => askDelete()
-							}
-						]}
-					/>
-				{/if}
 			{/if}
-		</div>
+		</Tabs.Content>
+
+		<Tabs.Content value="settings" class="flex flex-col divide-y">
+			{#if accepted}
+				<Section
+					title="Session policy"
+					icon={ShieldCheck}
+					description="Pushed to the daemon on its next sync. Running sessions keep their current rules."
+				>
+					<Item.Group class="divide-y rounded-lg border">
+						{#each policy as rule (rule.key)}
+							<Item.Root size="sm" class="rounded-none">
+								<Item.Content>
+									<Item.Title>
+										<label for={`policy-${rule.key}`}>{rule.title}</label>
+									</Item.Title>
+									<Item.Description>{rule.description}</Item.Description>
+								</Item.Content>
+								<Item.Actions>
+									<Switch
+										id={`policy-${rule.key}`}
+										bind:checked={() => cfg?.[rule.key] ?? false, (v) => setRule(rule.key, v)}
+										disabled={!can.edit}
+									/>
+								</Item.Actions>
+							</Item.Root>
+						{/each}
+					</Item.Group>
+				</Section>
+			{/if}
+
+			{#if can.edit}
+				<DangerZone
+					actions={[
+						{
+							title: 'Delete daemon',
+							description: 'Its targets stay, but nobody reaches them through this daemon anymore.',
+							label: 'Delete',
+							onClick: () => askDelete()
+						}
+					]}
+				/>
+			{/if}
+		</Tabs.Content>
 	{/if}
 </EntitySheet>
