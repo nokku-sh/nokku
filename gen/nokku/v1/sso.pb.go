@@ -23,6 +23,140 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// The step of a test sign-in that failed.
+type SSOTestStep int32
+
+const (
+	SSOTestStep_SSO_TEST_STEP_UNSPECIFIED SSOTestStep = 0
+	// Fetching the issuer's discovery document.
+	SSOTestStep_SSO_TEST_STEP_DISCOVERY SSOTestStep = 1
+	// The provider's answer to the sign-in, before any token.
+	SSOTestStep_SSO_TEST_STEP_AUTHORIZE SSOTestStep = 2
+	// Trading the code for tokens, where the client secret is checked.
+	SSOTestStep_SSO_TEST_STEP_TOKEN SSOTestStep = 3
+	// Checking the ID token's signature, audience and nonce.
+	SSOTestStep_SSO_TEST_STEP_ID_TOKEN SSOTestStep = 4
+)
+
+// Enum value maps for SSOTestStep.
+var (
+	SSOTestStep_name = map[int32]string{
+		0: "SSO_TEST_STEP_UNSPECIFIED",
+		1: "SSO_TEST_STEP_DISCOVERY",
+		2: "SSO_TEST_STEP_AUTHORIZE",
+		3: "SSO_TEST_STEP_TOKEN",
+		4: "SSO_TEST_STEP_ID_TOKEN",
+	}
+	SSOTestStep_value = map[string]int32{
+		"SSO_TEST_STEP_UNSPECIFIED": 0,
+		"SSO_TEST_STEP_DISCOVERY":   1,
+		"SSO_TEST_STEP_AUTHORIZE":   2,
+		"SSO_TEST_STEP_TOKEN":       3,
+		"SSO_TEST_STEP_ID_TOKEN":    4,
+	}
+)
+
+func (x SSOTestStep) Enum() *SSOTestStep {
+	p := new(SSOTestStep)
+	*p = x
+	return p
+}
+
+func (x SSOTestStep) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SSOTestStep) Descriptor() protoreflect.EnumDescriptor {
+	return file_nokku_v1_sso_proto_enumTypes[0].Descriptor()
+}
+
+func (SSOTestStep) Type() protoreflect.EnumType {
+	return &file_nokku_v1_sso_proto_enumTypes[0]
+}
+
+func (x SSOTestStep) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SSOTestStep.Descriptor instead.
+func (SSOTestStep) EnumDescriptor() ([]byte, []int) {
+	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{0}
+}
+
+// What a real sign-in with the same identity would do.
+type SSOTestOutcome int32
+
+const (
+	SSOTestOutcome_SSO_TEST_OUTCOME_UNSPECIFIED SSOTestOutcome = 0
+	// The identity belongs to a member, or a member has the email.
+	SSOTestOutcome_SSO_TEST_OUTCOME_SIGNS_IN SSOTestOutcome = 1
+	// Nobody has the email, and the provider creates accounts.
+	SSOTestOutcome_SSO_TEST_OUTCOME_CREATES SSOTestOutcome = 2
+	// Nobody has the email, and the provider does not create accounts.
+	SSOTestOutcome_SSO_TEST_OUTCOME_NO_ACCOUNT SSOTestOutcome = 3
+	// The provider would create an account, but every seat is taken.
+	SSOTestOutcome_SSO_TEST_OUTCOME_NO_SEAT          SSOTestOutcome = 4
+	SSOTestOutcome_SSO_TEST_OUTCOME_NO_EMAIL         SSOTestOutcome = 5
+	SSOTestOutcome_SSO_TEST_OUTCOME_EMAIL_UNVERIFIED SSOTestOutcome = 6
+	// The email is the owner's, who has to link the identity from their profile.
+	SSOTestOutcome_SSO_TEST_OUTCOME_OWNER_LINK SSOTestOutcome = 7
+	// The member is deactivated.
+	SSOTestOutcome_SSO_TEST_OUTCOME_INACTIVE SSOTestOutcome = 8
+)
+
+// Enum value maps for SSOTestOutcome.
+var (
+	SSOTestOutcome_name = map[int32]string{
+		0: "SSO_TEST_OUTCOME_UNSPECIFIED",
+		1: "SSO_TEST_OUTCOME_SIGNS_IN",
+		2: "SSO_TEST_OUTCOME_CREATES",
+		3: "SSO_TEST_OUTCOME_NO_ACCOUNT",
+		4: "SSO_TEST_OUTCOME_NO_SEAT",
+		5: "SSO_TEST_OUTCOME_NO_EMAIL",
+		6: "SSO_TEST_OUTCOME_EMAIL_UNVERIFIED",
+		7: "SSO_TEST_OUTCOME_OWNER_LINK",
+		8: "SSO_TEST_OUTCOME_INACTIVE",
+	}
+	SSOTestOutcome_value = map[string]int32{
+		"SSO_TEST_OUTCOME_UNSPECIFIED":      0,
+		"SSO_TEST_OUTCOME_SIGNS_IN":         1,
+		"SSO_TEST_OUTCOME_CREATES":          2,
+		"SSO_TEST_OUTCOME_NO_ACCOUNT":       3,
+		"SSO_TEST_OUTCOME_NO_SEAT":          4,
+		"SSO_TEST_OUTCOME_NO_EMAIL":         5,
+		"SSO_TEST_OUTCOME_EMAIL_UNVERIFIED": 6,
+		"SSO_TEST_OUTCOME_OWNER_LINK":       7,
+		"SSO_TEST_OUTCOME_INACTIVE":         8,
+	}
+)
+
+func (x SSOTestOutcome) Enum() *SSOTestOutcome {
+	p := new(SSOTestOutcome)
+	*p = x
+	return p
+}
+
+func (x SSOTestOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SSOTestOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_nokku_v1_sso_proto_enumTypes[1].Descriptor()
+}
+
+func (SSOTestOutcome) Type() protoreflect.EnumType {
+	return &file_nokku_v1_sso_proto_enumTypes[1]
+}
+
+func (x SSOTestOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SSOTestOutcome.Descriptor instead.
+func (SSOTestOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{1}
+}
+
 type SSOProvider struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	ProviderId      *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
@@ -168,8 +302,10 @@ func (*ListSSOProvidersRequest) Descriptor() ([]byte, []int) {
 }
 
 type ListSSOProvidersResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Providers     []*SSOProvider         `protobuf:"bytes,1,rep,name=providers" json:"providers,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Providers []*SSOProvider         `protobuf:"bytes,1,rep,name=providers" json:"providers,omitempty"`
+	// What the owner registers with every provider.
+	RedirectUri   *string `protobuf:"bytes,2,opt,name=redirect_uri,json=redirectUri" json:"redirect_uri,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -209,6 +345,13 @@ func (x *ListSSOProvidersResponse) GetProviders() []*SSOProvider {
 		return x.Providers
 	}
 	return nil
+}
+
+func (x *ListSSOProvidersResponse) GetRedirectUri() string {
+	if x != nil && x.RedirectUri != nil {
+		return *x.RedirectUri
+	}
+	return ""
 }
 
 type PutSSOProviderRequest struct {
@@ -436,6 +579,222 @@ func (*DeleteSSOProviderResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{6}
 }
 
+type SSOTest struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	ProviderId *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
+	// Unset when every step passed.
+	FailedStep *SSOTestStep `protobuf:"varint,2,opt,name=failed_step,json=failedStep,enum=nokku.v1.SSOTestStep" json:"failed_step,omitempty"`
+	// Why the step failed, in the provider's or the check's words.
+	Error         *string `protobuf:"bytes,3,opt,name=error" json:"error,omitempty"`
+	Subject       *string `protobuf:"bytes,4,opt,name=subject" json:"subject,omitempty"`
+	Email         *string `protobuf:"bytes,5,opt,name=email" json:"email,omitempty"`
+	Name          *string `protobuf:"bytes,6,opt,name=name" json:"name,omitempty"`
+	EmailVerified *bool   `protobuf:"varint,7,opt,name=email_verified,json=emailVerified" json:"email_verified,omitempty"`
+	// The claim names in the ID token.
+	Claims  []string        `protobuf:"bytes,8,rep,name=claims" json:"claims,omitempty"`
+	Outcome *SSOTestOutcome `protobuf:"varint,9,opt,name=outcome,enum=nokku.v1.SSOTestOutcome" json:"outcome,omitempty"`
+	// The member a real sign-in lands on.
+	MemberEmail   *string                `protobuf:"bytes,10,opt,name=member_email,json=memberEmail" json:"member_email,omitempty"`
+	TestedAt      *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=tested_at,json=testedAt" json:"tested_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SSOTest) Reset() {
+	*x = SSOTest{}
+	mi := &file_nokku_v1_sso_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SSOTest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SSOTest) ProtoMessage() {}
+
+func (x *SSOTest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_sso_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SSOTest.ProtoReflect.Descriptor instead.
+func (*SSOTest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SSOTest) GetProviderId() string {
+	if x != nil && x.ProviderId != nil {
+		return *x.ProviderId
+	}
+	return ""
+}
+
+func (x *SSOTest) GetFailedStep() SSOTestStep {
+	if x != nil && x.FailedStep != nil {
+		return *x.FailedStep
+	}
+	return SSOTestStep_SSO_TEST_STEP_UNSPECIFIED
+}
+
+func (x *SSOTest) GetError() string {
+	if x != nil && x.Error != nil {
+		return *x.Error
+	}
+	return ""
+}
+
+func (x *SSOTest) GetSubject() string {
+	if x != nil && x.Subject != nil {
+		return *x.Subject
+	}
+	return ""
+}
+
+func (x *SSOTest) GetEmail() string {
+	if x != nil && x.Email != nil {
+		return *x.Email
+	}
+	return ""
+}
+
+func (x *SSOTest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *SSOTest) GetEmailVerified() bool {
+	if x != nil && x.EmailVerified != nil {
+		return *x.EmailVerified
+	}
+	return false
+}
+
+func (x *SSOTest) GetClaims() []string {
+	if x != nil {
+		return x.Claims
+	}
+	return nil
+}
+
+func (x *SSOTest) GetOutcome() SSOTestOutcome {
+	if x != nil && x.Outcome != nil {
+		return *x.Outcome
+	}
+	return SSOTestOutcome_SSO_TEST_OUTCOME_UNSPECIFIED
+}
+
+func (x *SSOTest) GetMemberEmail() string {
+	if x != nil && x.MemberEmail != nil {
+		return *x.MemberEmail
+	}
+	return ""
+}
+
+func (x *SSOTest) GetTestedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.TestedAt
+	}
+	return nil
+}
+
+type GetSSOTestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSSOTestRequest) Reset() {
+	*x = GetSSOTestRequest{}
+	mi := &file_nokku_v1_sso_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSSOTestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSSOTestRequest) ProtoMessage() {}
+
+func (x *GetSSOTestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_sso_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSSOTestRequest.ProtoReflect.Descriptor instead.
+func (*GetSSOTestRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetSSOTestRequest) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return ""
+}
+
+type GetSSOTestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Test          *SSOTest               `protobuf:"bytes,1,opt,name=test" json:"test,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSSOTestResponse) Reset() {
+	*x = GetSSOTestResponse{}
+	mi := &file_nokku_v1_sso_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSSOTestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSSOTestResponse) ProtoMessage() {}
+
+func (x *GetSSOTestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_sso_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSSOTestResponse.ProtoReflect.Descriptor instead.
+func (*GetSSOTestResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetSSOTestResponse) GetTest() *SSOTest {
+	if x != nil {
+		return x.Test
+	}
+	return nil
+}
+
 var File_nokku_v1_sso_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_sso_proto_rawDesc = "" +
@@ -455,9 +814,10 @@ const file_nokku_v1_sso_proto_rawDesc = "" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x19\n" +
-	"\x17ListSSOProvidersRequest\"O\n" +
+	"\x17ListSSOProvidersRequest\"r\n" +
 	"\x18ListSSOProvidersResponse\x123\n" +
-	"\tproviders\x18\x01 \x03(\v2\x15.nokku.v1.SSOProviderR\tproviders\"\xcf\x02\n" +
+	"\tproviders\x18\x01 \x03(\v2\x15.nokku.v1.SSOProviderR\tproviders\x12!\n" +
+	"\fredirect_uri\x18\x02 \x01(\tR\vredirectUri\"\xcf\x02\n" +
 	"\x15PutSSOProviderRequest\x128\n" +
 	"\vprovider_id\x18\x01 \x01(\tB\x17\xbaH\x14r\x12\x10\x01\x18@2\f^[a-z0-9-]+$R\n" +
 	"providerId\x12\x1e\n" +
@@ -476,12 +836,49 @@ const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\x18DeleteSSOProviderRequest\x12(\n" +
 	"\vprovider_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +
 	"providerId\"\x1b\n" +
-	"\x19DeleteSSOProviderResponse2\xb5\x02\n" +
+	"\x19DeleteSSOProviderResponse\"\x8b\x03\n" +
+	"\aSSOTest\x12\x1f\n" +
+	"\vprovider_id\x18\x01 \x01(\tR\n" +
+	"providerId\x126\n" +
+	"\vfailed_step\x18\x02 \x01(\x0e2\x15.nokku.v1.SSOTestStepR\n" +
+	"failedStep\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\x12\x18\n" +
+	"\asubject\x18\x04 \x01(\tR\asubject\x12\x14\n" +
+	"\x05email\x18\x05 \x01(\tR\x05email\x12\x12\n" +
+	"\x04name\x18\x06 \x01(\tR\x04name\x12%\n" +
+	"\x0eemail_verified\x18\a \x01(\bR\remailVerified\x12\x16\n" +
+	"\x06claims\x18\b \x03(\tR\x06claims\x122\n" +
+	"\aoutcome\x18\t \x01(\x0e2\x18.nokku.v1.SSOTestOutcomeR\aoutcome\x12!\n" +
+	"\fmember_email\x18\n" +
+	" \x01(\tR\vmemberEmail\x127\n" +
+	"\ttested_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\btestedAt\".\n" +
+	"\x11GetSSOTestRequest\x12\x19\n" +
+	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\x02id\";\n" +
+	"\x12GetSSOTestResponse\x12%\n" +
+	"\x04test\x18\x01 \x01(\v2\x11.nokku.v1.SSOTestR\x04test*\x9b\x01\n" +
+	"\vSSOTestStep\x12\x1d\n" +
+	"\x19SSO_TEST_STEP_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17SSO_TEST_STEP_DISCOVERY\x10\x01\x12\x1b\n" +
+	"\x17SSO_TEST_STEP_AUTHORIZE\x10\x02\x12\x17\n" +
+	"\x13SSO_TEST_STEP_TOKEN\x10\x03\x12\x1a\n" +
+	"\x16SSO_TEST_STEP_ID_TOKEN\x10\x04*\xb4\x02\n" +
+	"\x0eSSOTestOutcome\x12 \n" +
+	"\x1cSSO_TEST_OUTCOME_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19SSO_TEST_OUTCOME_SIGNS_IN\x10\x01\x12\x1c\n" +
+	"\x18SSO_TEST_OUTCOME_CREATES\x10\x02\x12\x1f\n" +
+	"\x1bSSO_TEST_OUTCOME_NO_ACCOUNT\x10\x03\x12\x1c\n" +
+	"\x18SSO_TEST_OUTCOME_NO_SEAT\x10\x04\x12\x1d\n" +
+	"\x19SSO_TEST_OUTCOME_NO_EMAIL\x10\x05\x12%\n" +
+	"!SSO_TEST_OUTCOME_EMAIL_UNVERIFIED\x10\x06\x12\x1f\n" +
+	"\x1bSSO_TEST_OUTCOME_OWNER_LINK\x10\a\x12\x1d\n" +
+	"\x19SSO_TEST_OUTCOME_INACTIVE\x10\b2\x89\x03\n" +
 	"\n" +
 	"SSOService\x12d\n" +
 	"\x10ListSSOProviders\x12!.nokku.v1.ListSSOProvidersRequest\x1a\".nokku.v1.ListSSOProvidersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12[\n" +
 	"\x0ePutSSOProvider\x12\x1f.nokku.v1.PutSSOProviderRequest\x1a .nokku.v1.PutSSOProviderResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12d\n" +
-	"\x11DeleteSSOProvider\x12\".nokku.v1.DeleteSSOProviderRequest\x1a#.nokku.v1.DeleteSSOProviderResponse\"\x06\xc2\xf3\x18\x02\x18\x05B\x89\x01\n" +
+	"\x11DeleteSSOProvider\x12\".nokku.v1.DeleteSSOProviderRequest\x1a#.nokku.v1.DeleteSSOProviderResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12R\n" +
+	"\n" +
+	"GetSSOTest\x12\x1b.nokku.v1.GetSSOTestRequest\x1a\x1c.nokku.v1.GetSSOTestResponse\"\t\xc2\xf3\x18\x02\x18\x05\x90\x02\x01B\x89\x01\n" +
 	"\fcom.nokku.v1B\bSsoProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -496,33 +893,45 @@ func file_nokku_v1_sso_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_sso_proto_rawDescData
 }
 
-var file_nokku_v1_sso_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_nokku_v1_sso_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_nokku_v1_sso_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_nokku_v1_sso_proto_goTypes = []any{
-	(*SSOProvider)(nil),               // 0: nokku.v1.SSOProvider
-	(*ListSSOProvidersRequest)(nil),   // 1: nokku.v1.ListSSOProvidersRequest
-	(*ListSSOProvidersResponse)(nil),  // 2: nokku.v1.ListSSOProvidersResponse
-	(*PutSSOProviderRequest)(nil),     // 3: nokku.v1.PutSSOProviderRequest
-	(*PutSSOProviderResponse)(nil),    // 4: nokku.v1.PutSSOProviderResponse
-	(*DeleteSSOProviderRequest)(nil),  // 5: nokku.v1.DeleteSSOProviderRequest
-	(*DeleteSSOProviderResponse)(nil), // 6: nokku.v1.DeleteSSOProviderResponse
-	(*timestamppb.Timestamp)(nil),     // 7: google.protobuf.Timestamp
+	(SSOTestStep)(0),                  // 0: nokku.v1.SSOTestStep
+	(SSOTestOutcome)(0),               // 1: nokku.v1.SSOTestOutcome
+	(*SSOProvider)(nil),               // 2: nokku.v1.SSOProvider
+	(*ListSSOProvidersRequest)(nil),   // 3: nokku.v1.ListSSOProvidersRequest
+	(*ListSSOProvidersResponse)(nil),  // 4: nokku.v1.ListSSOProvidersResponse
+	(*PutSSOProviderRequest)(nil),     // 5: nokku.v1.PutSSOProviderRequest
+	(*PutSSOProviderResponse)(nil),    // 6: nokku.v1.PutSSOProviderResponse
+	(*DeleteSSOProviderRequest)(nil),  // 7: nokku.v1.DeleteSSOProviderRequest
+	(*DeleteSSOProviderResponse)(nil), // 8: nokku.v1.DeleteSSOProviderResponse
+	(*SSOTest)(nil),                   // 9: nokku.v1.SSOTest
+	(*GetSSOTestRequest)(nil),         // 10: nokku.v1.GetSSOTestRequest
+	(*GetSSOTestResponse)(nil),        // 11: nokku.v1.GetSSOTestResponse
+	(*timestamppb.Timestamp)(nil),     // 12: google.protobuf.Timestamp
 }
 var file_nokku_v1_sso_proto_depIdxs = []int32{
-	7, // 0: nokku.v1.SSOProvider.created_at:type_name -> google.protobuf.Timestamp
-	7, // 1: nokku.v1.SSOProvider.updated_at:type_name -> google.protobuf.Timestamp
-	0, // 2: nokku.v1.ListSSOProvidersResponse.providers:type_name -> nokku.v1.SSOProvider
-	0, // 3: nokku.v1.PutSSOProviderResponse.provider:type_name -> nokku.v1.SSOProvider
-	1, // 4: nokku.v1.SSOService.ListSSOProviders:input_type -> nokku.v1.ListSSOProvidersRequest
-	3, // 5: nokku.v1.SSOService.PutSSOProvider:input_type -> nokku.v1.PutSSOProviderRequest
-	5, // 6: nokku.v1.SSOService.DeleteSSOProvider:input_type -> nokku.v1.DeleteSSOProviderRequest
-	2, // 7: nokku.v1.SSOService.ListSSOProviders:output_type -> nokku.v1.ListSSOProvidersResponse
-	4, // 8: nokku.v1.SSOService.PutSSOProvider:output_type -> nokku.v1.PutSSOProviderResponse
-	6, // 9: nokku.v1.SSOService.DeleteSSOProvider:output_type -> nokku.v1.DeleteSSOProviderResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	12, // 0: nokku.v1.SSOProvider.created_at:type_name -> google.protobuf.Timestamp
+	12, // 1: nokku.v1.SSOProvider.updated_at:type_name -> google.protobuf.Timestamp
+	2,  // 2: nokku.v1.ListSSOProvidersResponse.providers:type_name -> nokku.v1.SSOProvider
+	2,  // 3: nokku.v1.PutSSOProviderResponse.provider:type_name -> nokku.v1.SSOProvider
+	0,  // 4: nokku.v1.SSOTest.failed_step:type_name -> nokku.v1.SSOTestStep
+	1,  // 5: nokku.v1.SSOTest.outcome:type_name -> nokku.v1.SSOTestOutcome
+	12, // 6: nokku.v1.SSOTest.tested_at:type_name -> google.protobuf.Timestamp
+	9,  // 7: nokku.v1.GetSSOTestResponse.test:type_name -> nokku.v1.SSOTest
+	3,  // 8: nokku.v1.SSOService.ListSSOProviders:input_type -> nokku.v1.ListSSOProvidersRequest
+	5,  // 9: nokku.v1.SSOService.PutSSOProvider:input_type -> nokku.v1.PutSSOProviderRequest
+	7,  // 10: nokku.v1.SSOService.DeleteSSOProvider:input_type -> nokku.v1.DeleteSSOProviderRequest
+	10, // 11: nokku.v1.SSOService.GetSSOTest:input_type -> nokku.v1.GetSSOTestRequest
+	4,  // 12: nokku.v1.SSOService.ListSSOProviders:output_type -> nokku.v1.ListSSOProvidersResponse
+	6,  // 13: nokku.v1.SSOService.PutSSOProvider:output_type -> nokku.v1.PutSSOProviderResponse
+	8,  // 14: nokku.v1.SSOService.DeleteSSOProvider:output_type -> nokku.v1.DeleteSSOProviderResponse
+	11, // 15: nokku.v1.SSOService.GetSSOTest:output_type -> nokku.v1.GetSSOTestResponse
+	12, // [12:16] is the sub-list for method output_type
+	8,  // [8:12] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_sso_proto_init() }
@@ -536,13 +945,14 @@ func file_nokku_v1_sso_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_sso_proto_rawDesc), len(file_nokku_v1_sso_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   7,
+			NumEnums:      2,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_nokku_v1_sso_proto_goTypes,
 		DependencyIndexes: file_nokku_v1_sso_proto_depIdxs,
+		EnumInfos:         file_nokku_v1_sso_proto_enumTypes,
 		MessageInfos:      file_nokku_v1_sso_proto_msgTypes,
 	}.Build()
 	File_nokku_v1_sso_proto = out.File

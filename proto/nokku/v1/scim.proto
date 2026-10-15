@@ -41,6 +41,8 @@ message CreateSCIMTokenResponse {
 message ListSCIMTokensRequest {}
 message ListSCIMTokensResponse {
   repeated SCIMToken tokens = 1;
+  // Where the identity provider sends users and groups.
+  string base_url = 2;
 }
 
 message DeleteSCIMTokenRequest {

@@ -73,6 +73,8 @@ func TestMain(m *testing.M) {
 	os.Setenv("NOKKU_LOCAL_STORAGE_PATH", storage)
 	// A test that holds a license key must not ask the real license worker for a new one.
 	os.Setenv("NOKKU_LICENSE_OFFLINE", "true")
+	// Saving a provider fetches its discovery document, and the test issuers listen on loopback.
+	os.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var err error

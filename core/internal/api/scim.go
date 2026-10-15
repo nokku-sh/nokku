@@ -29,11 +29,10 @@ func (s *scimService) CreateSCIMToken(
 		return nil, err
 	}
 	audit.SetTarget(ctx, tok.ID)
-	ws, _ := actor.WorkspaceFromContext(ctx)
 	return &nokkuv1.CreateSCIMTokenResponse{
 		Token:   &plaintext,
 		Entry:   scimTokenToProto(tok),
-		BaseUrl: new(ws.BaseURL + "/scim/v2"),
+		BaseUrl: new(iam.SCIMBaseURL(ctx)),
 	}, nil
 }
 
@@ -49,7 +48,7 @@ func (s *scimService) ListSCIMTokens(
 	for _, t := range tokens {
 		out = append(out, scimTokenToProto(t))
 	}
-	return &nokkuv1.ListSCIMTokensResponse{Tokens: out}, nil
+	return &nokkuv1.ListSCIMTokensResponse{Tokens: out, BaseUrl: new(iam.SCIMBaseURL(ctx))}, nil
 }
 
 func (s *scimService) DeleteSCIMToken(

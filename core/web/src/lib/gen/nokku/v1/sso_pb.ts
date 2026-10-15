@@ -2,8 +2,8 @@
 // @generated from file nokku/v1/sso.proto (package nokku.v1, edition 2023)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/sso.proto.
  */
 export const file_nokku_v1_sso: GenFile = /*@__PURE__*/
-  fileDesc("ChJub2trdS92MS9zc28ucHJvdG8SCG5va2t1LnYxIvIBCgtTU09Qcm92aWRlchITCgtwcm92aWRlcl9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB2VuYWJsZWQYAyABKAgSEgoKaXNzdWVyX3VybBgEIAEoCRIRCgljbGllbnRfaWQYBSABKAkSDgoGc2NvcGVzGAYgAygJEhgKEGppdF9wcm92aXNpb25pbmcYByABKAgSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiGQoXTGlzdFNTT1Byb3ZpZGVyc1JlcXVlc3QiRAoYTGlzdFNTT1Byb3ZpZGVyc1Jlc3BvbnNlEigKCXByb3ZpZGVycxgBIAMoCzIVLm5va2t1LnYxLlNTT1Byb3ZpZGVyIvgBChVQdXRTU09Qcm92aWRlclJlcXVlc3QSLAoLcHJvdmlkZXJfaWQYASABKAlCF7pIFHISEAEYQDIMXlthLXowLTktXSskEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISDwoHZW5hYmxlZBgDIAEoCBIcCgppc3N1ZXJfdXJsGAQgASgJQgi6SAVyA4gBARIdCgljbGllbnRfaWQYBSABKAlCCrpIB3IFEAEY6AcSHwoNY2xpZW50X3NlY3JldBgGIAEoCUIIukgFcgMY6AcSDgoGc2NvcGVzGAcgAygJEhgKEGppdF9wcm92aXNpb25pbmcYCCABKAgiQQoWUHV0U1NPUHJvdmlkZXJSZXNwb25zZRInCghwcm92aWRlchgBIAEoCzIVLm5va2t1LnYxLlNTT1Byb3ZpZGVyIjgKGERlbGV0ZVNTT1Byb3ZpZGVyUmVxdWVzdBIcCgtwcm92aWRlcl9pZBgBIAEoCUIHukgEcgIQASIbChlEZWxldGVTU09Qcm92aWRlclJlc3BvbnNlMrUCCgpTU09TZXJ2aWNlEmQKEExpc3RTU09Qcm92aWRlcnMSIS5ub2trdS52MS5MaXN0U1NPUHJvdmlkZXJzUmVxdWVzdBoiLm5va2t1LnYxLkxpc3RTU09Qcm92aWRlcnNSZXNwb25zZSIJkAIBwvMYAhgCElsKDlB1dFNTT1Byb3ZpZGVyEh8ubm9ra3UudjEuUHV0U1NPUHJvdmlkZXJSZXF1ZXN0GiAubm9ra3UudjEuUHV0U1NPUHJvdmlkZXJSZXNwb25zZSIGwvMYAhgFEmQKEURlbGV0ZVNTT1Byb3ZpZGVyEiIubm9ra3UudjEuRGVsZXRlU1NPUHJvdmlkZXJSZXF1ZXN0GiMubm9ra3UudjEuRGVsZXRlU1NPUHJvdmlkZXJSZXNwb25zZSIGwvMYAhgFYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChJub2trdS92MS9zc28ucHJvdG8SCG5va2t1LnYxIvIBCgtTU09Qcm92aWRlchITCgtwcm92aWRlcl9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB2VuYWJsZWQYAyABKAgSEgoKaXNzdWVyX3VybBgEIAEoCRIRCgljbGllbnRfaWQYBSABKAkSDgoGc2NvcGVzGAYgAygJEhgKEGppdF9wcm92aXNpb25pbmcYByABKAgSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiGQoXTGlzdFNTT1Byb3ZpZGVyc1JlcXVlc3QiWgoYTGlzdFNTT1Byb3ZpZGVyc1Jlc3BvbnNlEigKCXByb3ZpZGVycxgBIAMoCzIVLm5va2t1LnYxLlNTT1Byb3ZpZGVyEhQKDHJlZGlyZWN0X3VyaRgCIAEoCSL4AQoVUHV0U1NPUHJvdmlkZXJSZXF1ZXN0EiwKC3Byb3ZpZGVyX2lkGAEgASgJQhe6SBRyEhABGEAyDF5bYS16MC05LV0rJBIYCgRuYW1lGAIgASgJQgq6SAdyBRABGIACEg8KB2VuYWJsZWQYAyABKAgSHAoKaXNzdWVyX3VybBgEIAEoCUIIukgFcgOIAQESHQoJY2xpZW50X2lkGAUgASgJQgq6SAdyBRABGOgHEh8KDWNsaWVudF9zZWNyZXQYBiABKAlCCLpIBXIDGOgHEg4KBnNjb3BlcxgHIAMoCRIYChBqaXRfcHJvdmlzaW9uaW5nGAggASgIIkEKFlB1dFNTT1Byb3ZpZGVyUmVzcG9uc2USJwoIcHJvdmlkZXIYASABKAsyFS5ub2trdS52MS5TU09Qcm92aWRlciI4ChhEZWxldGVTU09Qcm92aWRlclJlcXVlc3QSHAoLcHJvdmlkZXJfaWQYASABKAlCB7pIBHICEAEiGwoZRGVsZXRlU1NPUHJvdmlkZXJSZXNwb25zZSKfAgoHU1NPVGVzdBITCgtwcm92aWRlcl9pZBgBIAEoCRIqCgtmYWlsZWRfc3RlcBgCIAEoDjIVLm5va2t1LnYxLlNTT1Rlc3RTdGVwEg0KBWVycm9yGAMgASgJEg8KB3N1YmplY3QYBCABKAkSDQoFZW1haWwYBSABKAkSDAoEbmFtZRgGIAEoCRIWCg5lbWFpbF92ZXJpZmllZBgHIAEoCBIOCgZjbGFpbXMYCCADKAkSKQoHb3V0Y29tZRgJIAEoDjIYLm5va2t1LnYxLlNTT1Rlc3RPdXRjb21lEhQKDG1lbWJlcl9lbWFpbBgKIAEoCRItCgl0ZXN0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIioKEUdldFNTT1Rlc3RSZXF1ZXN0EhUKAmlkGAEgASgJQgm6SAZyBBABGEAiNQoSR2V0U1NPVGVzdFJlc3BvbnNlEh8KBHRlc3QYASABKAsyES5ub2trdS52MS5TU09UZXN0KpsBCgtTU09UZXN0U3RlcBIdChlTU09fVEVTVF9TVEVQX1VOU1BFQ0lGSUVEEAASGwoXU1NPX1RFU1RfU1RFUF9ESVNDT1ZFUlkQARIbChdTU09fVEVTVF9TVEVQX0FVVEhPUklaRRACEhcKE1NTT19URVNUX1NURVBfVE9LRU4QAxIaChZTU09fVEVTVF9TVEVQX0lEX1RPS0VOEAQqtAIKDlNTT1Rlc3RPdXRjb21lEiAKHFNTT19URVNUX09VVENPTUVfVU5TUEVDSUZJRUQQABIdChlTU09fVEVTVF9PVVRDT01FX1NJR05TX0lOEAESHAoYU1NPX1RFU1RfT1VUQ09NRV9DUkVBVEVTEAISHwobU1NPX1RFU1RfT1VUQ09NRV9OT19BQ0NPVU5UEAMSHAoYU1NPX1RFU1RfT1VUQ09NRV9OT19TRUFUEAQSHQoZU1NPX1RFU1RfT1VUQ09NRV9OT19FTUFJTBAFEiUKIVNTT19URVNUX09VVENPTUVfRU1BSUxfVU5WRVJJRklFRBAGEh8KG1NTT19URVNUX09VVENPTUVfT1dORVJfTElOSxAHEh0KGVNTT19URVNUX09VVENPTUVfSU5BQ1RJVkUQCDKJAwoKU1NPU2VydmljZRJkChBMaXN0U1NPUHJvdmlkZXJzEiEubm9ra3UudjEuTGlzdFNTT1Byb3ZpZGVyc1JlcXVlc3QaIi5ub2trdS52MS5MaXN0U1NPUHJvdmlkZXJzUmVzcG9uc2UiCZACAcLzGAIYAhJbCg5QdXRTU09Qcm92aWRlchIfLm5va2t1LnYxLlB1dFNTT1Byb3ZpZGVyUmVxdWVzdBogLm5va2t1LnYxLlB1dFNTT1Byb3ZpZGVyUmVzcG9uc2UiBsLzGAIYBRJkChFEZWxldGVTU09Qcm92aWRlchIiLm5va2t1LnYxLkRlbGV0ZVNTT1Byb3ZpZGVyUmVxdWVzdBojLm5va2t1LnYxLkRlbGV0ZVNTT1Byb3ZpZGVyUmVzcG9uc2UiBsLzGAIYBRJSCgpHZXRTU09UZXN0Ehsubm9ra3UudjEuR2V0U1NPVGVzdFJlcXVlc3QaHC5ub2trdS52MS5HZXRTU09UZXN0UmVzcG9uc2UiCZACAcLzGAIYBWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.SSOProvider
@@ -94,6 +94,13 @@ export type ListSSOProvidersResponse = Message<"nokku.v1.ListSSOProvidersRespons
    * @generated from field: repeated nokku.v1.SSOProvider providers = 1;
    */
   providers: SSOProvider[];
+
+  /**
+   * What the owner registers with every provider.
+   *
+   * @generated from field: string redirect_uri = 2;
+   */
+  redirectUri: string;
 };
 
 /**
@@ -205,6 +212,231 @@ export const DeleteSSOProviderResponseSchema: GenMessage<DeleteSSOProviderRespon
   messageDesc(file_nokku_v1_sso, 6);
 
 /**
+ * @generated from message nokku.v1.SSOTest
+ */
+export type SSOTest = Message<"nokku.v1.SSOTest"> & {
+  /**
+   * @generated from field: string provider_id = 1;
+   */
+  providerId: string;
+
+  /**
+   * Unset when every step passed.
+   *
+   * @generated from field: nokku.v1.SSOTestStep failed_step = 2;
+   */
+  failedStep: SSOTestStep;
+
+  /**
+   * Why the step failed, in the provider's or the check's words.
+   *
+   * @generated from field: string error = 3;
+   */
+  error: string;
+
+  /**
+   * @generated from field: string subject = 4;
+   */
+  subject: string;
+
+  /**
+   * @generated from field: string email = 5;
+   */
+  email: string;
+
+  /**
+   * @generated from field: string name = 6;
+   */
+  name: string;
+
+  /**
+   * @generated from field: bool email_verified = 7;
+   */
+  emailVerified: boolean;
+
+  /**
+   * The claim names in the ID token.
+   *
+   * @generated from field: repeated string claims = 8;
+   */
+  claims: string[];
+
+  /**
+   * @generated from field: nokku.v1.SSOTestOutcome outcome = 9;
+   */
+  outcome: SSOTestOutcome;
+
+  /**
+   * The member a real sign-in lands on.
+   *
+   * @generated from field: string member_email = 10;
+   */
+  memberEmail: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp tested_at = 11;
+   */
+  testedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.SSOTest.
+ * Use `create(SSOTestSchema)` to create a new message.
+ */
+export const SSOTestSchema: GenMessage<SSOTest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_sso, 7);
+
+/**
+ * @generated from message nokku.v1.GetSSOTestRequest
+ */
+export type GetSSOTestRequest = Message<"nokku.v1.GetSSOTestRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message nokku.v1.GetSSOTestRequest.
+ * Use `create(GetSSOTestRequestSchema)` to create a new message.
+ */
+export const GetSSOTestRequestSchema: GenMessage<GetSSOTestRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_sso, 8);
+
+/**
+ * @generated from message nokku.v1.GetSSOTestResponse
+ */
+export type GetSSOTestResponse = Message<"nokku.v1.GetSSOTestResponse"> & {
+  /**
+   * @generated from field: nokku.v1.SSOTest test = 1;
+   */
+  test?: SSOTest | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.GetSSOTestResponse.
+ * Use `create(GetSSOTestResponseSchema)` to create a new message.
+ */
+export const GetSSOTestResponseSchema: GenMessage<GetSSOTestResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_sso, 9);
+
+/**
+ * The step of a test sign-in that failed.
+ *
+ * @generated from enum nokku.v1.SSOTestStep
+ */
+export enum SSOTestStep {
+  /**
+   * @generated from enum value: SSO_TEST_STEP_UNSPECIFIED = 0;
+   */
+  SSO_TEST_STEP_UNSPECIFIED = 0,
+
+  /**
+   * Fetching the issuer's discovery document.
+   *
+   * @generated from enum value: SSO_TEST_STEP_DISCOVERY = 1;
+   */
+  SSO_TEST_STEP_DISCOVERY = 1,
+
+  /**
+   * The provider's answer to the sign-in, before any token.
+   *
+   * @generated from enum value: SSO_TEST_STEP_AUTHORIZE = 2;
+   */
+  SSO_TEST_STEP_AUTHORIZE = 2,
+
+  /**
+   * Trading the code for tokens, where the client secret is checked.
+   *
+   * @generated from enum value: SSO_TEST_STEP_TOKEN = 3;
+   */
+  SSO_TEST_STEP_TOKEN = 3,
+
+  /**
+   * Checking the ID token's signature, audience and nonce.
+   *
+   * @generated from enum value: SSO_TEST_STEP_ID_TOKEN = 4;
+   */
+  SSO_TEST_STEP_ID_TOKEN = 4,
+}
+
+/**
+ * Describes the enum nokku.v1.SSOTestStep.
+ */
+export const SSOTestStepSchema: GenEnum<SSOTestStep> = /*@__PURE__*/
+  enumDesc(file_nokku_v1_sso, 0);
+
+/**
+ * What a real sign-in with the same identity would do.
+ *
+ * @generated from enum nokku.v1.SSOTestOutcome
+ */
+export enum SSOTestOutcome {
+  /**
+   * @generated from enum value: SSO_TEST_OUTCOME_UNSPECIFIED = 0;
+   */
+  SSO_TEST_OUTCOME_UNSPECIFIED = 0,
+
+  /**
+   * The identity belongs to a member, or a member has the email.
+   *
+   * @generated from enum value: SSO_TEST_OUTCOME_SIGNS_IN = 1;
+   */
+  SSO_TEST_OUTCOME_SIGNS_IN = 1,
+
+  /**
+   * Nobody has the email, and the provider creates accounts.
+   *
+   * @generated from enum value: SSO_TEST_OUTCOME_CREATES = 2;
+   */
+  SSO_TEST_OUTCOME_CREATES = 2,
+
+  /**
+   * Nobody has the email, and the provider does not create accounts.
+   *
+   * @generated from enum value: SSO_TEST_OUTCOME_NO_ACCOUNT = 3;
+   */
+  SSO_TEST_OUTCOME_NO_ACCOUNT = 3,
+
+  /**
+   * The provider would create an account, but every seat is taken.
+   *
+   * @generated from enum value: SSO_TEST_OUTCOME_NO_SEAT = 4;
+   */
+  SSO_TEST_OUTCOME_NO_SEAT = 4,
+
+  /**
+   * @generated from enum value: SSO_TEST_OUTCOME_NO_EMAIL = 5;
+   */
+  SSO_TEST_OUTCOME_NO_EMAIL = 5,
+
+  /**
+   * @generated from enum value: SSO_TEST_OUTCOME_EMAIL_UNVERIFIED = 6;
+   */
+  SSO_TEST_OUTCOME_EMAIL_UNVERIFIED = 6,
+
+  /**
+   * The email is the owner's, who has to link the identity from their profile.
+   *
+   * @generated from enum value: SSO_TEST_OUTCOME_OWNER_LINK = 7;
+   */
+  SSO_TEST_OUTCOME_OWNER_LINK = 7,
+
+  /**
+   * The member is deactivated.
+   *
+   * @generated from enum value: SSO_TEST_OUTCOME_INACTIVE = 8;
+   */
+  SSO_TEST_OUTCOME_INACTIVE = 8,
+}
+
+/**
+ * Describes the enum nokku.v1.SSOTestOutcome.
+ */
+export const SSOTestOutcomeSchema: GenEnum<SSOTestOutcome> = /*@__PURE__*/
+  enumDesc(file_nokku_v1_sso, 1);
+
+/**
  * @generated from service nokku.v1.SSOService
  */
 export const SSOService: GenService<{
@@ -231,6 +463,16 @@ export const SSOService: GenService<{
     methodKind: "unary";
     input: typeof DeleteSSOProviderRequestSchema;
     output: typeof DeleteSSOProviderResponseSchema;
+  },
+  /**
+   * GetSSOTest returns a test sign-in, only to the owner who ran it.
+   *
+   * @generated from rpc nokku.v1.SSOService.GetSSOTest
+   */
+  getSSOTest: {
+    methodKind: "unary";
+    input: typeof GetSSOTestRequestSchema;
+    output: typeof GetSSOTestResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_sso, 0);

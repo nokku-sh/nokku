@@ -45,6 +45,7 @@ const (
 	actionSessionRevoked  action = "SessionRevoked"
 	actionEmailChanged    action = "EmailChanged"
 	actionCredentialAdded action = "CredentialAdded" //nolint:gosec // an audit action name, not a credential
+	actionSSOTested       action = "SSOTested"
 )
 
 type event struct {

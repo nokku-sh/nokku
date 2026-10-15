@@ -30,7 +30,7 @@ func (s *ssoService) ListSSOProviders(
 	for i := range providers {
 		out = append(out, providerToProto(&providers[i]))
 	}
-	return &nokkuv1.ListSSOProvidersResponse{Providers: out}, nil
+	return &nokkuv1.ListSSOProvidersResponse{Providers: out, RedirectUri: new(iam.RedirectURI(ctx))}, nil
 }
 
 func (s *ssoService) PutSSOProvider(
@@ -41,6 +41,16 @@ func (s *ssoService) PutSSOProvider(
 	if s.cfg.SaaS {
 		if u, err := url.Parse(req.GetIssuerUrl()); err != nil || u.Scheme != "https" {
 			return nil, newError(connect.CodeInvalidArgument, "the issuer URL has to start with https://")
+		}
+	}
+	// Only a new issuer is fetched, so a provider that is down can still be edited or turned off.
+	prev, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetProviderId())
+	if err != nil || prev.OIDC.IssuerURL != req.GetIssuerUrl() {
+		if err := s.cfg.IAM.CheckIssuer(ctx, req.GetIssuerUrl()); err != nil {
+			return nil, newError(
+				connect.CodeInvalidArgument,
+				"the issuer URL did not answer with an OpenID Connect discovery document: "+err.Error(),
+			)
 		}
 	}
 	stored, err := s.cfg.IAM.PutSSOProvider(ctx, iam.SSOProvider{
@@ -76,6 +86,20 @@ func (s *ssoService) DeleteSSOProvider(
 		return nil, err
 	}
 	return &nokkuv1.DeleteSSOProviderResponse{}, nil
+}
+
+func (s *ssoService) GetSSOTest(
+	ctx context.Context,
+	req *nokkuv1.GetSSOTestRequest,
+) (*nokkuv1.GetSSOTestResponse, error) {
+	test, err := s.cfg.IAM.SSOTest(ctx, req.GetId())
+	if errors.Is(err, iam.ErrNotFound) {
+		return nil, errNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &nokkuv1.GetSSOTestResponse{Test: test}, nil
 }
 
 func providerToProto(p *iam.SSOProvider) *nokkuv1.SSOProvider {

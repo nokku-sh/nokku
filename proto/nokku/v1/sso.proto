@@ -17,6 +17,11 @@ service SSOService {
   rpc DeleteSSOProvider(DeleteSSOProviderRequest) returns (DeleteSSOProviderResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
+  // GetSSOTest returns a test sign-in, only to the owner who ran it.
+  rpc GetSSOTest(GetSSOTestRequest) returns (GetSSOTestResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 }
 
 message SSOProvider {
@@ -34,6 +39,8 @@ message SSOProvider {
 message ListSSOProvidersRequest {}
 message ListSSOProvidersResponse {
   repeated SSOProvider providers = 1;
+  // What the owner registers with every provider.
+  string redirect_uri = 2;
 }
 
 message PutSSOProviderRequest {
@@ -65,3 +72,63 @@ message DeleteSSOProviderRequest {
   string provider_id = 1 [(buf.validate.field).string.min_len = 1];
 }
 message DeleteSSOProviderResponse {}
+
+// The step of a test sign-in that failed.
+enum SSOTestStep {
+  SSO_TEST_STEP_UNSPECIFIED = 0;
+  // Fetching the issuer's discovery document.
+  SSO_TEST_STEP_DISCOVERY = 1;
+  // The provider's answer to the sign-in, before any token.
+  SSO_TEST_STEP_AUTHORIZE = 2;
+  // Trading the code for tokens, where the client secret is checked.
+  SSO_TEST_STEP_TOKEN = 3;
+  // Checking the ID token's signature, audience and nonce.
+  SSO_TEST_STEP_ID_TOKEN = 4;
+}
+
+// What a real sign-in with the same identity would do.
+enum SSOTestOutcome {
+  SSO_TEST_OUTCOME_UNSPECIFIED = 0;
+  // The identity belongs to a member, or a member has the email.
+  SSO_TEST_OUTCOME_SIGNS_IN = 1;
+  // Nobody has the email, and the provider creates accounts.
+  SSO_TEST_OUTCOME_CREATES = 2;
+  // Nobody has the email, and the provider does not create accounts.
+  SSO_TEST_OUTCOME_NO_ACCOUNT = 3;
+  // The provider would create an account, but every seat is taken.
+  SSO_TEST_OUTCOME_NO_SEAT = 4;
+  SSO_TEST_OUTCOME_NO_EMAIL = 5;
+  SSO_TEST_OUTCOME_EMAIL_UNVERIFIED = 6;
+  // The email is the owner's, who has to link the identity from their profile.
+  SSO_TEST_OUTCOME_OWNER_LINK = 7;
+  // The member is deactivated.
+  SSO_TEST_OUTCOME_INACTIVE = 8;
+}
+
+message SSOTest {
+  string provider_id = 1;
+  // Unset when every step passed.
+  SSOTestStep failed_step = 2;
+  // Why the step failed, in the provider's or the check's words.
+  string error = 3;
+  string subject = 4;
+  string email = 5;
+  string name = 6;
+  bool email_verified = 7;
+  // The claim names in the ID token.
+  repeated string claims = 8;
+  SSOTestOutcome outcome = 9;
+  // The member a real sign-in lands on.
+  string member_email = 10;
+  google.protobuf.Timestamp tested_at = 11;
+}
+
+message GetSSOTestRequest {
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+message GetSSOTestResponse {
+  SSOTest test = 1;
+}

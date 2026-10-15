@@ -128,7 +128,11 @@ func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *iam.Service) *oidcFlow
 func (h *oidcIDPHarness) startOIDCFlowFrom(t *testing.T, svc *iam.Service, login *http.Request) *oidcFlowRun {
 	t.Helper()
 	loginRec := httptest.NewRecorder()
-	svc.OIDC.Login(loginRec, login)
+	start := svc.OIDC.Login
+	if login.URL.Path == "/oidc/test" {
+		start = svc.OIDC.Test
+	}
+	start(loginRec, login)
 
 	authorizeURL := loginRec.Header().Get("Location")
 	if authorizeURL == "" {

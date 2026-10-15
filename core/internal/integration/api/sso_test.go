@@ -3,6 +3,10 @@
 package api_test
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -12,6 +16,29 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
+
+// fakeIssuer serves a discovery document under any path, so each path is an issuer of its own.
+func fakeIssuer(t *testing.T) *httptest.Server {
+	t.Helper()
+	const wellKnown = "/.well-known/openid-configuration"
+	var ts *httptest.Server
+	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		issuer, ok := strings.CutSuffix(r.URL.Path, wellKnown)
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                 ts.URL + issuer,
+			"authorization_endpoint": ts.URL + issuer + "/authorize",
+			"token_endpoint":         ts.URL + issuer + "/token",
+			"jwks_uri":               ts.URL + issuer + "/jwks",
+		})
+	}))
+	t.Cleanup(ts.Close)
+	return ts
+}
 
 // A provider and the SCIM tokens decide who signs in as anyone. An admin who could change them could become owner.
 func TestIdentitySettingsNeedTheOwner(t *testing.T) {
@@ -23,11 +50,12 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 
 	sso := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, admin)
 	scim := nokkuv1connect.NewSCIMServiceClient(srv.Client(), srv.URL, admin)
+	issuer := fakeIssuer(t).URL + "/evil"
 	provider := &nokkuv1.PutSSOProviderRequest{
 		ProviderId:   new("mine"),
 		Name:         new("mine"),
 		Enabled:      new(true),
-		IssuerUrl:    new("https://idp.evil.example"),
+		IssuerUrl:    new(issuer),
 		ClientId:     new("nokku"),
 		ClientSecret: new("s3cret"),
 	}
@@ -65,7 +93,7 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	stored, err := ownerSSO.PutSSOProvider(ctx, provider)
 	require.NoError(t, err)
 	assert.Equal(t, "mine", stored.GetProvider().GetProviderId())
-	assert.Equal(t, "https://idp.evil.example", stored.GetProvider().GetIssuerUrl())
+	assert.Equal(t, issuer, stored.GetProvider().GetIssuerUrl())
 
 	options, err := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL).
 		GetLoginOptions(ctx, &nokkuv1.GetLoginOptionsRequest{})
@@ -90,7 +118,8 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
 	sso := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, owner)
-	const issuer = "http://keycloak.lab:8080/realms/master"
+	lab := fakeIssuer(t).URL
+	issuer := lab + "/realms/master"
 	stored, err := sso.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{
 		ProviderId: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new(issuer),
 		ClientId: new("nokku"), ClientSecret: new("s3cret"),
@@ -100,7 +129,7 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 
 	// The stored secret stays with its issuer.
 	moved := &nokkuv1.PutSSOProviderRequest{
-		ProviderId: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new("http://other.lab:8080"),
+		ProviderId: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new(lab + "/realms/other"),
 		ClientId: new("nokku"),
 	}
 	_, err = sso.PutSSOProvider(t.Context(), moved)
@@ -113,6 +142,40 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 	require.NoError(t, err, "the same issuer keeps the stored secret")
 
 	_, err = sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("lab")})
+	require.NoError(t, err)
+}
+
+// A typo in the issuer fails on save. A provider that is down later still saves, so it can be turned off.
+func TestNewIssuerMustAnswer(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	owner := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+	)
+	sso := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, owner)
+	idp := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(idp.Close)
+
+	typo := &nokkuv1.PutSSOProviderRequest{
+		ProviderId: new("typo"), Name: new("Typo"), Enabled: new(true), IssuerUrl: new(idp.URL + "/realms/typo"),
+		ClientId: new("nokku"), ClientSecret: new("s3cret"),
+	}
+	_, err := sso.PutSSOProvider(t.Context(), typo)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an issuer without discovery: %v", err)
+
+	gone := fakeIssuer(t)
+	down := &nokkuv1.PutSSOProviderRequest{
+		ProviderId: new("down"), Name: new("Down"), Enabled: new(true), IssuerUrl: new(gone.URL + "/realms/down"),
+		ClientId: new("nokku"), ClientSecret: new("s3cret"),
+	}
+	_, err = sso.PutSSOProvider(t.Context(), down)
+	require.NoError(t, err)
+	gone.Close()
+	down.Enabled, down.ClientSecret = new(false), nil
+	_, err = sso.PutSSOProvider(t.Context(), down)
+	require.NoError(t, err, "turning off a provider with the same issuer")
+
+	_, err = sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("down")})
 	require.NoError(t, err)
 }
 

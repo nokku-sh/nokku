@@ -20,6 +20,11 @@ import (
 
 const scimMountPath = "/scim/v2"
 
+// SCIMBaseURL is where the workspace's identity provider sends users and groups.
+func SCIMBaseURL(ctx context.Context) string {
+	return baseURL(ctx) + scimMountPath
+}
+
 type SCIMFlow struct {
 	svc     *Service
 	mu      sync.Mutex

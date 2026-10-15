@@ -232,8 +232,10 @@ func (*ListSCIMTokensRequest) Descriptor() ([]byte, []int) {
 }
 
 type ListSCIMTokensResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tokens        []*SCIMToken           `protobuf:"bytes,1,rep,name=tokens" json:"tokens,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Tokens []*SCIMToken           `protobuf:"bytes,1,rep,name=tokens" json:"tokens,omitempty"`
+	// Where the identity provider sends users and groups.
+	BaseUrl       *string `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -273,6 +275,13 @@ func (x *ListSCIMTokensResponse) GetTokens() []*SCIMToken {
 		return x.Tokens
 	}
 	return nil
+}
+
+func (x *ListSCIMTokensResponse) GetBaseUrl() string {
+	if x != nil && x.BaseUrl != nil {
+		return *x.BaseUrl
+	}
+	return ""
 }
 
 type DeleteSCIMTokenRequest struct {
@@ -374,9 +383,10 @@ const file_nokku_v1_scim_proto_rawDesc = "" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12)\n" +
 	"\x05entry\x18\x02 \x01(\v2\x13.nokku.v1.SCIMTokenR\x05entry\x12\x19\n" +
 	"\bbase_url\x18\x03 \x01(\tR\abaseUrl\"\x17\n" +
-	"\x15ListSCIMTokensRequest\"E\n" +
+	"\x15ListSCIMTokensRequest\"`\n" +
 	"\x16ListSCIMTokensResponse\x12+\n" +
-	"\x06tokens\x18\x01 \x03(\v2\x13.nokku.v1.SCIMTokenR\x06tokens\"2\n" +
+	"\x06tokens\x18\x01 \x03(\v2\x13.nokku.v1.SCIMTokenR\x06tokens\x12\x19\n" +
+	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\"2\n" +
 	"\x16DeleteSCIMTokenRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x19\n" +
 	"\x17DeleteSCIMTokenResponse2\xad\x02\n" +
