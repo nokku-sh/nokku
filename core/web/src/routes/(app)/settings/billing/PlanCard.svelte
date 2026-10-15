@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { billing as billingApi } from '#lib/api/billing.svelte.js';
+	import { HOLD_DAYS } from '#lib/api/license.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -46,7 +47,7 @@
 		(immediate
 			? `It ends now and the workspace drops to Community.`
 			: `It runs until ${formatTs(sub?.currentPeriodEnd)}, then the workspace drops to Community.`) +
-			' Recordings and audit logs beyond the Community limits are kept for 30 more days.'
+			` Recordings and audit logs beyond the Community limits are kept for ${HOLD_DAYS} more days.`
 	);
 
 	async function submitCancel() {
@@ -112,7 +113,7 @@
 					<Alert.Title>Ends on {formatTs(sub?.currentPeriodEnd)}</Alert.Title>
 					<Alert.Description>
 						Then the workspace drops to Community. Recordings and audit logs beyond its limits are
-						kept for 30 more days.
+						kept for {HOLD_DAYS} more days.
 					</Alert.Description>
 				</Alert.Root>
 			{:else if isPastDue}

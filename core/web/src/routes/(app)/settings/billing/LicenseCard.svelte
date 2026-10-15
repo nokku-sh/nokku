@@ -9,6 +9,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { LicensePurchaseURL } from '#lib/config.js';
+	import { planName } from '#lib/plans.js';
 	import type { Tone } from '#lib/tone.js';
 	import { formatTs } from '#lib/utils.js';
 	import { ExternalLink, KeyRound, ShieldAlert } from '@lucide/svelte';
@@ -78,7 +79,9 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-xl font-semibold">
-				<h2>{phase === 'none' || phase === 'expired' ? 'Community' : 'Enterprise'} plan</h2>
+				<h2>
+					{planName(phase === 'none' || phase === 'expired' ? 'community' : 'enterprise')} plan
+				</h2>
 			</Card.Title>
 			<Card.Description>
 				{#if phase === 'none'}

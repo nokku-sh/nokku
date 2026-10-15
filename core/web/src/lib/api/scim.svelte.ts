@@ -5,6 +5,7 @@ import { SCIMService } from '#lib/gen/nokku/v1/scim_pb.js';
 export const scim = {
 	listTokens: () =>
 		useQuery(SCIMService.method.listSCIMTokens, {}, () => ({ select: (res) => res.tokens ?? [] })),
+	baseUrl: () => useQuery(SCIMService.method.listSCIMTokens, {}, { select: (res) => res.baseUrl }),
 
 	createToken: () =>
 		useMutation(SCIMService.method.createSCIMToken, {

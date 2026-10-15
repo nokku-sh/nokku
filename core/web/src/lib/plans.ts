@@ -1,6 +1,6 @@
 import { UpgradeURL } from '#lib/config.js';
 
-export type PlanCode = 'community' | 'pro' | 'enterprise';
+type PlanCode = 'community' | 'pro' | 'enterprise';
 
 const names: Record<PlanCode, string> = {
 	community: 'Community',
@@ -18,18 +18,23 @@ export const catalog: { key: string; label: string; plan: PlanCode }[] = [
 ];
 
 export function planName(code: string | undefined): string {
-	return names[(code || 'community') as PlanCode] ?? code ?? names.community;
+	return names[(code || 'community') as PlanCode] ?? code;
 }
 
-/** The plan to buy for a feature. Self-hosted licenses only come as Enterprise. */
-export function requiredPlan(feature: string, mode: string | undefined): string {
+/** Self-hosted licenses only come as Enterprise. */
+function planFor(feature: string, mode: string | undefined): PlanCode {
 	const plan = catalog.find((f) => f.key === feature)?.plan ?? 'enterprise';
-	return planName(mode === 'saas' ? plan : plan === 'community' ? plan : 'enterprise');
+	return mode === 'saas' || plan === 'community' ? plan : 'enterprise';
+}
+
+/** The plan to buy for a feature. */
+export function requiredPlan(feature: string, mode: string | undefined): string {
+	return planName(planFor(feature, mode));
 }
 
 /** Where to get a feature. Self-hosted activates a key in billing, hosted Pro is bought in billing, hosted Enterprise is sold outside. */
 export function upgradeLink(feature: string, mode: string | undefined) {
-	if (mode === 'saas' && requiredPlan(feature, mode) === names.enterprise) {
+	if (mode === 'saas' && planFor(feature, mode) === 'enterprise') {
 		return { href: UpgradeURL, label: 'See plans', external: true };
 	}
 	return {

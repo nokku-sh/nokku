@@ -47,9 +47,13 @@ export function newDraft<Desc extends DescMessage>(schema: Desc, init?: MessageI
 // useDraft only resets when a different entity loads, so background refetches never clobber edits.
 export function useDraft<Desc extends DescMessage>(
 	schema: Desc,
-	source: () => MessageShape<Desc> | undefined
+	source: () => MessageShape<Desc> | undefined,
+	keyOf: (entity: MessageShape<Desc>) => string | undefined = (e) => (e as { id?: string }).id
 ) {
-	const key = $derived((source() as { id?: string } | undefined)?.id);
+	const key = $derived.by(() => {
+		const entity = source();
+		return entity && keyOf(entity);
+	});
 	const draft = $derived.by(() => {
 		if (!key) return undefined;
 		const entity = untrack(source);

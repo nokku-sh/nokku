@@ -6,7 +6,7 @@ import { toast } from 'svelte-sonner';
 const DAY = 86_400_000;
 // The reminder starts this long before expiry, data limits hold this long after. See holdDays in internal/entitlement.
 const WARN_DAYS = 30;
-const HOLD_DAYS = 30;
+export const HOLD_DAYS = 30;
 
 type LicenseState = 'none' | 'active' | 'expiring' | 'expired';
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { scim } from '#lib/api/scim.svelte.js';
-	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
+	import LoadError from '#lib/components/blocks/LoadError.svelte';
 	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
 	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
@@ -15,16 +15,7 @@
 	import { confirm } from '#lib/hooks/index.js';
 	import { requiredPlan, upgradeLink } from '#lib/plans.js';
 	import { formatTs } from '#lib/utils.js';
-	import {
-		ArrowRight,
-		KeyRound,
-		Plus,
-		RotateCw,
-		ShieldAlert,
-		Trash2,
-		TriangleAlert,
-		UsersRound
-	} from '@lucide/svelte';
+	import { ArrowRight, KeyRound, Plus, ShieldAlert, Trash2, UsersRound } from '@lucide/svelte';
 
 	interface Props {
 		readonly?: boolean;
@@ -38,13 +29,12 @@
 	const tokens = scim.listTokens();
 	const createToken = scim.createToken();
 	const deleteToken = scim.deleteToken();
-	const baseUrl = workspace.baseUrl();
+	const scimURL = scim.baseUrl();
 
 	let createOpen = $state(false);
 	let label = $state('');
 	let created = $state<{ token: string; baseUrl: string }>();
 
-	const scimURL = $derived(baseUrl.data ? `${baseUrl.data}/scim/v2` : '');
 	const plan = $derived(requiredPlan('scim', mode));
 	const upgrade = $derived(upgradeLink('scim', mode));
 	// Tokens keep provisioning after a downgrade, so they stay listed and revocable.
@@ -53,7 +43,7 @@
 	// Stays open to show the secret once.
 	async function create() {
 		const res = await createToken.mutateAsync({ label: label.trim() });
-		created = { token: res.token ?? '', baseUrl: res.baseUrl || scimURL };
+		created = { token: res.token, baseUrl: res.baseUrl };
 		label = '';
 		return false;
 	}
@@ -161,22 +151,17 @@
 			<Card.Content>
 				<Field.Field>
 					<Field.Label for="scim-base-url">Base URL</Field.Label>
-					{#if scimURL}
+					{#if scimURL.data}
 						<InputGroupVariants
 							variant="copy-input"
-							value={scimURL}
+							value={scimURL.data}
 							readonly
 							class="font-mono text-xs"
 							copyLabel="SCIM base URL"
 							inputProps={{ id: 'scim-base-url' }}
 						/>
-					{:else if baseUrl.isError}
-						<p class="flex flex-wrap items-center gap-2 text-sm text-destructive" role="alert">
-							The workspace address did not load.
-							<Button variant="outline" size="sm" onclick={() => baseUrl.refetch()}
-								>Try again</Button
-							>
-						</p>
+					{:else if scimURL.isError}
+						<p class="text-sm text-destructive" role="alert">The base URL did not load.</p>
 					{:else}
 						<Skeleton class="h-8 w-full" />
 					{/if}
@@ -204,21 +189,11 @@
 			</Card.Header>
 			<Card.Content>
 				{#if tokens.isError}
-					<Empty.Root class="border border-dashed">
-						<Empty.Header>
-							<Empty.Media variant="icon" class="bg-destructive/10 text-destructive">
-								<TriangleAlert />
-							</Empty.Media>
-							<Empty.Title>Tokens did not load</Empty.Title>
-							<Empty.Description>Provisioning with them is not affected.</Empty.Description>
-						</Empty.Header>
-						<Empty.Content>
-							<Button variant="outline" size="sm" onclick={() => tokens.refetch()}>
-								<RotateCw data-icon="inline-start" />
-								Try again
-							</Button>
-						</Empty.Content>
-					</Empty.Root>
+					<LoadError
+						title="Tokens did not load"
+						description="Provisioning with them is not affected."
+						onRetry={() => tokens.refetch()}
+					/>
 				{:else if !tokens.data?.length}
 					<Empty.Root class="border border-dashed">
 						<Empty.Header>

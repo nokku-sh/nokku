@@ -132,6 +132,7 @@ export const areas: Area[] = [
 			'DeleteWorkspace',
 			'PutSSOProvider',
 			'DeleteSSOProvider',
+			'SSOTested',
 			'CreateSCIMToken',
 			'DeleteSCIMToken'
 		]
@@ -176,6 +177,7 @@ const labels: Record<string, string> = {
 	SessionIssued: 'Session started',
 	SessionRevoked: 'Session revoked',
 	CredentialAdded: 'Credential added',
+	SSOTested: 'Tested single sign-on',
 	EmailChanged: 'Email changed',
 	UserCreated: 'Account created',
 	UserDeleted: 'Account deleted',
