@@ -14,6 +14,8 @@
 	}
 
 	let { values = [], note = 'Copy it now, it is only shown once.', children }: Props = $props();
+
+	const uid = $props.id();
 </script>
 
 <div class="flex flex-col gap-3">
@@ -24,8 +26,15 @@
 	</Alert.Root>
 	{#each values as v, i (i)}
 		<Field.Field>
-			{#if v.label}<Field.Label>{v.label}</Field.Label>{/if}
-			<InputGroupVariants variant="copy-input" value={v.value} readonly class="font-mono" />
+			{#if v.label}<Field.Label for={`${uid}-${i}`}>{v.label}</Field.Label>{/if}
+			<InputGroupVariants
+				variant="copy-input"
+				value={v.value}
+				readonly
+				class="font-mono"
+				copyLabel={v.label}
+				inputProps={{ id: `${uid}-${i}` }}
+			/>
 		</Field.Field>
 	{/each}
 	{@render children?.()}

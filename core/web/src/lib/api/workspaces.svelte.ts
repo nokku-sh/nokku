@@ -13,6 +13,9 @@ import { useMutation, useQuery } from '#lib/query/index.js';
 // The host picks the workspace, so none of these name one.
 export const workspace = {
 	get: () => useQuery(WorkspaceService.method.getWorkspace, {}, { select: (res) => res.workspace }),
+	// The server's address for this workspace. Redirect and SCIM URLs start with it, never with location.origin.
+	baseUrl: () =>
+		useQuery(WorkspaceService.method.getWorkspace, {}, { select: (res) => res.baseUrl }),
 
 	update: () => useMutation(WorkspaceService.method.updateWorkspace),
 	delete: () =>

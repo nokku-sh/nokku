@@ -1,54 +1,46 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { billing } from '#lib/api/billing.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
+	import { util } from '#lib/api/workspaces.svelte.js';
 	import { Crown, UsersRound } from '@lucide/svelte';
 	import ProvidersTab from './ProvidersTab.svelte';
 	import SCIMTab from './SCIMTab.svelte';
 	import { OIDCIcon } from '#lib/assets/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
-	import * as Empty from '#lib/components/ui/empty/index.js';
-	import { Button } from '#lib/components/ui/button/index.js';
-	import { UpgradeURL } from '#lib/config.js';
 
-	// Unknown until the account loads, so the buttons don't flicker.
 	const me = user.self();
-	const readonly = $derived(me.data !== undefined && me.data.role !== WorkspaceRole.OWNER);
+	const isOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
+	// Read-only until the account loads, so nothing looks clickable for a moment and then isn't.
+	const readonly = $derived(!isOwner);
 
-	// Only admins read the plan. Everyone else gets the read-only tab either way.
+	// Only admins read the plan. Everyone below sees the settings read-only either way.
 	const can = user.can();
 	const billingData = billing.get(() => can.admin);
-	const scimAvailable = $derived(!can.admin || billingData.data?.features?.['scim'] === true);
+	const mode = $derived(util.instanceInfo().data?.mode);
+	// Undefined while the plan loads, so nothing gets offered or locked too early.
+	const has = (feature: string) =>
+		billingData.data ? billingData.data.features?.[feature] === true : undefined;
 
-	let tab = $state('providers');
+	const tab = $derived(page.url.searchParams.get('tab') === 'scim' ? 'scim' : 'providers');
+	function setTab(value: string) {
+		const url = new URL(page.url.href);
+		if (value === 'scim') url.searchParams.set('tab', value);
+		else url.searchParams.delete('tab');
+		void goto(url, { replace: true, reset: false });
+	}
 </script>
-
-{#snippet needsUpgrade()}
-	<Empty.Root class="border border-dashed">
-		<Empty.Header>
-			<Empty.Media variant="icon">
-				<UsersRound />
-			</Empty.Media>
-			<Empty.Title>Available on Enterprise</Empty.Title>
-			<Empty.Description>
-				SCIM provisioning syncs users and groups from your identity provider automatically. Upgrade
-				to Enterprise to connect Okta, Entra ID, and other SCIM directories.
-			</Empty.Description>
-		</Empty.Header>
-		<Empty.Content>
-			<Button href={UpgradeURL} target="_blank" rel="noopener">See plans</Button>
-		</Empty.Content>
-	</Empty.Root>
-{/snippet}
 
 <PageHeader
 	title="Single sign-on"
 	description="Connect the identity providers people sign in with, then provision them with SCIM"
 />
 
-{#if readonly}
+{#if me.data && readonly}
 	<Alert.Root class="mb-4">
 		<Crown class="size-4" />
 		<Alert.Title>Only the owner can change this</Alert.Title>
@@ -59,7 +51,7 @@
 	</Alert.Root>
 {/if}
 
-<Tabs.Root bind:value={tab} class="gap-4">
+<Tabs.Root value={tab} onValueChange={setTab} class="gap-4">
 	<Tabs.List>
 		<Tabs.Trigger value="providers">
 			<OIDCIcon />
@@ -72,13 +64,9 @@
 	</Tabs.List>
 
 	<Tabs.Content value="providers">
-		<ProvidersTab {readonly} />
+		<ProvidersTab {readonly} {mode} enforceAvailable={can.admin ? has('enforce_sso') : true} />
 	</Tabs.Content>
 	<Tabs.Content value="scim">
-		{#if !scimAvailable}
-			{@render needsUpgrade()}
-		{:else}
-			<SCIMTab {readonly} />
-		{/if}
+		<SCIMTab {readonly} {mode} available={can.admin ? has('scim') : true} />
 	</Tabs.Content>
 </Tabs.Root>

@@ -8,10 +8,10 @@ export const scim = {
 
 	createToken: () =>
 		useMutation(SCIMService.method.createSCIMToken, {
-			onSuccess: () => toast.success('Connector token created')
+			onSuccess: () => toast.success('SCIM token created')
 		}),
 	deleteToken: () =>
 		useMutation(SCIMService.method.deleteSCIMToken, {
-			onSuccess: () => toast.success('Connector token revoked')
+			onSuccess: () => toast.success('SCIM token revoked')
 		})
 };

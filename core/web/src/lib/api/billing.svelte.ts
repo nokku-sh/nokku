@@ -17,6 +17,6 @@ export const billing = {
 		}),
 	cancelSubscription: () =>
 		useMutation(BillingService.method.cancelSubscription, {
-			onSuccess: () => toast.success('Subscription cancelled')
+			onSuccess: () => toast.success('Subscription canceled')
 		})
 };

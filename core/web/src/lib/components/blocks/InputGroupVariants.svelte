@@ -15,6 +15,8 @@
 		class?: string;
 		searchResults?: number;
 		inputProps?: ComponentProps<typeof Input>;
+		/** Names the copied value for screen readers, as in "Copy redirect URI". */
+		copyLabel?: string;
 	}
 
 	let {
@@ -24,10 +26,11 @@
 		readonly = false,
 		class: className = '',
 		searchResults,
-		inputProps = {}
+		inputProps = {},
+		copyLabel
 	}: Props = $props();
 
-	const clipboard = new UseClipboard();
+	const clipboard = new UseClipboard({ delay: 1200 });
 
 	let showPassword = $state(false);
 </script>
@@ -37,7 +40,7 @@
 		<InputGroup.Input bind:value class="truncate" {placeholder} {readonly} {...inputProps} />
 		<InputGroup.Addon align="inline-end">
 			<InputGroup.Button
-				aria-label="Copy"
+				aria-label={copyLabel ? `Copy ${copyLabel}` : 'Copy'}
 				title="Copy"
 				size="icon-xs"
 				onclick={() => clipboard.copy(value)}
@@ -50,6 +53,7 @@
 			</InputGroup.Button>
 		</InputGroup.Addon>
 	</InputGroup.Root>
+	<span class="sr-only" aria-live="polite">{clipboard.copied ? 'Copied' : ''}</span>
 {:else if variant === 'search'}
 	<InputGroup.Root class={className}>
 		<InputGroup.Input bind:value placeholder={placeholder || 'Search...'} {...inputProps} />

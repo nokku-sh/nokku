@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { license, licenseStatus } from '#lib/api/license.svelte.js';
-	import { user } from '#lib/api/user.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -11,32 +9,32 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { LicensePurchaseURL } from '#lib/config.js';
-	import { atLeast } from '#lib/roles.js';
 	import type { Tone } from '#lib/tone.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Check, ExternalLink, KeyRound, ShieldAlert } from '@lucide/svelte';
+	import { ExternalLink, KeyRound, ShieldAlert } from '@lucide/svelte';
+
+	let { isOwner }: { isOwner: boolean } = $props();
 
 	const data = license.get();
 	const activate = license.activate();
-	const me = user.self();
 
 	const status = $derived(licenseStatus(data.data));
 	const phase = $derived(status.state);
-	const canActivate = $derived(atLeast(me.data?.role, WorkspaceRole.OWNER));
 
-	const badges: Record<typeof phase, { label: string; tone: Tone }> = {
-		none: { label: 'Free', tone: 'muted' },
+	const badges: Record<typeof phase, { label: string; tone: Tone } | undefined> = {
+		none: undefined,
 		active: { label: 'Active', tone: 'success' },
 		expiring: { label: 'Expires soon', tone: 'warning' },
 		expired: { label: 'Expired', tone: 'destructive' }
 	};
+	const activateLabels: Record<typeof phase, string> = {
+		none: 'Activate a key',
+		active: 'Activate a newer key',
+		expiring: 'Activate a renewed key',
+		expired: 'Activate a renewed key'
+	};
 
-	const benefits = [
-		'Unlimited users and infrastructure',
-		'SCIM, enforced SSO and audit export',
-		'365-day audit retention',
-		'Offline, air-gapped activation'
-	];
+	const badge = $derived(badges[phase]);
 
 	let open = $state(false);
 	let key = $state('');
@@ -79,83 +77,80 @@
 {:else}
 	<Card.Root>
 		<Card.Header>
-			<span class="spec-label">Self-hosted license</span>
-			<Card.Title class="text-3xl font-semibold tracking-tight">
-				{phase === 'none' ? 'Community' : 'Enterprise'}
+			<Card.Title class="text-xl font-semibold">
+				<h2>{phase === 'none' || phase === 'expired' ? 'Community' : 'Enterprise'} plan</h2>
 			</Card.Title>
 			<Card.Description>
 				{#if phase === 'none'}
-					Everything you need to start. Enterprise unlocks the rest.
+					Free on your own server. An Enterprise license lifts the member cap, keeps 365 days of
+					history and unlocks every feature. Keys activate offline, so air-gapped servers work.
 				{:else if phase === 'expired'}
-					This instance runs on Community limits until a new key is activated.
+					The Enterprise license expired, so this server runs on the Community limits.
 				{:else}
-					This instance is licensed for every Enterprise feature.
+					This server is licensed for every Enterprise feature.
 				{/if}
 			</Card.Description>
-			<Card.Action>
-				<Badge variant={badges[phase].tone}>{badges[phase].label}</Badge>
-			</Card.Action>
+			{#if badge}
+				<Card.Action>
+					<Badge variant={badge.tone}>{badge.label}</Badge>
+				</Card.Action>
+			{/if}
 		</Card.Header>
-		<Card.Content class="flex flex-col gap-4">
-			{#if phase === 'expiring'}
-				<Alert.Root variant="warning">
-					<ShieldAlert />
-					<Alert.Title>
-						Expires in {status.daysLeft}
-						{status.daysLeft === 1 ? 'day' : 'days'}
-					</Alert.Title>
-					<Alert.Description>
-						A renewed key arrives by email when the license renews. Activate it here to keep
-						Enterprise features without a gap.
-					</Alert.Description>
-				</Alert.Root>
-			{:else if phase === 'expired'}
-				<Alert.Root variant="destructive">
-					<ShieldAlert />
-					<Alert.Title>Expired on {formatTs(status.expiresAt)}</Alert.Title>
-					<Alert.Description>
-						Licensed features are off. Nothing is deleted yet, recordings and audit logs beyond the
-						Community limits are kept until {formatTs(status.keptUntil)}.
-					</Alert.Description>
-				</Alert.Root>
-			{/if}
 
-			{#if phase === 'none'}
-				<ul class="flex flex-col gap-2.5">
-					{#each benefits as b (b)}
-						<li class="flex items-start gap-2.5 text-sm text-muted-foreground">
-							<Check class="mt-0.5 size-4 shrink-0 text-primary" />
-							{b}
-						</li>
-					{/each}
-				</ul>
-			{:else if status.expiresAt && phase !== 'expired'}
-				<div class="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3">
-					<span class="spec-label">Valid until</span>
-					<span class="font-mono text-sm tabular-nums">{formatTs(status.expiresAt)}</span>
-				</div>
-			{/if}
-		</Card.Content>
+		{#if phase !== 'none'}
+			<Card.Content class="flex flex-col gap-4">
+				{#if phase === 'expiring'}
+					<Alert.Root variant="warning">
+						<ShieldAlert />
+						<Alert.Title>
+							Expires in {status.daysLeft}
+							{status.daysLeft === 1 ? 'day' : 'days'}
+						</Alert.Title>
+						<Alert.Description>
+							A renewed key arrives by email when the license renews. Activate it here to keep the
+							Enterprise features without a gap.
+						</Alert.Description>
+					</Alert.Root>
+				{:else if phase === 'expired'}
+					<Alert.Root variant="destructive">
+						<ShieldAlert />
+						<Alert.Title>Expired on {formatTs(status.expiresAt)}</Alert.Title>
+						<Alert.Description>
+							Servers and sign-ins keep working. Licensed features are off, and nothing is deleted
+							yet. Recordings and audit logs beyond the Community limits are kept until
+							{formatTs(status.keptUntil)}.
+						</Alert.Description>
+					</Alert.Root>
+				{/if}
+
+				{#if status.expiresAt && phase !== 'expired'}
+					<div class="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3">
+						<span class="spec-label">Valid until</span>
+						<span class="font-mono text-sm tabular-nums">{formatTs(status.expiresAt)}</span>
+					</div>
+				{/if}
+			</Card.Content>
+		{/if}
+
 		<Card.Footer class="flex flex-col items-stretch gap-3 border-t">
-			<div class="flex flex-wrap gap-2">
-				{#if canActivate}
+			{#if isOwner}
+				<div class="flex flex-wrap gap-2">
 					<Button
 						variant={phase === 'active' ? 'outline' : 'default'}
 						onclick={() => (open = true)}
 					>
 						<KeyRound data-icon="inline-start" />
-						{phase === 'none' ? 'Activate a key' : 'Activate a renewed key'}
+						{activateLabels[phase]}
 					</Button>
-				{/if}
-				{#if phase === 'none' || phase === 'expired'}
-					<Button variant="outline" href={LicensePurchaseURL} target="_blank" rel="noopener">
-						Buy an Enterprise license
-						<ExternalLink data-icon="inline-end" />
-					</Button>
-				{/if}
-			</div>
-			{#if !canActivate}
-				<p class="text-xs text-muted-foreground">A workspace owner can activate a license key.</p>
+					{#if phase === 'none' || phase === 'expired'}
+						<Button variant="outline" href={LicensePurchaseURL} target="_blank" rel="noopener">
+							Buy an Enterprise license
+							<ExternalLink data-icon="inline-end" />
+						</Button>
+					{/if}
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">The workspace owner activates license keys.</p>
 			{/if}
 		</Card.Footer>
 	</Card.Root>
