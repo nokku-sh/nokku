@@ -34,7 +34,11 @@ func (s *workspaceService) GetWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	return &nokkuv1.GetWorkspaceResponse{Workspace: workspace.ToProto()}, nil
+	ws, _ := actor.WorkspaceFromContext(ctx)
+	return &nokkuv1.GetWorkspaceResponse{
+		Workspace: workspace.ToProto(),
+		BaseUrl:   new(ws.BaseURL),
+	}, nil
 }
 
 func (s *workspaceService) UpdateWorkspace(

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -58,6 +59,7 @@ type fakeStripe struct {
 	workspaceID string
 	subs        map[string]remoteSub
 	cancelled   []string
+	raised      []string
 	checkouts   []url.Values
 }
 
@@ -76,9 +78,15 @@ func (f *fakeStripe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":{"message":"no such subscription"}}`, http.StatusNotFound)
 		return
 	}
-	if r.Method == http.MethodDelete {
+	_ = r.ParseForm()
+	switch {
+	case r.Method == http.MethodDelete:
 		f.cancelled = append(f.cancelled, id)
 		sub.status = "canceled"
+		f.subs[id] = sub
+	case r.PostForm.Has("items[0][quantity]"):
+		f.raised = append(f.raised, r.PostForm.Get("items[0][quantity]"))
+		sub.seats, _ = strconv.ParseInt(r.PostForm.Get("items[0][quantity]"), 10, 64)
 		f.subs[id] = sub
 	}
 	body := map[string]any{
@@ -89,6 +97,7 @@ func (f *fakeStripe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"cancel_at_period_end": sub.cancelAt,
 		"metadata":             map[string]string{"workspace_id": f.workspaceID},
 		"items": map[string]any{"data": []map[string]any{{
+			"id":                 "si_1",
 			"quantity":           sub.seats,
 			"current_period_end": time.Now().Add(24 * time.Hour).Unix(),
 		}}},
@@ -127,8 +136,9 @@ func newSync(t *testing.T) *fakeStripe {
 	t.Cleanup(func() { stripe.SetBackend(stripe.APIBackend, nil) })
 	t.Setenv("STRIPE_SECRET_KEY", "sk_test_x")
 	t.Setenv("STRIPE_WEBHOOK_SECRET", webhookSecret)
-	t.Setenv("STRIPE_PRO_PRICE_ID", "price_x")
-	fake.billing, err = billing.New(t.Context(), conn, "https://nokku.test", true)
+	t.Setenv("STRIPE_PRO_MONTHLY_PRICE_ID", "price_m")
+	t.Setenv("STRIPE_PRO_YEARLY_PRICE_ID", "price_y")
+	fake.billing, err = billing.New(t.Context(), conn, true)
 	require.NoError(t, err)
 	return fake
 }
@@ -155,6 +165,24 @@ func (f *fakeStripe) row(t *testing.T) *db.WorkspaceSubscription {
 	row, err := f.conn.Sys().GetSubscription(t.Context(), f.workspaceID)
 	require.NoError(t, err)
 	return row
+}
+
+func (f *fakeStripe) addMembers(t *testing.T, n int) {
+	t.Helper()
+	pinned := actor.WithWorkspace(t.Context(), actor.Workspace{ID: f.workspaceID})
+	require.NoError(t, f.conn.TenantTx(pinned, func(q *db.Queries) error {
+		for i := range n {
+			if _, err := q.CreateUserWithID(pinned, &db.CreateUserWithIDParams{
+				ID:    uuid.NewV7().String(),
+				Email: fmt.Sprintf("member-%d@example.com", i),
+				Name:  fmt.Sprintf("Member %d", i),
+				Role:  nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
 }
 
 // plans is the plan lookup of the hosted service on the same database.
@@ -279,11 +307,55 @@ func TestSync_DeletedWorkspaceIsNotAnError(t *testing.T) {
 	assert.Equal(t, http.StatusOK, fake.event(t, "sub_a"), "a 500 here would make Stripe retry forever")
 }
 
+func TestSync_RaisesSeatsToTheMemberCount(t *testing.T) {
+	fake := newSync(t)
+	fake.addMembers(t, 8)
+	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
+
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+
+	assert.Equal(t, []string{"8"}, fake.raised, "eight members need eight seats")
+	assert.EqualValues(t, 8, fake.row(t).Seats)
+
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	assert.Len(t, fake.raised, 1, "the webhook of the raise must not raise again")
+}
+
+func TestSync_DoesNotRaiseSeatsOfAPastDueSubscription(t *testing.T) {
+	fake := newSync(t)
+	fake.addMembers(t, 8)
+	fake.subs["sub_a"] = remoteSub{status: "past_due", seats: 5}
+
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+
+	assert.Empty(t, fake.raised, "a customer whose payment failed must not be charged more")
+	assert.EqualValues(t, 5, fake.row(t).Seats)
+}
+
+func TestCheckout_YearlyUsesTheYearlyPrice(t *testing.T) {
+	fake := newSync(t)
+
+	_, err := fake.billing.Checkout(t.Context(), actor.Workspace{ID: fake.workspaceID}, "owner@example.com", true)
+	require.NoError(t, err)
+	assert.Equal(t, "price_y", fake.checkouts[0].Get("line_items[0][price]"))
+}
+
+func TestCheckout_ReturnsToTheWorkspaceHost(t *testing.T) {
+	fake := newSync(t)
+	ws := actor.Workspace{ID: fake.workspaceID, BaseURL: "https://acme.nokku.test"}
+
+	_, err := fake.billing.Checkout(t.Context(), ws, "owner@example.com", false)
+	require.NoError(t, err)
+	assert.Equal(t, "https://acme.nokku.test/settings/billing", fake.checkouts[0].Get("success_url"),
+		"the hosted root host has no workspace to land in")
+	assert.Equal(t, "https://acme.nokku.test/settings/billing", fake.checkouts[0].Get("cancel_url"))
+}
+
 func TestCheckout_NewWorkspaceGetsItsCustomerFromCheckout(t *testing.T) {
 	ctx := t.Context()
 	fake := newSync(t)
 
-	link, err := fake.billing.Checkout(ctx, fake.workspaceID, "owner@example.com")
+	link, err := fake.billing.Checkout(ctx, actor.Workspace{ID: fake.workspaceID}, "owner@example.com", false)
 	require.NoError(t, err)
 	assert.Equal(t, "https://checkout.test/cs_1", link)
 	first := fake.checkouts[0]
@@ -292,15 +364,17 @@ func TestCheckout_NewWorkspaceGetsItsCustomerFromCheckout(t *testing.T) {
 	assert.Equal(t, fake.workspaceID, first.Get("subscription_data[metadata][workspace_id]"),
 		"sync finds the workspace through this")
 	assert.Equal(t, "5", first.Get("line_items[0][quantity]"), "five seats is the floor")
+	assert.Equal(t, "price_m", first.Get("line_items[0][price]"))
+	assert.Equal(t, "true", first.Get("managed_payments[enabled]"), "Stripe is the merchant of record and collects tax")
 
 	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
 	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
-	_, err = fake.billing.Checkout(ctx, fake.workspaceID, "owner@example.com")
+	_, err = fake.billing.Checkout(ctx, actor.Workspace{ID: fake.workspaceID}, "owner@example.com", false)
 	require.ErrorIs(t, err, billing.ErrActiveSubscription, "a paying workspace must not get a second subscription")
 
 	fake.subs["sub_a"] = remoteSub{status: "canceled", seats: 5, endedAt: time.Now().Unix()}
 	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
-	_, err = fake.billing.Checkout(ctx, fake.workspaceID, "owner@example.com")
+	_, err = fake.billing.Checkout(ctx, actor.Workspace{ID: fake.workspaceID}, "owner@example.com", false)
 	require.NoError(t, err)
 	again := fake.checkouts[1]
 	assert.Equal(t, "cus_1", again.Get("customer"), "a workspace that paid before keeps its customer")

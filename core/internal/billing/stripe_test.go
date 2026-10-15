@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	stripe "github.com/stripe/stripe-go/v86"
+
+	"github.com/nokku-sh/nokku/core/internal/actor"
 )
 
 func TestPeriodEnd(t *testing.T) {
@@ -29,7 +31,10 @@ func TestPeriodEnd(t *testing.T) {
 // Settings that do not fit NOKKU_SAAS fail the start, a hosted service must never come up self-hosted.
 func TestNewStripeNeverGuessesTheMode(t *testing.T) {
 	all := map[string]string{
-		"STRIPE_SECRET_KEY": "sk_test", "STRIPE_WEBHOOK_SECRET": "whsec", "STRIPE_PRO_PRICE_ID": "price",
+		"STRIPE_SECRET_KEY":           "sk_test",
+		"STRIPE_WEBHOOK_SECRET":       "whsec",
+		"STRIPE_PRO_MONTHLY_PRICE_ID": "price_m",
+		"STRIPE_PRO_YEARLY_PRICE_ID":  "price_y",
 	}
 	cases := map[string]struct {
 		saas    bool
@@ -47,7 +52,7 @@ func TestNewStripeNeverGuessesTheMode(t *testing.T) {
 		},
 		"self-hosted with stripe": {env: all, wantErr: "self-hosted"},
 		"self-hosted with one stripe key": {
-			env:     map[string]string{"STRIPE_PRO_PRICE_ID": "price"},
+			env:     map[string]string{"STRIPE_PRO_YEARLY_PRICE_ID": "price_y"},
 			wantErr: "self-hosted",
 		},
 	}
@@ -56,7 +61,7 @@ func TestNewStripeNeverGuessesTheMode(t *testing.T) {
 			for key := range all {
 				t.Setenv(key, tc.env[key])
 			}
-			s, err := newStripe(nil, "https://nokku.test", tc.saas)
+			s, err := newStripe(nil, tc.saas)
 			if tc.wantErr != "" {
 				require.ErrorContains(t, err, tc.wantErr)
 				return
@@ -70,9 +75,9 @@ func TestNewStripeNeverGuessesTheMode(t *testing.T) {
 // A call that missed the mode gate gets an error, not a panic.
 func TestNilStripeIsDisabled(t *testing.T) {
 	var s *Stripe
-	_, err := s.Checkout(t.Context(), "ws", "owner@example.com")
+	_, err := s.Checkout(t.Context(), actor.Workspace{ID: "ws"}, "owner@example.com", false)
 	require.ErrorIs(t, err, errDisabled)
-	_, err = s.Portal(t.Context(), "ws")
+	_, err = s.Portal(t.Context(), actor.Workspace{ID: "ws"})
 	require.ErrorIs(t, err, errDisabled)
 	require.ErrorIs(t, s.Cancel(t.Context(), "ws", true, ""), errDisabled)
 }

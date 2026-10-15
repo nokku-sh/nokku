@@ -51,6 +51,8 @@ message Subscription {
   string status = 1;
   bool cancel_at_period_end = 2;
   google.protobuf.Timestamp current_period_end = 3;
+  // kept_until is set while an ended plan's data limits still hold.
+  google.protobuf.Timestamp kept_until = 4;
 }
 
 message CreatePortalRequest {}
@@ -58,7 +60,9 @@ message CreatePortalResponse {
   string url = 1;
 }
 
-message CreateCheckoutRequest {}
+message CreateCheckoutRequest {
+  bool yearly = 1;
+}
 message CreateCheckoutResponse {
   string url = 1;
 }

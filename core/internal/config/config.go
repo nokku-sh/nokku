@@ -145,7 +145,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Billing, err = billing.New(ctx, cfg.Conn, cfg.FullURL(), cfg.SaaS)
+	cfg.Billing, err = billing.New(ctx, cfg.Conn, cfg.SaaS)
 	if err != nil {
 		return nil, err
 	}

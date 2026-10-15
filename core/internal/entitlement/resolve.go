@@ -109,7 +109,12 @@ func Active(status string) bool {
 }
 
 func inHold(endedAt time.Time) bool {
-	return time.Since(endedAt) < holdDays*24*time.Hour
+	return time.Now().Before(HoldEnd(endedAt))
+}
+
+// HoldEnd is when the data limits of a plan that ended at endedAt stop holding.
+func HoldEnd(endedAt time.Time) time.Time {
+	return endedAt.Add(holdDays * 24 * time.Hour)
 }
 
 // RetentionDays honors the hold and errors instead of falling back, so a failed lookup never shortens what is kept.

@@ -61,6 +61,11 @@ func (s *billingService) GetBilling(
 			CancelAtPeriodEnd: new(sub.CancelAtPeriodEnd),
 			CurrentPeriodEnd:  db.SafeTimestamp(sub.CurrentPeriodEnd),
 		}
+		if sub.EndedAt != nil && !entitlement.Active(sub.Status) {
+			if end := entitlement.HoldEnd(*sub.EndedAt); time.Now().Before(end) {
+				resp.Subscription.KeptUntil = db.SafeTimestamp(&end)
+			}
+		}
 	}
 
 	return resp, nil
@@ -68,7 +73,7 @@ func (s *billingService) GetBilling(
 
 func (s *billingService) CreateCheckout(
 	ctx context.Context,
-	_ *nokkuv1.CreateCheckoutRequest,
+	req *nokkuv1.CreateCheckoutRequest,
 ) (*nokkuv1.CreateCheckoutResponse, error) {
 	if !s.cfg.SaaS {
 		return nil, errBillingDisabled
@@ -78,7 +83,8 @@ func (s *billingService) CreateCheckout(
 		return nil, err
 	}
 
-	url, err := s.cfg.Billing.Checkout(ctx, actor.WorkspaceIDFromContext(ctx), user.Email)
+	ws, _ := actor.WorkspaceFromContext(ctx)
+	url, err := s.cfg.Billing.Checkout(ctx, ws, user.Email, req.GetYearly())
 	if errors.Is(err, billing.ErrActiveSubscription) {
 		return nil, newError(
 			connect.CodeFailedPrecondition,
@@ -101,7 +107,8 @@ func (s *billingService) CreatePortal(
 	if !s.cfg.SaaS {
 		return nil, errBillingDisabled
 	}
-	url, err := s.cfg.Billing.Portal(ctx, actor.WorkspaceIDFromContext(ctx))
+	ws, _ := actor.WorkspaceFromContext(ctx)
+	url, err := s.cfg.Billing.Portal(ctx, ws)
 	if err != nil {
 		return nil, errInternal
 	}

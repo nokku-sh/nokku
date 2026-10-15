@@ -65,6 +65,8 @@ message WorkspaceSettings {
 message GetWorkspaceRequest {}
 message GetWorkspaceResponse {
   Workspace workspace = 1;
+  // base_url is where this workspace lives, the slug host on the hosted service. Callback and SCIM URLs start with it.
+  string base_url = 2;
 }
 
 message UpdateWorkspaceRequest {

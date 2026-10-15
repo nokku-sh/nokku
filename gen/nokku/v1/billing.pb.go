@@ -224,8 +224,10 @@ type Subscription struct {
 	Status            *string                `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
 	CancelAtPeriodEnd *bool                  `protobuf:"varint,2,opt,name=cancel_at_period_end,json=cancelAtPeriodEnd" json:"cancel_at_period_end,omitempty"`
 	CurrentPeriodEnd  *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=current_period_end,json=currentPeriodEnd" json:"current_period_end,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// kept_until is set while an ended plan's data limits still hold.
+	KeptUntil     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=kept_until,json=keptUntil" json:"kept_until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Subscription) Reset() {
@@ -275,6 +277,13 @@ func (x *Subscription) GetCancelAtPeriodEnd() bool {
 func (x *Subscription) GetCurrentPeriodEnd() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CurrentPeriodEnd
+	}
+	return nil
+}
+
+func (x *Subscription) GetKeptUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.KeptUntil
 	}
 	return nil
 }
@@ -361,6 +370,7 @@ func (x *CreatePortalResponse) GetUrl() string {
 
 type CreateCheckoutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Yearly        *bool                  `protobuf:"varint,1,opt,name=yearly" json:"yearly,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -393,6 +403,13 @@ func (x *CreateCheckoutRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateCheckoutRequest.ProtoReflect.Descriptor instead.
 func (*CreateCheckoutRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_billing_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CreateCheckoutRequest) GetYearly() bool {
+	if x != nil && x.Yearly != nil {
+		return *x.Yearly
+	}
+	return false
 }
 
 type CreateCheckoutResponse struct {
@@ -725,15 +742,18 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\x05seats\x18\x01 \x01(\x03R\x05seats\x12%\n" +
 	"\x0eretention_days\x18\x02 \x01(\x03R\rretentionDays\x126\n" +
 	"\x17recording_storage_bytes\x18\x03 \x01(\x03R\x15recordingStorageBytes\x12!\n" +
-	"\fresource_cap\x18\x04 \x01(\x03R\vresourceCap\"\xa1\x01\n" +
+	"\fresource_cap\x18\x04 \x01(\x03R\vresourceCap\"\xdc\x01\n" +
 	"\fSubscription\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12/\n" +
 	"\x14cancel_at_period_end\x18\x02 \x01(\bR\x11cancelAtPeriodEnd\x12H\n" +
-	"\x12current_period_end\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\"\x15\n" +
+	"\x12current_period_end\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\x129\n" +
+	"\n" +
+	"kept_until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tkeptUntil\"\x15\n" +
 	"\x13CreatePortalRequest\"(\n" +
 	"\x14CreatePortalResponse\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\"\x17\n" +
-	"\x15CreateCheckoutRequest\"*\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"/\n" +
+	"\x15CreateCheckoutRequest\x12\x16\n" +
+	"\x06yearly\x18\x01 \x01(\bR\x06yearly\"*\n" +
 	"\x16CreateCheckoutResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\"[\n" +
 	"\x19CancelSubscriptionRequest\x12\x1c\n" +
@@ -797,24 +817,25 @@ var file_nokku_v1_billing_proto_depIdxs = []int32{
 	2,  // 1: nokku.v1.GetBillingResponse.quotas:type_name -> nokku.v1.Quotas
 	3,  // 2: nokku.v1.GetBillingResponse.subscription:type_name -> nokku.v1.Subscription
 	15, // 3: nokku.v1.Subscription.current_period_end:type_name -> google.protobuf.Timestamp
-	15, // 4: nokku.v1.GetLicenseResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0,  // 5: nokku.v1.BillingService.GetBilling:input_type -> nokku.v1.GetBillingRequest
-	4,  // 6: nokku.v1.BillingService.CreatePortal:input_type -> nokku.v1.CreatePortalRequest
-	6,  // 7: nokku.v1.BillingService.CreateCheckout:input_type -> nokku.v1.CreateCheckoutRequest
-	8,  // 8: nokku.v1.BillingService.CancelSubscription:input_type -> nokku.v1.CancelSubscriptionRequest
-	10, // 9: nokku.v1.BillingService.GetLicense:input_type -> nokku.v1.GetLicenseRequest
-	12, // 10: nokku.v1.BillingService.ActivateLicense:input_type -> nokku.v1.ActivateLicenseRequest
-	1,  // 11: nokku.v1.BillingService.GetBilling:output_type -> nokku.v1.GetBillingResponse
-	5,  // 12: nokku.v1.BillingService.CreatePortal:output_type -> nokku.v1.CreatePortalResponse
-	7,  // 13: nokku.v1.BillingService.CreateCheckout:output_type -> nokku.v1.CreateCheckoutResponse
-	9,  // 14: nokku.v1.BillingService.CancelSubscription:output_type -> nokku.v1.CancelSubscriptionResponse
-	11, // 15: nokku.v1.BillingService.GetLicense:output_type -> nokku.v1.GetLicenseResponse
-	13, // 16: nokku.v1.BillingService.ActivateLicense:output_type -> nokku.v1.ActivateLicenseResponse
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	15, // 4: nokku.v1.Subscription.kept_until:type_name -> google.protobuf.Timestamp
+	15, // 5: nokku.v1.GetLicenseResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 6: nokku.v1.BillingService.GetBilling:input_type -> nokku.v1.GetBillingRequest
+	4,  // 7: nokku.v1.BillingService.CreatePortal:input_type -> nokku.v1.CreatePortalRequest
+	6,  // 8: nokku.v1.BillingService.CreateCheckout:input_type -> nokku.v1.CreateCheckoutRequest
+	8,  // 9: nokku.v1.BillingService.CancelSubscription:input_type -> nokku.v1.CancelSubscriptionRequest
+	10, // 10: nokku.v1.BillingService.GetLicense:input_type -> nokku.v1.GetLicenseRequest
+	12, // 11: nokku.v1.BillingService.ActivateLicense:input_type -> nokku.v1.ActivateLicenseRequest
+	1,  // 12: nokku.v1.BillingService.GetBilling:output_type -> nokku.v1.GetBillingResponse
+	5,  // 13: nokku.v1.BillingService.CreatePortal:output_type -> nokku.v1.CreatePortalResponse
+	7,  // 14: nokku.v1.BillingService.CreateCheckout:output_type -> nokku.v1.CreateCheckoutResponse
+	9,  // 15: nokku.v1.BillingService.CancelSubscription:output_type -> nokku.v1.CancelSubscriptionResponse
+	11, // 16: nokku.v1.BillingService.GetLicense:output_type -> nokku.v1.GetLicenseResponse
+	13, // 17: nokku.v1.BillingService.ActivateLicense:output_type -> nokku.v1.ActivateLicenseResponse
+	12, // [12:18] is the sub-list for method output_type
+	6,  // [6:12] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_billing_proto_init() }

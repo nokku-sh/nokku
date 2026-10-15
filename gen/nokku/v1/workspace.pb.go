@@ -204,8 +204,10 @@ func (*GetWorkspaceRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetWorkspaceResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Workspace     *Workspace             `protobuf:"bytes,1,opt,name=workspace" json:"workspace,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Workspace *Workspace             `protobuf:"bytes,1,opt,name=workspace" json:"workspace,omitempty"`
+	// base_url is where this workspace lives, the slug host on the hosted service. Callback and SCIM URLs start with it.
+	BaseUrl       *string `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -245,6 +247,13 @@ func (x *GetWorkspaceResponse) GetWorkspace() *Workspace {
 		return x.Workspace
 	}
 	return nil
+}
+
+func (x *GetWorkspaceResponse) GetBaseUrl() string {
+	if x != nil && x.BaseUrl != nil {
+		return *x.BaseUrl
+	}
+	return ""
 }
 
 type UpdateWorkspaceRequest struct {
@@ -1187,9 +1196,10 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x15default_daemon_config\x18\x01 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\x12\x1f\n" +
 	"\venforce_sso\x18\x02 \x01(\bR\n" +
 	"enforceSso\"\x15\n" +
-	"\x13GetWorkspaceRequest\"I\n" +
+	"\x13GetWorkspaceRequest\"d\n" +
 	"\x14GetWorkspaceResponse\x121\n" +
-	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\x9d\x01\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\x12\x19\n" +
+	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\"\x9d\x01\n" +
 	"\x16UpdateWorkspaceRequest\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x03\x18\x80\x02R\x04name\x12*\n" +

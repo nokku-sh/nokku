@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -13,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	stripe "github.com/stripe/stripe-go/v86"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
@@ -31,18 +34,18 @@ const (
 
 // Stripe moves money and never decides what a workspace may do. A nil Stripe is a self-hosted server.
 type Stripe struct {
-	client    *stripe.Client
-	db        *db.Connection
-	returnURL string
+	client *stripe.Client
+	db     *db.Connection
 
-	ProPriceID    string `env:"STRIPE_PRO_PRICE_ID"`
-	SecretKey     string `env:"STRIPE_SECRET_KEY"`
-	WebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
+	ProMonthlyPriceID string `env:"STRIPE_PRO_MONTHLY_PRICE_ID"`
+	ProYearlyPriceID  string `env:"STRIPE_PRO_YEARLY_PRICE_ID"`
+	SecretKey         string `env:"STRIPE_SECRET_KEY"`
+	WebhookSecret     string `env:"STRIPE_WEBHOOK_SECRET"`
 }
 
 // New returns nil on a self-hosted server, see newStripe.
-func New(ctx context.Context, conn *db.Connection, baseURL string, saas bool) (*Stripe, error) {
-	s, err := newStripe(conn, baseURL, saas)
+func New(ctx context.Context, conn *db.Connection, saas bool) (*Stripe, error) {
+	s, err := newStripe(conn, saas)
 	if err != nil || s == nil {
 		return nil, err
 	}
@@ -51,16 +54,19 @@ func New(ctx context.Context, conn *db.Connection, baseURL string, saas bool) (*
 }
 
 // newStripe never guesses the mode. Hosted needs every setting, self-hosted with any of them fails the start.
-func newStripe(conn *db.Connection, returnURL string, saas bool) (*Stripe, error) {
+func newStripe(conn *db.Connection, saas bool) (*Stripe, error) {
 	s, err := env.ParseAs[Stripe]()
 	if err != nil {
 		return nil, err
 	}
-	complete := s.SecretKey != "" && s.WebhookSecret != "" && s.ProPriceID != ""
-	unset := s.SecretKey == "" && s.WebhookSecret == "" && s.ProPriceID == ""
+	settings := []string{s.SecretKey, s.WebhookSecret, s.ProMonthlyPriceID, s.ProYearlyPriceID}
+	complete := !slices.Contains(settings, "")
+	unset := strings.Join(settings, "") == ""
 	switch {
 	case saas && !complete:
-		return nil, errors.New("NOKKU_SAAS needs STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRO_PRICE_ID")
+		return nil, errors.New(
+			"NOKKU_SAAS needs STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRO_MONTHLY_PRICE_ID and STRIPE_PRO_YEARLY_PRICE_ID",
+		)
 	case !saas && !unset:
 		return nil, errors.New(
 			"STRIPE_* is set on a self-hosted server, set NOKKU_SAAS=true for the hosted service or remove it",
@@ -70,16 +76,16 @@ func newStripe(conn *db.Connection, returnURL string, saas bool) (*Stripe, error
 	}
 
 	s.db = conn
-	s.returnURL = returnURL
 	s.client = stripe.NewClient(s.SecretKey)
 	return &s, nil
 }
 
 // Checkout starts at the current member count. The paid quantity becomes the seat cap.
-func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (string, error) {
+func (s *Stripe) Checkout(ctx context.Context, ws actor.Workspace, email string, yearly bool) (string, error) {
 	if s == nil {
 		return "", errDisabled
 	}
+	workspaceID := ws.ID
 	if workspaceID == "" {
 		return "", errors.New("missing workspace ID")
 	}
@@ -93,10 +99,16 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 		return "", err
 	}
 
+	price := s.ProMonthlyPriceID
+	if yearly {
+		price = s.ProYearlyPriceID
+	}
 	params := &stripe.CheckoutSessionCreateParams{
 		Mode: stripe.String(stripe.CheckoutSessionModeSubscription),
+		// Stripe is the merchant of record and handles tax, so the session must not set automatic_tax or tax_id_collection.
+		ManagedPayments: &stripe.CheckoutSessionCreateManagedPaymentsParams{Enabled: new(true)},
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{{
-			Price:    stripe.String(s.ProPriceID),
+			Price:    stripe.String(price),
 			Quantity: new(quantity),
 			AdjustableQuantity: &stripe.CheckoutSessionCreateLineItemAdjustableQuantityParams{
 				Enabled: new(true),
@@ -104,8 +116,8 @@ func (s *Stripe) Checkout(ctx context.Context, workspaceID, email string) (strin
 				Maximum: new(int64(maxCheckoutSeats)),
 			},
 		}},
-		SuccessURL:        stripe.String(s.returnURL + "/profile/billing"),
-		CancelURL:         stripe.String(s.returnURL + "/profile/billing"),
+		SuccessURL:        stripe.String(billingPage(ws)),
+		CancelURL:         stripe.String(billingPage(ws)),
 		ClientReferenceID: stripe.String(workspaceID),
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{"workspace_id": workspaceID},
@@ -141,14 +153,14 @@ func (s *Stripe) activeSubscription(
 }
 
 // Portal is where seats are bought, so the Stripe portal configuration must allow quantity updates.
-func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error) {
+func (s *Stripe) Portal(ctx context.Context, ws actor.Workspace) (string, error) {
 	if s == nil {
 		return "", errDisabled
 	}
-	if workspaceID == "" {
+	if ws.ID == "" {
 		return "", errors.New("missing workspace ID")
 	}
-	sub, err := s.db.Sys().GetSubscription(ctx, workspaceID)
+	sub, err := s.db.Sys().GetSubscription(ctx, ws.ID)
 	if err != nil || sub.CustomerID == "" {
 		return "", errors.New("no Stripe customer for this workspace")
 	}
@@ -157,13 +169,18 @@ func (s *Stripe) Portal(ctx context.Context, workspaceID string) (string, error)
 		ctx,
 		&stripe.BillingPortalSessionCreateParams{
 			Customer:  stripe.String(sub.CustomerID),
-			ReturnURL: stripe.String(s.returnURL + "/profile/billing"),
+			ReturnURL: stripe.String(billingPage(ws)),
 		},
 	)
 	if err != nil {
 		return "", fmt.Errorf("create portal session: %w", err)
 	}
 	return session.URL, nil
+}
+
+// billingPage is on the workspace host, the hosted root host has no workspace to land in.
+func billingPage(ws actor.Workspace) string {
+	return ws.BaseURL + "/settings/billing"
 }
 
 func (s *Stripe) Cancel(
@@ -253,6 +270,11 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 		}
 	}
 
+	remote, err = s.trueUp(ctx, workspaceID, remote)
+	if err != nil {
+		return err
+	}
+
 	var seats int64
 	if remote.Items != nil && len(remote.Items.Data) > 0 {
 		seats = remote.Items.Data[0].Quantity
@@ -281,6 +303,37 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 		return nil
 	}
 	return err
+}
+
+// trueUp raises the paid seats to the member count, or dropping seats in the portal would keep members for free.
+// The update fires a webhook that syncs again, and that one finds nothing to raise.
+func (s *Stripe) trueUp(
+	ctx context.Context,
+	workspaceID string,
+	sub *stripe.Subscription,
+) (*stripe.Subscription, error) {
+	// A past due customer is not charged more on top.
+	if sub.Status != stripe.SubscriptionStatusActive || sub.Items == nil || len(sub.Items.Data) == 0 {
+		return sub, nil
+	}
+	item := sub.Items.Data[0]
+	want, err := s.billableSeats(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if item.Quantity >= want {
+		return sub, nil
+	}
+	slog.Info("raising seats to the member count",
+		"workspace_id", workspaceID, "paid", item.Quantity, "billable", want)
+	updated, err := s.client.V1Subscriptions.Update(ctx, sub.ID, &stripe.SubscriptionUpdateParams{
+		Items:             []*stripe.SubscriptionUpdateItemParams{{ID: stripe.String(item.ID), Quantity: new(want)}},
+		ProrationBehavior: new("always_invoice"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("raise seats: %w", err)
+	}
+	return updated, nil
 }
 
 // reconcile lets missed webhooks self-heal, 5 minutes after start and then every 12 hours.
