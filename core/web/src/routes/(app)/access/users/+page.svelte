@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
-	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
 	import { auth } from '#lib/api/auth.svelte.js';
 	import { users } from '#lib/api/workspaces.svelte.js';
@@ -11,6 +10,7 @@
 	import UserSheet from '#lib/components/sheets/UserSheet.svelte';
 	import {
 		DataTable,
+		bulkDelete,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
@@ -27,7 +27,7 @@
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
-	import { CircleUser, PlusIcon, ShieldCheck, Trash2, UserRoundX } from '@lucide/svelte';
+	import { CircleUser, PlusIcon, ShieldCheck, UserRoundX } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
@@ -56,22 +56,16 @@
 
 	// The owner and you are never in a bulk delete, the server refuses both.
 	const bulkActions: BulkAction<User>[] = [
-		{
-			label: 'Delete',
-			icon: Trash2,
-			variant: 'destructive',
-			confirm: (selected) => ({
-				title: `Delete ${plural(selected.length, 'account')}?`,
-				description: 'Their access ends right away. This cannot be undone.',
-				confirmText: 'Delete'
-			}),
-			onClick: (selected) =>
+		bulkDelete<User>({
+			noun: 'account',
+			description: 'Their access ends right away. This cannot be undone.',
+			run: (selected) =>
 				removeMany.mutateAsync(
 					selected
 						.filter((u) => u.role !== WorkspaceRole.OWNER && u.id !== me.data?.id)
 						.map(({ id }) => ({ userId: id }))
 				)
-		}
+		})
 	];
 
 	const rolesQuery = roles.list();

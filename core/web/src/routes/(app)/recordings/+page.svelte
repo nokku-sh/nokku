@@ -4,6 +4,7 @@
 	import WhoCell from './WhoCell.svelte';
 	import {
 		DataTable,
+		bulkDelete,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
@@ -22,10 +23,9 @@
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import StorageQuotaPill from './StorageQuotaPill.svelte';
 	import { createModalState, usePagination } from '#lib/hooks/index.js';
-	import { plural } from '#lib/api/bulk.js';
 	import { formatBytes } from '#lib/utils.js';
 	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
-	import { Bot, Trash2, Video } from '@lucide/svelte';
+	import { Bot, Video } from '@lucide/svelte';
 
 	const pager = usePagination();
 	const can = user.can();
@@ -46,17 +46,12 @@
 	const player = createModalState<Recording>({} as Recording);
 
 	const bulkActions: BulkAction<Recording>[] = [
-		{
-			label: 'Delete',
-			icon: Trash2,
-			variant: 'destructive',
-			confirm: (selected) => ({
-				title: `Delete ${plural(selected.length, 'recording')}?`,
-				description: 'This permanently deletes the recordings.'
-			}),
-			onClick: (selected) =>
+		bulkDelete<Recording>({
+			noun: 'recording',
+			description: 'This permanently deletes the recordings.',
+			run: (selected) =>
 				deleteRecordings.mutateAsync(selected.map(({ id }) => ({ recordingId: id })))
-		}
+		})
 	];
 
 	const columnHelper = createAppColumnHelper<Recording>();

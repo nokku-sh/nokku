@@ -132,6 +132,19 @@
 		[...page.url.searchParams.keys()].some((k) => !ownParams.includes(k))
 	);
 
+	// One empty state for three reasons: the load failed, the filters match nothing, or there is nothing yet.
+	const blank = $derived(
+		error
+			? { icon: CircleAlert, title: "Couldn't load this list", description: error.message }
+			: isFiltered
+				? {
+						icon: FilterX,
+						title: 'No matches',
+						description: 'Nothing matches the current search and filters.'
+					}
+				: emptyState
+	);
+
 	function clearFilters() {
 		const url = new URL(page.url.href);
 		const kept = new URLSearchParams();
@@ -246,44 +259,27 @@
 		{@render toolbar(table)}
 	{/if}
 
-	{#if error && !data.length}
+	{#if !data.length && (error || !isLoading)}
 		<Empty.Root class="h-[25vh] rounded-xl border bg-card text-card-foreground">
 			<Empty.Header>
-				<Empty.Media variant="icon" class="bg-destructive/10 text-destructive">
-					<CircleAlert />
+				<Empty.Media variant="icon" class={error && 'bg-destructive/10 text-destructive'}>
+					<blank.icon />
 				</Empty.Media>
-				<Empty.Title>Couldn't load this list</Empty.Title>
-				<Empty.Description>{error.message}</Empty.Description>
+				<Empty.Title>{blank.title}</Empty.Title>
+				<Empty.Description>{blank.description}</Empty.Description>
 			</Empty.Header>
-			{#if onRetry}
+			{#if error && onRetry}
 				<Empty.Content>
 					<Button variant="outline" size="sm" onclick={onRetry}>
 						<RotateCw data-icon="inline-start" />
 						Try again
 					</Button>
 				</Empty.Content>
-			{/if}
-		</Empty.Root>
-	{:else if !isLoading && !data.length}
-		<Empty.Root class="h-[25vh] rounded-xl border bg-card text-card-foreground">
-			<Empty.Header>
-				<Empty.Media variant="icon">
-					{#if isFiltered}
-						<FilterX />
-					{:else}
-						<emptyState.icon />
-					{/if}
-				</Empty.Media>
-				<Empty.Title>{isFiltered ? 'No matches' : emptyState.title}</Empty.Title>
-				<Empty.Description>
-					{isFiltered ? 'Nothing matches the current search and filters.' : emptyState.description}
-				</Empty.Description>
-			</Empty.Header>
-			{#if isFiltered}
+			{:else if !error && isFiltered}
 				<Empty.Content>
 					<Button variant="outline" size="sm" onclick={clearFilters}>Clear filters</Button>
 				</Empty.Content>
-			{:else if emptyState.command}
+			{:else if !error && emptyState.command}
 				<Empty.Content>
 					<Empty.Command>{emptyState.command}</Empty.Command>
 				</Empty.Content>

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
 	import { team } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -7,6 +6,7 @@
 	import TeamSheet from '#lib/components/sheets/TeamSheet.svelte';
 	import {
 		DataTable,
+		bulkDelete,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
@@ -22,7 +22,7 @@
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
-	import { PlusIcon, ShieldCheck, Trash2, Users } from '@lucide/svelte';
+	import { PlusIcon, ShieldCheck, Users } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
@@ -41,17 +41,10 @@
 	const deleteTeams = team.deleteMany();
 
 	const bulkActions: BulkAction<Team>[] = [
-		{
-			label: 'Delete',
-			icon: Trash2,
-			variant: 'destructive',
-			confirm: (selected) => ({
-				title: `Delete ${plural(selected.length, 'team')}?`,
-				description: 'This action cannot be undone.',
-				confirmText: 'Delete'
-			}),
-			onClick: (selected) => deleteTeams.mutateAsync(selected.map(({ id }) => ({ id })))
-		}
+		bulkDelete<Team>({
+			noun: 'team',
+			run: (selected) => deleteTeams.mutateAsync(selected.map(({ id }) => ({ id })))
+		})
 	];
 
 	const columnHelper = createAppColumnHelper<Team>();

@@ -80,7 +80,7 @@ export type AuditFilter = MessageInitShape<typeof AuditLogFilterSchema>;
 export type AuditQuery = { filter?: AuditFilter; limit?: number; offset?: number };
 
 // Empty filters are dropped so they don't split the query cache.
-export const cleanFilters = <T extends object>(filters?: T): Partial<T> =>
+const cleanFilters = <T extends object>(filters?: T): Partial<T> =>
 	Object.fromEntries(
 		Object.entries(filters ?? {}).filter(
 			([, v]) => v !== undefined && v !== '' && v !== null && !(Array.isArray(v) && !v.length)

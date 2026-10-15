@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
 	import { serviceAccount } from '#lib/api/service_account.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -7,6 +6,7 @@
 	import ServiceAccountSheet from '#lib/components/sheets/ServiceAccountSheet.svelte';
 	import {
 		DataTable,
+		bulkDelete,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
@@ -22,7 +22,7 @@
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { ServiceAccount } from '#lib/gen/nokku/v1/service_account_pb.js';
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
-	import { PlusIcon, ShieldCheck, Trash2, Waypoints } from '@lucide/svelte';
+	import { PlusIcon, ShieldCheck, Waypoints } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import { roles } from '#lib/api/roles.svelte.js';
 	import {
@@ -50,17 +50,10 @@
 	const deleteSAs = serviceAccount.deleteMany();
 
 	const bulkActions: BulkAction<ServiceAccount>[] = [
-		{
-			label: 'Delete',
-			icon: Trash2,
-			variant: 'destructive',
-			confirm: (selected) => ({
-				title: `Delete ${plural(selected.length, 'service account')}?`,
-				description: 'This action cannot be undone.',
-				confirmText: 'Delete'
-			}),
-			onClick: (selected) => deleteSAs.mutateAsync(selected.map(({ id }) => ({ id })))
-		}
+		bulkDelete<ServiceAccount>({
+			noun: 'service account',
+			run: (selected) => deleteSAs.mutateAsync(selected.map(({ id }) => ({ id })))
+		})
 	];
 
 	const rolesQuery = roles.list();

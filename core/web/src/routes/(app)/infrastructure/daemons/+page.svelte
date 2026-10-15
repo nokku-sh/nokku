@@ -6,6 +6,7 @@
 	import DaemonSheet from '#lib/components/sheets/DaemonSheet.svelte';
 	import {
 		DataTable,
+		bulkDelete,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
@@ -23,16 +24,7 @@
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import {
-		BotOff,
-		CircleCheckBig,
-		Clock,
-		Rocket,
-		Trash,
-		Video,
-		Wifi,
-		WifiOff
-	} from '@lucide/svelte';
+	import { BotOff, CircleCheckBig, Clock, Rocket, Video, Wifi, WifiOff } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const statusOptions = [
@@ -157,17 +149,10 @@
 				);
 			}
 		},
-		{
-			label: 'Delete',
-			icon: Trash,
-			variant: 'destructive',
-			confirm: (selected) => ({
-				title: `Delete ${plural(selected.length, 'daemon')}?`,
-				description: 'This action cannot be undone.',
-				confirmText: 'Delete'
-			}),
-			onClick: (selected) => deleteDaemons.mutateAsync(selected.map(({ id }) => ({ id })))
-		}
+		bulkDelete<Daemon>({
+			noun: 'daemon',
+			run: (selected) => deleteDaemons.mutateAsync(selected.map(({ id }) => ({ id })))
+		})
 	];
 </script>
 

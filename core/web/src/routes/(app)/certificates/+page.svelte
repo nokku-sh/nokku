@@ -2,7 +2,6 @@
 	import { page } from '$app/state';
 	import { ca } from '#lib/api/certificates.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { plural } from '#lib/api/bulk.js';
 	import { confirm, createModalState, useCreate, useSheet } from '#lib/hooks/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import CreateCAModal from '#lib/components/modals/CreateCAModal.svelte';
@@ -10,6 +9,7 @@
 	import SignModal from '#lib/components/modals/SignModal.svelte';
 	import {
 		DataTable,
+		bulkDelete,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
@@ -28,15 +28,7 @@
 		type CertificateAuthority
 	} from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { enumLabel } from '#lib/utils.js';
-	import {
-		KeyRound,
-		Plus,
-		Shield,
-		ShieldAlert,
-		ShieldCheck,
-		ShieldOff,
-		Trash2
-	} from '@lucide/svelte';
+	import { KeyRound, Plus, Shield, ShieldAlert, ShieldCheck, ShieldOff } from '@lucide/svelte';
 
 	const sheet = useSheet();
 	const can = user.can();
@@ -153,16 +145,12 @@
 	]);
 
 	const bulkActions: BulkAction<CertificateAuthority>[] = [
-		{
-			label: 'Delete',
-			icon: Trash2,
-			variant: 'destructive',
-			confirm: (selected) => ({
-				title: `Delete ${plural(selected.length, 'certificate authority', 'certificate authorities')}?`,
-				description: 'This revokes every certificate they signed. This action cannot be undone.'
-			}),
-			onClick: (selected) => deleteCAs.mutateAsync(selected.map(({ id }) => ({ id })))
-		}
+		bulkDelete<CertificateAuthority>({
+			noun: 'certificate authority',
+			nouns: 'certificate authorities',
+			description: 'This revokes every certificate they signed. This action cannot be undone.',
+			run: (selected) => deleteCAs.mutateAsync(selected.map(({ id }) => ({ id })))
+		})
 	];
 </script>
 

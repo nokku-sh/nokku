@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { plural } from '#lib/api/bulk.js';
 	import { page } from '$app/state';
 	import { ca } from '#lib/api/certificates.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
@@ -8,6 +7,7 @@
 	import TargetSheet from '#lib/components/sheets/TargetSheet.svelte';
 	import {
 		DataTable,
+		bulkDelete,
 		TableToolbar,
 		createAppColumnHelper,
 		type BulkAction
@@ -24,7 +24,7 @@
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
-	import { IdCard, Plus, Server, ShieldCheck, TagIcon, Trash2, UserIcon } from '@lucide/svelte';
+	import { IdCard, Plus, Server, ShieldCheck, TagIcon, UserIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
@@ -138,17 +138,10 @@
 	]);
 
 	const bulkActions: BulkAction<Target>[] = [
-		{
-			label: 'Delete',
-			icon: Trash2,
-			variant: 'destructive',
-			confirm: (selected) => ({
-				title: `Delete ${plural(selected.length, 'target')}?`,
-				description: 'This action cannot be undone.',
-				confirmText: 'Delete'
-			}),
-			onClick: (selected) => deleteTargets.mutateAsync(selected.map(({ id }) => ({ id })))
-		}
+		bulkDelete<Target>({
+			noun: 'target',
+			run: (selected) => deleteTargets.mutateAsync(selected.map(({ id }) => ({ id })))
+		})
 	];
 </script>
 

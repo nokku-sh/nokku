@@ -62,31 +62,3 @@ export function useDraft<Desc extends DescMessage>(
 		}
 	};
 }
-
-// createEntityModalState edits a clone, so the query cache is never mutated.
-export function createEntityModalState<Desc extends DescMessage>(
-	schema: Desc,
-	newInit?: () => MessageInitShape<Desc>
-) {
-	type Entity = MessageShape<Desc>;
-	const clone = (entity: Entity) => plainClone(schema, entity);
-
-	let open = $state(false);
-	let draft = $state<Entity>(clone(create(schema)));
-
-	return {
-		get open() {
-			return open;
-		},
-		set open(value: boolean) {
-			open = value;
-		},
-		get draft() {
-			return draft;
-		},
-		openNew() {
-			draft = clone(create(schema, newInit?.()));
-			open = true;
-		}
-	};
-}

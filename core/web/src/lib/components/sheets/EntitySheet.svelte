@@ -8,7 +8,7 @@
 		id?: string;
 		createdAt?: Timestamp;
 		updatedAt?: Timestamp;
-		extra?: { label: string; value?: string; copy?: boolean }[];
+		extra?: { label: string; value?: string }[];
 	};
 </script>
 
@@ -55,8 +55,7 @@
 		subtitle?: Snippet;
 		/** Primary actions under the title. */
 		actions?: Snippet;
-		/** Extra buttons next to close, usually a ⋯ menu. */
-		menu?: Snippet;
+
 		/** The ID, timestamps and extras, tucked into the info popover next to the copy link button. */
 		meta?: SheetMeta;
 		/** Runs the failed save again from the footer. */
@@ -82,7 +81,6 @@
 		detailMono = false,
 		subtitle,
 		actions,
-		menu,
 		meta,
 		onRetry,
 		children
@@ -176,7 +174,7 @@
 					</Sheet.Description>
 				</div>
 			</div>
-			{#if (menu || meta) && !loading && !missing}
+			{#if meta && !loading && !missing}
 				<div class="absolute top-3 right-11 flex items-center gap-0.5">
 					{#if meta?.id}
 						<Tooltip.Root>
@@ -214,11 +212,7 @@
 									{#each meta?.extra?.filter((e) => e.value) ?? [] as e (e.label)}
 										<dt class="text-muted-foreground">{e.label}</dt>
 										<dd class="flex min-w-0 justify-end">
-											{#if e.copy}
-												<CopyText value={e.value ?? ''} mono />
-											{:else}
-												<span class="truncate">{e.value}</span>
-											{/if}
+											<span class="truncate">{e.value}</span>
 										</dd>
 									{/each}
 									{#each timestamps as t (t.label)}
@@ -231,7 +225,6 @@
 							</Popover.Content>
 						</Popover.Root>
 					{/if}
-					{@render menu?.()}
 				</div>
 			{/if}
 			{#if actions && !loading && !missing}

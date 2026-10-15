@@ -190,7 +190,7 @@ export function routeFor(path: string): RouteItem | undefined {
 }
 
 // Show everything until the role is known, so the nav doesn't flicker.
-export function canSee(route: RouteItem, role: WorkspaceRole | undefined): boolean {
+function canSee(route: RouteItem, role: WorkspaceRole | undefined): boolean {
 	return role === undefined || atLeast(role, route.role ?? WorkspaceRole.MEMBER);
 }
 
