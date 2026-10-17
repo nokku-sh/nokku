@@ -38,21 +38,30 @@ message GetBillingResponse {
   int64 user_count = 5;
   int64 resource_count = 6;
   Subscription subscription = 7;
+  // held_quotas are the data limits of a plan that ended and still hold until held_until. Unset without a hold.
+  Quotas held_quotas = 8;
+  google.protobuf.Timestamp held_until = 9;
 }
 
 message Quotas {
   int64 seats = 1;
-  int64 retention_days = 2;
+  int64 audit_retention_days = 2;
   int64 recording_storage_bytes = 3;
   int64 resource_cap = 4;
+  int64 recording_retention_days = 5;
 }
 
 message Subscription {
   string status = 1;
   bool cancel_at_period_end = 2;
   google.protobuf.Timestamp current_period_end = 3;
-  // kept_until is set while an ended plan's data limits still hold.
-  google.protobuf.Timestamp kept_until = 4;
+  reserved 4; // kept_until, see GetBillingResponse.held_until
+  // trial is the free start of a hosted workspace, nothing is paid yet. current_period_end is when it ends.
+  bool trial = 5;
+  // delete_at is when a hosted workspace that stopped paying is deleted, unless it subscribes before.
+  google.protobuf.Timestamp delete_at = 6;
+  // ended_at is when the trial or the paid plan ended, unset while it runs.
+  google.protobuf.Timestamp ended_at = 7;
 }
 
 message CreatePortalRequest {}

@@ -59,7 +59,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 			return err
 		}
 		for _, wsID := range workspaceIDs {
-			retentionDays, err := s.entitlements.RetentionDays(ctx, wsID)
+			retentionDays, err := s.entitlements.AuditRetentionDays(ctx, wsID)
 			if err != nil {
 				slog.Warn("audit retention skipped, plan lookup failed",
 					"error", err, "workspace_id", wsID)

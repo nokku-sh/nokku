@@ -21,6 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/entitlement"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
@@ -174,6 +175,13 @@ func (r *Resolver) workspace(row *db.Workspace) actor.Workspace {
 	return actor.Workspace{ID: row.ID, Slug: row.Slug, BaseURL: r.BaseURL(row.Slug)}
 }
 
+// Forget drops a deleted workspace from the slug cache, so its name is free at once.
+func (r *Resolver) Forget(slug string) {
+	if r.slugs != nil {
+		r.slugs.Delete(slug)
+	}
+}
+
 // Forbidden reports a reserved host, or a slug with a brand or phishing word from denylist.txt.
 func Forbidden(slug string) bool {
 	if reserved[slug] {
@@ -212,7 +220,7 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 			if err := q.DeleteWorkspace(ctx, ws.ID); err != nil {
 				return err
 			}
-			r.slugs.Delete(ws.Slug)
+			r.Forget(ws.Slug)
 		}
 		return nil
 	})
@@ -238,7 +246,10 @@ func Create(ctx context.Context, conn *db.Connection, slug, name string) (*db.Wo
 		if err != nil {
 			return err
 		}
-		if err := q.InitSubscription(ctx); err != nil {
+		if err := q.StartTrial(ctx, &db.StartTrialParams{
+			Plan: entitlement.PlanPro,
+			Days: entitlement.TrialDays,
+		}); err != nil {
 			return err
 		}
 		ca.Name, ca.Description = "Default CA", new("Default CA for "+ws.Name)

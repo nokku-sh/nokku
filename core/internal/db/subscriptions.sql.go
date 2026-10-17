@@ -77,7 +77,7 @@ func (q *Queries) GetInstanceLicense(ctx context.Context) (string, error) {
 
 const getSubscription = `-- name: GetSubscription :one
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, seats, ended_at, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, seats, ended_at, trial_reminder, deletion_warning, deletion_warned_at, updated_at
 FROM
   workspace_subscriptions
 WHERE
@@ -99,14 +99,90 @@ func (q *Queries) GetSubscription(ctx context.Context, workspaceID string) (*Wor
 		&i.CancelAtPeriodEnd,
 		&i.Seats,
 		&i.EndedAt,
+		&i.TrialReminder,
+		&i.DeletionWarning,
+		&i.DeletionWarnedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
+const listLapsedWorkspaces = `-- name: ListLapsedWorkspaces :many
+SELECT
+  s.workspace_id, s.source, s.plan, s.status, s.customer_id, s.subscription_id, s.current_period_end, s.cancel_at_period_end, s.seats, s.ended_at, s.trial_reminder, s.deletion_warning, s.deletion_warned_at, s.updated_at,
+  w.slug,
+  w.name AS workspace_name,
+  u.id AS owner_id,
+  u.email AS owner_email
+FROM
+  workspace_subscriptions s
+  JOIN workspaces w ON w.id = s.workspace_id
+  LEFT JOIN users u ON u.workspace_id = s.workspace_id
+  AND u.role = 5 -- owner
+  AND u.active
+WHERE
+  (
+    s.source = 'trial'
+    AND s.current_period_end < NOW()
+  )
+  OR (
+    s.source = 'stripe'
+    AND s.ended_at IS NOT NULL
+  )
+`
+
+type ListLapsedWorkspacesRow struct {
+	WorkspaceSubscription WorkspaceSubscription `json:"workspaceSubscription"`
+	Slug                  string                `json:"slug"`
+	WorkspaceName         string                `json:"workspaceName"`
+	OwnerID               *string               `json:"ownerId"`
+	OwnerEmail            *string               `json:"ownerEmail"`
+}
+
+// Hosted workspaces whose trial or paid plan is over, with the owner to warn. deletionDate in internal/api decides when
+// each goes. Runs as nokku_system.
+func (q *Queries) ListLapsedWorkspaces(ctx context.Context) ([]*ListLapsedWorkspacesRow, error) {
+	rows, err := q.db.Query(ctx, listLapsedWorkspaces)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListLapsedWorkspacesRow
+	for rows.Next() {
+		var i ListLapsedWorkspacesRow
+		if err := rows.Scan(
+			&i.WorkspaceSubscription.WorkspaceID,
+			&i.WorkspaceSubscription.Source,
+			&i.WorkspaceSubscription.Plan,
+			&i.WorkspaceSubscription.Status,
+			&i.WorkspaceSubscription.CustomerID,
+			&i.WorkspaceSubscription.SubscriptionID,
+			&i.WorkspaceSubscription.CurrentPeriodEnd,
+			&i.WorkspaceSubscription.CancelAtPeriodEnd,
+			&i.WorkspaceSubscription.Seats,
+			&i.WorkspaceSubscription.EndedAt,
+			&i.WorkspaceSubscription.TrialReminder,
+			&i.WorkspaceSubscription.DeletionWarning,
+			&i.WorkspaceSubscription.DeletionWarnedAt,
+			&i.WorkspaceSubscription.UpdatedAt,
+			&i.Slug,
+			&i.WorkspaceName,
+			&i.OwnerID,
+			&i.OwnerEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProviderSubscriptions = `-- name: ListProviderSubscriptions :many
 SELECT
-  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, seats, ended_at, updated_at
+  workspace_id, source, plan, status, customer_id, subscription_id, current_period_end, cancel_at_period_end, seats, ended_at, trial_reminder, deletion_warning, deletion_warned_at, updated_at
 FROM
   workspace_subscriptions
 WHERE
@@ -136,6 +212,9 @@ func (q *Queries) ListProviderSubscriptions(ctx context.Context) ([]*WorkspaceSu
 			&i.CancelAtPeriodEnd,
 			&i.Seats,
 			&i.EndedAt,
+			&i.TrialReminder,
+			&i.DeletionWarning,
+			&i.DeletionWarnedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -146,6 +225,86 @@ func (q *Queries) ListProviderSubscriptions(ctx context.Context) ([]*WorkspaceSu
 		return nil, err
 	}
 	return items, nil
+}
+
+const listTrialsEnding = `-- name: ListTrialsEnding :many
+SELECT
+  s.workspace_id,
+  s.current_period_end::timestamptz AS trial_end,
+  s.trial_reminder,
+  w.slug,
+  w.name AS workspace_name,
+  u.id AS owner_id,
+  u.email AS owner_email
+FROM
+  workspace_subscriptions s
+  JOIN workspaces w ON w.id = s.workspace_id
+  JOIN users u ON u.workspace_id = s.workspace_id
+  AND u.role = 5 -- owner
+  AND u.active
+WHERE
+  s.source = 'trial'
+  AND s.current_period_end > NOW()
+  AND s.current_period_end <= NOW() + make_interval(days => $1::int)
+`
+
+type ListTrialsEndingRow struct {
+	WorkspaceID   string    `json:"workspaceId"`
+	TrialEnd      time.Time `json:"trialEnd"`
+	TrialReminder int32     `json:"trialReminder"`
+	Slug          string    `json:"slug"`
+	WorkspaceName string    `json:"workspaceName"`
+	OwnerID       string    `json:"ownerId"`
+	OwnerEmail    string    `json:"ownerEmail"`
+}
+
+// Trials that end within the next days, with the owner to remind. Runs as nokku_system.
+func (q *Queries) ListTrialsEnding(ctx context.Context, within int32) ([]*ListTrialsEndingRow, error) {
+	rows, err := q.db.Query(ctx, listTrialsEnding, within)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListTrialsEndingRow
+	for rows.Next() {
+		var i ListTrialsEndingRow
+		if err := rows.Scan(
+			&i.WorkspaceID,
+			&i.TrialEnd,
+			&i.TrialReminder,
+			&i.Slug,
+			&i.WorkspaceName,
+			&i.OwnerID,
+			&i.OwnerEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setDeletionWarning = `-- name: SetDeletionWarning :exec
+UPDATE workspace_subscriptions
+SET
+  deletion_warning = $1,
+  deletion_warned_at = NOW(),
+  updated_at = NOW()
+WHERE
+  workspace_id = $2
+`
+
+type SetDeletionWarningParams struct {
+	Days        int32  `json:"days"`
+	WorkspaceID string `json:"workspaceId"`
+}
+
+func (q *Queries) SetDeletionWarning(ctx context.Context, arg *SetDeletionWarningParams) error {
+	_, err := q.db.Exec(ctx, setDeletionWarning, arg.Days, arg.WorkspaceID)
+	return err
 }
 
 const setInstanceLicense = `-- name: SetInstanceLicense :exec
@@ -161,6 +320,26 @@ SET
 
 func (q *Queries) SetInstanceLicense(ctx context.Context, key string) error {
 	_, err := q.db.Exec(ctx, setInstanceLicense, key)
+	return err
+}
+
+const setTrialReminder = `-- name: SetTrialReminder :exec
+UPDATE workspace_subscriptions
+SET
+  trial_reminder = $1,
+  updated_at = NOW()
+WHERE
+  workspace_id = $2
+  AND source = 'trial'
+`
+
+type SetTrialReminderParams struct {
+	Days        int32  `json:"days"`
+	WorkspaceID string `json:"workspaceId"`
+}
+
+func (q *Queries) SetTrialReminder(ctx context.Context, arg *SetTrialReminderParams) error {
+	_, err := q.db.Exec(ctx, setTrialReminder, arg.Days, arg.WorkspaceID)
 	return err
 }
 
@@ -191,9 +370,18 @@ SET
   cancel_at_period_end = EXCLUDED.cancel_at_period_end,
   seats = EXCLUDED.seats,
   ended_at = EXCLUDED.ended_at,
+  -- A plan that ends again is a new countdown, the warnings of the last one do not count.
+  deletion_warning = CASE
+    WHEN workspace_subscriptions.ended_at IS DISTINCT FROM EXCLUDED.ended_at THEN 0
+    ELSE workspace_subscriptions.deletion_warning
+  END,
+  deletion_warned_at = CASE
+    WHEN workspace_subscriptions.ended_at IS DISTINCT FROM EXCLUDED.ended_at THEN NULL
+    ELSE workspace_subscriptions.deletion_warned_at
+  END,
   updated_at = NOW()
 WHERE
-  workspace_subscriptions.source IN ('stripe', '')
+  workspace_subscriptions.source IN ('stripe', 'trial', '')
 `
 
 type UpsertSubscriptionParams struct {
@@ -209,7 +397,7 @@ type UpsertSubscriptionParams struct {
 	EndedAt           *time.Time `json:"endedAt"`
 }
 
-// Manual subscriptions survive provider syncs.
+// Manual subscriptions survive provider syncs, a trial gives way to the first one.
 func (q *Queries) UpsertSubscription(ctx context.Context, arg *UpsertSubscriptionParams) error {
 	_, err := q.db.Exec(ctx, upsertSubscription,
 		arg.WorkspaceID,

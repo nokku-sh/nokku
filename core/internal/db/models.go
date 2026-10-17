@@ -305,5 +305,8 @@ type WorkspaceSubscription struct {
 	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
 	Seats             int64      `json:"seats"`
 	EndedAt           *time.Time `json:"endedAt"`
+	TrialReminder     int32      `json:"trialReminder"`
+	DeletionWarning   int32      `json:"deletionWarning"`
+	DeletionWarnedAt  *time.Time `json:"deletionWarnedAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
 }

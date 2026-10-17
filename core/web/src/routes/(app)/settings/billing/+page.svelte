@@ -37,7 +37,7 @@
 		{#if mode === 'saas'}
 			<PlanCard billing={data.data} isOwner={can.own} />
 		{:else}
-			<LicenseCard isOwner={can.own} />
+			<LicenseCard billing={data.data} isOwner={can.own} />
 		{/if}
 		<UsageCard billing={data.data} {mode} />
 	</div>

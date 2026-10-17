@@ -13,17 +13,18 @@
 
 	interface Props {
 		target: Target;
-		/** Its daemon is online, so a web shell works. Otherwise the row copies the ssh command. */
-		shell: boolean;
+		/** Why a web shell does not work, unset when it does. The row then copies the ssh command. */
+		why: string | undefined;
 	}
 
-	let { target, shell }: Props = $props();
+	let { target, why }: Props = $props();
+
+	const shell = $derived(!why);
 
 	const usernames = $derived(target.usernames);
 	const mine = $derived(
 		[...getSessions().entries()].filter(([, s]) => !!s.daemonID && s.daemonID === target.daemonId)
 	);
-	const why = $derived(target.daemonId ? 'daemon offline' : 'nk sync');
 
 	const connect = useConnect();
 	const run = (username: string) =>

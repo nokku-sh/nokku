@@ -1,0 +1,31 @@
+nokku.
+
+Trial ending
+
+
+Your trial ends in {{ .Left }}.
+
+The Pro trial of {{ .Workspace }} ends on {{ .EndDate }}. Subscribe before then and nothing changes. You keep the rest of the trial, the first charge comes when it ends.
+
+After the trial: Nokku signs no certificates for this workspace. Servers keep their access rules.
+
+On {{ .DeleteDate }}: the workspace is deleted, with its audit log and recordings.
+
+Pro is billed per member, at least 5. Stripe shows the total before you pay.
+
+Subscribe to Pro {{ .BillingURL }}
+
+You get this because you own this workspace.{{ if .Next }} One more reminder comes {{ .Next }} before the end.{{ end }}
+
+This is an email about your workspace on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}Nokku{{ end }}.{{ if .Operator.SupportEmail }} Questions? Write to {{ .Operator.SupportEmail }}.{{ end }}
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

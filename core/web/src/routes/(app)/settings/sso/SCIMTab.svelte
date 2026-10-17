@@ -35,7 +35,7 @@
 	let label = $state('');
 	let created = $state<{ token: string; baseUrl: string }>();
 
-	const plan = $derived(requiredPlan('scim', mode));
+	const plan = requiredPlan('scim');
 	const upgrade = $derived(upgradeLink('scim', mode));
 	// Tokens keep provisioning after a downgrade, so they stay listed and revocable.
 	const lapsed = $derived(available === false && !!tokens.data?.length);

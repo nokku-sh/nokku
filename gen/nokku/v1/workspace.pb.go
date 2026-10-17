@@ -207,7 +207,11 @@ type GetWorkspaceResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Workspace *Workspace             `protobuf:"bytes,1,opt,name=workspace" json:"workspace,omitempty"`
 	// base_url is where this workspace lives, the slug host on the hosted service. Callback and SCIM URLs start with it.
-	BaseUrl       *string `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
+	BaseUrl *string `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
+	// inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner subscribes.
+	Inactive *bool `protobuf:"varint,3,opt,name=inactive" json:"inactive,omitempty"`
+	// delete_at is when an inactive workspace is deleted, unless the owner subscribes before.
+	DeleteAt      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=delete_at,json=deleteAt" json:"delete_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -254,6 +258,20 @@ func (x *GetWorkspaceResponse) GetBaseUrl() string {
 		return *x.BaseUrl
 	}
 	return ""
+}
+
+func (x *GetWorkspaceResponse) GetInactive() bool {
+	if x != nil && x.Inactive != nil {
+		return *x.Inactive
+	}
+	return false
+}
+
+func (x *GetWorkspaceResponse) GetDeleteAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DeleteAt
+	}
+	return nil
 }
 
 type UpdateWorkspaceRequest struct {
@@ -1196,10 +1214,12 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x15default_daemon_config\x18\x01 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\x12\x1f\n" +
 	"\venforce_sso\x18\x02 \x01(\bR\n" +
 	"enforceSso\"\x15\n" +
-	"\x13GetWorkspaceRequest\"d\n" +
+	"\x13GetWorkspaceRequest\"\xb9\x01\n" +
 	"\x14GetWorkspaceResponse\x121\n" +
 	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\x12\x19\n" +
-	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\"\x9d\x01\n" +
+	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\x12\x1a\n" +
+	"\binactive\x18\x03 \x01(\bR\binactive\x127\n" +
+	"\tdelete_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\bdeleteAt\"\x9d\x01\n" +
 	"\x16UpdateWorkspaceRequest\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x03\x18\x80\x02R\x04name\x12*\n" +
@@ -1316,39 +1336,40 @@ var file_nokku_v1_workspace_proto_depIdxs = []int32{
 	24, // 2: nokku.v1.Workspace.updated_at:type_name -> google.protobuf.Timestamp
 	25, // 3: nokku.v1.WorkspaceSettings.default_daemon_config:type_name -> nokku.v1.DaemonConfig
 	0,  // 4: nokku.v1.GetWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	1,  // 5: nokku.v1.UpdateWorkspaceRequest.settings:type_name -> nokku.v1.WorkspaceSettings
-	0,  // 6: nokku.v1.UpdateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	26, // 7: nokku.v1.ListUsersRequest.role:type_name -> nokku.v1.WorkspaceRole
-	27, // 8: nokku.v1.ListUsersResponse.users:type_name -> nokku.v1.User
-	27, // 9: nokku.v1.GetUserResponse.user:type_name -> nokku.v1.User
-	26, // 10: nokku.v1.UpdateUserRoleRequest.role:type_name -> nokku.v1.WorkspaceRole
-	2,  // 11: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
-	4,  // 12: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
-	6,  // 13: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
-	12, // 14: nokku.v1.WorkspaceService.ListUsers:input_type -> nokku.v1.ListUsersRequest
-	14, // 15: nokku.v1.WorkspaceService.GetUser:input_type -> nokku.v1.GetUserRequest
-	16, // 16: nokku.v1.WorkspaceService.UpdateUserRole:input_type -> nokku.v1.UpdateUserRoleRequest
-	18, // 17: nokku.v1.WorkspaceService.SetUserActive:input_type -> nokku.v1.SetUserActiveRequest
-	20, // 18: nokku.v1.WorkspaceService.DeleteUser:input_type -> nokku.v1.DeleteUserRequest
-	22, // 19: nokku.v1.WorkspaceService.TransferOwnership:input_type -> nokku.v1.TransferOwnershipRequest
-	8,  // 20: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
-	10, // 21: nokku.v1.WorkspaceService.SubscribeChanges:input_type -> nokku.v1.SubscribeChangesRequest
-	3,  // 22: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
-	5,  // 23: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
-	7,  // 24: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
-	13, // 25: nokku.v1.WorkspaceService.ListUsers:output_type -> nokku.v1.ListUsersResponse
-	15, // 26: nokku.v1.WorkspaceService.GetUser:output_type -> nokku.v1.GetUserResponse
-	17, // 27: nokku.v1.WorkspaceService.UpdateUserRole:output_type -> nokku.v1.UpdateUserRoleResponse
-	19, // 28: nokku.v1.WorkspaceService.SetUserActive:output_type -> nokku.v1.SetUserActiveResponse
-	21, // 29: nokku.v1.WorkspaceService.DeleteUser:output_type -> nokku.v1.DeleteUserResponse
-	23, // 30: nokku.v1.WorkspaceService.TransferOwnership:output_type -> nokku.v1.TransferOwnershipResponse
-	9,  // 31: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
-	11, // 32: nokku.v1.WorkspaceService.SubscribeChanges:output_type -> nokku.v1.SubscribeChangesResponse
-	22, // [22:33] is the sub-list for method output_type
-	11, // [11:22] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	24, // 5: nokku.v1.GetWorkspaceResponse.delete_at:type_name -> google.protobuf.Timestamp
+	1,  // 6: nokku.v1.UpdateWorkspaceRequest.settings:type_name -> nokku.v1.WorkspaceSettings
+	0,  // 7: nokku.v1.UpdateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
+	26, // 8: nokku.v1.ListUsersRequest.role:type_name -> nokku.v1.WorkspaceRole
+	27, // 9: nokku.v1.ListUsersResponse.users:type_name -> nokku.v1.User
+	27, // 10: nokku.v1.GetUserResponse.user:type_name -> nokku.v1.User
+	26, // 11: nokku.v1.UpdateUserRoleRequest.role:type_name -> nokku.v1.WorkspaceRole
+	2,  // 12: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
+	4,  // 13: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
+	6,  // 14: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
+	12, // 15: nokku.v1.WorkspaceService.ListUsers:input_type -> nokku.v1.ListUsersRequest
+	14, // 16: nokku.v1.WorkspaceService.GetUser:input_type -> nokku.v1.GetUserRequest
+	16, // 17: nokku.v1.WorkspaceService.UpdateUserRole:input_type -> nokku.v1.UpdateUserRoleRequest
+	18, // 18: nokku.v1.WorkspaceService.SetUserActive:input_type -> nokku.v1.SetUserActiveRequest
+	20, // 19: nokku.v1.WorkspaceService.DeleteUser:input_type -> nokku.v1.DeleteUserRequest
+	22, // 20: nokku.v1.WorkspaceService.TransferOwnership:input_type -> nokku.v1.TransferOwnershipRequest
+	8,  // 21: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
+	10, // 22: nokku.v1.WorkspaceService.SubscribeChanges:input_type -> nokku.v1.SubscribeChangesRequest
+	3,  // 23: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
+	5,  // 24: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
+	7,  // 25: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
+	13, // 26: nokku.v1.WorkspaceService.ListUsers:output_type -> nokku.v1.ListUsersResponse
+	15, // 27: nokku.v1.WorkspaceService.GetUser:output_type -> nokku.v1.GetUserResponse
+	17, // 28: nokku.v1.WorkspaceService.UpdateUserRole:output_type -> nokku.v1.UpdateUserRoleResponse
+	19, // 29: nokku.v1.WorkspaceService.SetUserActive:output_type -> nokku.v1.SetUserActiveResponse
+	21, // 30: nokku.v1.WorkspaceService.DeleteUser:output_type -> nokku.v1.DeleteUserResponse
+	23, // 31: nokku.v1.WorkspaceService.TransferOwnership:output_type -> nokku.v1.TransferOwnershipResponse
+	9,  // 32: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
+	11, // 33: nokku.v1.WorkspaceService.SubscribeChanges:output_type -> nokku.v1.SubscribeChangesResponse
+	23, // [23:34] is the sub-list for method output_type
+	12, // [12:23] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_workspace_proto_init() }

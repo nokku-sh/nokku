@@ -39,6 +39,10 @@ func New(cfg *config.Config) *Server {
 }
 
 func (s *Server) Start(ctx context.Context) error {
+	if s.cfg.SaaS {
+		go runLifecycle(ctx, s.cfg)
+	}
+
 	proto := new(http.Protocols)
 	proto.SetHTTP1(true)
 	proto.SetHTTP2(true)

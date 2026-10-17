@@ -155,10 +155,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// An expired license still starts, refusing here would turn a late renewal into an outage.
-	if !cfg.SaaS && enc.UsesKMS() && cfg.Entitlements.License() == nil {
-		return nil, fmt.Errorf("external KMS requires an Enterprise license")
-	}
 	// Self-host makes its one workspace here, the hosted service reads it off the subdomain.
 	cfg.Tenant, err = tenant.New(ctx, cfg.Conn, cfg.FullURL(), cfg.SaaS)
 	if err != nil {

@@ -9,6 +9,7 @@
 	import ConnectionBanner from '#lib/components/layout/ConnectionBanner.svelte';
 	import { canVisit } from '#lib/components/layout/routes.js';
 	import LicenseBanner from '#lib/components/layout/LicenseBanner.svelte';
+	import PlanBanner from '#lib/components/layout/PlanBanner.svelte';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
@@ -140,6 +141,7 @@
 				<AppHeader />
 				<ConnectionBanner />
 				<LicenseBanner />
+				<PlanBanner />
 
 				<main class="flex min-h-0 flex-1 flex-col overflow-auto">
 					{#key page.url.pathname}

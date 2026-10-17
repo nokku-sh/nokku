@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { billing as billingApi } from '#lib/api/billing.svelte.js';
-	import { HOLD_DAYS } from '#lib/api/license.svelte.js';
+	import { plural } from '#lib/api/bulk.js';
+	import { daysUntil, HOLD_DAYS } from '#lib/api/license.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -19,18 +20,30 @@
 
 	let { billing, isOwner }: { billing: GetBillingResponse; isOwner: boolean } = $props();
 
+	// The trial warning shows from this many days before the end.
+	const TRIAL_WARN_DAYS = 7;
+
 	const checkout = billingApi.checkout();
 	const portal = billingApi.portal();
 	const cancel = billingApi.cancelSubscription();
 
 	const sub = $derived(billing.subscription);
+	const isInactive = $derived(billing.plan === 'inactive');
+	const isTrial = $derived(!!sub?.trial && !isInactive);
+	// Stripe's own trialing is a paid subscription that has not charged yet.
 	const isActive = $derived(sub?.status === 'active' || sub?.status === 'trialing');
 	const isPastDue = $derived(sub?.status === 'past_due');
 	const isCanceling = $derived(isActive && sub?.cancelAtPeriodEnd);
-	const name = $derived(planName(billing.plan));
-	const isCommunity = $derived((billing.plan || 'community') === 'community');
+	const trialDaysLeft = $derived(
+		isTrial && sub?.currentPeriodEnd ? Math.max(daysUntil(sub.currentPeriodEnd), 0) : undefined
+	);
+	const trialEndingSoon = $derived(trialDaysLeft !== undefined && trialDaysLeft <= TRIAL_WARN_DAYS);
+
+	const title = $derived(isInactive ? 'No active plan' : `${planName(billing.plan)} plan`);
 
 	const status = $derived.by((): { label: string; tone: Tone } | undefined => {
+		if (isInactive) return { label: 'Inactive', tone: 'destructive' };
+		if (isTrial) return { label: 'Trial', tone: 'info' };
 		if (isCanceling) return { label: 'Ending', tone: 'warning' };
 		if (sub?.status === 'trialing') return { label: 'Trial', tone: 'info' };
 		if (isPastDue) return { label: 'Payment failed', tone: 'warning' };
@@ -45,9 +58,9 @@
 
 	const cancelDescription = $derived(
 		(immediate
-			? `It ends now and the workspace drops to Community.`
-			: `It runs until ${formatTs(sub?.currentPeriodEnd)}, then the workspace drops to Community.`) +
-			` Recordings and audit logs beyond the Community limits are kept for ${HOLD_DAYS} more days.`
+			? `It ends now and Nokku stops signing certificates for this workspace.`
+			: `It runs until ${formatTs(sub?.currentPeriodEnd)}, then Nokku stops signing certificates for this workspace.`) +
+			` Recordings and older audit logs are kept for ${HOLD_DAYS} more days. Without a new subscription the workspace is deleted after half a year.`
 	);
 
 	async function submitCancel() {
@@ -86,16 +99,21 @@
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title class="text-xl font-semibold"><h2>{name} plan</h2></Card.Title>
+		<Card.Title class="text-xl font-semibold"><h2>{title}</h2></Card.Title>
 		<Card.Description>
-			{#if isActive}
+			{#if isTrial}
+				Free until
+				<span class="font-medium text-foreground">{formatTs(sub?.currentPeriodEnd)}</span>.
+				Subscribe any time, you keep the rest of the trial.
+			{:else if isActive}
 				{isCanceling ? 'Ends on' : 'Renews on'}
 				<span class="font-medium text-foreground">{formatTs(sub?.currentPeriodEnd)}</span>
 			{:else if isPastDue}
 				The last payment failed. Everything keeps working while Stripe retries.
-			{:else if isCommunity}
-				Free. Pro adds enforced SSO, audit log export, 90 days of history and as many members as you
-				pay for.
+			{:else if isInactive}
+				The {sub?.trial ? 'trial' : 'subscription'} ended{sub?.endedAt
+					? ` on ${formatTs(sub.endedAt)}`
+					: ''}.
 			{/if}
 		</Card.Description>
 		{#if status}
@@ -105,15 +123,34 @@
 		{/if}
 	</Card.Header>
 
-	{#if isCanceling || isPastDue || sub?.keptUntil}
+	{#if isInactive || isCanceling || isPastDue || trialEndingSoon}
 		<Card.Content>
-			{#if isCanceling}
+			{#if isInactive}
+				<Alert.Root variant="destructive">
+					<ShieldAlert />
+					<Alert.Title>Nokku signs no certificates for this workspace</Alert.Title>
+					<Alert.Description>
+						Servers keep their access rules, and certificates already signed work until they expire.
+						Nobody can sign in with <code class="font-mono">nk</code> or open a terminal, and
+						nothing new can be added.
+						{#if billing.heldUntil && !sub?.trial}
+							Recordings and older audit logs are kept until {formatTs(billing.heldUntil)}.
+						{/if}
+						{#if sub?.deleteAt}
+							On {formatTs(sub.deleteAt)} the workspace and everything in it is deleted, and its name
+							becomes free.
+						{/if}
+						{sub?.deleteAt ? 'Subscribe before then' : 'Subscribe'} to pick up where you left off.
+					</Alert.Description>
+				</Alert.Root>
+			{:else if isCanceling}
 				<Alert.Root variant="warning">
 					<ShieldAlert />
 					<Alert.Title>Ends on {formatTs(sub?.currentPeriodEnd)}</Alert.Title>
 					<Alert.Description>
-						Then the workspace drops to Community. Recordings and audit logs beyond its limits are
-						kept for {HOLD_DAYS} more days.
+						Then Nokku stops signing certificates for this workspace. Recordings and older audit
+						logs are kept for {HOLD_DAYS} more days. Without a new subscription the workspace is deleted
+						after half a year.
 					</Alert.Description>
 				</Alert.Root>
 			{:else if isPastDue}
@@ -121,16 +158,22 @@
 					<ShieldAlert />
 					<Alert.Title>Update the payment method</Alert.Title>
 					<Alert.Description>
-						If Stripe cannot charge it, the subscription ends and the workspace drops to Community.
+						If Stripe cannot charge it, the subscription ends and Nokku stops signing certificates
+						for this workspace.
 					</Alert.Description>
 				</Alert.Root>
-			{:else if sub?.keptUntil}
+			{:else}
 				<Alert.Root variant="info">
 					<Info />
-					<Alert.Title>Your subscription ended</Alert.Title>
+					<Alert.Title>
+						{trialDaysLeft === 0
+							? 'The trial ends today'
+							: `The trial ends in ${plural(trialDaysLeft ?? 0, 'day')}`}
+					</Alert.Title>
 					<Alert.Description>
-						Recordings and audit logs beyond the Community limits are kept until
-						{formatTs(sub.keptUntil)}. Upgrade before then to keep them.
+						Then Nokku stops signing certificates for this workspace until you subscribe. Servers
+						and their access rules stay as they are. Without a subscription the workspace is deleted {HOLD_DAYS}
+						days after the trial.
 					</Alert.Description>
 				</Alert.Root>
 			{/if}
@@ -156,7 +199,7 @@
 					<Button variant="ghost" onclick={() => (cancelOpen = true)}>Cancel subscription</Button>
 				{/if}
 			</div>
-		{:else if isCommunity}
+		{:else}
 			<div class="flex flex-wrap items-center gap-2">
 				<ToggleGroup.Root
 					type="single"
@@ -169,14 +212,16 @@
 					<ToggleGroup.Item value="yearly">Yearly</ToggleGroup.Item>
 				</ToggleGroup.Root>
 				<Button onclick={() => checkout.mutate({ yearly })} disabled={checkout.isPending}>
-					Upgrade to Pro
+					Subscribe to Pro
 					{#if checkout.isPending}<Spinner data-icon="inline-end" />{:else}<ExternalLink
 							data-icon="inline-end"
 						/>{/if}
 				</Button>
 			</div>
 			<p class="text-xs text-muted-foreground">
-				Billed per member, at least 5. Stripe shows the total before you pay.
+				Billed per member, at least 5. {isTrial
+					? 'The first charge comes when the trial ends.'
+					: 'Stripe shows the total before you pay.'}
 			</p>
 		{/if}
 	</Card.Footer>

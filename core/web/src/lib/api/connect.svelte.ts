@@ -7,7 +7,7 @@ import { toast } from 'svelte-sonner';
 import { daemon } from './daemons.svelte';
 import { target } from './targets.svelte';
 import { user } from './user.svelte';
-import { util } from './workspaces.svelte';
+import { util, workspace } from './workspaces.svelte';
 
 function remember(id: string) {
 	recentTargets.current = [id, ...recentTargets.current.filter((r) => r !== id)].slice(0, 6);
@@ -50,11 +50,21 @@ export function useConnect() {
 export function useServers(when: () => boolean = () => true) {
 	const me = user.self();
 	const access = target.access(() => (when() ? me.data?.id : undefined));
+	// A workspace without a plan signs no certificates, so a web shell would only fail.
+	const plan = workspace.plan();
 
 	const online = $derived(
 		new Set((access.data?.daemons ?? []).filter((d) => d.online).map((d) => d.id))
 	);
-	const canShell = (t: Pick<Target, 'daemonId'>) => !!t.daemonId && online.has(t.daemonId);
+	const inactive = $derived(!!plan.data?.inactive);
+	const isOnline = (t: Pick<Target, 'daemonId'>) => !!t.daemonId && online.has(t.daemonId);
+	// Why a server only offers its ssh command, undefined when a web shell works.
+	const why = (t: Pick<Target, 'daemonId'>) => {
+		if (inactive) return 'no active plan';
+		if (!t.daemonId) return 'nk sync';
+		return isOnline(t) ? undefined : 'daemon offline';
+	};
+	const canShell = (t: Pick<Target, 'daemonId'>) => !why(t);
 
 	const list = $derived.by(() => {
 		const recent = recentTargets.current;
@@ -77,7 +87,12 @@ export function useServers(when: () => boolean = () => true) {
 		get list() {
 			return list;
 		},
-		canShell
+		get inactive() {
+			return inactive;
+		},
+		online: isOnline,
+		canShell,
+		why
 	};
 }
 

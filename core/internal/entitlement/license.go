@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -81,10 +82,30 @@ func (s *Service) verifyLicense(key string) (*license.Claims, error) {
 	if err != nil && !errors.Is(err, license.ErrExpired) {
 		return nil, err
 	}
-	if claims.Plan != PlanEnterprise {
+	if claims.Plan != PlanPro && claims.Plan != PlanEnterprise {
 		return nil, fmt.Errorf("unknown license plan %q", claims.Plan)
 	}
+	seats, err := licenseSeats(claims)
+	switch {
+	case err != nil:
+		return nil, err
+	case claims.Plan == PlanPro && seats == 0:
+		return nil, errors.New("a Pro license must name its seats")
+	}
 	return claims, nil
+}
+
+// licenseSeats is the seat cap the key was bought with, 0 for none.
+func licenseSeats(c *license.Claims) (int64, error) {
+	raw, ok := c.Meta["seats"]
+	if !ok {
+		return 0, nil
+	}
+	seats, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || seats <= 0 {
+		return 0, fmt.Errorf("license seats %q are no count", raw)
+	}
+	return seats, nil
 }
 
 // takeLicense refuses a key that would shorten the held license, so an old key cannot undo a renewal.
@@ -169,7 +190,7 @@ func reportLicense(c *license.Claims) {
 	case left <= 0:
 		slog.Error("license expired, licensed features are off until a new key is activated",
 			"expired_at", expires,
-			"data_kept_until", expires.AddDate(0, 0, holdDays))
+			"data_kept_until", HoldEnd(expires))
 	case left < licenseWarnDays*24*time.Hour:
 		slog.Warn("license expires soon, activate the renewed key under Billing",
 			"expires_at", expires, "days_left", int(math.Ceil(left.Hours()/24)))

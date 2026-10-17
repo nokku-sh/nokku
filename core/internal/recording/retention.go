@@ -39,7 +39,7 @@ func (s *Service) cleanup(ctx context.Context) {
 			return err
 		}
 		for _, wsID := range workspaceIDs {
-			retentionDays, err := s.limits.RetentionDays(ctx, wsID)
+			retentionDays, err := s.limits.RecordingRetentionDays(ctx, wsID)
 			if err != nil {
 				slog.Warn("recording retention skipped, plan lookup failed",
 					"error", err, "workspace_id", wsID)

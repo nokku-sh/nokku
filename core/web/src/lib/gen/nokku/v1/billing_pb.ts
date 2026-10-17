@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/billing.proto.
  */
 export const file_nokku_v1_billing: GenFile = /*@__PURE__*/
-  fileDesc("ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSITChFHZXRCaWxsaW5nUmVxdWVzdCKbAgoSR2V0QmlsbGluZ1Jlc3BvbnNlEgwKBHBsYW4YASABKAkSDAoEbW9kZRgCIAEoCRI8CghmZWF0dXJlcxgDIAMoCzIqLm5va2t1LnYxLkdldEJpbGxpbmdSZXNwb25zZS5GZWF0dXJlc0VudHJ5EiAKBnF1b3RhcxgEIAEoCzIQLm5va2t1LnYxLlF1b3RhcxISCgp1c2VyX2NvdW50GAUgASgDEhYKDnJlc291cmNlX2NvdW50GAYgASgDEiwKDHN1YnNjcmlwdGlvbhgHIAEoCzIWLm5va2t1LnYxLlN1YnNjcmlwdGlvbhovCg1GZWF0dXJlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCDoCOAEiZgoGUXVvdGFzEg0KBXNlYXRzGAEgASgDEhYKDnJldGVudGlvbl9kYXlzGAIgASgDEh8KF3JlY29yZGluZ19zdG9yYWdlX2J5dGVzGAMgASgDEhQKDHJlc291cmNlX2NhcBgEIAEoAyKkAQoMU3Vic2NyaXB0aW9uEg4KBnN0YXR1cxgBIAEoCRIcChRjYW5jZWxfYXRfcGVyaW9kX2VuZBgCIAEoCBI2ChJjdXJyZW50X3BlcmlvZF9lbmQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmtlcHRfdW50aWwYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhUKE0NyZWF0ZVBvcnRhbFJlcXVlc3QiIwoUQ3JlYXRlUG9ydGFsUmVzcG9uc2USCwoDdXJsGAEgASgJIicKFUNyZWF0ZUNoZWNrb3V0UmVxdWVzdBIOCgZ5ZWFybHkYASABKAgiJQoWQ3JlYXRlQ2hlY2tvdXRSZXNwb25zZRILCgN1cmwYASABKAkiSAoZQ2FuY2VsU3Vic2NyaXB0aW9uUmVxdWVzdBIRCglpbW1lZGlhdGUYASABKAgSGAoGcmVhc29uGAIgASgJQgi6SAVyAxjoByIcChpDYW5jZWxTdWJzY3JpcHRpb25SZXNwb25zZSITChFHZXRMaWNlbnNlUmVxdWVzdCJiChJHZXRMaWNlbnNlUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIOCgZhY3RpdmUYAiABKAgSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMQoWQWN0aXZhdGVMaWNlbnNlUmVxdWVzdBIXCgNrZXkYASABKAlCCrpIB3IFEAEYgCAiGQoXQWN0aXZhdGVMaWNlbnNlUmVzcG9uc2UytQQKDkJpbGxpbmdTZXJ2aWNlElIKCkdldEJpbGxpbmcSGy5ub2trdS52MS5HZXRCaWxsaW5nUmVxdWVzdBocLm5va2t1LnYxLkdldEJpbGxpbmdSZXNwb25zZSIJkAIBwvMYAhgEElUKDENyZWF0ZVBvcnRhbBIdLm5va2t1LnYxLkNyZWF0ZVBvcnRhbFJlcXVlc3QaHi5ub2trdS52MS5DcmVhdGVQb3J0YWxSZXNwb25zZSIGwvMYAhgFElsKDkNyZWF0ZUNoZWNrb3V0Eh8ubm9ra3UudjEuQ3JlYXRlQ2hlY2tvdXRSZXF1ZXN0GiAubm9ra3UudjEuQ3JlYXRlQ2hlY2tvdXRSZXNwb25zZSIGwvMYAhgFEmcKEkNhbmNlbFN1YnNjcmlwdGlvbhIjLm5va2t1LnYxLkNhbmNlbFN1YnNjcmlwdGlvblJlcXVlc3QaJC5ub2trdS52MS5DYW5jZWxTdWJzY3JpcHRpb25SZXNwb25zZSIGwvMYAhgFElIKCkdldExpY2Vuc2USGy5ub2trdS52MS5HZXRMaWNlbnNlUmVxdWVzdBocLm5va2t1LnYxLkdldExpY2Vuc2VSZXNwb25zZSIJkAIBwvMYAhABEl4KD0FjdGl2YXRlTGljZW5zZRIgLm5va2t1LnYxLkFjdGl2YXRlTGljZW5zZVJlcXVlc3QaIS5ub2trdS52MS5BY3RpdmF0ZUxpY2Vuc2VSZXNwb25zZSIGwvMYAhgFYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSITChFHZXRCaWxsaW5nUmVxdWVzdCLyAgoSR2V0QmlsbGluZ1Jlc3BvbnNlEgwKBHBsYW4YASABKAkSDAoEbW9kZRgCIAEoCRI8CghmZWF0dXJlcxgDIAMoCzIqLm5va2t1LnYxLkdldEJpbGxpbmdSZXNwb25zZS5GZWF0dXJlc0VudHJ5EiAKBnF1b3RhcxgEIAEoCzIQLm5va2t1LnYxLlF1b3RhcxISCgp1c2VyX2NvdW50GAUgASgDEhYKDnJlc291cmNlX2NvdW50GAYgASgDEiwKDHN1YnNjcmlwdGlvbhgHIAEoCzIWLm5va2t1LnYxLlN1YnNjcmlwdGlvbhIlCgtoZWxkX3F1b3RhcxgIIAEoCzIQLm5va2t1LnYxLlF1b3RhcxIuCgpoZWxkX3VudGlsGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBovCg1GZWF0dXJlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCDoCOAEijgEKBlF1b3RhcxINCgVzZWF0cxgBIAEoAxIcChRhdWRpdF9yZXRlbnRpb25fZGF5cxgCIAEoAxIfChdyZWNvcmRpbmdfc3RvcmFnZV9ieXRlcxgDIAEoAxIUCgxyZXNvdXJjZV9jYXAYBCABKAMSIAoYcmVjb3JkaW5nX3JldGVudGlvbl9kYXlzGAUgASgDIuYBCgxTdWJzY3JpcHRpb24SDgoGc3RhdHVzGAEgASgJEhwKFGNhbmNlbF9hdF9wZXJpb2RfZW5kGAIgASgIEjYKEmN1cnJlbnRfcGVyaW9kX2VuZBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFdHJpYWwYBSABKAgSLQoJZGVsZXRlX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBKBAgEEAUiFQoTQ3JlYXRlUG9ydGFsUmVxdWVzdCIjChRDcmVhdGVQb3J0YWxSZXNwb25zZRILCgN1cmwYASABKAkiJwoVQ3JlYXRlQ2hlY2tvdXRSZXF1ZXN0Eg4KBnllYXJseRgBIAEoCCIlChZDcmVhdGVDaGVja291dFJlc3BvbnNlEgsKA3VybBgBIAEoCSJIChlDYW5jZWxTdWJzY3JpcHRpb25SZXF1ZXN0EhEKCWltbWVkaWF0ZRgBIAEoCBIYCgZyZWFzb24YAiABKAlCCLpIBXIDGOgHIhwKGkNhbmNlbFN1YnNjcmlwdGlvblJlc3BvbnNlIhMKEUdldExpY2Vuc2VSZXF1ZXN0ImIKEkdldExpY2Vuc2VSZXNwb25zZRIMCgRwbGFuGAEgASgJEg4KBmFjdGl2ZRgCIAEoCBIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIxChZBY3RpdmF0ZUxpY2Vuc2VSZXF1ZXN0EhcKA2tleRgBIAEoCUIKukgHcgUQARiAICIZChdBY3RpdmF0ZUxpY2Vuc2VSZXNwb25zZTK1BAoOQmlsbGluZ1NlcnZpY2USUgoKR2V0QmlsbGluZxIbLm5va2t1LnYxLkdldEJpbGxpbmdSZXF1ZXN0Ghwubm9ra3UudjEuR2V0QmlsbGluZ1Jlc3BvbnNlIgmQAgHC8xgCGAQSVQoMQ3JlYXRlUG9ydGFsEh0ubm9ra3UudjEuQ3JlYXRlUG9ydGFsUmVxdWVzdBoeLm5va2t1LnYxLkNyZWF0ZVBvcnRhbFJlc3BvbnNlIgbC8xgCGAUSWwoOQ3JlYXRlQ2hlY2tvdXQSHy5ub2trdS52MS5DcmVhdGVDaGVja291dFJlcXVlc3QaIC5ub2trdS52MS5DcmVhdGVDaGVja291dFJlc3BvbnNlIgbC8xgCGAUSZwoSQ2FuY2VsU3Vic2NyaXB0aW9uEiMubm9ra3UudjEuQ2FuY2VsU3Vic2NyaXB0aW9uUmVxdWVzdBokLm5va2t1LnYxLkNhbmNlbFN1YnNjcmlwdGlvblJlc3BvbnNlIgbC8xgCGAUSUgoKR2V0TGljZW5zZRIbLm5va2t1LnYxLkdldExpY2Vuc2VSZXF1ZXN0Ghwubm9ra3UudjEuR2V0TGljZW5zZVJlc3BvbnNlIgmQAgHC8xgCEAESXgoPQWN0aXZhdGVMaWNlbnNlEiAubm9ra3UudjEuQWN0aXZhdGVMaWNlbnNlUmVxdWVzdBohLm5va2t1LnYxLkFjdGl2YXRlTGljZW5zZVJlc3BvbnNlIgbC8xgCGAViCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.GetBillingRequest
@@ -67,6 +67,18 @@ export type GetBillingResponse = Message<"nokku.v1.GetBillingResponse"> & {
    * @generated from field: nokku.v1.Subscription subscription = 7;
    */
   subscription?: Subscription | undefined;
+
+  /**
+   * held_quotas are the data limits of a plan that ended and still hold until held_until. Unset without a hold.
+   *
+   * @generated from field: nokku.v1.Quotas held_quotas = 8;
+   */
+  heldQuotas?: Quotas | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp held_until = 9;
+   */
+  heldUntil?: Timestamp | undefined;
 };
 
 /**
@@ -86,9 +98,9 @@ export type Quotas = Message<"nokku.v1.Quotas"> & {
   seats: bigint;
 
   /**
-   * @generated from field: int64 retention_days = 2;
+   * @generated from field: int64 audit_retention_days = 2;
    */
-  retentionDays: bigint;
+  auditRetentionDays: bigint;
 
   /**
    * @generated from field: int64 recording_storage_bytes = 3;
@@ -99,6 +111,11 @@ export type Quotas = Message<"nokku.v1.Quotas"> & {
    * @generated from field: int64 resource_cap = 4;
    */
   resourceCap: bigint;
+
+  /**
+   * @generated from field: int64 recording_retention_days = 5;
+   */
+  recordingRetentionDays: bigint;
 };
 
 /**
@@ -128,11 +145,25 @@ export type Subscription = Message<"nokku.v1.Subscription"> & {
   currentPeriodEnd?: Timestamp | undefined;
 
   /**
-   * kept_until is set while an ended plan's data limits still hold.
+   * trial is the free start of a hosted workspace, nothing is paid yet. current_period_end is when it ends.
    *
-   * @generated from field: google.protobuf.Timestamp kept_until = 4;
+   * @generated from field: bool trial = 5;
    */
-  keptUntil?: Timestamp | undefined;
+  trial: boolean;
+
+  /**
+   * delete_at is when a hosted workspace that stopped paying is deleted, unless it subscribes before.
+   *
+   * @generated from field: google.protobuf.Timestamp delete_at = 6;
+   */
+  deleteAt?: Timestamp | undefined;
+
+  /**
+   * ended_at is when the trial or the paid plan ended, unset while it runs.
+   *
+   * @generated from field: google.protobuf.Timestamp ended_at = 7;
+   */
+  endedAt?: Timestamp | undefined;
 };
 
 /**

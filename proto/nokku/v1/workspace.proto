@@ -67,6 +67,10 @@ message GetWorkspaceResponse {
   Workspace workspace = 1;
   // base_url is where this workspace lives, the slug host on the hosted service. Callback and SCIM URLs start with it.
   string base_url = 2;
+  // inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner subscribes.
+  bool inactive = 3;
+  // delete_at is when an inactive workspace is deleted, unless the owner subscribes before.
+  google.protobuf.Timestamp delete_at = 4;
 }
 
 message UpdateWorkspaceRequest {

@@ -20,15 +20,18 @@ CREATE TABLE workspace_state (
 
 CREATE TABLE workspace_subscriptions (
   workspace_id UUID PRIMARY KEY DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  source TEXT NOT NULL DEFAULT '', -- stripe, manual, ...
+  source TEXT NOT NULL DEFAULT '', -- stripe, trial, manual, ...
   plan TEXT NOT NULL DEFAULT '', -- community, pro, enterprise
-  status TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT '', -- stripe's own, or trial
   customer_id TEXT NOT NULL DEFAULT '', -- stripe customer id, opaque
   subscription_id TEXT NOT NULL DEFAULT '', -- stripe subscription id, opaque
   current_period_end TIMESTAMPTZ,
   cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
   seats BIGINT NOT NULL DEFAULT 0, -- paid quantity, 0 = the plan's own cap
   ended_at TIMESTAMPTZ, -- set once the subscription is over, starts the retention hold
+  trial_reminder INTEGER NOT NULL DEFAULT 0, -- days before the trial end of the last reminder sent, 0 for none
+  deletion_warning INTEGER NOT NULL DEFAULT 0, -- days before the deletion of the last warning sent, 0 for none
+  deletion_warned_at TIMESTAMPTZ, -- when it went out, a late warning pushes the deletion back
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

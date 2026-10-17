@@ -9,6 +9,7 @@ import (
 	htmltemplate "html/template"
 	"io"
 	"log/slog"
+	"math"
 	"net/textproto"
 	"strings"
 	texttemplate "text/template"
@@ -33,7 +34,9 @@ const (
 	// cooldownEntries bounds the cooldown store, one entry per user and template.
 	cooldownEntries = 10_000
 	emailConfirm    = "email-confirm"
-	magicLink       = "magic-link"
+	// mailDate is how a mail names a day.
+	mailDate  = "2 Jan 2006"
+	magicLink = "magic-link"
 )
 
 // Service only delivers when an SMTP host is set.
@@ -223,6 +226,62 @@ func (s *Service) SendNewLoginEmail(
 	})
 }
 
+// TrialEnding is a mail to the owner of a hosted workspace whose trial runs out.
+type TrialEnding struct {
+	UserID, Email         string
+	Workspace, BillingURL string
+	Next                  int32 // days before the end of the next reminder, 0 for none
+	Ends, Deleted         time.Time
+}
+
+func (s *Service) SendTrialEndingEmail(ctx context.Context, t TrialEnding) error {
+	left := inDays(max(int(math.Ceil(time.Until(t.Ends).Hours()/24)), 1))
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   t.UserID,
+		to:       t.Email,
+		subject:  "Your Nokku trial ends in " + left,
+		template: "trial-ending",
+		data: trialTemplateData{
+			Operator:   s.Operator,
+			Workspace:  t.Workspace,
+			Left:       left,
+			EndDate:    t.Ends.UTC().Format(mailDate),
+			DeleteDate: t.Deleted.UTC().Format(mailDate),
+			BillingURL: t.BillingURL,
+			Next:       inDays(int(t.Next)),
+		},
+	})
+}
+
+// DeletionWarning is a mail to the owner of a hosted workspace that stopped paying and is about to be deleted.
+type DeletionWarning struct {
+	UserID, Email   string
+	Workspace, Slug string
+	BillingURL      string
+	Trial           bool  // the workspace never paid, its trial ended
+	Next            int32 // days before the deletion of the next warning, 0 for none
+	Ended, Deleted  time.Time
+}
+
+func (s *Service) SendDeletionWarningEmail(ctx context.Context, w DeletionWarning) error {
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   w.UserID,
+		to:       w.Email,
+		subject:  w.Workspace + " is deleted on " + w.Deleted.UTC().Format(mailDate),
+		template: "workspace-deletion",
+		data: deletionTemplateData{
+			Operator:   s.Operator,
+			Workspace:  w.Workspace,
+			Slug:       w.Slug,
+			Trial:      w.Trial,
+			EndDate:    w.Ended.UTC().Format(mailDate),
+			DeleteDate: w.Deleted.UTC().Format(mailDate),
+			BillingURL: w.BillingURL,
+			Next:       inDays(int(w.Next)),
+		},
+	})
+}
+
 // sendTemplate claims the cooldown slot before sending and releases it on failure, so nothing double-sends.
 func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	if req.userID == "" {
@@ -305,6 +364,17 @@ func renderFile(path string, data any, parse func(string) (executor, error)) (st
 }
 
 // lifetime words how long a link works in its largest whole unit, "24 hours" and not "24h0m0s".
+// inDays words a count of days, empty for 0.
+func inDays(n int) string {
+	switch n {
+	case 0:
+		return ""
+	case 1:
+		return "1 day"
+	}
+	return fmt.Sprintf("%d days", n)
+}
+
 func lifetime(d time.Duration) string {
 	n, unit := int(d/time.Minute), "minute"
 	switch {

@@ -10,7 +10,8 @@ func TestPlanMatrix(t *testing.T) {
 		plan            string
 		wantSeatCap     int64
 		wantResourceCap int64
-		wantRetention   int64
+		wantAudit       int64
+		wantRecordings  int64
 		wantStorageCap  int64
 		wantFeatures    map[string]bool
 	}{
@@ -18,33 +19,36 @@ func TestPlanMatrix(t *testing.T) {
 			plan:            PlanCommunity,
 			wantSeatCap:     5,
 			wantResourceCap: 50,
-			wantRetention:   7,
+			wantAudit:       30,
+			wantRecordings:  7,
 			wantStorageCap:  1 << 30,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:        true,
 				FeatureEnforceSSO:  false,
 				FeatureAuditExport: false,
-				FeatureExternalKMS: false,
+				FeatureExternalKMS: true,
 			},
 		},
 		{
 			plan:            PlanPro,
 			wantSeatCap:     unlimited,
 			wantResourceCap: 2000,
-			wantRetention:   90,
+			wantAudit:       90,
+			wantRecordings:  90,
 			wantStorageCap:  50 << 30,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:        true,
 				FeatureEnforceSSO:  true,
 				FeatureAuditExport: true,
-				FeatureExternalKMS: false,
+				FeatureExternalKMS: true,
 			},
 		},
 		{
 			plan:            PlanEnterprise,
 			wantSeatCap:     unlimited,
 			wantResourceCap: unlimited,
-			wantRetention:   365,
+			wantAudit:       365,
+			wantRecordings:  365,
 			wantStorageCap:  500 << 30,
 			wantFeatures: map[string]bool{
 				FeatureOIDC:        true,
@@ -67,8 +71,11 @@ func TestPlanMatrix(t *testing.T) {
 			if plan.ResourceCap != tt.wantResourceCap {
 				t.Errorf("ResourceCap = %d, want %d", plan.ResourceCap, tt.wantResourceCap)
 			}
-			if plan.RetentionDays != tt.wantRetention {
-				t.Errorf("RetentionDays = %d, want %d", plan.RetentionDays, tt.wantRetention)
+			if plan.AuditRetentionDays != tt.wantAudit {
+				t.Errorf("AuditRetentionDays = %d, want %d", plan.AuditRetentionDays, tt.wantAudit)
+			}
+			if plan.RecordingRetentionDays != tt.wantRecordings {
+				t.Errorf("RecordingRetentionDays = %d, want %d", plan.RecordingRetentionDays, tt.wantRecordings)
 			}
 			if plan.RecordingStorageBytes != tt.wantStorageCap {
 				t.Errorf(
@@ -114,5 +121,24 @@ func TestZeroPlanHasNoFeature(t *testing.T) {
 	}
 	if resolvePlan(PlanEnterprise).Has("no_such_feature") {
 		t.Error("Enterprise has a feature that is not in the catalog")
+	}
+}
+
+func TestInactive_KeepsTheFreeFeaturesAndLimits(t *testing.T) {
+	community := resolvePlan(PlanCommunity)
+	if inactive.AuditRetentionDays != community.AuditRetentionDays ||
+		inactive.RecordingRetentionDays != community.RecordingRetentionDays {
+		t.Error("an inactive workspace keeps its data like Community")
+	}
+	if inactive.SeatCap != 0 || inactive.ResourceCap != 0 {
+		t.Error("an inactive workspace takes nothing new")
+	}
+	for _, f := range CatalogFeatures {
+		if want := f.Plan == PlanCommunity; inactive.Has(f.Code) != want {
+			t.Errorf("inactive.Has(%q) = %v, want %v", f.Code, !want, want)
+		}
+	}
+	if resolvePlan(PlanInactive).Name != PlanCommunity {
+		t.Error("inactive must never come out of resolvePlan, a self-hosted server has no such plan")
 	}
 }

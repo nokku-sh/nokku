@@ -19,7 +19,7 @@
 		<div class="mb-2 flex items-center justify-between">
 			<h2 class="text-sm font-semibold">Servers</h2>
 			<Badge variant="outline" class="text-xs">
-				{servers.list.filter(servers.canShell).length} online
+				{servers.list.filter(servers.online).length} online
 			</Badge>
 		</div>
 		<InputGroupVariants variant="search" bind:value={searchQuery} searchResults={filtered.length} />
@@ -45,7 +45,7 @@
 		{:else}
 			<div class="flex flex-col gap-0.5 p-1.5">
 				{#each filtered as target (target.id)}
-					<ServerRow {target} shell={servers.canShell(target)} />
+					<ServerRow {target} why={servers.why(target)} />
 				{/each}
 			</div>
 		{/if}

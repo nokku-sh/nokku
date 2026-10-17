@@ -15,7 +15,6 @@ import (
 // procedureFeatures is the only place routes are gated. guard_test.go fails on a catalog feature with no wiring.
 var procedureFeatures = map[string]string{
 	nokkuv1connect.UtilServiceExportAuditLogsProcedure: FeatureAuditExport,
-	// Listing and revoking must keep working after a downgrade.
 	nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure: FeatureSCIM,
 }
 
@@ -27,12 +26,22 @@ var cappedCreate = map[string]bool{
 	nokkuv1connect.CertificateServiceCreateCertificateAuthorityProcedure: true,
 }
 
+// signing is every route that signs a user certificate. An inactive workspace gets none, its host certificates and
+// daemon syncs carry on.
+var signing = map[string]bool{
+	nokkuv1connect.CertificateServiceSignSSHCertificateProcedure: true,
+	nokkuv1connect.DaemonServiceCreateSessionProcedure:           true,
+}
+
 // NewGuardInterceptor gates features and caps creates. Every gated route is unary, streams pass through.
 func NewGuardInterceptor(ent *Service) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			procedure := req.Spec().Procedure
 			if err := ent.checkFeature(ctx, procedure, req.Any()); err != nil {
+				return nil, err
+			}
+			if err := ent.checkSigning(ctx, procedure); err != nil {
 				return nil, err
 			}
 			if err := ent.checkCap(ctx, procedure); err != nil {
@@ -63,6 +72,17 @@ func (s *Service) checkFeature(ctx context.Context, procedure string, msg any) e
 	}
 	return connect.NewError(connect.CodePermissionDenied, fmt.Errorf(
 		"%s is not available on the %s plan", featureLabel(feature), displayName(plan.Name)))
+}
+
+func (s *Service) checkSigning(ctx context.Context, procedure string) error {
+	if !signing[procedure] {
+		return nil
+	}
+	workspaceID := actor.WorkspaceIDFromContext(ctx)
+	if workspaceID == "" || s.Resolve(ctx, workspaceID).Name != PlanInactive {
+		return nil
+	}
+	return errInactive()
 }
 
 func (s *Service) checkCap(ctx context.Context, procedure string) error {
@@ -105,6 +125,8 @@ func displayName(plan string) string {
 		return "Pro"
 	case PlanEnterprise:
 		return "Enterprise"
+	case PlanInactive:
+		return "inactive"
 	}
 	return plan
 }

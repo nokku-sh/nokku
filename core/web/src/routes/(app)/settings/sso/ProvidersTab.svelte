@@ -129,7 +129,7 @@
 		<Card.Header>
 			<Card.Title class="flex flex-wrap items-center gap-2">
 				<h2>Require single sign-on</h2>
-				{#if locked}<Badge variant="outline">{requiredPlan('enforce_sso', mode)}</Badge>{/if}
+				{#if locked}<Badge variant="outline">{requiredPlan('enforce_sso')}</Badge>{/if}
 			</Card.Title>
 			<Card.Description>
 				Passkeys and email links stop working for everyone but the owner. The owner keeps both to
@@ -162,9 +162,7 @@
 		{#if locked}
 			<Card.Footer class="flex flex-wrap items-center justify-between gap-2 border-t">
 				<p id="enforce-locked" class="text-sm text-muted-foreground">
-					{mode === 'saas'
-						? `Your plan does not include it. ${requiredPlan('enforce_sso', mode)} does.`
-						: 'It needs an Enterprise license on this server.'}
+					Your plan does not include it. {requiredPlan('enforce_sso')} does.
 				</p>
 				{#if !readonly}
 					<Button

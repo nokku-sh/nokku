@@ -116,7 +116,7 @@ func (s *utilService) ListAuditLogs(
 		slog.Error("failed to list audit logs", "error", err)
 		return nil, errInternal
 	}
-	days := s.cfg.Entitlements.Resolve(ctx, actor.WorkspaceIDFromContext(ctx)).RetentionDays
+	days := s.cfg.Entitlements.Resolve(ctx, actor.WorkspaceIDFromContext(ctx)).AuditRetentionDays
 	retention := int32(min(days, math.MaxInt32)) //nolint:gosec // clamped to int32 just before
 	return &nokkuv1.ListAuditLogsResponse{Logs: eventLogs(events), Total: &total, RetentionDays: &retention}, nil
 }

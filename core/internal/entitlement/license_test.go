@@ -17,7 +17,10 @@ func TestActivateLicense_Refusals(t *testing.T) {
 
 	require.ErrorIs(t, sut.ActivateLicense(ctx, "NOKKU-AAAAA-BBBBB"), ErrLicenseInvalid)
 	require.ErrorIs(t, sut.ActivateLicense(ctx, issue(t, PlanPro, year)), ErrLicenseInvalid,
-		"a self-hosted license is Enterprise")
+		"a Pro key must name its seats")
+	require.ErrorIs(t, sut.ActivateLicense(ctx, issueSeats(t, PlanPro, year, "ten")), ErrLicenseInvalid)
+	require.ErrorIs(t, sut.ActivateLicense(ctx, issueSeats(t, PlanPro, year, "0")), ErrLicenseInvalid)
+	require.ErrorIs(t, sut.ActivateLicense(ctx, issue(t, "team", year)), ErrLicenseInvalid)
 	require.ErrorIs(t, sut.ActivateLicense(ctx, issue(t, PlanEnterprise, -time.Hour)), ErrLicenseExpired)
 	assert.Nil(t, sut.License(), "a refused key must not become the license")
 

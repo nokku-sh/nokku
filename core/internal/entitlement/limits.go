@@ -2,15 +2,24 @@ package entitlement
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"connectrpc.com/connect"
 )
 
+func errInactive() error {
+	return connect.NewError(connect.CodeFailedPrecondition,
+		errors.New("this workspace has no active plan, the owner can subscribe under Billing"))
+}
+
 // CanInvite is shared by the invitation, SSO, and SCIM join paths.
 func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64) error {
 	plan := s.Resolve(ctx, workspaceID)
+	if plan.Name == PlanInactive {
+		return errInactive()
+	}
 	if plan.SeatCap == unlimited || used < plan.SeatCap {
 		return nil
 	}
@@ -26,6 +35,9 @@ func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64)
 // CheckResources allows the create when the count cannot be read, quotas fail open.
 func (s *Service) CheckResources(ctx context.Context, workspaceID string) error {
 	plan := s.Resolve(ctx, workspaceID)
+	if plan.Name == PlanInactive {
+		return errInactive()
+	}
 	if plan.ResourceCap == unlimited {
 		return nil
 	}

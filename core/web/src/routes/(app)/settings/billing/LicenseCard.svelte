@@ -8,13 +8,14 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import { LicensePurchaseURL } from '#lib/config.js';
+	import { LicensePurchaseURL, LicenseTrialURL } from '#lib/config.js';
+	import type { GetBillingResponse } from '#lib/gen/nokku/v1/billing_pb.js';
 	import { planName } from '#lib/plans.js';
 	import type { Tone } from '#lib/tone.js';
 	import { formatTs } from '#lib/utils.js';
 	import { ExternalLink, KeyRound, ShieldAlert } from '@lucide/svelte';
 
-	let { isOwner }: { isOwner: boolean } = $props();
+	let { billing, isOwner }: { billing: GetBillingResponse; isOwner: boolean } = $props();
 
 	const data = license.get();
 	const activate = license.activate();
@@ -36,6 +37,8 @@
 	};
 
 	const badge = $derived(badges[phase]);
+	// Community unless the key is active.
+	const plan = $derived(data.data?.plan);
 
 	let open = $state(false);
 	let key = $state('');
@@ -79,16 +82,17 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-xl font-semibold">
-				<h2>
-					{planName(phase === 'none' || phase === 'expired' ? 'community' : 'enterprise')} plan
-				</h2>
+				<h2>{planName(plan)} plan</h2>
 			</Card.Title>
 			<Card.Description>
 				{#if phase === 'none'}
-					Free on your own server. An Enterprise license lifts the member cap, keeps 365 days of
-					history and unlocks every feature. Keys activate offline, so air-gapped servers work.
+					Free on your own server for up to 5 members. Pro is billed per seat and adds enforced SSO,
+					audit log export and 90 days of history. A free trial key unlocks every feature for 30
+					days. Keys activate offline, so air-gapped servers work.
 				{:else if phase === 'expired'}
-					The Enterprise license expired, so this server runs on the Community limits.
+					The license expired, so this server runs on the Community limits.
+				{:else if plan === 'pro'}
+					This server is licensed for Pro.
 				{:else}
 					This server is licensed for every Enterprise feature.
 				{/if}
@@ -111,7 +115,7 @@
 						</Alert.Title>
 						<Alert.Description>
 							A renewed key arrives by email when the license renews. Activate it here to keep the
-							Enterprise features without a gap.
+							licensed features without a gap.
 						</Alert.Description>
 					</Alert.Root>
 				{:else if phase === 'expired'}
@@ -119,9 +123,11 @@
 						<ShieldAlert />
 						<Alert.Title>Expired on {formatTs(status.expiresAt)}</Alert.Title>
 						<Alert.Description>
-							Servers and sign-ins keep working. Licensed features are off, and nothing is deleted
-							yet. Recordings and audit logs beyond the Community limits are kept until
-							{formatTs(status.keptUntil)}.
+							Servers and sign-ins keep working. Licensed features are off.
+							{#if billing.heldUntil}
+								Recordings and audit logs beyond the Community limits are kept until
+								{formatTs(billing.heldUntil)}.
+							{/if}
 						</Alert.Description>
 					</Alert.Root>
 				{/if}
@@ -147,7 +153,14 @@
 					</Button>
 					{#if phase === 'none' || phase === 'expired'}
 						<Button variant="outline" href={LicensePurchaseURL} target="_blank" rel="noopener">
-							Buy an Enterprise license
+							Buy a license
+							<ExternalLink data-icon="inline-end" />
+						</Button>
+					{/if}
+					<!-- One trial per server, a lapsed key is renewed by buying. -->
+					{#if phase === 'none'}
+						<Button variant="ghost" href={LicenseTrialURL} target="_blank" rel="noopener">
+							Start a free trial
 							<ExternalLink data-icon="inline-end" />
 						</Button>
 					{/if}

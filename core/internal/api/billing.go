@@ -28,24 +28,22 @@ func (s *billingService) GetBilling(
 	ws := actor.WorkspaceIDFromContext(ctx)
 	var userCount int64
 	var resourceCount int64
-	var sub *db.WorkspaceSubscription
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		userCount, err = q.CountActiveUsers(ctx, ws)
 		if err != nil {
 			return err
 		}
 		resourceCount, err = q.CountWorkspaceResources(ctx, ws)
-		if err != nil {
-			return err
-		}
-		// Community workspaces have no subscription row.
-		sub, _ = q.GetSubscription(ctx, ws)
-		return nil
+		return err
 	}); err != nil {
 		return nil, err
 	}
 
-	plan := s.cfg.Entitlements.Resolve(ctx, ws)
+	st, err := s.cfg.Entitlements.Status(ctx, ws)
+	if err != nil {
+		slog.Warn("entitlement subscription lookup failed", "error", err, "workspace_id", ws)
+	}
+	plan := st.Plan
 	resp := &nokkuv1.GetBillingResponse{
 		Plan:          new(plan.Name),
 		Mode:          new(s.cfg.Mode()),
@@ -54,17 +52,19 @@ func (s *billingService) GetBilling(
 		UserCount:     new(userCount),
 		ResourceCount: new(resourceCount),
 	}
+	if st.HeldUntil != nil {
+		resp.HeldQuotas, resp.HeldUntil = quotasProto(st.Keep), db.SafeTimestamp(st.HeldUntil)
+	}
 
-	if sub != nil {
+	// Self-hosted workspaces have no subscription row.
+	if sub := st.Sub; sub != nil {
 		resp.Subscription = &nokkuv1.Subscription{
 			Status:            new(sub.Status),
 			CancelAtPeriodEnd: new(sub.CancelAtPeriodEnd),
 			CurrentPeriodEnd:  db.SafeTimestamp(sub.CurrentPeriodEnd),
-		}
-		if sub.EndedAt != nil && !entitlement.Active(sub.Status) {
-			if end := entitlement.HoldEnd(*sub.EndedAt); time.Now().Before(end) {
-				resp.Subscription.KeptUntil = db.SafeTimestamp(&end)
-			}
+			Trial:             new(sub.Source == entitlement.SourceTrial),
+			DeleteAt:          db.SafeTimestamp(deletionDate(sub)),
+			EndedAt:           db.SafeTimestamp(entitlement.Ended(sub)),
 		}
 	}
 
@@ -194,9 +194,10 @@ func featuresProto(p entitlement.Plan) map[string]bool {
 // quotasProto uses -1 for unlimited.
 func quotasProto(p entitlement.Plan) *nokkuv1.Quotas {
 	return &nokkuv1.Quotas{
-		Seats:                 new(p.SeatCap),
-		RetentionDays:         new(p.RetentionDays),
-		RecordingStorageBytes: new(p.RecordingStorageBytes),
-		ResourceCap:           new(p.ResourceCap),
+		Seats:                  new(p.SeatCap),
+		AuditRetentionDays:     new(p.AuditRetentionDays),
+		RecordingRetentionDays: new(p.RecordingRetentionDays),
+		RecordingStorageBytes:  new(p.RecordingStorageBytes),
+		ResourceCap:            new(p.ResourceCap),
 	}
 }

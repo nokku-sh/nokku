@@ -68,6 +68,9 @@ type GetBillingResponse struct {
 	UserCount     *int64                 `protobuf:"varint,5,opt,name=user_count,json=userCount" json:"user_count,omitempty"`
 	ResourceCount *int64                 `protobuf:"varint,6,opt,name=resource_count,json=resourceCount" json:"resource_count,omitempty"`
 	Subscription  *Subscription          `protobuf:"bytes,7,opt,name=subscription" json:"subscription,omitempty"`
+	// held_quotas are the data limits of a plan that ended and still hold until held_until. Unset without a hold.
+	HeldQuotas    *Quotas                `protobuf:"bytes,8,opt,name=held_quotas,json=heldQuotas" json:"held_quotas,omitempty"`
+	HeldUntil     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=held_until,json=heldUntil" json:"held_until,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -151,14 +154,29 @@ func (x *GetBillingResponse) GetSubscription() *Subscription {
 	return nil
 }
 
+func (x *GetBillingResponse) GetHeldQuotas() *Quotas {
+	if x != nil {
+		return x.HeldQuotas
+	}
+	return nil
+}
+
+func (x *GetBillingResponse) GetHeldUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.HeldUntil
+	}
+	return nil
+}
+
 type Quotas struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	Seats                 *int64                 `protobuf:"varint,1,opt,name=seats" json:"seats,omitempty"`
-	RetentionDays         *int64                 `protobuf:"varint,2,opt,name=retention_days,json=retentionDays" json:"retention_days,omitempty"`
-	RecordingStorageBytes *int64                 `protobuf:"varint,3,opt,name=recording_storage_bytes,json=recordingStorageBytes" json:"recording_storage_bytes,omitempty"`
-	ResourceCap           *int64                 `protobuf:"varint,4,opt,name=resource_cap,json=resourceCap" json:"resource_cap,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Seats                  *int64                 `protobuf:"varint,1,opt,name=seats" json:"seats,omitempty"`
+	AuditRetentionDays     *int64                 `protobuf:"varint,2,opt,name=audit_retention_days,json=auditRetentionDays" json:"audit_retention_days,omitempty"`
+	RecordingStorageBytes  *int64                 `protobuf:"varint,3,opt,name=recording_storage_bytes,json=recordingStorageBytes" json:"recording_storage_bytes,omitempty"`
+	ResourceCap            *int64                 `protobuf:"varint,4,opt,name=resource_cap,json=resourceCap" json:"resource_cap,omitempty"`
+	RecordingRetentionDays *int64                 `protobuf:"varint,5,opt,name=recording_retention_days,json=recordingRetentionDays" json:"recording_retention_days,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *Quotas) Reset() {
@@ -198,9 +216,9 @@ func (x *Quotas) GetSeats() int64 {
 	return 0
 }
 
-func (x *Quotas) GetRetentionDays() int64 {
-	if x != nil && x.RetentionDays != nil {
-		return *x.RetentionDays
+func (x *Quotas) GetAuditRetentionDays() int64 {
+	if x != nil && x.AuditRetentionDays != nil {
+		return *x.AuditRetentionDays
 	}
 	return 0
 }
@@ -219,13 +237,24 @@ func (x *Quotas) GetResourceCap() int64 {
 	return 0
 }
 
+func (x *Quotas) GetRecordingRetentionDays() int64 {
+	if x != nil && x.RecordingRetentionDays != nil {
+		return *x.RecordingRetentionDays
+	}
+	return 0
+}
+
 type Subscription struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Status            *string                `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
 	CancelAtPeriodEnd *bool                  `protobuf:"varint,2,opt,name=cancel_at_period_end,json=cancelAtPeriodEnd" json:"cancel_at_period_end,omitempty"`
 	CurrentPeriodEnd  *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=current_period_end,json=currentPeriodEnd" json:"current_period_end,omitempty"`
-	// kept_until is set while an ended plan's data limits still hold.
-	KeptUntil     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=kept_until,json=keptUntil" json:"kept_until,omitempty"`
+	// trial is the free start of a hosted workspace, nothing is paid yet. current_period_end is when it ends.
+	Trial *bool `protobuf:"varint,5,opt,name=trial" json:"trial,omitempty"`
+	// delete_at is when a hosted workspace that stopped paying is deleted, unless it subscribes before.
+	DeleteAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=delete_at,json=deleteAt" json:"delete_at,omitempty"`
+	// ended_at is when the trial or the paid plan ended, unset while it runs.
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -281,9 +310,23 @@ func (x *Subscription) GetCurrentPeriodEnd() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Subscription) GetKeptUntil() *timestamppb.Timestamp {
+func (x *Subscription) GetTrial() bool {
+	if x != nil && x.Trial != nil {
+		return *x.Trial
+	}
+	return false
+}
+
+func (x *Subscription) GetDeleteAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.KeptUntil
+		return x.DeleteAt
+	}
+	return nil
+}
+
+func (x *Subscription) GetEndedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndedAt
 	}
 	return nil
 }
@@ -725,7 +768,7 @@ var File_nokku_v1_billing_proto protoreflect.FileDescriptor
 const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
 	"\x16nokku/v1/billing.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x13\n" +
-	"\x11GetBillingRequest\"\xed\x02\n" +
+	"\x11GetBillingRequest\"\xdb\x03\n" +
 	"\x12GetBillingResponse\x12\x12\n" +
 	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x12\n" +
 	"\x04mode\x18\x02 \x01(\tR\x04mode\x12F\n" +
@@ -734,21 +777,27 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
 	"user_count\x18\x05 \x01(\x03R\tuserCount\x12%\n" +
 	"\x0eresource_count\x18\x06 \x01(\x03R\rresourceCount\x12:\n" +
-	"\fsubscription\x18\a \x01(\v2\x16.nokku.v1.SubscriptionR\fsubscription\x1a;\n" +
+	"\fsubscription\x18\a \x01(\v2\x16.nokku.v1.SubscriptionR\fsubscription\x121\n" +
+	"\vheld_quotas\x18\b \x01(\v2\x10.nokku.v1.QuotasR\n" +
+	"heldQuotas\x129\n" +
+	"\n" +
+	"held_until\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\theldUntil\x1a;\n" +
 	"\rFeaturesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x01\"\xa0\x01\n" +
+	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x01\"\xe5\x01\n" +
 	"\x06Quotas\x12\x14\n" +
-	"\x05seats\x18\x01 \x01(\x03R\x05seats\x12%\n" +
-	"\x0eretention_days\x18\x02 \x01(\x03R\rretentionDays\x126\n" +
+	"\x05seats\x18\x01 \x01(\x03R\x05seats\x120\n" +
+	"\x14audit_retention_days\x18\x02 \x01(\x03R\x12auditRetentionDays\x126\n" +
 	"\x17recording_storage_bytes\x18\x03 \x01(\x03R\x15recordingStorageBytes\x12!\n" +
-	"\fresource_cap\x18\x04 \x01(\x03R\vresourceCap\"\xdc\x01\n" +
+	"\fresource_cap\x18\x04 \x01(\x03R\vresourceCap\x128\n" +
+	"\x18recording_retention_days\x18\x05 \x01(\x03R\x16recordingRetentionDays\"\xad\x02\n" +
 	"\fSubscription\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12/\n" +
 	"\x14cancel_at_period_end\x18\x02 \x01(\bR\x11cancelAtPeriodEnd\x12H\n" +
-	"\x12current_period_end\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\x129\n" +
-	"\n" +
-	"kept_until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tkeptUntil\"\x15\n" +
+	"\x12current_period_end\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\x12\x14\n" +
+	"\x05trial\x18\x05 \x01(\bR\x05trial\x127\n" +
+	"\tdelete_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bdeleteAt\x125\n" +
+	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\aendedAtJ\x04\b\x04\x10\x05\"\x15\n" +
 	"\x13CreatePortalRequest\"(\n" +
 	"\x14CreatePortalResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\"/\n" +
@@ -816,26 +865,29 @@ var file_nokku_v1_billing_proto_depIdxs = []int32{
 	14, // 0: nokku.v1.GetBillingResponse.features:type_name -> nokku.v1.GetBillingResponse.FeaturesEntry
 	2,  // 1: nokku.v1.GetBillingResponse.quotas:type_name -> nokku.v1.Quotas
 	3,  // 2: nokku.v1.GetBillingResponse.subscription:type_name -> nokku.v1.Subscription
-	15, // 3: nokku.v1.Subscription.current_period_end:type_name -> google.protobuf.Timestamp
-	15, // 4: nokku.v1.Subscription.kept_until:type_name -> google.protobuf.Timestamp
-	15, // 5: nokku.v1.GetLicenseResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0,  // 6: nokku.v1.BillingService.GetBilling:input_type -> nokku.v1.GetBillingRequest
-	4,  // 7: nokku.v1.BillingService.CreatePortal:input_type -> nokku.v1.CreatePortalRequest
-	6,  // 8: nokku.v1.BillingService.CreateCheckout:input_type -> nokku.v1.CreateCheckoutRequest
-	8,  // 9: nokku.v1.BillingService.CancelSubscription:input_type -> nokku.v1.CancelSubscriptionRequest
-	10, // 10: nokku.v1.BillingService.GetLicense:input_type -> nokku.v1.GetLicenseRequest
-	12, // 11: nokku.v1.BillingService.ActivateLicense:input_type -> nokku.v1.ActivateLicenseRequest
-	1,  // 12: nokku.v1.BillingService.GetBilling:output_type -> nokku.v1.GetBillingResponse
-	5,  // 13: nokku.v1.BillingService.CreatePortal:output_type -> nokku.v1.CreatePortalResponse
-	7,  // 14: nokku.v1.BillingService.CreateCheckout:output_type -> nokku.v1.CreateCheckoutResponse
-	9,  // 15: nokku.v1.BillingService.CancelSubscription:output_type -> nokku.v1.CancelSubscriptionResponse
-	11, // 16: nokku.v1.BillingService.GetLicense:output_type -> nokku.v1.GetLicenseResponse
-	13, // 17: nokku.v1.BillingService.ActivateLicense:output_type -> nokku.v1.ActivateLicenseResponse
-	12, // [12:18] is the sub-list for method output_type
-	6,  // [6:12] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	2,  // 3: nokku.v1.GetBillingResponse.held_quotas:type_name -> nokku.v1.Quotas
+	15, // 4: nokku.v1.GetBillingResponse.held_until:type_name -> google.protobuf.Timestamp
+	15, // 5: nokku.v1.Subscription.current_period_end:type_name -> google.protobuf.Timestamp
+	15, // 6: nokku.v1.Subscription.delete_at:type_name -> google.protobuf.Timestamp
+	15, // 7: nokku.v1.Subscription.ended_at:type_name -> google.protobuf.Timestamp
+	15, // 8: nokku.v1.GetLicenseResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 9: nokku.v1.BillingService.GetBilling:input_type -> nokku.v1.GetBillingRequest
+	4,  // 10: nokku.v1.BillingService.CreatePortal:input_type -> nokku.v1.CreatePortalRequest
+	6,  // 11: nokku.v1.BillingService.CreateCheckout:input_type -> nokku.v1.CreateCheckoutRequest
+	8,  // 12: nokku.v1.BillingService.CancelSubscription:input_type -> nokku.v1.CancelSubscriptionRequest
+	10, // 13: nokku.v1.BillingService.GetLicense:input_type -> nokku.v1.GetLicenseRequest
+	12, // 14: nokku.v1.BillingService.ActivateLicense:input_type -> nokku.v1.ActivateLicenseRequest
+	1,  // 15: nokku.v1.BillingService.GetBilling:output_type -> nokku.v1.GetBillingResponse
+	5,  // 16: nokku.v1.BillingService.CreatePortal:output_type -> nokku.v1.CreatePortalResponse
+	7,  // 17: nokku.v1.BillingService.CreateCheckout:output_type -> nokku.v1.CreateCheckoutResponse
+	9,  // 18: nokku.v1.BillingService.CancelSubscription:output_type -> nokku.v1.CancelSubscriptionResponse
+	11, // 19: nokku.v1.BillingService.GetLicense:output_type -> nokku.v1.GetLicenseResponse
+	13, // 20: nokku.v1.BillingService.ActivateLicense:output_type -> nokku.v1.ActivateLicenseResponse
+	15, // [15:21] is the sub-list for method output_type
+	9,  // [9:15] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_billing_proto_init() }

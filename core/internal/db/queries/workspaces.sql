@@ -6,10 +6,18 @@ VALUES
 RETURNING
   *;
 
--- name: InitSubscription :exec
+-- name: StartTrial :exec
+-- A hosted workspace starts on a trial, the first checkout replaces the row. Its status is none of Stripe's, so
+-- entitlement.Active never reads it as paid.
 INSERT INTO
-  workspace_subscriptions DEFAULT
+  workspace_subscriptions (source, plan, status, current_period_end)
 VALUES
+  (
+    'trial',
+    @plan,
+    'trial',
+    NOW() + make_interval(days => @days::int)
+  )
 ON CONFLICT (workspace_id) DO NOTHING;
 
 -- name: GetWorkspace :one

@@ -33,36 +33,18 @@ func conditionalFeatures() []string {
 }
 
 // featuresFreeInAllPlans need no gate. Making one paid means wiring it in the guard in the same change.
-var featuresFreeInAllPlans = []string{FeatureOIDC}
-
-// featuresGatedOutsideTheGuard are enforced elsewhere. External KMS is instance-level, not a workspace route.
-var featuresGatedOutsideTheGuard = map[string]string{
-	FeatureExternalKMS: "instance-level: KMS_URI startup check in internal/config",
-}
+var featuresFreeInAllPlans = []string{FeatureOIDC, FeatureExternalKMS}
 
 // A paid feature that no route enforces is revenue leakage, a feature no plan includes is dead weight.
 func TestGolden_FeaturesWired(t *testing.T) {
-	allFeatures := CatalogFeatures
-
-	for _, f := range allFeatures {
-		feature := f.Code
-		reason := "unwired"
-		switch {
-		case wiredFeatures()[feature]:
+	for _, f := range CatalogFeatures {
+		if wiredFeatures()[f.Code] || slices.Contains(featuresFreeInAllPlans, f.Code) {
 			continue
-		case slices.Contains(featuresFreeInAllPlans, feature):
-			reason = "free in all plans"
-		default:
-			if _, ok := featuresGatedOutsideTheGuard[feature]; ok {
-				reason = "gated outside the guard"
-			}
 		}
-		if reason == "unwired" {
-			t.Errorf(
-				"feature %q is in the catalog but gated nowhere: wire it in procedureFeatures/conditionalFeature or exempt it with a documented reason",
-				feature,
-			)
-		}
+		t.Errorf(
+			"feature %q is in the catalog but gated nowhere: wire it in procedureFeatures/conditionalFeature or list it as free",
+			f.Code,
+		)
 	}
 
 	// The reverse direction: gates must reference real catalog features.

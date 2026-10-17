@@ -11,30 +11,28 @@ const names: Record<PlanCode, string> = {
 /** Mirrors CatalogFeatures in internal/entitlement. */
 export const catalog: { key: string; label: string; plan: PlanCode }[] = [
 	{ key: 'oidc', label: 'OIDC single sign-on', plan: 'community' },
+	{ key: 'external_kms', label: 'External key management', plan: 'community' },
 	{ key: 'enforce_sso', label: 'Enforced single sign-on', plan: 'pro' },
 	{ key: 'audit_export', label: 'Audit log export', plan: 'pro' },
-	{ key: 'scim', label: 'SCIM provisioning', plan: 'enterprise' },
-	{ key: 'external_kms', label: 'External key management', plan: 'enterprise' }
+	{ key: 'scim', label: 'SCIM provisioning', plan: 'enterprise' }
 ];
 
 export function planName(code: string | undefined): string {
 	return names[(code || 'community') as PlanCode] ?? code;
 }
 
-/** Self-hosted licenses only come as Enterprise. */
-function planFor(feature: string, mode: string | undefined): PlanCode {
-	const plan = catalog.find((f) => f.key === feature)?.plan ?? 'enterprise';
-	return mode === 'saas' || plan === 'community' ? plan : 'enterprise';
+function planFor(feature: string): PlanCode {
+	return catalog.find((f) => f.key === feature)?.plan ?? 'enterprise';
 }
 
-/** The plan to buy for a feature. */
-export function requiredPlan(feature: string, mode: string | undefined): string {
-	return planName(planFor(feature, mode));
+/** The plan to buy for a feature, the same hosted and self-hosted. */
+export function requiredPlan(feature: string): string {
+	return planName(planFor(feature));
 }
 
 /** Where to get a feature. Self-hosted activates a key in billing, hosted Pro is bought in billing, hosted Enterprise is sold outside. */
 export function upgradeLink(feature: string, mode: string | undefined) {
-	if (mode === 'saas' && planFor(feature, mode) === 'enterprise') {
+	if (mode === 'saas' && planFor(feature) === 'enterprise') {
 		return { href: UpgradeURL, label: 'See plans', external: true };
 	}
 	return {

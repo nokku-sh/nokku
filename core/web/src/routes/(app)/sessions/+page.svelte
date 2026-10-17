@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getSessions } from '#lib/api/terminal.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import ServerList from './ServerList.svelte';
 	import TerminalTabs from './TerminalTabs.svelte';
 	import TerminalView from './TerminalView.svelte';
@@ -7,6 +8,8 @@
 	import * as Empty from '#lib/components/ext/empty/index.js';
 	import { activeSessionID } from '#lib/store.svelte.js';
 	import { PanelLeftClose, PanelLeftOpen, Terminal } from '@lucide/svelte';
+
+	const plan = workspace.plan();
 
 	let panelOpen = $state(true);
 </script>
@@ -46,7 +49,9 @@
 						</Empty.Media>
 						<Empty.Title>No open sessions</Empty.Title>
 						<Empty.Description>
-							Pick a server to open a shell right here, or list them from your own terminal.
+							{plan.data?.inactive
+								? 'Shells open again once the workspace has a plan.'
+								: 'Pick a server to open a shell right here, or list them from your own terminal.'}
 						</Empty.Description>
 					</Empty.Header>
 					<Empty.Content>

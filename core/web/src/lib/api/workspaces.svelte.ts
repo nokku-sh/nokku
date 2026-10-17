@@ -20,6 +20,14 @@ export const workspace = {
 			{},
 			{ select: (res) => res.baseUrl, staleTime: Infinity }
 		),
+	// A hosted workspace with no trial or plan. It signs no certificates until the owner subscribes, and is deleted
+	// on deleteAt. The layout's get() keeps it fresh, so opening a page does not refetch it.
+	plan: () =>
+		useQuery(
+			WorkspaceService.method.getWorkspace,
+			{},
+			{ select: (res) => ({ inactive: res.inactive, deleteAt: res.deleteAt }), staleTime: Infinity }
+		),
 
 	update: () => useMutation(WorkspaceService.method.updateWorkspace),
 	delete: () =>

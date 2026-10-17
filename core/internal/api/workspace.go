@@ -17,6 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/email"
+	"github.com/nokku-sh/nokku/core/internal/entitlement"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
@@ -35,10 +36,17 @@ func (s *workspaceService) GetWorkspace(
 		return nil, err
 	}
 	ws, _ := actor.WorkspaceFromContext(ctx)
-	return &nokkuv1.GetWorkspaceResponse{
+	// A failed lookup is Community, which leaves the banner out.
+	st, _ := s.cfg.Entitlements.Status(ctx, ws.ID)
+	resp := &nokkuv1.GetWorkspaceResponse{
 		Workspace: workspace.ToProto(),
 		BaseUrl:   new(ws.BaseURL),
-	}, nil
+		Inactive:  new(st.Plan.Name == entitlement.PlanInactive),
+	}
+	if st.Sub != nil {
+		resp.DeleteAt = db.SafeTimestamp(deletionDate(st.Sub))
+	}
+	return resp, nil
 }
 
 func (s *workspaceService) UpdateWorkspace(
@@ -72,32 +80,39 @@ func (s *workspaceService) DeleteWorkspace(
 	if !s.cfg.SaaS {
 		return nil, errSingleWorkspace
 	}
-	ws := actor.WorkspaceIDFromContext(ctx)
-	// Avatars are stored by user id, so the ids are read while the rows exist.
-	userIDs, err := s.cfg.Conn.Tenant().ListUserIDs(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.cfg.Billing.Cancel(ctx, ws, true, ""); err != nil {
+	ws, _ := actor.WorkspaceFromContext(ctx)
+	if err := s.cfg.Billing.Cancel(ctx, ws.ID, true, ""); err != nil {
 		return nil, errInternal
 	}
-	if err := s.cfg.Conn.Tenant().DeleteWorkspace(ctx, ws); err != nil {
+	if err := deleteWorkspace(ctx, s.cfg, ws); err != nil {
 		return nil, err
 	}
-	s.cfg.Record.PurgeWorkspace(ctx, ws)
-	s.purgeAvatars(ctx, userIDs)
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
-// purgeAvatars runs detached like PurgeWorkspace, a big workspace would outlast the request.
-func (s *workspaceService) purgeAvatars(ctx context.Context, userIDs []string) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
+// deleteWorkspace removes ws with its recordings and avatars.
+func deleteWorkspace(ctx context.Context, cfg *config.Config, ws actor.Workspace) error {
+	ctx = actor.WithWorkspace(ctx, ws)
+	// Avatars are stored by user id, so the ids are read while the rows exist.
+	userIDs, err := cfg.Conn.Tenant().ListUserIDs(ctx)
+	if err != nil {
+		return err
+	}
+	if err := cfg.Conn.Tenant().DeleteWorkspace(ctx, ws.ID); err != nil {
+		return err
+	}
+	cfg.Tenant.Forget(ws.Slug)
+	cfg.Record.PurgeWorkspace(ctx, ws.ID)
+
+	// Detached like PurgeWorkspace, a big workspace would outlast the request.
+	avatarCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
 	go func() {
 		defer cancel()
 		for _, id := range userIDs {
-			deleteAvatar(ctx, s.cfg, id)
+			deleteAvatar(avatarCtx, cfg, id)
 		}
 	}()
+	return nil
 }
 
 // CreateWorkspace is the hosted signup. The workspace is deleted again when nobody uses the sign-in link.

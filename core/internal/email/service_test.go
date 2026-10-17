@@ -83,6 +83,46 @@ func TestRenderTemplates(t *testing.T) {
 				"7 days",
 			},
 		},
+		{
+			name: "trial-ending",
+			data: trialTemplateData{
+				Operator:   Operator{SupportEmail: "help@nokku.sh"},
+				Workspace:  "Acme",
+				Left:       "7 days",
+				EndDate:    "23 Oct 2026",
+				DeleteDate: "22 Nov 2026",
+				BillingURL: "https://acme.nokku.sh/settings/billing",
+				Next:       "3 days",
+			},
+			contains: []string{
+				"Your trial ends in",
+				"The Pro trial of Acme ends in 7 days.",
+				"23 Oct 2026",
+				"22 Nov 2026",
+				"https://acme.nokku.sh/settings/billing",
+				"One more reminder comes 3 days",
+				"help@nokku.sh",
+			},
+		},
+		{
+			name: "workspace-deletion",
+			data: deletionTemplateData{
+				Workspace:  "Acme",
+				Slug:       "acme",
+				EndDate:    "16 Apr 2026",
+				DeleteDate: "13 Oct 2026",
+				BillingURL: "https://acme.nokku.sh/settings/billing",
+				Next:       "7 days",
+			},
+			contains: []string{
+				"Acme is deleted on 13 Oct 2026.",
+				"plan",
+				"16 Apr 2026",
+				"acme",
+				"https://acme.nokku.sh/settings/billing",
+				"One more warning comes 7 days before",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -148,4 +188,20 @@ func TestRenderOperatorFooter(t *testing.T) {
 			t.Error("footer shows a Terms link without a terms URL")
 		}
 	})
+}
+
+func TestRenderTrialEnding_LastReminderPromisesNoOther(t *testing.T) {
+	t.Parallel()
+	body, err := render("trial-ending", trialTemplateData{Workspace: "Acme", Left: inDays(1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{body.html, body.text} {
+		if strings.Contains(part, "One more reminder") {
+			t.Error("the 3 day reminder is the last one")
+		}
+		if !strings.Contains(part, "ends in 1 day.") {
+			t.Error("one day is singular")
+		}
+	}
 }

@@ -30,6 +30,8 @@ const (
 	minBillableSeats = 5
 	// Stripe defaults the checkout quantity picker to 99.
 	maxCheckoutSeats = 10000
+	// Stripe refuses a trial_end closer than two days.
+	minTrialLeft = 48 * time.Hour
 )
 
 // Stripe moves money and never decides what a workspace may do. A nil Stripe is a self-hosted server.
@@ -116,18 +118,24 @@ func (s *Stripe) Checkout(ctx context.Context, ws actor.Workspace, email string,
 				Maximum: new(int64(maxCheckoutSeats)),
 			},
 		}},
-		SuccessURL:        stripe.String(billingPage(ws)),
-		CancelURL:         stripe.String(billingPage(ws)),
+		SuccessURL:        stripe.String(Page(ws.BaseURL)),
+		CancelURL:         stripe.String(Page(ws.BaseURL)),
 		ClientReferenceID: stripe.String(workspaceID),
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{"workspace_id": workspaceID},
 		},
 	}
+	sub, err := s.db.Sys().GetSubscription(ctx, workspaceID)
 	// A workspace that paid before keeps its customer, Checkout makes one for a new workspace.
-	if sub, err := s.db.Sys().GetSubscription(ctx, workspaceID); err == nil && sub.CustomerID != "" {
+	if err == nil && sub.CustomerID != "" {
 		params.Customer = stripe.String(sub.CustomerID)
 	} else if email != "" {
 		params.CustomerEmail = stripe.String(email)
+	}
+	// Paying early keeps the rest of the trial, the first charge comes when it ends.
+	if err == nil && sub.Source == entitlement.SourceTrial && sub.CurrentPeriodEnd != nil &&
+		time.Until(*sub.CurrentPeriodEnd) > minTrialLeft {
+		params.SubscriptionData.TrialEnd = new(sub.CurrentPeriodEnd.Unix())
 	}
 
 	session, err := s.client.V1CheckoutSessions.Create(ctx, params)
@@ -146,7 +154,7 @@ func (s *Stripe) activeSubscription(
 	if err != nil {
 		return nil, err
 	}
-	if sub.Source != "stripe" || !entitlement.Active(sub.Status) {
+	if sub.Source != entitlement.SourceStripe || !entitlement.Active(sub.Status) {
 		return nil, pgx.ErrNoRows
 	}
 	return sub, nil
@@ -169,7 +177,7 @@ func (s *Stripe) Portal(ctx context.Context, ws actor.Workspace) (string, error)
 		ctx,
 		&stripe.BillingPortalSessionCreateParams{
 			Customer:  stripe.String(sub.CustomerID),
-			ReturnURL: stripe.String(billingPage(ws)),
+			ReturnURL: stripe.String(Page(ws.BaseURL)),
 		},
 	)
 	if err != nil {
@@ -178,9 +186,10 @@ func (s *Stripe) Portal(ctx context.Context, ws actor.Workspace) (string, error)
 	return session.URL, nil
 }
 
-// billingPage is on the workspace host, the hosted root host has no workspace to land in.
-func billingPage(ws actor.Workspace) string {
-	return ws.BaseURL + "/settings/billing"
+// Page is the billing page of the workspace at baseURL. It is on the workspace host, the hosted root host has no
+// workspace to land in.
+func Page(baseURL string) string {
+	return baseURL + "/settings/billing"
 }
 
 func (s *Stripe) Cancel(
@@ -286,7 +295,7 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 	// The plan stays on an ended row, the retention hold reads it.
 	err = s.db.Sys().UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
 		WorkspaceID: workspaceID,
-		Source:      "stripe",
+		Source:      entitlement.SourceStripe,
 		Plan:        entitlement.PlanPro,
 		// Stripe's own status, entitlement.Active reads it.
 		Status:            string(remote.Status),

@@ -15,6 +15,12 @@ import (
 // holdDays keeps the data limits of an ended plan in force, so a lapsed card never deletes data right away.
 const holdDays = 30
 
+// Where a hosted plan comes from. A workspace starts with a trial row, its current_period_end is when the trial ends.
+const (
+	SourceTrial  = "trial"
+	SourceStripe = "stripe"
+)
+
 type Service struct {
 	conn *db.Connection
 	// saas only changes where the plan comes from.
@@ -42,61 +48,98 @@ func newService(conn *db.Connection, publicKey string, saas bool) *Service {
 	}
 }
 
-// Resolve never returns a zero Plan. A lookup that fails gives Community, so a billing outage never grants paid features.
+// Status is what a workspace may do now, and the data limits the purge jobs honor.
+type Status struct {
+	Plan Plan // in force
+	// Keep differs from Plan during the hold, which ends at HeldUntil.
+	Keep      Plan
+	HeldUntil *time.Time
+	Sub       *db.WorkspaceSubscription // hosted only, nil without a row
+}
+
+// Resolve never returns a zero Plan. A lookup that fails gives Community, so a billing outage never grants paid
+// features and never stops a hosted workspace from signing.
 func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
-	plan, _, err := s.lookup(ctx, workspaceID)
+	st, err := s.Status(ctx, workspaceID)
 	if err != nil {
 		slog.Warn("entitlement subscription lookup failed", "error", err, "workspace_id", workspaceID)
 	}
-	return plan
+	return st.Plan
 }
 
-// lookup returns the plan in force and the one whose data limits the purge jobs honor. They differ during the hold.
-func (s *Service) lookup(ctx context.Context, workspaceID string) (plan, keep Plan, err error) {
+// Status falls back to Community next to the error, like Resolve.
+func (s *Service) Status(ctx context.Context, workspaceID string) (Status, error) {
 	if s.saas {
-		sub, subErr := s.conn.Sys().GetSubscription(ctx, workspaceID)
-		return fromSubscription(sub, subErr)
+		return fromSubscription(s.conn.Sys().GetSubscription(ctx, workspaceID))
 	}
-	plan, keep = fromLicense(s.License())
+	st := fromLicense(s.License())
 	// These caps protect SaaS infrastructure only, licensed plans included.
-	plan.RecordingStorageBytes, plan.ResourceCap = unlimited, unlimited
-	keep.RecordingStorageBytes, keep.ResourceCap = unlimited, unlimited
-	return plan, keep, nil
+	st.Plan.RecordingStorageBytes, st.Plan.ResourceCap = unlimited, unlimited
+	st.Keep.RecordingStorageBytes, st.Keep.ResourceCap = unlimited, unlimited
+	return st, nil
 }
 
 // fromSubscription takes what GetSubscription answered. A row that cannot be read is Community next to the error.
-func fromSubscription(sub *db.WorkspaceSubscription, err error) (plan, keep Plan, _ error) {
-	free := resolvePlan(PlanCommunity)
+func fromSubscription(sub *db.WorkspaceSubscription, err error) (Status, error) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		return free, free, nil
+		return Status{Plan: inactive, Keep: inactive}, nil
 	case err != nil:
-		return free, free, err
-	case Active(sub.Status):
-		plan = resolvePlan(sub.Plan)
+		free := resolvePlan(PlanCommunity)
+		return Status{Plan: free, Keep: free}, err
+	case running(sub):
+		plan := resolvePlan(sub.Plan)
 		if sub.Seats > 0 {
 			plan.SeatCap = sub.Seats
 		}
-		return plan, plan, nil
-	case sub.EndedAt != nil && inHold(*sub.EndedAt):
-		return free, resolvePlan(sub.Plan), nil
+		return Status{Plan: plan, Keep: plan, Sub: sub}, nil
 	}
-	return free, free, nil
+	st := after(inactive, resolvePlan(sub.Plan), Ended(sub))
+	st.Sub = sub
+	return st, nil
+}
+
+// running reports whether sub pays for its plan right now. A trial runs until its period ends.
+func running(sub *db.WorkspaceSubscription) bool {
+	if sub.Source == SourceTrial {
+		return sub.CurrentPeriodEnd != nil && time.Now().Before(*sub.CurrentPeriodEnd)
+	}
+	return Active(sub.Status)
+}
+
+// Ended is when sub stopped paying for its plan, nil while it runs or when it never paid.
+func Ended(sub *db.WorkspaceSubscription) *time.Time {
+	switch {
+	case running(sub):
+		return nil
+	case sub.Source == SourceTrial:
+		return sub.CurrentPeriodEnd
+	}
+	return sub.EndedAt
 }
 
 // fromLicense takes the held key, nil without one.
-func fromLicense(c *license.Claims) (plan, keep Plan) {
+func fromLicense(c *license.Claims) Status {
 	free := resolvePlan(PlanCommunity)
 	switch {
 	case c == nil:
-		return free, free
+		return Status{Plan: free, Keep: free}
 	case !c.IsExpired():
-		plan = resolvePlan(c.Plan)
-		return plan, plan
-	case inHold(time.Unix(c.ExpiresAt, 0)):
-		return free, resolvePlan(c.Plan)
+		plan := resolvePlan(c.Plan)
+		if seats, _ := licenseSeats(c); seats > 0 {
+			plan.SeatCap = seats
+		}
+		return Status{Plan: plan, Keep: plan}
 	}
-	return free, free
+	return after(free, resolvePlan(c.Plan), new(time.Unix(c.ExpiresAt, 0)))
+}
+
+// after puts next in force once ended stopped at endedAt, and holds the data limits of ended for holdDays.
+func after(next, ended Plan, endedAt *time.Time) Status {
+	if endedAt == nil || !time.Now().Before(HoldEnd(*endedAt)) {
+		return Status{Plan: next, Keep: next}
+	}
+	return Status{Plan: next, Keep: ended, HeldUntil: new(HoldEnd(*endedAt))}
 }
 
 // Active reports whether a subscription in this Stripe status pays for its plan. past_due is a grace period, an unknown status fails closed.
@@ -108,22 +151,23 @@ func Active(status string) bool {
 	return false
 }
 
-func inHold(endedAt time.Time) bool {
-	return time.Now().Before(HoldEnd(endedAt))
-}
-
 // HoldEnd is when the data limits of a plan that ended at endedAt stop holding.
 func HoldEnd(endedAt time.Time) time.Time {
 	return endedAt.Add(holdDays * 24 * time.Hour)
 }
 
-// RetentionDays honors the hold and errors instead of falling back, so a failed lookup never shortens what is kept.
-func (s *Service) RetentionDays(ctx context.Context, workspaceID string) (int64, error) {
-	_, keep, err := s.lookup(ctx, workspaceID)
-	return keep.RetentionDays, err
+// AuditRetentionDays honors the hold and errors instead of falling back, so a failed lookup never shortens what is kept.
+func (s *Service) AuditRetentionDays(ctx context.Context, workspaceID string) (int64, error) {
+	st, err := s.Status(ctx, workspaceID)
+	return st.Keep.AuditRetentionDays, err
+}
+
+func (s *Service) RecordingRetentionDays(ctx context.Context, workspaceID string) (int64, error) {
+	st, err := s.Status(ctx, workspaceID)
+	return st.Keep.RecordingRetentionDays, err
 }
 
 func (s *Service) RecordingStorageBytes(ctx context.Context, workspaceID string) (int64, error) {
-	_, keep, err := s.lookup(ctx, workspaceID)
-	return keep.RecordingStorageBytes, err
+	st, err := s.Status(ctx, workspaceID)
+	return st.Keep.RecordingStorageBytes, err
 }

@@ -1,0 +1,31 @@
+nokku.
+
+Workspace deletion
+
+
+{{ .Workspace }} is deleted on {{ .DeleteDate }}.
+
+Its {{ if .Trial }}trial{{ else }}plan{{ end }} ended on {{ .EndDate }} and nobody subscribed since. Subscribe before the deletion and everything stays as it is.
+
+What goes: the servers and their access rules, the certificate authorities, the audit log and the recordings.
+
+The name: {{ .Slug }} becomes free for anyone to sign up with.
+
+Pro is billed per member, at least 5. Stripe shows the total before you pay.
+
+Subscribe to Pro {{ .BillingURL }}
+
+You get this because you own this workspace.{{ if .Next }} One more warning comes {{ .Next }} before the deletion.{{ end }}
+
+This is an email about your workspace on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}Nokku{{ end }}.{{ if .Operator.SupportEmail }} Questions? Write to {{ .Operator.SupportEmail }}.{{ end }}
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

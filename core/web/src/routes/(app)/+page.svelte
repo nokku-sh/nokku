@@ -18,6 +18,9 @@
 
 	const me = user.self();
 	const ws = workspace.get();
+	// Without a plan nothing signs, so the ways in stay hidden until the owner subscribes.
+	const plan = workspace.plan();
+	const inactive = $derived(!!plan.data?.inactive);
 	const role = $derived(me.data?.role);
 	// Members only see their own servers, the overview needs viewer rights.
 	const canView = $derived(atLeast(role, WorkspaceRole.VIEWER));
@@ -39,7 +42,7 @@
 	title={`${greeting}${first ? `, ${first}` : ''}`}
 	description={ws.data ? `Here is how ${ws.data.name} is doing` : undefined}
 >
-	{#if !fresh}
+	{#if !fresh && !inactive}
 		<Button href="/sessions">
 			<SquareTerminal data-icon="inline-start" />
 			Open a shell
@@ -67,7 +70,7 @@
 		{#if data.data}
 			<GetStarted workspace={ws.data?.name ?? ''} connected users={data.data.users} />
 		{/if}
-	{:else if me.data}
+	{:else if me.data && !inactive}
 		<GetIn />
 	{/if}
 

@@ -29,7 +29,8 @@
 	<Card.Header>
 		<Card.Title><h2>Your servers</h2></Card.Title>
 		<Card.Description>
-			Click an account to open a shell here, or copy its ssh command for your own terminal.
+			Click an account to {all.inactive ? '' : 'open a shell here, or '}copy its ssh command for
+			your own terminal.
 		</Card.Description>
 		<Card.Action>
 			<InputGroup.Root class="w-44 sm:w-56">

@@ -8,7 +8,7 @@ WHERE
   workspace_id = $1;
 
 -- name: UpsertSubscription :exec
--- Manual subscriptions survive provider syncs.
+-- Manual subscriptions survive provider syncs, a trial gives way to the first one.
 INSERT INTO
   workspace_subscriptions (
     workspace_id,
@@ -35,9 +35,18 @@ SET
   cancel_at_period_end = EXCLUDED.cancel_at_period_end,
   seats = EXCLUDED.seats,
   ended_at = EXCLUDED.ended_at,
+  -- A plan that ends again is a new countdown, the warnings of the last one do not count.
+  deletion_warning = CASE
+    WHEN workspace_subscriptions.ended_at IS DISTINCT FROM EXCLUDED.ended_at THEN 0
+    ELSE workspace_subscriptions.deletion_warning
+  END,
+  deletion_warned_at = CASE
+    WHEN workspace_subscriptions.ended_at IS DISTINCT FROM EXCLUDED.ended_at THEN NULL
+    ELSE workspace_subscriptions.deletion_warned_at
+  END,
   updated_at = NOW()
 WHERE
-  workspace_subscriptions.source IN ('stripe', '');
+  workspace_subscriptions.source IN ('stripe', 'trial', '');
 
 -- name: ListProviderSubscriptions :many
 -- Ended subscriptions are final at the provider, so they need no more syncs.
@@ -108,3 +117,67 @@ SELECT
         d.workspace_id = $1
     )
   )::bigint AS resource_count;
+
+-- name: ListTrialsEnding :many
+-- Trials that end within the next days, with the owner to remind. Runs as nokku_system.
+SELECT
+  s.workspace_id,
+  s.current_period_end::timestamptz AS trial_end,
+  s.trial_reminder,
+  w.slug,
+  w.name AS workspace_name,
+  u.id AS owner_id,
+  u.email AS owner_email
+FROM
+  workspace_subscriptions s
+  JOIN workspaces w ON w.id = s.workspace_id
+  JOIN users u ON u.workspace_id = s.workspace_id
+  AND u.role = 5 -- owner
+  AND u.active
+WHERE
+  s.source = 'trial'
+  AND s.current_period_end > NOW()
+  AND s.current_period_end <= NOW() + make_interval(days => @within::int);
+
+-- name: SetTrialReminder :exec
+UPDATE workspace_subscriptions
+SET
+  trial_reminder = @days,
+  updated_at = NOW()
+WHERE
+  workspace_id = @workspace_id
+  AND source = 'trial';
+
+-- name: ListLapsedWorkspaces :many
+-- Hosted workspaces whose trial or paid plan is over, with the owner to warn. deletionDate in internal/api decides when
+-- each goes. Runs as nokku_system.
+SELECT
+  sqlc.embed(s),
+  w.slug,
+  w.name AS workspace_name,
+  u.id AS owner_id,
+  u.email AS owner_email
+FROM
+  workspace_subscriptions s
+  JOIN workspaces w ON w.id = s.workspace_id
+  LEFT JOIN users u ON u.workspace_id = s.workspace_id
+  AND u.role = 5 -- owner
+  AND u.active
+WHERE
+  (
+    s.source = 'trial'
+    AND s.current_period_end < NOW()
+  )
+  OR (
+    s.source = 'stripe'
+    AND s.ended_at IS NOT NULL
+  );
+
+-- name: SetDeletionWarning :exec
+UPDATE workspace_subscriptions
+SET
+  deletion_warning = @days,
+  deletion_warned_at = NOW(),
+  updated_at = NOW()
+WHERE
+  workspace_id = @workspace_id;

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ import (
 	"connectrpc.com/connect"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -123,7 +125,10 @@ func newSync(t *testing.T) *fakeStripe {
 		}); err != nil {
 			return err
 		}
-		return q.InitSubscription(t.Context())
+		return q.StartTrial(t.Context(), &db.StartTrialParams{
+			Plan: entitlement.PlanPro,
+			Days: entitlement.TrialDays,
+		})
 	}))
 
 	srv := httptest.NewServer(fake)
@@ -210,7 +215,7 @@ func TestSync_PaidSubscriptionIsThePlan(t *testing.T) {
 	ctx := t.Context()
 	fake := newSync(t)
 	ent := fake.plans(t)
-	assert.Equal(t, entitlement.PlanCommunity, ent.Resolve(ctx, fake.workspaceID).Name, "a new workspace is free")
+	assert.Equal(t, entitlement.PlanPro, ent.Resolve(ctx, fake.workspaceID).Name, "a new workspace is on a trial")
 
 	fake.subs["sub_a"] = remoteSub{status: "active", seats: 7}
 	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
@@ -228,7 +233,7 @@ func TestSync_PaidSubscriptionIsThePlan(t *testing.T) {
 
 	fake.subs["sub_a"] = remoteSub{status: "unpaid", seats: 7}
 	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
-	assert.Equal(t, entitlement.PlanCommunity, ent.Resolve(ctx, fake.workspaceID).Name)
+	assert.Equal(t, entitlement.PlanInactive, ent.Resolve(ctx, fake.workspaceID).Name, "hosted has no free plan")
 }
 
 func TestSync_EndedSubscriptionKeepsPlanForTheHold(t *testing.T) {
@@ -247,14 +252,20 @@ func TestSync_EndedSubscriptionKeepsPlanForTheHold(t *testing.T) {
 	assert.Equal(t, ended, row.EndedAt.Unix())
 
 	ent := fake.plans(t)
-	assert.Equal(t, entitlement.PlanCommunity, ent.Resolve(t.Context(), fake.workspaceID).Name,
+	assert.Equal(t, entitlement.PlanInactive, ent.Resolve(t.Context(), fake.workspaceID).Name,
 		"paid features end with the plan")
-	days, err := ent.RetentionDays(t.Context(), fake.workspaceID)
+	days, err := ent.AuditRetentionDays(t.Context(), fake.workspaceID)
 	require.NoError(t, err)
 	assert.EqualValues(t, 90, days, "retention must hold for 30 days after the plan ended")
 	capBytes, err := ent.RecordingStorageBytes(t.Context(), fake.workspaceID)
 	require.NoError(t, err)
 	assert.EqualValues(t, 50<<30, capBytes, "the storage cap must hold too, or eviction deletes recordings")
+
+	st, err := ent.Status(t.Context(), fake.workspaceID)
+	require.NoError(t, err)
+	assert.Equal(t, entitlement.PlanPro, st.Keep.Name, "billing shows what the hold keeps")
+	require.NotNil(t, st.HeldUntil)
+	assert.Equal(t, entitlement.HoldEnd(time.Unix(ended, 0)), *st.HeldUntil)
 }
 
 func TestSync_LateEventForOldSubscriptionKeepsTheLiveOne(t *testing.T) {
@@ -387,37 +398,70 @@ func TestCancel_FreeWorkspaceHasNothingToCancel(t *testing.T) {
 		"deleting a free workspace calls this and must not fail")
 }
 
-func TestCheckResources_CapsTheFreePlan(t *testing.T) {
+// endTrial moves the trial end into the past, as if the days ran out.
+func (f *fakeStripe) endTrial(t *testing.T, ago time.Duration) {
+	t.Helper()
+	require.NoError(t, f.conn.Sys().UpsertSubscription(t.Context(), &db.UpsertSubscriptionParams{
+		WorkspaceID:      f.workspaceID,
+		Source:           entitlement.SourceTrial,
+		Plan:             entitlement.PlanPro,
+		Status:           "trial",
+		CurrentPeriodEnd: new(time.Now().Add(-ago)),
+	}))
+}
+
+func TestTrial_EndedWorkspaceTakesNothingNew(t *testing.T) {
 	ctx := t.Context()
 	fake := newSync(t)
 	ent := fake.plans(t)
-	pinned := actor.WithWorkspace(ctx, actor.Workspace{ID: fake.workspaceID})
-	addTeams := func(from, to int) {
-		require.NoError(t, fake.conn.TenantTx(pinned, func(q *db.Queries) error {
-			for i := from; i < to; i++ {
-				if _, err := q.CreateTeam(
-					pinned,
-					&db.CreateTeamParams{Name: fmt.Sprintf("team-%d", i), Tags: []string{}},
-				); err != nil {
-					return err
-				}
-			}
-			return nil
-		}))
+	require.NoError(t, ent.CheckResources(ctx, fake.workspaceID))
+	require.NoError(t, ent.CanInvite(ctx, fake.workspaceID, 20), "a trial has no seat cap")
+
+	fake.endTrial(t, time.Hour)
+	plan := ent.Resolve(ctx, fake.workspaceID)
+	assert.Equal(t, entitlement.PlanInactive, plan.Name)
+	for name, err := range map[string]error{
+		"create": ent.CheckResources(ctx, fake.workspaceID),
+		"invite": ent.CanInvite(ctx, fake.workspaceID, 1),
+	} {
+		require.Error(t, err, name)
+		assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), name)
+		require.ErrorContains(t, err, "no active plan", name)
 	}
 
-	addTeams(0, 49)
-	require.NoError(t, ent.CheckResources(ctx, fake.workspaceID), "49 of 50 leaves room for one more")
+	days, err := ent.RecordingRetentionDays(ctx, fake.workspaceID)
+	require.NoError(t, err)
+	assert.EqualValues(t, 90, days, "the trial's data limits hold for 30 days")
 
-	addTeams(49, 50)
-	err := ent.CheckResources(ctx, fake.workspaceID)
-	require.Error(t, err)
-	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err))
-	require.ErrorContains(t, err, "your plan includes 50 managed resources")
+	fake.endTrial(t, 31*24*time.Hour)
+	days, err = ent.RecordingRetentionDays(ctx, fake.workspaceID)
+	require.NoError(t, err)
+	assert.EqualValues(t, 7, days)
+}
 
-	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
+func TestTrial_SubscriptionReplacesIt(t *testing.T) {
+	fake := newSync(t)
+	fake.subs["sub_a"] = remoteSub{status: "trialing", seats: 5}
 	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
-	assert.NoError(t, ent.CheckResources(ctx, fake.workspaceID), "Pro has room for 2000")
+
+	row := fake.row(t)
+	assert.Equal(t, "stripe", row.Source, "the first checkout must replace the trial row")
+	assert.Equal(t, "sub_a", row.SubscriptionID)
+	assert.Equal(t, entitlement.PlanPro, fake.plans(t).Resolve(t.Context(), fake.workspaceID).Name)
+}
+
+func TestCheckout_KeepsTheRestOfTheTrial(t *testing.T) {
+	fake := newSync(t)
+	_, err := fake.billing.Checkout(t.Context(), actor.Workspace{ID: fake.workspaceID}, "owner@example.com", false)
+	require.NoError(t, err)
+	trialEnd, err := strconv.ParseInt(fake.checkouts[0].Get("subscription_data[trial_end]"), 10, 64)
+	require.NoError(t, err, "paying early must not cut the trial short")
+	assert.Equal(t, fake.row(t).CurrentPeriodEnd.Unix(), trialEnd)
+
+	fake.endTrial(t, time.Hour)
+	_, err = fake.billing.Checkout(t.Context(), actor.Workspace{ID: fake.workspaceID}, "owner@example.com", false)
+	require.NoError(t, err)
+	assert.Empty(t, fake.checkouts[1].Get("subscription_data[trial_end]"), "an ended trial is charged at once")
 }
 
 // Quotas fail open, features fail closed, and the purge jobs get an error instead of a shorter window.
@@ -433,7 +477,125 @@ func TestLookup_WhenTheDatabaseDoesNotAnswer(t *testing.T) {
 	plan := ent.Resolve(down, fake.workspaceID)
 	assert.Equal(t, entitlement.PlanCommunity, plan.Name, "an outage must never hand out paid features")
 	assert.False(t, plan.Has(entitlement.FeatureAuditExport))
-	_, err := ent.RetentionDays(down, fake.workspaceID)
+	assert.NotEqual(t, entitlement.PlanInactive, plan.Name, "an outage must never stop the workspace from signing")
+	_, err := ent.AuditRetentionDays(down, fake.workspaceID)
 	require.Error(t, err, "an outage must never shorten what is kept")
 	assert.NoError(t, ent.CheckResources(down, fake.workspaceID), "a count that fails must not block a create")
+}
+
+// signViaGuard calls SignSSHCertificate through the guard, as the API serves it for the workspace.
+func signViaGuard(t *testing.T, ent *entitlement.Service, workspaceID string) error {
+	t.Helper()
+	pin := connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			return next(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), req)
+		}
+	})
+	mux := http.NewServeMux()
+	mux.Handle(nokkuv1connect.CertificateServiceSignSSHCertificateProcedure, connect.NewUnaryHandler(
+		nokkuv1connect.CertificateServiceSignSSHCertificateProcedure,
+		func(context.Context, *connect.Request[nokkuv1.SignSSHCertificateRequest]) (
+			*connect.Response[nokkuv1.SignSSHCertificateResponse], error,
+		) {
+			return connect.NewResponse(&nokkuv1.SignSSHCertificateResponse{}), nil
+		},
+		connect.WithInterceptors(pin, entitlement.NewGuardInterceptor(ent)),
+	))
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	client := connect.NewClient[nokkuv1.SignSSHCertificateRequest, nokkuv1.SignSSHCertificateResponse](
+		srv.Client(), srv.URL+nokkuv1connect.CertificateServiceSignSSHCertificateProcedure,
+	)
+	_, err := client.CallUnary(t.Context(), connect.NewRequest(&nokkuv1.SignSSHCertificateRequest{}))
+	return err
+}
+
+func TestGuard_EndedTrialSignsNothing(t *testing.T) {
+	fake := newSync(t)
+	ent := fake.plans(t)
+	require.NoError(t, signViaGuard(t, ent, fake.workspaceID), "a trial signs")
+
+	fake.endTrial(t, time.Hour)
+	err := signViaGuard(t, ent, fake.workspaceID)
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
+	require.ErrorContains(t, err, "no active plan")
+
+	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	assert.NoError(t, signViaGuard(t, ent, fake.workspaceID), "subscribing signs again at once")
+}
+
+func TestTrial_RemindersAndExpiry(t *testing.T) {
+	ctx := t.Context()
+	fake := newSync(t)
+	pinned := actor.WithWorkspace(ctx, actor.Workspace{ID: fake.workspaceID})
+	require.NoError(t, fake.conn.TenantTx(pinned, func(q *db.Queries) error {
+		_, err := q.CreateUserWithID(pinned, &db.CreateUserWithIDParams{
+			ID: uuid.NewV7().String(), Email: "owner@example.com", Name: "Owner",
+			Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER,
+		})
+		return err
+	}))
+	fake.addMembers(t, 2)
+	sys := fake.conn.Sys()
+	ending := func() []*db.ListTrialsEndingRow {
+		rows, err := sys.ListTrialsEnding(ctx, 7)
+		require.NoError(t, err)
+		return slices.DeleteFunc(
+			rows,
+			func(r *db.ListTrialsEndingRow) bool { return r.WorkspaceID != fake.workspaceID },
+		)
+	}
+	assert.Empty(t, ending(), "a fresh trial has 30 days left")
+
+	fake.endTrial(t, -5*24*time.Hour)
+	rows := ending()
+	require.Len(t, rows, 1, "only the owner gets the reminder")
+	assert.Equal(t, "owner@example.com", rows[0].OwnerEmail)
+	assert.Zero(t, rows[0].TrialReminder)
+
+	require.NoError(t, sys.SetTrialReminder(ctx, &db.SetTrialReminderParams{Days: 7, WorkspaceID: fake.workspaceID}))
+	assert.EqualValues(t, 7, ending()[0].TrialReminder)
+
+	lapsed := func() *db.ListLapsedWorkspacesRow {
+		rows, err := sys.ListLapsedWorkspaces(ctx)
+		require.NoError(t, err)
+		for _, r := range rows {
+			if r.WorkspaceSubscription.WorkspaceID == fake.workspaceID {
+				return r
+			}
+		}
+		return nil
+	}
+	assert.Nil(t, lapsed(), "a running trial is not lapsed")
+
+	fake.endTrial(t, 24*time.Hour)
+	row := lapsed()
+	require.NotNil(t, row)
+	require.NotNil(t, row.OwnerEmail)
+	assert.Equal(t, "owner@example.com", *row.OwnerEmail)
+	require.NotNil(t, entitlement.Ended(&row.WorkspaceSubscription), "the deletion countdown starts at the trial end")
+
+	require.NoError(
+		t,
+		sys.SetDeletionWarning(ctx, &db.SetDeletionWarningParams{Days: 7, WorkspaceID: fake.workspaceID}),
+	)
+	row = lapsed()
+	assert.EqualValues(t, 7, row.WorkspaceSubscription.DeletionWarning)
+	require.NotNil(t, row.WorkspaceSubscription.DeletionWarnedAt)
+
+	// Paying resets the countdown, a later lapse starts a new one.
+	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	assert.Nil(t, lapsed(), "a paying workspace is not lapsed")
+
+	fake.subs["sub_a"] = remoteSub{status: "canceled", seats: 5, endedAt: time.Now().AddDate(0, 0, -10).Unix()}
+	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
+	row = lapsed()
+	require.NotNil(t, row)
+	assert.Zero(t, row.WorkspaceSubscription.DeletionWarning, "the warnings of an old countdown must not count")
+	assert.Nil(t, row.WorkspaceSubscription.DeletionWarnedAt)
+	assert.WithinDuration(t, time.Now().AddDate(0, 0, -10), *entitlement.Ended(&row.WorkspaceSubscription), time.Minute)
 }
