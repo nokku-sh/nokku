@@ -30,9 +30,11 @@ jobs:
         with:
           setup_only: true
 
+      # Only builds two small generators, not worth a cache.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
+          cache: false
 
       - name: Format and lint
         working-directory: proto
@@ -62,6 +64,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
+          cache: false
+
+      - uses: nokku-sh/.github/actions/go-cache@main
 
       - uses: ./.github/actions/prepare
 
