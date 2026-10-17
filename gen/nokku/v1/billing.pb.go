@@ -249,14 +249,11 @@ type Subscription struct {
 	Status            *string                `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
 	CancelAtPeriodEnd *bool                  `protobuf:"varint,2,opt,name=cancel_at_period_end,json=cancelAtPeriodEnd" json:"cancel_at_period_end,omitempty"`
 	CurrentPeriodEnd  *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=current_period_end,json=currentPeriodEnd" json:"current_period_end,omitempty"`
-	// trial is the free start of a hosted workspace, nothing is paid yet. current_period_end is when it ends.
-	Trial *bool `protobuf:"varint,5,opt,name=trial" json:"trial,omitempty"`
-	// delete_at is when a hosted workspace that stopped paying is deleted, unless it subscribes before.
-	DeleteAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=delete_at,json=deleteAt" json:"delete_at,omitempty"`
-	// ended_at is when the trial or the paid plan ended, unset while it runs.
-	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Trial             *bool                  `protobuf:"varint,4,opt,name=trial" json:"trial,omitempty"`
+	DeleteAt          *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=delete_at,json=deleteAt" json:"delete_at,omitempty"`
+	EndedAt           *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Subscription) Reset() {
@@ -790,14 +787,14 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\x14audit_retention_days\x18\x02 \x01(\x03R\x12auditRetentionDays\x126\n" +
 	"\x17recording_storage_bytes\x18\x03 \x01(\x03R\x15recordingStorageBytes\x12!\n" +
 	"\fresource_cap\x18\x04 \x01(\x03R\vresourceCap\x128\n" +
-	"\x18recording_retention_days\x18\x05 \x01(\x03R\x16recordingRetentionDays\"\xad\x02\n" +
+	"\x18recording_retention_days\x18\x05 \x01(\x03R\x16recordingRetentionDays\"\xa7\x02\n" +
 	"\fSubscription\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12/\n" +
 	"\x14cancel_at_period_end\x18\x02 \x01(\bR\x11cancelAtPeriodEnd\x12H\n" +
 	"\x12current_period_end\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x10currentPeriodEnd\x12\x14\n" +
-	"\x05trial\x18\x05 \x01(\bR\x05trial\x127\n" +
-	"\tdelete_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bdeleteAt\x125\n" +
-	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\aendedAtJ\x04\b\x04\x10\x05\"\x15\n" +
+	"\x05trial\x18\x04 \x01(\bR\x05trial\x127\n" +
+	"\tdelete_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bdeleteAt\x125\n" +
+	"\bended_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\"\x15\n" +
 	"\x13CreatePortalRequest\"(\n" +
 	"\x14CreatePortalResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\"/\n" +

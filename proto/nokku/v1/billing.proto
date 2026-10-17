@@ -55,13 +55,9 @@ message Subscription {
   string status = 1;
   bool cancel_at_period_end = 2;
   google.protobuf.Timestamp current_period_end = 3;
-  reserved 4; // kept_until, see GetBillingResponse.held_until
-  // trial is the free start of a hosted workspace, nothing is paid yet. current_period_end is when it ends.
-  bool trial = 5;
-  // delete_at is when a hosted workspace that stopped paying is deleted, unless it subscribes before.
-  google.protobuf.Timestamp delete_at = 6;
-  // ended_at is when the trial or the paid plan ended, unset while it runs.
-  google.protobuf.Timestamp ended_at = 7;
+  bool trial = 4;
+  google.protobuf.Timestamp delete_at = 5;
+  google.protobuf.Timestamp ended_at = 6;
 }
 
 message CreatePortalRequest {}
