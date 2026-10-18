@@ -85,8 +85,10 @@ type TargetAccount struct {
 	ServiceAccountIds []string               `protobuf:"bytes,6,rep,name=service_account_ids,json=serviceAccountIds" json:"service_account_ids,omitempty"`
 	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	SeenAt            *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=seen_at,json=seenAt" json:"seen_at,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// expires_at holds the subjects whose grant ends, by subject id. The others hold it for good.
+	ExpiresAt     map[string]*timestamppb.Timestamp `protobuf:"bytes,9,rep,name=expires_at,json=expiresAt" json:"expires_at,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TargetAccount) Reset() {
@@ -171,6 +173,13 @@ func (x *TargetAccount) GetCreatedAt() *timestamppb.Timestamp {
 func (x *TargetAccount) GetSeenAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.SeenAt
+	}
+	return nil
+}
+
+func (x *TargetAccount) GetExpiresAt() map[string]*timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
 	}
 	return nil
 }
@@ -296,10 +305,12 @@ func (x *ListTargetAccountsResponse) GetTotal() int32 {
 }
 
 type AddSubjectsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	SubjectIds    []string               `protobuf:"bytes,2,rep,name=subject_ids,json=subjectIds" json:"subject_ids,omitempty"`
-	Kind          *SubjectKind           `protobuf:"varint,3,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	SubjectIds []string               `protobuf:"bytes,2,rep,name=subject_ids,json=subjectIds" json:"subject_ids,omitempty"`
+	Kind       *SubjectKind           `protobuf:"varint,3,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
+	// expires_at ends the grants then, unset is for good. A subject that already holds the account gets it as well.
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -353,6 +364,13 @@ func (x *AddSubjectsRequest) GetKind() SubjectKind {
 		return *x.Kind
 	}
 	return SubjectKind_SUBJECT_KIND_UNSPECIFIED
+}
+
+func (x *AddSubjectsRequest) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
 }
 
 type AddSubjectsResponse struct {
@@ -755,7 +773,7 @@ var File_nokku_v1_target_account_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\n" +
-	"\x1dnokku/v1/target_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xae\x02\n" +
+	"\x1dnokku/v1/target_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xcf\x03\n" +
 	"\rTargetAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x1a\n" +
@@ -765,7 +783,12 @@ const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\x13service_account_ids\x18\x06 \x03(\tR\x11serviceAccountIds\x129\n" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x123\n" +
-	"\aseen_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x06seenAt\"\x9a\x01\n" +
+	"\aseen_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x06seenAt\x12E\n" +
+	"\n" +
+	"expires_at\x18\t \x03(\v2&.nokku.v1.TargetAccount.ExpiresAtEntryR\texpiresAt\x1aX\n" +
+	"\x0eExpiresAtEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
+	"\x05value\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05value:\x028\x01\"\x9a\x01\n" +
 	"\x19ListTargetAccountsRequest\x12%\n" +
 	"\ttarget_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
@@ -773,13 +796,15 @@ const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\x05query\x18\x04 \x01(\tR\x05query\"g\n" +
 	"\x1aListTargetAccountsResponse\x123\n" +
 	"\baccounts\x18\x01 \x03(\v2\x17.nokku.v1.TargetAccountR\baccounts\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\x99\x01\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\xe5\x01\n" +
 	"\x12AddSubjectsRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x122\n" +
 	"\vsubject_ids\x18\x02 \x03(\tB\x11\xbaH\x0e\x92\x01\v\b\x01\x102\"\x05r\x03\xb0\x01\x01R\n" +
 	"subjectIds\x125\n" +
 	"\x04kind\x18\x03 \x01(\x0e2\x15.nokku.v1.SubjectKindB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\"\x15\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\x12J\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x0f\xbaH\f\xb2\x01\tJ\x05\b\x80\x8a\x8a\x0f@\x01R\texpiresAt\"\x15\n" +
 	"\x13AddSubjectsResponse\"\x9c\x01\n" +
 	"\x15RemoveSubjectsRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x122\n" +
@@ -829,7 +854,7 @@ func file_nokku_v1_target_account_proto_rawDescGZIP() []byte {
 }
 
 var file_nokku_v1_target_account_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nokku_v1_target_account_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_nokku_v1_target_account_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_nokku_v1_target_account_proto_goTypes = []any{
 	(SubjectKind)(0),                    // 0: nokku.v1.SubjectKind
 	(*TargetAccount)(nil),               // 1: nokku.v1.TargetAccount
@@ -845,33 +870,37 @@ var file_nokku_v1_target_account_proto_goTypes = []any{
 	(*AddTargetAccountResponse)(nil),    // 11: nokku.v1.AddTargetAccountResponse
 	(*RemoveTargetAccountRequest)(nil),  // 12: nokku.v1.RemoveTargetAccountRequest
 	(*RemoveTargetAccountResponse)(nil), // 13: nokku.v1.RemoveTargetAccountResponse
-	(*timestamppb.Timestamp)(nil),       // 14: google.protobuf.Timestamp
+	nil,                                 // 14: nokku.v1.TargetAccount.ExpiresAtEntry
+	(*timestamppb.Timestamp)(nil),       // 15: google.protobuf.Timestamp
 }
 var file_nokku_v1_target_account_proto_depIdxs = []int32{
-	14, // 0: nokku.v1.TargetAccount.created_at:type_name -> google.protobuf.Timestamp
-	14, // 1: nokku.v1.TargetAccount.seen_at:type_name -> google.protobuf.Timestamp
-	1,  // 2: nokku.v1.ListTargetAccountsResponse.accounts:type_name -> nokku.v1.TargetAccount
-	0,  // 3: nokku.v1.AddSubjectsRequest.kind:type_name -> nokku.v1.SubjectKind
-	0,  // 4: nokku.v1.RemoveSubjectsRequest.kind:type_name -> nokku.v1.SubjectKind
-	0,  // 5: nokku.v1.RevokeAllAccessRequest.kind:type_name -> nokku.v1.SubjectKind
-	1,  // 6: nokku.v1.AddTargetAccountResponse.account:type_name -> nokku.v1.TargetAccount
-	2,  // 7: nokku.v1.TargetAccountService.ListTargetAccounts:input_type -> nokku.v1.ListTargetAccountsRequest
-	10, // 8: nokku.v1.TargetAccountService.AddTargetAccount:input_type -> nokku.v1.AddTargetAccountRequest
-	12, // 9: nokku.v1.TargetAccountService.RemoveTargetAccount:input_type -> nokku.v1.RemoveTargetAccountRequest
-	4,  // 10: nokku.v1.TargetAccountService.AddSubjects:input_type -> nokku.v1.AddSubjectsRequest
-	6,  // 11: nokku.v1.TargetAccountService.RemoveSubjects:input_type -> nokku.v1.RemoveSubjectsRequest
-	8,  // 12: nokku.v1.TargetAccountService.RevokeAllAccess:input_type -> nokku.v1.RevokeAllAccessRequest
-	3,  // 13: nokku.v1.TargetAccountService.ListTargetAccounts:output_type -> nokku.v1.ListTargetAccountsResponse
-	11, // 14: nokku.v1.TargetAccountService.AddTargetAccount:output_type -> nokku.v1.AddTargetAccountResponse
-	13, // 15: nokku.v1.TargetAccountService.RemoveTargetAccount:output_type -> nokku.v1.RemoveTargetAccountResponse
-	5,  // 16: nokku.v1.TargetAccountService.AddSubjects:output_type -> nokku.v1.AddSubjectsResponse
-	7,  // 17: nokku.v1.TargetAccountService.RemoveSubjects:output_type -> nokku.v1.RemoveSubjectsResponse
-	9,  // 18: nokku.v1.TargetAccountService.RevokeAllAccess:output_type -> nokku.v1.RevokeAllAccessResponse
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	15, // 0: nokku.v1.TargetAccount.created_at:type_name -> google.protobuf.Timestamp
+	15, // 1: nokku.v1.TargetAccount.seen_at:type_name -> google.protobuf.Timestamp
+	14, // 2: nokku.v1.TargetAccount.expires_at:type_name -> nokku.v1.TargetAccount.ExpiresAtEntry
+	1,  // 3: nokku.v1.ListTargetAccountsResponse.accounts:type_name -> nokku.v1.TargetAccount
+	0,  // 4: nokku.v1.AddSubjectsRequest.kind:type_name -> nokku.v1.SubjectKind
+	15, // 5: nokku.v1.AddSubjectsRequest.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 6: nokku.v1.RemoveSubjectsRequest.kind:type_name -> nokku.v1.SubjectKind
+	0,  // 7: nokku.v1.RevokeAllAccessRequest.kind:type_name -> nokku.v1.SubjectKind
+	1,  // 8: nokku.v1.AddTargetAccountResponse.account:type_name -> nokku.v1.TargetAccount
+	15, // 9: nokku.v1.TargetAccount.ExpiresAtEntry.value:type_name -> google.protobuf.Timestamp
+	2,  // 10: nokku.v1.TargetAccountService.ListTargetAccounts:input_type -> nokku.v1.ListTargetAccountsRequest
+	10, // 11: nokku.v1.TargetAccountService.AddTargetAccount:input_type -> nokku.v1.AddTargetAccountRequest
+	12, // 12: nokku.v1.TargetAccountService.RemoveTargetAccount:input_type -> nokku.v1.RemoveTargetAccountRequest
+	4,  // 13: nokku.v1.TargetAccountService.AddSubjects:input_type -> nokku.v1.AddSubjectsRequest
+	6,  // 14: nokku.v1.TargetAccountService.RemoveSubjects:input_type -> nokku.v1.RemoveSubjectsRequest
+	8,  // 15: nokku.v1.TargetAccountService.RevokeAllAccess:input_type -> nokku.v1.RevokeAllAccessRequest
+	3,  // 16: nokku.v1.TargetAccountService.ListTargetAccounts:output_type -> nokku.v1.ListTargetAccountsResponse
+	11, // 17: nokku.v1.TargetAccountService.AddTargetAccount:output_type -> nokku.v1.AddTargetAccountResponse
+	13, // 18: nokku.v1.TargetAccountService.RemoveTargetAccount:output_type -> nokku.v1.RemoveTargetAccountResponse
+	5,  // 19: nokku.v1.TargetAccountService.AddSubjects:output_type -> nokku.v1.AddSubjectsResponse
+	7,  // 20: nokku.v1.TargetAccountService.RemoveSubjects:output_type -> nokku.v1.RemoveSubjectsResponse
+	9,  // 21: nokku.v1.TargetAccountService.RevokeAllAccess:output_type -> nokku.v1.RevokeAllAccessResponse
+	16, // [16:22] is the sub-list for method output_type
+	10, // [10:16] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_target_account_proto_init() }
@@ -886,7 +915,7 @@ func file_nokku_v1_target_account_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_target_account_proto_rawDesc), len(file_nokku_v1_target_account_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

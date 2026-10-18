@@ -10,6 +10,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -190,8 +191,11 @@ type DaemonConfig struct {
 	AllowAgentForwarding *bool                  `protobuf:"varint,3,opt,name=allow_agent_forwarding,json=allowAgentForwarding" json:"allow_agent_forwarding,omitempty"`
 	GatewayPorts         *bool                  `protobuf:"varint,4,opt,name=gateway_ports,json=gatewayPorts" json:"gateway_ports,omitempty"`
 	Ephemeral            *bool                  `protobuf:"varint,5,opt,name=ephemeral" json:"ephemeral,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// idle_timeout closes an interactive session nobody typed into for that long. It is the workspace's
+	// session_idle_timeout, filled in by the core on sync and ignored when sent.
+	IdleTimeout   *durationpb.Duration `protobuf:"bytes,6,opt,name=idle_timeout,json=idleTimeout" json:"idle_timeout,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DaemonConfig) Reset() {
@@ -257,6 +261,13 @@ func (x *DaemonConfig) GetEphemeral() bool {
 		return *x.Ephemeral
 	}
 	return false
+}
+
+func (x *DaemonConfig) GetIdleTimeout() *durationpb.Duration {
+	if x != nil {
+		return x.IdleTimeout
+	}
+	return nil
 }
 
 type GetDaemonRequest struct {
@@ -2386,7 +2397,7 @@ var File_nokku_v1_daemon_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/daemon.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x19nokku/v1/recordings.proto\"\xd1\x03\n" +
+	"\x15nokku/v1/daemon.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x19nokku/v1/recordings.proto\"\xd1\x03\n" +
 	"\x06Daemon\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
@@ -2402,13 +2413,14 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"lastSeenAt\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdb\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x99\x02\n" +
 	"\fDaemonConfig\x12'\n" +
 	"\x0frecord_sessions\x18\x01 \x01(\bR\x0erecordSessions\x12)\n" +
 	"\x10allow_forwarding\x18\x02 \x01(\bR\x0fallowForwarding\x124\n" +
 	"\x16allow_agent_forwarding\x18\x03 \x01(\bR\x14allowAgentForwarding\x12#\n" +
 	"\rgateway_ports\x18\x04 \x01(\bR\fgatewayPorts\x12\x1c\n" +
-	"\tephemeral\x18\x05 \x01(\bR\tephemeral\",\n" +
+	"\tephemeral\x18\x05 \x01(\bR\tephemeral\x12<\n" +
+	"\fidle_timeout\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\vidleTimeout\",\n" +
 	"\x10GetDaemonRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
 	"\x11GetDaemonResponse\x12(\n" +
@@ -2628,8 +2640,9 @@ var file_nokku_v1_daemon_proto_goTypes = []any{
 	nil,                                 // 43: nokku.v1.EnrollDaemonRequest.MetadataEntry
 	nil,                                 // 44: nokku.v1.SyncDaemonRequest.MetadataEntry
 	(*timestamppb.Timestamp)(nil),       // 45: google.protobuf.Timestamp
-	(*UploadRecordingRequest)(nil),      // 46: nokku.v1.UploadRecordingRequest
-	(*UploadRecordingResponse)(nil),     // 47: nokku.v1.UploadRecordingResponse
+	(*durationpb.Duration)(nil),         // 46: google.protobuf.Duration
+	(*UploadRecordingRequest)(nil),      // 47: nokku.v1.UploadRecordingRequest
+	(*UploadRecordingResponse)(nil),     // 48: nokku.v1.UploadRecordingResponse
 }
 var file_nokku_v1_daemon_proto_depIdxs = []int32{
 	0,  // 0: nokku.v1.Daemon.status:type_name -> nokku.v1.DaemonStatus
@@ -2638,66 +2651,67 @@ var file_nokku_v1_daemon_proto_depIdxs = []int32{
 	45, // 3: nokku.v1.Daemon.updated_at:type_name -> google.protobuf.Timestamp
 	45, // 4: nokku.v1.Daemon.created_at:type_name -> google.protobuf.Timestamp
 	45, // 5: nokku.v1.Daemon.last_seen_at:type_name -> google.protobuf.Timestamp
-	1,  // 6: nokku.v1.GetDaemonResponse.daemon:type_name -> nokku.v1.Daemon
-	0,  // 7: nokku.v1.UpdateDaemonRequest.status:type_name -> nokku.v1.DaemonStatus
-	2,  // 8: nokku.v1.UpdateDaemonRequest.config:type_name -> nokku.v1.DaemonConfig
-	0,  // 9: nokku.v1.ListDaemonsRequest.status:type_name -> nokku.v1.DaemonStatus
-	1,  // 10: nokku.v1.ListDaemonsResponse.daemons:type_name -> nokku.v1.Daemon
-	31, // 11: nokku.v1.CreateSessionResponse.session:type_name -> nokku.v1.DaemonSession
-	31, // 12: nokku.v1.ListSessionsResponse.sessions:type_name -> nokku.v1.DaemonSession
-	43, // 13: nokku.v1.EnrollDaemonRequest.metadata:type_name -> nokku.v1.EnrollDaemonRequest.MetadataEntry
-	0,  // 14: nokku.v1.EnrollDaemonResponse.status:type_name -> nokku.v1.DaemonStatus
-	2,  // 15: nokku.v1.EnrollDaemonResponse.config:type_name -> nokku.v1.DaemonConfig
-	44, // 16: nokku.v1.SyncDaemonRequest.metadata:type_name -> nokku.v1.SyncDaemonRequest.MetadataEntry
-	0,  // 17: nokku.v1.SyncDaemonResponse.status:type_name -> nokku.v1.DaemonStatus
-	2,  // 18: nokku.v1.SyncDaemonResponse.config:type_name -> nokku.v1.DaemonConfig
-	19, // 19: nokku.v1.SyncDaemonResponse.principals:type_name -> nokku.v1.AccountPrincipals
-	22, // 20: nokku.v1.SyncDaemonResponse.retired_ca_keys:type_name -> nokku.v1.RetiredCAKey
-	45, // 21: nokku.v1.RetiredCAKey.trusted_until:type_name -> google.protobuf.Timestamp
-	29, // 22: nokku.v1.ConnectRequest.heartbeat:type_name -> nokku.v1.Heartbeat
-	30, // 23: nokku.v1.ConnectResponse.state_update:type_name -> nokku.v1.StateUpdate
-	32, // 24: nokku.v1.ConnectResponse.relay_open:type_name -> nokku.v1.RelayOpen
-	33, // 25: nokku.v1.RelayRequest.start:type_name -> nokku.v1.RelayStart
-	35, // 26: nokku.v1.RelayResponse.ready:type_name -> nokku.v1.RelayReady
-	37, // 27: nokku.v1.RelayResponse.closed:type_name -> nokku.v1.RelayClosed
-	40, // 28: nokku.v1.DaemonRelayRequest.ready:type_name -> nokku.v1.DaemonRelayReady
-	41, // 29: nokku.v1.DaemonRelayRequest.closed:type_name -> nokku.v1.DaemonRelayClosed
-	41, // 30: nokku.v1.DaemonRelayResponse.closed:type_name -> nokku.v1.DaemonRelayClosed
-	3,  // 31: nokku.v1.DaemonService.GetDaemon:input_type -> nokku.v1.GetDaemonRequest
-	5,  // 32: nokku.v1.DaemonService.UpdateDaemon:input_type -> nokku.v1.UpdateDaemonRequest
-	7,  // 33: nokku.v1.DaemonService.DeleteDaemon:input_type -> nokku.v1.DeleteDaemonRequest
-	9,  // 34: nokku.v1.DaemonService.ListDaemons:input_type -> nokku.v1.ListDaemonsRequest
-	13, // 35: nokku.v1.DaemonService.ListSessions:input_type -> nokku.v1.ListSessionsRequest
-	11, // 36: nokku.v1.DaemonService.CreateSession:input_type -> nokku.v1.CreateSessionRequest
-	15, // 37: nokku.v1.DaemonService.CloseSession:input_type -> nokku.v1.CloseSessionRequest
-	34, // 38: nokku.v1.DaemonService.Relay:input_type -> nokku.v1.RelayRequest
-	17, // 39: nokku.v1.DaemonControlService.EnrollDaemon:input_type -> nokku.v1.EnrollDaemonRequest
-	20, // 40: nokku.v1.DaemonControlService.SyncDaemon:input_type -> nokku.v1.SyncDaemonRequest
-	27, // 41: nokku.v1.DaemonControlService.Connect:input_type -> nokku.v1.ConnectRequest
-	38, // 42: nokku.v1.DaemonControlService.DaemonRelay:input_type -> nokku.v1.DaemonRelayRequest
-	23, // 43: nokku.v1.DaemonControlService.SignHostCertificate:input_type -> nokku.v1.SignHostCertificateRequest
-	46, // 44: nokku.v1.DaemonControlService.UploadRecording:input_type -> nokku.v1.UploadRecordingRequest
-	25, // 45: nokku.v1.DaemonControlService.UnenrollDaemon:input_type -> nokku.v1.UnenrollDaemonRequest
-	4,  // 46: nokku.v1.DaemonService.GetDaemon:output_type -> nokku.v1.GetDaemonResponse
-	6,  // 47: nokku.v1.DaemonService.UpdateDaemon:output_type -> nokku.v1.UpdateDaemonResponse
-	8,  // 48: nokku.v1.DaemonService.DeleteDaemon:output_type -> nokku.v1.DeleteDaemonResponse
-	10, // 49: nokku.v1.DaemonService.ListDaemons:output_type -> nokku.v1.ListDaemonsResponse
-	14, // 50: nokku.v1.DaemonService.ListSessions:output_type -> nokku.v1.ListSessionsResponse
-	12, // 51: nokku.v1.DaemonService.CreateSession:output_type -> nokku.v1.CreateSessionResponse
-	16, // 52: nokku.v1.DaemonService.CloseSession:output_type -> nokku.v1.CloseSessionResponse
-	36, // 53: nokku.v1.DaemonService.Relay:output_type -> nokku.v1.RelayResponse
-	18, // 54: nokku.v1.DaemonControlService.EnrollDaemon:output_type -> nokku.v1.EnrollDaemonResponse
-	21, // 55: nokku.v1.DaemonControlService.SyncDaemon:output_type -> nokku.v1.SyncDaemonResponse
-	28, // 56: nokku.v1.DaemonControlService.Connect:output_type -> nokku.v1.ConnectResponse
-	39, // 57: nokku.v1.DaemonControlService.DaemonRelay:output_type -> nokku.v1.DaemonRelayResponse
-	24, // 58: nokku.v1.DaemonControlService.SignHostCertificate:output_type -> nokku.v1.SignHostCertificateResponse
-	47, // 59: nokku.v1.DaemonControlService.UploadRecording:output_type -> nokku.v1.UploadRecordingResponse
-	26, // 60: nokku.v1.DaemonControlService.UnenrollDaemon:output_type -> nokku.v1.UnenrollDaemonResponse
-	46, // [46:61] is the sub-list for method output_type
-	31, // [31:46] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	46, // 6: nokku.v1.DaemonConfig.idle_timeout:type_name -> google.protobuf.Duration
+	1,  // 7: nokku.v1.GetDaemonResponse.daemon:type_name -> nokku.v1.Daemon
+	0,  // 8: nokku.v1.UpdateDaemonRequest.status:type_name -> nokku.v1.DaemonStatus
+	2,  // 9: nokku.v1.UpdateDaemonRequest.config:type_name -> nokku.v1.DaemonConfig
+	0,  // 10: nokku.v1.ListDaemonsRequest.status:type_name -> nokku.v1.DaemonStatus
+	1,  // 11: nokku.v1.ListDaemonsResponse.daemons:type_name -> nokku.v1.Daemon
+	31, // 12: nokku.v1.CreateSessionResponse.session:type_name -> nokku.v1.DaemonSession
+	31, // 13: nokku.v1.ListSessionsResponse.sessions:type_name -> nokku.v1.DaemonSession
+	43, // 14: nokku.v1.EnrollDaemonRequest.metadata:type_name -> nokku.v1.EnrollDaemonRequest.MetadataEntry
+	0,  // 15: nokku.v1.EnrollDaemonResponse.status:type_name -> nokku.v1.DaemonStatus
+	2,  // 16: nokku.v1.EnrollDaemonResponse.config:type_name -> nokku.v1.DaemonConfig
+	44, // 17: nokku.v1.SyncDaemonRequest.metadata:type_name -> nokku.v1.SyncDaemonRequest.MetadataEntry
+	0,  // 18: nokku.v1.SyncDaemonResponse.status:type_name -> nokku.v1.DaemonStatus
+	2,  // 19: nokku.v1.SyncDaemonResponse.config:type_name -> nokku.v1.DaemonConfig
+	19, // 20: nokku.v1.SyncDaemonResponse.principals:type_name -> nokku.v1.AccountPrincipals
+	22, // 21: nokku.v1.SyncDaemonResponse.retired_ca_keys:type_name -> nokku.v1.RetiredCAKey
+	45, // 22: nokku.v1.RetiredCAKey.trusted_until:type_name -> google.protobuf.Timestamp
+	29, // 23: nokku.v1.ConnectRequest.heartbeat:type_name -> nokku.v1.Heartbeat
+	30, // 24: nokku.v1.ConnectResponse.state_update:type_name -> nokku.v1.StateUpdate
+	32, // 25: nokku.v1.ConnectResponse.relay_open:type_name -> nokku.v1.RelayOpen
+	33, // 26: nokku.v1.RelayRequest.start:type_name -> nokku.v1.RelayStart
+	35, // 27: nokku.v1.RelayResponse.ready:type_name -> nokku.v1.RelayReady
+	37, // 28: nokku.v1.RelayResponse.closed:type_name -> nokku.v1.RelayClosed
+	40, // 29: nokku.v1.DaemonRelayRequest.ready:type_name -> nokku.v1.DaemonRelayReady
+	41, // 30: nokku.v1.DaemonRelayRequest.closed:type_name -> nokku.v1.DaemonRelayClosed
+	41, // 31: nokku.v1.DaemonRelayResponse.closed:type_name -> nokku.v1.DaemonRelayClosed
+	3,  // 32: nokku.v1.DaemonService.GetDaemon:input_type -> nokku.v1.GetDaemonRequest
+	5,  // 33: nokku.v1.DaemonService.UpdateDaemon:input_type -> nokku.v1.UpdateDaemonRequest
+	7,  // 34: nokku.v1.DaemonService.DeleteDaemon:input_type -> nokku.v1.DeleteDaemonRequest
+	9,  // 35: nokku.v1.DaemonService.ListDaemons:input_type -> nokku.v1.ListDaemonsRequest
+	13, // 36: nokku.v1.DaemonService.ListSessions:input_type -> nokku.v1.ListSessionsRequest
+	11, // 37: nokku.v1.DaemonService.CreateSession:input_type -> nokku.v1.CreateSessionRequest
+	15, // 38: nokku.v1.DaemonService.CloseSession:input_type -> nokku.v1.CloseSessionRequest
+	34, // 39: nokku.v1.DaemonService.Relay:input_type -> nokku.v1.RelayRequest
+	17, // 40: nokku.v1.DaemonControlService.EnrollDaemon:input_type -> nokku.v1.EnrollDaemonRequest
+	20, // 41: nokku.v1.DaemonControlService.SyncDaemon:input_type -> nokku.v1.SyncDaemonRequest
+	27, // 42: nokku.v1.DaemonControlService.Connect:input_type -> nokku.v1.ConnectRequest
+	38, // 43: nokku.v1.DaemonControlService.DaemonRelay:input_type -> nokku.v1.DaemonRelayRequest
+	23, // 44: nokku.v1.DaemonControlService.SignHostCertificate:input_type -> nokku.v1.SignHostCertificateRequest
+	47, // 45: nokku.v1.DaemonControlService.UploadRecording:input_type -> nokku.v1.UploadRecordingRequest
+	25, // 46: nokku.v1.DaemonControlService.UnenrollDaemon:input_type -> nokku.v1.UnenrollDaemonRequest
+	4,  // 47: nokku.v1.DaemonService.GetDaemon:output_type -> nokku.v1.GetDaemonResponse
+	6,  // 48: nokku.v1.DaemonService.UpdateDaemon:output_type -> nokku.v1.UpdateDaemonResponse
+	8,  // 49: nokku.v1.DaemonService.DeleteDaemon:output_type -> nokku.v1.DeleteDaemonResponse
+	10, // 50: nokku.v1.DaemonService.ListDaemons:output_type -> nokku.v1.ListDaemonsResponse
+	14, // 51: nokku.v1.DaemonService.ListSessions:output_type -> nokku.v1.ListSessionsResponse
+	12, // 52: nokku.v1.DaemonService.CreateSession:output_type -> nokku.v1.CreateSessionResponse
+	16, // 53: nokku.v1.DaemonService.CloseSession:output_type -> nokku.v1.CloseSessionResponse
+	36, // 54: nokku.v1.DaemonService.Relay:output_type -> nokku.v1.RelayResponse
+	18, // 55: nokku.v1.DaemonControlService.EnrollDaemon:output_type -> nokku.v1.EnrollDaemonResponse
+	21, // 56: nokku.v1.DaemonControlService.SyncDaemon:output_type -> nokku.v1.SyncDaemonResponse
+	28, // 57: nokku.v1.DaemonControlService.Connect:output_type -> nokku.v1.ConnectResponse
+	39, // 58: nokku.v1.DaemonControlService.DaemonRelay:output_type -> nokku.v1.DaemonRelayResponse
+	24, // 59: nokku.v1.DaemonControlService.SignHostCertificate:output_type -> nokku.v1.SignHostCertificateResponse
+	48, // 60: nokku.v1.DaemonControlService.UploadRecording:output_type -> nokku.v1.UploadRecordingResponse
+	26, // 61: nokku.v1.DaemonControlService.UnenrollDaemon:output_type -> nokku.v1.UnenrollDaemonResponse
+	47, // [47:62] is the sub-list for method output_type
+	32, // [32:47] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_daemon_proto_init() }

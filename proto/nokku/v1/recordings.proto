@@ -32,6 +32,8 @@ message Recording {
   string subject_id = 9;
   string principal = 10;
   string subject_name = 11;
+  // held is true while a legal hold keeps it, it can't be deleted then.
+  bool held = 12;
 }
 
 message UploadRecordingRequest {

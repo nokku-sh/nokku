@@ -3,10 +3,12 @@ package db
 import (
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
@@ -187,7 +189,28 @@ func (p *GetTargetAccountsByTargetIDsRow) ToProto() *nokkuv1.TargetAccount {
 	out.UserIds = p.UserIds
 	out.TeamIds = p.TeamIds
 	out.ServiceAccountIds = p.ServiceAccountIds
+	out.ExpiresAt = expiries(p.ExpiringIds, p.ExpiresAt)
 	return out
+}
+
+// expiries pairs the two arrays a grant query returns in the same order.
+func expiries(ids []string, at []time.Time) map[string]*timestamppb.Timestamp {
+	if len(ids) == 0 || len(ids) != len(at) {
+		return nil
+	}
+	out := make(map[string]*timestamppb.Timestamp, len(ids))
+	for i, id := range ids {
+		out[id] = timestamppb.New(at[i])
+	}
+	return out
+}
+
+// Until is when the access ends, nil when it is for good.
+func (r *ListSubjectUsernamesForTargetsRow) Until() *time.Time {
+	if r.ForGood {
+		return nil
+	}
+	return &r.ExpiresAt
 }
 
 func (u *User) ToProto() *nokkuv1.User {
@@ -236,6 +259,8 @@ func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 func (d *Daemon) EffectiveConfig() *nokkuv1.DaemonConfig {
 	cfg := ResolveDaemonConfig(d.Config)
 	cfg.Ephemeral = new(d.RetireAfter != nil)
+	// The workspace sets it for every daemon, see daemon.Sync.
+	cfg.IdleTimeout = nil
 	return cfg
 }
 
@@ -329,7 +354,94 @@ func (p *ListTargetAccountsRow) ToProto() *nokkuv1.TargetAccount {
 	out.UserIds = p.UserIds
 	out.TeamIds = p.TeamIds
 	out.ServiceAccountIds = p.ServiceAccountIds
+	out.ExpiresAt = expiries(p.ExpiringIds, p.ExpiresAt)
 	return out
+}
+
+func (h *LegalHold) ToProto() *nokkuv1.LegalHold {
+	if h == nil {
+		return nil
+	}
+	return &nokkuv1.LegalHold{
+		Id:        &h.ID,
+		Reason:    &h.Reason,
+		StartsAt:  SafeTimestamp(&h.StartsAt),
+		EndsAt:    SafeTimestamp(h.EndsAt),
+		CreatedBy: h.CreatedBy,
+		CreatedAt: SafeTimestamp(&h.CreatedAt),
+	}
+}
+
+func LegalHoldsToProto(rows []*LegalHold) []*nokkuv1.LegalHold {
+	return mapSlice(rows, func(h *LegalHold) *nokkuv1.LegalHold { return h.ToProto() })
+}
+
+// The status and kind columns hold the enum names in lower case, without the prefix.
+const (
+	accessRequestStatusPrefix = "ACCESS_REQUEST_STATUS_"
+	auditStreamKindPrefix     = "AUDIT_STREAM_KIND_"
+)
+
+// AccessRequestStatus is the column value of status, empty for none.
+func AccessRequestStatus(status nokkuv1.AccessRequestStatus) string {
+	if status == nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_UNSPECIFIED {
+		return ""
+	}
+	return strings.ToLower(strings.TrimPrefix(status.String(), accessRequestStatusPrefix))
+}
+
+// GrantedUntil is when an approved request's access ends, nil for any other.
+func (r *AccessRequestDetail) GrantedUntil() *time.Time {
+	if r.Status != AccessRequestStatus(nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED) ||
+		r.DecidedAt == nil {
+		return nil
+	}
+	return new(r.DecidedAt.Add(r.Duration))
+}
+
+func (r *AccessRequestDetail) ToProto() *nokkuv1.AccessRequest {
+	if r == nil {
+		return nil
+	}
+	status := nokkuv1.AccessRequestStatus(
+		nokkuv1.AccessRequestStatus_value[accessRequestStatusPrefix+strings.ToUpper(r.Status)],
+	)
+	return &nokkuv1.AccessRequest{
+		Id:             &r.ID,
+		RequesterId:    &r.RequesterID,
+		RequesterName:  &r.RequesterName,
+		RequesterEmail: &r.RequesterEmail,
+		TargetId:       &r.TargetID,
+		TargetName:     &r.TargetName,
+		Username:       &r.Username,
+		Duration:       durationpb.New(r.Duration),
+		Reason:         &r.Reason,
+		Status:         &status,
+		DecidedBy:      r.DecidedBy,
+		DeciderName:    &r.DeciderName,
+		DecidedAt:      SafeTimestamp(r.DecidedAt),
+		CreatedAt:      SafeTimestamp(&r.CreatedAt),
+		GrantedUntil:   SafeTimestamp(r.GrantedUntil()),
+	}
+}
+
+// AuditStreamKind is the column value of kind.
+func AuditStreamKind(kind nokkuv1.AuditStreamKind) string {
+	return strings.ToLower(strings.TrimPrefix(kind.String(), auditStreamKindPrefix))
+}
+
+func (r *ListAuditStreamsRow) ToProto() *nokkuv1.AuditStream {
+	kind := nokkuv1.AuditStreamKind(nokkuv1.AuditStreamKind_value[auditStreamKindPrefix+strings.ToUpper(r.Kind)])
+	return &nokkuv1.AuditStream{
+		Id:           &r.ID,
+		Kind:         &kind,
+		Url:          &r.URL,
+		Enabled:      &r.Enabled,
+		LastSentAt:   SafeTimestamp(r.LastSentAt),
+		LastError:    &r.LastError,
+		FailingSince: SafeTimestamp(r.FailingSince),
+		CreatedAt:    SafeTimestamp(&r.CreatedAt),
+	}
 }
 
 func TargetAccountsToProto(rows []*ListTargetAccountsRow) []*nokkuv1.TargetAccount {

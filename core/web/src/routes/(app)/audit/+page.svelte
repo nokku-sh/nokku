@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Badge } from '#lib/components/ext/badge/index.js';
-	import ExportMenu from '#lib/components/audit/ExportMenu.svelte';
+	import ExportMenu from '#lib/components/blocks/ExportMenu.svelte';
+	import AuditStreams from '#lib/components/audit/AuditStreams.svelte';
+	import LegalHolds from '#lib/components/audit/LegalHolds.svelte';
 	import { page } from '$app/state';
 	import { util } from '#lib/api/workspaces.svelte.js';
 	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
@@ -9,7 +11,12 @@
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
-	import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import {
+		AuditOutcome,
+		ExportAuditLogsRequest_Format,
+		type EventLog
+	} from '#lib/gen/nokku/v1/util_pb.js';
+	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import { usePagination } from '#lib/hooks/index.js';
 	import { auditUTC } from '#lib/store.svelte.js';
 	import { renderComponent } from '@tanstack/svelte-table';
@@ -50,6 +57,15 @@
 	});
 
 	const logs = util.getLogs(() => ({ ...pager.args, filter }));
+	const exportLogs = util.exportLogs();
+
+	// Exports need both bounds, an open ended range ends now.
+	function exportAs(format: ExportAuditLogsRequest_Format) {
+		exportLogs.mutate({
+			format,
+			filter: { ...filter, endDate: filter.endDate ?? timestampFromDate(new Date()) }
+		});
+	}
 	const target = $derived(page.url.searchParams.get('target'));
 
 	const activeView = $derived.by(() => {
@@ -102,7 +118,14 @@
 			Kept {logs.data.retentionDays} days
 		</Badge>
 	{/if}
-	<ExportMenu {filter} />
+	<AuditStreams />
+	<LegalHolds />
+	<ExportMenu
+		hint="Exactly what is on screen, up to 90 days"
+		feature="audit_export"
+		pending={exportLogs.isPending}
+		onExport={exportAs}
+	/>
 </PageHeader>
 
 <div class="flex flex-wrap items-center justify-between gap-3">

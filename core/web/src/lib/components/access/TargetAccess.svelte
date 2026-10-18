@@ -13,9 +13,10 @@
 	import { confirm } from '#lib/hooks/index.js';
 	import { Ellipsis, KeyRound, Plus, Search, SquareTerminal, Trash2 } from '@lucide/svelte';
 	import { SvelteMap } from 'svelte/reactivity';
+	import GrantLength from './GrantLength.svelte';
 	import SubjectChip from './SubjectChip.svelte';
 	import SubjectPicker from './SubjectPicker.svelte';
-	import { grantsOf, kindLabels, type Subject, type SubjectRef } from './subjects.svelte';
+	import { grantEnd, grantsOf, kindLabels, type Subject, type SubjectRef } from './subjects.svelte';
 
 	interface Props {
 		targetId: string;
@@ -44,15 +45,21 @@
 		return [...server, ...added];
 	}
 
+	// Hours a grant made here lasts, 0 is for good.
+	let hours = $state(0);
+
 	async function toggle(p: TargetAccount, subject: Pick<Subject, 'id' | 'kind'>, grant: boolean) {
 		const k = key(p, subject.id);
+		const expiresAt = grant ? grantEnd(hours) : undefined;
 		pending.set(
 			k,
-			grant ? { id: subject.id, kind: subject.kind, subject: subject as Subject } : null
+			grant ? { id: subject.id, kind: subject.kind, subject: subject as Subject, expiresAt } : null
 		);
-		const mutation = grant ? addSubjects : removeSubjects;
+		const change = { id: p.id, subjectIds: [subject.id], kind: subject.kind };
 		try {
-			await mutation.mutateAsync({ id: p.id, subjectIds: [subject.id], kind: subject.kind });
+			await (grant
+				? addSubjects.mutateAsync({ ...change, expiresAt })
+				: removeSubjects.mutateAsync(change));
 		} finally {
 			pending.delete(k);
 		}
@@ -102,6 +109,9 @@
 	<p class="text-sm text-muted-foreground">
 		People log in as one of these accounts. Grant a team and every member gets it.
 	</p>
+	{#if can.edit && list.length}
+		<GrantLength bind:hours />
+	{/if}
 
 	{#if list.length > 6}
 		<InputGroup.Root>

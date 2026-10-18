@@ -158,16 +158,19 @@ WHERE
   workspace_id IS NOT NULL;
 
 -- name: DeleteWorkspaceAuditLogs :execrows
-DELETE FROM audit.audit_logs
+-- A legal hold keeps its range.
+DELETE FROM audit.audit_logs a
 WHERE
-  workspace_id = @workspace_id
-  AND timestamp < @cutoff;
+  a.workspace_id = @workspace_id
+  AND a.timestamp < @cutoff
+  AND NOT legal_hold_covers (a.workspace_id, a.timestamp);
 
 -- name: DeleteAuditLogsBefore :execrows
--- The longest retention for every row, also the ones whose workspace is gone.
-DELETE FROM audit.audit_logs
+-- The longest retention for every row, also the ones whose workspace is gone. A legal hold keeps its range.
+DELETE FROM audit.audit_logs a
 WHERE
-  timestamp < @cutoff;
+  a.timestamp < @cutoff
+  AND NOT legal_hold_covers (a.workspace_id, a.timestamp);
 
 -- name: EnableAuditRetention :exec
 -- Opts this transaction into the audit_logs delete guard.

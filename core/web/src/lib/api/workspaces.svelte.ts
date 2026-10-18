@@ -125,22 +125,51 @@ export const util = {
 	exportLogs: () =>
 		useMutation(UtilService.method.exportAuditLogs, {
 			onSuccess: (data) => {
-				const blob = new Blob([data.data.slice()], {
-					type: data.contentType || 'application/octet-stream'
-				});
-				const url = URL.createObjectURL(blob);
-				const link = document.createElement('a');
-				link.href = url;
-				link.download = data.filename || 'audit_logs.csv';
-				document.body.appendChild(link);
-				link.click();
-				document.body.removeChild(link);
-				URL.revokeObjectURL(url);
-
+				download(data, 'audit_logs.csv');
 				toast.success('Audit logs exported');
+			},
+			onError: (error) => {
+				toast.error(`Export failed: ${error.message}`);
+			}
+		}),
+
+	exportAccessReport: () =>
+		useMutation(UtilService.method.exportAccessReport, {
+			onSuccess: (data) => {
+				download(data, 'access-report.csv');
+				toast.success('Access report exported');
 			},
 			onError: (error) => {
 				toast.error(`Export failed: ${error.message}`);
 			}
 		})
 };
+
+/** Saves an export the server rendered. */
+function download(
+	file: { data: Uint8Array; filename: string; contentType: string },
+	fallback: string
+) {
+	const blob = new Blob([file.data.slice()], {
+		type: file.contentType || 'application/octet-stream'
+	});
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = file.filename || fallback;
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+	URL.revokeObjectURL(url);
+}
+
+/** Whether the plan has a feature. Undefined while the plan loads, so nothing gets offered or locked too early. */
+export function useFeatures() {
+	// Every member reads it, so any page can show a lock. The layout's get() keeps it fresh.
+	const features = useQuery(
+		WorkspaceService.method.getWorkspace,
+		{},
+		{ select: (res) => res.features, staleTime: Infinity }
+	);
+	return (feature: string) => (features.data ? features.data[feature] === true : undefined);
+}

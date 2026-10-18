@@ -50,6 +50,15 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return nil
 		}
 
+		workspace, err := q.GetWorkspace(ctx)
+		if err != nil {
+			return err
+		}
+		// Zero is off, which is what an unset field says too.
+		if idle := workspace.Settings.GetSessionIdleTimeout(); idle.AsDuration() > 0 {
+			res.Config.IdleTimeout = idle
+		}
+
 		// Read the version first, so a change in between costs one extra sync instead of a stale daemon.
 		res.Version, err = q.GetWorkspaceStateVersion(ctx, daemon.WorkspaceID)
 		if err != nil {

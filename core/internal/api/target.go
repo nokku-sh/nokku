@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -155,7 +156,7 @@ func seedTargetGrants(ctx context.Context, q *db.Queries, targetID string, grant
 		}
 		for kind, ids := range subjects {
 			for _, id := range ids {
-				if err := q.AddGrant(ctx, &db.AddGrantParams{
+				if err := q.PutGrant(ctx, &db.PutGrantParams{
 					AccountID:   account.ID,
 					SubjectKind: kind,
 					SubjectID:   id,
@@ -347,16 +348,12 @@ func (s *targetService) GetSubjectAccess(
 			}
 		}
 
-		usernamesByTarget := make(map[string][]string)
 		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 			TargetIds: targetIDs,
 			SubjectID: req.GetSubjectId(),
 		})
 		if err != nil {
 			return err
-		}
-		for _, u := range uRows {
-			usernamesByTarget[u.TargetID] = append(usernamesByTarget[u.TargetID], u.Username)
 		}
 
 		var accounts map[string][]*nokkuv1.TargetAccount
@@ -368,10 +365,10 @@ func (s *targetService) GetSubjectAccess(
 
 		for _, r := range rows {
 			target := r.ToProto()
-			target.Usernames = usernamesByTarget[r.ID]
 			target.Accounts = accounts[r.ID]
 			targets = append(targets, target)
 		}
+		setUsernames(targets, uRows)
 
 		if len(uniqueDaemonIDs) > 0 {
 			daemonRows, err := q.GetDaemonsByIDs(ctx, slices.Collect(maps.Keys(uniqueDaemonIDs)))
@@ -406,6 +403,27 @@ func (s *targetService) GetSubjectAccess(
 		CertificateAuthorities: cas,
 		Daemons:                daemons,
 	}, nil
+}
+
+// setUsernames fills in the accounts the subject holds on each target, and when the ones that end do.
+func setUsernames(targets []*nokkuv1.Target, rows []*db.ListSubjectUsernamesForTargetsRow) {
+	byID := make(map[string]*nokkuv1.Target, len(targets))
+	for _, t := range targets {
+		byID[t.GetId()] = t
+	}
+	for _, r := range rows {
+		target := byID[r.TargetID]
+		if target == nil {
+			continue
+		}
+		target.Usernames = append(target.Usernames, r.Username)
+		if until := r.Until(); until != nil {
+			if target.UsernameExpiresAt == nil {
+				target.UsernameExpiresAt = make(map[string]*timestamppb.Timestamp)
+			}
+			target.UsernameExpiresAt[r.Username] = timestamppb.New(*until)
+		}
+	}
 }
 
 func (s *targetService) GetMyAccess(
@@ -460,7 +478,6 @@ func (s *targetService) GetMyAccess(
 		}
 
 		// The CLI needs the accounts this subject may use, not the whole graph.
-		usernamesByTarget := make(map[string][]string)
 		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 			TargetIds: targetIDs,
 			SubjectID: p.ID,
@@ -468,12 +485,7 @@ func (s *targetService) GetMyAccess(
 		if err != nil {
 			return err
 		}
-		for _, u := range uRows {
-			usernamesByTarget[u.TargetID] = append(usernamesByTarget[u.TargetID], u.Username)
-		}
-		for _, t := range resp.GetTargets() {
-			t.Usernames = usernamesByTarget[t.GetId()]
-		}
+		setUsernames(resp.GetTargets(), uRows)
 		slices.SortFunc(resp.GetTargets(), func(a, b *nokkuv1.Target) int {
 			return strings.Compare(a.GetName(), b.GetName())
 		})

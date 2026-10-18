@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { target } from '#lib/api/targets.svelte.js';
 	import { team } from '#lib/api/team.svelte.js';
+	import AccessReportMenu from '#lib/components/access/AccessReportMenu.svelte';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import UserSheet from '#lib/components/sheets/UserSheet.svelte';
 	import ServiceAccountSheet from '#lib/components/sheets/ServiceAccountSheet.svelte';
@@ -109,7 +110,9 @@
 	const zoom = $derived(Math.min(1, Math.max(0.5, (width - PADDING * 2) / GRAPH_WIDTH)));
 </script>
 
-<PageHeader title="Topology" description="Who can log in where, across the whole workspace" />
+<PageHeader title="Topology" description="Who can log in where, across the whole workspace">
+	<AccessReportMenu />
+</PageHeader>
 
 <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
 	<Search

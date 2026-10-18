@@ -1,0 +1,161 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+// AccessRequestService lets a member ask for an account for a while. An admin other than them decides, and an
+// approval grants the account until it runs out.
+service AccessRequestService {
+  // ListRequestableAccounts names the targets a member may ask for, the ones carrying a requestable tag.
+  rpc ListRequestableAccounts(ListRequestableAccountsRequest) returns (ListRequestableAccountsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CreateAccessRequest(CreateAccessRequestRequest) returns (CreateAccessRequestResponse) {
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+  }
+  // GetAccessRequest and ListAccessRequests show a member only their own requests, admins see all.
+  rpc GetAccessRequest(GetAccessRequestRequest) returns (GetAccessRequestResponse) {
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListAccessRequests(ListAccessRequestsRequest) returns (ListAccessRequestsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ApproveAccessRequest(ApproveAccessRequestRequest) returns (ApproveAccessRequestResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
+  rpc DenyAccessRequest(DenyAccessRequestRequest) returns (DenyAccessRequestResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
+  rpc CancelAccessRequest(CancelAccessRequestRequest) returns (CancelAccessRequestResponse) {
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+  }
+  // SetRequestableTags replaces the tags whose targets members may ask for. None turns requests off.
+  rpc SetRequestableTags(SetRequestableTagsRequest) returns (SetRequestableTagsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
+}
+
+enum AccessRequestStatus {
+  ACCESS_REQUEST_STATUS_UNSPECIFIED = 0;
+  ACCESS_REQUEST_STATUS_PENDING = 1;
+  ACCESS_REQUEST_STATUS_APPROVED = 2;
+  ACCESS_REQUEST_STATUS_DENIED = 3;
+  ACCESS_REQUEST_STATUS_CANCELLED = 4;
+  ACCESS_REQUEST_STATUS_EXPIRED = 5;
+}
+
+message AccessRequest {
+  string id = 1;
+  string requester_id = 2;
+  string requester_name = 3;
+  string requester_email = 4;
+  string target_id = 5;
+  string target_name = 6;
+  string username = 7;
+  google.protobuf.Duration duration = 8;
+  string reason = 9;
+  AccessRequestStatus status = 10;
+  string decided_by = 11;
+  string decider_name = 12;
+  google.protobuf.Timestamp decided_at = 13;
+  google.protobuf.Timestamp created_at = 14;
+  // granted_until is when the grant of an approved request ends.
+  google.protobuf.Timestamp granted_until = 15;
+}
+
+message RequestableTarget {
+  string id = 1;
+  string name = 2;
+  repeated string usernames = 3;
+}
+
+message ListRequestableAccountsRequest {}
+message ListRequestableAccountsResponse {
+  repeated RequestableTarget targets = 1;
+}
+
+message CreateAccessRequestRequest {
+  // target is its id or its name.
+  string target = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string username = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+  }];
+  google.protobuf.Duration duration = 3 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {
+      gte: {seconds: 900}
+      lte: {seconds: 604800}
+    }
+  ];
+  string reason = 4 [(buf.validate.field).string = {
+    min_len: 3
+    max_len: 1000
+  }];
+}
+message CreateAccessRequestResponse {
+  AccessRequest request = 1;
+}
+
+message GetAccessRequestRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetAccessRequestResponse {
+  AccessRequest request = 1;
+}
+
+message ListAccessRequestsRequest {
+  AccessRequestStatus status = 1 [(buf.validate.field).enum.defined_only = true];
+  int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 3 [(buf.validate.field).int32.gte = 0];
+}
+message ListAccessRequestsResponse {
+  repeated AccessRequest requests = 1;
+  int32 total = 2;
+}
+
+message ApproveAccessRequestRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ApproveAccessRequestResponse {
+  AccessRequest request = 1;
+}
+
+message DenyAccessRequestRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DenyAccessRequestResponse {
+  AccessRequest request = 1;
+}
+
+message CancelAccessRequestRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message CancelAccessRequestResponse {}
+
+message SetRequestableTagsRequest {
+  repeated string tags = 1 [(buf.validate.field).repeated = {
+    max_items: 50
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 64
+      }
+    }
+  }];
+}
+message SetRequestableTagsResponse {}

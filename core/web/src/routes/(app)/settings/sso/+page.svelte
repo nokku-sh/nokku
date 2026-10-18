@@ -2,9 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
-	import { billing } from '#lib/api/billing.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { util } from '#lib/api/workspaces.svelte.js';
+	import { useFeatures, util } from '#lib/api/workspaces.svelte.js';
 	import { Crown, UsersRound } from '@lucide/svelte';
 	import ProvidersTab from './ProvidersTab.svelte';
 	import SCIMTab from './SCIMTab.svelte';
@@ -17,13 +16,7 @@
 	const info = util.instanceInfo();
 	const mode = $derived(info.data?.mode);
 
-	// Only admins read the plan. Everyone below sees the settings read-only, so they get no lock either.
-	// Undefined while the plan loads, so nothing gets offered or locked too early.
-	const billingData = billing.get(() => can.admin);
-	const has = (feature: string) => {
-		if (!can.admin) return true;
-		return billingData.data ? billingData.data.features?.[feature] === true : undefined;
-	};
+	const has = useFeatures();
 
 	// Not `tab`, the provider sheet owns that one.
 	const view = $derived(page.url.searchParams.get('view') === 'scim' ? 'scim' : 'providers');

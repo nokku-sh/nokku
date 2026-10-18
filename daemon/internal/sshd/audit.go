@@ -15,6 +15,7 @@ const (
 	eventForward           eventType = "forward"
 	eventRemoteForward     eventType = "remote_forward"
 	eventRecordingDegraded eventType = "recording_degraded"
+	eventSessionIdle       eventType = "session_idle"
 )
 
 type auditEvent struct {

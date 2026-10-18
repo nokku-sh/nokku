@@ -9,6 +9,7 @@ import {
 	CreditCard,
 	FileClock,
 	Gauge,
+	Hand,
 	IdCard,
 	KeyRound,
 	Mail,
@@ -42,6 +43,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 		{ title: 'Dashboard', url: '/', icon: Gauge, shortcut: 'h' },
 		// Every member opens shells on their own servers here.
 		{ title: 'Sessions', url: '/sessions', icon: SquareTerminal, shortcut: 's' },
+		{ title: 'Requests', url: '/access/requests', icon: Hand, shortcut: 'q' },
 		{
 			title: 'Topology',
 			url: '/topology',

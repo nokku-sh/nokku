@@ -8,6 +8,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 
@@ -27,13 +29,15 @@ func wiredFeatures() map[string]bool {
 	return wired
 }
 
-// conditionalFeatures is kept in sync by hand, the golden test fails when it drifts from the switch.
+// conditionalFeatures is kept in sync by hand with requestedFeatures, the golden test fails when it drifts.
 func conditionalFeatures() []string {
-	return []string{FeatureEnforceSSO}
+	return []string{
+		FeatureEnforceSSO, FeatureExpiringAccess, FeatureIdleTimeout, FeatureAccessRequests, FeatureAuditStreaming,
+	}
 }
 
 // featuresFreeInAllPlans need no gate. Making one paid means wiring it in the guard in the same change.
-var featuresFreeInAllPlans = []string{FeatureOIDC, FeatureExternalKMS}
+var featuresFreeInAllPlans = []string{FeatureOIDC}
 
 // A paid feature that no route enforces is revenue leakage, a feature no plan includes is dead weight.
 func TestGolden_FeaturesWired(t *testing.T) {
@@ -42,7 +46,7 @@ func TestGolden_FeaturesWired(t *testing.T) {
 			continue
 		}
 		t.Errorf(
-			"feature %q is in the catalog but gated nowhere: wire it in procedureFeatures/conditionalFeature or list it as free",
+			"feature %q is in the catalog but gated nowhere: wire it in procedureFeatures/requestedFeatures or list it as free",
 			f.Code,
 		)
 	}
@@ -55,63 +59,84 @@ func TestGolden_FeaturesWired(t *testing.T) {
 	}
 }
 
-func TestConditionalFeature(t *testing.T) {
-	ssoEnforce := &nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
-	}
-	ssoRelax := &nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)},
-	}
-	workspacePlain := &nokkuv1.UpdateWorkspaceRequest{
-		Name:     new("renamed"),
-		Settings: &nokkuv1.WorkspaceSettings{},
-	}
-
+func TestRequestedFeatures(t *testing.T) {
 	tests := []struct {
-		name      string
-		procedure string
-		msg       any
-		wantFeat  string
-		wantGated bool
+		name string
+		msg  any
+		want []string
 	}{
 		{
-			name:      "enforcing SSO is gated",
-			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
-			msg:       ssoEnforce,
-			wantFeat:  FeatureEnforceSSO,
-			wantGated: true,
+			name: "enforcing SSO is gated",
+			msg:  &nokkuv1.UpdateWorkspaceRequest{Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)}},
+			want: []string{FeatureEnforceSSO},
 		},
 		{
-			name:      "relaxing SSO is never gated",
-			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
-			msg:       ssoRelax,
+			name: "relaxing SSO is never gated",
+			msg:  &nokkuv1.UpdateWorkspaceRequest{Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)}},
 		},
 		{
-			name:      "other procedures are not conditionally gated",
-			procedure: "/nokku.v1.WorkspaceService/GetWorkspace",
-			msg:       ssoEnforce,
+			name: "other workspace updates are not gated",
+			msg:  &nokkuv1.UpdateWorkspaceRequest{Name: new("renamed"), Settings: &nokkuv1.WorkspaceSettings{}},
 		},
 		{
-			name:      "other workspace updates are not gated",
-			procedure: "/nokku.v1.WorkspaceService/UpdateWorkspace",
-			msg:       workspacePlain,
+			name: "an idle timeout is gated",
+			msg: &nokkuv1.UpdateWorkspaceRequest{
+				Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(15 * time.Minute)},
+			},
+			want: []string{FeatureIdleTimeout},
 		},
 		{
-			name:      "non-SSO request types are ignored",
-			procedure: "/nokku.v1.SSOService/UpdateSSOProvider",
-			msg:       "not a proto",
+			name: "turning the idle timeout off is never gated",
+			msg: &nokkuv1.UpdateWorkspaceRequest{
+				Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(0)},
+			},
+		},
+		{
+			name: "both settings at once are both checked",
+			msg: &nokkuv1.UpdateWorkspaceRequest{
+				Settings: &nokkuv1.WorkspaceSettings{
+					EnforceSso:         new(true),
+					SessionIdleTimeout: durationpb.New(time.Minute),
+				},
+			},
+			want: []string{FeatureEnforceSSO, FeatureIdleTimeout},
+		},
+		{
+			name: "a grant that ends is gated",
+			msg:  &nokkuv1.AddSubjectsRequest{ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))},
+			want: []string{FeatureExpiringAccess},
+		},
+		{
+			name: "a grant for good is never gated",
+			msg:  &nokkuv1.AddSubjectsRequest{},
+		},
+		{
+			name: "opening targets to requests is gated",
+			msg:  &nokkuv1.SetRequestableTagsRequest{Tags: []string{"prod"}},
+			want: []string{FeatureAccessRequests},
+		},
+		{
+			name: "closing them is never gated",
+			msg:  &nokkuv1.SetRequestableTagsRequest{},
+		},
+		{
+			name: "turning a stream on is gated",
+			msg:  &nokkuv1.UpdateAuditStreamRequest{Enabled: new(true)},
+			want: []string{FeatureAuditStreaming},
+		},
+		{
+			name: "turning it off is never gated",
+			msg:  &nokkuv1.UpdateAuditStreamRequest{Enabled: new(false)},
+		},
+		{
+			name: "a message of another type is ignored",
+			msg:  "not a proto",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			feature, gated := conditionalFeature(tt.procedure, tt.msg)
-			if gated != tt.wantGated {
-				t.Errorf("gated = %v, want %v", gated, tt.wantGated)
-			}
-			if feature != tt.wantFeat {
-				t.Errorf("feature = %q, want %q", feature, tt.wantFeat)
-			}
+			assert.Equal(t, tt.want, requestedFeatures(tt.msg))
 		})
 	}
 }
@@ -153,6 +178,9 @@ var createProcedures = []string{
 	nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure,
 	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure,
 	nokkuv1connect.DaemonServiceCreateSessionProcedure,
+	nokkuv1connect.LegalHoldServiceCreateLegalHoldProcedure,
+	nokkuv1connect.AccessRequestServiceCreateAccessRequestProcedure,
+	nokkuv1connect.AuditStreamServiceCreateAuditStreamProcedure,
 }
 
 // createProceduresGatedOutsideTheGuard have their quota check elsewhere, with the place named.
@@ -163,6 +191,11 @@ var createProceduresGatedOutsideTheGuard = map[string]string{
 	nokkuv1connect.WorkspaceServiceCreateWorkspaceProcedure: "pre-tenant: bounded by the auth rate limit",
 	// Sessions are bounded by the recording storage cap and eviction, they leave no permanent rows.
 	nokkuv1connect.DaemonServiceCreateSessionProcedure: "bounded by recording storage eviction",
+	// Each hold also weighs on every retention delete.
+	nokkuv1connect.LegalHoldServiceCreateLegalHoldProcedure: "handler: maxLegalHolds per workspace",
+	// Asking and cancelling over and over would leave a row each time.
+	nokkuv1connect.AccessRequestServiceCreateAccessRequestProcedure: "handler: maxDailyRequests per person",
+	nokkuv1connect.AuditStreamServiceCreateAuditStreamProcedure:     "handler: maxAuditStreams per workspace",
 }
 
 // An uncapped create route on SaaS is an unbounded-resource hole, so each is capped or exempted with a reason.

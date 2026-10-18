@@ -59,6 +59,8 @@ type Target struct {
 	Endpoints []string `json:"endpoints,omitempty"`
 	// Usernames are the accounts this subject may log in as on the target.
 	Usernames []string `json:"usernames,omitempty"`
+	// Until holds the usernames whose grant ends, the others are for good.
+	Until map[string]time.Time `json:"until,omitempty"`
 	// HostPublicKey pins the host key of a manual target.
 	HostPublicKey string            `json:"host_public_key,omitempty"`
 	Metadata      map[string]string `json:"metadata,omitempty"`

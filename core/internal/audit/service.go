@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/egress"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
 
@@ -17,12 +19,20 @@ const (
 type Service struct {
 	conn         *db.Connection
 	entitlements *entitlement.Service
+	// egress reaches the stream destinations a workspace chose.
+	egress *http.Client
 }
 
-func New(ctx context.Context, conn *db.Connection, entitlements *entitlement.Service) *Service {
-	s := &Service{conn: conn, entitlements: entitlements}
+func New(ctx context.Context, conn *db.Connection, entitlements *entitlement.Service) (*Service, error) {
+	client, err := egress.NewClient(streamTimeout)
+	if err != nil {
+		return nil, err
+	}
+	client.CheckRedirect = refuseRedirect
+	s := &Service{conn: conn, entitlements: entitlements, egress: client}
 	go s.runBackgroundJobs(ctx)
-	return s
+	go s.streamLoop(ctx)
+	return s, nil
 }
 
 func (s *Service) runBackgroundJobs(ctx context.Context) {

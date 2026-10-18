@@ -6,6 +6,7 @@
 	import { user } from '#lib/api/user.svelte.js';
 	import { roles } from '#lib/api/roles.svelte.js';
 	import { atLeast, parseRole, roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
+	import AccessReportMenu from '#lib/components/access/AccessReportMenu.svelte';
 	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
 	import UserSheet from '#lib/components/sheets/UserSheet.svelte';
 	import {
@@ -148,6 +149,9 @@
 {/if}
 
 <PageHeader title="Users" description="Everyone in this workspace, their role and their teams">
+	{#if can.view}
+		<AccessReportMenu />
+	{/if}
 	{#if canInvite}
 		<Button onclick={() => (create.open = true)}>
 			<PlusIcon data-icon="inline-start" />

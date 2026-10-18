@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/mizuchilabs/kata/buildinfo"
 
+	"github.com/nokku-sh/nokku/core/internal/access"
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 
@@ -166,6 +167,31 @@ func (s *utilService) ExportAuditLogs(
 		Data:        data,
 		Filename:    new(fmt.Sprintf("audit-logs-%s.%s.gz", time.Now().Format("2006-01-02"), ext)),
 		ContentType: new("application/gzip"),
+	}, nil
+}
+
+func (s *utilService) ExportAccessReport(
+	ctx context.Context,
+	req *nokkuv1.ExportAccessReportRequest,
+) (*nokkuv1.ExportAccessReportResponse, error) {
+	rows, err := s.cfg.Conn.Tenant().ListAccessReport(ctx)
+	if err != nil {
+		return nil, err
+	}
+	data, err := access.Report(rows, req.GetFormat())
+	if err != nil {
+		slog.Error("failed to render the access report", "error", err)
+		return nil, errInternal
+	}
+
+	ext, contentType := "json", "application/json"
+	if req.GetFormat() == nokkuv1.ExportAuditLogsRequest_FORMAT_CSV {
+		ext, contentType = "csv", "text/csv"
+	}
+	return &nokkuv1.ExportAccessReportResponse{
+		Data:        data,
+		Filename:    new(fmt.Sprintf("access-report-%s.%s", time.Now().Format(time.DateOnly), ext)),
+		ContentType: new(contentType),
 	}, nil
 }
 

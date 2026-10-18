@@ -1,0 +1,33 @@
+nokku.
+
+Access request
+
+
+{{ .Requester }} asks for access.
+
+They want to log in as {{ .Account }} on {{ .Target }} for {{ .Duration }}. Approve or deny it in Nokku.
+
+Server: {{ .Target }}
+
+Account: {{ .Account }}
+
+Reason: {{ .Reason }}
+
+They cannot approve it themselves. Without an answer it ends after a day.
+
+Review the request {{ .RequestURL }}
+
+Request {{ .RequestID }}
+
+You get this email because you approve access requests on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}this Nokku server{{ end }}.
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

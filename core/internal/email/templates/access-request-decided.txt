@@ -1,0 +1,33 @@
+nokku.
+
+Access request
+
+
+Your request was {{ .Decision }}.
+
+{{ .Decider }} {{ .Decision }} your request for {{ .Account }} on {{ .Target }}.{{ if .Until }} You can log in until {{ .Until }}.{{ end }}
+
+Server: {{ .Target }}
+
+Account: {{ .Account }}
+
+Decided by: {{ .Decider }}
+
+{{ if .Until }}Connect with ssh as usual. Access ends by itself.{{ else }}Ask again with more detail, or talk to an admin.{{ end }}
+
+Open the request {{ .RequestURL }}
+
+Request {{ .RequestID }}
+
+You get this email because you asked for access on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}this Nokku server{{ end }}.
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

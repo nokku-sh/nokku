@@ -504,12 +504,21 @@ func (sess *session) runPTY() {
 	stop := context.AfterFunc(sess.ctx, func() { _ = sess.ptmx.Close() })
 	defer stop()
 
+	// Read once, a running session keeps the rule it started with. Only keystrokes count, output does not.
+	touch := func() {}
+	if idle := sess.server.policy.Load().IdleTimeout; idle > 0 {
+		timer := time.AfterFunc(idle, sess.idleOut)
+		defer timer.Stop()
+		touch = func() { timer.Reset(idle) }
+	}
+
 	var input sync.WaitGroup
 	input.Go(func() {
 		buf := make([]byte, 32*1024)
 		for {
 			n, readErr := sess.Read(buf)
 			if n > 0 {
+				touch()
 				// Only echoed input is recorded, so password prompts never are.
 				if sess.rec != nil && echoEnabled(sess.ptmx) {
 					sess.rec.RecordInput(buf[:n])
@@ -615,6 +624,13 @@ func (sess *session) recordingFull() {
 	} else {
 		_, _ = io.WriteString(sess.Stderr(), notice+"\n")
 	}
+	sess.exit(1)
+}
+
+// idleOut ends an interactive session nobody typed into for the idle timeout.
+func (sess *session) idleOut() {
+	sess.server.emit(sess.event(eventSessionIdle))
+	_, _ = io.WriteString(sess, "\r\nnokkud: no input for too long, closing this session\r\n")
 	sess.exit(1)
 }
 

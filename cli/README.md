@@ -131,7 +131,8 @@ It checks the pinned host key first, then removes the drop-in, the CA and the pr
 | Command                      | Purpose                                                                                       |
 | ---------------------------- | --------------------------------------------------------------------------------------------- |
 | `nk login` (alias `refresh`) | Sign in and sync local state                                                                  |
-| `nk ls` / `nk list`          | List the servers you can reach                                                                |
+| `nk ls` / `nk list`          | List the servers you can reach, and until when for access that ends                           |
+| `nk request <host> <user>`   | Ask an admin for an account on a server for a while, then wait for the answer                 |
 | `nk doctor`                  | Check the core, the TPM and your local SSH setup                                              |
 | `nk sync <host>`             | Add a server without the daemon, or refresh one you added                                     |
 | `nk rm <host>`               | Clean up a server you added with `nk sync` and delete its target                              |
@@ -139,12 +140,13 @@ It checks the pinned host key first, then removes the drop-in, the CA and the pr
 
 ### Command flags
 
-| Command     | Flags                                                                                      |
-| ----------- | ------------------------------------------------------------------------------------------ |
-| `nk ls`     | `--json` for machine-readable output, with the `host` ssh knows each server by             |
-| `nk doctor` | `--fix` to repair permissions and regenerate files, `--json` for output                    |
-| `nk sync`   | `--name`, `--ca`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json` |
-| `nk rm`     | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                 |
+| Command      | Flags                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------ |
+| `nk ls`      | `--json` for machine-readable output, with the `host` ssh knows each server by                   |
+| `nk doctor`  | `--fix` to repair permissions and regenerate files, `--json` for output                          |
+| `nk sync`    | `--name`, `--ca`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`       |
+| `nk request` | `--reason` (required), `--for` from `15m` to `168h`, default `1h`, `--no-wait` to return at once |
+| `nk rm`      | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                       |
 
 ## Configuration
 

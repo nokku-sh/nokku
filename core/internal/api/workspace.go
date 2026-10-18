@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -42,6 +42,7 @@ func (s *workspaceService) GetWorkspace(
 		Workspace: workspace.ToProto(),
 		BaseUrl:   new(ws.BaseURL),
 		Inactive:  new(st.Plan.Name == entitlement.PlanInactive),
+		Features:  featuresProto(st.Plan),
 	}
 	if st.Sub != nil {
 		resp.DeleteAt = db.SafeTimestamp(deletionDate(st.Sub))
@@ -59,7 +60,13 @@ func (s *workspaceService) UpdateWorkspace(
 		if err != nil {
 			return err
 		}
-		proto.Merge(base.Settings, req.GetSettings())
+		// Each field the request sets replaces the stored one whole. Merge would keep a stored timeout under a zero one.
+		if settings := req.GetSettings(); settings != nil {
+			settings.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+				base.Settings.ProtoReflect().Set(fd, v)
+				return true
+			})
+		}
 		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
 			Name:        req.Name,
 			Description: req.Description,

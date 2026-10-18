@@ -4,11 +4,16 @@ package entitlement
 import "slices"
 
 const (
-	FeatureOIDC        = "oidc"
-	FeatureEnforceSSO  = "enforce_sso"
-	FeatureSCIM        = "scim"
-	FeatureAuditExport = "audit_export"
-	FeatureExternalKMS = "external_kms"
+	FeatureOIDC           = "oidc"
+	FeatureEnforceSSO     = "enforce_sso"
+	FeatureSCIM           = "scim"
+	FeatureAuditExport    = "audit_export"
+	FeatureExpiringAccess = "expiring_access"
+	FeatureAccessReview   = "access_review"
+	FeatureIdleTimeout    = "idle_timeout"
+	FeatureAccessRequests = "access_requests"
+	FeatureAuditStreaming = "audit_streaming"
+	FeatureLegalHold      = "legal_hold"
 )
 
 const (
@@ -31,11 +36,15 @@ type Feature struct {
 
 var CatalogFeatures = []Feature{
 	{FeatureOIDC, "OIDC single sign-on", PlanCommunity},
-	// Free everywhere: a gate on how keys are stored could only ever stop a server from starting.
-	{FeatureExternalKMS, "external key management", PlanCommunity},
 	{FeatureEnforceSSO, "enforced single sign-on", PlanPro},
 	{FeatureAuditExport, "audit log export", PlanPro},
+	{FeatureExpiringAccess, "expiring access", PlanPro},
+	{FeatureAccessReview, "the access review report", PlanPro},
+	{FeatureIdleTimeout, "the idle session timeout", PlanPro},
 	{FeatureSCIM, "SCIM provisioning", PlanEnterprise},
+	{FeatureAccessRequests, "access requests", PlanEnterprise},
+	{FeatureAuditStreaming, "audit log streaming", PlanEnterprise},
+	{FeatureLegalHold, "legal hold", PlanEnterprise},
 }
 
 const unlimited int64 = -1

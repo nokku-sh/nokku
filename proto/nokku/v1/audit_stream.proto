@@ -1,0 +1,102 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+// AuditStreamService sends audit events to a SIEM or a webhook as they happen. Each stream keeps a cursor, so a
+// destination that is down gets what it missed once it is back.
+service AuditStreamService {
+  rpc ListAuditStreams(ListAuditStreamsRequest) returns (ListAuditStreamsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CreateAuditStream(CreateAuditStreamRequest) returns (CreateAuditStreamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+  }
+  rpc UpdateAuditStream(UpdateAuditStreamRequest) returns (UpdateAuditStreamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+  }
+  rpc DeleteAuditStream(DeleteAuditStreamRequest) returns (DeleteAuditStreamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+  }
+  // TestAuditStream sends one made up event and answers with what the destination said.
+  rpc TestAuditStream(TestAuditStreamRequest) returns (TestAuditStreamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_OWNER};
+  }
+}
+
+enum AuditStreamKind {
+  AUDIT_STREAM_KIND_UNSPECIFIED = 0;
+  // WEBHOOK posts a JSON array, signed with an HMAC of the secret in X-Nokku-Signature.
+  AUDIT_STREAM_KIND_WEBHOOK = 1;
+  // SPLUNK posts to an HTTP Event Collector, the secret is the HEC token.
+  AUDIT_STREAM_KIND_SPLUNK = 2;
+  // DATADOG posts to the logs intake, the secret is the API key.
+  AUDIT_STREAM_KIND_DATADOG = 3;
+}
+
+message AuditStream {
+  string id = 1;
+  AuditStreamKind kind = 2;
+  string url = 3;
+  bool enabled = 4;
+  google.protobuf.Timestamp last_sent_at = 5;
+  string last_error = 6;
+  google.protobuf.Timestamp failing_since = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message ListAuditStreamsRequest {}
+message ListAuditStreamsResponse {
+  repeated AuditStream streams = 1;
+}
+
+message CreateAuditStreamRequest {
+  AuditStreamKind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string url = 2 [(buf.validate.field).string = {
+    uri: true
+    prefix: "https://"
+    max_len: 2048
+  }];
+  string secret = 3 [(buf.validate.field).string = {
+    min_len: 8
+    max_len: 1024
+  }];
+}
+message CreateAuditStreamResponse {
+  AuditStream stream = 1;
+}
+
+message UpdateAuditStreamRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string url = 2 [(buf.validate.field).string = {
+    uri: true
+    prefix: "https://"
+    max_len: 2048
+  }];
+  // secret unset keeps the one stored.
+  string secret = 3 [(buf.validate.field).string = {
+    min_len: 8
+    max_len: 1024
+  }];
+  bool enabled = 4;
+}
+message UpdateAuditStreamResponse {
+  AuditStream stream = 1;
+}
+
+message DeleteAuditStreamRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeleteAuditStreamResponse {}
+
+message TestAuditStreamRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message TestAuditStreamResponse {}

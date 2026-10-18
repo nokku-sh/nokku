@@ -42,6 +42,40 @@ func TestRenderTemplates(t *testing.T) {
 		},
 
 		{
+			name: "access-request",
+			data: accessRequestTemplateData{
+				Requester:  "Ada",
+				Target:     "web-1",
+				Account:    "deploy",
+				Duration:   "2 hours",
+				Reason:     "fix <the> deploy",
+				RequestURL: "https://acme.nokku.sh/access/requests?id=r1",
+				RequestID:  "r1",
+			},
+			contains: []string{
+				"Ada asks for access.",
+				"deploy on web-1 for 2 hours",
+				"https://acme.nokku.sh/access/requests?id=r1",
+			},
+		},
+		{
+			name: "access-request-decided",
+			data: accessDecisionTemplateData{
+				Decision:   "approved",
+				Decider:    "Grace",
+				Target:     "web-1",
+				Account:    "deploy",
+				Until:      "18 Oct 2026, 20:00 UTC",
+				RequestURL: "https://acme.nokku.sh/access/requests?id=r1",
+				RequestID:  "r1",
+			},
+			contains: []string{
+				"Your request was approved.",
+				"You can log in until 18 Oct 2026, 20:00 UTC.",
+				"Connect with ssh as usual.",
+			},
+		},
+		{
 			name: "new-login",
 			data: newLoginTemplateData{
 				ProfileURL: "https://app.nokku.sh/profile/security",

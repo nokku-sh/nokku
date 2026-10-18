@@ -7,42 +7,8 @@ package db
 
 import (
 	"context"
+	"time"
 )
-
-const addGrant = `-- name: AddGrant :exec
-INSERT INTO
-  grants (
-    account_id,
-    user_id,
-    team_id,
-    service_account_id
-  )
-VALUES
-  (
-    $1,
-    CASE
-      WHEN $2::TEXT = 'user' THEN $3::UUID
-    END,
-    CASE
-      WHEN $2::TEXT = 'team' THEN $3::UUID
-    END,
-    CASE
-      WHEN $2::TEXT = 'service_account' THEN $3::UUID
-    END
-  )
-ON CONFLICT DO NOTHING
-`
-
-type AddGrantParams struct {
-	AccountID   string `json:"accountId"`
-	SubjectKind string `json:"subjectKind"`
-	SubjectID   string `json:"subjectId"`
-}
-
-func (q *Queries) AddGrant(ctx context.Context, arg *AddGrantParams) error {
-	_, err := q.db.Exec(ctx, addGrant, arg.AccountID, arg.SubjectKind, arg.SubjectID)
-	return err
-}
 
 const createTargetAccount = `-- name: CreateTargetAccount :one
 INSERT INTO
@@ -76,6 +42,69 @@ func (q *Queries) CreateTargetAccount(ctx context.Context, arg *CreateTargetAcco
 	return &i, err
 }
 
+const deleteExpiredGrants = `-- name: DeleteExpiredGrants :many
+WITH
+  gone AS (
+    DELETE FROM grants g
+    WHERE
+      g.workspace_id = $1
+      AND g.expires_at <= NOW()
+    RETURNING
+      g.account_id,
+      g.subject_kind,
+      g.subject_id,
+      g.expires_at
+  )
+SELECT
+  gone.account_id,
+  gone.subject_kind,
+  gone.subject_id,
+  gone.expires_at::TIMESTAMPTZ AS expires_at,
+  p.username,
+  t.name AS target_name
+FROM
+  gone
+  JOIN target_accounts p ON p.id = gone.account_id
+  JOIN targets t ON t.id = p.target_id
+`
+
+type DeleteExpiredGrantsRow struct {
+	AccountID   string    `json:"accountId"`
+	SubjectKind *string   `json:"subjectKind"`
+	SubjectID   string    `json:"subjectId"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+	Username    string    `json:"username"`
+	TargetName  string    `json:"targetName"`
+}
+
+// One workspace at a time, the state version is bumped once per transaction and workspace.
+func (q *Queries) DeleteExpiredGrants(ctx context.Context, workspaceID string) ([]*DeleteExpiredGrantsRow, error) {
+	rows, err := q.db.Query(ctx, deleteExpiredGrants, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*DeleteExpiredGrantsRow
+	for rows.Next() {
+		var i DeleteExpiredGrantsRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.SubjectKind,
+			&i.SubjectID,
+			&i.ExpiresAt,
+			&i.Username,
+			&i.TargetName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteTargetAccount = `-- name: DeleteTargetAccount :exec
 DELETE FROM target_accounts
 WHERE
@@ -84,6 +113,31 @@ WHERE
 
 func (q *Queries) DeleteTargetAccount(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, deleteTargetAccount, id)
+	return err
+}
+
+const extendGrant = `-- name: ExtendGrant :exec
+INSERT INTO
+  grants (account_id, user_id, expires_at)
+VALUES
+  ($1, $2::UUID, $3::TIMESTAMPTZ)
+ON CONFLICT (account_id, subject_id) DO UPDATE
+SET
+  expires_at = CASE
+    WHEN grants.expires_at IS NULL THEN NULL
+    ELSE GREATEST(grants.expires_at, EXCLUDED.expires_at)
+  END
+`
+
+type ExtendGrantParams struct {
+	AccountID string    `json:"accountId"`
+	UserID    string    `json:"userId"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+// An approved request never shortens access the user already has. A grant for good stays one.
+func (q *Queries) ExtendGrant(ctx context.Context, arg *ExtendGrantParams) error {
+	_, err := q.db.Exec(ctx, extendGrant, arg.AccountID, arg.UserID, arg.ExpiresAt)
 	return err
 }
 
@@ -118,10 +172,18 @@ SELECT
   COALESCE(
     array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'service_account'),
     '{}'
-  )::UUID[] AS service_account_ids
+  )::UUID[] AS service_account_ids,
+  COALESCE(
+    array_agg(g.subject_id ORDER BY g.subject_id) FILTER (WHERE g.expires_at IS NOT NULL),
+    '{}'
+  )::UUID[] AS expiring_ids,
+  COALESCE(
+    array_agg(g.expires_at ORDER BY g.subject_id) FILTER (WHERE g.expires_at IS NOT NULL),
+    '{}'
+  )::TIMESTAMPTZ[] AS expires_at
 FROM
   target_accounts p
-  LEFT JOIN grants g ON g.account_id = p.id
+  LEFT JOIN live_grants g ON g.account_id = p.id
 WHERE
   p.target_id = ANY ($1::UUID[])
 GROUP BY
@@ -135,6 +197,8 @@ type GetTargetAccountsByTargetIDsRow struct {
 	UserIds           []string      `json:"userIds"`
 	TeamIds           []string      `json:"teamIds"`
 	ServiceAccountIds []string      `json:"serviceAccountIds"`
+	ExpiringIds       []string      `json:"expiringIds"`
+	ExpiresAt         []time.Time   `json:"expiresAt"`
 }
 
 func (q *Queries) GetTargetAccountsByTargetIDs(ctx context.Context, targetIds []string) ([]*GetTargetAccountsByTargetIDsRow, error) {
@@ -156,6 +220,8 @@ func (q *Queries) GetTargetAccountsByTargetIDs(ctx context.Context, targetIds []
 			&i.UserIds,
 			&i.TeamIds,
 			&i.ServiceAccountIds,
+			&i.ExpiringIds,
+			&i.ExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -224,7 +290,7 @@ FROM
     SELECT
       g.subject_id AS ids
     FROM
-      grants g
+      live_grants g
     WHERE
       g.account_id = p.id
       AND g.subject_kind = 'service_account'
@@ -232,7 +298,7 @@ FROM
     SELECT
       u.id
     FROM
-      grants g
+      live_grants g
       JOIN users u ON u.id = g.subject_id
       AND u.active
     WHERE
@@ -242,7 +308,7 @@ FROM
     SELECT
       u.id
     FROM
-      grants g
+      live_grants g
       JOIN team_members tm ON tm.team_id = g.subject_id
       JOIN users u ON u.id = tm.user_id
       AND u.active
@@ -285,35 +351,34 @@ func (q *Queries) ListAccountSubjectsForTarget(ctx context.Context, targetID str
 }
 
 const listSubjectUsernamesForTargets = `-- name: ListSubjectUsernamesForTargets :many
-SELECT DISTINCT
+SELECT
   p.target_id,
-  p.username
+  p.username,
+  bool_or(g.expires_at IS NULL)::BOOLEAN AS for_good,
+  -- Only read when not for good, then no grant has a NULL. The epoch keeps the column scannable.
+  COALESCE(max(g.expires_at), 'epoch')::TIMESTAMPTZ AS expires_at
 FROM
   target_accounts p
+  JOIN live_grants g ON g.account_id = p.id
 WHERE
   p.target_id = ANY ($1::UUID[])
-  AND EXISTS (
-    SELECT
-      1
-    FROM
-      grants g
-    WHERE
-      g.account_id = p.id
-      AND (
-        g.subject_id = $2
-        OR (
-          g.subject_kind = 'team'
-          AND g.subject_id IN (
-            SELECT
-              tm.team_id
-            FROM
-              team_members tm
-            WHERE
-              tm.user_id = $2
-          )
-        )
+  AND (
+    g.subject_id = $2
+    OR (
+      g.subject_kind = 'team'
+      AND g.subject_id IN (
+        SELECT
+          tm.team_id
+        FROM
+          team_members tm
+        WHERE
+          tm.user_id = $2
       )
+    )
   )
+GROUP BY
+  p.target_id,
+  p.username
 ORDER BY
   p.target_id,
   p.username
@@ -325,11 +390,14 @@ type ListSubjectUsernamesForTargetsParams struct {
 }
 
 type ListSubjectUsernamesForTargetsRow struct {
-	TargetID string `json:"targetId"`
-	Username string `json:"username"`
+	TargetID  string    `json:"targetId"`
+	Username  string    `json:"username"`
+	ForGood   bool      `json:"forGood"`
+	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// A team grant counts for its members. Subject UUIDs are unique across kinds.
+// A team grant counts for its members. Subject UUIDs are unique across kinds. The access lasts until the latest
+// grant that applies ends, or for good when one of them is.
 func (q *Queries) ListSubjectUsernamesForTargets(ctx context.Context, arg *ListSubjectUsernamesForTargetsParams) ([]*ListSubjectUsernamesForTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listSubjectUsernamesForTargets, arg.TargetIds, arg.SubjectID)
 	if err != nil {
@@ -339,7 +407,12 @@ func (q *Queries) ListSubjectUsernamesForTargets(ctx context.Context, arg *ListS
 	var items []*ListSubjectUsernamesForTargetsRow
 	for rows.Next() {
 		var i ListSubjectUsernamesForTargetsRow
-		if err := rows.Scan(&i.TargetID, &i.Username); err != nil {
+		if err := rows.Scan(
+			&i.TargetID,
+			&i.Username,
+			&i.ForGood,
+			&i.ExpiresAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)
@@ -391,6 +464,15 @@ SELECT
     array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'service_account'),
     '{}'
   )::UUID[] AS "serviceAccountIds",
+  -- Two arrays in the same order, the subjects whose grant ends and when.
+  COALESCE(
+    array_agg(g.subject_id ORDER BY g.subject_id) FILTER (WHERE g.expires_at IS NOT NULL),
+    '{}'
+  )::UUID[] AS "expiringIds",
+  COALESCE(
+    array_agg(g.expires_at ORDER BY g.subject_id) FILTER (WHERE g.expires_at IS NOT NULL),
+    '{}'
+  )::TIMESTAMPTZ[] AS "expiresAt",
   (SELECT
     COUNT(*)::INTEGER
   FROM
@@ -398,7 +480,7 @@ SELECT
 FROM
   target_accounts p
   JOIN paginated pp ON pp.id = p.id
-  LEFT JOIN grants g ON g.account_id = p.id
+  LEFT JOIN live_grants g ON g.account_id = p.id
 GROUP BY
   p.id
 ORDER BY
@@ -417,6 +499,8 @@ type ListTargetAccountsRow struct {
 	UserIds           []string      `json:"userIds"`
 	TeamIds           []string      `json:"teamIds"`
 	ServiceAccountIds []string      `json:"serviceAccountIds"`
+	ExpiringIds       []string      `json:"expiringIds"`
+	ExpiresAt         []time.Time   `json:"expiresAt"`
 	TotalCount        int32         `json:"totalCount"`
 }
 
@@ -444,6 +528,8 @@ func (q *Queries) ListTargetAccounts(ctx context.Context, arg *ListTargetAccount
 			&i.UserIds,
 			&i.TeamIds,
 			&i.ServiceAccountIds,
+			&i.ExpiringIds,
+			&i.ExpiresAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -454,6 +540,81 @@ func (q *Queries) ListTargetAccounts(ctx context.Context, arg *ListTargetAccount
 		return nil, err
 	}
 	return items, nil
+}
+
+const listWorkspacesWithExpiredGrants = `-- name: ListWorkspacesWithExpiredGrants :many
+SELECT DISTINCT
+  workspace_id
+FROM
+  grants
+WHERE
+  expires_at <= NOW()
+`
+
+func (q *Queries) ListWorkspacesWithExpiredGrants(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listWorkspacesWithExpiredGrants)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var workspace_id string
+		if err := rows.Scan(&workspace_id); err != nil {
+			return nil, err
+		}
+		items = append(items, workspace_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const putGrant = `-- name: PutGrant :exec
+INSERT INTO
+  grants (
+    account_id,
+    user_id,
+    team_id,
+    service_account_id,
+    expires_at
+  )
+VALUES
+  (
+    $1,
+    CASE
+      WHEN $2::TEXT = 'user' THEN $3::UUID
+    END,
+    CASE
+      WHEN $2::TEXT = 'team' THEN $3::UUID
+    END,
+    CASE
+      WHEN $2::TEXT = 'service_account' THEN $3::UUID
+    END,
+    $4::TIMESTAMPTZ
+  )
+ON CONFLICT (account_id, subject_id) DO UPDATE
+SET
+  expires_at = EXCLUDED.expires_at
+`
+
+type PutGrantParams struct {
+	AccountID   string     `json:"accountId"`
+	SubjectKind string     `json:"subjectKind"`
+	SubjectID   string     `json:"subjectId"`
+	ExpiresAt   *time.Time `json:"expiresAt"`
+}
+
+// An admin's grant, the expiry is set exactly as asked. It can extend, shorten or end an expiry.
+func (q *Queries) PutGrant(ctx context.Context, arg *PutGrantParams) error {
+	_, err := q.db.Exec(ctx, putGrant,
+		arg.AccountID,
+		arg.SubjectKind,
+		arg.SubjectID,
+		arg.ExpiresAt,
+	)
+	return err
 }
 
 const removeGrant = `-- name: RemoveGrant :exec

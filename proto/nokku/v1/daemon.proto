@@ -3,6 +3,7 @@ edition = "2023";
 package nokku.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 import "nokku/v1/recordings.proto";
@@ -86,6 +87,9 @@ message DaemonConfig {
   bool allow_agent_forwarding = 3;
   bool gateway_ports = 4;
   bool ephemeral = 5;
+  // idle_timeout closes an interactive session nobody typed into for that long. It is the workspace's
+  // session_idle_timeout, filled in by the core on sync and ignored when sent.
+  google.protobuf.Duration idle_timeout = 6;
 }
 
 message GetDaemonRequest {

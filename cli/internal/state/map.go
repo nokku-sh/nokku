@@ -2,7 +2,10 @@ package state
 
 import (
 	"log/slog"
+	"time"
 	"uuid"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -70,9 +73,21 @@ func MapTarget(t *nokkuv1.Target) Target {
 		Name:          ui.PlainLine(t.GetName()),
 		Endpoints:     plainAll(t.GetEndpoints()),
 		Usernames:     plainAll(t.GetUsernames()),
+		Until:         untilAll(t.GetUsernameExpiresAt()),
 		HostPublicKey: t.GetHostPublicKey(),
 		Metadata:      t.GetMetadata(),
 	}
+}
+
+func untilAll(ends map[string]*timestamppb.Timestamp) map[string]time.Time {
+	if len(ends) == 0 {
+		return nil
+	}
+	out := make(map[string]time.Time, len(ends))
+	for username, end := range ends {
+		out[ui.PlainLine(username)] = end.AsTime()
+	}
+	return out
 }
 
 func plainAll(values []string) []string {

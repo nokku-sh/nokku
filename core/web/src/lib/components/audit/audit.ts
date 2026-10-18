@@ -39,7 +39,15 @@ export const areas: Area[] = [
 			'RemoveSubjects',
 			'RevokeAllAccess',
 			'AddTargetAccount',
-			'RemoveTargetAccount'
+			'RemoveTargetAccount',
+			'GrantExpired',
+			'CreateAccessRequest',
+			'ApproveAccessRequest',
+			'DenyAccessRequest',
+			'CancelAccessRequest',
+			'AccessRequestExpired',
+			'SetRequestableTags',
+			'ExportAccessReport'
 		]
 	},
 	{
@@ -134,7 +142,13 @@ export const areas: Area[] = [
 			'DeleteSSOProvider',
 			'SSOTested',
 			'CreateSCIMToken',
-			'DeleteSCIMToken'
+			'DeleteSCIMToken',
+			'CreateLegalHold',
+			'DeleteLegalHold',
+			'CreateAuditStream',
+			'UpdateAuditStream',
+			'DeleteAuditStream',
+			'TestAuditStream'
 		]
 	}
 ];
@@ -191,7 +205,17 @@ const labels: Record<string, string> = {
 	RemoveSubjects: 'Revoked access',
 	RevokeAllAccess: 'Revoked all access',
 	AddTargetAccount: 'Added login account',
-	RemoveTargetAccount: 'Removed login account'
+	RemoveTargetAccount: 'Removed login account',
+	GrantExpired: 'Access expired',
+	CreateAccessRequest: 'Asked for access',
+	ApproveAccessRequest: 'Approved a request',
+	DenyAccessRequest: 'Denied a request',
+	CancelAccessRequest: 'Cancelled a request',
+	AccessRequestExpired: 'Request expired',
+	SetRequestableTags: 'Changed requestable servers',
+	ExportAccessReport: 'Exported the access report',
+	CreateLegalHold: 'Placed a legal hold',
+	DeleteLegalHold: 'Released a legal hold'
 };
 
 /** "DeleteTarget" reads as "Delete target". */

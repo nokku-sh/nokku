@@ -27,7 +27,7 @@ var (
 
 const (
 	// minBillableSeats is the pricing floor.
-	minBillableSeats = 5
+	minBillableSeats = 3
 	// Stripe defaults the checkout quantity picker to 99.
 	maxCheckoutSeats = 10000
 	// Stripe refuses a trial_end closer than two days.

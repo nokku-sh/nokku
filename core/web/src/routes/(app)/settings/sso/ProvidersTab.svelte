@@ -39,11 +39,9 @@
 	const locked = $derived(enforceAvailable === false && !enforced);
 	const upgrade = $derived(upgradeLink('enforce_sso', mode));
 
+	// Only the switch is sent. A downgraded workspace may turn it off, and nothing else rides along to be refused.
 	function setEnforced(on: boolean) {
-		if (!ws.data?.settings) return;
-		const settings = createMessage(WorkspaceSettingsSchema, ws.data.settings);
-		settings.enforceSso = on;
-		update.mutate({ settings });
+		update.mutate({ settings: createMessage(WorkspaceSettingsSchema, { enforceSso: on }) });
 	}
 </script>
 

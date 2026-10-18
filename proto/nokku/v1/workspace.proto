@@ -3,6 +3,7 @@ edition = "2023";
 package nokku.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 import "nokku/v1/account.proto";
@@ -55,11 +56,18 @@ message Workspace {
   WorkspaceSettings settings = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  // requestable_tags names the targets members may ask access for. Set with SetRequestableTags.
+  repeated string requestable_tags = 8;
 }
 
 message WorkspaceSettings {
   nokku.v1.DaemonConfig default_daemon_config = 1;
   bool enforce_sso = 2;
+  // session_idle_timeout closes interactive sessions on every daemon after that long without input. Zero is off.
+  google.protobuf.Duration session_idle_timeout = 3 [(buf.validate.field).duration = {
+    gte: {}
+    lte: {seconds: 86400}
+  }];
 }
 
 message GetWorkspaceRequest {}
@@ -71,6 +79,8 @@ message GetWorkspaceResponse {
   bool inactive = 3;
   // delete_at is when an inactive workspace is deleted, unless the owner subscribes before.
   google.protobuf.Timestamp delete_at = 4;
+  // features is what every member may see, so any page can show a lock. GetBilling has the rest.
+  map<string, bool> features = 5;
 }
 
 message UpdateWorkspaceRequest {

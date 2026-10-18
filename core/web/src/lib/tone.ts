@@ -9,6 +9,8 @@ const statusWords: Record<string, Tone> = {
 	succeeded: 'success',
 	enabled: 'success',
 	complete: 'success',
+	approved: 'success',
+	held: 'info',
 	truncated: 'warning',
 	pending: 'warning',
 	connecting: 'warning',

@@ -34,6 +34,10 @@ service UtilService {
   rpc ExportAuditLogs(ExportAuditLogsRequest) returns (ExportAuditLogsResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
   }
+  // ExportAccessReport is who can log in where and when they last got a certificate there, for an access review.
+  rpc ExportAccessReport(ExportAccessReportRequest) returns (ExportAccessReportResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+  }
   rpc ListMyActivity(ListMyActivityRequest) returns (ListMyActivityResponse) {
     option (access) = {self: true};
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -133,6 +137,18 @@ message ExportAuditLogsRequest {
   AuditLogFilter filter = 2;
 }
 message ExportAuditLogsResponse {
+  bytes data = 1;
+  string filename = 2;
+  string content_type = 3;
+}
+
+message ExportAccessReportRequest {
+  ExportAuditLogsRequest.Format format = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+message ExportAccessReportResponse {
   bytes data = 1;
   string filename = 2;
   string content_type = 3;

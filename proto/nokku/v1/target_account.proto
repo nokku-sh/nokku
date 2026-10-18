@@ -44,6 +44,8 @@ message TargetAccount {
   repeated string service_account_ids = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp seen_at = 8;
+  // expires_at holds the subjects whose grant ends, by subject id. The others hold it for good.
+  map<string, google.protobuf.Timestamp> expires_at = 9;
 }
 
 message ListTargetAccountsRequest {
@@ -72,6 +74,11 @@ message AddSubjectsRequest {
   SubjectKind kind = 3 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
+  }];
+  // expires_at ends the grants then, unset is for good. A subject that already holds the account gets it as well.
+  google.protobuf.Timestamp expires_at = 4 [(buf.validate.field).timestamp = {
+    gt_now: true
+    within: {seconds: 31622400}
   }];
 }
 message AddSubjectsResponse {}

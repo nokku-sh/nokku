@@ -11,10 +11,15 @@ const names: Record<PlanCode, string> = {
 /** Mirrors CatalogFeatures in internal/entitlement. */
 export const catalog: { key: string; label: string; plan: PlanCode }[] = [
 	{ key: 'oidc', label: 'OIDC single sign-on', plan: 'community' },
-	{ key: 'external_kms', label: 'External key management', plan: 'community' },
 	{ key: 'enforce_sso', label: 'Enforced single sign-on', plan: 'pro' },
 	{ key: 'audit_export', label: 'Audit log export', plan: 'pro' },
-	{ key: 'scim', label: 'SCIM provisioning', plan: 'enterprise' }
+	{ key: 'expiring_access', label: 'Expiring access', plan: 'pro' },
+	{ key: 'access_review', label: 'Access review report', plan: 'pro' },
+	{ key: 'idle_timeout', label: 'Idle session timeout', plan: 'pro' },
+	{ key: 'scim', label: 'SCIM provisioning', plan: 'enterprise' },
+	{ key: 'access_requests', label: 'Access requests', plan: 'enterprise' },
+	{ key: 'audit_streaming', label: 'Audit log streaming', plan: 'enterprise' },
+	{ key: 'legal_hold', label: 'Legal hold', plan: 'enterprise' }
 ];
 
 export function planName(code: string | undefined): string {

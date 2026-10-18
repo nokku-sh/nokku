@@ -191,6 +191,9 @@ func (s *Server) registerServices(ctx context.Context) {
 	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(&scimService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(newDaemonControlService(s.cfg), opts...))
 	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(&recordingService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewLegalHoldServiceHandler(&legalHoldService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewAccessRequestServiceHandler(&accessRequestService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewAuditStreamServiceHandler(&auditStreamService{cfg: s.cfg}, opts...))
 
 	static := web.Handler()
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

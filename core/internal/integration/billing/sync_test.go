@@ -374,7 +374,7 @@ func TestCheckout_NewWorkspaceGetsItsCustomerFromCheckout(t *testing.T) {
 	assert.Empty(t, first.Get("customer"))
 	assert.Equal(t, fake.workspaceID, first.Get("subscription_data[metadata][workspace_id]"),
 		"sync finds the workspace through this")
-	assert.Equal(t, "5", first.Get("line_items[0][quantity]"), "five seats is the floor")
+	assert.Equal(t, "3", first.Get("line_items[0][quantity]"), "three seats is the floor")
 	assert.Equal(t, "price_m", first.Get("line_items[0][price]"))
 	assert.Equal(t, "true", first.Get("managed_payments[enabled]"), "Stripe is the merchant of record and collects tax")
 

@@ -66,7 +66,12 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		INSERT INTO join_token_grants (workspace_id, token_id, username, user_id) SELECT $1, id, 'dev', $2 FROM t;
 		INSERT INTO recordings (workspace_id, daemon_name, username, key) VALUES ($1, 'd', 'deploy', 'key');
 		INSERT INTO workspace_subscriptions (workspace_id) VALUES ($1);
-	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.u)
+		INSERT INTO access_usage (workspace_id, target_id, subject_id) VALUES ($1, $3, $2);
+		INSERT INTO legal_holds (workspace_id, reason, starts_at) VALUES ($1, 'incident', NOW());
+		INSERT INTO access_requests (workspace_id, requester_id, account_id, duration, reason)
+		VALUES ($1, $2, $4, '1 hour', 'fix');
+		INSERT INTO audit_streams (workspace_id, kind, url, secret) VALUES ($1, 'webhook', 'https://siem.test', 'key');
+	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.u, f.target, f.account)
 	if err != nil {
 		t.Fatalf("seed every table: %v", err)
 	}

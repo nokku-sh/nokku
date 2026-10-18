@@ -49,8 +49,9 @@ func heard(t *testing.T, conn *pgx.Conn, ws string) []string {
 	}
 }
 
-// silentTables are the sign-ins. They change all day and no list shows them to others, so no console hears of them.
-var silentTables = []string{"credentials", "known_devices", "one_time_tokens"}
+// silentTables change all day and no list shows them live, so no console hears of them: the sign-ins, and when a
+// subject last got a certificate for a server.
+var silentTables = []string{"credentials", "known_devices", "one_time_tokens", "access_usage"}
 
 // A new tenant table has to say whether a console hears its changes.
 func TestEveryTenantTableAnnouncesOrIsSilent(t *testing.T) {
@@ -85,7 +86,7 @@ func TestUpdateTriggerNamesEveryColumn(t *testing.T) {
 			JOIN pg_trigger tg ON tg.tgrelid = a.attrelid AND tg.tgname = 'notify_change_update'
 			WHERE a.attrelid = ('public.' || $1)::regclass
 				AND a.attnum > 0 AND NOT a.attisdropped AND a.attgenerated = ''
-				AND a.attname NOT IN ('last_seen_at', 'last_used_at', 'last_sync_at')
+				AND a.attname NOT IN ('last_seen_at', 'last_used_at', 'last_sync_at', 'cursor_ts', 'cursor_id', 'last_sent_at')
 				AND a.attnum <> ALL (tg.tgattr::int2[])`,
 			table).Scan(&missing)
 		if err != nil {

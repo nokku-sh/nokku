@@ -53,7 +53,9 @@ func (s *recordingService) ListRecordings(
 		if total == 0 {
 			total = r.TotalCount
 		}
-		recordings = append(recordings, r.Recording.ToProto())
+		rec := r.Recording.ToProto()
+		rec.Held = &r.Held
+		recordings = append(recordings, rec)
 	}
 	return &nokkuv1.ListRecordingsResponse{
 		Recordings: recordings,
@@ -120,8 +122,21 @@ func (s *recordingService) DeleteRecording(
 	ctx context.Context,
 	req *nokkuv1.DeleteRecordingRequest,
 ) (*nokkuv1.DeleteRecordingResponse, error) {
-	if err := s.cfg.Conn.Tenant().DeleteRecording(ctx, req.GetRecordingId()); err != nil {
+	q := s.cfg.Conn.Tenant()
+	deleted, err := q.DeleteRecording(ctx, req.GetRecordingId())
+	if err != nil {
 		return nil, err
+	}
+	if deleted == 0 {
+		held, err := q.RecordingHeld(ctx, req.GetRecordingId())
+		if err != nil {
+			return nil, err
+		}
+		if held {
+			return nil, newError(connect.CodeFailedPrecondition, "a legal hold keeps this recording, release it first")
+		}
+		// Gone already, and so is its object.
+		return &nokkuv1.DeleteRecordingResponse{}, nil
 	}
 	// Best effort, a stray object goes with the workspace purge.
 	if err := s.cfg.Storage.Delete(

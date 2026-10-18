@@ -56,3 +56,27 @@ type deletionTemplateData struct {
 	BillingURL string
 	Next       string // when the next warning comes, empty for none
 }
+
+type accessRequestTemplateData struct {
+	Operator Operator
+
+	Requester  string
+	Target     string
+	Account    string
+	Duration   string // "2 hours"
+	Reason     string
+	RequestURL string
+	RequestID  string
+}
+
+type accessDecisionTemplateData struct {
+	Operator Operator
+
+	Decision   string // "approved" or "denied"
+	Decider    string
+	Target     string
+	Account    string
+	Until      string // empty when denied
+	RequestURL string
+	RequestID  string
+}

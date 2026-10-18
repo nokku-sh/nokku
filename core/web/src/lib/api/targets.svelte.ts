@@ -42,7 +42,8 @@ export const target = {
 			() => ({ subjectId: extract(subjectId) }),
 			() => ({ enabled: !!extract(subjectId) })
 		),
-	filters: () => useQuery(TargetService.method.getTargetFilters, {}),
+	filters: (when?: () => boolean) =>
+		useQuery(TargetService.method.getTargetFilters, {}, () => ({ enabled: when?.() ?? true })),
 	// Without a filter this is the whole workspace.
 	accessGraph: (filter?: () => AccessGraphFilter | undefined, when?: () => boolean) =>
 		useQuery(

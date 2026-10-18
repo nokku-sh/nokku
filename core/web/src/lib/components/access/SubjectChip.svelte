@@ -4,6 +4,8 @@
 	import { users } from '#lib/api/workspaces.svelte.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { formatTs } from '#lib/utils.js';
+	import { Clock } from '@lucide/svelte';
 	import SubjectAvatar from './SubjectAvatar.svelte';
 	import {
 		fromUser,
@@ -54,5 +56,16 @@
 >
 	{#snippet leading()}
 		<SubjectAvatar {subject} class="size-6" />
+	{/snippet}
+	{#snippet trailing()}
+		{#if grant.expiresAt}
+			<span
+				class="flex shrink-0 items-center gap-1 text-muted-foreground"
+				title={`Until ${formatTs(grant.expiresAt, 'withTime')}`}
+			>
+				<Clock class="size-3" />
+				{formatTs(grant.expiresAt, 'relative-short')}
+			</span>
+		{/if}
 	{/snippet}
 </Chip>

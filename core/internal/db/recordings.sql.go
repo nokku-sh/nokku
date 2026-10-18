@@ -82,22 +82,28 @@ func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParam
 	return &i, err
 }
 
-const deleteRecording = `-- name: DeleteRecording :exec
-DELETE FROM recordings
+const deleteRecording = `-- name: DeleteRecording :execrows
+DELETE FROM recordings r
 WHERE
-  id = $1
+  r.id = $1
+  AND NOT legal_hold_covers (r.workspace_id, r.started_at)
 `
 
-func (q *Queries) DeleteRecording(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, deleteRecording, id)
-	return err
+// Nothing is deleted when a legal hold covers it.
+func (q *Queries) DeleteRecording(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRecording, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteRecordingsBefore = `-- name: DeleteRecordingsBefore :many
-DELETE FROM recordings
+DELETE FROM recordings r
 WHERE
-  workspace_id = $1
-  AND started_at < $2
+  r.workspace_id = $1
+  AND r.started_at < $2
+  AND NOT legal_hold_covers (r.workspace_id, r.started_at)
 RETURNING
   id,
   size_bytes
@@ -113,6 +119,7 @@ type DeleteRecordingsBeforeRow struct {
 	SizeBytes int64  `json:"sizeBytes"`
 }
 
+// A legal hold keeps its range.
 func (q *Queries) DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) ([]*DeleteRecordingsBeforeRow, error) {
 	rows, err := q.db.Query(ctx, deleteRecordingsBefore, arg.WorkspaceID, arg.Cutoff)
 	if err != nil {
@@ -261,6 +268,7 @@ WITH
   )
 SELECT
   r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.subject_name, r.principal, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at,
+  legal_hold_covers (r.workspace_id, r.started_at)::BOOLEAN AS held,
   (
     SELECT
       COUNT(*)
@@ -284,6 +292,7 @@ type ListRecordingsParams struct {
 
 type ListRecordingsRow struct {
 	Recording  Recording `json:"recording"`
+	Held       bool      `json:"held"`
 	TotalCount int32     `json:"totalCount"`
 }
 
@@ -318,6 +327,7 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 			&i.Recording.SizeBytes,
 			&i.Recording.Complete,
 			&i.Recording.CreatedAt,
+			&i.Held,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -332,15 +342,18 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 
 const oldestRecordings = `-- name: OldestRecordings :many
 SELECT
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at, ended_at, size_bytes, complete, created_at
+  r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.subject_name, r.principal, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at
 FROM
-  recordings
+  recordings r
+WHERE
+  NOT legal_hold_covers (r.workspace_id, r.started_at)
 ORDER BY
-  started_at ASC
+  r.started_at ASC
 LIMIT
   $1
 `
 
+// Held recordings are never evicted, so they are never offered.
 func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Recording, error) {
 	rows, err := q.db.Query(ctx, oldestRecordings, limit)
 	if err != nil {
@@ -374,6 +387,26 @@ func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Record
 		return nil, err
 	}
 	return items, nil
+}
+
+const recordingHeld = `-- name: RecordingHeld :one
+SELECT
+  EXISTS (
+    SELECT
+      1
+    FROM
+      recordings r
+    WHERE
+      r.id = $1
+      AND legal_hold_covers (r.workspace_id, r.started_at)
+  )::BOOLEAN
+`
+
+func (q *Queries) RecordingHeld(ctx context.Context, id string) (bool, error) {
+	row := q.db.QueryRow(ctx, recordingHeld, id)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const setRecordingComplete = `-- name: SetRecordingComplete :one

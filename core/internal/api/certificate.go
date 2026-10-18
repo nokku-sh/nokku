@@ -208,6 +208,8 @@ func (s *certificateService) SignSSHCertificate(
 
 	var ca *db.SSHCA
 	var principals []string
+	// until is when the first grant in the certificate ends, nil when all of them are for good.
+	var until *time.Time
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		target, err := q.GetTarget(ctx, req.GetTargetId())
 		if err != nil {
@@ -226,6 +228,9 @@ func (s *certificateService) SignSSHCertificate(
 		}
 		for _, a := range accounts {
 			principals = append(principals, ssh.LoginPrincipal(caller.ID, target.ID, a.Username))
+			if end := a.Until(); end != nil && (until == nil || end.Before(*until)) {
+				until = end
+			}
 		}
 		// A daemon that is not approved may still hold the principals of its last sync. It gets no certificates to match.
 		if target.DaemonID != nil {
@@ -240,8 +245,10 @@ func (s *certificateService) SignSSHCertificate(
 		if target.CaID == nil {
 			return newError(connect.CodeFailedPrecondition, "this server has no certificate authority")
 		}
-		ca, err = q.GetCA(ctx, *target.CaID)
-		return err
+		if ca, err = q.GetCA(ctx, *target.CaID); err != nil {
+			return err
+		}
+		return q.TouchAccessUsage(ctx, &db.TouchAccessUsageParams{TargetID: target.ID, SubjectID: caller.ID})
 	}); err != nil {
 		return nil, err
 	}
@@ -260,6 +267,12 @@ func (s *certificateService) SignSSHCertificate(
 		// Nothing left would sign for the CA default.
 		if ttl <= 0 {
 			return nil, newError(connect.CodeUnauthenticated, "the token has expired")
+		}
+	}
+	if until != nil {
+		ttl = grantTTL(ca, ttl, *until)
+		if ttl <= 0 {
+			return nil, newError(connect.CodePermissionDenied, "you have no access to this server")
 		}
 	}
 
@@ -288,6 +301,11 @@ func (s *certificateService) SignSSHCertificate(
 		SignedCertificate: new(ssh.MarshalKey(cert)),
 		ExpiresAt:         timestamppb.New(expiry),
 	}, nil
+}
+
+// grantTTL keeps the certificate from outliving the first grant in it that ends.
+func grantTTL(ca *db.SSHCA, ttl time.Duration, until time.Time) time.Duration {
+	return min(ssh.UserTTL(ca, ttl), time.Until(until))
 }
 
 // serviceAccountTTL keeps the certificate from outliving the token.

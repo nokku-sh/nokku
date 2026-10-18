@@ -131,7 +131,10 @@ func (s *daemonService) CreateSession(
 		if !slices.Contains(accounts, req.GetUsername()) {
 			return db.ErrPermissionDenied
 		}
-		return nil
+		return q.TouchAccessUsageByDaemon(ctx, &db.TouchAccessUsageByDaemonParams{
+			DaemonID:  &daemon.ID,
+			SubjectID: userID,
+		})
 	}); err != nil {
 		return nil, err
 	}

@@ -60,7 +60,7 @@ WITH
       p.target_id,
       u.tag
     FROM
-      grants g
+      live_grants g
       JOIN target_accounts p ON p.id = g.account_id
       JOIN targets t ON t.id = p.target_id
       CROSS JOIN LATERAL unnest(
@@ -263,7 +263,7 @@ SELECT
       SELECT
         1
       FROM
-        grants g
+        live_grants g
         JOIN target_accounts p ON p.id = g.account_id
       WHERE
         p.target_id = t.id

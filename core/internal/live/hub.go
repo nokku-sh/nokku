@@ -39,6 +39,13 @@ var readers = map[string][]string{
 		nokkuv1connect.RecordingServiceName,
 		nokkuv1connect.DashboardServiceName,
 	},
+	// The expiry job ends grants and requests, the stream worker writes its status.
+	"grants": {
+		nokkuv1connect.TargetAccountServiceName,
+		nokkuv1connect.TargetServiceName,
+	},
+	"access_requests": {nokkuv1connect.AccessRequestServiceName},
+	"audit_streams":   {nokkuv1connect.AuditStreamServiceName},
 }
 
 // Change is what a console hears. The zero value says nothing changed.

@@ -24,18 +24,20 @@ const (
 )
 
 type Recording struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	Username      *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
-	SizeBytes     *int64                 `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
-	Complete      *bool                  `protobuf:"varint,5,opt,name=complete" json:"complete,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
-	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
-	DaemonName    *string                `protobuf:"bytes,8,opt,name=daemon_name,json=daemonName" json:"daemon_name,omitempty"`
-	SubjectId     *string                `protobuf:"bytes,9,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
-	Principal     *string                `protobuf:"bytes,10,opt,name=principal" json:"principal,omitempty"`
-	SubjectName   *string                `protobuf:"bytes,11,opt,name=subject_name,json=subjectName" json:"subject_name,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	DaemonId    *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	Username    *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
+	SizeBytes   *int64                 `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
+	Complete    *bool                  `protobuf:"varint,5,opt,name=complete" json:"complete,omitempty"`
+	StartedAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
+	EndedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
+	DaemonName  *string                `protobuf:"bytes,8,opt,name=daemon_name,json=daemonName" json:"daemon_name,omitempty"`
+	SubjectId   *string                `protobuf:"bytes,9,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
+	Principal   *string                `protobuf:"bytes,10,opt,name=principal" json:"principal,omitempty"`
+	SubjectName *string                `protobuf:"bytes,11,opt,name=subject_name,json=subjectName" json:"subject_name,omitempty"`
+	// held is true while a legal hold keeps it, it can't be deleted then.
+	Held          *bool `protobuf:"varint,12,opt,name=held" json:"held,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -145,6 +147,13 @@ func (x *Recording) GetSubjectName() string {
 		return *x.SubjectName
 	}
 	return ""
+}
+
+func (x *Recording) GetHeld() bool {
+	if x != nil && x.Held != nil {
+		return *x.Held
+	}
+	return false
 }
 
 type UploadRecordingRequest struct {
@@ -747,7 +756,7 @@ var File_nokku_v1_recordings_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_recordings_proto_rawDesc = "" +
 	"\n" +
-	"\x19nokku/v1/recordings.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x82\x03\n" +
+	"\x19nokku/v1/recordings.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x96\x03\n" +
 	"\tRecording\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tdaemon_id\x18\x02 \x01(\tR\bdaemonId\x12\x1a\n" +
@@ -764,7 +773,8 @@ const file_nokku_v1_recordings_proto_rawDesc = "" +
 	"subject_id\x18\t \x01(\tR\tsubjectId\x12\x1c\n" +
 	"\tprincipal\x18\n" +
 	" \x01(\tR\tprincipal\x12!\n" +
-	"\fsubject_name\x18\v \x01(\tR\vsubjectName\"\x98\x01\n" +
+	"\fsubject_name\x18\v \x01(\tR\vsubjectName\x12\x12\n" +
+	"\x04held\x18\f \x01(\bR\x04held\"\x98\x01\n" +
 	"\x16UploadRecordingRequest\x12-\n" +
 	"\x04meta\x18\x01 \x01(\v2\x17.nokku.v1.RecordingMetaH\x00R\x04meta\x12\x16\n" +
 	"\x05chunk\x18\x02 \x01(\fH\x00R\x05chunk\x120\n" +

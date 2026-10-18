@@ -15,6 +15,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/urfave/cli/v3"
 
+	"github.com/nokku-sh/nokku/core/internal/access"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/billing"
 	"github.com/nokku-sh/nokku/core/internal/cache"
@@ -160,9 +161,13 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Audit = audit.New(ctx, cfg.Conn, cfg.Entitlements)
+	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Entitlements)
+	if err != nil {
+		return nil, err
+	}
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Storage, cfg.Entitlements, cfg.Audit)
 	go daemon.RetireLoop(ctx, cfg.Conn, cfg.Audit.Record)
+	go access.ExpireLoop(ctx, cfg.Conn, cfg.Audit.Append)
 
 	// Its own derived key, so the DPoP nonce HMAC never shares one with the keyset wrap.
 	nonceKey, err := hkdf.Key(sha256.New, []byte(cfg.Secret), nil, "nokku dpop nonce v1", 32)

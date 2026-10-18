@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { workspace } from '#lib/api/workspaces.svelte.js';
+	import { useFeatures, workspace } from '#lib/api/workspaces.svelte.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import PlanBadge from '#lib/components/blocks/PlanBadge.svelte';
+	import { durationFromMs, durationMs } from '@bufbuild/protobuf/wkt';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -27,7 +30,38 @@
 	});
 	const config = $derived(settings.defaultDaemonConfig!);
 
-	const autoSave = useAutoSave(() => update.mutateAsync({ settings }));
+	// Only the daemon defaults are sent, so a setting the plan no longer allows never blocks the save.
+	const autoSave = useAutoSave(() =>
+		update.mutateAsync({
+			settings: create(WorkspaceSettingsSchema, { defaultDaemonConfig: config })
+		})
+	);
+
+	const has = useFeatures();
+	const idleMinutes = $derived(
+		Math.round(durationMs(ws.data?.settings?.sessionIdleTimeout ?? durationFromMs(0)) / 60_000)
+	);
+	// A downgraded workspace may still turn it off.
+	const idleLocked = $derived(has('idle_timeout') === false && idleMinutes === 0);
+	const idleChoices = [
+		{ minutes: 0, label: 'Never' },
+		{ minutes: 5, label: 'After 5 minutes' },
+		{ minutes: 15, label: 'After 15 minutes' },
+		{ minutes: 30, label: 'After 30 minutes' },
+		{ minutes: 60, label: 'After 1 hour' },
+		{ minutes: 240, label: 'After 4 hours' }
+	];
+	const idleLabel = $derived(
+		idleChoices.find((c) => c.minutes === idleMinutes)?.label ?? `After ${idleMinutes} minutes`
+	);
+
+	function setIdle(minutes: number) {
+		update.mutate({
+			settings: create(WorkspaceSettingsSchema, {
+				sessionIdleTimeout: durationFromMs(minutes * 60_000)
+			})
+		});
+	}
 
 	type Toggle = {
 		key: keyof Pick<
@@ -107,4 +141,46 @@
 			idleText={canEdit ? 'Changes save automatically' : 'Only the owner can change this'}
 		/>
 	</Card.Footer>
+</Card.Root>
+
+<Card.Root class="mt-4">
+	<Card.Header>
+		<Card.Title>Every daemon</Card.Title>
+		<Card.Description>Applies to all daemons at once, enrolled or not.</Card.Description>
+	</Card.Header>
+	<Card.Content>
+		<Item.Root variant="outline">
+			<Item.Content>
+				<Item.Title>
+					Close idle terminals
+					<PlanBadge feature="idle_timeout" />
+				</Item.Title>
+				<Item.Description>
+					Ends a terminal session after this long without a keystroke. Commands without a terminal,
+					file copies and port forwards keep running. Servers set up with nk sync are not covered.
+				</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				{#if ws.isLoading}
+					<Skeleton class="h-8 w-40" />
+				{:else}
+					<Select.Root
+						type="single"
+						value={String(idleMinutes)}
+						onValueChange={(v) => setIdle(Number(v))}
+						disabled={!canEdit || idleLocked || update.isPending}
+					>
+						<Select.Trigger class="w-44" aria-label="Close idle terminals">
+							{idleLabel}
+						</Select.Trigger>
+						<Select.Content>
+							{#each idleChoices as c (c.minutes)}
+								<Select.Item value={String(c.minutes)}>{c.label}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				{/if}
+			</Item.Actions>
+		</Item.Root>
+	</Card.Content>
 </Card.Root>

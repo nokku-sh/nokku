@@ -11,6 +11,38 @@ import (
 	nokku "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
+type AccessRequest struct {
+	ID          string        `json:"id"`
+	WorkspaceID string        `json:"workspaceId"`
+	RequesterID string        `json:"requesterId"`
+	AccountID   string        `json:"accountId"`
+	Duration    time.Duration `json:"duration"`
+	Reason      string        `json:"reason"`
+	Status      string        `json:"status"`
+	DecidedBy   *string       `json:"decidedBy"`
+	DecidedAt   *time.Time    `json:"decidedAt"`
+	CreatedAt   time.Time     `json:"createdAt"`
+}
+
+type AccessRequestDetail struct {
+	ID             string        `json:"id"`
+	WorkspaceID    string        `json:"workspaceId"`
+	RequesterID    string        `json:"requesterId"`
+	AccountID      string        `json:"accountId"`
+	Duration       time.Duration `json:"duration"`
+	Reason         string        `json:"reason"`
+	Status         string        `json:"status"`
+	DecidedBy      *string       `json:"decidedBy"`
+	DecidedAt      *time.Time    `json:"decidedAt"`
+	CreatedAt      time.Time     `json:"createdAt"`
+	TargetID       string        `json:"targetId"`
+	TargetName     string        `json:"targetName"`
+	Username       string        `json:"username"`
+	RequesterName  string        `json:"requesterName"`
+	RequesterEmail string        `json:"requesterEmail"`
+	DeciderName    string        `json:"deciderName"`
+}
+
 type AccessToken struct {
 	ID               string             `json:"id"`
 	TokenHash        crypto.HashedToken `json:"tokenHash"`
@@ -30,6 +62,13 @@ type AccessToken struct {
 	CreatedAt        time.Time          `json:"createdAt"`
 }
 
+type AccessUsage struct {
+	WorkspaceID string    `json:"workspaceId"`
+	TargetID    string    `json:"targetId"`
+	SubjectID   string    `json:"subjectId"`
+	LastCertAt  time.Time `json:"lastCertAt"`
+}
+
 type AuditAuditLog struct {
 	ID          string    `json:"id"`
 	Timestamp   time.Time `json:"timestamp"`
@@ -43,6 +82,22 @@ type AuditAuditLog struct {
 	Ip          string    `json:"ip"`
 	UserAgent   string    `json:"userAgent"`
 	Details     []byte    `json:"details"`
+}
+
+type AuditStream struct {
+	ID           string                `json:"id"`
+	WorkspaceID  string                `json:"workspaceId"`
+	Kind         string                `json:"kind"`
+	URL          string                `json:"url"`
+	Secret       crypto.EncryptedBytes `json:"secret"`
+	Enabled      bool                  `json:"enabled"`
+	CursorTs     time.Time             `json:"cursorTs"`
+	CursorID     string                `json:"cursorId"`
+	LastSentAt   *time.Time            `json:"lastSentAt"`
+	LastError    string                `json:"lastError"`
+	FailingSince *time.Time            `json:"failingSince"`
+	RetryAt      *time.Time            `json:"retryAt"`
+	CreatedAt    time.Time             `json:"createdAt"`
 }
 
 type Credential struct {
@@ -75,14 +130,15 @@ type Daemon struct {
 }
 
 type Grant struct {
-	AccountID        string    `json:"accountId"`
-	WorkspaceID      string    `json:"workspaceId"`
-	UserID           *string   `json:"userId"`
-	TeamID           *string   `json:"teamId"`
-	ServiceAccountID *string   `json:"serviceAccountId"`
-	SubjectKind      *string   `json:"subjectKind"`
-	SubjectID        string    `json:"subjectId"`
-	CreatedAt        time.Time `json:"createdAt"`
+	AccountID        string     `json:"accountId"`
+	WorkspaceID      string     `json:"workspaceId"`
+	UserID           *string    `json:"userId"`
+	TeamID           *string    `json:"teamId"`
+	ServiceAccountID *string    `json:"serviceAccountId"`
+	SubjectKind      *string    `json:"subjectKind"`
+	SubjectID        string     `json:"subjectId"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	ExpiresAt        *time.Time `json:"expiresAt"`
 }
 
 type InstanceLicense struct {
@@ -138,6 +194,28 @@ type KnownDevice struct {
 	ExpiresAt   time.Time `json:"expiresAt"`
 	LastSeenAt  time.Time `json:"lastSeenAt"`
 	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type LegalHold struct {
+	ID          string     `json:"id"`
+	WorkspaceID string     `json:"workspaceId"`
+	Reason      string     `json:"reason"`
+	StartsAt    time.Time  `json:"startsAt"`
+	EndsAt      *time.Time `json:"endsAt"`
+	CreatedBy   *string    `json:"createdBy"`
+	CreatedAt   time.Time  `json:"createdAt"`
+}
+
+type LiveGrant struct {
+	AccountID        string     `json:"accountId"`
+	WorkspaceID      string     `json:"workspaceId"`
+	UserID           *string    `json:"userId"`
+	TeamID           *string    `json:"teamId"`
+	ServiceAccountID *string    `json:"serviceAccountId"`
+	SubjectKind      *string    `json:"subjectKind"`
+	SubjectID        string     `json:"subjectId"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	ExpiresAt        *time.Time `json:"expiresAt"`
 }
 
 type OneTimeToken struct {
@@ -280,13 +358,14 @@ type WebCA struct {
 }
 
 type Workspace struct {
-	ID          string                   `json:"id"`
-	Slug        string                   `json:"slug"`
-	Name        string                   `json:"name"`
-	Description *string                  `json:"description"`
-	Settings    *nokku.WorkspaceSettings `json:"settings"`
-	CreatedAt   time.Time                `json:"createdAt"`
-	UpdatedAt   time.Time                `json:"updatedAt"`
+	ID              string                   `json:"id"`
+	Slug            string                   `json:"slug"`
+	Name            string                   `json:"name"`
+	Description     *string                  `json:"description"`
+	Settings        *nokku.WorkspaceSettings `json:"settings"`
+	RequestableTags []string                 `json:"requestableTags"`
+	CreatedAt       time.Time                `json:"createdAt"`
+	UpdatedAt       time.Time                `json:"updatedAt"`
 }
 
 type WorkspaceState struct {

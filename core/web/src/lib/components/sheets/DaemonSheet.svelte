@@ -46,7 +46,8 @@
 		update.mutateAsync({ id: sheet.id, config: create(DaemonConfigSchema, cfg ?? {}) })
 	);
 
-	type Rule = keyof Omit<DaemonConfig, '$typeName' | '$unknown'>;
+	// The idle timeout is the workspace's, set under Settings.
+	type Rule = keyof Omit<DaemonConfig, '$typeName' | '$unknown' | 'idleTimeout'>;
 
 	function applyRule(key: Rule, value: boolean) {
 		const d = draft.current;

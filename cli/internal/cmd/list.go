@@ -39,7 +39,7 @@ func listCMD() *cli.Command {
 			for _, t := range s.Targets {
 				users := ui.Dim("no accounts")
 				if len(t.Usernames) > 0 {
-					users = strings.Join(t.Usernames, ", ")
+					users = strings.Join(withUntil(t), ", ")
 				}
 				name := cmp.Or(aliases[t.ID], t.Name)
 				fmt.Printf("  %-24s %s %s\n", name, users, ui.Dim(manualNote(t, s.CAByID(t.CAID))))
@@ -48,6 +48,27 @@ func listCMD() *cli.Command {
 			return nil
 		},
 	}
+}
+
+// withUntil names when the accounts that end do, a time today or a date and time.
+func withUntil(t state.Target) []string {
+	out := make([]string, len(t.Usernames))
+	for i, username := range t.Usernames {
+		out[i] = username
+		if end, ok := t.Until[username]; ok {
+			out[i] += ui.Dim(" (until " + untilLabel(end) + ")")
+		}
+	}
+	return out
+}
+
+// untilLabel is a time today, or a date and time.
+func untilLabel(end time.Time) string {
+	end = end.Local()
+	if end.Format(time.DateOnly) == time.Now().Format(time.DateOnly) {
+		return end.Format("15:04")
+	}
+	return end.Format("Jan 2 15:04")
 }
 
 func manualNote(t state.Target, ca *state.CA) string {
@@ -71,11 +92,12 @@ func listJSON(s *state.State, aliases map[string]string) any {
 	type listedTarget struct {
 		Name string `json:"name"`
 		// Host is what ssh knows the target by, empty when it stays out of ssh_config.
-		Host       string   `json:"host,omitempty"`
-		Users      []string `json:"users"`
-		Manual     bool     `json:"manual"`
-		LastSynced string   `json:"last_synced,omitempty"`
-		NeedsSync  bool     `json:"needs_sync,omitzero"`
+		Host       string               `json:"host,omitempty"`
+		Users      []string             `json:"users"`
+		Until      map[string]time.Time `json:"until,omitempty"`
+		Manual     bool                 `json:"manual"`
+		LastSynced string               `json:"last_synced,omitempty"`
+		NeedsSync  bool                 `json:"needs_sync,omitzero"`
 	}
 	out := struct {
 		Targets []listedTarget `json:"targets"`
@@ -85,6 +107,7 @@ func listJSON(s *state.State, aliases map[string]string) any {
 			Name:       t.Name,
 			Host:       aliases[t.ID],
 			Users:      append([]string{}, t.Usernames...),
+			Until:      t.Until,
 			Manual:     t.Manual(),
 			LastSynced: t.Metadata["last_manual_sync"],
 			NeedsSync:  t.NeedsSync(s.CAByID(t.CAID)),

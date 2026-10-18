@@ -34,8 +34,9 @@ const (
 	// cooldownEntries bounds the cooldown store, one entry per user and template.
 	cooldownEntries = 10_000
 	emailConfirm    = "email-confirm"
-	// mailDate is how a mail names a day.
+	// mailDate is how a mail names a day, mailTime a moment.
 	mailDate  = "2 Jan 2006"
+	mailTime  = "2 Jan 2006, 15:04 UTC"
 	magicLink = "magic-link"
 )
 
@@ -67,7 +68,9 @@ type Operator struct {
 }
 
 type sendRequest struct {
-	userID   string
+	userID string
+	// ref cools mails about one thing down on their own, like the requests of one person.
+	ref      string
 	to       string
 	subject  string
 	template string
@@ -221,7 +224,7 @@ func (s *Service) SendNewLoginEmail(
 			DeviceID:   deviceID,
 			DeviceName: deviceName,
 			IPAddress:  ip,
-			EventTime:  time.Now().UTC().Format("2 Jan 2006, 15:04 UTC"),
+			EventTime:  time.Now().UTC().Format(mailTime),
 		},
 	})
 }
@@ -282,6 +285,68 @@ func (s *Service) SendDeletionWarningEmail(ctx context.Context, w DeletionWarnin
 	})
 }
 
+// AccessRequest is a mail to one approver about a request that waits for an answer.
+type AccessRequest struct {
+	UserID, Email              string
+	RequesterID, RequestID     string
+	Requester, Target, Account string
+	Reason, URL                string
+	Duration                   time.Duration
+}
+
+// SendAccessRequestEmail cools down per requester, so asking and cancelling over and over floods nobody.
+func (s *Service) SendAccessRequestEmail(ctx context.Context, r AccessRequest) error {
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   r.UserID,
+		ref:      r.RequesterID,
+		to:       r.Email,
+		subject:  r.Requester + " asks for " + r.Account + " on " + r.Target,
+		template: "access-request",
+		data: accessRequestTemplateData{
+			Operator:   s.Operator,
+			Requester:  r.Requester,
+			Target:     r.Target,
+			Account:    r.Account,
+			Duration:   lifetime(r.Duration),
+			Reason:     r.Reason,
+			RequestURL: r.URL,
+			RequestID:  r.RequestID,
+		},
+	})
+}
+
+// AccessDecision is a mail to the one who asked. Until is set when the request was approved.
+type AccessDecision struct {
+	UserID, Email                       string
+	RequestID, Decider, Target, Account string
+	URL                                 string
+	Until                               *time.Time
+}
+
+func (s *Service) SendAccessDecisionEmail(ctx context.Context, d AccessDecision) error {
+	decision, until := "denied", ""
+	if d.Until != nil {
+		decision, until = "approved", d.Until.UTC().Format(mailTime)
+	}
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   d.UserID,
+		ref:      d.RequestID,
+		to:       d.Email,
+		subject:  "Your request for " + d.Account + " on " + d.Target + " was " + decision,
+		template: "access-request-decided",
+		data: accessDecisionTemplateData{
+			Operator:   s.Operator,
+			Decision:   decision,
+			Decider:    d.Decider,
+			Target:     d.Target,
+			Account:    d.Account,
+			Until:      until,
+			RequestURL: d.URL,
+			RequestID:  d.RequestID,
+		},
+	})
+}
+
 // sendTemplate claims the cooldown slot before sending and releases it on failure, so nothing double-sends.
 func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	if req.userID == "" {
@@ -292,7 +357,7 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 		return err
 	}
 
-	key := cooldownKey(req.userID, req.template)
+	key := cooldownKey(req.userID, req.template+req.ref)
 	claimed, err := s.cache.SetNX(ctx, key, nil, cooldown)
 	// A full store must not hold back a reset or an alert, signups can fill it from outside.
 	if err != nil {

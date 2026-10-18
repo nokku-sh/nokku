@@ -72,6 +72,7 @@ WITH
   )
 SELECT
   sqlc.embed(r),
+  legal_hold_covers (r.workspace_id, r.started_at)::BOOLEAN AS held,
   (
     SELECT
       COUNT(*)
@@ -109,20 +110,37 @@ WHERE
 RETURNING
   *;
 
--- name: DeleteRecording :exec
-DELETE FROM recordings
+-- name: DeleteRecording :execrows
+-- Nothing is deleted when a legal hold covers it.
+DELETE FROM recordings r
 WHERE
-  id = @id;
+  r.id = @id
+  AND NOT legal_hold_covers (r.workspace_id, r.started_at);
 
 -- name: OldestRecordings :many
+-- Held recordings are never evicted, so they are never offered.
 SELECT
-  *
+  r.*
 FROM
-  recordings
+  recordings r
+WHERE
+  NOT legal_hold_covers (r.workspace_id, r.started_at)
 ORDER BY
-  started_at ASC
+  r.started_at ASC
 LIMIT
   sqlc.narg('limit');
+
+-- name: RecordingHeld :one
+SELECT
+  EXISTS (
+    SELECT
+      1
+    FROM
+      recordings r
+    WHERE
+      r.id = @id
+      AND legal_hold_covers (r.workspace_id, r.started_at)
+  )::BOOLEAN;
 
 -- name: ListRecordingWorkspaceIDs :many
 -- Hops from one workspace to the next in the index. A DISTINCT reads every recording to name a few hundred ids.
@@ -165,10 +183,12 @@ WHERE
   workspace_id IS NOT NULL;
 
 -- name: DeleteRecordingsBefore :many
-DELETE FROM recordings
+-- A legal hold keeps its range.
+DELETE FROM recordings r
 WHERE
-  workspace_id = @workspace_id
-  AND started_at < @cutoff
+  r.workspace_id = @workspace_id
+  AND r.started_at < @cutoff
+  AND NOT legal_hold_covers (r.workspace_id, r.started_at)
 RETURNING
   id,
   size_bytes;

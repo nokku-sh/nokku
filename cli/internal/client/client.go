@@ -46,6 +46,7 @@ type Client struct {
 	users           nokkuv1connect.WorkspaceServiceClient
 	teams           nokkuv1connect.TeamServiceClient
 	serviceAccounts nokkuv1connect.ServiceAccountServiceClient
+	requests        nokkuv1connect.AccessRequestServiceClient
 }
 
 func New(s *state.State) (*Client, error) {
@@ -94,6 +95,7 @@ func (c *Client) dial() error {
 	c.users = nokkuv1connect.NewWorkspaceServiceClient(c.httpc, s.APIURL, opts)
 	c.teams = nokkuv1connect.NewTeamServiceClient(c.httpc, s.APIURL, opts)
 	c.serviceAccounts = nokkuv1connect.NewServiceAccountServiceClient(c.httpc, s.APIURL, opts)
+	c.requests = nokkuv1connect.NewAccessRequestServiceClient(c.httpc, s.APIURL, opts)
 	return nil
 }
 

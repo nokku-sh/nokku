@@ -10,7 +10,8 @@
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
-	import { Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';
+	import { formatTs } from '#lib/utils.js';
+	import { Clock, Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import GrantPopover from './GrantPopover.svelte';
 	import { kindLabels, subjectIds } from './subjects.svelte';
@@ -156,6 +157,16 @@
 								<SquareTerminal class="ml-2 size-3 text-muted-foreground" />
 							{/snippet}
 							{#snippet trailing()}
+								{@const end = t.usernameExpiresAt[g.account.username]}
+								{#if end}
+									<span
+										class="flex items-center gap-1"
+										title={`Until ${formatTs(end, 'withTime')}`}
+									>
+										<Clock class="size-3" />
+										{formatTs(end, 'relative-short')}
+									</span>
+								{/if}
 								{#if !g.direct}<Users class="size-3" />{/if}
 							{/snippet}
 						</Chip>

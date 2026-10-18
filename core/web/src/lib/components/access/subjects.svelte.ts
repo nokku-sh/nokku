@@ -5,6 +5,7 @@ import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_accoun
 import type { ServiceAccount } from '#lib/gen/nokku/v1/service_account_pb.js';
 import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
 import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+import { timestampFromMs, type Timestamp } from '@bufbuild/protobuf/wkt';
 
 export type Subject = {
 	id: string;
@@ -15,7 +16,16 @@ export type Subject = {
 };
 
 /** A grant on a login account, resolved to a name lazily by SubjectChip. */
-export type SubjectRef = { id: string; kind: SubjectKind; subject?: Subject };
+export type SubjectRef = {
+	id: string;
+	kind: SubjectKind;
+	subject?: Subject;
+	expiresAt?: Timestamp;
+};
+
+/** When a grant made now for hours ends, undefined is for good. */
+export const grantEnd = (hours: number) =>
+	hours > 0 ? timestampFromMs(Date.now() + hours * 3_600_000) : undefined;
 
 export const kindLabels: Record<SubjectKind, { one: string; many: string }> = {
 	[SubjectKind.UNSPECIFIED]: { one: 'subject', many: 'subjects' },
@@ -73,10 +83,11 @@ export function subjectIds(p: TargetAccount, kind: SubjectKind): string[] {
 }
 
 export function grantsOf(p: TargetAccount): SubjectRef[] {
+	const ref = (kind: SubjectKind) => (id: string) => ({ id, kind, expiresAt: p.expiresAt[id] });
 	return [
-		...p.userIds.map((id) => ({ id, kind: SubjectKind.USER })),
-		...p.teamIds.map((id) => ({ id, kind: SubjectKind.TEAM })),
-		...p.serviceAccountIds.map((id) => ({ id, kind: SubjectKind.SERVICE_ACCOUNT }))
+		...p.userIds.map(ref(SubjectKind.USER)),
+		...p.teamIds.map(ref(SubjectKind.TEAM)),
+		...p.serviceAccountIds.map(ref(SubjectKind.SERVICE_ACCOUNT))
 	];
 }
 

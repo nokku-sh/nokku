@@ -53,9 +53,14 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 			if v.ID == recordingID || time.Since(v.StartedAt) < minEvictAge {
 				continue
 			}
-			if err := s.conn.Tenant().DeleteRecording(ctx, v.ID); err != nil {
+			deleted, err := s.conn.Tenant().DeleteRecording(ctx, v.ID)
+			if err != nil {
 				slog.Warn("recording eviction failed", "error", err, "workspace_id", workspaceID)
 				return true
+			}
+			// A legal hold made since the list keeps it.
+			if deleted == 0 {
+				continue
 			}
 			// Best effort, a stray object goes with the workspace purge.
 			if err := s.store.Delete(ctx, storage.RecordingPath(workspaceID, v.ID)); err != nil {

@@ -2,9 +2,11 @@ package api
 
 import (
 	"context"
+	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -51,14 +53,22 @@ func (s *targetAccountService) AddSubjects(
 		if !ok {
 			return errInvalidInput
 		}
+		var expiresAt *time.Time
+		if req.GetExpiresAt() != nil {
+			expiresAt = new(req.GetExpiresAt().AsTime())
+		}
 		for _, subjectID := range req.GetSubjectIds() {
-			if err := q.AddGrant(ctx, &db.AddGrantParams{
+			if err := q.PutGrant(ctx, &db.PutGrantParams{
 				AccountID:   req.GetId(),
 				SubjectKind: kind,
 				SubjectID:   subjectID,
+				ExpiresAt:   expiresAt,
 			}); err != nil {
 				return err
 			}
+		}
+		if expiresAt != nil {
+			audit.Set(ctx, "expires_at", *expiresAt)
 		}
 		return nil
 	}); err != nil {

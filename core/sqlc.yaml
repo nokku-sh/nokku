@@ -129,3 +129,7 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "EncryptedBytes"
+          - column: "audit_streams.secret"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "EncryptedBytes"

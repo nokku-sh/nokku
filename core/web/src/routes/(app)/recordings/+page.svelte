@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { legalHolds } from '#lib/api/legal-holds.svelte.js';
 	import { recordings } from '#lib/api/recordings.svelte.js';
+	import { useFeatures } from '#lib/api/workspaces.svelte.js';
 	import RecordingPlayer from './RecordingPlayer.svelte';
 	import WhoCell from './WhoCell.svelte';
 	import {
@@ -25,7 +27,8 @@
 	import { createModalState, usePagination } from '#lib/hooks/index.js';
 	import { formatBytes } from '#lib/utils.js';
 	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
-	import { Bot, Video } from '@lucide/svelte';
+	import { timestampFromMs, timestampMs } from '@bufbuild/protobuf/wkt';
+	import { Bot, Lock, Video } from '@lucide/svelte';
 
 	const pager = usePagination();
 	const can = user.can();
@@ -42,6 +45,20 @@
 	);
 	const deleteRecording = recordings.delete();
 	const deleteRecordings = recordings.deleteMany();
+
+	const has = useFeatures();
+	const hold = legalHolds.create();
+
+	// A hold of one second around the start keeps this recording and nothing much else.
+	function keep(r: Recording) {
+		if (!r.startedAt) return;
+		const start = timestampMs(r.startedAt);
+		void hold.mutateAsync({
+			reason: `Recording of ${r.username} on ${daemonName.get(r.daemonId) ?? r.daemonName}`,
+			startsAt: timestampFromMs(start),
+			endsAt: timestampFromMs(start + 1000)
+		});
+	}
 
 	const player = createModalState<Recording>({} as Recording);
 
@@ -87,7 +104,9 @@
 		columnHelper.accessor('complete', {
 			header: 'Status',
 			cell: ({ row }) =>
-				renderComponent(StateCell, { label: row.original.complete ? 'Complete' : 'Truncated' })
+				renderComponent(StateCell, {
+					label: row.original.held ? 'Held' : row.original.complete ? 'Complete' : 'Truncated'
+				})
 		}),
 		columnHelper.display({
 			id: 'actions',
@@ -96,13 +115,24 @@
 				renderComponent(ActionCell, {
 					label: `recording of ${row.original.username}`,
 					id: row.original.id,
-					deleteConfig: can.edit
-						? {
-								itemName: `recording of ${row.original.username}`,
-								description: 'This permanently deletes the recording.',
-								onDelete: () => deleteRecording.mutateAsync({ recordingId: row.original.id })
-							}
-						: undefined
+					menuActions:
+						can.admin && has('legal_hold') && !row.original.held
+							? [
+									{
+										label: 'Keep under a legal hold',
+										icon: Lock,
+										onClick: () => keep(row.original)
+									}
+								]
+							: [],
+					deleteConfig:
+						can.edit && !row.original.held
+							? {
+									itemName: `recording of ${row.original.username}`,
+									description: 'This permanently deletes the recording.',
+									onDelete: () => deleteRecording.mutateAsync({ recordingId: row.original.id })
+								}
+							: undefined
 				})
 		})
 	]);

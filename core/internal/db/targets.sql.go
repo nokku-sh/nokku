@@ -143,7 +143,7 @@ WHERE
     SELECT
       p.target_id
     FROM
-      grants g
+      live_grants g
       JOIN target_accounts p ON p.id = g.account_id
     WHERE
       -- One array of ids, an OR over the teams would keep the lookup off the subject index.

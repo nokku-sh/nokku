@@ -16,6 +16,7 @@ var encryptedColumns = []struct{ table, column string }{
 	{"sso_providers", "config"},
 	{"recordings", "key"},
 	{"web_ca", "private_key"},
+	{"audit_streams", "secret"},
 }
 
 const reencryptBatch = 1000

@@ -235,7 +235,7 @@ func TestCreateSession(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		return q.AddGrant(t.Context(), &db.AddGrantParams{
+		return q.PutGrant(t.Context(), &db.PutGrantParams{
 			AccountID: p.ID, SubjectKind: "user", SubjectID: memberPrincipal.ID,
 		})
 	})

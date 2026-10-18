@@ -45,3 +45,17 @@ func TestServiceAccountTTLEndsWithTheToken(t *testing.T) {
 	got = serviceAccountTTL(ca, 0, new(time.Now().Add(-time.Minute)))
 	assert.Negative(t, got, "an expired token must leave nothing to sign for")
 }
+
+func TestGrantTTLEndsWithTheGrant(t *testing.T) {
+	ca := &db.SSHCA{UserDefaultTtl: 120 * time.Hour, UserMaxTtl: 168 * time.Hour}
+
+	got := grantTTL(ca, 0, time.Now().Add(2*time.Hour))
+	assert.LessOrEqual(t, got, 2*time.Hour, "the certificate outlives the grant")
+	assert.Greater(t, got, 119*time.Minute)
+
+	got = grantTTL(ca, time.Hour, time.Now().Add(24*time.Hour))
+	assert.Equal(t, time.Hour, got, "a grant that lasts longer must not lengthen what was asked")
+
+	got = grantTTL(ca, 0, time.Now().Add(-time.Minute))
+	assert.Negative(t, got, "an ended grant must leave nothing to sign for")
+}

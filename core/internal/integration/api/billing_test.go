@@ -21,23 +21,28 @@ import (
 // The mode entitlement.New takes, named so the calls read.
 const modeSelfHosted = false
 
+// issueLicense makes a signing key and a year's license for plan. A server built with pubHex accepts key.
+func issueLicense(t *testing.T, plan string) (pubHex, key string) {
+	t.Helper()
+	privB64, pubHex, err := license.GenerateKey()
+	require.NoError(t, err)
+	priv, err := license.ParsePrivateKey(privB64)
+	require.NoError(t, err)
+	key, err = license.Issue("NOKKU", license.Claims{Plan: plan, ExpiresAt: time.Now().AddDate(1, 0, 0).Unix()}, priv)
+	require.NoError(t, err)
+	return pubHex, key
+}
+
 // The real queries: the key lands in the database, applies at once, and a restart finds it.
 func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	ctx := t.Context()
 
-	privB64, pubHex, err := license.GenerateKey()
-	require.NoError(t, err)
-	priv, err := license.ParsePrivateKey(privB64)
-	require.NoError(t, err)
-	key, err := license.Issue("NOKKU", license.Claims{
-		Plan:      entitlement.PlanEnterprise,
-		ExpiresAt: time.Now().AddDate(1, 0, 0).Unix(),
-	}, priv)
-	require.NoError(t, err)
+	pubHex, key := issueLicense(t, entitlement.PlanEnterprise)
 
 	// A server with its own entitlement service, so the shared one stays unlicensed.
 	local := *cfg
+	var err error
 	local.Entitlements, err = entitlement.New(ctx, cfg.Conn, pubHex, modeSelfHosted)
 	require.NoError(t, err)
 	srv := httptest.NewServer(api.New(&local).Handler(ctx))

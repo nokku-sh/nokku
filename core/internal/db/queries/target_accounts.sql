@@ -51,6 +51,15 @@ SELECT
     array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'service_account'),
     '{}'
   )::UUID[] AS "serviceAccountIds",
+  -- Two arrays in the same order, the subjects whose grant ends and when.
+  COALESCE(
+    array_agg(g.subject_id ORDER BY g.subject_id) FILTER (WHERE g.expires_at IS NOT NULL),
+    '{}'
+  )::UUID[] AS "expiringIds",
+  COALESCE(
+    array_agg(g.expires_at ORDER BY g.subject_id) FILTER (WHERE g.expires_at IS NOT NULL),
+    '{}'
+  )::TIMESTAMPTZ[] AS "expiresAt",
   (SELECT
     COUNT(*)::INTEGER
   FROM
@@ -58,7 +67,7 @@ SELECT
 FROM
   target_accounts p
   JOIN paginated pp ON pp.id = p.id
-  LEFT JOIN grants g ON g.account_id = p.id
+  LEFT JOIN live_grants g ON g.account_id = p.id
 GROUP BY
   p.id
 ORDER BY
@@ -143,13 +152,15 @@ FROM
 WHERE
   p.id = @account_id;
 
--- name: AddGrant :exec
+-- name: PutGrant :exec
+-- An admin's grant, the expiry is set exactly as asked. It can extend, shorten or end an expiry.
 INSERT INTO
   grants (
     account_id,
     user_id,
     team_id,
-    service_account_id
+    service_account_id,
+    expires_at
   )
 VALUES
   (
@@ -162,9 +173,59 @@ VALUES
     END,
     CASE
       WHEN @subject_kind::TEXT = 'service_account' THEN @subject_id::UUID
-    END
+    END,
+    sqlc.narg('expires_at')::TIMESTAMPTZ
   )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (account_id, subject_id) DO UPDATE
+SET
+  expires_at = EXCLUDED.expires_at;
+
+-- name: ExtendGrant :exec
+-- An approved request never shortens access the user already has. A grant for good stays one.
+INSERT INTO
+  grants (account_id, user_id, expires_at)
+VALUES
+  (@account_id, @user_id::UUID, @expires_at::TIMESTAMPTZ)
+ON CONFLICT (account_id, subject_id) DO UPDATE
+SET
+  expires_at = CASE
+    WHEN grants.expires_at IS NULL THEN NULL
+    ELSE GREATEST(grants.expires_at, EXCLUDED.expires_at)
+  END;
+
+-- name: ListWorkspacesWithExpiredGrants :many
+SELECT DISTINCT
+  workspace_id
+FROM
+  grants
+WHERE
+  expires_at <= NOW();
+
+-- name: DeleteExpiredGrants :many
+-- One workspace at a time, the state version is bumped once per transaction and workspace.
+WITH
+  gone AS (
+    DELETE FROM grants g
+    WHERE
+      g.workspace_id = @workspace_id
+      AND g.expires_at <= NOW()
+    RETURNING
+      g.account_id,
+      g.subject_kind,
+      g.subject_id,
+      g.expires_at
+  )
+SELECT
+  gone.account_id,
+  gone.subject_kind,
+  gone.subject_id,
+  gone.expires_at::TIMESTAMPTZ AS expires_at,
+  p.username,
+  t.name AS target_name
+FROM
+  gone
+  JOIN target_accounts p ON p.id = gone.account_id
+  JOIN targets t ON t.id = p.target_id;
 
 -- name: RemoveGrant :exec
 DELETE FROM grants
@@ -193,10 +254,18 @@ SELECT
   COALESCE(
     array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'service_account'),
     '{}'
-  )::UUID[] AS service_account_ids
+  )::UUID[] AS service_account_ids,
+  COALESCE(
+    array_agg(g.subject_id ORDER BY g.subject_id) FILTER (WHERE g.expires_at IS NOT NULL),
+    '{}'
+  )::UUID[] AS expiring_ids,
+  COALESCE(
+    array_agg(g.expires_at ORDER BY g.subject_id) FILTER (WHERE g.expires_at IS NOT NULL),
+    '{}'
+  )::TIMESTAMPTZ[] AS expires_at
 FROM
   target_accounts p
-  LEFT JOIN grants g ON g.account_id = p.id
+  LEFT JOIN live_grants g ON g.account_id = p.id
 WHERE
   p.target_id = ANY (@target_ids::UUID[])
 GROUP BY
@@ -205,36 +274,36 @@ ORDER BY
   p.username;
 
 -- name: ListSubjectUsernamesForTargets :many
--- A team grant counts for its members. Subject UUIDs are unique across kinds.
-SELECT DISTINCT
+-- A team grant counts for its members. Subject UUIDs are unique across kinds. The access lasts until the latest
+-- grant that applies ends, or for good when one of them is.
+SELECT
   p.target_id,
-  p.username
+  p.username,
+  bool_or(g.expires_at IS NULL)::BOOLEAN AS for_good,
+  -- Only read when not for good, then no grant has a NULL. The epoch keeps the column scannable.
+  COALESCE(max(g.expires_at), 'epoch')::TIMESTAMPTZ AS expires_at
 FROM
   target_accounts p
+  JOIN live_grants g ON g.account_id = p.id
 WHERE
   p.target_id = ANY (@target_ids::UUID[])
-  AND EXISTS (
-    SELECT
-      1
-    FROM
-      grants g
-    WHERE
-      g.account_id = p.id
-      AND (
-        g.subject_id = @subject_id
-        OR (
-          g.subject_kind = 'team'
-          AND g.subject_id IN (
-            SELECT
-              tm.team_id
-            FROM
-              team_members tm
-            WHERE
-              tm.user_id = @subject_id
-          )
-        )
+  AND (
+    g.subject_id = @subject_id
+    OR (
+      g.subject_kind = 'team'
+      AND g.subject_id IN (
+        SELECT
+          tm.team_id
+        FROM
+          team_members tm
+        WHERE
+          tm.user_id = @subject_id
       )
+    )
   )
+GROUP BY
+  p.target_id,
+  p.username
 ORDER BY
   p.target_id,
   p.username;
@@ -250,7 +319,7 @@ FROM
     SELECT
       g.subject_id AS ids
     FROM
-      grants g
+      live_grants g
     WHERE
       g.account_id = p.id
       AND g.subject_kind = 'service_account'
@@ -258,7 +327,7 @@ FROM
     SELECT
       u.id
     FROM
-      grants g
+      live_grants g
       JOIN users u ON u.id = g.subject_id
       AND u.active
     WHERE
@@ -268,7 +337,7 @@ FROM
     SELECT
       u.id
     FROM
-      grants g
+      live_grants g
       JOIN team_members tm ON tm.team_id = g.subject_id
       JOIN users u ON u.id = tm.user_id
       AND u.active

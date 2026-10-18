@@ -1,0 +1,59 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+// LegalHoldService keeps the audit logs and recordings of a time range past their retention.
+service LegalHoldService {
+  rpc ListLegalHolds(ListLegalHoldsRequest) returns (ListLegalHoldsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CreateLegalHold(CreateLegalHoldRequest) returns (CreateLegalHoldResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
+  // DeleteLegalHold releases a hold. Retention removes what it kept on its next run.
+  rpc DeleteLegalHold(DeleteLegalHoldRequest) returns (DeleteLegalHoldResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
+}
+
+message LegalHold {
+  string id = 1;
+  string reason = 2;
+  google.protobuf.Timestamp starts_at = 3;
+  // ends_at unset holds until released.
+  google.protobuf.Timestamp ends_at = 4;
+  string created_by = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message ListLegalHoldsRequest {}
+message ListLegalHoldsResponse {
+  repeated LegalHold holds = 1;
+}
+
+message CreateLegalHoldRequest {
+  option (buf.validate.message).cel = {
+    id: "ends_after_start"
+    message: "the hold must end after it starts"
+    expression: "!has(this.ends_at) || this.ends_at > this.starts_at"
+  };
+  string reason = 1 [(buf.validate.field).string = {
+    min_len: 3
+    max_len: 1000
+  }];
+  google.protobuf.Timestamp starts_at = 2 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp ends_at = 3;
+}
+message CreateLegalHoldResponse {
+  LegalHold hold = 1;
+}
+
+message DeleteLegalHoldRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeleteLegalHoldResponse {}

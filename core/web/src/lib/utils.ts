@@ -1,3 +1,4 @@
+import { plural } from '#lib/api/bulk.js';
 export { cn } from 'cn';
 import { timestampDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 import { type DateValue, DateFormatter, getLocalTimeZone } from '@internationalized/date';
@@ -124,6 +125,11 @@ export function enumLabel(value: string | undefined): string {
 		.split('_')
 		.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
 		.join(' ');
+}
+
+/** "1 hour", "8 hours", "7 days". Whole days read as days. */
+export function formatHours(hours: number): string {
+	return hours >= 24 && hours % 24 === 0 ? plural(hours / 24, 'day') : plural(hours, 'hour');
 }
 
 /** nk goes to app.nokku.sh unless told otherwise, and the pin lets it trust a server behind a private CA. */

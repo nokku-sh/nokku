@@ -43,6 +43,8 @@ type Policy struct {
 	AllowAgentForwarding bool
 	// GatewayPorts lets -R forwards bind non-loopback addresses.
 	GatewayPorts bool
+	// IdleTimeout closes an interactive session after that long without input. Zero never does.
+	IdleTimeout time.Duration
 }
 
 // DefaultPolicy also fills any field the core leaves unset.
@@ -138,6 +140,7 @@ func PolicyFrom(cfg *nokkuv1.DaemonConfig) Policy {
 	set(&p.AllowForwarding, cfg.AllowForwarding)           //nolint:protogetter // presence check
 	set(&p.AllowAgentForwarding, cfg.AllowAgentForwarding) //nolint:protogetter // presence check
 	set(&p.GatewayPorts, cfg.GatewayPorts)                 //nolint:protogetter // presence check
+	p.IdleTimeout = cfg.GetIdleTimeout().AsDuration()
 	return p
 }
 

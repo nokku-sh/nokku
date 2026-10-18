@@ -45,6 +45,7 @@ func Root() *cli.Command {
 			loginCMD(),
 			logoutCMD(),
 			listCMD(),
+			requestCMD(),
 			syncCMD(),
 			rmCMD(),
 			doctorCMD(),

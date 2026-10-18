@@ -8,6 +8,8 @@ CREATE TABLE workspaces (
   name TEXT NOT NULL,
   description TEXT,
   settings JSONB NOT NULL DEFAULT '{}',
+  -- Members may ask access for the targets with one of these tags.
+  requestable_tags TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -347,6 +349,8 @@ CREATE TABLE grants (
   ) STORED,
   subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, team_id, service_account_id)) STORED,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- NULL is for good. Resolvers skip a grant past it at once, the expiry job deletes it within a minute.
+  expires_at TIMESTAMPTZ,
   FOREIGN KEY (workspace_id, account_id) REFERENCES target_accounts (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, team_id) REFERENCES teams (workspace_id, id) ON DELETE CASCADE,
@@ -354,6 +358,19 @@ CREATE TABLE grants (
   PRIMARY KEY (account_id, subject_id),
   CHECK (num_nonnulls (user_id, team_id, service_account_id) = 1)
 );
+
+-- The grants that have not ended. Every resolver reads this, so an ended grant opens nothing even before the expiry
+-- job deletes it. security_invoker keeps the row security of the caller.
+CREATE VIEW live_grants
+WITH
+  (security_invoker = TRUE) AS
+SELECT
+  *
+FROM
+  grants
+WHERE
+  expires_at IS NULL
+  OR expires_at > NOW();
 
 -- The grants an enroll token seeds on every target it makes. Same shape as grants, keyed by token and username.
 CREATE TABLE join_token_grants (
@@ -380,6 +397,85 @@ CREATE TABLE join_token_grants (
   CHECK (num_nonnulls (user_id, team_id, service_account_id) = 1)
 );
 
+-- A member asks for an account for a while and an admin decides. Approving grants it until then. A request nobody
+-- answers expires after a day.
+CREATE TABLE access_requests (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  requester_id UUID NOT NULL,
+  account_id UUID NOT NULL,
+  duration INTERVAL NOT NULL,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (
+    status IN ('pending', 'approved', 'denied', 'cancelled', 'expired')
+  ),
+  decided_by UUID,
+  decided_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (workspace_id, requester_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, account_id) REFERENCES target_accounts (workspace_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id, decided_by) REFERENCES users (workspace_id, id) ON DELETE SET NULL (decided_by)
+);
+
+-- One open request per person and account.
+CREATE UNIQUE INDEX idx_access_requests_pending ON access_requests (requester_id, account_id)
+WHERE
+  status = 'pending';
+
+CREATE INDEX idx_access_requests_workspace ON access_requests (workspace_id, created_at DESC);
+
+CREATE INDEX idx_access_requests_requester ON access_requests (requester_id, created_at DESC);
+
+-- A request with the names it is shown with.
+CREATE VIEW access_request_details
+WITH
+  (security_invoker = TRUE) AS
+SELECT
+  r.*,
+  t.id AS target_id,
+  t.name AS target_name,
+  p.username,
+  u.name AS requester_name,
+  u.email AS requester_email,
+  COALESCE(d.name, d.email, '') AS decider_name
+FROM
+  access_requests r
+  JOIN target_accounts p ON p.id = r.account_id
+  JOIN targets t ON t.id = p.target_id
+  JOIN users u ON u.id = r.requester_id
+  LEFT JOIN users d ON d.id = r.decided_by;
+
+-- Where audit events go as they happen, like a SIEM. The cursor is the last event sent, so nothing is dropped and
+-- events go in order. A retry may send one again, its id tells. A failing stream is retried after retry_at.
+CREATE TABLE audit_streams (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('webhook', 'splunk', 'datadog')),
+  url TEXT NOT NULL,
+  secret BYTEA NOT NULL, -- the HMAC key, HEC token or API key, stored encrypted
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  cursor_ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  cursor_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+  last_sent_at TIMESTAMPTZ,
+  last_error TEXT NOT NULL DEFAULT '',
+  failing_since TIMESTAMPTZ,
+  retry_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_streams_workspace ON audit_streams (workspace_id);
+
+-- When a subject last got a certificate for a target, for the access review. nk signs again once half of a
+-- certificate's life is gone, so this trails real use by a few days at most. A row of a deleted subject is ignored.
+CREATE TABLE access_usage (
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  target_id UUID NOT NULL,
+  subject_id UUID NOT NULL,
+  last_cert_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (target_id, subject_id),
+  FOREIGN KEY (workspace_id, target_id) REFERENCES targets (workspace_id, id) ON DELETE CASCADE
+);
+
 CREATE TABLE recordings (
   id UUID PRIMARY KEY DEFAULT uuidv7(), -- the session id
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -398,6 +494,33 @@ CREATE TABLE recordings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE SET NULL (daemon_id)
 );
+
+-- Keeps the audit rows and recordings of a time range past their retention, for an incident or an investigation.
+-- Not the billing hold, which keeps the data of an ended plan for a while. ends_at NULL holds until released.
+CREATE TABLE legal_holds (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ,
+  created_by UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (
+    ends_at IS NULL
+    OR ends_at > starts_at
+  ),
+  FOREIGN KEY (workspace_id, created_by) REFERENCES users (workspace_id, id) ON DELETE SET NULL (created_by)
+);
+
+CREATE INDEX idx_legal_holds_workspace ON legal_holds (workspace_id);
+
+-- Whether a legal hold keeps what a workspace recorded at stamp. Every delete of audit rows and recordings asks it.
+CREATE FUNCTION legal_hold_covers (ws UUID, stamp TIMESTAMPTZ) RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM legal_holds h
+    WHERE h.workspace_id = ws AND stamp >= h.starts_at AND (h.ends_at IS NULL OR stamp < h.ends_at)
+  )
+$$;
 
 -- The one keyset that encrypts everything at rest. rotated_at is when it last got a new primary key.
 CREATE TABLE keysets (
@@ -448,6 +571,10 @@ CREATE INDEX idx_grants_subject ON grants (subject_id);
 
 CREATE INDEX idx_grants_workspace_id ON grants (workspace_id);
 
+CREATE INDEX idx_grants_expires_at ON grants (expires_at)
+WHERE
+  expires_at IS NOT NULL;
+
 -- Carries the size, so the storage total of a workspace is read from the index alone.
 CREATE INDEX idx_recordings_workspace_started ON recordings (workspace_id, started_at DESC) INCLUDE (size_bytes);
 
@@ -476,7 +603,9 @@ CREATE FUNCTION bump_state_version () RETURNS TRIGGER AS $$
 DECLARE
   ws UUID;
 BEGIN
-  IF TG_OP = 'DELETE' THEN
+  IF TG_TABLE_NAME = 'workspaces' THEN
+    ws := NEW.id;
+  ELSIF TG_OP = 'DELETE' THEN
     ws := OLD.workspace_id;
   ELSE
     ws := NEW.workspace_id;
@@ -498,6 +627,12 @@ SET
 CREATE TRIGGER bump_state_version
 AFTER INSERT
 OR DELETE ON grants FOR EACH ROW
+EXECUTE FUNCTION bump_state_version ();
+
+-- An expiry moved earlier must reach the hosts before the old one would have.
+CREATE TRIGGER bump_state_version_update
+AFTER
+UPDATE OF expires_at ON grants FOR EACH ROW WHEN (OLD.expires_at IS DISTINCT FROM NEW.expires_at)
 EXECUTE FUNCTION bump_state_version ();
 
 CREATE TRIGGER bump_state_version
@@ -542,6 +677,14 @@ EXECUTE FUNCTION bump_state_version ();
 CREATE TRIGGER bump_state_version
 AFTER
 UPDATE OF ca_id ON targets FOR EACH ROW WHEN (OLD.ca_id IS DISTINCT FROM NEW.ca_id)
+EXECUTE FUNCTION bump_state_version ();
+
+-- Daemons take the idle timeout from the workspace settings, nothing else in them.
+CREATE TRIGGER bump_state_version
+AFTER
+UPDATE OF settings ON workspaces FOR EACH ROW WHEN (
+  OLD.settings -> 'session_idle_timeout' IS DISTINCT FROM NEW.settings -> 'session_idle_timeout'
+)
 EXECUTE FUNCTION bump_state_version ();
 
 -- A deactivated account must leave every daemon's map at once.
@@ -601,7 +744,10 @@ BEGIN
     'targets',
     'target_accounts',
     'grants',
-    'recordings'
+    'recordings',
+    'legal_holds',
+    'access_requests',
+    'audit_streams'
   ] LOOP
     EXECUTE format(
       'CREATE TRIGGER notify_change AFTER INSERT OR DELETE ON %I
@@ -624,7 +770,7 @@ BEGIN
           AND attnum > 0
           AND NOT attisdropped
           AND attgenerated = ''
-          AND attname NOT IN ('last_seen_at', 'last_used_at', 'last_sync_at')
+          AND attname NOT IN ('last_seen_at', 'last_used_at', 'last_sync_at', 'cursor_ts', 'cursor_id', 'last_sent_at')
       ),
       t
     );
@@ -722,7 +868,11 @@ BEGIN
     'targets',
     'target_accounts',
     'grants',
-    'recordings'
+    'access_usage',
+    'recordings',
+    'legal_holds',
+    'access_requests',
+    'audit_streams'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
