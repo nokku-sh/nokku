@@ -24,6 +24,8 @@ import (
 
 //go:generate pnpm install
 //go:generate pnpm build
+// The build empties build/, the placeholder lets go build work without node.
+//go:generate touch build/.gitkeep
 //go:embed all:build
 var staticFS embed.FS
 
