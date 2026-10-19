@@ -22,6 +22,8 @@ import (
 	"github.com/vearutop/statigz/brotli"
 )
 
+//go:generate pnpm install
+//go:generate pnpm build
 //go:embed all:build
 var staticFS embed.FS
 

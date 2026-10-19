@@ -3,26 +3,21 @@ version: "3"
 tasks:
   build:
     desc: Build binary
+    env:
+      CGO_ENABLED: 0
     cmds:
       - mkdir -p ~/.local/bin
-      - CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o ~/.local/bin/ ./cmd/nk
+      - go build -ldflags="-s -w" -trimpath -o ~/.local/bin/ ./cmd/nk
 
   enclave:
     desc: Build nk with the Secure Enclave bridge (macOS only)
     platforms: [darwin]
+    env:
+      CGO_ENABLED: 1
     cmds:
       - ./internal/enclave/build.sh
       - mkdir -p ~/.local/bin
-      - CGO_ENABLED=1 go build -tags enclave -ldflags="-s -w" -trimpath -o ~/.local/bin/ ./cmd/nk
-
-  snapshot:bin:
-    desc: Build snapshot binaries of nk only, the darwin ones only build on a Mac
-    env:
-      NOKKU_ONLY: cli
-    # .goreleaser.yaml is in the repo root.
-    dir: ..
-    cmds:
-      - goreleaser build --snapshot --clean {{.CLI_ARGS}}
+      - go build -tags enclave -ldflags="-s -w" -trimpath -o ~/.local/bin/ ./cmd/nk
 
   lint:
     desc: Run go vet & lint
@@ -45,3 +40,11 @@ tasks:
             go test "$pkg" -run='^$' -fuzz="^${target}$" -fuzztime="{{.FUZZTIME}}"
           done
         done
+
+  snapshot:bin:
+    desc: Build snapshot binaries of nk only, the darwin ones only build on a Mac
+    env:
+      NOKKU_ONLY: cli
+    dir: ..
+    cmds:
+      - goreleaser build --snapshot --clean {{.CLI_ARGS}}

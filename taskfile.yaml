@@ -16,15 +16,15 @@ tasks:
     desc: Regenerate everything that comes from proto/ and the SQL queries
     cmds:
       - buf generate
-      - task: core:gen
+      - cd core && sqlc generate
 
   update:
     desc: Update dependencies
     cmds:
       - cd proto && buf dep update
+      - cd core/web && pnpm update --latest
       - go get -u ./...
       - go mod tidy
-      - task: core:update
 
   test:
     desc: Run the unit tests of every app

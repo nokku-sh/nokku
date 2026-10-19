@@ -3,8 +3,10 @@ version: "3"
 tasks:
   build:
     desc: Build binary
+    env:
+      CGO_ENABLED: 0
     cmds:
-      - CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o nokkud ./cmd/nokkud
+      - go build -ldflags="-s -w" -trimpath -o nokkud ./cmd/nokkud
       - sudo mv nokkud /usr/local/bin
 
   lint:
@@ -34,7 +36,6 @@ tasks:
     env:
       NOKKU_ONLY: daemon
       IMAGE: ghcr.io/nokku-sh/nokkud
-    # .goreleaser.yaml is in the repo root.
     dir: ..
     cmds:
       - goreleaser release --snapshot --clean --skip=validate,sign,sbom,archive,nfpm,ko
