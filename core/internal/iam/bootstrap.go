@@ -71,8 +71,11 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 	if cfg.AdminEmail == "" {
 		return "", nil
 	}
+	if cfg.AdminName == "" {
+		cfg.AdminName = strings.Split(cfg.AdminEmail, "@")[0]
+	}
 	var owner *db.User
-	err = s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+	if err = s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		owner, err = q.GetOwner(ctx)
 		if errors.Is(err, pgx.ErrNoRows) {
 			owner, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
@@ -82,8 +85,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 			}, "")
 		}
 		return err
-	})
-	if err != nil {
+	}); err != nil {
 		return "", err
 	}
 	creds, err := s.conn.Tenant().ListUserCredentials(ctx, owner.ID)
