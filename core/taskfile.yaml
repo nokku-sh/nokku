@@ -2,11 +2,24 @@ version: "3"
 
 tasks:
   dev:
-    desc: Run backend and frontend concurrently, the app is on the backend's port
-    deps: [backend, frontend]
+    desc: Run backend and frontend concurrently and seed the users to sign in as, the app is on the backend's port
+    deps: [backend, frontend, seed:idp]
+
+  dev:reset:
+    desc: Wipe every dev container, then run dev
+    cmds:
+      - docker compose -f compose.dev.yml up -d --force-recreate
+      - task: dev
+
+  containers:
+    desc: Start the dev containers of compose.dev.yml, then wait for Postgres
+    cmds:
+      - docker compose -f compose.dev.yml up -d
+      - docker compose -f compose.dev.yml up -d --wait postgres
 
   backend:
     desc: Run backend
+    deps: [containers]
     env:
       NOKKU_DEV_UI: "http://localhost:5173"
     cmds:
@@ -18,34 +31,11 @@ tasks:
     cmds:
       - pnpm run dev
 
-  update:
-    desc: Update frontend dependencies, Go modules are updated from the repo root
-    cmds:
-      - cd web && pnpm update --latest
-
-  gen:
-    desc: Generate sqlc and the web client from ../proto
-    cmds:
-      - buf generate
-      - sqlc generate
-
   build:
     desc: Build binary
-    deps: [build:ui]
     cmds:
+      - go generate ./...
       - go build -ldflags="-s -w{{ if .NOKKU_LICENSE_PUBLIC_KEY }} -X github.com/nokku-sh/nokku/core/internal/config.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}{{ end }}" -trimpath -o bin/nokku ./cmd/nokku
-
-  build:ui:
-    desc: Build frontends
-    dir: web
-    cmds:
-      - pnpm install; pnpm build
-      - touch build/.gitkeep
-
-  test:
-    desc: Run the unit tests
-    cmds:
-      - go test -race -count=1 -cover ./...
 
   test:integration:
     desc: Run the integration tests, they start Postgres, Keycloak and Vault in Docker
@@ -70,7 +60,6 @@ tasks:
     env:
       NOKKU_ONLY: core
       IMAGE: ghcr.io/nokku-sh/nokku
-    # .goreleaser.yaml is in the repo root.
     dir: ..
     cmds:
       - goreleaser release --snapshot --clean --skip=validate,sign,sbom,archive,nfpm,docker
@@ -90,45 +79,14 @@ tasks:
     cmds:
       - stripe listen -f http://localhost:3000/webhooks/stripe --events customer.subscription.created,customer.subscription.updated,customer.subscription.deleted
 
-  migrate:new:
-    desc: Create a new migration file (pass a name, e.g. "add_users_last_login")
-    cmds:
-      - tern new {{.CLI_ARGS}} --migrations internal/db/migrations
-
-  migrate:status:
-    desc: Show applied migrations
-    cmds:
-      - tern status --migrations internal/db/migrations
-
   seed:
     desc: Fill the dev database with fake data, flags go after --
     cmds:
       - go run ./cmd/seed {{.CLI_ARGS}}
 
-  migrate:up:
-    desc: Apply pending migrations (dev only; production auto-migrates on boot)
+  seed:idp:
+    desc: Set up Pocket ID sign-ins with ready users, it waits for the server
     cmds:
-      - tern migrate --migrations internal/db/migrations
-
-  migrate:down:
-    desc: Revert last migration
-    cmds:
-      - tern migrate --migrations internal/db/migrations --destination -1
-
-  migrate:dump:
-    desc: Dump the current schema from a migrated database (for squashing)
-    cmds:
-      - |
-        pg_dump --schema-only --no-owner --no-privileges --no-comments \
-        --no-security-labels --no-publications --no-subscriptions \
-        --no-tablespaces -h 127.0.0.1 -p 5432 -U postgres \
-        -d nokku > new-001_base.sql
-      - |
-        echo "Dumped to new-001_base.sql. To squash, prepend the role creation \
-        block and append the grants section from the current 001_base.sql, \
-        strip pg_dump's schema_version bookkeeping table and \\restrict lines, \
-        replace internal/db/migrations/001_base.sql with the result, \
-        and delete the old migrations. A database that is ahead needs \
-        UPDATE schema_version SET version = 1."
-    env:
-      PGPASSWORD: "{{ .PGPASSWORD }}"
+      # It runs next to the server in dev, a failure must not stop that.
+      - cmd: go run ./cmd/seed idp
+        ignore_error: true

@@ -1,4 +1,4 @@
-// Command seed fills the first workspace of a dev database with fake data.
+// Command seed fills the first workspace of a dev database with fake data, or with users who can sign in.
 package main
 
 import (
@@ -35,6 +35,14 @@ func main() {
 			&cli.IntFlag{Name: "daemons", Value: 5, Usage: "number of daemons, each with its server"},
 		},
 		Action: run,
+		Commands: []*cli.Command{{
+			Name:  "idp",
+			Usage: "set up sign-ins against the Pocket ID of compose.dev.yml",
+			Description: "It waits for the server, then adds Pocket ID as a provider, fills Pocket ID " +
+				"with users and groups, and has it send them over SCIM. The owner is linked to " +
+				"admin@nokku.test. task dev runs it.",
+			Action: runIDP,
+		}},
 	}
 
 	if err := cmd.Run(sigx.NotifyContext(), os.Args); err != nil {
@@ -43,32 +51,15 @@ func main() {
 	}
 }
 
-// Only the database and the keys, the server may be running next to this.
 func run(ctx context.Context, cmd *cli.Command) error {
 	ec, err := env.ParseAs[config.EnvConfig]()
 	if err != nil {
 		return err
 	}
-	conn, err := db.NewConnection(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
-	}
-	ws, err := conn.Sys().GetFirstWorkspace(ctx)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return errors.New("there is no workspace yet, start the server once")
-	}
+	ctx, conn, ws, err := open(ctx, ec)
 	if err != nil {
 		return err
 	}
-	// The key of a CA is encrypted on its way into the database.
-	enc, err := kms.New(ctx, conn, ec.Secret)
-	if err != nil {
-		return err
-	}
-	if err := crypto.SetEncryptor(enc); err != nil {
-		return err
-	}
-
 	n := counts{
 		users:           cmd.Int("users"),
 		teams:           cmd.Int("teams"),
@@ -77,7 +68,6 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		targets:         cmd.Int("targets"),
 		daemons:         cmd.Int("daemons"),
 	}
-	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: ec.FullURL()})
 	err = conn.TenantTx(ctx, func(q *db.Queries) error {
 		return seed(ctx, q, ws, n)
 	})
@@ -93,4 +83,29 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		ws.Name, n.users, n.teams, n.serviceAccounts, n.cas, n.targets, n.daemons,
 	)
 	return nil
+}
+
+// open takes only the database and the keys, the server may be running next to this. The ctx carries the first workspace.
+func open(ctx context.Context, ec config.EnvConfig) (context.Context, *db.Connection, *db.Workspace, error) {
+	conn, err := db.NewConnection(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+	ws, err := conn.Sys().GetFirstWorkspace(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, nil, errors.New("there is no workspace yet, start the server once")
+	}
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// Keys and provider secrets are encrypted on their way into the database.
+	enc, err := kms.New(ctx, conn, ec.Secret)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if err := crypto.SetEncryptor(enc); err != nil {
+		return nil, nil, nil, err
+	}
+	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: ec.FullURL()})
+	return ctx, conn, ws, nil
 }

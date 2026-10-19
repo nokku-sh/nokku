@@ -50,22 +50,19 @@ silently rotates every machine identity derived from it.
 
 ## The core
 
-Start a local PostgreSQL (ephemeral/tmpfs):
-
-```bash
-cd core
-docker compose -f compose.dev.yml up -d postgres
-```
-
 Set `NOKKU_SECRET` to any 32 characters or more. The database defaults already
-match the dev PostgreSQL. Then run backend and frontend together:
+match the dev PostgreSQL. Then, in `core/`:
 
 ```bash
 task dev
 ```
 
-This runs the backend (`go run ./cmd/nokku`) and the `web` frontend via
-Vite. Open `http://localhost:3000`, the backend's address. The backend takes
+This starts the containers of `compose.dev.yml`, then the backend
+(`go run ./cmd/nokku`) and the `web` frontend via Vite, and seeds the users to
+sign in as (see below). Every container keeps its data in memory,
+`task dev:reset` wipes them all and runs `task dev` again.
+
+Open `http://localhost:3000`, the backend's address. The backend takes
 the UI from Vite (the `backend` task sets `NOKKU_DEV_UI` for it), so edits
 show up at once, and links, cookies and passkeys use the same address a real
 install has. Leave `NOKKU_BASE_URL` unset.
@@ -78,6 +75,35 @@ To work on the built-in TLS, give this machine a name, like a line
 The app is then on `https://nokku.test:3000`. Run
 `nk --api https://nokku.test:3000 --pin ... login` once with the pin from the
 start log, it installs the CA for your browser.
+
+### Users to sign in as
+
+`compose.dev.yml` runs Pocket ID at http://localhost:1411 for OIDC and SCIM.
+`task dev` runs `task seed:idp` next to the server. It waits until the server
+is up, adds Pocket ID as a provider, fills Pocket ID with the users below and
+has it send them over SCIM.
+
+The server needs `NOKKU_ALLOW_PRIVATE_NETWORKS=true`, Pocket ID is on
+localhost. Set `NOKKU_ADMIN_EMAIL=admin@nokku.test`, the owner is linked to
+the first Pocket ID user. Point mail at Mailpit: `NOKKU_SMTP_HOST=localhost`,
+`NOKKU_SMTP_PORT=1025` and no username or password. Mailpit keeps every mail,
+whoever it is for, at http://localhost:8025.
+
+Pocket ID has no passwords. On nokku's login page pick Pocket ID, then
+Alternative Sign In Methods, Email Login, and enter the address. The code
+lands in Mailpit. A passkey you register in Pocket ID skips that next time.
+
+| User                | In nokku                                     |
+| ------------------- | -------------------------------------------- |
+| `admin@nokku.test`  | the owner, and admin of Pocket ID            |
+| `editor@nokku.test` | editor, team Platform                        |
+| `member@nokku.test` | member, team Platform                        |
+| `viewer@nokku.test` | viewer, team SRE                             |
+| `gone@nokku.test`   | sent deactivated, cannot sign in             |
+
+Pocket ID syncs five minutes after a change and every hour. Its admin page
+has Sync now on the nokku client. It owns the directory: a nokku user it does
+not know, say from `task seed` or an invite, is deprovisioned on the next sync.
 
 ## Regenerating generated code
 
