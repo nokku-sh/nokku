@@ -126,7 +126,7 @@ linters:
     exhaustive:
       check:
         - switch
-        - map
+        - mapliteral
 
     funcorder:
       struct-method: false
@@ -224,14 +224,14 @@ linters:
           - gocognit
           - funlen
       # The server is not on the strict rules yet, shadow alone is 340 findings.
-      - path: '^core/'
+      - path: "^core/"
         linters:
           - funlen
           - gocognit
           - goconst
           - nilnil
-      - path: '^core/'
-        text: '^shadow:'
+      - path: "^core/"
+        text: "^shadow:"
         linters: [govet]
       - path: '^core/internal/recording/term\.go'
         linters: [cyclop]
