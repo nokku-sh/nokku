@@ -9,6 +9,32 @@ import (
 	"context"
 )
 
+const getTeamByName = `-- name: GetTeamByName :one
+SELECT
+  id, workspace_id, name, description, tags, scim_external_id, created_at, updated_at
+FROM
+  teams
+WHERE
+  name = $1
+`
+
+// A SCIM create takes over a team of that name that no group is linked to yet.
+func (q *Queries) GetTeamByName(ctx context.Context, name string) (*Team, error) {
+	row := q.db.QueryRow(ctx, getTeamByName, name)
+	var i Team
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Description,
+		&i.Tags,
+		&i.ScimExternalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const listSCIMUsers = `-- name: ListSCIMUsers :many
 SELECT
   id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
@@ -62,6 +88,39 @@ func (q *Queries) ListSCIMUsers(ctx context.Context, arg *ListSCIMUsersParams) (
 		return nil, err
 	}
 	return items, nil
+}
+
+const setTeamSCIMExternalID = `-- name: SetTeamSCIMExternalID :one
+UPDATE teams
+SET
+  scim_external_id = $1,
+  updated_at = NOW()
+WHERE
+  id = $2
+RETURNING
+  id, workspace_id, name, description, tags, scim_external_id, created_at, updated_at
+`
+
+type SetTeamSCIMExternalIDParams struct {
+	ExternalID *string `json:"externalId"`
+	ID         string  `json:"id"`
+}
+
+// Like SetUserSCIMExternalID, for a SCIM group.
+func (q *Queries) SetTeamSCIMExternalID(ctx context.Context, arg *SetTeamSCIMExternalIDParams) (*Team, error) {
+	row := q.db.QueryRow(ctx, setTeamSCIMExternalID, arg.ExternalID, arg.ID)
+	var i Team
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Description,
+		&i.Tags,
+		&i.ScimExternalID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
 }
 
 const setUserSCIMExternalID = `-- name: SetUserSCIMExternalID :exec

@@ -1,6 +1,6 @@
 package iam
 
-// SCIM Groups are workspace teams. The SCIM id is the team id and members reference user ids.
+// SCIM Groups are workspace teams. The SCIM id is the team id, members reference user ids, externalId is on the row.
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	scim "github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
+	"github.com/elimity-com/scim/optional"
 	"github.com/jackc/pgx/v5"
 	filter "github.com/scim2/filter-parser/v2"
 
@@ -43,16 +44,29 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 	if name == "" {
 		return scim.Resource{}, scimerrors.ScimErrorBadRequest("displayName is required")
 	}
+	ctx := r.Context()
 	var res scim.Resource
-	err := h.tx(r.Context(), "", func(q *db.Queries) error {
-		team, err := q.CreateTeam(r.Context(), &db.CreateTeamParams{Name: name})
-		if err != nil {
+	err := h.tx(ctx, "", func(q *db.Queries) error {
+		// A team made by hand is taken over, it keeps its id and its grants. The members are the group's from now on.
+		team, err := q.GetTeamByName(ctx, name)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			if team, err = q.CreateTeam(ctx, &db.CreateTeamParams{Name: name}); err != nil {
+				return err
+			}
+		case err != nil:
+			return err
+		case team.ScimExternalID != nil:
+			// Another group of the provider holds it, adopting would let the two overwrite each other.
+			return scimerrors.ScimErrorUniqueness
+		}
+		if team, err = linkTeamSCIM(ctx, q, team, scimAttrString(attrs["externalId"])); err != nil {
 			return err
 		}
-		if err := addTeamMembers(r.Context(), q, team.ID, scimMemberRefs(attrs["members"])); err != nil {
+		if err := setTeamMembers(ctx, q, team.ID, scimMemberRefs(attrs["members"])); err != nil {
 			return err
 		}
-		res, err = groupResource(r.Context(), q, h.ws, team)
+		res, err = groupResource(ctx, q, h.ws, team)
 		return err
 	})
 	return res, err
@@ -106,6 +120,9 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 				return err
 			}
 		}
+		if team, err = linkTeamSCIM(ctx, q, team, scimAttrString(attrs["externalId"])); err != nil {
+			return err
+		}
 		// The PUT representation is authoritative for members.
 		if err := setTeamMembers(ctx, q, id, scimMemberRefs(attrs["members"])); err != nil {
 			return err
@@ -142,6 +159,10 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 				changed = true
 				team, err = q.UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, Name: &name})
 				return err
+			case "externalId":
+				changed = true
+				team, err = linkTeamSCIM(ctx, q, team, scimAttrString(value))
+				return err
 			case "members":
 				changed = true
 				ids := scimMemberRefs(value)
@@ -173,6 +194,18 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 		return err
 	})
 	return res, err
+}
+
+// linkTeamSCIM stores the identity provider's id on the team, the way linkSCIM does on a user.
+func linkTeamSCIM(ctx context.Context, q *db.Queries, team *db.Team, externalID string) (*db.Team, error) {
+	if externalID == "" || (team.ScimExternalID != nil && *team.ScimExternalID == externalID) {
+		return team, nil
+	}
+	team, err := q.SetTeamSCIMExternalID(ctx, &db.SetTeamSCIMExternalIDParams{ID: team.ID, ExternalID: &externalID})
+	if db.IsUniqueViolation(err) {
+		return nil, scimerrors.ScimErrorBadRequest("externalId is already linked to another group")
+	}
+	return team, err
 }
 
 // setTeamMembers makes userIDs the whole membership.
@@ -228,11 +261,15 @@ func groupResource(
 		})
 	}
 	attrs := scim.ResourceAttributes{"members": members, "displayName": team.Name}
-	return scim.Resource{
+	out := scim.Resource{
 		ID:         team.ID,
 		Attributes: attrs,
 		Meta:       scim.Meta{Created: &team.CreatedAt, LastModified: &team.UpdatedAt},
-	}, nil
+	}
+	if team.ScimExternalID != nil {
+		out.ExternalID = optional.NewString(*team.ScimExternalID)
+	}
+	return out, nil
 }
 
 func scimFilterValues(expr filter.Expression) []string {

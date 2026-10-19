@@ -194,9 +194,11 @@ CREATE TABLE teams (
   name TEXT NOT NULL,
   description TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',
+  scim_external_id TEXT, -- the identity provider's id for a group SCIM provisions
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, id)
+  UNIQUE (workspace_id, id),
+  UNIQUE (workspace_id, scim_external_id)
 );
 
 CREATE TABLE team_members (

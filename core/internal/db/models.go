@@ -321,13 +321,14 @@ type TargetAccount struct {
 }
 
 type Team struct {
-	ID          string    `json:"id"`
-	WorkspaceID string    `json:"workspaceId"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description"`
-	Tags        []string  `json:"tags"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID             string    `json:"id"`
+	WorkspaceID    string    `json:"workspaceId"`
+	Name           string    `json:"name"`
+	Description    *string   `json:"description"`
+	Tags           []string  `json:"tags"`
+	ScimExternalID *string   `json:"scimExternalId"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 type TeamMember struct {

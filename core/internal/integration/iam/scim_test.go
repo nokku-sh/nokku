@@ -409,6 +409,87 @@ func TestSCIMGroupPatchMembers(t *testing.T) {
 	assert.Empty(t, members(bare), "a bare remove left members")
 }
 
+// Pocket ID finds its groups again by externalId. One it cannot find it creates again, then deletes.
+func TestSCIMGroupKeepsExternalID(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	c := e.scim(t, o)
+	group := func(name, externalID string) map[string]any {
+		return map[string]any{
+			"schemas":     []string{"urn:ietf:params:scim:schemas:core:2.0:Group"},
+			"displayName": name,
+			"externalId":  externalID,
+		}
+	}
+
+	var created scimResource
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Groups", group("platform", "pid-1"), &created))
+	assert.Equal(t, "pid-1", created.ExternalID, "create dropped externalId")
+
+	var list scimList
+	require.Equal(t, http.StatusOK, c.do(http.MethodGet, "/Groups", nil, &list))
+	require.Len(t, list.Resources, 1)
+	assert.Equal(t, "pid-1", list.Resources[0].ExternalID, "list dropped externalId")
+
+	var got scimResource
+	require.Equal(t, http.StatusOK, c.do(http.MethodPut, "/Groups/"+created.ID, group("platform", "pid-2"), &got))
+	assert.Equal(t, "pid-2", got.ExternalID, "replace kept the old externalId")
+	require.Equal(
+		t,
+		http.StatusOK,
+		c.do(http.MethodPatch, "/Groups/"+created.ID, patchOp("replace", "externalId", "pid-3"), &got),
+	)
+	assert.Equal(t, "pid-3", got.ExternalID, "patch kept the old externalId")
+
+	assert.Equal(
+		t,
+		http.StatusBadRequest,
+		c.do(http.MethodPost, "/Groups", group("sre", "pid-3"), nil),
+		"a second group took the same externalId",
+	)
+}
+
+// A team made by hand is taken over by the group of its name, so it keeps its id and grants.
+func TestSCIMGroupAdoptsAnUnlinkedTeam(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	c := e.scim(t, o)
+	var alice, bob scimResource
+	c.do(http.MethodPost, "/Users", scimUser("alice@"+testDomain(), ""), &alice)
+	c.do(http.MethodPost, "/Users", scimUser("bob@"+testDomain(), ""), &bob)
+	var team *db.Team
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
+		if team, err = q.CreateTeam(t.Context(), &db.CreateTeamParams{Name: "platform"}); err != nil {
+			return err
+		}
+		return q.AddTeamMember(t.Context(), &db.AddTeamMemberParams{TeamID: team.ID, UserID: alice.ID})
+	}))
+	group := func(externalID string) map[string]any {
+		return map[string]any{
+			"schemas":     []string{"urn:ietf:params:scim:schemas:core:2.0:Group"},
+			"displayName": "platform",
+			"externalId":  externalID,
+			"members":     []any{map[string]any{"value": bob.ID}},
+		}
+	}
+
+	var got scimResource
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Groups", group("pid-1"), &got))
+	assert.Equal(t, team.ID, got.ID, "a new team was made instead")
+	assert.Equal(t, "pid-1", got.ExternalID)
+	require.Len(t, got.Members, 1, "the members are the group's")
+	assert.Equal(t, bob.ID, got.Members[0].Value)
+
+	assert.Equal(
+		t,
+		http.StatusConflict,
+		c.do(http.MethodPost, "/Groups", group("pid-2"), nil),
+		"a linked team was taken over",
+	)
+	require.Equal(t, http.StatusOK, c.do(http.MethodGet, "/Groups/"+team.ID, nil, &got))
+	assert.Equal(t, "pid-1", got.ExternalID, "the refused create relinked the team")
+}
+
 // Switching an account back on takes a seat like a join does.
 func TestSCIMReactivationNeedsASeat(t *testing.T) {
 	e := newTestEnvWith(t, iam.Deps{CanJoin: func(_ context.Context, _ string, used int64) error {

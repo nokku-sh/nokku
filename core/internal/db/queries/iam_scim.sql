@@ -24,3 +24,23 @@ SET
   updated_at = NOW()
 WHERE
   id = @id;
+
+-- name: SetTeamSCIMExternalID :one
+-- Like SetUserSCIMExternalID, for a SCIM group.
+UPDATE teams
+SET
+  scim_external_id = sqlc.narg('external_id'),
+  updated_at = NOW()
+WHERE
+  id = @id
+RETURNING
+  *;
+
+-- name: GetTeamByName :one
+-- A SCIM create takes over a team of that name that no group is linked to yet.
+SELECT
+  *
+FROM
+  teams
+WHERE
+  name = @name;
