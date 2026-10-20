@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 )
 
 // newTimeoutInterceptor caps every unary call. A deadline the client asked for only counts when it is earlier.
