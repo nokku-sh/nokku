@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/cenkalti/backoff/v7"
 	"github.com/mizuchilabs/kata/buildinfo"
 

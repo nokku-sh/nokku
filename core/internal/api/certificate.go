@@ -11,7 +11,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	gossh "golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/types/known/timestamppb"
 

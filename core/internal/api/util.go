@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/mizuchilabs/kata/buildinfo"
 
 	"github.com/nokku-sh/nokku/core/internal/access"

@@ -11,7 +11,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/realip"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	nokkudaemon "github.com/nokku-sh/nokku/core/internal/daemon"
 
