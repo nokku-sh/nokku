@@ -13,6 +13,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	// The host's git config would sign the test commits, which asks a security key for a touch.
+	_ = os.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	_ = os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	os.Exit(leaktest.Exit(m.Run()))
 }
 
