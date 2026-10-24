@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"connectrpc.com/validate"
 
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"

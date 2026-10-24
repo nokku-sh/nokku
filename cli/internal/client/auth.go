@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 )
 
 // callTimeout bounds every unary call. The relay is a stream and lives as long as the ssh session.

@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 

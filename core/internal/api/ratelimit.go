@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-chi/httprate"
 
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"

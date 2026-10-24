@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"github.com/nokku-sh/nokku/internal/dpop"
 )

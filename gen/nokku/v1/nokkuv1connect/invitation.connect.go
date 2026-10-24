@@ -5,7 +5,7 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
 	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"

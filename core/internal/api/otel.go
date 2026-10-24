@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"connectrpc.com/otelconnect"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"go.opentelemetry.io/contrib/bridges/otelslog"

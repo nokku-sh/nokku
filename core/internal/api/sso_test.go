@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
