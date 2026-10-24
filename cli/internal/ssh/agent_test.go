@@ -239,7 +239,8 @@ func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 }
 
 func sshCmd(env, args []string) (string, error) {
-	cmd := exec.Command("ssh", args...)
+	// The host's ssh config, like a ControlMaster, would change what these runs prove.
+	cmd := exec.Command("ssh", append([]string{"-F", "/dev/null"}, args...)...)
 	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	return string(out), err
