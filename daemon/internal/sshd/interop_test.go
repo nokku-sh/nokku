@@ -51,6 +51,7 @@ func TestBinaryInterop(t *testing.T) {
 	identity := userCertFile(t, ca)
 	known := filepath.Join(t.TempDir(), "known_hosts")
 	baseOpts := []string{
+		"-F", "/dev/null",
 		"-p", port,
 		"-i", identity,
 		"-o", "StrictHostKeyChecking=no",
@@ -58,6 +59,7 @@ func TestBinaryInterop(t *testing.T) {
 	}
 	// scp/sftp take the port as -P, ssh/rsync/git take -p.
 	fileOpts := []string{
+		"-F", "/dev/null",
 		"-P", port,
 		"-i", identity,
 		"-o", "StrictHostKeyChecking=no",

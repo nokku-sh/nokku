@@ -223,7 +223,7 @@ func TestServerRsync(t *testing.T) {
 	user := currentUser(t)
 	remote := fmt.Sprintf("%s@%s:%s", user, host, filepath.Join(scratch, "data.txt"))
 	sshOpts := fmt.Sprintf(
-		"ssh -p %s -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+		"ssh -F /dev/null -p %s -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
 		port,
 		userCertFile(t, ca),
 	)
@@ -293,7 +293,7 @@ func TestServerGit(t *testing.T) {
 	)
 
 	sshCmd := fmt.Sprintf(
-		"ssh -p %s -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+		"ssh -F /dev/null -p %s -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
 		port,
 		key,
 	)

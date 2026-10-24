@@ -38,6 +38,7 @@ func TestServerSCPLegacy(t *testing.T) {
 
 	identity := userCertFile(t, ca)
 	opts := []string{
+		"-F", "/dev/null",
 		"-O",
 		"-q",
 		"-i", identity,

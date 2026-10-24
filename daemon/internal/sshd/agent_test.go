@@ -177,6 +177,7 @@ func TestServerAgentForwardingInterop(t *testing.T) {
 	identity := userCertFile(t, ca)
 	cmd := exec.Command(
 		sshBin,
+		"-F", "/dev/null",
 		"-A",
 		"-p", port,
 		"-i", identity,

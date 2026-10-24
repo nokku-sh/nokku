@@ -310,6 +310,7 @@ func TestServerRemoteForwardInterop(t *testing.T) {
 	// ssh -R <boundPort>:<echoHost>:<echoPort> -N
 	cmd := exec.Command(
 		sshBin,
+		"-F", "/dev/null",
 		"-p", port,
 		"-i", identity,
 		"-o", "StrictHostKeyChecking=no",
