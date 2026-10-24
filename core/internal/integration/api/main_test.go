@@ -14,7 +14,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/coder/websocket"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -194,11 +194,14 @@ func uniq(prefix string) string {
 	return prefix + "-" + uuid.New().String()[:8]
 }
 
-func header(key, value string) connect.ClientOption {
-	return connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			req.Header().Set(key, value)
-			return next(ctx, req)
+// header sets a request header on unary calls. Stream tests set theirs on the client context.
+func header(key, value string) connect.ClientInterceptor {
+	return func(next connect.ClientFunc) connect.ClientFunc {
+		return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {
+			if info, ok := connect.CallInfoForClientContext(ctx); ok && spec.StreamType == connect.StreamTypeUnary {
+				info.RequestHeader().Set(key, value)
+			}
+			return next(ctx, spec)
 		}
-	}))
+	}
 }

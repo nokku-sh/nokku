@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"connectrpc.com/otelconnect"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
@@ -22,7 +22,7 @@ import (
 )
 
 // newTelemetry turns OTel on when an OTLP endpoint is set. Everything else follows the OTEL_* environment.
-func newTelemetry(ctx context.Context) connect.Interceptor {
+func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return nil
 	}
@@ -98,7 +98,7 @@ func newTelemetry(ctx context.Context) connect.Interceptor {
 		_ = tp.Shutdown(bg)
 	})
 
-	interceptor, err := otelconnect.NewInterceptor()
+	interceptor, err := otelconnect.NewServerInterceptor()
 	if err != nil {
 		slog.Warn("failed to create otel interceptor", "error", err)
 		return nil

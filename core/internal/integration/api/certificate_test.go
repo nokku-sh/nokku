@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
@@ -37,7 +38,9 @@ func TestSignSSHCertificate(t *testing.T) {
 	require.NoError(t, err)
 	wantPrincipal := member.ID + "@" + targetID + ":root"
 
-	principals := nokkuv1connect.NewTargetAccountServiceClient(srv.Client(), srv.URL, adminAuth)
+	principals := nokkuv1connect.NewTargetAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 	root, err := principals.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
 		TargetId: &targetID,
 		Username: new("root"),
@@ -56,12 +59,11 @@ func TestSignSSHCertificate(t *testing.T) {
 	sshPub, err := gossh.NewPublicKey(pub)
 	require.NoError(t, err)
 	sign := func(target string) ([]string, error) {
-		res, err := nokkuv1connect.NewCertificateServiceClient(
-			srv.Client(), srv.URL, header("Authorization", "Bearer "+memberToken),
-		).SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
-			TargetId:  &target,
-			PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
-		})
+		res, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+memberToken))).
+			SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
+				TargetId:  &target,
+				PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
+			})
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +77,7 @@ func TestSignSSHCertificate(t *testing.T) {
 	_, err = sign(targetID)
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err),
 		"a daemon nobody approved got a certificate signed, %v", err)
-	_, err = nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
+	_, err = nokkuv1connect.NewDaemonServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
 			Id:     new(enrolled.GetId()),
 			Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
@@ -90,16 +92,15 @@ func TestSignSSHCertificate(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
 		"a server without a grant got a certificate signed, %v", err)
 
-	synced, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
-		daemonAuth(t, cfg, daemonKey, enrolled.GetAccessToken(),
-			nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)).
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(t, cfg, daemonKey, enrolled.GetAccessToken(),
+		nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))).
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	require.NoError(t, err)
 	require.Len(t, synced.GetPrincipals(), 1)
 	assert.Equal(t, []string{wantPrincipal}, synced.GetPrincipals()[0].GetCertPrincipals(),
 		"the daemon must be told the principal the certificate carries")
 
-	listed, err := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, adminAuth).
+	listed, err := nokkuv1connect.NewTargetServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		GetTargetPrincipals(t.Context(), &nokkuv1.GetTargetPrincipalsRequest{
 			TargetId: &targetID,
 		})
@@ -132,7 +133,9 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, enrolled.GetStatus())
 	targetID := enrolled.GetTargetId()
 
-	accounts := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth)
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 	created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
 		Name: new(uniq("ci")),
 	})
@@ -141,7 +144,9 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	tokenExpiry := time.Now().Add(10 * time.Minute)
 	short := serviceAccountToken(t, accounts, id, timestamppb.New(tokenExpiry))
 
-	principals := nokkuv1connect.NewTargetAccountServiceClient(srv.Client(), srv.URL, adminAuth)
+	principals := nokkuv1connect.NewTargetAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 	root, err := principals.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
 		TargetId: &targetID,
 		Username: new("root"),
@@ -160,13 +165,12 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	require.NoError(t, err)
 	// It asks for two days, which the CA would give a person.
 	validUntil := func(token string) time.Time {
-		res, err := nokkuv1connect.NewCertificateServiceClient(
-			srv.Client(), srv.URL, header("Authorization", "Bearer "+token),
-		).SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
-			TargetId:  &targetID,
-			PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
-			Ttl:       durationpb.New(48 * time.Hour),
-		})
+		res, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
+			SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
+				TargetId:  &targetID,
+				PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
+				Ttl:       durationpb.New(48 * time.Hour),
+			})
 		require.NoError(t, err)
 		return res.GetExpiresAt().AsTime()
 	}
@@ -182,10 +186,12 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 func TestCARestrictions(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	admin := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, header(
-		"Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
-	))
+	admin := nokkuv1connect.NewCertificateServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header(
+			"Authorization",
+			"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+		)),
+	)
 
 	created, err := admin.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 		Name:          new(uniq("restricted")),
@@ -222,7 +228,9 @@ func TestDefaultCAMoves(t *testing.T) {
 	workspaceID := seedWorkspace(t, cfg)
 	adminAuth := header("Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
-	admin := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth)
+	admin := nokkuv1connect.NewCertificateServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 	defaults := func() []string {
 		res, err := admin.ListCertificateAuthorities(t.Context(), &nokkuv1.ListCertificateAuthoritiesRequest{})
 		require.NoError(t, err)

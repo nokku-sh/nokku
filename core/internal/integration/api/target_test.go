@@ -9,7 +9,8 @@ import (
 	"testing"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,8 +55,12 @@ func TestSyncTargetUsers(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 	)
-	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, editorAuth)
-	principals := nokkuv1connect.NewTargetAccountServiceClient(srv.Client(), srv.URL, editorAuth)
+	editor := nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editorAuth),
+	)
+	principals := nokkuv1connect.NewTargetAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editorAuth),
+	)
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:      &targetID,
 		HostPublicKey: &hostKey,
@@ -104,8 +109,15 @@ func TestSyncTargetUsers(t *testing.T) {
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"root", "deploy", "ops", "backup"}, usernames())
 
-	viewer := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)))
+	viewer := nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header(
+				"Authorization",
+				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER),
+			),
+		),
+	)
 	_, err = viewer.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:  &targetID,
 		Usernames: []string{"intruder"},
@@ -117,8 +129,15 @@ func TestUpdateTargetReplacesLists(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	targetID := seedTarget(t, cfg, workspaceID)
-	editor := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)))
+	editor := nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header(
+				"Authorization",
+				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
+			),
+		),
+	)
 
 	updated, err := editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
 		Id:        &targetID,
@@ -241,8 +260,12 @@ func seedAccessGraph(t *testing.T) accessFixture {
 	})
 
 	client := func(role nokkuv1.WorkspaceRole) nokkuv1connect.TargetServiceClient {
-		return nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL,
-			header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role)))
+		return nokkuv1connect.NewTargetServiceClient(
+			connect.NewClient(
+				connecthttp.NewTransport(srv.Client(), srv.URL),
+				header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role)),
+			),
+		)
 	}
 	f.client, f.memberClient = client(
 		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER,
@@ -251,7 +274,12 @@ func seedAccessGraph(t *testing.T) accessFixture {
 	)
 	f.as = func(userID string) nokkuv1connect.TargetServiceClient {
 		token := sessionFor(t, cfg, &db.User{ID: userID})
-		return nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+token))
+		return nokkuv1connect.NewTargetServiceClient(
+			connect.NewClient(
+				connecthttp.NewTransport(srv.Client(), srv.URL),
+				header("Authorization", "Bearer "+token),
+			),
+		)
 	}
 	return f
 }
@@ -490,7 +518,9 @@ func TestNewServerHasTheRootAccount(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	targets := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, admin)
+	targets := nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), admin),
+	)
 	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("web"))})
 	require.NoError(t, err)
 
@@ -512,7 +542,9 @@ func TestNewServerSeedsGrants(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 	)
-	targets := nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL, editor)
+	targets := nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editor),
+	)
 
 	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
 		Name: new(uniq("web")),

@@ -6,15 +6,12 @@ import (
 	"log/slog"
 	"time"
 
-	"connectrpc.com/connect"
-
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
 
 // Proxies close a stream idle for 60s, and the core drops one silent for 2 minutes.
 const heartbeatInterval = 30 * time.Second
-
-type controlStream = connect.BidiStreamForClientSimple[nokkuv1.ConnectRequest, nokkuv1.ConnectResponse]
 
 // Only a daemon rejection is fatal to the caller.
 func (c *Client) runControlStream(ctx context.Context) error {
@@ -47,7 +44,7 @@ func (c *Client) runControlStream(ctx context.Context) error {
 	}
 }
 
-func (c *Client) sendHeartbeats(ctx context.Context, stream *controlStream) {
+func (c *Client) sendHeartbeats(ctx context.Context, stream nokkuv1connect.DaemonControlServiceConnectClientStream) {
 	t := time.NewTicker(heartbeatInterval)
 	defer t.Stop()
 	for {

@@ -5,7 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/go-chi/httprate"
 
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -34,7 +35,7 @@ func (s *Server) withRateLimit(next http.Handler) http.Handler {
 	auth := httprate.LimitBy(authPerMinute, time.Minute, clientIP)(next)
 	deviceStart := httprate.LimitBy(deviceStartsPerWindow, deviceStartWindow, clientIP)(next)
 	// Answered as an RPC error, the signup form reads a bare 429 as the server being gone.
-	rpcErrors := connect.NewErrorWriter()
+	rpcErrors := connecthttp.NewErrorWriter()
 	signup := httprate.LimitBy(signupsPerWindow, signupWindow, clientIP,
 		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
 			_ = rpcErrors.Write(w, r, newError(

@@ -9,9 +9,10 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -67,7 +68,7 @@ func (s *recordingService) ListRecordings(
 func (s *recordingService) GetRecording(
 	ctx context.Context,
 	req *nokkuv1.GetRecordingRequest,
-	stream *connect.ServerStream[nokkuv1.GetRecordingResponse],
+	stream nokkuv1connect.RecordingServiceGetRecordingServerStream,
 ) error {
 	rec, err := s.cfg.Conn.Tenant().GetRecording(ctx, req.GetRecordingId())
 	if err != nil {

@@ -11,7 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,10 @@ func TestTransferOwnership(t *testing.T) {
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
 	stranger := seedUser(t, cfg, seedOtherWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		srv.Client(), srv.URL, header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
+		),
 	)
 	transfer := func(to string) error {
 		_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &to})
@@ -65,7 +69,10 @@ func TestTransferOwnershipAfterTheOwnerRowMoved(t *testing.T) {
 	})
 
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		srv.Client(), srv.URL, header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
+		),
 	)
 	_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &member.ID})
 	require.NoError(t, err)
@@ -82,7 +89,7 @@ func TestAvatar(t *testing.T) {
 	// A transparent, wider than tall PNG. The server crops it to a square.
 	var png bytes.Buffer
 	require.NoError(t, imgpng.Encode(&png, image.NewNRGBA(image.Rect(0, 0, 300, 200))))
-	set, err := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+token)).
+	set, err := nokkuv1connect.NewAccountServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
 		SetAvatar(t.Context(), &nokkuv1.SetAvatarRequest{Image: png.Bytes()})
 	require.NoError(t, err)
 	picture := set.GetUser().GetPicture()
@@ -109,8 +116,12 @@ func TestAvatar(t *testing.T) {
 
 	assert.NotEqual(t, http.StatusOK, get("").StatusCode, "an avatar without a session")
 
-	admin := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
+	admin := nokkuv1connect.NewWorkspaceServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)),
+		),
+	)
 	_, err = admin.DeleteUser(t.Context(), &nokkuv1.DeleteUserRequest{UserId: &user.ID})
 	require.NoError(t, err)
 	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
@@ -123,8 +134,7 @@ func TestAvatar(t *testing.T) {
 func TestAvatarRefusesWhatIsNoImage(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	user := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	_, err := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+sessionFor(t, cfg, user))).
+	_, err := nokkuv1connect.NewAccountServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+sessionFor(t, cfg, user)))).
 		SetAvatar(t.Context(), &nokkuv1.SetAvatarRequest{Image: []byte("<svg onload=alert(1)>")})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
 }
@@ -137,7 +147,10 @@ func TestManageUsers(t *testing.T) {
 	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	viewer := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		srv.Client(), srv.URL, header("Authorization", "Bearer "+sessionFor(t, cfg, admin)),
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header("Authorization", "Bearer "+sessionFor(t, cfg, admin)),
+		),
 	)
 
 	_, err := workspaces.UpdateUserRole(t.Context(), &nokkuv1.UpdateUserRoleRequest{
@@ -183,11 +196,11 @@ func TestSelfHostHasOneWorkspace(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, owner).
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner)).
 		DeleteWorkspace(t.Context(), &nokkuv1.DeleteWorkspaceRequest{})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "got %v", err)
 
-	_, err = nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL).
+	_, err = nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
 		CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{
 			Slug: new("acme"), Name: new("Acme"), OwnerEmail: new("o@acme.test"),
 		})

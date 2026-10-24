@@ -6,16 +6,15 @@ import (
 	"fmt"
 	"io"
 
-	"connectrpc.com/connect"
-
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
 // Read and Write each have exactly one caller, the ProxyCommand pipes.
 type relayStream struct {
-	stream  *connect.BidiStreamForClientSimple[nokkuv1.RelayRequest, nokkuv1.RelayResponse]
+	stream  nokkuv1connect.DaemonServiceRelayClientStream
 	pending []byte
 }
 
@@ -32,8 +31,8 @@ func (c *Client) Relay(ctx context.Context, target *state.Target) (io.ReadWriteC
 	ok := false
 	defer func() {
 		if !ok {
-			_ = stream.CloseRequest()
-			_ = stream.CloseResponse()
+			_ = stream.CloseSend()
+			_ = stream.Close()
 		}
 	}()
 
@@ -95,10 +94,10 @@ func (r *relayStream) Write(p []byte) (int, error) {
 
 // Half-closes the send side. The sshd side keeps streaming until it closes the session.
 func (r *relayStream) CloseWrite() error {
-	return r.stream.CloseRequest()
+	return r.stream.CloseSend()
 }
 
 func (r *relayStream) Close() error {
-	_ = r.stream.CloseRequest()
-	return r.stream.CloseResponse()
+	_ = r.stream.CloseSend()
+	return r.stream.Close()
 }

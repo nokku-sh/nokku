@@ -19,11 +19,14 @@ import (
 	"testing/synctest"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/dpop"
 )
 
@@ -69,7 +72,7 @@ func TestSignUnboundProcedure(t *testing.T) {
 		UserAgent:         "test-agent",
 	})
 
-	header := http.Header{}
+	header := &connect.Header{}
 	require.NoError(t, c.sign(t.Context(), header, enroll))
 	assert.Empty(t, header.Get("Authorization"), "the stored token went to an unbound procedure")
 	assert.Equal(t, "test-agent", header.Get("User-Agent"))
@@ -81,7 +84,7 @@ func TestSignUnboundProcedure(t *testing.T) {
 func TestSignWithoutTokenOrUnbound(t *testing.T) {
 	c := testClient(t, &countingTransport{}, "")
 
-	header := http.Header{}
+	header := &connect.Header{}
 	require.NoError(t, c.sign(t.Context(), header, testProcedure))
 	assert.Empty(t, header.Get("DPoP"), "an unauthenticated procedure must not be signed")
 	assert.Empty(t, header.Get("Authorization"), "an unauthenticated procedure must not carry a token")
@@ -91,7 +94,7 @@ func TestSignBoundToken(t *testing.T) {
 	const token = "session-token"
 	c := testClient(t, &countingTransport{}, token)
 
-	header := http.Header{}
+	header := &connect.Header{}
 	require.NoError(t, c.sign(t.Context(), header, testProcedure))
 	assert.Equal(t, "DPoP "+token, header.Get("Authorization"))
 	got := claims(t, header.Get("DPoP"))
@@ -150,44 +153,102 @@ func TestLearnMarksNonceFresh(t *testing.T) {
 	assert.Equal(t, "learned", c.currentNonce())
 }
 
-func TestLearnFromError(t *testing.T) {
+func TestLearnFrom(t *testing.T) {
 	tr := &countingTransport{}
 	c := testClient(t, tr, "")
 
-	err := connect.NewError(connect.CodeUnauthenticated, errors.New("stale nonce"))
-	err.Meta().Set("DPoP-Nonce", "from-error")
+	_, info := connect.NewClientContext(t.Context())
+	info.ResponseHeader().Set("DPoP-Nonce", "from-error")
 
-	assert.True(t, c.LearnFromError(err), "LearnFromError must report a learned nonce")
+	assert.True(t, c.learnFrom(info, connect.NewError(connect.CodeUnauthenticated, "stale nonce")),
+		"learnFrom must report a learned nonce")
 	assert.Equal(t, "from-error", c.currentNonce())
 	require.NoError(t, c.refreshNonce(t.Context()))
 	assert.Zero(t, tr.calls.Load(), "a learned nonce is fresh")
 
-	assert.False(t, c.LearnFromError(connect.NewError(connect.CodeInternal, errors.New("boom"))),
+	assert.False(t, c.learnFrom(info, connect.NewError(connect.CodeInternal, "boom")),
 		"a non-authentication error carries no nonce to learn")
 }
 
-func TestWrapUnaryRetriesAfterStaleNonce(t *testing.T) {
+// fakeStream stands in for the transport. recv is what Receive answers.
+type fakeStream struct {
+	sent int
+	recv func() error
+}
+
+func (s *fakeStream) SendHeaders() error { return nil }
+func (s *fakeStream) Send(any) error     { s.sent++; return nil }
+func (s *fakeStream) CloseSend() error   { return nil }
+func (s *fakeStream) Close() error       { return nil }
+
+func (s *fakeStream) Receive(any) error {
+	if s.recv == nil {
+		return nil
+	}
+	return s.recv()
+}
+
+// callUnary drives a stream the way connect.Client.CallUnary does.
+func callUnary(ctx context.Context, open connect.ClientFunc) error {
+	stream, err := open(ctx, connect.Spec{Procedure: testProcedure, StreamType: connect.StreamTypeUnary})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = stream.Close() }()
+	if err = stream.Send(&emptypb.Empty{}); err != nil {
+		return err
+	}
+	if err = stream.CloseSend(); err != nil {
+		return err
+	}
+	return stream.Receive(&emptypb.Empty{})
+}
+
+func TestUnaryRetriesAfterStaleNonce(t *testing.T) {
 	c := testClient(t, &countingTransport{}, "tok")
 	// Mark the nonce fresh so the retry path is reached without a prefetch.
 	c.Learn("nonce-1")
 
+	ctx, info := connect.NewClientContext(t.Context())
 	var proofs []string
-	next := func(_ context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		proofs = append(proofs, req.Header().Get("DPoP"))
+	var streams []*fakeStream
+	next := func(context.Context, connect.Spec) (connect.ClientStream, error) {
+		proofs = append(proofs, info.RequestHeader().Get("DPoP"))
+		s := &fakeStream{}
 		if len(proofs) == 1 {
-			err := connect.NewError(connect.CodeUnauthenticated, errors.New("stale nonce"))
-			err.Meta().Set("DPoP-Nonce", "nonce-2")
-			return nil, err
+			s.recv = func() error {
+				info.ResponseHeader().Set("DPoP-Nonce", "nonce-2")
+				return connect.NewError(connect.CodeUnauthenticated, "stale nonce")
+			}
 		}
-		return connect.NewResponse(&emptypb.Empty{}), nil
+		streams = append(streams, s)
+		return s, nil
 	}
 
-	resp, err := c.WrapUnary(next)(t.Context(), connect.NewRequest(&emptypb.Empty{}))
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
+	require.NoError(t, callUnary(ctx, c.Intercept(next)))
 	require.Len(t, proofs, 2, "one retry")
 	assert.NotEqual(t, proofs[0], proofs[1], "the retry must carry a freshly signed proof")
 	assert.Equal(t, "nonce-2", claims(t, proofs[1])["nonce"])
+	assert.Equal(t, 1, streams[1].sent, "the retry must send the request again")
+}
+
+func TestUnaryRetriesOnlyOnce(t *testing.T) {
+	c := testClient(t, &countingTransport{}, "tok")
+	c.Learn("nonce-1")
+
+	ctx, info := connect.NewClientContext(t.Context())
+	opened := 0
+	next := func(context.Context, connect.Spec) (connect.ClientStream, error) {
+		opened++
+		return &fakeStream{recv: func() error {
+			info.ResponseHeader().Set("DPoP-Nonce", "nonce-again")
+			return connect.NewError(connect.CodeUnauthenticated, "stale nonce")
+		}}, nil
+	}
+
+	err := callUnary(ctx, c.Intercept(next))
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
+	assert.Equal(t, 2, opened, "a second stale nonce must not loop")
 }
 
 func TestNewHTTPClient(t *testing.T) {
@@ -242,17 +303,18 @@ func TestFetchNonceRefusesAServerAtAnotherURL(t *testing.T) {
 }
 
 // The mismatch is checked again on every call, so the reason never turns into a bare rejection by the server.
-func TestWrapUnaryStopsOnAURLMismatch(t *testing.T) {
+func TestUnaryStopsOnAURLMismatch(t *testing.T) {
 	tr := &countingTransport{nonce: "n", base: "https://other.example.com"}
 	c := testClient(t, tr, "tok")
 	sent := 0
-	call := c.WrapUnary(func(context.Context, connect.AnyRequest) (connect.AnyResponse, error) {
+	call := c.Intercept(func(context.Context, connect.Spec) (connect.ClientStream, error) {
 		sent++
-		return connect.NewResponse(&emptypb.Empty{}), nil
+		return &fakeStream{}, nil
 	})
 
 	for range 2 {
-		_, err := call(t.Context(), connect.NewRequest(&emptypb.Empty{}))
+		ctx, _ := connect.NewClientContext(t.Context())
+		err := callUnary(ctx, call)
 		require.ErrorIs(t, err, ErrAPIURLMismatch)
 		assert.NotEqual(t, connect.CodeUnauthenticated, connect.CodeOf(err), "it must not read as a rejected session")
 	}
@@ -359,20 +421,6 @@ func (brokenSigner) Sign(io.Reader, []byte, crypto.SignerOpts) ([]byte, error) {
 	return nil, errors.New("tpm is gone")
 }
 
-// recordingConn is a stream conn that counts what would reach the network.
-type recordingConn struct {
-	connect.StreamingClientConn
-
-	header http.Header
-	sent   int
-}
-
-func (c *recordingConn) RequestHeader() http.Header { return c.header }
-func (c *recordingConn) Send(any) error             { c.sent++; return nil }
-func (c *recordingConn) Receive(any) error          { c.sent++; return nil }
-func (c *recordingConn) CloseRequest() error        { c.sent++; return nil }
-func (c *recordingConn) CloseResponse() error       { c.sent++; return nil }
-
 func TestStreamThatCannotBeSignedIsNeverSent(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -381,27 +429,116 @@ func TestStreamThatCannotBeSignedIsNeverSent(t *testing.T) {
 	c := New(proofer, &http.Client{Transport: &countingTransport{nonce: "n"}}, func() string { return "tok" },
 		Options{BaseURL: testBase})
 
-	inner := &recordingConn{header: http.Header{}}
-	open := c.WrapStreamingClient(func(context.Context, connect.Spec) connect.StreamingClientConn { return inner })
-	conn := open(t.Context(), connect.Spec{Procedure: testProcedure})
+	ctx, info := connect.NewClientContext(t.Context())
+	opened := false
+	open := c.Intercept(func(context.Context, connect.Spec) (connect.ClientStream, error) {
+		opened = true
+		return &fakeStream{}, nil
+	})
+	_, err = open(ctx, connect.Spec{Procedure: testProcedure, StreamType: connect.StreamTypeBidi})
 
-	require.ErrorContains(t, conn.Send(&emptypb.Empty{}), "tpm is gone")
-	require.ErrorContains(t, conn.Receive(&emptypb.Empty{}), "tpm is gone")
-	require.NoError(t, conn.CloseRequest())
-	require.NoError(t, conn.CloseResponse())
-	assert.Zero(t, inner.sent, "the stream went out without a proof")
-	assert.Empty(t, inner.header.Get("Authorization"), "the token was set although there is no proof")
+	require.ErrorContains(t, err, "tpm is gone")
+	assert.False(t, opened, "the stream went out without a proof")
+	assert.Empty(t, info.RequestHeader().Get("Authorization"), "the token was set although there is no proof")
 }
 
 func TestStreamIsSigned(t *testing.T) {
 	c := testClient(t, &countingTransport{nonce: "n"}, "tok")
 
-	inner := &recordingConn{header: http.Header{}}
-	open := c.WrapStreamingClient(func(context.Context, connect.Spec) connect.StreamingClientConn { return inner })
-	conn := open(t.Context(), connect.Spec{Procedure: testProcedure})
+	ctx, info := connect.NewClientContext(t.Context())
+	inner := &fakeStream{}
+	open := c.Intercept(func(context.Context, connect.Spec) (connect.ClientStream, error) { return inner, nil })
+	stream, err := open(ctx, connect.Spec{Procedure: testProcedure, StreamType: connect.StreamTypeBidi})
+	require.NoError(t, err)
 
-	require.NoError(t, conn.Send(&emptypb.Empty{}))
+	require.NoError(t, stream.Send(&emptypb.Empty{}))
 	assert.Equal(t, 1, inner.sent)
-	assert.Equal(t, "DPoP tok", inner.header.Get("Authorization"))
-	assert.Equal(t, "n", claims(t, inner.header.Get("DPoP"))["nonce"])
+	assert.Equal(t, "DPoP tok", info.RequestHeader().Get("Authorization"))
+	assert.Equal(t, "n", claims(t, info.RequestHeader().Get("DPoP"))["nonce"])
+}
+
+// A daemon redials its control stream, the nonce of the rejected one must sign the next.
+func TestRejectedStreamLearnsTheNonce(t *testing.T) {
+	c := testClient(t, &countingTransport{nonce: "n"}, "tok")
+
+	ctx, info := connect.NewClientContext(t.Context())
+	open := c.Intercept(func(context.Context, connect.Spec) (connect.ClientStream, error) {
+		return &fakeStream{recv: func() error {
+			info.ResponseHeader().Set("DPoP-Nonce", "fresh")
+			return connect.NewError(connect.CodeUnauthenticated, "stale nonce")
+		}}, nil
+	})
+	stream, err := open(ctx, connect.Spec{Procedure: testProcedure, StreamType: connect.StreamTypeBidi})
+	require.NoError(t, err)
+
+	require.Error(t, stream.Receive(&emptypb.Empty{}))
+	assert.Equal(t, "fresh", c.currentNonce())
+}
+
+// nonceCore turns the first call down with a fresh nonce, the way core answers a stale proof.
+type nonceCore struct {
+	nokkuv1connect.UnimplementedDaemonControlServiceHandler
+
+	calls  atomic.Int32
+	proofs []string
+}
+
+func (n *nonceCore) reject(next connect.ServerFunc) connect.ServerFunc {
+	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
+		info, _ := connect.CallInfoForServerContext(ctx)
+		n.proofs = append(n.proofs, info.RequestHeader().Get("DPoP"))
+		if n.calls.Add(1) == 1 {
+			info.ResponseHeader().Set("DPoP-Nonce", "n2")
+			return connect.NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
+		}
+		return next(ctx, spec, stream)
+	}
+}
+
+func (*nonceCore) SyncDaemon(context.Context, *nokkuv1.SyncDaemonRequest) (*nokkuv1.SyncDaemonResponse, error) {
+	return &nokkuv1.SyncDaemonResponse{}, nil
+}
+
+// nonceServer serves core behind the real HTTP transport, so the nonce travels as a response header.
+func nonceServer(t *testing.T, core *nonceCore) (*Client, nokkuv1connect.DaemonControlServiceClient) {
+	t.Helper()
+	server := connect.NewServer(core.reject)
+	nokkuv1connect.RegisterDaemonControlServiceHandler(server, core)
+	mux := http.NewServeMux()
+	connecthttp.Mount(mux, server)
+	srv := h2cServer(t, mux.ServeHTTP)
+
+	httpc, err := NewHTTPClient(nil, time.Second)
+	require.NoError(t, err)
+	c := New(testProofer(t), httpc, func() string { return "tok" }, Options{BaseURL: srv.URL})
+	// Fresh, so no prefetch runs against a server without the nonce route.
+	c.Learn("n1")
+	return c, nokkuv1connect.NewDaemonControlServiceClient(
+		connect.NewClient(connecthttp.NewTransport(httpc, srv.URL), c.Intercept),
+	)
+}
+
+func TestUnaryRetryOverHTTP(t *testing.T) {
+	core := &nonceCore{}
+	_, client := nonceServer(t, core)
+
+	_, err := client.SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
+	require.NoError(t, err, "the retry with the fresh nonce must go through")
+	require.EqualValues(t, 2, core.calls.Load(), "one retry")
+	assert.Equal(t, "n1", claims(t, core.proofs[0])["nonce"])
+	assert.Equal(t, "n2", claims(t, core.proofs[1])["nonce"])
+}
+
+func TestRejectedStreamLearnsTheNonceOverHTTP(t *testing.T) {
+	core := &nonceCore{}
+	c, client := nonceServer(t, core)
+
+	stream, err := client.Connect(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = stream.Close() })
+	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{}))
+
+	_, err = stream.Receive()
+	require.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
+	assert.Equal(t, "n2", c.currentNonce(), "the next dial must sign with the nonce the rejection carried")
 }

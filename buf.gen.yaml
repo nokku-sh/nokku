@@ -12,11 +12,10 @@ plugins:
   - protoc_builtin: go
     out: gen
     opt: paths=source_relative
-  - local: protoc-gen-connect-go
+  - local: [go, tool, protoc-gen-connect-go]
     out: gen
     opt:
       - paths=source_relative
-      - simple
   - local: protoc-gen-es
     out: core/web/src/lib/gen
     opt: target=ts

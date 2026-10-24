@@ -3,7 +3,7 @@ package recording
 import (
 	"context"
 	"errors"
-	"net/http"
+	"io"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -11,7 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -118,26 +119,24 @@ func TestUploadPending(t *testing.T) {
 func answeringCore(t *testing.T, answer func(call int) error) nokkuv1connect.DaemonControlServiceClient {
 	t.Helper()
 	var calls atomic.Int32
-	handler := connect.NewClientStreamHandlerSimple(
-		nokkuv1connect.DaemonControlServiceUploadRecordingProcedure,
-		func(_ context.Context, stream *connect.ClientStream[nokkuv1.UploadRecordingRequest]) (*nokkuv1.UploadRecordingResponse, error) {
-			stream.Receive()
+	mux := uploadMux(
+		func(_ context.Context, stream nokkuv1connect.DaemonControlServiceUploadRecordingServerStream) (*nokkuv1.UploadRecordingResponse, error) {
+			_, _ = stream.Receive()
 			if err := answer(int(calls.Add(1))); err != nil {
 				return nil, err
 			}
-			for stream.Receive() {
+			for {
+				_, err := stream.Receive()
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					return nil, err
+				}
 			}
 			return &nokkuv1.UploadRecordingResponse{}, nil
 		},
-		connect.WithSchema(
-			nokkuv1.File_nokku_v1_daemon_proto.Services().
-				ByName("DaemonControlService").
-				Methods().
-				ByName("UploadRecording"),
-		),
 	)
-	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.DaemonControlServiceUploadRecordingProcedure, handler)
 	// HTTP/2 like the daemon, HTTP/1.1 does not end a request body early.
 	srv := httptest.NewUnstartedServer(mux)
 	srv.EnableHTTP2 = true
@@ -146,7 +145,9 @@ func answeringCore(t *testing.T, answer func(call int) error) nokkuv1connect.Dae
 		srv.CloseClientConnections()
 		srv.Close()
 	})
-	return nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL)
+	return nokkuv1connect.NewDaemonControlServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
+	)
 }
 
 // pendingRecording leaves one recording on disk whose live upload failed.
@@ -172,7 +173,7 @@ func TestUploadPendingReportsAFullWorkspace(t *testing.T) {
 	client := answeringCore(t, func(int) error {
 		return connect.NewError(
 			connect.CodeResourceExhausted,
-			errors.New("the recording storage of this workspace is full"),
+			"the recording storage of this workspace is full",
 		)
 	})
 	pendingRecording(t, dir)
@@ -188,7 +189,7 @@ func TestUploadPendingGoesOnAfterAFailedFile(t *testing.T) {
 	dir := newRecordsDir(t)
 	client := answeringCore(t, func(call int) error {
 		if call == 1 {
-			return connect.NewError(connect.CodeInternal, errors.New("something went wrong"))
+			return connect.NewError(connect.CodeInternal, "something went wrong")
 		}
 		return nil
 	})

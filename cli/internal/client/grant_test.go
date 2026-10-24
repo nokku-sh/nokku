@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -63,17 +65,26 @@ func (fakeServiceAccounts) ListServiceAccounts(
 func newGrantTestClient(t *testing.T) *Client {
 	t.Helper()
 	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.NewWorkspaceServiceHandler(fakeUsers{}))
-	mux.Handle(nokkuv1connect.NewTeamServiceHandler(fakeTeams{}))
-	mux.Handle(nokkuv1connect.NewServiceAccountServiceHandler(fakeServiceAccounts{}))
+	srv := connect.NewServer()
+	nokkuv1connect.RegisterWorkspaceServiceHandler(srv, fakeUsers{})
+	nokkuv1connect.RegisterTeamServiceHandler(srv, fakeTeams{})
+	nokkuv1connect.RegisterServiceAccountServiceHandler(srv, fakeServiceAccounts{})
+	connecthttp.Mount(mux, srv)
+
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
 	c := &Client{State: &state.State{APIURL: server.URL}}
 	c.State.User = &state.User{ID: "me-user"}
-	c.users = nokkuv1connect.NewWorkspaceServiceClient(http.DefaultClient, server.URL)
-	c.teams = nokkuv1connect.NewTeamServiceClient(http.DefaultClient, server.URL)
-	c.serviceAccounts = nokkuv1connect.NewServiceAccountServiceClient(http.DefaultClient, server.URL)
+	c.users = nokkuv1connect.NewWorkspaceServiceClient(
+		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
+	)
+	c.teams = nokkuv1connect.NewTeamServiceClient(
+		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
+	)
+	c.serviceAccounts = nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
+	)
 	return c
 }
 

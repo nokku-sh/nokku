@@ -8,7 +8,8 @@ import (
 	"time"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -26,7 +27,9 @@ func TestUpdateServiceAccount(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	client := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, auth)
+	client := nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), auth),
+	)
 
 	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
 		Name: new("deploy"),
@@ -61,7 +64,9 @@ func TestServiceAccountRole(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	client := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, auth)
+	client := nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), auth),
+	)
 
 	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
 		Name: new(uniq("sa")),
@@ -124,7 +129,9 @@ func TestServiceAccountTokens(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	client := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, auth)
+	client := nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), auth),
+	)
 
 	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
 		Name: new(uniq("sa")),
@@ -151,9 +158,8 @@ func TestServiceAccountTokens(t *testing.T) {
 	assert.Nil(t, second.GetToken().GetExpiresAt(), "an expiry that is left out never expires")
 
 	whoami := func(token string) (string, error) {
-		res, err := nokkuv1connect.NewUtilServiceClient(
-			srv.Client(), srv.URL, header("Authorization", "Bearer "+token),
-		).Whoami(t.Context(), &nokkuv1.WhoamiRequest{})
+		res, err := nokkuv1connect.NewUtilServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
+			Whoami(t.Context(), &nokkuv1.WhoamiRequest{})
 		return res.GetSubjectId(), err
 	}
 	for _, secret := range []string{first.GetSecret(), second.GetSecret()} {

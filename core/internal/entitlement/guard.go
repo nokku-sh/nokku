@@ -3,9 +3,8 @@ package entitlement
 import (
 	"cmp"
 	"context"
-	"fmt"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -43,22 +42,37 @@ var signing = map[string]bool{
 }
 
 // NewGuardInterceptor gates features and caps creates. Every gated route is unary, streams pass through.
-func NewGuardInterceptor(ent *Service) connect.UnaryInterceptorFunc {
-	return func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			procedure := req.Spec().Procedure
-			if err := ent.checkFeature(ctx, procedure, req.Any()); err != nil {
-				return nil, err
+func NewGuardInterceptor(ent *Service) connect.ServerInterceptor {
+	return func(next connect.ServerFunc) connect.ServerFunc {
+		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
+			if spec.StreamType != connect.StreamTypeUnary {
+				return next(ctx, spec, stream)
 			}
-			if err := ent.checkSigning(ctx, procedure); err != nil {
-				return nil, err
-			}
-			if err := ent.checkCap(ctx, procedure); err != nil {
-				return nil, err
-			}
-			return next(ctx, req)
+			return next(ctx, spec, &guardedStream{ServerStream: stream, ctx: ctx, procedure: spec.Procedure, ent: ent})
 		}
 	}
+}
+
+// guardedStream checks the request once it is decoded, the feature gate reads its fields.
+type guardedStream struct {
+	connect.ServerStream
+
+	ctx       context.Context
+	procedure string
+	ent       *Service
+}
+
+func (g *guardedStream) Receive(msg any) error {
+	if err := g.ServerStream.Receive(msg); err != nil {
+		return err
+	}
+	if err := g.ent.checkFeature(g.ctx, g.procedure, msg); err != nil {
+		return err
+	}
+	if err := g.ent.checkSigning(g.ctx, g.procedure); err != nil {
+		return err
+	}
+	return g.ent.checkCap(g.ctx, g.procedure)
 }
 
 // checkFeature passes unpinned requests, the authz interceptor owns that boundary.
@@ -78,8 +92,8 @@ func (s *Service) checkFeature(ctx context.Context, procedure string, msg any) e
 	plan := s.Resolve(ctx, workspaceID)
 	for _, feature := range features {
 		if !plan.Has(feature) {
-			return connect.NewError(connect.CodePermissionDenied, fmt.Errorf(
-				"%s is not available on the %s plan", featureLabel(feature), displayName(plan.Name)))
+			return connect.Errorf(connect.CodePermissionDenied,
+				"%s is not available on the %s plan", featureLabel(feature), displayName(plan.Name))
 		}
 	}
 	return nil

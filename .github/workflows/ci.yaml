@@ -45,7 +45,6 @@ jobs:
       - name: Generated Go code is up to date
         run: |
           go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
           npm install -g @bufbuild/protoc-gen-es@2
           buf generate
           git diff --exit-code -- gen

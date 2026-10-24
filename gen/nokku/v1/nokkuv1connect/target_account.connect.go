@@ -5,52 +5,89 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// TargetAccountServiceName is the fully-qualified name of the TargetAccountService service.
 	TargetAccountServiceName = "nokku.v1.TargetAccountService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// TargetAccountServiceListTargetAccountsProcedure is the fully-qualified name of the
+	// TargetAccountServiceListTargetAccountsProcedure is the procedure name of the
 	// TargetAccountService's ListTargetAccounts RPC.
 	TargetAccountServiceListTargetAccountsProcedure = "/nokku.v1.TargetAccountService/ListTargetAccounts"
-	// TargetAccountServiceAddTargetAccountProcedure is the fully-qualified name of the
-	// TargetAccountService's AddTargetAccount RPC.
+	// TargetAccountServiceAddTargetAccountProcedure is the procedure name of the TargetAccountService's
+	// AddTargetAccount RPC.
 	TargetAccountServiceAddTargetAccountProcedure = "/nokku.v1.TargetAccountService/AddTargetAccount"
-	// TargetAccountServiceRemoveTargetAccountProcedure is the fully-qualified name of the
+	// TargetAccountServiceRemoveTargetAccountProcedure is the procedure name of the
 	// TargetAccountService's RemoveTargetAccount RPC.
 	TargetAccountServiceRemoveTargetAccountProcedure = "/nokku.v1.TargetAccountService/RemoveTargetAccount"
-	// TargetAccountServiceAddSubjectsProcedure is the fully-qualified name of the
-	// TargetAccountService's AddSubjects RPC.
+	// TargetAccountServiceAddSubjectsProcedure is the procedure name of the TargetAccountService's
+	// AddSubjects RPC.
 	TargetAccountServiceAddSubjectsProcedure = "/nokku.v1.TargetAccountService/AddSubjects"
-	// TargetAccountServiceRemoveSubjectsProcedure is the fully-qualified name of the
-	// TargetAccountService's RemoveSubjects RPC.
+	// TargetAccountServiceRemoveSubjectsProcedure is the procedure name of the TargetAccountService's
+	// RemoveSubjects RPC.
 	TargetAccountServiceRemoveSubjectsProcedure = "/nokku.v1.TargetAccountService/RemoveSubjects"
-	// TargetAccountServiceRevokeAllAccessProcedure is the fully-qualified name of the
-	// TargetAccountService's RevokeAllAccess RPC.
+	// TargetAccountServiceRevokeAllAccessProcedure is the procedure name of the TargetAccountService's
+	// RevokeAllAccess RPC.
 	TargetAccountServiceRevokeAllAccessProcedure = "/nokku.v1.TargetAccountService/RevokeAllAccess"
+)
+
+var (
+	targetAccountServiceListTargetAccountsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("ListTargetAccounts"),
+			Procedure:        TargetAccountServiceListTargetAccountsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetAccountServiceAddTargetAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("AddTargetAccount"),
+			Procedure:  TargetAccountServiceAddTargetAccountProcedure,
+		}
+	})
+	targetAccountServiceRemoveTargetAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("RemoveTargetAccount"),
+			Procedure:  TargetAccountServiceRemoveTargetAccountProcedure,
+		}
+	})
+	targetAccountServiceAddSubjectsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("AddSubjects"),
+			Procedure:  TargetAccountServiceAddSubjectsProcedure,
+		}
+	})
+	targetAccountServiceRemoveSubjectsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("RemoveSubjects"),
+			Procedure:  TargetAccountServiceRemoveSubjectsProcedure,
+		}
+	})
+	targetAccountServiceRevokeAllAccessSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("RevokeAllAccess"),
+			Procedure:  TargetAccountServiceRevokeAllAccessProcedure,
+		}
+	})
 )
 
 // TargetAccountServiceClient is a client for the nokku.v1.TargetAccountService service.
@@ -64,118 +101,9 @@ type TargetAccountServiceClient interface {
 }
 
 // NewTargetAccountServiceClient constructs a client for the nokku.v1.TargetAccountService service.
-// By default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped
-// responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewTargetAccountServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) TargetAccountServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	targetAccountServiceMethods := v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods()
-	return &targetAccountServiceClient{
-		listTargetAccounts: connect.NewClient[v1.ListTargetAccountsRequest, v1.ListTargetAccountsResponse](
-			httpClient,
-			baseURL+TargetAccountServiceListTargetAccountsProcedure,
-			connect.WithSchema(targetAccountServiceMethods.ByName("ListTargetAccounts")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		addTargetAccount: connect.NewClient[v1.AddTargetAccountRequest, v1.AddTargetAccountResponse](
-			httpClient,
-			baseURL+TargetAccountServiceAddTargetAccountProcedure,
-			connect.WithSchema(targetAccountServiceMethods.ByName("AddTargetAccount")),
-			connect.WithClientOptions(opts...),
-		),
-		removeTargetAccount: connect.NewClient[v1.RemoveTargetAccountRequest, v1.RemoveTargetAccountResponse](
-			httpClient,
-			baseURL+TargetAccountServiceRemoveTargetAccountProcedure,
-			connect.WithSchema(targetAccountServiceMethods.ByName("RemoveTargetAccount")),
-			connect.WithClientOptions(opts...),
-		),
-		addSubjects: connect.NewClient[v1.AddSubjectsRequest, v1.AddSubjectsResponse](
-			httpClient,
-			baseURL+TargetAccountServiceAddSubjectsProcedure,
-			connect.WithSchema(targetAccountServiceMethods.ByName("AddSubjects")),
-			connect.WithClientOptions(opts...),
-		),
-		removeSubjects: connect.NewClient[v1.RemoveSubjectsRequest, v1.RemoveSubjectsResponse](
-			httpClient,
-			baseURL+TargetAccountServiceRemoveSubjectsProcedure,
-			connect.WithSchema(targetAccountServiceMethods.ByName("RemoveSubjects")),
-			connect.WithClientOptions(opts...),
-		),
-		revokeAllAccess: connect.NewClient[v1.RevokeAllAccessRequest, v1.RevokeAllAccessResponse](
-			httpClient,
-			baseURL+TargetAccountServiceRevokeAllAccessProcedure,
-			connect.WithSchema(targetAccountServiceMethods.ByName("RevokeAllAccess")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// targetAccountServiceClient implements TargetAccountServiceClient.
-type targetAccountServiceClient struct {
-	listTargetAccounts  *connect.Client[v1.ListTargetAccountsRequest, v1.ListTargetAccountsResponse]
-	addTargetAccount    *connect.Client[v1.AddTargetAccountRequest, v1.AddTargetAccountResponse]
-	removeTargetAccount *connect.Client[v1.RemoveTargetAccountRequest, v1.RemoveTargetAccountResponse]
-	addSubjects         *connect.Client[v1.AddSubjectsRequest, v1.AddSubjectsResponse]
-	removeSubjects      *connect.Client[v1.RemoveSubjectsRequest, v1.RemoveSubjectsResponse]
-	revokeAllAccess     *connect.Client[v1.RevokeAllAccessRequest, v1.RevokeAllAccessResponse]
-}
-
-// ListTargetAccounts calls nokku.v1.TargetAccountService.ListTargetAccounts.
-func (c *targetAccountServiceClient) ListTargetAccounts(ctx context.Context, req *v1.ListTargetAccountsRequest) (*v1.ListTargetAccountsResponse, error) {
-	response, err := c.listTargetAccounts.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// AddTargetAccount calls nokku.v1.TargetAccountService.AddTargetAccount.
-func (c *targetAccountServiceClient) AddTargetAccount(ctx context.Context, req *v1.AddTargetAccountRequest) (*v1.AddTargetAccountResponse, error) {
-	response, err := c.addTargetAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RemoveTargetAccount calls nokku.v1.TargetAccountService.RemoveTargetAccount.
-func (c *targetAccountServiceClient) RemoveTargetAccount(ctx context.Context, req *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error) {
-	response, err := c.removeTargetAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// AddSubjects calls nokku.v1.TargetAccountService.AddSubjects.
-func (c *targetAccountServiceClient) AddSubjects(ctx context.Context, req *v1.AddSubjectsRequest) (*v1.AddSubjectsResponse, error) {
-	response, err := c.addSubjects.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RemoveSubjects calls nokku.v1.TargetAccountService.RemoveSubjects.
-func (c *targetAccountServiceClient) RemoveSubjects(ctx context.Context, req *v1.RemoveSubjectsRequest) (*v1.RemoveSubjectsResponse, error) {
-	response, err := c.removeSubjects.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RevokeAllAccess calls nokku.v1.TargetAccountService.RevokeAllAccess.
-func (c *targetAccountServiceClient) RevokeAllAccess(ctx context.Context, req *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error) {
-	response, err := c.revokeAllAccess.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// Multiple service clients may share a single connect.Client.
+func NewTargetAccountServiceClient(client *connect.Client) TargetAccountServiceClient {
+	return &targetAccountServiceClient{client: client}
 }
 
 // TargetAccountServiceHandler is an implementation of the nokku.v1.TargetAccountService service.
@@ -188,93 +116,169 @@ type TargetAccountServiceHandler interface {
 	RevokeAllAccess(context.Context, *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error)
 }
 
-// NewTargetAccountServiceHandler builds an HTTP handler from the service implementation. It returns
-// the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewTargetAccountServiceHandler(svc TargetAccountServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	targetAccountServiceMethods := v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods()
-	targetAccountServiceListTargetAccountsHandler := connect.NewUnaryHandlerSimple(
-		TargetAccountServiceListTargetAccountsProcedure,
-		svc.ListTargetAccounts,
-		connect.WithSchema(targetAccountServiceMethods.ByName("ListTargetAccounts")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterTargetAccountServiceHandler registers svc as the nokku.v1.TargetAccountService
+// implementation on server.
+func RegisterTargetAccountServiceHandler(server *connect.Server, svc TargetAccountServiceHandler) {
+	adapter := targetAccountServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: targetAccountServiceListTargetAccountsSpec(), Handler: adapter.listTargetAccounts},
+		connect.Method{Spec: targetAccountServiceAddTargetAccountSpec(), Handler: adapter.addTargetAccount},
+		connect.Method{Spec: targetAccountServiceRemoveTargetAccountSpec(), Handler: adapter.removeTargetAccount},
+		connect.Method{Spec: targetAccountServiceAddSubjectsSpec(), Handler: adapter.addSubjects},
+		connect.Method{Spec: targetAccountServiceRemoveSubjectsSpec(), Handler: adapter.removeSubjects},
+		connect.Method{Spec: targetAccountServiceRevokeAllAccessSpec(), Handler: adapter.revokeAllAccess},
 	)
-	targetAccountServiceAddTargetAccountHandler := connect.NewUnaryHandlerSimple(
-		TargetAccountServiceAddTargetAccountProcedure,
-		svc.AddTargetAccount,
-		connect.WithSchema(targetAccountServiceMethods.ByName("AddTargetAccount")),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetAccountServiceRemoveTargetAccountHandler := connect.NewUnaryHandlerSimple(
-		TargetAccountServiceRemoveTargetAccountProcedure,
-		svc.RemoveTargetAccount,
-		connect.WithSchema(targetAccountServiceMethods.ByName("RemoveTargetAccount")),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetAccountServiceAddSubjectsHandler := connect.NewUnaryHandlerSimple(
-		TargetAccountServiceAddSubjectsProcedure,
-		svc.AddSubjects,
-		connect.WithSchema(targetAccountServiceMethods.ByName("AddSubjects")),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetAccountServiceRemoveSubjectsHandler := connect.NewUnaryHandlerSimple(
-		TargetAccountServiceRemoveSubjectsProcedure,
-		svc.RemoveSubjects,
-		connect.WithSchema(targetAccountServiceMethods.ByName("RemoveSubjects")),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetAccountServiceRevokeAllAccessHandler := connect.NewUnaryHandlerSimple(
-		TargetAccountServiceRevokeAllAccessProcedure,
-		svc.RevokeAllAccess,
-		connect.WithSchema(targetAccountServiceMethods.ByName("RevokeAllAccess")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.TargetAccountService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case TargetAccountServiceListTargetAccountsProcedure:
-			targetAccountServiceListTargetAccountsHandler.ServeHTTP(w, r)
-		case TargetAccountServiceAddTargetAccountProcedure:
-			targetAccountServiceAddTargetAccountHandler.ServeHTTP(w, r)
-		case TargetAccountServiceRemoveTargetAccountProcedure:
-			targetAccountServiceRemoveTargetAccountHandler.ServeHTTP(w, r)
-		case TargetAccountServiceAddSubjectsProcedure:
-			targetAccountServiceAddSubjectsHandler.ServeHTTP(w, r)
-		case TargetAccountServiceRemoveSubjectsProcedure:
-			targetAccountServiceRemoveSubjectsHandler.ServeHTTP(w, r)
-		case TargetAccountServiceRevokeAllAccessProcedure:
-			targetAccountServiceRevokeAllAccessHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedTargetAccountServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedTargetAccountServiceHandler struct{}
 
 func (UnimplementedTargetAccountServiceHandler) ListTargetAccounts(context.Context, *v1.ListTargetAccountsRequest) (*v1.ListTargetAccountsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetAccountService.ListTargetAccounts is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.ListTargetAccounts is not implemented")
 }
 
 func (UnimplementedTargetAccountServiceHandler) AddTargetAccount(context.Context, *v1.AddTargetAccountRequest) (*v1.AddTargetAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetAccountService.AddTargetAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.AddTargetAccount is not implemented")
 }
 
 func (UnimplementedTargetAccountServiceHandler) RemoveTargetAccount(context.Context, *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetAccountService.RemoveTargetAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.RemoveTargetAccount is not implemented")
 }
 
 func (UnimplementedTargetAccountServiceHandler) AddSubjects(context.Context, *v1.AddSubjectsRequest) (*v1.AddSubjectsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetAccountService.AddSubjects is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.AddSubjects is not implemented")
 }
 
 func (UnimplementedTargetAccountServiceHandler) RemoveSubjects(context.Context, *v1.RemoveSubjectsRequest) (*v1.RemoveSubjectsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetAccountService.RemoveSubjects is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.RemoveSubjects is not implemented")
 }
 
 func (UnimplementedTargetAccountServiceHandler) RevokeAllAccess(context.Context, *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetAccountService.RevokeAllAccess is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.RevokeAllAccess is not implemented")
+}
+
+type targetAccountServiceClient struct {
+	client *connect.Client
+}
+
+func (c *targetAccountServiceClient) ListTargetAccounts(ctx context.Context, req *v1.ListTargetAccountsRequest) (*v1.ListTargetAccountsResponse, error) {
+	var res v1.ListTargetAccountsResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceListTargetAccountsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) AddTargetAccount(ctx context.Context, req *v1.AddTargetAccountRequest) (*v1.AddTargetAccountResponse, error) {
+	var res v1.AddTargetAccountResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceAddTargetAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) RemoveTargetAccount(ctx context.Context, req *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error) {
+	var res v1.RemoveTargetAccountResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceRemoveTargetAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) AddSubjects(ctx context.Context, req *v1.AddSubjectsRequest) (*v1.AddSubjectsResponse, error) {
+	var res v1.AddSubjectsResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceAddSubjectsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) RemoveSubjects(ctx context.Context, req *v1.RemoveSubjectsRequest) (*v1.RemoveSubjectsResponse, error) {
+	var res v1.RemoveSubjectsResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceRemoveSubjectsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) RevokeAllAccess(ctx context.Context, req *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error) {
+	var res v1.RevokeAllAccessResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceRevokeAllAccessSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type targetAccountServiceHandler struct{ svc TargetAccountServiceHandler }
+
+func (h targetAccountServiceHandler) listTargetAccounts(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListTargetAccountsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListTargetAccounts(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) addTargetAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.AddTargetAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.AddTargetAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) removeTargetAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RemoveTargetAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RemoveTargetAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) addSubjects(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.AddSubjectsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.AddSubjects(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) removeSubjects(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RemoveSubjectsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RemoveSubjects(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) revokeAllAccess(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RevokeAllAccessRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RevokeAllAccess(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

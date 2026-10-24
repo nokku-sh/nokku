@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -75,7 +75,7 @@ func (b *fakeCore) SignHostCertificate(
 	*nokkuv1.SignHostCertificateRequest,
 ) (*nokkuv1.SignHostCertificateResponse, error) {
 	b.signs.Add(1)
-	return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("certificate authority is not active"))
+	return nil, connect.NewError(connect.CodeFailedPrecondition, "certificate authority is not active")
 }
 
 func newTestCAKey(t *testing.T) string {
@@ -93,7 +93,9 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 	require.NoError(t, paths.Verify())
 
 	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(core))
+	server := connect.NewServer()
+	nokkuv1connect.RegisterDaemonControlServiceHandler(server, core)
+	connecthttp.Mount(mux, server, connecthttp.WithReadMaxBytes(0))
 	api := httptest.NewServer(mux)
 	t.Cleanup(api.Close)
 
@@ -117,9 +119,11 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 	return &Client{
 		cache:  cache,
 		config: &state.Config{TargetID: "target-1"},
-		ctl:    nokkuv1connect.NewDaemonControlServiceClient(api.Client(), api.URL),
-		srv:    srv,
-		renew:  make(chan struct{}, 1),
+		ctl: nokkuv1connect.NewDaemonControlServiceClient(
+			connect.NewClient(connecthttp.NewTransport(api.Client(), api.URL)),
+		),
+		srv:   srv,
+		renew: make(chan struct{}, 1),
 	}
 }
 

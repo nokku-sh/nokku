@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -32,7 +33,7 @@ func caSeen(t *testing.T, viaProxy bool) (status int, pin string) {
 	require.NoError(t, err)
 	_ = res.Body.Close()
 
-	info, err := nokkuv1connect.NewUtilServiceClient(srv.Client(), srv.URL).
+	info, err := nokkuv1connect.NewUtilServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
 		GetInstanceInfo(ctx, &nokkuv1.GetInstanceInfoRequest{})
 	require.NoError(t, err)
 	return res.StatusCode, info.GetCaPin()

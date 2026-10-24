@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -20,125 +20,109 @@ import (
 var (
 	errInternal = connect.NewError(
 		connect.CodeInternal,
-		errors.New("something went wrong, please try again"),
+		"something went wrong, please try again",
 	)
 	errNotFound = connect.NewError(
 		connect.CodeNotFound,
-		errors.New("the requested resource was not found"),
+		"the requested resource was not found",
 	)
 	errTimeout = connect.NewError(
 		connect.CodeDeadlineExceeded,
-		errors.New("the request took too long, please try again"),
+		"the request took too long, please try again",
 	)
 	errPermissionDenied = connect.NewError(
 		connect.CodePermissionDenied,
-		errors.New("you don't have permission to do that"),
+		"you don't have permission to do that",
 	)
 	errBillingDisabled = connect.NewError(
 		connect.CodeUnimplemented,
-		errors.New("billing is disabled"),
+		"billing is disabled",
 	)
 	errInviteInvalid = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("invalid or expired invitation"),
+		"invalid or expired invitation",
 	)
 	errInvalidInput = connect.NewError(
 		connect.CodeInvalidArgument,
-		errors.New("please check your input and try again"),
+		"please check your input and try again",
 	)
 	errSingleWorkspace = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("a self-hosted server keeps its workspace"),
+		"a self-hosted server keeps its workspace",
 	)
 	errLegalHold = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("this workspace has legal holds, remove them first"),
+		"this workspace has legal holds, remove them first",
 	)
 )
 
 // errRecordingStorageFull is not InvalidArgument, a daemon gives up on that.
 var errRecordingStorageFull = connect.NewError(
 	connect.CodeResourceExhausted,
-	errors.New("the recording storage of this workspace is full"),
+	"the recording storage of this workspace is full",
 )
 
 // errMailNotSent is not Unavailable, the client reads that as the server being gone.
 var errMailNotSent = connect.NewError(
 	connect.CodeFailedPrecondition,
-	errors.New("the email could not be sent, try again in a few minutes"),
+	"the email could not be sent, try again in a few minutes",
 )
 
 // errLinkInvalid is Unauthenticated, the client skips its generic toast for that code.
 var (
 	errLinkInvalid = connect.NewError(
 		connect.CodeUnauthenticated,
-		errors.New("this link is invalid or expired"),
+		"this link is invalid or expired",
 	)
 	errAccountInactive = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("this account has been deactivated"),
+		"this account has been deactivated",
 	)
 	errSSORequired = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("this workspace requires single sign-on"),
+		"this workspace requires single sign-on",
 	)
 	errSeatLimit = connect.NewError(
 		connect.CodeResourceExhausted,
-		errors.New("this workspace has no seats left"),
+		"this workspace has no seats left",
 	)
 	errNoWorkspace = connect.NewError(
 		connect.CodeNotFound,
-		errors.New("no such workspace"),
+		"no such workspace",
 	)
 )
 
 var (
 	errAccountNotFound = connect.NewError(
 		connect.CodeNotFound,
-		errors.New("account not found"),
+		"account not found",
 	)
 	errEmailManaged = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("this account signs in through an identity provider, change the email address there"),
+		"this account signs in through an identity provider, change the email address there",
 	)
 	errLastLoginMethod = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("add another way to sign in before removing this one"),
+		"add another way to sign in before removing this one",
 	)
 	errCurrentSession = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("use logout to end the current session"),
+		"use logout to end the current session",
 	)
 	errOwnerAccount = connect.NewError(
 		connect.CodeFailedPrecondition,
-		errors.New("transfer ownership of the workspace before deleting your account"),
+		"transfer ownership of the workspace before deleting your account",
 	)
 )
 
 func newError(code connect.Code, msg string) error {
-	return connect.NewError(code, errors.New(msg))
+	return connect.NewError(code, msg)
 }
 
 // errorInterceptor maps every handler error onto a connect error. It sits inside audit so that sees the final code.
-type errorInterceptor struct{}
-
-func (errorInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		res, err := next(ctx, req)
-		if err != nil {
-			return nil, toConnectError(err)
-		}
-		return res, nil
-	}
-}
-
-func (errorInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
-	return next
-}
-
-func (errorInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		return toConnectError(next(ctx, conn))
+func errorInterceptor(next connect.ServerFunc) connect.ServerFunc {
+	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
+		return toConnectError(next(ctx, spec, stream))
 	}
 }
 

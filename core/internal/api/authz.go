@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -47,30 +47,33 @@ type authorizationInterceptor struct {
 	cfg *config.Config
 }
 
-func (a *authorizationInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := a.authorize(ctx, req.Spec().Procedure); err != nil {
-			return nil, err
+// A unary call is checked once its request is decoded, so the audit row of a denied call still names the target.
+// Generated handlers receive before they run, a stream is checked up front.
+func (a *authorizationInterceptor) intercept(next connect.ServerFunc) connect.ServerFunc {
+	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
+		if spec.StreamType == connect.StreamTypeUnary {
+			return next(ctx, spec, &authorizedStream{ServerStream: stream, ctx: ctx, procedure: spec.Procedure, a: a})
 		}
-		return next(ctx, req)
-	}
-}
-
-func (a *authorizationInterceptor) WrapStreamingClient(
-	next connect.StreamingClientFunc,
-) connect.StreamingClientFunc {
-	return next
-}
-
-func (a *authorizationInterceptor) WrapStreamingHandler(
-	next connect.StreamingHandlerFunc,
-) connect.StreamingHandlerFunc {
-	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		if err := a.authorize(ctx, conn.Spec().Procedure); err != nil {
+		if err := a.authorize(ctx, spec.Procedure); err != nil {
 			return err
 		}
-		return next(ctx, conn)
+		return next(ctx, spec, stream)
 	}
+}
+
+type authorizedStream struct {
+	connect.ServerStream
+
+	ctx       context.Context
+	procedure string
+	a         *authorizationInterceptor
+}
+
+func (s *authorizedStream) Receive(msg any) error {
+	if err := s.ServerStream.Receive(msg); err != nil {
+		return err
+	}
+	return s.a.authorize(s.ctx, s.procedure)
 }
 
 func (a *authorizationInterceptor) authorize(ctx context.Context, procedure string) error {

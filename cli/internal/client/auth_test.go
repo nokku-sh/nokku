@@ -2,13 +2,12 @@ package client
 
 import (
 	"context"
+	"errors"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
 func TestBearerAuthSetsHeader(t *testing.T) {
@@ -16,16 +15,17 @@ func TestBearerAuthSetsHeader(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 
-	var authz, ua string
-	next := func(_ context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		authz = req.Header().Get("Authorization")
-		ua = req.Header().Get("User-Agent")
-		return connect.NewResponse(&nokkuv1.User{}), nil
-	}
+	ctx, info := connect.NewClientContext(t.Context())
+	errOpened := errors.New("opened")
+	next := func(context.Context, connect.Spec) (connect.ClientStream, error) { return nil, errOpened }
 
 	auth := &bearerAuth{token: "nk_sa_secret", ua: "nk/test"}
-	_, err := auth.WrapUnary(next)(t.Context(), connect.NewRequest(&nokkuv1.User{}))
-	must.NoError(err)
-	is.Equal("Bearer nk_sa_secret", authz)
-	is.Equal("nk/test", ua, "service-account requests must still identify the client")
+	_, err := auth.intercept(next)(ctx, connect.Spec{})
+	must.ErrorIs(err, errOpened, "the call must go on")
+	is.Equal("Bearer nk_sa_secret", info.RequestHeader().Get("Authorization"))
+	is.Equal(
+		"nk/test",
+		info.RequestHeader().Get("User-Agent"),
+		"service-account requests must still identify the client",
+	)
 }

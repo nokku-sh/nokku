@@ -91,7 +91,7 @@ func (s *Service) verifySessionProof(
 }
 
 // AdvertiseDPoPNonce also sends the canonical API URL, so a recovering client corrects the htu it signs.
-func (s *Service) AdvertiseDPoPNonce(ctx context.Context, h http.Header) {
+func (s *Service) AdvertiseDPoPNonce(ctx context.Context, h interface{ Set(key, value string) }) {
 	h.Set(deviceURLHeader, baseURL(ctx))
 	h.Set("DPoP-Nonce", s.DPoP.CurrentNonce())
 }

@@ -5,10 +5,10 @@ import (
 	"errors"
 	"io"
 
-	"connectrpc.com/connect"
 	"golang.org/x/time/rate"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
 
 const (
@@ -30,7 +30,7 @@ func waitRelayBytes(ctx context.Context, l *rate.Limiter, n int) error {
 // BridgeRelay is a dumb pipe, the SSH session inside is end-to-end encrypted.
 func BridgeRelay(
 	ctx context.Context,
-	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
+	stream nokkuv1connect.DaemonServiceRelayServerStream,
 	relay *Relay,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)

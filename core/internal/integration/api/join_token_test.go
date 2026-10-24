@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -26,7 +27,9 @@ func TestCreateJoinTokenWithGrants(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	tokens := nokkuv1connect.NewJoinTokenServiceClient(srv.Client(), srv.URL, adminAuth)
+	tokens := nokkuv1connect.NewJoinTokenServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 
 	created, err := tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
 		Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),

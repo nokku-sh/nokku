@@ -5,51 +5,88 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// AuthServiceName is the fully-qualified name of the AuthService service.
 	AuthServiceName = "nokku.v1.AuthService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// AuthServiceRequestMagicLinkProcedure is the fully-qualified name of the AuthService's
-	// RequestMagicLink RPC.
+	// AuthServiceRequestMagicLinkProcedure is the procedure name of the AuthService's RequestMagicLink
+	// RPC.
 	AuthServiceRequestMagicLinkProcedure = "/nokku.v1.AuthService/RequestMagicLink"
-	// AuthServiceConsumeMagicLinkProcedure is the fully-qualified name of the AuthService's
-	// ConsumeMagicLink RPC.
+	// AuthServiceConsumeMagicLinkProcedure is the procedure name of the AuthService's ConsumeMagicLink
+	// RPC.
 	AuthServiceConsumeMagicLinkProcedure = "/nokku.v1.AuthService/ConsumeMagicLink"
-	// AuthServiceLogoutProcedure is the fully-qualified name of the AuthService's Logout RPC.
+	// AuthServiceLogoutProcedure is the procedure name of the AuthService's Logout RPC.
 	AuthServiceLogoutProcedure = "/nokku.v1.AuthService/Logout"
-	// AuthServiceGetLoginOptionsProcedure is the fully-qualified name of the AuthService's
-	// GetLoginOptions RPC.
+	// AuthServiceGetLoginOptionsProcedure is the procedure name of the AuthService's GetLoginOptions
+	// RPC.
 	AuthServiceGetLoginOptionsProcedure = "/nokku.v1.AuthService/GetLoginOptions"
-	// AuthServiceConfirmEmailChangeProcedure is the fully-qualified name of the AuthService's
+	// AuthServiceConfirmEmailChangeProcedure is the procedure name of the AuthService's
 	// ConfirmEmailChange RPC.
 	AuthServiceConfirmEmailChangeProcedure = "/nokku.v1.AuthService/ConfirmEmailChange"
-	// AuthServiceCancelEmailChangeProcedure is the fully-qualified name of the AuthService's
+	// AuthServiceCancelEmailChangeProcedure is the procedure name of the AuthService's
 	// CancelEmailChange RPC.
 	AuthServiceCancelEmailChangeProcedure = "/nokku.v1.AuthService/CancelEmailChange"
+)
+
+var (
+	authServiceRequestMagicLinkSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods().ByName("RequestMagicLink"),
+			Procedure:  AuthServiceRequestMagicLinkProcedure,
+		}
+	})
+	authServiceConsumeMagicLinkSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods().ByName("ConsumeMagicLink"),
+			Procedure:  AuthServiceConsumeMagicLinkProcedure,
+		}
+	})
+	authServiceLogoutSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods().ByName("Logout"),
+			Procedure:  AuthServiceLogoutProcedure,
+		}
+	})
+	authServiceGetLoginOptionsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods().ByName("GetLoginOptions"),
+			Procedure:        AuthServiceGetLoginOptionsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	authServiceConfirmEmailChangeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods().ByName("ConfirmEmailChange"),
+			Procedure:  AuthServiceConfirmEmailChangeProcedure,
+		}
+	})
+	authServiceCancelEmailChangeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods().ByName("CancelEmailChange"),
+			Procedure:  AuthServiceCancelEmailChangeProcedure,
+		}
+	})
 )
 
 // AuthServiceClient is a client for the nokku.v1.AuthService service.
@@ -62,119 +99,10 @@ type AuthServiceClient interface {
 	CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error)
 }
 
-// NewAuthServiceClient constructs a client for the nokku.v1.AuthService service. By default, it
-// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
-// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
-// connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewAuthServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AuthServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	authServiceMethods := v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods()
-	return &authServiceClient{
-		requestMagicLink: connect.NewClient[v1.RequestMagicLinkRequest, v1.RequestMagicLinkResponse](
-			httpClient,
-			baseURL+AuthServiceRequestMagicLinkProcedure,
-			connect.WithSchema(authServiceMethods.ByName("RequestMagicLink")),
-			connect.WithClientOptions(opts...),
-		),
-		consumeMagicLink: connect.NewClient[v1.ConsumeMagicLinkRequest, v1.ConsumeMagicLinkResponse](
-			httpClient,
-			baseURL+AuthServiceConsumeMagicLinkProcedure,
-			connect.WithSchema(authServiceMethods.ByName("ConsumeMagicLink")),
-			connect.WithClientOptions(opts...),
-		),
-		logout: connect.NewClient[v1.LogoutRequest, v1.LogoutResponse](
-			httpClient,
-			baseURL+AuthServiceLogoutProcedure,
-			connect.WithSchema(authServiceMethods.ByName("Logout")),
-			connect.WithClientOptions(opts...),
-		),
-		getLoginOptions: connect.NewClient[v1.GetLoginOptionsRequest, v1.GetLoginOptionsResponse](
-			httpClient,
-			baseURL+AuthServiceGetLoginOptionsProcedure,
-			connect.WithSchema(authServiceMethods.ByName("GetLoginOptions")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		confirmEmailChange: connect.NewClient[v1.ConfirmEmailChangeRequest, v1.ConfirmEmailChangeResponse](
-			httpClient,
-			baseURL+AuthServiceConfirmEmailChangeProcedure,
-			connect.WithSchema(authServiceMethods.ByName("ConfirmEmailChange")),
-			connect.WithClientOptions(opts...),
-		),
-		cancelEmailChange: connect.NewClient[v1.CancelEmailChangeRequest, v1.CancelEmailChangeResponse](
-			httpClient,
-			baseURL+AuthServiceCancelEmailChangeProcedure,
-			connect.WithSchema(authServiceMethods.ByName("CancelEmailChange")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// authServiceClient implements AuthServiceClient.
-type authServiceClient struct {
-	requestMagicLink   *connect.Client[v1.RequestMagicLinkRequest, v1.RequestMagicLinkResponse]
-	consumeMagicLink   *connect.Client[v1.ConsumeMagicLinkRequest, v1.ConsumeMagicLinkResponse]
-	logout             *connect.Client[v1.LogoutRequest, v1.LogoutResponse]
-	getLoginOptions    *connect.Client[v1.GetLoginOptionsRequest, v1.GetLoginOptionsResponse]
-	confirmEmailChange *connect.Client[v1.ConfirmEmailChangeRequest, v1.ConfirmEmailChangeResponse]
-	cancelEmailChange  *connect.Client[v1.CancelEmailChangeRequest, v1.CancelEmailChangeResponse]
-}
-
-// RequestMagicLink calls nokku.v1.AuthService.RequestMagicLink.
-func (c *authServiceClient) RequestMagicLink(ctx context.Context, req *v1.RequestMagicLinkRequest) (*v1.RequestMagicLinkResponse, error) {
-	response, err := c.requestMagicLink.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ConsumeMagicLink calls nokku.v1.AuthService.ConsumeMagicLink.
-func (c *authServiceClient) ConsumeMagicLink(ctx context.Context, req *v1.ConsumeMagicLinkRequest) (*v1.ConsumeMagicLinkResponse, error) {
-	response, err := c.consumeMagicLink.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// Logout calls nokku.v1.AuthService.Logout.
-func (c *authServiceClient) Logout(ctx context.Context, req *v1.LogoutRequest) (*v1.LogoutResponse, error) {
-	response, err := c.logout.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// GetLoginOptions calls nokku.v1.AuthService.GetLoginOptions.
-func (c *authServiceClient) GetLoginOptions(ctx context.Context, req *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error) {
-	response, err := c.getLoginOptions.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ConfirmEmailChange calls nokku.v1.AuthService.ConfirmEmailChange.
-func (c *authServiceClient) ConfirmEmailChange(ctx context.Context, req *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error) {
-	response, err := c.confirmEmailChange.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CancelEmailChange calls nokku.v1.AuthService.CancelEmailChange.
-func (c *authServiceClient) CancelEmailChange(ctx context.Context, req *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error) {
-	response, err := c.cancelEmailChange.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// NewAuthServiceClient constructs a client for the nokku.v1.AuthService service. Multiple service
+// clients may share a single connect.Client.
+func NewAuthServiceClient(client *connect.Client) AuthServiceClient {
+	return &authServiceClient{client: client}
 }
 
 // AuthServiceHandler is an implementation of the nokku.v1.AuthService service.
@@ -187,93 +115,168 @@ type AuthServiceHandler interface {
 	CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error)
 }
 
-// NewAuthServiceHandler builds an HTTP handler from the service implementation. It returns the path
-// on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	authServiceMethods := v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods()
-	authServiceRequestMagicLinkHandler := connect.NewUnaryHandlerSimple(
-		AuthServiceRequestMagicLinkProcedure,
-		svc.RequestMagicLink,
-		connect.WithSchema(authServiceMethods.ByName("RequestMagicLink")),
-		connect.WithHandlerOptions(opts...),
+// RegisterAuthServiceHandler registers svc as the nokku.v1.AuthService implementation on server.
+func RegisterAuthServiceHandler(server *connect.Server, svc AuthServiceHandler) {
+	adapter := authServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: authServiceRequestMagicLinkSpec(), Handler: adapter.requestMagicLink},
+		connect.Method{Spec: authServiceConsumeMagicLinkSpec(), Handler: adapter.consumeMagicLink},
+		connect.Method{Spec: authServiceLogoutSpec(), Handler: adapter.logout},
+		connect.Method{Spec: authServiceGetLoginOptionsSpec(), Handler: adapter.getLoginOptions},
+		connect.Method{Spec: authServiceConfirmEmailChangeSpec(), Handler: adapter.confirmEmailChange},
+		connect.Method{Spec: authServiceCancelEmailChangeSpec(), Handler: adapter.cancelEmailChange},
 	)
-	authServiceConsumeMagicLinkHandler := connect.NewUnaryHandlerSimple(
-		AuthServiceConsumeMagicLinkProcedure,
-		svc.ConsumeMagicLink,
-		connect.WithSchema(authServiceMethods.ByName("ConsumeMagicLink")),
-		connect.WithHandlerOptions(opts...),
-	)
-	authServiceLogoutHandler := connect.NewUnaryHandlerSimple(
-		AuthServiceLogoutProcedure,
-		svc.Logout,
-		connect.WithSchema(authServiceMethods.ByName("Logout")),
-		connect.WithHandlerOptions(opts...),
-	)
-	authServiceGetLoginOptionsHandler := connect.NewUnaryHandlerSimple(
-		AuthServiceGetLoginOptionsProcedure,
-		svc.GetLoginOptions,
-		connect.WithSchema(authServiceMethods.ByName("GetLoginOptions")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	authServiceConfirmEmailChangeHandler := connect.NewUnaryHandlerSimple(
-		AuthServiceConfirmEmailChangeProcedure,
-		svc.ConfirmEmailChange,
-		connect.WithSchema(authServiceMethods.ByName("ConfirmEmailChange")),
-		connect.WithHandlerOptions(opts...),
-	)
-	authServiceCancelEmailChangeHandler := connect.NewUnaryHandlerSimple(
-		AuthServiceCancelEmailChangeProcedure,
-		svc.CancelEmailChange,
-		connect.WithSchema(authServiceMethods.ByName("CancelEmailChange")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.AuthService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case AuthServiceRequestMagicLinkProcedure:
-			authServiceRequestMagicLinkHandler.ServeHTTP(w, r)
-		case AuthServiceConsumeMagicLinkProcedure:
-			authServiceConsumeMagicLinkHandler.ServeHTTP(w, r)
-		case AuthServiceLogoutProcedure:
-			authServiceLogoutHandler.ServeHTTP(w, r)
-		case AuthServiceGetLoginOptionsProcedure:
-			authServiceGetLoginOptionsHandler.ServeHTTP(w, r)
-		case AuthServiceConfirmEmailChangeProcedure:
-			authServiceConfirmEmailChangeHandler.ServeHTTP(w, r)
-		case AuthServiceCancelEmailChangeProcedure:
-			authServiceCancelEmailChangeHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedAuthServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedAuthServiceHandler struct{}
 
 func (UnimplementedAuthServiceHandler) RequestMagicLink(context.Context, *v1.RequestMagicLinkRequest) (*v1.RequestMagicLinkResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuthService.RequestMagicLink is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuthService.RequestMagicLink is not implemented")
 }
 
 func (UnimplementedAuthServiceHandler) ConsumeMagicLink(context.Context, *v1.ConsumeMagicLinkRequest) (*v1.ConsumeMagicLinkResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuthService.ConsumeMagicLink is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuthService.ConsumeMagicLink is not implemented")
 }
 
 func (UnimplementedAuthServiceHandler) Logout(context.Context, *v1.LogoutRequest) (*v1.LogoutResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuthService.Logout is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuthService.Logout is not implemented")
 }
 
 func (UnimplementedAuthServiceHandler) GetLoginOptions(context.Context, *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuthService.GetLoginOptions is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuthService.GetLoginOptions is not implemented")
 }
 
 func (UnimplementedAuthServiceHandler) ConfirmEmailChange(context.Context, *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuthService.ConfirmEmailChange is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuthService.ConfirmEmailChange is not implemented")
 }
 
 func (UnimplementedAuthServiceHandler) CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuthService.CancelEmailChange is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuthService.CancelEmailChange is not implemented")
+}
+
+type authServiceClient struct {
+	client *connect.Client
+}
+
+func (c *authServiceClient) RequestMagicLink(ctx context.Context, req *v1.RequestMagicLinkRequest) (*v1.RequestMagicLinkResponse, error) {
+	var res v1.RequestMagicLinkResponse
+	if err := c.client.CallUnary(ctx, authServiceRequestMagicLinkSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *authServiceClient) ConsumeMagicLink(ctx context.Context, req *v1.ConsumeMagicLinkRequest) (*v1.ConsumeMagicLinkResponse, error) {
+	var res v1.ConsumeMagicLinkResponse
+	if err := c.client.CallUnary(ctx, authServiceConsumeMagicLinkSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *authServiceClient) Logout(ctx context.Context, req *v1.LogoutRequest) (*v1.LogoutResponse, error) {
+	var res v1.LogoutResponse
+	if err := c.client.CallUnary(ctx, authServiceLogoutSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *authServiceClient) GetLoginOptions(ctx context.Context, req *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error) {
+	var res v1.GetLoginOptionsResponse
+	if err := c.client.CallUnary(ctx, authServiceGetLoginOptionsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *authServiceClient) ConfirmEmailChange(ctx context.Context, req *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error) {
+	var res v1.ConfirmEmailChangeResponse
+	if err := c.client.CallUnary(ctx, authServiceConfirmEmailChangeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *authServiceClient) CancelEmailChange(ctx context.Context, req *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error) {
+	var res v1.CancelEmailChangeResponse
+	if err := c.client.CallUnary(ctx, authServiceCancelEmailChangeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type authServiceHandler struct{ svc AuthServiceHandler }
+
+func (h authServiceHandler) requestMagicLink(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RequestMagicLinkRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RequestMagicLink(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h authServiceHandler) consumeMagicLink(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ConsumeMagicLinkRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ConsumeMagicLink(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h authServiceHandler) logout(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.LogoutRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Logout(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h authServiceHandler) getLoginOptions(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetLoginOptionsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetLoginOptions(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h authServiceHandler) confirmEmailChange(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ConfirmEmailChangeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ConfirmEmailChange(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h authServiceHandler) cancelEmailChange(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CancelEmailChangeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CancelEmailChange(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

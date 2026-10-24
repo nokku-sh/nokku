@@ -5,58 +5,111 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// AccessRequestServiceName is the fully-qualified name of the AccessRequestService service.
 	AccessRequestServiceName = "nokku.v1.AccessRequestService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// AccessRequestServiceListRequestableAccountsProcedure is the fully-qualified name of the
+	// AccessRequestServiceListRequestableAccountsProcedure is the procedure name of the
 	// AccessRequestService's ListRequestableAccounts RPC.
 	AccessRequestServiceListRequestableAccountsProcedure = "/nokku.v1.AccessRequestService/ListRequestableAccounts"
-	// AccessRequestServiceCreateAccessRequestProcedure is the fully-qualified name of the
+	// AccessRequestServiceCreateAccessRequestProcedure is the procedure name of the
 	// AccessRequestService's CreateAccessRequest RPC.
 	AccessRequestServiceCreateAccessRequestProcedure = "/nokku.v1.AccessRequestService/CreateAccessRequest"
-	// AccessRequestServiceGetAccessRequestProcedure is the fully-qualified name of the
-	// AccessRequestService's GetAccessRequest RPC.
+	// AccessRequestServiceGetAccessRequestProcedure is the procedure name of the AccessRequestService's
+	// GetAccessRequest RPC.
 	AccessRequestServiceGetAccessRequestProcedure = "/nokku.v1.AccessRequestService/GetAccessRequest"
-	// AccessRequestServiceListAccessRequestsProcedure is the fully-qualified name of the
+	// AccessRequestServiceListAccessRequestsProcedure is the procedure name of the
 	// AccessRequestService's ListAccessRequests RPC.
 	AccessRequestServiceListAccessRequestsProcedure = "/nokku.v1.AccessRequestService/ListAccessRequests"
-	// AccessRequestServiceApproveAccessRequestProcedure is the fully-qualified name of the
+	// AccessRequestServiceApproveAccessRequestProcedure is the procedure name of the
 	// AccessRequestService's ApproveAccessRequest RPC.
 	AccessRequestServiceApproveAccessRequestProcedure = "/nokku.v1.AccessRequestService/ApproveAccessRequest"
-	// AccessRequestServiceDenyAccessRequestProcedure is the fully-qualified name of the
+	// AccessRequestServiceDenyAccessRequestProcedure is the procedure name of the
 	// AccessRequestService's DenyAccessRequest RPC.
 	AccessRequestServiceDenyAccessRequestProcedure = "/nokku.v1.AccessRequestService/DenyAccessRequest"
-	// AccessRequestServiceCancelAccessRequestProcedure is the fully-qualified name of the
+	// AccessRequestServiceCancelAccessRequestProcedure is the procedure name of the
 	// AccessRequestService's CancelAccessRequest RPC.
 	AccessRequestServiceCancelAccessRequestProcedure = "/nokku.v1.AccessRequestService/CancelAccessRequest"
-	// AccessRequestServiceSetRequestableTagsProcedure is the fully-qualified name of the
+	// AccessRequestServiceSetRequestableTagsProcedure is the procedure name of the
 	// AccessRequestService's SetRequestableTags RPC.
 	AccessRequestServiceSetRequestableTagsProcedure = "/nokku.v1.AccessRequestService/SetRequestableTags"
+)
+
+var (
+	accessRequestServiceListRequestableAccountsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods().ByName("ListRequestableAccounts"),
+			Procedure:        AccessRequestServiceListRequestableAccountsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	accessRequestServiceCreateAccessRequestSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods().ByName("CreateAccessRequest"),
+			Procedure:  AccessRequestServiceCreateAccessRequestProcedure,
+		}
+	})
+	accessRequestServiceGetAccessRequestSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods().ByName("GetAccessRequest"),
+			Procedure:        AccessRequestServiceGetAccessRequestProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	accessRequestServiceListAccessRequestsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods().ByName("ListAccessRequests"),
+			Procedure:        AccessRequestServiceListAccessRequestsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	accessRequestServiceApproveAccessRequestSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods().ByName("ApproveAccessRequest"),
+			Procedure:  AccessRequestServiceApproveAccessRequestProcedure,
+		}
+	})
+	accessRequestServiceDenyAccessRequestSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods().ByName("DenyAccessRequest"),
+			Procedure:  AccessRequestServiceDenyAccessRequestProcedure,
+		}
+	})
+	accessRequestServiceCancelAccessRequestSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods().ByName("CancelAccessRequest"),
+			Procedure:  AccessRequestServiceCancelAccessRequestProcedure,
+		}
+	})
+	accessRequestServiceSetRequestableTagsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods().ByName("SetRequestableTags"),
+			Procedure:  AccessRequestServiceSetRequestableTagsProcedure,
+		}
+	})
 )
 
 // AccessRequestServiceClient is a client for the nokku.v1.AccessRequestService service.
@@ -75,152 +128,9 @@ type AccessRequestServiceClient interface {
 }
 
 // NewAccessRequestServiceClient constructs a client for the nokku.v1.AccessRequestService service.
-// By default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped
-// responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewAccessRequestServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AccessRequestServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	accessRequestServiceMethods := v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods()
-	return &accessRequestServiceClient{
-		listRequestableAccounts: connect.NewClient[v1.ListRequestableAccountsRequest, v1.ListRequestableAccountsResponse](
-			httpClient,
-			baseURL+AccessRequestServiceListRequestableAccountsProcedure,
-			connect.WithSchema(accessRequestServiceMethods.ByName("ListRequestableAccounts")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		createAccessRequest: connect.NewClient[v1.CreateAccessRequestRequest, v1.CreateAccessRequestResponse](
-			httpClient,
-			baseURL+AccessRequestServiceCreateAccessRequestProcedure,
-			connect.WithSchema(accessRequestServiceMethods.ByName("CreateAccessRequest")),
-			connect.WithClientOptions(opts...),
-		),
-		getAccessRequest: connect.NewClient[v1.GetAccessRequestRequest, v1.GetAccessRequestResponse](
-			httpClient,
-			baseURL+AccessRequestServiceGetAccessRequestProcedure,
-			connect.WithSchema(accessRequestServiceMethods.ByName("GetAccessRequest")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		listAccessRequests: connect.NewClient[v1.ListAccessRequestsRequest, v1.ListAccessRequestsResponse](
-			httpClient,
-			baseURL+AccessRequestServiceListAccessRequestsProcedure,
-			connect.WithSchema(accessRequestServiceMethods.ByName("ListAccessRequests")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		approveAccessRequest: connect.NewClient[v1.ApproveAccessRequestRequest, v1.ApproveAccessRequestResponse](
-			httpClient,
-			baseURL+AccessRequestServiceApproveAccessRequestProcedure,
-			connect.WithSchema(accessRequestServiceMethods.ByName("ApproveAccessRequest")),
-			connect.WithClientOptions(opts...),
-		),
-		denyAccessRequest: connect.NewClient[v1.DenyAccessRequestRequest, v1.DenyAccessRequestResponse](
-			httpClient,
-			baseURL+AccessRequestServiceDenyAccessRequestProcedure,
-			connect.WithSchema(accessRequestServiceMethods.ByName("DenyAccessRequest")),
-			connect.WithClientOptions(opts...),
-		),
-		cancelAccessRequest: connect.NewClient[v1.CancelAccessRequestRequest, v1.CancelAccessRequestResponse](
-			httpClient,
-			baseURL+AccessRequestServiceCancelAccessRequestProcedure,
-			connect.WithSchema(accessRequestServiceMethods.ByName("CancelAccessRequest")),
-			connect.WithClientOptions(opts...),
-		),
-		setRequestableTags: connect.NewClient[v1.SetRequestableTagsRequest, v1.SetRequestableTagsResponse](
-			httpClient,
-			baseURL+AccessRequestServiceSetRequestableTagsProcedure,
-			connect.WithSchema(accessRequestServiceMethods.ByName("SetRequestableTags")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// accessRequestServiceClient implements AccessRequestServiceClient.
-type accessRequestServiceClient struct {
-	listRequestableAccounts *connect.Client[v1.ListRequestableAccountsRequest, v1.ListRequestableAccountsResponse]
-	createAccessRequest     *connect.Client[v1.CreateAccessRequestRequest, v1.CreateAccessRequestResponse]
-	getAccessRequest        *connect.Client[v1.GetAccessRequestRequest, v1.GetAccessRequestResponse]
-	listAccessRequests      *connect.Client[v1.ListAccessRequestsRequest, v1.ListAccessRequestsResponse]
-	approveAccessRequest    *connect.Client[v1.ApproveAccessRequestRequest, v1.ApproveAccessRequestResponse]
-	denyAccessRequest       *connect.Client[v1.DenyAccessRequestRequest, v1.DenyAccessRequestResponse]
-	cancelAccessRequest     *connect.Client[v1.CancelAccessRequestRequest, v1.CancelAccessRequestResponse]
-	setRequestableTags      *connect.Client[v1.SetRequestableTagsRequest, v1.SetRequestableTagsResponse]
-}
-
-// ListRequestableAccounts calls nokku.v1.AccessRequestService.ListRequestableAccounts.
-func (c *accessRequestServiceClient) ListRequestableAccounts(ctx context.Context, req *v1.ListRequestableAccountsRequest) (*v1.ListRequestableAccountsResponse, error) {
-	response, err := c.listRequestableAccounts.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CreateAccessRequest calls nokku.v1.AccessRequestService.CreateAccessRequest.
-func (c *accessRequestServiceClient) CreateAccessRequest(ctx context.Context, req *v1.CreateAccessRequestRequest) (*v1.CreateAccessRequestResponse, error) {
-	response, err := c.createAccessRequest.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// GetAccessRequest calls nokku.v1.AccessRequestService.GetAccessRequest.
-func (c *accessRequestServiceClient) GetAccessRequest(ctx context.Context, req *v1.GetAccessRequestRequest) (*v1.GetAccessRequestResponse, error) {
-	response, err := c.getAccessRequest.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListAccessRequests calls nokku.v1.AccessRequestService.ListAccessRequests.
-func (c *accessRequestServiceClient) ListAccessRequests(ctx context.Context, req *v1.ListAccessRequestsRequest) (*v1.ListAccessRequestsResponse, error) {
-	response, err := c.listAccessRequests.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ApproveAccessRequest calls nokku.v1.AccessRequestService.ApproveAccessRequest.
-func (c *accessRequestServiceClient) ApproveAccessRequest(ctx context.Context, req *v1.ApproveAccessRequestRequest) (*v1.ApproveAccessRequestResponse, error) {
-	response, err := c.approveAccessRequest.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DenyAccessRequest calls nokku.v1.AccessRequestService.DenyAccessRequest.
-func (c *accessRequestServiceClient) DenyAccessRequest(ctx context.Context, req *v1.DenyAccessRequestRequest) (*v1.DenyAccessRequestResponse, error) {
-	response, err := c.denyAccessRequest.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CancelAccessRequest calls nokku.v1.AccessRequestService.CancelAccessRequest.
-func (c *accessRequestServiceClient) CancelAccessRequest(ctx context.Context, req *v1.CancelAccessRequestRequest) (*v1.CancelAccessRequestResponse, error) {
-	response, err := c.cancelAccessRequest.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// SetRequestableTags calls nokku.v1.AccessRequestService.SetRequestableTags.
-func (c *accessRequestServiceClient) SetRequestableTags(ctx context.Context, req *v1.SetRequestableTagsRequest) (*v1.SetRequestableTagsResponse, error) {
-	response, err := c.setRequestableTags.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// Multiple service clients may share a single connect.Client.
+func NewAccessRequestServiceClient(client *connect.Client) AccessRequestServiceClient {
+	return &accessRequestServiceClient{client: client}
 }
 
 // AccessRequestServiceHandler is an implementation of the nokku.v1.AccessRequestService service.
@@ -238,119 +148,219 @@ type AccessRequestServiceHandler interface {
 	SetRequestableTags(context.Context, *v1.SetRequestableTagsRequest) (*v1.SetRequestableTagsResponse, error)
 }
 
-// NewAccessRequestServiceHandler builds an HTTP handler from the service implementation. It returns
-// the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewAccessRequestServiceHandler(svc AccessRequestServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	accessRequestServiceMethods := v1.File_nokku_v1_access_request_proto.Services().ByName("AccessRequestService").Methods()
-	accessRequestServiceListRequestableAccountsHandler := connect.NewUnaryHandlerSimple(
-		AccessRequestServiceListRequestableAccountsProcedure,
-		svc.ListRequestableAccounts,
-		connect.WithSchema(accessRequestServiceMethods.ByName("ListRequestableAccounts")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterAccessRequestServiceHandler registers svc as the nokku.v1.AccessRequestService
+// implementation on server.
+func RegisterAccessRequestServiceHandler(server *connect.Server, svc AccessRequestServiceHandler) {
+	adapter := accessRequestServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: accessRequestServiceListRequestableAccountsSpec(), Handler: adapter.listRequestableAccounts},
+		connect.Method{Spec: accessRequestServiceCreateAccessRequestSpec(), Handler: adapter.createAccessRequest},
+		connect.Method{Spec: accessRequestServiceGetAccessRequestSpec(), Handler: adapter.getAccessRequest},
+		connect.Method{Spec: accessRequestServiceListAccessRequestsSpec(), Handler: adapter.listAccessRequests},
+		connect.Method{Spec: accessRequestServiceApproveAccessRequestSpec(), Handler: adapter.approveAccessRequest},
+		connect.Method{Spec: accessRequestServiceDenyAccessRequestSpec(), Handler: adapter.denyAccessRequest},
+		connect.Method{Spec: accessRequestServiceCancelAccessRequestSpec(), Handler: adapter.cancelAccessRequest},
+		connect.Method{Spec: accessRequestServiceSetRequestableTagsSpec(), Handler: adapter.setRequestableTags},
 	)
-	accessRequestServiceCreateAccessRequestHandler := connect.NewUnaryHandlerSimple(
-		AccessRequestServiceCreateAccessRequestProcedure,
-		svc.CreateAccessRequest,
-		connect.WithSchema(accessRequestServiceMethods.ByName("CreateAccessRequest")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accessRequestServiceGetAccessRequestHandler := connect.NewUnaryHandlerSimple(
-		AccessRequestServiceGetAccessRequestProcedure,
-		svc.GetAccessRequest,
-		connect.WithSchema(accessRequestServiceMethods.ByName("GetAccessRequest")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	accessRequestServiceListAccessRequestsHandler := connect.NewUnaryHandlerSimple(
-		AccessRequestServiceListAccessRequestsProcedure,
-		svc.ListAccessRequests,
-		connect.WithSchema(accessRequestServiceMethods.ByName("ListAccessRequests")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	accessRequestServiceApproveAccessRequestHandler := connect.NewUnaryHandlerSimple(
-		AccessRequestServiceApproveAccessRequestProcedure,
-		svc.ApproveAccessRequest,
-		connect.WithSchema(accessRequestServiceMethods.ByName("ApproveAccessRequest")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accessRequestServiceDenyAccessRequestHandler := connect.NewUnaryHandlerSimple(
-		AccessRequestServiceDenyAccessRequestProcedure,
-		svc.DenyAccessRequest,
-		connect.WithSchema(accessRequestServiceMethods.ByName("DenyAccessRequest")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accessRequestServiceCancelAccessRequestHandler := connect.NewUnaryHandlerSimple(
-		AccessRequestServiceCancelAccessRequestProcedure,
-		svc.CancelAccessRequest,
-		connect.WithSchema(accessRequestServiceMethods.ByName("CancelAccessRequest")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accessRequestServiceSetRequestableTagsHandler := connect.NewUnaryHandlerSimple(
-		AccessRequestServiceSetRequestableTagsProcedure,
-		svc.SetRequestableTags,
-		connect.WithSchema(accessRequestServiceMethods.ByName("SetRequestableTags")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.AccessRequestService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case AccessRequestServiceListRequestableAccountsProcedure:
-			accessRequestServiceListRequestableAccountsHandler.ServeHTTP(w, r)
-		case AccessRequestServiceCreateAccessRequestProcedure:
-			accessRequestServiceCreateAccessRequestHandler.ServeHTTP(w, r)
-		case AccessRequestServiceGetAccessRequestProcedure:
-			accessRequestServiceGetAccessRequestHandler.ServeHTTP(w, r)
-		case AccessRequestServiceListAccessRequestsProcedure:
-			accessRequestServiceListAccessRequestsHandler.ServeHTTP(w, r)
-		case AccessRequestServiceApproveAccessRequestProcedure:
-			accessRequestServiceApproveAccessRequestHandler.ServeHTTP(w, r)
-		case AccessRequestServiceDenyAccessRequestProcedure:
-			accessRequestServiceDenyAccessRequestHandler.ServeHTTP(w, r)
-		case AccessRequestServiceCancelAccessRequestProcedure:
-			accessRequestServiceCancelAccessRequestHandler.ServeHTTP(w, r)
-		case AccessRequestServiceSetRequestableTagsProcedure:
-			accessRequestServiceSetRequestableTagsHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedAccessRequestServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedAccessRequestServiceHandler struct{}
 
 func (UnimplementedAccessRequestServiceHandler) ListRequestableAccounts(context.Context, *v1.ListRequestableAccountsRequest) (*v1.ListRequestableAccountsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccessRequestService.ListRequestableAccounts is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccessRequestService.ListRequestableAccounts is not implemented")
 }
 
 func (UnimplementedAccessRequestServiceHandler) CreateAccessRequest(context.Context, *v1.CreateAccessRequestRequest) (*v1.CreateAccessRequestResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccessRequestService.CreateAccessRequest is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccessRequestService.CreateAccessRequest is not implemented")
 }
 
 func (UnimplementedAccessRequestServiceHandler) GetAccessRequest(context.Context, *v1.GetAccessRequestRequest) (*v1.GetAccessRequestResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccessRequestService.GetAccessRequest is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccessRequestService.GetAccessRequest is not implemented")
 }
 
 func (UnimplementedAccessRequestServiceHandler) ListAccessRequests(context.Context, *v1.ListAccessRequestsRequest) (*v1.ListAccessRequestsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccessRequestService.ListAccessRequests is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccessRequestService.ListAccessRequests is not implemented")
 }
 
 func (UnimplementedAccessRequestServiceHandler) ApproveAccessRequest(context.Context, *v1.ApproveAccessRequestRequest) (*v1.ApproveAccessRequestResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccessRequestService.ApproveAccessRequest is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccessRequestService.ApproveAccessRequest is not implemented")
 }
 
 func (UnimplementedAccessRequestServiceHandler) DenyAccessRequest(context.Context, *v1.DenyAccessRequestRequest) (*v1.DenyAccessRequestResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccessRequestService.DenyAccessRequest is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccessRequestService.DenyAccessRequest is not implemented")
 }
 
 func (UnimplementedAccessRequestServiceHandler) CancelAccessRequest(context.Context, *v1.CancelAccessRequestRequest) (*v1.CancelAccessRequestResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccessRequestService.CancelAccessRequest is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccessRequestService.CancelAccessRequest is not implemented")
 }
 
 func (UnimplementedAccessRequestServiceHandler) SetRequestableTags(context.Context, *v1.SetRequestableTagsRequest) (*v1.SetRequestableTagsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccessRequestService.SetRequestableTags is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccessRequestService.SetRequestableTags is not implemented")
+}
+
+type accessRequestServiceClient struct {
+	client *connect.Client
+}
+
+func (c *accessRequestServiceClient) ListRequestableAccounts(ctx context.Context, req *v1.ListRequestableAccountsRequest) (*v1.ListRequestableAccountsResponse, error) {
+	var res v1.ListRequestableAccountsResponse
+	if err := c.client.CallUnary(ctx, accessRequestServiceListRequestableAccountsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accessRequestServiceClient) CreateAccessRequest(ctx context.Context, req *v1.CreateAccessRequestRequest) (*v1.CreateAccessRequestResponse, error) {
+	var res v1.CreateAccessRequestResponse
+	if err := c.client.CallUnary(ctx, accessRequestServiceCreateAccessRequestSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accessRequestServiceClient) GetAccessRequest(ctx context.Context, req *v1.GetAccessRequestRequest) (*v1.GetAccessRequestResponse, error) {
+	var res v1.GetAccessRequestResponse
+	if err := c.client.CallUnary(ctx, accessRequestServiceGetAccessRequestSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accessRequestServiceClient) ListAccessRequests(ctx context.Context, req *v1.ListAccessRequestsRequest) (*v1.ListAccessRequestsResponse, error) {
+	var res v1.ListAccessRequestsResponse
+	if err := c.client.CallUnary(ctx, accessRequestServiceListAccessRequestsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accessRequestServiceClient) ApproveAccessRequest(ctx context.Context, req *v1.ApproveAccessRequestRequest) (*v1.ApproveAccessRequestResponse, error) {
+	var res v1.ApproveAccessRequestResponse
+	if err := c.client.CallUnary(ctx, accessRequestServiceApproveAccessRequestSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accessRequestServiceClient) DenyAccessRequest(ctx context.Context, req *v1.DenyAccessRequestRequest) (*v1.DenyAccessRequestResponse, error) {
+	var res v1.DenyAccessRequestResponse
+	if err := c.client.CallUnary(ctx, accessRequestServiceDenyAccessRequestSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accessRequestServiceClient) CancelAccessRequest(ctx context.Context, req *v1.CancelAccessRequestRequest) (*v1.CancelAccessRequestResponse, error) {
+	var res v1.CancelAccessRequestResponse
+	if err := c.client.CallUnary(ctx, accessRequestServiceCancelAccessRequestSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accessRequestServiceClient) SetRequestableTags(ctx context.Context, req *v1.SetRequestableTagsRequest) (*v1.SetRequestableTagsResponse, error) {
+	var res v1.SetRequestableTagsResponse
+	if err := c.client.CallUnary(ctx, accessRequestServiceSetRequestableTagsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type accessRequestServiceHandler struct{ svc AccessRequestServiceHandler }
+
+func (h accessRequestServiceHandler) listRequestableAccounts(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListRequestableAccountsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListRequestableAccounts(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accessRequestServiceHandler) createAccessRequest(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CreateAccessRequestRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CreateAccessRequest(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accessRequestServiceHandler) getAccessRequest(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetAccessRequestRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetAccessRequest(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accessRequestServiceHandler) listAccessRequests(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListAccessRequestsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListAccessRequests(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accessRequestServiceHandler) approveAccessRequest(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ApproveAccessRequestRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ApproveAccessRequest(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accessRequestServiceHandler) denyAccessRequest(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DenyAccessRequestRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DenyAccessRequest(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accessRequestServiceHandler) cancelAccessRequest(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CancelAccessRequestRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CancelAccessRequest(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accessRequestServiceHandler) setRequestableTags(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetRequestableTagsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetRequestableTags(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

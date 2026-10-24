@@ -5,64 +5,129 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// AccountServiceName is the fully-qualified name of the AccountService service.
 	AccountServiceName = "nokku.v1.AccountService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// AccountServiceGetAccountProcedure is the fully-qualified name of the AccountService's GetAccount
-	// RPC.
+	// AccountServiceGetAccountProcedure is the procedure name of the AccountService's GetAccount RPC.
 	AccountServiceGetAccountProcedure = "/nokku.v1.AccountService/GetAccount"
-	// AccountServiceUpdateAccountProcedure is the fully-qualified name of the AccountService's
-	// UpdateAccount RPC.
-	AccountServiceUpdateAccountProcedure = "/nokku.v1.AccountService/UpdateAccount"
-	// AccountServiceSetAvatarProcedure is the fully-qualified name of the AccountService's SetAvatar
+	// AccountServiceUpdateAccountProcedure is the procedure name of the AccountService's UpdateAccount
 	// RPC.
+	AccountServiceUpdateAccountProcedure = "/nokku.v1.AccountService/UpdateAccount"
+	// AccountServiceSetAvatarProcedure is the procedure name of the AccountService's SetAvatar RPC.
 	AccountServiceSetAvatarProcedure = "/nokku.v1.AccountService/SetAvatar"
-	// AccountServiceRequestEmailChangeProcedure is the fully-qualified name of the AccountService's
+	// AccountServiceRequestEmailChangeProcedure is the procedure name of the AccountService's
 	// RequestEmailChange RPC.
 	AccountServiceRequestEmailChangeProcedure = "/nokku.v1.AccountService/RequestEmailChange"
-	// AccountServiceListCredentialsProcedure is the fully-qualified name of the AccountService's
+	// AccountServiceListCredentialsProcedure is the procedure name of the AccountService's
 	// ListCredentials RPC.
 	AccountServiceListCredentialsProcedure = "/nokku.v1.AccountService/ListCredentials"
-	// AccountServiceRenameCredentialProcedure is the fully-qualified name of the AccountService's
+	// AccountServiceRenameCredentialProcedure is the procedure name of the AccountService's
 	// RenameCredential RPC.
 	AccountServiceRenameCredentialProcedure = "/nokku.v1.AccountService/RenameCredential"
-	// AccountServiceRemoveCredentialProcedure is the fully-qualified name of the AccountService's
+	// AccountServiceRemoveCredentialProcedure is the procedure name of the AccountService's
 	// RemoveCredential RPC.
 	AccountServiceRemoveCredentialProcedure = "/nokku.v1.AccountService/RemoveCredential"
-	// AccountServiceListAccountSessionsProcedure is the fully-qualified name of the AccountService's
+	// AccountServiceListAccountSessionsProcedure is the procedure name of the AccountService's
 	// ListAccountSessions RPC.
 	AccountServiceListAccountSessionsProcedure = "/nokku.v1.AccountService/ListAccountSessions"
-	// AccountServiceRemoveSessionProcedure is the fully-qualified name of the AccountService's
-	// RemoveSession RPC.
+	// AccountServiceRemoveSessionProcedure is the procedure name of the AccountService's RemoveSession
+	// RPC.
 	AccountServiceRemoveSessionProcedure = "/nokku.v1.AccountService/RemoveSession"
-	// AccountServiceDeleteAccountProcedure is the fully-qualified name of the AccountService's
-	// DeleteAccount RPC.
+	// AccountServiceDeleteAccountProcedure is the procedure name of the AccountService's DeleteAccount
+	// RPC.
 	AccountServiceDeleteAccountProcedure = "/nokku.v1.AccountService/DeleteAccount"
+)
+
+var (
+	accountServiceGetAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("GetAccount"),
+			Procedure:        AccountServiceGetAccountProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	accountServiceUpdateAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("UpdateAccount"),
+			Procedure:  AccountServiceUpdateAccountProcedure,
+		}
+	})
+	accountServiceSetAvatarSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("SetAvatar"),
+			Procedure:  AccountServiceSetAvatarProcedure,
+		}
+	})
+	accountServiceRequestEmailChangeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("RequestEmailChange"),
+			Procedure:  AccountServiceRequestEmailChangeProcedure,
+		}
+	})
+	accountServiceListCredentialsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("ListCredentials"),
+			Procedure:        AccountServiceListCredentialsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	accountServiceRenameCredentialSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("RenameCredential"),
+			Procedure:  AccountServiceRenameCredentialProcedure,
+		}
+	})
+	accountServiceRemoveCredentialSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("RemoveCredential"),
+			Procedure:  AccountServiceRemoveCredentialProcedure,
+		}
+	})
+	accountServiceListAccountSessionsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("ListAccountSessions"),
+			Procedure:        AccountServiceListAccountSessionsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	accountServiceRemoveSessionSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("RemoveSession"),
+			Procedure:  AccountServiceRemoveSessionProcedure,
+		}
+	})
+	accountServiceDeleteAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("DeleteAccount"),
+			Procedure:  AccountServiceDeleteAccountProcedure,
+		}
+	})
 )
 
 // AccountServiceClient is a client for the nokku.v1.AccountService service.
@@ -80,185 +145,10 @@ type AccountServiceClient interface {
 	DeleteAccount(context.Context, *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error)
 }
 
-// NewAccountServiceClient constructs a client for the nokku.v1.AccountService service. By default,
-// it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and
-// sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC()
-// or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewAccountServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AccountServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	accountServiceMethods := v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods()
-	return &accountServiceClient{
-		getAccount: connect.NewClient[v1.GetAccountRequest, v1.GetAccountResponse](
-			httpClient,
-			baseURL+AccountServiceGetAccountProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("GetAccount")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		updateAccount: connect.NewClient[v1.UpdateAccountRequest, v1.UpdateAccountResponse](
-			httpClient,
-			baseURL+AccountServiceUpdateAccountProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("UpdateAccount")),
-			connect.WithClientOptions(opts...),
-		),
-		setAvatar: connect.NewClient[v1.SetAvatarRequest, v1.SetAvatarResponse](
-			httpClient,
-			baseURL+AccountServiceSetAvatarProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("SetAvatar")),
-			connect.WithClientOptions(opts...),
-		),
-		requestEmailChange: connect.NewClient[v1.RequestEmailChangeRequest, v1.RequestEmailChangeResponse](
-			httpClient,
-			baseURL+AccountServiceRequestEmailChangeProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("RequestEmailChange")),
-			connect.WithClientOptions(opts...),
-		),
-		listCredentials: connect.NewClient[v1.ListCredentialsRequest, v1.ListCredentialsResponse](
-			httpClient,
-			baseURL+AccountServiceListCredentialsProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("ListCredentials")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		renameCredential: connect.NewClient[v1.RenameCredentialRequest, v1.RenameCredentialResponse](
-			httpClient,
-			baseURL+AccountServiceRenameCredentialProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("RenameCredential")),
-			connect.WithClientOptions(opts...),
-		),
-		removeCredential: connect.NewClient[v1.RemoveCredentialRequest, v1.RemoveCredentialResponse](
-			httpClient,
-			baseURL+AccountServiceRemoveCredentialProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("RemoveCredential")),
-			connect.WithClientOptions(opts...),
-		),
-		listAccountSessions: connect.NewClient[v1.ListAccountSessionsRequest, v1.ListAccountSessionsResponse](
-			httpClient,
-			baseURL+AccountServiceListAccountSessionsProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("ListAccountSessions")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		removeSession: connect.NewClient[v1.RemoveSessionRequest, v1.RemoveSessionResponse](
-			httpClient,
-			baseURL+AccountServiceRemoveSessionProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("RemoveSession")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteAccount: connect.NewClient[v1.DeleteAccountRequest, v1.DeleteAccountResponse](
-			httpClient,
-			baseURL+AccountServiceDeleteAccountProcedure,
-			connect.WithSchema(accountServiceMethods.ByName("DeleteAccount")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// accountServiceClient implements AccountServiceClient.
-type accountServiceClient struct {
-	getAccount          *connect.Client[v1.GetAccountRequest, v1.GetAccountResponse]
-	updateAccount       *connect.Client[v1.UpdateAccountRequest, v1.UpdateAccountResponse]
-	setAvatar           *connect.Client[v1.SetAvatarRequest, v1.SetAvatarResponse]
-	requestEmailChange  *connect.Client[v1.RequestEmailChangeRequest, v1.RequestEmailChangeResponse]
-	listCredentials     *connect.Client[v1.ListCredentialsRequest, v1.ListCredentialsResponse]
-	renameCredential    *connect.Client[v1.RenameCredentialRequest, v1.RenameCredentialResponse]
-	removeCredential    *connect.Client[v1.RemoveCredentialRequest, v1.RemoveCredentialResponse]
-	listAccountSessions *connect.Client[v1.ListAccountSessionsRequest, v1.ListAccountSessionsResponse]
-	removeSession       *connect.Client[v1.RemoveSessionRequest, v1.RemoveSessionResponse]
-	deleteAccount       *connect.Client[v1.DeleteAccountRequest, v1.DeleteAccountResponse]
-}
-
-// GetAccount calls nokku.v1.AccountService.GetAccount.
-func (c *accountServiceClient) GetAccount(ctx context.Context, req *v1.GetAccountRequest) (*v1.GetAccountResponse, error) {
-	response, err := c.getAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// UpdateAccount calls nokku.v1.AccountService.UpdateAccount.
-func (c *accountServiceClient) UpdateAccount(ctx context.Context, req *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error) {
-	response, err := c.updateAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// SetAvatar calls nokku.v1.AccountService.SetAvatar.
-func (c *accountServiceClient) SetAvatar(ctx context.Context, req *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error) {
-	response, err := c.setAvatar.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RequestEmailChange calls nokku.v1.AccountService.RequestEmailChange.
-func (c *accountServiceClient) RequestEmailChange(ctx context.Context, req *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error) {
-	response, err := c.requestEmailChange.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListCredentials calls nokku.v1.AccountService.ListCredentials.
-func (c *accountServiceClient) ListCredentials(ctx context.Context, req *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error) {
-	response, err := c.listCredentials.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RenameCredential calls nokku.v1.AccountService.RenameCredential.
-func (c *accountServiceClient) RenameCredential(ctx context.Context, req *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error) {
-	response, err := c.renameCredential.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RemoveCredential calls nokku.v1.AccountService.RemoveCredential.
-func (c *accountServiceClient) RemoveCredential(ctx context.Context, req *v1.RemoveCredentialRequest) (*v1.RemoveCredentialResponse, error) {
-	response, err := c.removeCredential.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListAccountSessions calls nokku.v1.AccountService.ListAccountSessions.
-func (c *accountServiceClient) ListAccountSessions(ctx context.Context, req *v1.ListAccountSessionsRequest) (*v1.ListAccountSessionsResponse, error) {
-	response, err := c.listAccountSessions.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RemoveSession calls nokku.v1.AccountService.RemoveSession.
-func (c *accountServiceClient) RemoveSession(ctx context.Context, req *v1.RemoveSessionRequest) (*v1.RemoveSessionResponse, error) {
-	response, err := c.removeSession.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteAccount calls nokku.v1.AccountService.DeleteAccount.
-func (c *accountServiceClient) DeleteAccount(ctx context.Context, req *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error) {
-	response, err := c.deleteAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// NewAccountServiceClient constructs a client for the nokku.v1.AccountService service. Multiple
+// service clients may share a single connect.Client.
+func NewAccountServiceClient(client *connect.Client) AccountServiceClient {
+	return &accountServiceClient{client: client}
 }
 
 // AccountServiceHandler is an implementation of the nokku.v1.AccountService service.
@@ -276,143 +166,269 @@ type AccountServiceHandler interface {
 	DeleteAccount(context.Context, *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error)
 }
 
-// NewAccountServiceHandler builds an HTTP handler from the service implementation. It returns the
-// path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewAccountServiceHandler(svc AccountServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	accountServiceMethods := v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods()
-	accountServiceGetAccountHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceGetAccountProcedure,
-		svc.GetAccount,
-		connect.WithSchema(accountServiceMethods.ByName("GetAccount")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterAccountServiceHandler registers svc as the nokku.v1.AccountService implementation on
+// server.
+func RegisterAccountServiceHandler(server *connect.Server, svc AccountServiceHandler) {
+	adapter := accountServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: accountServiceGetAccountSpec(), Handler: adapter.getAccount},
+		connect.Method{Spec: accountServiceUpdateAccountSpec(), Handler: adapter.updateAccount},
+		connect.Method{Spec: accountServiceSetAvatarSpec(), Handler: adapter.setAvatar},
+		connect.Method{Spec: accountServiceRequestEmailChangeSpec(), Handler: adapter.requestEmailChange},
+		connect.Method{Spec: accountServiceListCredentialsSpec(), Handler: adapter.listCredentials},
+		connect.Method{Spec: accountServiceRenameCredentialSpec(), Handler: adapter.renameCredential},
+		connect.Method{Spec: accountServiceRemoveCredentialSpec(), Handler: adapter.removeCredential},
+		connect.Method{Spec: accountServiceListAccountSessionsSpec(), Handler: adapter.listAccountSessions},
+		connect.Method{Spec: accountServiceRemoveSessionSpec(), Handler: adapter.removeSession},
+		connect.Method{Spec: accountServiceDeleteAccountSpec(), Handler: adapter.deleteAccount},
 	)
-	accountServiceUpdateAccountHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceUpdateAccountProcedure,
-		svc.UpdateAccount,
-		connect.WithSchema(accountServiceMethods.ByName("UpdateAccount")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accountServiceSetAvatarHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceSetAvatarProcedure,
-		svc.SetAvatar,
-		connect.WithSchema(accountServiceMethods.ByName("SetAvatar")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accountServiceRequestEmailChangeHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceRequestEmailChangeProcedure,
-		svc.RequestEmailChange,
-		connect.WithSchema(accountServiceMethods.ByName("RequestEmailChange")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accountServiceListCredentialsHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceListCredentialsProcedure,
-		svc.ListCredentials,
-		connect.WithSchema(accountServiceMethods.ByName("ListCredentials")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	accountServiceRenameCredentialHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceRenameCredentialProcedure,
-		svc.RenameCredential,
-		connect.WithSchema(accountServiceMethods.ByName("RenameCredential")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accountServiceRemoveCredentialHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceRemoveCredentialProcedure,
-		svc.RemoveCredential,
-		connect.WithSchema(accountServiceMethods.ByName("RemoveCredential")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accountServiceListAccountSessionsHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceListAccountSessionsProcedure,
-		svc.ListAccountSessions,
-		connect.WithSchema(accountServiceMethods.ByName("ListAccountSessions")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	accountServiceRemoveSessionHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceRemoveSessionProcedure,
-		svc.RemoveSession,
-		connect.WithSchema(accountServiceMethods.ByName("RemoveSession")),
-		connect.WithHandlerOptions(opts...),
-	)
-	accountServiceDeleteAccountHandler := connect.NewUnaryHandlerSimple(
-		AccountServiceDeleteAccountProcedure,
-		svc.DeleteAccount,
-		connect.WithSchema(accountServiceMethods.ByName("DeleteAccount")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.AccountService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case AccountServiceGetAccountProcedure:
-			accountServiceGetAccountHandler.ServeHTTP(w, r)
-		case AccountServiceUpdateAccountProcedure:
-			accountServiceUpdateAccountHandler.ServeHTTP(w, r)
-		case AccountServiceSetAvatarProcedure:
-			accountServiceSetAvatarHandler.ServeHTTP(w, r)
-		case AccountServiceRequestEmailChangeProcedure:
-			accountServiceRequestEmailChangeHandler.ServeHTTP(w, r)
-		case AccountServiceListCredentialsProcedure:
-			accountServiceListCredentialsHandler.ServeHTTP(w, r)
-		case AccountServiceRenameCredentialProcedure:
-			accountServiceRenameCredentialHandler.ServeHTTP(w, r)
-		case AccountServiceRemoveCredentialProcedure:
-			accountServiceRemoveCredentialHandler.ServeHTTP(w, r)
-		case AccountServiceListAccountSessionsProcedure:
-			accountServiceListAccountSessionsHandler.ServeHTTP(w, r)
-		case AccountServiceRemoveSessionProcedure:
-			accountServiceRemoveSessionHandler.ServeHTTP(w, r)
-		case AccountServiceDeleteAccountProcedure:
-			accountServiceDeleteAccountHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedAccountServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedAccountServiceHandler struct{}
 
 func (UnimplementedAccountServiceHandler) GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.GetAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.GetAccount is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.UpdateAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.UpdateAccount is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.SetAvatar is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.SetAvatar is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.RequestEmailChange is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.RequestEmailChange is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.ListCredentials is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.ListCredentials is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) RenameCredential(context.Context, *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.RenameCredential is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.RenameCredential is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) RemoveCredential(context.Context, *v1.RemoveCredentialRequest) (*v1.RemoveCredentialResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.RemoveCredential is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.RemoveCredential is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) ListAccountSessions(context.Context, *v1.ListAccountSessionsRequest) (*v1.ListAccountSessionsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.ListAccountSessions is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.ListAccountSessions is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) RemoveSession(context.Context, *v1.RemoveSessionRequest) (*v1.RemoveSessionResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.RemoveSession is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.RemoveSession is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) DeleteAccount(context.Context, *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.DeleteAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.DeleteAccount is not implemented")
+}
+
+type accountServiceClient struct {
+	client *connect.Client
+}
+
+func (c *accountServiceClient) GetAccount(ctx context.Context, req *v1.GetAccountRequest) (*v1.GetAccountResponse, error) {
+	var res v1.GetAccountResponse
+	if err := c.client.CallUnary(ctx, accountServiceGetAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) UpdateAccount(ctx context.Context, req *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error) {
+	var res v1.UpdateAccountResponse
+	if err := c.client.CallUnary(ctx, accountServiceUpdateAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) SetAvatar(ctx context.Context, req *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error) {
+	var res v1.SetAvatarResponse
+	if err := c.client.CallUnary(ctx, accountServiceSetAvatarSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) RequestEmailChange(ctx context.Context, req *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error) {
+	var res v1.RequestEmailChangeResponse
+	if err := c.client.CallUnary(ctx, accountServiceRequestEmailChangeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) ListCredentials(ctx context.Context, req *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error) {
+	var res v1.ListCredentialsResponse
+	if err := c.client.CallUnary(ctx, accountServiceListCredentialsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) RenameCredential(ctx context.Context, req *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error) {
+	var res v1.RenameCredentialResponse
+	if err := c.client.CallUnary(ctx, accountServiceRenameCredentialSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) RemoveCredential(ctx context.Context, req *v1.RemoveCredentialRequest) (*v1.RemoveCredentialResponse, error) {
+	var res v1.RemoveCredentialResponse
+	if err := c.client.CallUnary(ctx, accountServiceRemoveCredentialSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) ListAccountSessions(ctx context.Context, req *v1.ListAccountSessionsRequest) (*v1.ListAccountSessionsResponse, error) {
+	var res v1.ListAccountSessionsResponse
+	if err := c.client.CallUnary(ctx, accountServiceListAccountSessionsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) RemoveSession(ctx context.Context, req *v1.RemoveSessionRequest) (*v1.RemoveSessionResponse, error) {
+	var res v1.RemoveSessionResponse
+	if err := c.client.CallUnary(ctx, accountServiceRemoveSessionSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *accountServiceClient) DeleteAccount(ctx context.Context, req *v1.DeleteAccountRequest) (*v1.DeleteAccountResponse, error) {
+	var res v1.DeleteAccountResponse
+	if err := c.client.CallUnary(ctx, accountServiceDeleteAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type accountServiceHandler struct{ svc AccountServiceHandler }
+
+func (h accountServiceHandler) getAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) updateAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.UpdateAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.UpdateAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) setAvatar(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetAvatarRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetAvatar(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) requestEmailChange(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RequestEmailChangeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RequestEmailChange(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) listCredentials(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListCredentialsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListCredentials(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) renameCredential(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RenameCredentialRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RenameCredential(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) removeCredential(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RemoveCredentialRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RemoveCredential(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) listAccountSessions(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListAccountSessionsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListAccountSessions(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) removeSession(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RemoveSessionRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RemoveSession(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h accountServiceHandler) deleteAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

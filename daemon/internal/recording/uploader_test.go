@@ -3,13 +3,15 @@ package recording
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,18 +27,48 @@ type testServer struct {
 	client nokkuv1connect.DaemonControlServiceClient
 }
 
+// uploadCore is a core that only takes uploads.
+type uploadCore struct {
+	nokkuv1connect.UnimplementedDaemonControlServiceHandler
+
+	handle func(context.Context, nokkuv1connect.DaemonControlServiceUploadRecordingServerStream) (*nokkuv1.UploadRecordingResponse, error)
+}
+
+func (c uploadCore) UploadRecording(
+	ctx context.Context,
+	stream nokkuv1connect.DaemonControlServiceUploadRecordingServerStream,
+) (*nokkuv1.UploadRecordingResponse, error) {
+	return c.handle(ctx, stream)
+}
+
+func uploadMux(
+	handle func(context.Context, nokkuv1connect.DaemonControlServiceUploadRecordingServerStream) (*nokkuv1.UploadRecordingResponse, error),
+) *http.ServeMux {
+	server := connect.NewServer()
+	nokkuv1connect.RegisterDaemonControlServiceHandler(server, uploadCore{handle: handle})
+	mux := http.NewServeMux()
+	connecthttp.Mount(mux, server)
+	return mux
+}
+
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	ts := &testServer{}
-	handler := connect.NewClientStreamHandlerSimple(
-		nokkuv1connect.DaemonControlServiceUploadRecordingProcedure,
-		func(_ context.Context, stream *connect.ClientStream[nokkuv1.UploadRecordingRequest]) (*nokkuv1.UploadRecordingResponse, error) {
+	mux := uploadMux(
+		func(_ context.Context, stream nokkuv1connect.DaemonControlServiceUploadRecordingServerStream) (*nokkuv1.UploadRecordingResponse, error) {
 			ts.mu.Lock()
 			ts.opens++
 			ts.mu.Unlock()
-			for stream.Receive() {
+			for {
+				msg, err := stream.Receive()
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					return nil, err
+				}
 				ts.mu.Lock()
-				ts.msgs = append(ts.msgs, stream.Msg())
+				ts.msgs = append(ts.msgs, msg)
 				ts.mu.Unlock()
 			}
 			ts.mu.Lock()
@@ -45,23 +77,16 @@ func newTestServer(t *testing.T) *testServer {
 			size := int64(123)
 			return &nokkuv1.UploadRecordingResponse{SizeBytes: &size}, nil
 		},
-		// Without the schema's stream type the handler frames the RPC as unary and never reads the body.
-		connect.WithSchema(
-			nokkuv1.File_nokku_v1_daemon_proto.Services().
-				ByName("DaemonControlService").
-				Methods().
-				ByName("UploadRecording"),
-		),
 	)
-	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.DaemonControlServiceUploadRecordingProcedure, handler)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(func() {
 		// Client connections first, httptest.Close would block on a live keep-alive one.
 		srv.CloseClientConnections()
 		srv.Close()
 	})
-	ts.client = nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL)
+	ts.client = nokkuv1connect.NewDaemonControlServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
+	)
 	return ts
 }
 
@@ -127,24 +152,15 @@ func TestUploaderZeroSlicesAreNoop(t *testing.T) {
 }
 
 func TestUploaderReportsWhyTheBackendRefused(t *testing.T) {
-	handler := connect.NewClientStreamHandlerSimple(
-		nokkuv1connect.DaemonControlServiceUploadRecordingProcedure,
-		func(_ context.Context, stream *connect.ClientStream[nokkuv1.UploadRecordingRequest]) (*nokkuv1.UploadRecordingResponse, error) {
-			stream.Receive()
+	mux := uploadMux(
+		func(_ context.Context, stream nokkuv1connect.DaemonControlServiceUploadRecordingServerStream) (*nokkuv1.UploadRecordingResponse, error) {
+			_, _ = stream.Receive()
 			return nil, connect.NewError(
 				connect.CodeResourceExhausted,
-				errors.New("the recording storage of this workspace is full"),
+				"the recording storage of this workspace is full",
 			)
 		},
-		connect.WithSchema(
-			nokkuv1.File_nokku_v1_daemon_proto.Services().
-				ByName("DaemonControlService").
-				Methods().
-				ByName("UploadRecording"),
-		),
 	)
-	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.DaemonControlServiceUploadRecordingProcedure, handler)
 	// HTTP/2 like the daemon, HTTP/1.1 does not end a request body early.
 	srv := httptest.NewUnstartedServer(mux)
 	srv.EnableHTTP2 = true
@@ -153,7 +169,9 @@ func TestUploaderReportsWhyTheBackendRefused(t *testing.T) {
 		srv.CloseClientConnections()
 		srv.Close()
 	})
-	client := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL)
+	client := nokkuv1connect.NewDaemonControlServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
+	)
 
 	u := NewUploader(context.Background(), client, "s1", "user", "")
 	for range 200 {

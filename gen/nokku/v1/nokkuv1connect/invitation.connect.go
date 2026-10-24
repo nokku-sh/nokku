@@ -5,40 +5,49 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// InvitationServiceName is the fully-qualified name of the InvitationService service.
 	InvitationServiceName = "nokku.v1.InvitationService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// InvitationServiceGetInvitationProcedure is the fully-qualified name of the InvitationService's
+	// InvitationServiceGetInvitationProcedure is the procedure name of the InvitationService's
 	// GetInvitation RPC.
 	InvitationServiceGetInvitationProcedure = "/nokku.v1.InvitationService/GetInvitation"
-	// InvitationServiceAcceptInvitationProcedure is the fully-qualified name of the InvitationService's
+	// InvitationServiceAcceptInvitationProcedure is the procedure name of the InvitationService's
 	// AcceptInvitation RPC.
 	InvitationServiceAcceptInvitationProcedure = "/nokku.v1.InvitationService/AcceptInvitation"
+)
+
+var (
+	invitationServiceGetInvitationSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods().ByName("GetInvitation"),
+			Procedure:        InvitationServiceGetInvitationProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	invitationServiceAcceptInvitationSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods().ByName("AcceptInvitation"),
+			Procedure:  InvitationServiceAcceptInvitationProcedure,
+		}
+	})
 )
 
 // InvitationServiceClient is a client for the nokku.v1.InvitationService service.
@@ -47,55 +56,10 @@ type InvitationServiceClient interface {
 	AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error)
 }
 
-// NewInvitationServiceClient constructs a client for the nokku.v1.InvitationService service. By
-// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
-// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewInvitationServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) InvitationServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	invitationServiceMethods := v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods()
-	return &invitationServiceClient{
-		getInvitation: connect.NewClient[v1.GetInvitationRequest, v1.GetInvitationResponse](
-			httpClient,
-			baseURL+InvitationServiceGetInvitationProcedure,
-			connect.WithSchema(invitationServiceMethods.ByName("GetInvitation")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		acceptInvitation: connect.NewClient[v1.AcceptInvitationRequest, v1.AcceptInvitationResponse](
-			httpClient,
-			baseURL+InvitationServiceAcceptInvitationProcedure,
-			connect.WithSchema(invitationServiceMethods.ByName("AcceptInvitation")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// invitationServiceClient implements InvitationServiceClient.
-type invitationServiceClient struct {
-	getInvitation    *connect.Client[v1.GetInvitationRequest, v1.GetInvitationResponse]
-	acceptInvitation *connect.Client[v1.AcceptInvitationRequest, v1.AcceptInvitationResponse]
-}
-
-// GetInvitation calls nokku.v1.InvitationService.GetInvitation.
-func (c *invitationServiceClient) GetInvitation(ctx context.Context, req *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error) {
-	response, err := c.getInvitation.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// AcceptInvitation calls nokku.v1.InvitationService.AcceptInvitation.
-func (c *invitationServiceClient) AcceptInvitation(ctx context.Context, req *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error) {
-	response, err := c.acceptInvitation.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// NewInvitationServiceClient constructs a client for the nokku.v1.InvitationService service.
+// Multiple service clients may share a single connect.Client.
+func NewInvitationServiceClient(client *connect.Client) InvitationServiceClient {
+	return &invitationServiceClient{client: client}
 }
 
 // InvitationServiceHandler is an implementation of the nokku.v1.InvitationService service.
@@ -104,45 +68,69 @@ type InvitationServiceHandler interface {
 	AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error)
 }
 
-// NewInvitationServiceHandler builds an HTTP handler from the service implementation. It returns
-// the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewInvitationServiceHandler(svc InvitationServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	invitationServiceMethods := v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods()
-	invitationServiceGetInvitationHandler := connect.NewUnaryHandlerSimple(
-		InvitationServiceGetInvitationProcedure,
-		svc.GetInvitation,
-		connect.WithSchema(invitationServiceMethods.ByName("GetInvitation")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterInvitationServiceHandler registers svc as the nokku.v1.InvitationService implementation
+// on server.
+func RegisterInvitationServiceHandler(server *connect.Server, svc InvitationServiceHandler) {
+	adapter := invitationServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: invitationServiceGetInvitationSpec(), Handler: adapter.getInvitation},
+		connect.Method{Spec: invitationServiceAcceptInvitationSpec(), Handler: adapter.acceptInvitation},
 	)
-	invitationServiceAcceptInvitationHandler := connect.NewUnaryHandlerSimple(
-		InvitationServiceAcceptInvitationProcedure,
-		svc.AcceptInvitation,
-		connect.WithSchema(invitationServiceMethods.ByName("AcceptInvitation")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.InvitationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case InvitationServiceGetInvitationProcedure:
-			invitationServiceGetInvitationHandler.ServeHTTP(w, r)
-		case InvitationServiceAcceptInvitationProcedure:
-			invitationServiceAcceptInvitationHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedInvitationServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedInvitationServiceHandler struct{}
 
 func (UnimplementedInvitationServiceHandler) GetInvitation(context.Context, *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.InvitationService.GetInvitation is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.InvitationService.GetInvitation is not implemented")
 }
 
 func (UnimplementedInvitationServiceHandler) AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.InvitationService.AcceptInvitation is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.InvitationService.AcceptInvitation is not implemented")
+}
+
+type invitationServiceClient struct {
+	client *connect.Client
+}
+
+func (c *invitationServiceClient) GetInvitation(ctx context.Context, req *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error) {
+	var res v1.GetInvitationResponse
+	if err := c.client.CallUnary(ctx, invitationServiceGetInvitationSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *invitationServiceClient) AcceptInvitation(ctx context.Context, req *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error) {
+	var res v1.AcceptInvitationResponse
+	if err := c.client.CallUnary(ctx, invitationServiceAcceptInvitationSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type invitationServiceHandler struct{ svc InvitationServiceHandler }
+
+func (h invitationServiceHandler) getInvitation(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetInvitationRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetInvitation(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h invitationServiceHandler) acceptInvitation(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.AcceptInvitationRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.AcceptInvitation(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 

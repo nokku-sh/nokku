@@ -9,7 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -52,8 +53,10 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	owner := header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER))
 	admin := header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
 
-	sso := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, admin)
-	scim := nokkuv1connect.NewSCIMServiceClient(srv.Client(), srv.URL, admin)
+	sso := nokkuv1connect.NewSSOServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), admin))
+	scim := nokkuv1connect.NewSCIMServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), admin),
+	)
 	issuer := fakeIssuer(t).URL + "/evil"
 	provider := &nokkuv1.PutSSOProviderRequest{
 		ProviderId:   new("mine"),
@@ -93,13 +96,15 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	require.NoError(t, err, "an admin still reads the SCIM tokens")
 
 	// The owner stores it, and the login page offers it right away.
-	ownerSSO := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, owner)
+	ownerSSO := nokkuv1connect.NewSSOServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner),
+	)
 	stored, err := ownerSSO.PutSSOProvider(ctx, provider)
 	require.NoError(t, err)
 	assert.Equal(t, "mine", stored.GetProvider().GetProviderId())
 	assert.Equal(t, issuer, stored.GetProvider().GetIssuerUrl())
 
-	options, err := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL).
+	options, err := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
 		GetLoginOptions(ctx, &nokkuv1.GetLoginOptionsRequest{})
 	require.NoError(t, err)
 	var ids []string
@@ -121,7 +126,7 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
-	sso := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, owner)
+	sso := nokkuv1connect.NewSSOServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner))
 	lab := fakeIssuer(t).URL
 	issuer := lab + "/realms/master"
 	stored, err := sso.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{
@@ -156,7 +161,7 @@ func TestNewIssuerMustAnswer(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
-	sso := nokkuv1connect.NewSSOServiceClient(srv.Client(), srv.URL, owner)
+	sso := nokkuv1connect.NewSSOServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner))
 	idp := httptest.NewServer(http.NotFoundHandler())
 	t.Cleanup(idp.Close)
 
@@ -190,7 +195,7 @@ func TestEnforceSSOIsGated(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, owner).
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner)).
 		UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
 		})
@@ -219,7 +224,7 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 		owner: true,
 	}
 
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+owner)).
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner))).
 		UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
 		})

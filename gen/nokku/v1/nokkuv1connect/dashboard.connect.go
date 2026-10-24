@@ -5,37 +5,39 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// DashboardServiceName is the fully-qualified name of the DashboardService service.
 	DashboardServiceName = "nokku.v1.DashboardService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// DashboardServiceGetDashboardProcedure is the fully-qualified name of the DashboardService's
+	// DashboardServiceGetDashboardProcedure is the procedure name of the DashboardService's
 	// GetDashboard RPC.
 	DashboardServiceGetDashboardProcedure = "/nokku.v1.DashboardService/GetDashboard"
+)
+
+var (
+	dashboardServiceGetDashboardSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_dashboard_proto.Services().ByName("DashboardService").Methods().ByName("GetDashboard"),
+			Procedure:        DashboardServiceGetDashboardProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
 )
 
 // DashboardServiceClient is a client for the nokku.v1.DashboardService service.
@@ -43,39 +45,10 @@ type DashboardServiceClient interface {
 	GetDashboard(context.Context, *v1.GetDashboardRequest) (*v1.GetDashboardResponse, error)
 }
 
-// NewDashboardServiceClient constructs a client for the nokku.v1.DashboardService service. By
-// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
-// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewDashboardServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) DashboardServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	dashboardServiceMethods := v1.File_nokku_v1_dashboard_proto.Services().ByName("DashboardService").Methods()
-	return &dashboardServiceClient{
-		getDashboard: connect.NewClient[v1.GetDashboardRequest, v1.GetDashboardResponse](
-			httpClient,
-			baseURL+DashboardServiceGetDashboardProcedure,
-			connect.WithSchema(dashboardServiceMethods.ByName("GetDashboard")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// dashboardServiceClient implements DashboardServiceClient.
-type dashboardServiceClient struct {
-	getDashboard *connect.Client[v1.GetDashboardRequest, v1.GetDashboardResponse]
-}
-
-// GetDashboard calls nokku.v1.DashboardService.GetDashboard.
-func (c *dashboardServiceClient) GetDashboard(ctx context.Context, req *v1.GetDashboardRequest) (*v1.GetDashboardResponse, error) {
-	response, err := c.getDashboard.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// NewDashboardServiceClient constructs a client for the nokku.v1.DashboardService service. Multiple
+// service clients may share a single connect.Client.
+func NewDashboardServiceClient(client *connect.Client) DashboardServiceClient {
+	return &dashboardServiceClient{client: client}
 }
 
 // DashboardServiceHandler is an implementation of the nokku.v1.DashboardService service.
@@ -83,33 +56,44 @@ type DashboardServiceHandler interface {
 	GetDashboard(context.Context, *v1.GetDashboardRequest) (*v1.GetDashboardResponse, error)
 }
 
-// NewDashboardServiceHandler builds an HTTP handler from the service implementation. It returns the
-// path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewDashboardServiceHandler(svc DashboardServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	dashboardServiceMethods := v1.File_nokku_v1_dashboard_proto.Services().ByName("DashboardService").Methods()
-	dashboardServiceGetDashboardHandler := connect.NewUnaryHandlerSimple(
-		DashboardServiceGetDashboardProcedure,
-		svc.GetDashboard,
-		connect.WithSchema(dashboardServiceMethods.ByName("GetDashboard")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterDashboardServiceHandler registers svc as the nokku.v1.DashboardService implementation on
+// server.
+func RegisterDashboardServiceHandler(server *connect.Server, svc DashboardServiceHandler) {
+	adapter := dashboardServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: dashboardServiceGetDashboardSpec(), Handler: adapter.getDashboard},
 	)
-	return "/nokku.v1.DashboardService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case DashboardServiceGetDashboardProcedure:
-			dashboardServiceGetDashboardHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedDashboardServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedDashboardServiceHandler struct{}
 
 func (UnimplementedDashboardServiceHandler) GetDashboard(context.Context, *v1.GetDashboardRequest) (*v1.GetDashboardResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.DashboardService.GetDashboard is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DashboardService.GetDashboard is not implemented")
+}
+
+type dashboardServiceClient struct {
+	client *connect.Client
+}
+
+func (c *dashboardServiceClient) GetDashboard(ctx context.Context, req *v1.GetDashboardRequest) (*v1.GetDashboardResponse, error) {
+	var res v1.GetDashboardResponse
+	if err := c.client.CallUnary(ctx, dashboardServiceGetDashboardSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type dashboardServiceHandler struct{ svc DashboardServiceHandler }
+
+func (h dashboardServiceHandler) getDashboard(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetDashboardRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetDashboard(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

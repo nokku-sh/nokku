@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"

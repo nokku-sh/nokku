@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	cryptossh "golang.org/x/crypto/ssh"
@@ -46,7 +47,7 @@ func (f *fakeCore) SignSSHCertificate(
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
 	if f.sign == nil {
-		return nil, connect.NewError(connect.CodeUnimplemented, assert.AnError)
+		return nil, connect.NewError(connect.CodeUnimplemented, assert.AnError.Error()).WithCause(assert.AnError)
 	}
 	return f.sign(f.test, req)
 }
@@ -108,16 +109,20 @@ func newSyncTestClient(t *testing.T, core *fakeCore) *Client {
 	t.Helper()
 	core.test = t
 	mux := http.NewServeMux()
-	targetPath, targetHandler := nokkuv1connect.NewTargetServiceHandler(core)
-	certPath, certHandler := nokkuv1connect.NewCertificateServiceHandler(core)
-	mux.Handle(targetPath, targetHandler)
-	mux.Handle(certPath, certHandler)
+	server := connect.NewServer()
+	nokkuv1connect.RegisterTargetServiceHandler(server, core)
+	nokkuv1connect.RegisterCertificateServiceHandler(server, core)
+	connecthttp.Mount(mux, server)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
 	c := &Client{State: &state.State{APIURL: srv.URL, SessionToken: "sess-token"}, httpc: srv.Client()}
-	c.certs = nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL)
-	c.targets = nokkuv1connect.NewTargetServiceClient(srv.Client(), srv.URL)
+	c.certs = nokkuv1connect.NewCertificateServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
+	)
+	c.targets = nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
+	)
 	return c
 }
 
@@ -184,7 +189,7 @@ func TestSyncDropsCertificatesOfAnotherSubject(t *testing.T) {
 func TestSyncUnauthenticatedNonInteractive(t *testing.T) {
 	setTestDirs(t)
 	core := &fakeCore{
-		accessErr: connect.NewError(connect.CodeUnauthenticated, assert.AnError),
+		accessErr: connect.NewError(connect.CodeUnauthenticated, assert.AnError.Error()).WithCause(assert.AnError),
 	}
 	c := newSyncTestClient(t, core)
 
@@ -203,8 +208,12 @@ func TestSyncOrCacheFallsBackToCache(t *testing.T) {
 	require.NoError(t, st.Save())
 
 	c := &Client{State: st}
-	c.certs = nokkuv1connect.NewCertificateServiceClient(&http.Client{}, st.APIURL)
-	c.targets = nokkuv1connect.NewTargetServiceClient(&http.Client{}, st.APIURL)
+	c.certs = nokkuv1connect.NewCertificateServiceClient(
+		connect.NewClient(connecthttp.NewTransport(&http.Client{}, st.APIURL)),
+	)
+	c.targets = nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(&http.Client{}, st.APIURL)),
+	)
 	err := c.SyncOrCache(t.Context(), false)
 	require.NoError(t, err, "unreachable core must fall back to cached data")
 	assert.True(t, st.HasCachedData())
@@ -224,7 +233,9 @@ func TestSyncOrCacheNeverFallsBackToAnotherServer(t *testing.T) {
 
 	st := &state.State{APIURL: "http://127.0.0.1:1"}
 	c := &Client{State: st}
-	c.targets = nokkuv1connect.NewTargetServiceClient(&http.Client{}, st.APIURL)
+	c.targets = nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(&http.Client{}, st.APIURL)),
+	)
 	err := c.SyncOrCache(t.Context(), false)
 	require.ErrorContains(t, err, "nothing is cached yet")
 	assert.Empty(t, st.Targets)
@@ -235,8 +246,12 @@ func TestSyncOrCacheWithoutCacheFails(t *testing.T) {
 
 	st := &state.State{APIURL: "http://127.0.0.1:1", SessionToken: "sess-token"}
 	c := &Client{State: st}
-	c.certs = nokkuv1connect.NewCertificateServiceClient(&http.Client{}, st.APIURL)
-	c.targets = nokkuv1connect.NewTargetServiceClient(&http.Client{}, st.APIURL)
+	c.certs = nokkuv1connect.NewCertificateServiceClient(
+		connect.NewClient(connecthttp.NewTransport(&http.Client{}, st.APIURL)),
+	)
+	c.targets = nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(&http.Client{}, st.APIURL)),
+	)
 	err := c.SyncOrCache(t.Context(), false)
 	assert.ErrorContains(t, err, "nothing is cached yet")
 }

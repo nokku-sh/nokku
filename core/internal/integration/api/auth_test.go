@@ -6,7 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,8 +21,15 @@ func TestLoginPageFollowsARename(t *testing.T) {
 	workspaceID := seedWorkspace(t, cfg)
 	before, err := workspaceName(wsCtx(t, cfg), cfg.Conn)
 	require.NoError(t, err)
-	workspaces := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)))
+	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header(
+				"Authorization",
+				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+			),
+		),
+	)
 	rename := func(name string) {
 		t.Helper()
 		_, err := workspaces.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{Name: &name})
@@ -32,7 +40,7 @@ func TestLoginPageFollowsARename(t *testing.T) {
 
 	renamed := uniq("renamed")
 	rename(renamed)
-	auth := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL)
+	auth := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)))
 	options, err := auth.GetLoginOptions(t.Context(), &nokkuv1.GetLoginOptionsRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, renamed, options.GetWorkspaceName())
@@ -42,7 +50,7 @@ func TestLoginPageFollowsARename(t *testing.T) {
 func TestMagicLinkSignIn(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
-	auth := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL)
+	auth := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)))
 
 	options, err := auth.GetLoginOptions(t.Context(), &nokkuv1.GetLoginOptionsRequest{})
 	require.NoError(t, err)
@@ -78,7 +86,7 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	require.NoError(t, err)
 	_, token, _ := strings.Cut(link, "token=")
 
-	auth := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL)
+	auth := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)))
 	ctx, info := connect.NewClientContext(t.Context())
 	_, err = auth.ConsumeMagicLink(ctx, &nokkuv1.ConsumeMagicLinkRequest{Token: &token})
 	require.NoError(t, err)
@@ -97,7 +105,12 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	require.NotEmpty(t, deviceCookie, "a new browser gets the device cookie")
 
 	account := func(bearer string) nokkuv1connect.AccountServiceClient {
-		return nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+bearer))
+		return nokkuv1connect.NewAccountServiceClient(
+			connect.NewClient(
+				connecthttp.NewTransport(srv.Client(), srv.URL),
+				header("Authorization", "Bearer "+bearer),
+			),
+		)
 	}
 	kinds := func() map[string]string {
 		t.Helper()

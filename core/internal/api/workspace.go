@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"

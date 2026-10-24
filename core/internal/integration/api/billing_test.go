@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/mizuchilabs/inkan/license"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,7 +50,9 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	srv := httptest.NewServer(api.New(&local).Handler(ctx))
 	t.Cleanup(srv.Close)
 	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
-	sut := nokkuv1connect.NewBillingServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+owner))
+	sut := nokkuv1connect.NewBillingServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
+	)
 
 	before, err := sut.GetLicense(ctx, &nokkuv1.GetLicenseRequest{})
 	require.NoError(t, err)

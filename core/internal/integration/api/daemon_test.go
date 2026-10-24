@@ -14,7 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/coder/websocket"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/cryptosigner"
@@ -66,7 +67,7 @@ func TestEnrollDaemon(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 
-	created, err := nokkuv1connect.NewJoinTokenServiceClient(srv.Client(), srv.URL, adminAuth).
+	created, err := nokkuv1connect.NewJoinTokenServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
 			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			MaxUses:     new(int32(1)),
@@ -78,9 +79,10 @@ func TestEnrollDaemon(t *testing.T) {
 	require.NoError(t, err)
 	enroll := func(token string, key *ecdsa.PrivateKey) (*nokkuv1.EnrollDaemonResponse, error) {
 		client := nokkuv1connect.NewDaemonControlServiceClient(
-			srv.Client(),
-			srv.URL,
-			header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure, "")),
+			connect.NewClient(
+				connecthttp.NewTransport(srv.Client(), srv.URL),
+				header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure, "")),
+			),
 		)
 		return client.EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: &token})
 	}
@@ -91,7 +93,9 @@ func TestEnrollDaemon(t *testing.T) {
 	assert.NotEmpty(t, res.GetAccessToken())
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, res.GetStatus(), "auto approve token")
 
-	daemons := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth)
+	daemons := nokkuv1connect.NewDaemonServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 	got, err := daemons.GetDaemon(
 		t.Context(),
 		&nokkuv1.GetDaemonRequest{Id: new(res.GetId())},
@@ -164,13 +168,13 @@ func TestCreateSession(t *testing.T) {
 	)
 
 	// Enrollment falls back to the default CA, which CreateSession needs.
-	_, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
+	_, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 			Name:      new(uniq("default")),
 			IsDefault: new(true),
 		})
 	require.NoError(t, err)
-	created, err := nokkuv1connect.NewJoinTokenServiceClient(srv.Client(), srv.URL, adminAuth).
+	created, err := nokkuv1connect.NewJoinTokenServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
 			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			AutoApprove: new(true),
@@ -179,7 +183,7 @@ func TestCreateSession(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	enrollAuth := header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure, ""))
-	enrolled, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL, enrollAuth).
+	enrolled, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), enrollAuth)).
 		EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: new(created.GetSecret())})
 	require.NoError(t, err)
 
@@ -189,18 +193,25 @@ func TestCreateSession(t *testing.T) {
 	}
 	memberToken := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	member := nokkuv1connect.NewDaemonServiceClient(
-		srv.Client(),
-		srv.URL,
-		header("Authorization", "Bearer "+memberToken),
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header("Authorization", "Bearer "+memberToken),
+		),
 	)
-	accounts := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth)
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 	sa, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
 		Name: new(uniq("ci")),
 		Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 	})
 	require.NoError(t, err)
-	machine := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+serviceAccountToken(t, accounts, sa.GetServiceAccount().GetId(), nil)))
+	machine := nokkuv1connect.NewDaemonServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header("Authorization", "Bearer "+serviceAccountToken(t, accounts, sa.GetServiceAccount().GetId(), nil)),
+		),
+	)
 	_, err = machine.CreateSession(t.Context(), req)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "service account, got %v", err)
 
@@ -211,7 +222,8 @@ func TestCreateSession(t *testing.T) {
 	openRelay := func() error {
 		relayCtx, info := connect.NewClientContext(t.Context())
 		info.RequestHeader().Set("Authorization", "Bearer "+memberToken)
-		relay, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL).Relay(relayCtx)
+		relay, err := nokkuv1connect.NewDaemonServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+			Relay(relayCtx)
 		if err != nil {
 			return err
 		}
@@ -295,7 +307,8 @@ func TestCreateSession(t *testing.T) {
 	control.RequestHeader().Set("Authorization", "DPoP "+token)
 	control.RequestHeader().Set("DPoP",
 		dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceConnectProcedure, token))
-	stream, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).Connect(controlCtx)
+	stream, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+		Connect(controlCtx)
 	require.NoError(t, err)
 	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
 		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
@@ -327,7 +340,8 @@ func TestCreateSession(t *testing.T) {
 			case <-t.Context().Done():
 				return
 			}
-			relay, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).DaemonRelay(relayCtx)
+			relay, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+				DaemonRelay(relayCtx)
 			if err != nil {
 				return
 			}
@@ -412,12 +426,16 @@ func TestCreateSession(t *testing.T) {
 }
 
 // daemonAuth signs one call the way nokkud does.
-func daemonAuth(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey, token, procedure string) connect.ClientOption {
+func daemonAuth(
+	t *testing.T,
+	cfg *config.Config,
+	key *ecdsa.PrivateKey,
+	token, procedure string,
+) connect.ClientInterceptor {
 	t.Helper()
-	return connect.WithClientOptions(
-		header("Authorization", "DPoP "+token),
-		header("DPoP", dpopProof(t, cfg, key, procedure, token)),
-	)
+	auth := header("Authorization", "DPoP "+token)
+	proof := header("DPoP", dpopProof(t, cfg, key, procedure, token))
+	return func(next connect.ClientFunc) connect.ClientFunc { return auth(proof(next)) }
 }
 
 func enrollTestDaemon(
@@ -432,7 +450,7 @@ func enrollTestDaemon(
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	created, err := nokkuv1connect.NewJoinTokenServiceClient(srv.Client(), srv.URL, adminAuth).
+	created, err := nokkuv1connect.NewJoinTokenServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
 			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			AutoApprove: &autoApprove,
@@ -441,7 +459,7 @@ func enrollTestDaemon(
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	enrollAuth := header("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure, ""))
-	enrolled, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL, enrollAuth).
+	enrolled, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), enrollAuth)).
 		EnrollDaemon(t.Context(), &nokkuv1.EnrollDaemonRequest{Token: new(created.GetSecret())})
 	require.NoError(t, err)
 	return key, enrolled
@@ -455,15 +473,13 @@ func TestPendingDaemonIsDenied(t *testing.T) {
 	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, enrolled.GetStatus())
 	token := enrolled.GetAccessToken()
 
-	synced, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
-		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)).
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))).
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, synced.GetStatus())
 	assert.Empty(t, synced.GetPrincipals())
 
-	_, err = nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
-		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure)).
+	_, err = nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure))).
 		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{PublicKey: new("ssh-ed25519 AAAA")})
 	assert.Equal(
 		t,
@@ -485,13 +501,12 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	_, err := nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
+	_, err := nokkuv1connect.NewDaemonServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		DeleteDaemon(t.Context(), &nokkuv1.DeleteDaemonRequest{Id: new(enrolled.GetId())})
 	require.NoError(t, err)
 
 	sync := func() (*nokkuv1.SyncDaemonResponse, error) {
-		return nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
-			daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)).
+		return nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))).
 			SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	}
 	synced, err := sync()
@@ -506,10 +521,10 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 func seedDefaultCA(
 	t *testing.T,
 	srv *httptest.Server,
-	adminAuth connect.ClientOption,
+	adminAuth connect.ClientInterceptor,
 ) *nokkuv1.CertificateAuthority {
 	t.Helper()
-	created, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
+	created, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 			Name:      new(uniq("default")),
 			IsDefault: new(true),
@@ -532,7 +547,9 @@ func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 	_, err = owner.Exec(t.Context(), "DELETE FROM ssh_cas WHERE workspace_id = $1", workspaceID)
 	require.NoError(t, err)
 	require.NoError(t, owner.Close(t.Context()))
-	certs := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth)
+	certs := nokkuv1connect.NewCertificateServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 	create := func(name string, isDefault bool) string {
 		res, err := certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 			Name:      new(uniq(name)),
@@ -584,8 +601,7 @@ func TestSyncDaemonReport(t *testing.T) {
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 
-	synced, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
-		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)).
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))).
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{
 			Users:      []string{"root", "deploy", "bad name", `corp\john`},
 			PrivateIps: []string{"10.0.0.5:4022", "example.com:22", "nonsense"},
@@ -634,11 +650,10 @@ func TestSignHostCertificate(t *testing.T) {
 	hostPub, err := ssh.NewPublicKey(&hostKey.PublicKey)
 	require.NoError(t, err)
 
-	res, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
-		daemonAuth(
-			t, cfg, key, enrolled.GetAccessToken(),
-			nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure,
-		)).
+	res, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(
+		t, cfg, key, enrolled.GetAccessToken(),
+		nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure,
+	))).
 		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{
 			PublicKey: new(string(ssh.MarshalAuthorizedKey(hostPub))),
 		})
@@ -662,8 +677,12 @@ func TestUnenrollDaemon(t *testing.T) {
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 	control := func(procedure string) nokkuv1connect.DaemonControlServiceClient {
-		return nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL,
-			daemonAuth(t, cfg, key, token, procedure))
+		return nokkuv1connect.NewDaemonControlServiceClient(
+			connect.NewClient(
+				connecthttp.NewTransport(srv.Client(), srv.URL),
+				daemonAuth(t, cfg, key, token, procedure),
+			),
+		)
 	}
 
 	_, err := control(nokkuv1connect.DaemonControlServiceUnenrollDaemonProcedure).
@@ -674,7 +693,7 @@ func TestUnenrollDaemon(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	_, err = nokkuv1connect.NewDaemonServiceClient(srv.Client(), srv.URL, adminAuth).
+	_, err = nokkuv1connect.NewDaemonServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(enrolled.GetId())})
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "the daemon is still there, got %v", err)
 

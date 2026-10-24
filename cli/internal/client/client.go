@@ -10,7 +10,8 @@ import (
 	"time"
 	"unicode"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/fsutil"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -77,23 +78,28 @@ func (c *Client) dial() error {
 		return err
 	}
 
-	var auth connect.Interceptor = &bearerAuth{token: s.Token, ua: buildinfo.UserAgent("nk")}
+	auth := (&bearerAuth{token: s.Token, ua: buildinfo.UserAgent("nk")}).intercept
 	if c.proofer != nil {
 		c.dpop = dpopclient.New(c.proofer, c.httpc, func() string { return s.SessionToken }, dpopclient.Options{
 			BaseURL:   s.APIURL,
 			UserAgent: buildinfo.UserAgent("nk"),
 		})
-		auth = c.dpop
+		auth = c.dpop.Intercept
 	}
-	opts := connect.WithInterceptors(callTimeout, auth)
-	c.auth = nokkuv1connect.NewAuthServiceClient(c.httpc, s.APIURL, opts)
-	c.certs = nokkuv1connect.NewCertificateServiceClient(c.httpc, s.APIURL, opts)
-	c.targets = nokkuv1connect.NewTargetServiceClient(c.httpc, s.APIURL, opts)
-	c.daemons = nokkuv1connect.NewDaemonServiceClient(c.httpc, s.APIURL, opts)
-	c.users = nokkuv1connect.NewWorkspaceServiceClient(c.httpc, s.APIURL, opts)
-	c.teams = nokkuv1connect.NewTeamServiceClient(c.httpc, s.APIURL, opts)
-	c.serviceAccounts = nokkuv1connect.NewServiceAccountServiceClient(c.httpc, s.APIURL, opts)
-	c.requests = nokkuv1connect.NewAccessRequestServiceClient(c.httpc, s.APIURL, opts)
+	// Unbounded like the v1 client, the access snapshot and target pages grow with the workspace.
+	cc := connect.NewClient(
+		connecthttp.NewTransport(c.httpc, s.APIURL, connecthttp.WithReadMaxBytes(0)),
+		callTimeout,
+		auth,
+	)
+	c.auth = nokkuv1connect.NewAuthServiceClient(cc)
+	c.certs = nokkuv1connect.NewCertificateServiceClient(cc)
+	c.targets = nokkuv1connect.NewTargetServiceClient(cc)
+	c.daemons = nokkuv1connect.NewDaemonServiceClient(cc)
+	c.users = nokkuv1connect.NewWorkspaceServiceClient(cc)
+	c.teams = nokkuv1connect.NewTeamServiceClient(cc)
+	c.serviceAccounts = nokkuv1connect.NewServiceAccountServiceClient(cc)
+	c.requests = nokkuv1connect.NewAccessRequestServiceClient(cc)
 	return nil
 }
 

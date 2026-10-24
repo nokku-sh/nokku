@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,13 +16,13 @@ func TestTimeoutCapsAClientDeadline(t *testing.T) {
 	defer cancel()
 
 	var left time.Duration
-	next := func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
+	next := func(ctx context.Context, _ connect.Spec, _ connect.ServerStream) error {
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok, "the handler ctx has no deadline")
 		left = time.Until(deadline)
-		return nil, nil
+		return nil
 	}
-	_, err := newTimeoutInterceptor()(next)(ctx, nil)
+	err := newTimeoutInterceptor()(next)(ctx, connect.Spec{StreamType: connect.StreamTypeUnary}, nil)
 	require.NoError(t, err)
 	assert.LessOrEqual(t, left, 10*time.Second, "a client deadline lifted the cap")
 }

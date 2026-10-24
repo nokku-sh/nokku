@@ -2,13 +2,13 @@ package daemon
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -19,13 +19,13 @@ const heartbeatDeadline = 2 * time.Minute
 
 func (p *Pool) Connect(
 	ctx context.Context,
-	stream *connect.BidiStream[nokkuv1.ConnectRequest, nokkuv1.ConnectResponse],
+	stream nokkuv1connect.DaemonControlServiceConnectServerStream,
 ) error {
 	daemonID := actor.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return connect.NewError(
 			connect.CodePermissionDenied,
-			errors.New("daemon authentication required"),
+			"daemon authentication required",
 		)
 	}
 
@@ -35,10 +35,10 @@ func (p *Pool) Connect(
 		daemon, err = q.GetDaemon(ctx, daemonID)
 		return err
 	}); err != nil {
-		return connect.NewError(connect.CodeNotFound, errors.New("daemon not found"))
+		return connect.NewError(connect.CodeNotFound, "daemon not found")
 	}
 	if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-		return connect.NewError(connect.CodePermissionDenied, errors.New("daemon not accepted"))
+		return connect.NewError(connect.CodePermissionDenied, "daemon not accepted")
 	}
 
 	conn := p.registerDaemon(ctx, daemonID, daemon.WorkspaceID)
@@ -112,13 +112,13 @@ func (p *Pool) Connect(
 
 func (p *Pool) DaemonRelay(
 	ctx context.Context,
-	stream *connect.BidiStream[nokkuv1.DaemonRelayRequest, nokkuv1.DaemonRelayResponse],
+	stream nokkuv1connect.DaemonControlServiceDaemonRelayServerStream,
 ) error {
 	daemonID := actor.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return connect.NewError(
 			connect.CodePermissionDenied,
-			errors.New("daemon authentication required"),
+			"daemon authentication required",
 		)
 	}
 
@@ -130,17 +130,17 @@ func (p *Pool) DaemonRelay(
 	if !ok || ready.Ready == nil {
 		return connect.NewError(
 			connect.CodeInvalidArgument,
-			errors.New("first message must be DaemonRelayReady"),
+			"first message must be DaemonRelayReady",
 		)
 	}
 	relayID := ready.Ready.GetRelayId()
 	if relayID == "" {
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("relay_id required"))
+		return connect.NewError(connect.CodeInvalidArgument, "relay_id required")
 	}
 
 	relay := p.registerRelay(relayID, daemonID)
 	if relay == nil {
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("unknown relay"))
+		return connect.NewError(connect.CodeInvalidArgument, "unknown relay")
 	}
 	defer p.UnregisterRelay(relayID)
 

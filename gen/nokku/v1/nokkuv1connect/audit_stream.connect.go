@@ -5,49 +5,79 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// AuditStreamServiceName is the fully-qualified name of the AuditStreamService service.
 	AuditStreamServiceName = "nokku.v1.AuditStreamService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// AuditStreamServiceListAuditStreamsProcedure is the fully-qualified name of the
-	// AuditStreamService's ListAuditStreams RPC.
+	// AuditStreamServiceListAuditStreamsProcedure is the procedure name of the AuditStreamService's
+	// ListAuditStreams RPC.
 	AuditStreamServiceListAuditStreamsProcedure = "/nokku.v1.AuditStreamService/ListAuditStreams"
-	// AuditStreamServiceCreateAuditStreamProcedure is the fully-qualified name of the
-	// AuditStreamService's CreateAuditStream RPC.
+	// AuditStreamServiceCreateAuditStreamProcedure is the procedure name of the AuditStreamService's
+	// CreateAuditStream RPC.
 	AuditStreamServiceCreateAuditStreamProcedure = "/nokku.v1.AuditStreamService/CreateAuditStream"
-	// AuditStreamServiceUpdateAuditStreamProcedure is the fully-qualified name of the
-	// AuditStreamService's UpdateAuditStream RPC.
+	// AuditStreamServiceUpdateAuditStreamProcedure is the procedure name of the AuditStreamService's
+	// UpdateAuditStream RPC.
 	AuditStreamServiceUpdateAuditStreamProcedure = "/nokku.v1.AuditStreamService/UpdateAuditStream"
-	// AuditStreamServiceDeleteAuditStreamProcedure is the fully-qualified name of the
-	// AuditStreamService's DeleteAuditStream RPC.
+	// AuditStreamServiceDeleteAuditStreamProcedure is the procedure name of the AuditStreamService's
+	// DeleteAuditStream RPC.
 	AuditStreamServiceDeleteAuditStreamProcedure = "/nokku.v1.AuditStreamService/DeleteAuditStream"
-	// AuditStreamServiceTestAuditStreamProcedure is the fully-qualified name of the
-	// AuditStreamService's TestAuditStream RPC.
+	// AuditStreamServiceTestAuditStreamProcedure is the procedure name of the AuditStreamService's
+	// TestAuditStream RPC.
 	AuditStreamServiceTestAuditStreamProcedure = "/nokku.v1.AuditStreamService/TestAuditStream"
+)
+
+var (
+	auditStreamServiceListAuditStreamsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_audit_stream_proto.Services().ByName("AuditStreamService").Methods().ByName("ListAuditStreams"),
+			Procedure:        AuditStreamServiceListAuditStreamsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	auditStreamServiceCreateAuditStreamSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_audit_stream_proto.Services().ByName("AuditStreamService").Methods().ByName("CreateAuditStream"),
+			Procedure:  AuditStreamServiceCreateAuditStreamProcedure,
+		}
+	})
+	auditStreamServiceUpdateAuditStreamSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_audit_stream_proto.Services().ByName("AuditStreamService").Methods().ByName("UpdateAuditStream"),
+			Procedure:  AuditStreamServiceUpdateAuditStreamProcedure,
+		}
+	})
+	auditStreamServiceDeleteAuditStreamSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_audit_stream_proto.Services().ByName("AuditStreamService").Methods().ByName("DeleteAuditStream"),
+			Procedure:  AuditStreamServiceDeleteAuditStreamProcedure,
+		}
+	})
+	auditStreamServiceTestAuditStreamSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_audit_stream_proto.Services().ByName("AuditStreamService").Methods().ByName("TestAuditStream"),
+			Procedure:  AuditStreamServiceTestAuditStreamProcedure,
+		}
+	})
 )
 
 // AuditStreamServiceClient is a client for the nokku.v1.AuditStreamService service.
@@ -60,103 +90,10 @@ type AuditStreamServiceClient interface {
 	TestAuditStream(context.Context, *v1.TestAuditStreamRequest) (*v1.TestAuditStreamResponse, error)
 }
 
-// NewAuditStreamServiceClient constructs a client for the nokku.v1.AuditStreamService service. By
-// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
-// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewAuditStreamServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) AuditStreamServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	auditStreamServiceMethods := v1.File_nokku_v1_audit_stream_proto.Services().ByName("AuditStreamService").Methods()
-	return &auditStreamServiceClient{
-		listAuditStreams: connect.NewClient[v1.ListAuditStreamsRequest, v1.ListAuditStreamsResponse](
-			httpClient,
-			baseURL+AuditStreamServiceListAuditStreamsProcedure,
-			connect.WithSchema(auditStreamServiceMethods.ByName("ListAuditStreams")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		createAuditStream: connect.NewClient[v1.CreateAuditStreamRequest, v1.CreateAuditStreamResponse](
-			httpClient,
-			baseURL+AuditStreamServiceCreateAuditStreamProcedure,
-			connect.WithSchema(auditStreamServiceMethods.ByName("CreateAuditStream")),
-			connect.WithClientOptions(opts...),
-		),
-		updateAuditStream: connect.NewClient[v1.UpdateAuditStreamRequest, v1.UpdateAuditStreamResponse](
-			httpClient,
-			baseURL+AuditStreamServiceUpdateAuditStreamProcedure,
-			connect.WithSchema(auditStreamServiceMethods.ByName("UpdateAuditStream")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteAuditStream: connect.NewClient[v1.DeleteAuditStreamRequest, v1.DeleteAuditStreamResponse](
-			httpClient,
-			baseURL+AuditStreamServiceDeleteAuditStreamProcedure,
-			connect.WithSchema(auditStreamServiceMethods.ByName("DeleteAuditStream")),
-			connect.WithClientOptions(opts...),
-		),
-		testAuditStream: connect.NewClient[v1.TestAuditStreamRequest, v1.TestAuditStreamResponse](
-			httpClient,
-			baseURL+AuditStreamServiceTestAuditStreamProcedure,
-			connect.WithSchema(auditStreamServiceMethods.ByName("TestAuditStream")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// auditStreamServiceClient implements AuditStreamServiceClient.
-type auditStreamServiceClient struct {
-	listAuditStreams  *connect.Client[v1.ListAuditStreamsRequest, v1.ListAuditStreamsResponse]
-	createAuditStream *connect.Client[v1.CreateAuditStreamRequest, v1.CreateAuditStreamResponse]
-	updateAuditStream *connect.Client[v1.UpdateAuditStreamRequest, v1.UpdateAuditStreamResponse]
-	deleteAuditStream *connect.Client[v1.DeleteAuditStreamRequest, v1.DeleteAuditStreamResponse]
-	testAuditStream   *connect.Client[v1.TestAuditStreamRequest, v1.TestAuditStreamResponse]
-}
-
-// ListAuditStreams calls nokku.v1.AuditStreamService.ListAuditStreams.
-func (c *auditStreamServiceClient) ListAuditStreams(ctx context.Context, req *v1.ListAuditStreamsRequest) (*v1.ListAuditStreamsResponse, error) {
-	response, err := c.listAuditStreams.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CreateAuditStream calls nokku.v1.AuditStreamService.CreateAuditStream.
-func (c *auditStreamServiceClient) CreateAuditStream(ctx context.Context, req *v1.CreateAuditStreamRequest) (*v1.CreateAuditStreamResponse, error) {
-	response, err := c.createAuditStream.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// UpdateAuditStream calls nokku.v1.AuditStreamService.UpdateAuditStream.
-func (c *auditStreamServiceClient) UpdateAuditStream(ctx context.Context, req *v1.UpdateAuditStreamRequest) (*v1.UpdateAuditStreamResponse, error) {
-	response, err := c.updateAuditStream.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteAuditStream calls nokku.v1.AuditStreamService.DeleteAuditStream.
-func (c *auditStreamServiceClient) DeleteAuditStream(ctx context.Context, req *v1.DeleteAuditStreamRequest) (*v1.DeleteAuditStreamResponse, error) {
-	response, err := c.deleteAuditStream.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// TestAuditStream calls nokku.v1.AuditStreamService.TestAuditStream.
-func (c *auditStreamServiceClient) TestAuditStream(ctx context.Context, req *v1.TestAuditStreamRequest) (*v1.TestAuditStreamResponse, error) {
-	response, err := c.testAuditStream.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// NewAuditStreamServiceClient constructs a client for the nokku.v1.AuditStreamService service.
+// Multiple service clients may share a single connect.Client.
+func NewAuditStreamServiceClient(client *connect.Client) AuditStreamServiceClient {
+	return &auditStreamServiceClient{client: client}
 }
 
 // AuditStreamServiceHandler is an implementation of the nokku.v1.AuditStreamService service.
@@ -169,81 +106,144 @@ type AuditStreamServiceHandler interface {
 	TestAuditStream(context.Context, *v1.TestAuditStreamRequest) (*v1.TestAuditStreamResponse, error)
 }
 
-// NewAuditStreamServiceHandler builds an HTTP handler from the service implementation. It returns
-// the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewAuditStreamServiceHandler(svc AuditStreamServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	auditStreamServiceMethods := v1.File_nokku_v1_audit_stream_proto.Services().ByName("AuditStreamService").Methods()
-	auditStreamServiceListAuditStreamsHandler := connect.NewUnaryHandlerSimple(
-		AuditStreamServiceListAuditStreamsProcedure,
-		svc.ListAuditStreams,
-		connect.WithSchema(auditStreamServiceMethods.ByName("ListAuditStreams")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterAuditStreamServiceHandler registers svc as the nokku.v1.AuditStreamService implementation
+// on server.
+func RegisterAuditStreamServiceHandler(server *connect.Server, svc AuditStreamServiceHandler) {
+	adapter := auditStreamServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: auditStreamServiceListAuditStreamsSpec(), Handler: adapter.listAuditStreams},
+		connect.Method{Spec: auditStreamServiceCreateAuditStreamSpec(), Handler: adapter.createAuditStream},
+		connect.Method{Spec: auditStreamServiceUpdateAuditStreamSpec(), Handler: adapter.updateAuditStream},
+		connect.Method{Spec: auditStreamServiceDeleteAuditStreamSpec(), Handler: adapter.deleteAuditStream},
+		connect.Method{Spec: auditStreamServiceTestAuditStreamSpec(), Handler: adapter.testAuditStream},
 	)
-	auditStreamServiceCreateAuditStreamHandler := connect.NewUnaryHandlerSimple(
-		AuditStreamServiceCreateAuditStreamProcedure,
-		svc.CreateAuditStream,
-		connect.WithSchema(auditStreamServiceMethods.ByName("CreateAuditStream")),
-		connect.WithHandlerOptions(opts...),
-	)
-	auditStreamServiceUpdateAuditStreamHandler := connect.NewUnaryHandlerSimple(
-		AuditStreamServiceUpdateAuditStreamProcedure,
-		svc.UpdateAuditStream,
-		connect.WithSchema(auditStreamServiceMethods.ByName("UpdateAuditStream")),
-		connect.WithHandlerOptions(opts...),
-	)
-	auditStreamServiceDeleteAuditStreamHandler := connect.NewUnaryHandlerSimple(
-		AuditStreamServiceDeleteAuditStreamProcedure,
-		svc.DeleteAuditStream,
-		connect.WithSchema(auditStreamServiceMethods.ByName("DeleteAuditStream")),
-		connect.WithHandlerOptions(opts...),
-	)
-	auditStreamServiceTestAuditStreamHandler := connect.NewUnaryHandlerSimple(
-		AuditStreamServiceTestAuditStreamProcedure,
-		svc.TestAuditStream,
-		connect.WithSchema(auditStreamServiceMethods.ByName("TestAuditStream")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.AuditStreamService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case AuditStreamServiceListAuditStreamsProcedure:
-			auditStreamServiceListAuditStreamsHandler.ServeHTTP(w, r)
-		case AuditStreamServiceCreateAuditStreamProcedure:
-			auditStreamServiceCreateAuditStreamHandler.ServeHTTP(w, r)
-		case AuditStreamServiceUpdateAuditStreamProcedure:
-			auditStreamServiceUpdateAuditStreamHandler.ServeHTTP(w, r)
-		case AuditStreamServiceDeleteAuditStreamProcedure:
-			auditStreamServiceDeleteAuditStreamHandler.ServeHTTP(w, r)
-		case AuditStreamServiceTestAuditStreamProcedure:
-			auditStreamServiceTestAuditStreamHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedAuditStreamServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedAuditStreamServiceHandler struct{}
 
 func (UnimplementedAuditStreamServiceHandler) ListAuditStreams(context.Context, *v1.ListAuditStreamsRequest) (*v1.ListAuditStreamsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuditStreamService.ListAuditStreams is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuditStreamService.ListAuditStreams is not implemented")
 }
 
 func (UnimplementedAuditStreamServiceHandler) CreateAuditStream(context.Context, *v1.CreateAuditStreamRequest) (*v1.CreateAuditStreamResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuditStreamService.CreateAuditStream is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuditStreamService.CreateAuditStream is not implemented")
 }
 
 func (UnimplementedAuditStreamServiceHandler) UpdateAuditStream(context.Context, *v1.UpdateAuditStreamRequest) (*v1.UpdateAuditStreamResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuditStreamService.UpdateAuditStream is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuditStreamService.UpdateAuditStream is not implemented")
 }
 
 func (UnimplementedAuditStreamServiceHandler) DeleteAuditStream(context.Context, *v1.DeleteAuditStreamRequest) (*v1.DeleteAuditStreamResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuditStreamService.DeleteAuditStream is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuditStreamService.DeleteAuditStream is not implemented")
 }
 
 func (UnimplementedAuditStreamServiceHandler) TestAuditStream(context.Context, *v1.TestAuditStreamRequest) (*v1.TestAuditStreamResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AuditStreamService.TestAuditStream is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuditStreamService.TestAuditStream is not implemented")
+}
+
+type auditStreamServiceClient struct {
+	client *connect.Client
+}
+
+func (c *auditStreamServiceClient) ListAuditStreams(ctx context.Context, req *v1.ListAuditStreamsRequest) (*v1.ListAuditStreamsResponse, error) {
+	var res v1.ListAuditStreamsResponse
+	if err := c.client.CallUnary(ctx, auditStreamServiceListAuditStreamsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *auditStreamServiceClient) CreateAuditStream(ctx context.Context, req *v1.CreateAuditStreamRequest) (*v1.CreateAuditStreamResponse, error) {
+	var res v1.CreateAuditStreamResponse
+	if err := c.client.CallUnary(ctx, auditStreamServiceCreateAuditStreamSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *auditStreamServiceClient) UpdateAuditStream(ctx context.Context, req *v1.UpdateAuditStreamRequest) (*v1.UpdateAuditStreamResponse, error) {
+	var res v1.UpdateAuditStreamResponse
+	if err := c.client.CallUnary(ctx, auditStreamServiceUpdateAuditStreamSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *auditStreamServiceClient) DeleteAuditStream(ctx context.Context, req *v1.DeleteAuditStreamRequest) (*v1.DeleteAuditStreamResponse, error) {
+	var res v1.DeleteAuditStreamResponse
+	if err := c.client.CallUnary(ctx, auditStreamServiceDeleteAuditStreamSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *auditStreamServiceClient) TestAuditStream(ctx context.Context, req *v1.TestAuditStreamRequest) (*v1.TestAuditStreamResponse, error) {
+	var res v1.TestAuditStreamResponse
+	if err := c.client.CallUnary(ctx, auditStreamServiceTestAuditStreamSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type auditStreamServiceHandler struct{ svc AuditStreamServiceHandler }
+
+func (h auditStreamServiceHandler) listAuditStreams(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListAuditStreamsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListAuditStreams(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h auditStreamServiceHandler) createAuditStream(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CreateAuditStreamRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CreateAuditStream(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h auditStreamServiceHandler) updateAuditStream(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.UpdateAuditStreamRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.UpdateAuditStream(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h auditStreamServiceHandler) deleteAuditStream(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteAuditStreamRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteAuditStream(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h auditStreamServiceHandler) testAuditStream(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.TestAuditStreamRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.TestAuditStream(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

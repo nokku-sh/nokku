@@ -8,7 +8,8 @@ import (
 	"time"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,7 +36,10 @@ func TestAuditDeniedCall(t *testing.T) {
 
 	deleteTarget := func(token, id string) connect.Code {
 		targets := nokkuv1connect.NewTargetServiceClient(
-			srv.Client(), srv.URL, header("Authorization", "Bearer "+token),
+			connect.NewClient(
+				connecthttp.NewTransport(srv.Client(), srv.URL),
+				header("Authorization", "Bearer "+token),
+			),
 		)
 		_, err := targets.DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &id})
 		return connect.CodeOf(err)
@@ -73,15 +77,16 @@ func TestAuditNamesServiceAccount(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	name := uniq("ci")
-	accounts := nokkuv1connect.NewServiceAccountServiceClient(srv.Client(), srv.URL, adminAuth)
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	)
 	sa, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{Name: &name})
 	require.NoError(t, err)
 	token := serviceAccountToken(t, accounts, sa.GetServiceAccount().GetId(), nil)
 
 	target := uuid.NewV7().String()
-	_, err = nokkuv1connect.NewTargetServiceClient(
-		srv.Client(), srv.URL, header("Authorization", "Bearer "+token),
-	).DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &target})
+	_, err = nokkuv1connect.NewTargetServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
+		DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &target})
 	require.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 
 	var rows []*db.ListAuditLogsRow

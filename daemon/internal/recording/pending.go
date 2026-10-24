@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -80,7 +80,7 @@ func UploadPending(ctx context.Context, client nokkuv1connect.DaemonControlServi
 func uploadFile(ctx context.Context, client nokkuv1connect.DaemonControlServiceClient, path string) error {
 	hdr, err := readHeader(path)
 	if err != nil {
-		return connect.NewError(connect.CodeInvalidArgument, err)
+		return connect.NewError(connect.CodeInvalidArgument, err.Error()).WithCause(err)
 	}
 	f, err := os.Open(path) // #nosec G304 - a file from the recordings dir
 	if err != nil {

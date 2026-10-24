@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -42,7 +43,7 @@ func enterprise(t *testing.T) (*config.Config, *httptest.Server) {
 	t.Cleanup(srv.Close)
 
 	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
-	_, err = nokkuv1connect.NewBillingServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+owner)).
+	_, err = nokkuv1connect.NewBillingServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner))).
 		ActivateLicense(t.Context(), &nokkuv1.ActivateLicenseRequest{Key: &key})
 	require.NoError(t, err)
 	return &local, srv
@@ -70,8 +71,12 @@ func TestAccessRequestFlow(t *testing.T) {
 
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	as := func(u *db.User) nokkuv1connect.AccessRequestServiceClient {
-		return nokkuv1connect.NewAccessRequestServiceClient(srv.Client(), srv.URL,
-			header("Authorization", "Bearer "+sessionFor(t, cfg, u)))
+		return nokkuv1connect.NewAccessRequestServiceClient(
+			connect.NewClient(
+				connecthttp.NewTransport(srv.Client(), srv.URL),
+				header("Authorization", "Bearer "+sessionFor(t, cfg, u)),
+			),
+		)
 	}
 	asMember := as(member)
 	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
@@ -162,7 +167,9 @@ func TestIdleTimeoutTurnsOff(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	srv := enterpriseServer(t)
 	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
-	client := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+owner))
+	client := nokkuv1connect.NewWorkspaceServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
+	)
 	set := func(d time.Duration) *nokkuv1.WorkspaceSettings {
 		res, err := client.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(d)},

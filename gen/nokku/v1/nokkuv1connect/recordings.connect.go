@@ -5,175 +5,203 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// RecordingServiceName is the fully-qualified name of the RecordingService service.
 	RecordingServiceName = "nokku.v1.RecordingService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// RecordingServiceGetRecordingProcedure is the fully-qualified name of the RecordingService's
+	// RecordingServiceGetRecordingProcedure is the procedure name of the RecordingService's
 	// GetRecording RPC.
 	RecordingServiceGetRecordingProcedure = "/nokku.v1.RecordingService/GetRecording"
-	// RecordingServiceListRecordingsProcedure is the fully-qualified name of the RecordingService's
+	// RecordingServiceListRecordingsProcedure is the procedure name of the RecordingService's
 	// ListRecordings RPC.
 	RecordingServiceListRecordingsProcedure = "/nokku.v1.RecordingService/ListRecordings"
-	// RecordingServiceDeleteRecordingProcedure is the fully-qualified name of the RecordingService's
+	// RecordingServiceDeleteRecordingProcedure is the procedure name of the RecordingService's
 	// DeleteRecording RPC.
 	RecordingServiceDeleteRecordingProcedure = "/nokku.v1.RecordingService/DeleteRecording"
 )
 
+var (
+	recordingServiceGetRecordingSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeServer,
+			Schema:           v1.File_nokku_v1_recordings_proto.Services().ByName("RecordingService").Methods().ByName("GetRecording"),
+			Procedure:        RecordingServiceGetRecordingProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	recordingServiceListRecordingsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_recordings_proto.Services().ByName("RecordingService").Methods().ByName("ListRecordings"),
+			Procedure:        RecordingServiceListRecordingsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	recordingServiceDeleteRecordingSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_recordings_proto.Services().ByName("RecordingService").Methods().ByName("DeleteRecording"),
+			Procedure:  RecordingServiceDeleteRecordingProcedure,
+		}
+	})
+)
+
 // RecordingServiceClient is a client for the nokku.v1.RecordingService service.
 type RecordingServiceClient interface {
-	GetRecording(context.Context, *v1.GetRecordingRequest) (*connect.ServerStreamForClient[v1.GetRecordingResponse], error)
+	GetRecording(context.Context, *v1.GetRecordingRequest) (RecordingServiceGetRecordingClientStream, error)
 	ListRecordings(context.Context, *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error)
 	DeleteRecording(context.Context, *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error)
 }
 
-// NewRecordingServiceClient constructs a client for the nokku.v1.RecordingService service. By
-// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
-// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewRecordingServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) RecordingServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	recordingServiceMethods := v1.File_nokku_v1_recordings_proto.Services().ByName("RecordingService").Methods()
-	return &recordingServiceClient{
-		getRecording: connect.NewClient[v1.GetRecordingRequest, v1.GetRecordingResponse](
-			httpClient,
-			baseURL+RecordingServiceGetRecordingProcedure,
-			connect.WithSchema(recordingServiceMethods.ByName("GetRecording")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		listRecordings: connect.NewClient[v1.ListRecordingsRequest, v1.ListRecordingsResponse](
-			httpClient,
-			baseURL+RecordingServiceListRecordingsProcedure,
-			connect.WithSchema(recordingServiceMethods.ByName("ListRecordings")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		deleteRecording: connect.NewClient[v1.DeleteRecordingRequest, v1.DeleteRecordingResponse](
-			httpClient,
-			baseURL+RecordingServiceDeleteRecordingProcedure,
-			connect.WithSchema(recordingServiceMethods.ByName("DeleteRecording")),
-			connect.WithClientOptions(opts...),
-		),
+// NewRecordingServiceClient constructs a client for the nokku.v1.RecordingService service. Multiple
+// service clients may share a single connect.Client.
+func NewRecordingServiceClient(client *connect.Client) RecordingServiceClient {
+	return &recordingServiceClient{client: client}
+}
+
+// RecordingServiceGetRecordingClientStream is the client stream for the RecordingService's
+// GetRecording RPC.
+type RecordingServiceGetRecordingClientStream struct {
+	stream connect.ClientStream
+}
+
+// Receive returns the next response message from the server.
+func (s RecordingServiceGetRecordingClientStream) Receive() (*v1.GetRecordingResponse, error) {
+	var res v1.GetRecordingResponse
+	if err := s.stream.Receive(&res); err != nil {
+		return nil, err
 	}
+	return &res, nil
 }
 
-// recordingServiceClient implements RecordingServiceClient.
-type recordingServiceClient struct {
-	getRecording    *connect.Client[v1.GetRecordingRequest, v1.GetRecordingResponse]
-	listRecordings  *connect.Client[v1.ListRecordingsRequest, v1.ListRecordingsResponse]
-	deleteRecording *connect.Client[v1.DeleteRecordingRequest, v1.DeleteRecordingResponse]
-}
-
-// GetRecording calls nokku.v1.RecordingService.GetRecording.
-func (c *recordingServiceClient) GetRecording(ctx context.Context, req *v1.GetRecordingRequest) (*connect.ServerStreamForClient[v1.GetRecordingResponse], error) {
-	return c.getRecording.CallServerStream(ctx, connect.NewRequest(req))
-}
-
-// ListRecordings calls nokku.v1.RecordingService.ListRecordings.
-func (c *recordingServiceClient) ListRecordings(ctx context.Context, req *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error) {
-	response, err := c.listRecordings.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteRecording calls nokku.v1.RecordingService.DeleteRecording.
-func (c *recordingServiceClient) DeleteRecording(ctx context.Context, req *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error) {
-	response, err := c.deleteRecording.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// Close releases the stream's resources. It is idempotent and is typically deferred to clean up a
+// stream abandoned before io.EOF.
+func (s RecordingServiceGetRecordingClientStream) Close() error {
+	return s.stream.Close()
 }
 
 // RecordingServiceHandler is an implementation of the nokku.v1.RecordingService service.
 type RecordingServiceHandler interface {
-	GetRecording(context.Context, *v1.GetRecordingRequest, *connect.ServerStream[v1.GetRecordingResponse]) error
+	GetRecording(context.Context, *v1.GetRecordingRequest, RecordingServiceGetRecordingServerStream) error
 	ListRecordings(context.Context, *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error)
 	DeleteRecording(context.Context, *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error)
 }
 
-// NewRecordingServiceHandler builds an HTTP handler from the service implementation. It returns the
-// path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewRecordingServiceHandler(svc RecordingServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	recordingServiceMethods := v1.File_nokku_v1_recordings_proto.Services().ByName("RecordingService").Methods()
-	recordingServiceGetRecordingHandler := connect.NewServerStreamHandlerSimple(
-		RecordingServiceGetRecordingProcedure,
-		svc.GetRecording,
-		connect.WithSchema(recordingServiceMethods.ByName("GetRecording")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterRecordingServiceHandler registers svc as the nokku.v1.RecordingService implementation on
+// server.
+func RegisterRecordingServiceHandler(server *connect.Server, svc RecordingServiceHandler) {
+	adapter := recordingServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: recordingServiceGetRecordingSpec(), Handler: adapter.getRecording},
+		connect.Method{Spec: recordingServiceListRecordingsSpec(), Handler: adapter.listRecordings},
+		connect.Method{Spec: recordingServiceDeleteRecordingSpec(), Handler: adapter.deleteRecording},
 	)
-	recordingServiceListRecordingsHandler := connect.NewUnaryHandlerSimple(
-		RecordingServiceListRecordingsProcedure,
-		svc.ListRecordings,
-		connect.WithSchema(recordingServiceMethods.ByName("ListRecordings")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	recordingServiceDeleteRecordingHandler := connect.NewUnaryHandlerSimple(
-		RecordingServiceDeleteRecordingProcedure,
-		svc.DeleteRecording,
-		connect.WithSchema(recordingServiceMethods.ByName("DeleteRecording")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.RecordingService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case RecordingServiceGetRecordingProcedure:
-			recordingServiceGetRecordingHandler.ServeHTTP(w, r)
-		case RecordingServiceListRecordingsProcedure:
-			recordingServiceListRecordingsHandler.ServeHTTP(w, r)
-		case RecordingServiceDeleteRecordingProcedure:
-			recordingServiceDeleteRecordingHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
+}
+
+// RecordingServiceGetRecordingServerStream is the server stream for the RecordingService's
+// GetRecording RPC.
+type RecordingServiceGetRecordingServerStream struct {
+	stream connect.ServerStream
+}
+
+// SendHeaders flushes the response headers without a message. The first Send does this implicitly.
+func (s RecordingServiceGetRecordingServerStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a response message to the client.
+func (s RecordingServiceGetRecordingServerStream) Send(res *v1.GetRecordingResponse) error {
+	return s.stream.Send(res)
 }
 
 // UnimplementedRecordingServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedRecordingServiceHandler struct{}
 
-func (UnimplementedRecordingServiceHandler) GetRecording(context.Context, *v1.GetRecordingRequest, *connect.ServerStream[v1.GetRecordingResponse]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.RecordingService.GetRecording is not implemented"))
+func (UnimplementedRecordingServiceHandler) GetRecording(context.Context, *v1.GetRecordingRequest, RecordingServiceGetRecordingServerStream) error {
+	return connect.NewError(connect.CodeUnimplemented, "nokku.v1.RecordingService.GetRecording is not implemented")
 }
 
 func (UnimplementedRecordingServiceHandler) ListRecordings(context.Context, *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.RecordingService.ListRecordings is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.RecordingService.ListRecordings is not implemented")
 }
 
 func (UnimplementedRecordingServiceHandler) DeleteRecording(context.Context, *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.RecordingService.DeleteRecording is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.RecordingService.DeleteRecording is not implemented")
+}
+
+type recordingServiceClient struct {
+	client *connect.Client
+}
+
+func (c *recordingServiceClient) GetRecording(ctx context.Context, req *v1.GetRecordingRequest) (RecordingServiceGetRecordingClientStream, error) {
+	stream, err := c.client.CallServerStream(ctx, recordingServiceGetRecordingSpec(), req)
+	if err != nil {
+		return RecordingServiceGetRecordingClientStream{}, err
+	}
+	return RecordingServiceGetRecordingClientStream{stream: stream}, nil
+}
+
+func (c *recordingServiceClient) ListRecordings(ctx context.Context, req *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error) {
+	var res v1.ListRecordingsResponse
+	if err := c.client.CallUnary(ctx, recordingServiceListRecordingsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *recordingServiceClient) DeleteRecording(ctx context.Context, req *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error) {
+	var res v1.DeleteRecordingResponse
+	if err := c.client.CallUnary(ctx, recordingServiceDeleteRecordingSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type recordingServiceHandler struct{ svc RecordingServiceHandler }
+
+func (h recordingServiceHandler) getRecording(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetRecordingRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	return h.svc.GetRecording(ctx, &req, RecordingServiceGetRecordingServerStream{stream: stream})
+}
+
+func (h recordingServiceHandler) listRecordings(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListRecordingsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListRecordings(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h recordingServiceHandler) deleteRecording(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteRecordingRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteRecording(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

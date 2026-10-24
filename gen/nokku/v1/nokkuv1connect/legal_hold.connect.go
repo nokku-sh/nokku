@@ -5,43 +5,59 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// LegalHoldServiceName is the fully-qualified name of the LegalHoldService service.
 	LegalHoldServiceName = "nokku.v1.LegalHoldService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// LegalHoldServiceListLegalHoldsProcedure is the fully-qualified name of the LegalHoldService's
+	// LegalHoldServiceListLegalHoldsProcedure is the procedure name of the LegalHoldService's
 	// ListLegalHolds RPC.
 	LegalHoldServiceListLegalHoldsProcedure = "/nokku.v1.LegalHoldService/ListLegalHolds"
-	// LegalHoldServiceCreateLegalHoldProcedure is the fully-qualified name of the LegalHoldService's
+	// LegalHoldServiceCreateLegalHoldProcedure is the procedure name of the LegalHoldService's
 	// CreateLegalHold RPC.
 	LegalHoldServiceCreateLegalHoldProcedure = "/nokku.v1.LegalHoldService/CreateLegalHold"
-	// LegalHoldServiceDeleteLegalHoldProcedure is the fully-qualified name of the LegalHoldService's
+	// LegalHoldServiceDeleteLegalHoldProcedure is the procedure name of the LegalHoldService's
 	// DeleteLegalHold RPC.
 	LegalHoldServiceDeleteLegalHoldProcedure = "/nokku.v1.LegalHoldService/DeleteLegalHold"
+)
+
+var (
+	legalHoldServiceListLegalHoldsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_legal_hold_proto.Services().ByName("LegalHoldService").Methods().ByName("ListLegalHolds"),
+			Procedure:        LegalHoldServiceListLegalHoldsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	legalHoldServiceCreateLegalHoldSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_legal_hold_proto.Services().ByName("LegalHoldService").Methods().ByName("CreateLegalHold"),
+			Procedure:  LegalHoldServiceCreateLegalHoldProcedure,
+		}
+	})
+	legalHoldServiceDeleteLegalHoldSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_legal_hold_proto.Services().ByName("LegalHoldService").Methods().ByName("DeleteLegalHold"),
+			Procedure:  LegalHoldServiceDeleteLegalHoldProcedure,
+		}
+	})
 )
 
 // LegalHoldServiceClient is a client for the nokku.v1.LegalHoldService service.
@@ -52,71 +68,10 @@ type LegalHoldServiceClient interface {
 	DeleteLegalHold(context.Context, *v1.DeleteLegalHoldRequest) (*v1.DeleteLegalHoldResponse, error)
 }
 
-// NewLegalHoldServiceClient constructs a client for the nokku.v1.LegalHoldService service. By
-// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
-// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewLegalHoldServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) LegalHoldServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	legalHoldServiceMethods := v1.File_nokku_v1_legal_hold_proto.Services().ByName("LegalHoldService").Methods()
-	return &legalHoldServiceClient{
-		listLegalHolds: connect.NewClient[v1.ListLegalHoldsRequest, v1.ListLegalHoldsResponse](
-			httpClient,
-			baseURL+LegalHoldServiceListLegalHoldsProcedure,
-			connect.WithSchema(legalHoldServiceMethods.ByName("ListLegalHolds")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		createLegalHold: connect.NewClient[v1.CreateLegalHoldRequest, v1.CreateLegalHoldResponse](
-			httpClient,
-			baseURL+LegalHoldServiceCreateLegalHoldProcedure,
-			connect.WithSchema(legalHoldServiceMethods.ByName("CreateLegalHold")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteLegalHold: connect.NewClient[v1.DeleteLegalHoldRequest, v1.DeleteLegalHoldResponse](
-			httpClient,
-			baseURL+LegalHoldServiceDeleteLegalHoldProcedure,
-			connect.WithSchema(legalHoldServiceMethods.ByName("DeleteLegalHold")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// legalHoldServiceClient implements LegalHoldServiceClient.
-type legalHoldServiceClient struct {
-	listLegalHolds  *connect.Client[v1.ListLegalHoldsRequest, v1.ListLegalHoldsResponse]
-	createLegalHold *connect.Client[v1.CreateLegalHoldRequest, v1.CreateLegalHoldResponse]
-	deleteLegalHold *connect.Client[v1.DeleteLegalHoldRequest, v1.DeleteLegalHoldResponse]
-}
-
-// ListLegalHolds calls nokku.v1.LegalHoldService.ListLegalHolds.
-func (c *legalHoldServiceClient) ListLegalHolds(ctx context.Context, req *v1.ListLegalHoldsRequest) (*v1.ListLegalHoldsResponse, error) {
-	response, err := c.listLegalHolds.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CreateLegalHold calls nokku.v1.LegalHoldService.CreateLegalHold.
-func (c *legalHoldServiceClient) CreateLegalHold(ctx context.Context, req *v1.CreateLegalHoldRequest) (*v1.CreateLegalHoldResponse, error) {
-	response, err := c.createLegalHold.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteLegalHold calls nokku.v1.LegalHoldService.DeleteLegalHold.
-func (c *legalHoldServiceClient) DeleteLegalHold(ctx context.Context, req *v1.DeleteLegalHoldRequest) (*v1.DeleteLegalHoldResponse, error) {
-	response, err := c.deleteLegalHold.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// NewLegalHoldServiceClient constructs a client for the nokku.v1.LegalHoldService service. Multiple
+// service clients may share a single connect.Client.
+func NewLegalHoldServiceClient(client *connect.Client) LegalHoldServiceClient {
+	return &legalHoldServiceClient{client: client}
 }
 
 // LegalHoldServiceHandler is an implementation of the nokku.v1.LegalHoldService service.
@@ -127,57 +82,94 @@ type LegalHoldServiceHandler interface {
 	DeleteLegalHold(context.Context, *v1.DeleteLegalHoldRequest) (*v1.DeleteLegalHoldResponse, error)
 }
 
-// NewLegalHoldServiceHandler builds an HTTP handler from the service implementation. It returns the
-// path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewLegalHoldServiceHandler(svc LegalHoldServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	legalHoldServiceMethods := v1.File_nokku_v1_legal_hold_proto.Services().ByName("LegalHoldService").Methods()
-	legalHoldServiceListLegalHoldsHandler := connect.NewUnaryHandlerSimple(
-		LegalHoldServiceListLegalHoldsProcedure,
-		svc.ListLegalHolds,
-		connect.WithSchema(legalHoldServiceMethods.ByName("ListLegalHolds")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterLegalHoldServiceHandler registers svc as the nokku.v1.LegalHoldService implementation on
+// server.
+func RegisterLegalHoldServiceHandler(server *connect.Server, svc LegalHoldServiceHandler) {
+	adapter := legalHoldServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: legalHoldServiceListLegalHoldsSpec(), Handler: adapter.listLegalHolds},
+		connect.Method{Spec: legalHoldServiceCreateLegalHoldSpec(), Handler: adapter.createLegalHold},
+		connect.Method{Spec: legalHoldServiceDeleteLegalHoldSpec(), Handler: adapter.deleteLegalHold},
 	)
-	legalHoldServiceCreateLegalHoldHandler := connect.NewUnaryHandlerSimple(
-		LegalHoldServiceCreateLegalHoldProcedure,
-		svc.CreateLegalHold,
-		connect.WithSchema(legalHoldServiceMethods.ByName("CreateLegalHold")),
-		connect.WithHandlerOptions(opts...),
-	)
-	legalHoldServiceDeleteLegalHoldHandler := connect.NewUnaryHandlerSimple(
-		LegalHoldServiceDeleteLegalHoldProcedure,
-		svc.DeleteLegalHold,
-		connect.WithSchema(legalHoldServiceMethods.ByName("DeleteLegalHold")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.LegalHoldService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case LegalHoldServiceListLegalHoldsProcedure:
-			legalHoldServiceListLegalHoldsHandler.ServeHTTP(w, r)
-		case LegalHoldServiceCreateLegalHoldProcedure:
-			legalHoldServiceCreateLegalHoldHandler.ServeHTTP(w, r)
-		case LegalHoldServiceDeleteLegalHoldProcedure:
-			legalHoldServiceDeleteLegalHoldHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedLegalHoldServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedLegalHoldServiceHandler struct{}
 
 func (UnimplementedLegalHoldServiceHandler) ListLegalHolds(context.Context, *v1.ListLegalHoldsRequest) (*v1.ListLegalHoldsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.LegalHoldService.ListLegalHolds is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.LegalHoldService.ListLegalHolds is not implemented")
 }
 
 func (UnimplementedLegalHoldServiceHandler) CreateLegalHold(context.Context, *v1.CreateLegalHoldRequest) (*v1.CreateLegalHoldResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.LegalHoldService.CreateLegalHold is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.LegalHoldService.CreateLegalHold is not implemented")
 }
 
 func (UnimplementedLegalHoldServiceHandler) DeleteLegalHold(context.Context, *v1.DeleteLegalHoldRequest) (*v1.DeleteLegalHoldResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.LegalHoldService.DeleteLegalHold is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.LegalHoldService.DeleteLegalHold is not implemented")
+}
+
+type legalHoldServiceClient struct {
+	client *connect.Client
+}
+
+func (c *legalHoldServiceClient) ListLegalHolds(ctx context.Context, req *v1.ListLegalHoldsRequest) (*v1.ListLegalHoldsResponse, error) {
+	var res v1.ListLegalHoldsResponse
+	if err := c.client.CallUnary(ctx, legalHoldServiceListLegalHoldsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *legalHoldServiceClient) CreateLegalHold(ctx context.Context, req *v1.CreateLegalHoldRequest) (*v1.CreateLegalHoldResponse, error) {
+	var res v1.CreateLegalHoldResponse
+	if err := c.client.CallUnary(ctx, legalHoldServiceCreateLegalHoldSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *legalHoldServiceClient) DeleteLegalHold(ctx context.Context, req *v1.DeleteLegalHoldRequest) (*v1.DeleteLegalHoldResponse, error) {
+	var res v1.DeleteLegalHoldResponse
+	if err := c.client.CallUnary(ctx, legalHoldServiceDeleteLegalHoldSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type legalHoldServiceHandler struct{ svc LegalHoldServiceHandler }
+
+func (h legalHoldServiceHandler) listLegalHolds(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListLegalHoldsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListLegalHolds(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h legalHoldServiceHandler) createLegalHold(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CreateLegalHoldRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CreateLegalHold(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h legalHoldServiceHandler) deleteLegalHold(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteLegalHoldRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteLegalHold(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

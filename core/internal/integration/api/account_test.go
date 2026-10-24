@@ -6,7 +6,8 @@ import (
 	"testing"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,8 +22,12 @@ func seedAccount(t *testing.T, cfg *config.Config) (*db.User, nokkuv1connect.Acc
 	t.Helper()
 	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	_, srv := newTestAPI(t)
-	client := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+sessionFor(t, cfg, u)))
+	client := nokkuv1connect.NewAccountServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header("Authorization", "Bearer "+sessionFor(t, cfg, u)),
+		),
+	)
 	return u, client
 }
 
@@ -39,7 +44,7 @@ func TestRequestEmailChangeNeedsMail(t *testing.T) {
 // The mails carry the tokens, so the links are taken from iam directly.
 func TestConfirmAndCancelEmailChange(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	auth := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL)
+	auth := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)))
 	email := func(account nokkuv1connect.AccountServiceClient) (string, error) {
 		got, err := account.GetAccount(t.Context(), &nokkuv1.GetAccountRequest{})
 		return got.GetUser().GetEmail(), err
@@ -88,12 +93,10 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 func TestDeleteAccount(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	owner := nokkuv1connect.NewAccountServiceClient(
-		srv.Client(),
-		srv.URL,
-		header(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header(
 			"Authorization",
 			"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
-		),
+		)),
 	)
 	_, err := owner.DeleteAccount(t.Context(), &nokkuv1.DeleteAccountRequest{})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "the owner left: %v", err)

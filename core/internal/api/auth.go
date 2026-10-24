@@ -5,11 +5,12 @@ import (
 	"errors"
 	"net/http"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
@@ -18,18 +19,18 @@ type authService struct {
 	cfg *config.Config
 }
 
-func callInfo(ctx context.Context) (connect.CallInfo, error) {
-	ci, ok := connect.CallInfoForHandlerContext(ctx)
+func callInfo(ctx context.Context) (*connect.CallInfo, error) {
+	ci, ok := connect.CallInfoForServerContext(ctx)
 	if !ok {
 		return nil, connect.NewError(
 			connect.CodeInternal,
-			errors.New("no call info in context"),
+			"no call info in context",
 		)
 	}
 	return ci, nil
 }
 
-func setCookie(ci connect.CallInfo, c *http.Cookie) {
+func setCookie(ci *connect.CallInfo, c *http.Cookie) {
 	ci.ResponseHeader().Add("Set-Cookie", c.String())
 }
 
@@ -92,7 +93,8 @@ func (s *authService) ConsumeMagicLink(
 		return nil, errLinkInvalid
 	}
 	setCookie(ci, cookie)
-	if c := s.cfg.IAM.RememberDevice(ctx, ci.RequestHeader(), ci.Peer().Addr, u); c != nil {
+	meta, _ := actor.RequestMetaFromContext(ctx)
+	if c := s.cfg.IAM.RememberDevice(ctx, meta.Header, meta.RemoteAddr, u); c != nil {
 		setCookie(ci, c)
 	}
 	return &nokkuv1.ConsumeMagicLinkResponse{User: u.ToProto()}, nil
@@ -108,10 +110,11 @@ func (s *authService) Logout(
 	}
 	// Public endpoint, so authenticate the credential here before revoking.
 	setCookie(ci, s.cfg.IAM.ClearSessionCookie())
-	if err := s.cfg.IAM.Logout(ctx, ci.RequestHeader(), nokkuv1connect.AuthServiceLogoutProcedure); err != nil {
+	meta, _ := actor.RequestMetaFromContext(ctx)
+	if err := s.cfg.IAM.Logout(ctx, meta.Header, nokkuv1connect.AuthServiceLogoutProcedure); err != nil {
 		if errors.Is(err, iam.ErrDPoPNonce) || errors.Is(err, iam.ErrDPoPRequired) {
 			s.cfg.IAM.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
-			return nil, connect.NewError(connect.CodeUnauthenticated, err)
+			return nil, connect.NewError(connect.CodeUnauthenticated, err.Error()).WithCause(err)
 		}
 		return nil, errInternal
 	}

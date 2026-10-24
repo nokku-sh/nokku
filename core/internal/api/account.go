@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -97,7 +97,7 @@ func (s *accountService) RequestEmailChange(
 	}
 	if err := s.cfg.IAM.RequireRecentSignIn(ctx); err != nil {
 		// The web app reads Unauthenticated as a session to sign in again, and comes back here after.
-		if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {
+		if ci, ok := connect.CallInfoForServerContext(ctx); ok {
 			setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 		}
 		return nil, newError(connect.CodeUnauthenticated, "sign in again to change your email")
@@ -264,7 +264,7 @@ func (s *accountService) DeleteAccount(
 		return nil, errInternal
 	}
 	// The session cookie is HttpOnly, only a server response can clear it.
-	if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {
+	if ci, ok := connect.CallInfoForServerContext(ctx); ok {
 		setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	}
 	return &nokkuv1.DeleteAccountResponse{}, nil

@@ -5,69 +5,150 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// TargetServiceName is the fully-qualified name of the TargetService service.
 	TargetServiceName = "nokku.v1.TargetService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// TargetServiceGetTargetProcedure is the fully-qualified name of the TargetService's GetTarget RPC.
+	// TargetServiceGetTargetProcedure is the procedure name of the TargetService's GetTarget RPC.
 	TargetServiceGetTargetProcedure = "/nokku.v1.TargetService/GetTarget"
-	// TargetServiceListTargetsProcedure is the fully-qualified name of the TargetService's ListTargets
-	// RPC.
+	// TargetServiceListTargetsProcedure is the procedure name of the TargetService's ListTargets RPC.
 	TargetServiceListTargetsProcedure = "/nokku.v1.TargetService/ListTargets"
-	// TargetServiceCreateTargetProcedure is the fully-qualified name of the TargetService's
-	// CreateTarget RPC.
+	// TargetServiceCreateTargetProcedure is the procedure name of the TargetService's CreateTarget RPC.
 	TargetServiceCreateTargetProcedure = "/nokku.v1.TargetService/CreateTarget"
-	// TargetServiceUpdateTargetProcedure is the fully-qualified name of the TargetService's
-	// UpdateTarget RPC.
+	// TargetServiceUpdateTargetProcedure is the procedure name of the TargetService's UpdateTarget RPC.
 	TargetServiceUpdateTargetProcedure = "/nokku.v1.TargetService/UpdateTarget"
-	// TargetServiceDeleteTargetProcedure is the fully-qualified name of the TargetService's
-	// DeleteTarget RPC.
+	// TargetServiceDeleteTargetProcedure is the procedure name of the TargetService's DeleteTarget RPC.
 	TargetServiceDeleteTargetProcedure = "/nokku.v1.TargetService/DeleteTarget"
-	// TargetServiceGetSubjectAccessProcedure is the fully-qualified name of the TargetService's
+	// TargetServiceGetSubjectAccessProcedure is the procedure name of the TargetService's
 	// GetSubjectAccess RPC.
 	TargetServiceGetSubjectAccessProcedure = "/nokku.v1.TargetService/GetSubjectAccess"
-	// TargetServiceGetMyAccessProcedure is the fully-qualified name of the TargetService's GetMyAccess
-	// RPC.
+	// TargetServiceGetMyAccessProcedure is the procedure name of the TargetService's GetMyAccess RPC.
 	TargetServiceGetMyAccessProcedure = "/nokku.v1.TargetService/GetMyAccess"
-	// TargetServiceGetTargetFiltersProcedure is the fully-qualified name of the TargetService's
+	// TargetServiceGetTargetFiltersProcedure is the procedure name of the TargetService's
 	// GetTargetFilters RPC.
 	TargetServiceGetTargetFiltersProcedure = "/nokku.v1.TargetService/GetTargetFilters"
-	// TargetServiceGetTargetPrincipalsProcedure is the fully-qualified name of the TargetService's
+	// TargetServiceGetTargetPrincipalsProcedure is the procedure name of the TargetService's
 	// GetTargetPrincipals RPC.
 	TargetServiceGetTargetPrincipalsProcedure = "/nokku.v1.TargetService/GetTargetPrincipals"
-	// TargetServiceSyncTargetUsersProcedure is the fully-qualified name of the TargetService's
+	// TargetServiceSyncTargetUsersProcedure is the procedure name of the TargetService's
 	// SyncTargetUsers RPC.
 	TargetServiceSyncTargetUsersProcedure = "/nokku.v1.TargetService/SyncTargetUsers"
-	// TargetServiceGetAccessGraphProcedure is the fully-qualified name of the TargetService's
-	// GetAccessGraph RPC.
+	// TargetServiceGetAccessGraphProcedure is the procedure name of the TargetService's GetAccessGraph
+	// RPC.
 	TargetServiceGetAccessGraphProcedure = "/nokku.v1.TargetService/GetAccessGraph"
-	// TargetServiceListAccessGraphTargetsProcedure is the fully-qualified name of the TargetService's
+	// TargetServiceListAccessGraphTargetsProcedure is the procedure name of the TargetService's
 	// ListAccessGraphTargets RPC.
 	TargetServiceListAccessGraphTargetsProcedure = "/nokku.v1.TargetService/ListAccessGraphTargets"
+)
+
+var (
+	targetServiceGetTargetSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetTarget"),
+			Procedure:        TargetServiceGetTargetProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetServiceListTargetsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("ListTargets"),
+			Procedure:        TargetServiceListTargetsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetServiceCreateTargetSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("CreateTarget"),
+			Procedure:  TargetServiceCreateTargetProcedure,
+		}
+	})
+	targetServiceUpdateTargetSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("UpdateTarget"),
+			Procedure:  TargetServiceUpdateTargetProcedure,
+		}
+	})
+	targetServiceDeleteTargetSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("DeleteTarget"),
+			Procedure:  TargetServiceDeleteTargetProcedure,
+		}
+	})
+	targetServiceGetSubjectAccessSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetSubjectAccess"),
+			Procedure:        TargetServiceGetSubjectAccessProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetServiceGetMyAccessSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetMyAccess"),
+			Procedure:        TargetServiceGetMyAccessProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetServiceGetTargetFiltersSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetTargetFilters"),
+			Procedure:        TargetServiceGetTargetFiltersProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetServiceGetTargetPrincipalsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetTargetPrincipals"),
+			Procedure:        TargetServiceGetTargetPrincipalsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetServiceSyncTargetUsersSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("SyncTargetUsers"),
+			Procedure:  TargetServiceSyncTargetUsersProcedure,
+		}
+	})
+	targetServiceGetAccessGraphSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetAccessGraph"),
+			Procedure:        TargetServiceGetAccessGraphProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetServiceListAccessGraphTargetsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("ListAccessGraphTargets"),
+			Procedure:        TargetServiceListAccessGraphTargetsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
 )
 
 // TargetServiceClient is a client for the nokku.v1.TargetService service.
@@ -86,222 +167,10 @@ type TargetServiceClient interface {
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
 }
 
-// NewTargetServiceClient constructs a client for the nokku.v1.TargetService service. By default, it
-// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
-// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
-// connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewTargetServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) TargetServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	targetServiceMethods := v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods()
-	return &targetServiceClient{
-		getTarget: connect.NewClient[v1.GetTargetRequest, v1.GetTargetResponse](
-			httpClient,
-			baseURL+TargetServiceGetTargetProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("GetTarget")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		listTargets: connect.NewClient[v1.ListTargetsRequest, v1.ListTargetsResponse](
-			httpClient,
-			baseURL+TargetServiceListTargetsProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("ListTargets")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		createTarget: connect.NewClient[v1.CreateTargetRequest, v1.CreateTargetResponse](
-			httpClient,
-			baseURL+TargetServiceCreateTargetProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("CreateTarget")),
-			connect.WithClientOptions(opts...),
-		),
-		updateTarget: connect.NewClient[v1.UpdateTargetRequest, v1.UpdateTargetResponse](
-			httpClient,
-			baseURL+TargetServiceUpdateTargetProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("UpdateTarget")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteTarget: connect.NewClient[v1.DeleteTargetRequest, v1.DeleteTargetResponse](
-			httpClient,
-			baseURL+TargetServiceDeleteTargetProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("DeleteTarget")),
-			connect.WithClientOptions(opts...),
-		),
-		getSubjectAccess: connect.NewClient[v1.GetSubjectAccessRequest, v1.GetSubjectAccessResponse](
-			httpClient,
-			baseURL+TargetServiceGetSubjectAccessProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("GetSubjectAccess")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		getMyAccess: connect.NewClient[v1.GetMyAccessRequest, v1.GetMyAccessResponse](
-			httpClient,
-			baseURL+TargetServiceGetMyAccessProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("GetMyAccess")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		getTargetFilters: connect.NewClient[v1.GetTargetFiltersRequest, v1.GetTargetFiltersResponse](
-			httpClient,
-			baseURL+TargetServiceGetTargetFiltersProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("GetTargetFilters")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		getTargetPrincipals: connect.NewClient[v1.GetTargetPrincipalsRequest, v1.GetTargetPrincipalsResponse](
-			httpClient,
-			baseURL+TargetServiceGetTargetPrincipalsProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("GetTargetPrincipals")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		syncTargetUsers: connect.NewClient[v1.SyncTargetUsersRequest, v1.SyncTargetUsersResponse](
-			httpClient,
-			baseURL+TargetServiceSyncTargetUsersProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("SyncTargetUsers")),
-			connect.WithClientOptions(opts...),
-		),
-		getAccessGraph: connect.NewClient[v1.GetAccessGraphRequest, v1.GetAccessGraphResponse](
-			httpClient,
-			baseURL+TargetServiceGetAccessGraphProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("GetAccessGraph")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		listAccessGraphTargets: connect.NewClient[v1.ListAccessGraphTargetsRequest, v1.ListAccessGraphTargetsResponse](
-			httpClient,
-			baseURL+TargetServiceListAccessGraphTargetsProcedure,
-			connect.WithSchema(targetServiceMethods.ByName("ListAccessGraphTargets")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// targetServiceClient implements TargetServiceClient.
-type targetServiceClient struct {
-	getTarget              *connect.Client[v1.GetTargetRequest, v1.GetTargetResponse]
-	listTargets            *connect.Client[v1.ListTargetsRequest, v1.ListTargetsResponse]
-	createTarget           *connect.Client[v1.CreateTargetRequest, v1.CreateTargetResponse]
-	updateTarget           *connect.Client[v1.UpdateTargetRequest, v1.UpdateTargetResponse]
-	deleteTarget           *connect.Client[v1.DeleteTargetRequest, v1.DeleteTargetResponse]
-	getSubjectAccess       *connect.Client[v1.GetSubjectAccessRequest, v1.GetSubjectAccessResponse]
-	getMyAccess            *connect.Client[v1.GetMyAccessRequest, v1.GetMyAccessResponse]
-	getTargetFilters       *connect.Client[v1.GetTargetFiltersRequest, v1.GetTargetFiltersResponse]
-	getTargetPrincipals    *connect.Client[v1.GetTargetPrincipalsRequest, v1.GetTargetPrincipalsResponse]
-	syncTargetUsers        *connect.Client[v1.SyncTargetUsersRequest, v1.SyncTargetUsersResponse]
-	getAccessGraph         *connect.Client[v1.GetAccessGraphRequest, v1.GetAccessGraphResponse]
-	listAccessGraphTargets *connect.Client[v1.ListAccessGraphTargetsRequest, v1.ListAccessGraphTargetsResponse]
-}
-
-// GetTarget calls nokku.v1.TargetService.GetTarget.
-func (c *targetServiceClient) GetTarget(ctx context.Context, req *v1.GetTargetRequest) (*v1.GetTargetResponse, error) {
-	response, err := c.getTarget.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListTargets calls nokku.v1.TargetService.ListTargets.
-func (c *targetServiceClient) ListTargets(ctx context.Context, req *v1.ListTargetsRequest) (*v1.ListTargetsResponse, error) {
-	response, err := c.listTargets.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CreateTarget calls nokku.v1.TargetService.CreateTarget.
-func (c *targetServiceClient) CreateTarget(ctx context.Context, req *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error) {
-	response, err := c.createTarget.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// UpdateTarget calls nokku.v1.TargetService.UpdateTarget.
-func (c *targetServiceClient) UpdateTarget(ctx context.Context, req *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error) {
-	response, err := c.updateTarget.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteTarget calls nokku.v1.TargetService.DeleteTarget.
-func (c *targetServiceClient) DeleteTarget(ctx context.Context, req *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error) {
-	response, err := c.deleteTarget.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// GetSubjectAccess calls nokku.v1.TargetService.GetSubjectAccess.
-func (c *targetServiceClient) GetSubjectAccess(ctx context.Context, req *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error) {
-	response, err := c.getSubjectAccess.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// GetMyAccess calls nokku.v1.TargetService.GetMyAccess.
-func (c *targetServiceClient) GetMyAccess(ctx context.Context, req *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error) {
-	response, err := c.getMyAccess.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// GetTargetFilters calls nokku.v1.TargetService.GetTargetFilters.
-func (c *targetServiceClient) GetTargetFilters(ctx context.Context, req *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error) {
-	response, err := c.getTargetFilters.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// GetTargetPrincipals calls nokku.v1.TargetService.GetTargetPrincipals.
-func (c *targetServiceClient) GetTargetPrincipals(ctx context.Context, req *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error) {
-	response, err := c.getTargetPrincipals.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// SyncTargetUsers calls nokku.v1.TargetService.SyncTargetUsers.
-func (c *targetServiceClient) SyncTargetUsers(ctx context.Context, req *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error) {
-	response, err := c.syncTargetUsers.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// GetAccessGraph calls nokku.v1.TargetService.GetAccessGraph.
-func (c *targetServiceClient) GetAccessGraph(ctx context.Context, req *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error) {
-	response, err := c.getAccessGraph.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListAccessGraphTargets calls nokku.v1.TargetService.ListAccessGraphTargets.
-func (c *targetServiceClient) ListAccessGraphTargets(ctx context.Context, req *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error) {
-	response, err := c.listAccessGraphTargets.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// NewTargetServiceClient constructs a client for the nokku.v1.TargetService service. Multiple
+// service clients may share a single connect.Client.
+func NewTargetServiceClient(client *connect.Client) TargetServiceClient {
+	return &targetServiceClient{client: client}
 }
 
 // TargetServiceHandler is an implementation of the nokku.v1.TargetService service.
@@ -320,172 +189,319 @@ type TargetServiceHandler interface {
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
 }
 
-// NewTargetServiceHandler builds an HTTP handler from the service implementation. It returns the
-// path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewTargetServiceHandler(svc TargetServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	targetServiceMethods := v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods()
-	targetServiceGetTargetHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceGetTargetProcedure,
-		svc.GetTarget,
-		connect.WithSchema(targetServiceMethods.ByName("GetTarget")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterTargetServiceHandler registers svc as the nokku.v1.TargetService implementation on
+// server.
+func RegisterTargetServiceHandler(server *connect.Server, svc TargetServiceHandler) {
+	adapter := targetServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: targetServiceGetTargetSpec(), Handler: adapter.getTarget},
+		connect.Method{Spec: targetServiceListTargetsSpec(), Handler: adapter.listTargets},
+		connect.Method{Spec: targetServiceCreateTargetSpec(), Handler: adapter.createTarget},
+		connect.Method{Spec: targetServiceUpdateTargetSpec(), Handler: adapter.updateTarget},
+		connect.Method{Spec: targetServiceDeleteTargetSpec(), Handler: adapter.deleteTarget},
+		connect.Method{Spec: targetServiceGetSubjectAccessSpec(), Handler: adapter.getSubjectAccess},
+		connect.Method{Spec: targetServiceGetMyAccessSpec(), Handler: adapter.getMyAccess},
+		connect.Method{Spec: targetServiceGetTargetFiltersSpec(), Handler: adapter.getTargetFilters},
+		connect.Method{Spec: targetServiceGetTargetPrincipalsSpec(), Handler: adapter.getTargetPrincipals},
+		connect.Method{Spec: targetServiceSyncTargetUsersSpec(), Handler: adapter.syncTargetUsers},
+		connect.Method{Spec: targetServiceGetAccessGraphSpec(), Handler: adapter.getAccessGraph},
+		connect.Method{Spec: targetServiceListAccessGraphTargetsSpec(), Handler: adapter.listAccessGraphTargets},
 	)
-	targetServiceListTargetsHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceListTargetsProcedure,
-		svc.ListTargets,
-		connect.WithSchema(targetServiceMethods.ByName("ListTargets")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceCreateTargetHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceCreateTargetProcedure,
-		svc.CreateTarget,
-		connect.WithSchema(targetServiceMethods.ByName("CreateTarget")),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceUpdateTargetHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceUpdateTargetProcedure,
-		svc.UpdateTarget,
-		connect.WithSchema(targetServiceMethods.ByName("UpdateTarget")),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceDeleteTargetHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceDeleteTargetProcedure,
-		svc.DeleteTarget,
-		connect.WithSchema(targetServiceMethods.ByName("DeleteTarget")),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceGetSubjectAccessHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceGetSubjectAccessProcedure,
-		svc.GetSubjectAccess,
-		connect.WithSchema(targetServiceMethods.ByName("GetSubjectAccess")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceGetMyAccessHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceGetMyAccessProcedure,
-		svc.GetMyAccess,
-		connect.WithSchema(targetServiceMethods.ByName("GetMyAccess")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceGetTargetFiltersHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceGetTargetFiltersProcedure,
-		svc.GetTargetFilters,
-		connect.WithSchema(targetServiceMethods.ByName("GetTargetFilters")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceGetTargetPrincipalsHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceGetTargetPrincipalsProcedure,
-		svc.GetTargetPrincipals,
-		connect.WithSchema(targetServiceMethods.ByName("GetTargetPrincipals")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceSyncTargetUsersHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceSyncTargetUsersProcedure,
-		svc.SyncTargetUsers,
-		connect.WithSchema(targetServiceMethods.ByName("SyncTargetUsers")),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceGetAccessGraphHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceGetAccessGraphProcedure,
-		svc.GetAccessGraph,
-		connect.WithSchema(targetServiceMethods.ByName("GetAccessGraph")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	targetServiceListAccessGraphTargetsHandler := connect.NewUnaryHandlerSimple(
-		TargetServiceListAccessGraphTargetsProcedure,
-		svc.ListAccessGraphTargets,
-		connect.WithSchema(targetServiceMethods.ByName("ListAccessGraphTargets")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.TargetService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case TargetServiceGetTargetProcedure:
-			targetServiceGetTargetHandler.ServeHTTP(w, r)
-		case TargetServiceListTargetsProcedure:
-			targetServiceListTargetsHandler.ServeHTTP(w, r)
-		case TargetServiceCreateTargetProcedure:
-			targetServiceCreateTargetHandler.ServeHTTP(w, r)
-		case TargetServiceUpdateTargetProcedure:
-			targetServiceUpdateTargetHandler.ServeHTTP(w, r)
-		case TargetServiceDeleteTargetProcedure:
-			targetServiceDeleteTargetHandler.ServeHTTP(w, r)
-		case TargetServiceGetSubjectAccessProcedure:
-			targetServiceGetSubjectAccessHandler.ServeHTTP(w, r)
-		case TargetServiceGetMyAccessProcedure:
-			targetServiceGetMyAccessHandler.ServeHTTP(w, r)
-		case TargetServiceGetTargetFiltersProcedure:
-			targetServiceGetTargetFiltersHandler.ServeHTTP(w, r)
-		case TargetServiceGetTargetPrincipalsProcedure:
-			targetServiceGetTargetPrincipalsHandler.ServeHTTP(w, r)
-		case TargetServiceSyncTargetUsersProcedure:
-			targetServiceSyncTargetUsersHandler.ServeHTTP(w, r)
-		case TargetServiceGetAccessGraphProcedure:
-			targetServiceGetAccessGraphHandler.ServeHTTP(w, r)
-		case TargetServiceListAccessGraphTargetsProcedure:
-			targetServiceListAccessGraphTargetsHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedTargetServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedTargetServiceHandler struct{}
 
 func (UnimplementedTargetServiceHandler) GetTarget(context.Context, *v1.GetTargetRequest) (*v1.GetTargetResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.GetTarget is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetTarget is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) ListTargets(context.Context, *v1.ListTargetsRequest) (*v1.ListTargetsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.ListTargets is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.ListTargets is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.CreateTarget is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.CreateTarget is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.UpdateTarget is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.UpdateTarget is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.DeleteTarget is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.DeleteTarget is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.GetSubjectAccess is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetSubjectAccess is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) GetMyAccess(context.Context, *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.GetMyAccess is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetMyAccess is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.GetTargetFilters is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetTargetFilters is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.GetTargetPrincipals is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetTargetPrincipals is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.SyncTargetUsers is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.SyncTargetUsers is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.GetAccessGraph is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetAccessGraph is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.TargetService.ListAccessGraphTargets is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.ListAccessGraphTargets is not implemented")
+}
+
+type targetServiceClient struct {
+	client *connect.Client
+}
+
+func (c *targetServiceClient) GetTarget(ctx context.Context, req *v1.GetTargetRequest) (*v1.GetTargetResponse, error) {
+	var res v1.GetTargetResponse
+	if err := c.client.CallUnary(ctx, targetServiceGetTargetSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) ListTargets(ctx context.Context, req *v1.ListTargetsRequest) (*v1.ListTargetsResponse, error) {
+	var res v1.ListTargetsResponse
+	if err := c.client.CallUnary(ctx, targetServiceListTargetsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) CreateTarget(ctx context.Context, req *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error) {
+	var res v1.CreateTargetResponse
+	if err := c.client.CallUnary(ctx, targetServiceCreateTargetSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) UpdateTarget(ctx context.Context, req *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error) {
+	var res v1.UpdateTargetResponse
+	if err := c.client.CallUnary(ctx, targetServiceUpdateTargetSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) DeleteTarget(ctx context.Context, req *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error) {
+	var res v1.DeleteTargetResponse
+	if err := c.client.CallUnary(ctx, targetServiceDeleteTargetSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) GetSubjectAccess(ctx context.Context, req *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error) {
+	var res v1.GetSubjectAccessResponse
+	if err := c.client.CallUnary(ctx, targetServiceGetSubjectAccessSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) GetMyAccess(ctx context.Context, req *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error) {
+	var res v1.GetMyAccessResponse
+	if err := c.client.CallUnary(ctx, targetServiceGetMyAccessSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) GetTargetFilters(ctx context.Context, req *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error) {
+	var res v1.GetTargetFiltersResponse
+	if err := c.client.CallUnary(ctx, targetServiceGetTargetFiltersSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) GetTargetPrincipals(ctx context.Context, req *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error) {
+	var res v1.GetTargetPrincipalsResponse
+	if err := c.client.CallUnary(ctx, targetServiceGetTargetPrincipalsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) SyncTargetUsers(ctx context.Context, req *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error) {
+	var res v1.SyncTargetUsersResponse
+	if err := c.client.CallUnary(ctx, targetServiceSyncTargetUsersSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) GetAccessGraph(ctx context.Context, req *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error) {
+	var res v1.GetAccessGraphResponse
+	if err := c.client.CallUnary(ctx, targetServiceGetAccessGraphSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) ListAccessGraphTargets(ctx context.Context, req *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error) {
+	var res v1.ListAccessGraphTargetsResponse
+	if err := c.client.CallUnary(ctx, targetServiceListAccessGraphTargetsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type targetServiceHandler struct{ svc TargetServiceHandler }
+
+func (h targetServiceHandler) getTarget(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetTargetRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetTarget(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) listTargets(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListTargetsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListTargets(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) createTarget(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CreateTargetRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CreateTarget(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) updateTarget(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.UpdateTargetRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.UpdateTarget(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) deleteTarget(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteTargetRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteTarget(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) getSubjectAccess(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetSubjectAccessRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetSubjectAccess(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) getMyAccess(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetMyAccessRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetMyAccess(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) getTargetFilters(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetTargetFiltersRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetTargetFilters(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) getTargetPrincipals(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetTargetPrincipalsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetTargetPrincipals(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) syncTargetUsers(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SyncTargetUsersRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SyncTargetUsers(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) getAccessGraph(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetAccessGraphRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetAccessGraph(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) listAccessGraphTargets(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListAccessGraphTargetsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListAccessGraphTargets(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

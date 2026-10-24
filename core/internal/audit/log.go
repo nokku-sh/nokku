@@ -4,11 +4,10 @@ import (
 	"cmp"
 	"context"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
@@ -45,37 +44,39 @@ func Set(ctx context.Context, key string, value any) {
 	}
 }
 
-func (s *Service) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		e := newEvent(req.Spec().Procedure)
+// Intercept records every call that changes something. It sits outside authorization so denied calls are recorded too.
+func (s *Service) Intercept(next connect.ServerFunc) connect.ServerFunc {
+	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
+		e := newEvent(spec.Procedure)
 		if e == nil {
-			return next(ctx, req)
-		}
-		if msg, ok := req.Any().(proto.Message); ok {
-			e.Target = cut(requestTarget(msg.ProtoReflect()), maxTarget)
+			return next(ctx, spec, stream)
 		}
 		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
-		resp, err := next(context.WithValue(ctx, eventKey{}, e), req)
-		s.finish(ctx, e, req.Header(), req.Peer().Addr, err)
-		return resp, err
-	}
-}
-
-func (s *Service) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
-	return next
-}
-
-func (s *Service) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		e := newEvent(conn.Spec().Procedure)
-		if e == nil {
-			return next(ctx, conn)
+		// A stream may still receive after the handler returned, only a unary request names the target.
+		if spec.StreamType == connect.StreamTypeUnary {
+			stream = &targetStream{ServerStream: stream, e: e}
 		}
-		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
-		err := next(context.WithValue(ctx, eventKey{}, e), conn)
-		s.finish(ctx, e, conn.RequestHeader(), conn.Peer().Addr, err)
+		err := next(context.WithValue(ctx, eventKey{}, e), spec, stream)
+		s.finish(ctx, e, err)
 		return err
 	}
+}
+
+// targetStream takes the target from the request as it is decoded, before the handler can override it.
+type targetStream struct {
+	connect.ServerStream
+
+	e *Event
+}
+
+func (t *targetStream) Receive(msg any) error {
+	if err := t.ServerStream.Receive(msg); err != nil {
+		return err
+	}
+	if m, ok := msg.(proto.Message); ok {
+		t.e.Target = cut(requestTarget(m.ProtoReflect()), maxTarget)
+	}
+	return nil
 }
 
 func newEvent(procedure string) *Event {
@@ -90,15 +91,10 @@ func newEvent(procedure string) *Event {
 
 // Log is for work the interceptor cannot see, like a relay opening.
 func (s *Service) Log(ctx context.Context, e *Event) {
-	var header http.Header
-	var peer string
-	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
-		header, peer = meta.Header, meta.RemoteAddr
-	}
 	if e.WorkspaceID == "" {
 		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
 	}
-	s.finish(ctx, e, header, peer, nil)
+	s.finish(ctx, e, nil)
 }
 
 // Record is for the sign-in flows. They run before there is a principal, so the caller names the actor.
@@ -117,16 +113,16 @@ func (s *Service) Record(ctx context.Context, e *Event) {
 }
 
 // finish skips unauthenticated calls and calls outside a workspace, the sign-in flows record their own.
-func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer string, err error) {
+func (s *Service) finish(ctx context.Context, e *Event, err error) {
 	p, _ := actor.PrincipalFromContext(ctx)
 	if p.ID == "" || e.WorkspaceID == "" {
 		return
 	}
 	e.Timestamp = time.Now().UTC()
 	e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), cmp.Or(p.Email, p.Name)
-	if header != nil {
-		e.IP = strings.ToValidUTF8(realip.Bucket(header, peer), "")
-		e.UserAgent = cut(strings.ToValidUTF8(header.Get("User-Agent"), ""), maxUserAgent)
+	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
+		e.IP = strings.ToValidUTF8(realip.Bucket(meta.Header, meta.RemoteAddr), "")
+		e.UserAgent = cut(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
 	}
 	e.OK = err == nil
 	if err != nil {

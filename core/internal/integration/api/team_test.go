@@ -5,6 +5,8 @@ package api_test
 import (
 	"testing"
 
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,8 +17,15 @@ import (
 func TestUpdateTeamReplacesTags(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	editor := nokkuv1connect.NewTeamServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)))
+	editor := nokkuv1connect.NewTeamServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header(
+				"Authorization",
+				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
+			),
+		),
+	)
 
 	created, err := editor.CreateTeam(t.Context(), &nokkuv1.CreateTeamRequest{
 		Name: new(uniq("platform")),

@@ -2,16 +2,14 @@ package entitlement
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log/slog"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 )
 
 func errInactive() error {
 	return connect.NewError(connect.CodeFailedPrecondition,
-		errors.New("this workspace has no active plan, the owner can subscribe under Billing"))
+		"this workspace has no active plan, the owner can subscribe under Billing")
 }
 
 // CanInvite is shared by the invitation, SSO, and SCIM join paths.
@@ -25,11 +23,11 @@ func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64)
 	}
 	slog.Warn("seat cap reached", "plan", plan.Name, "cap", plan.SeatCap, "workspace_id", workspaceID)
 	if plan.Name == PlanCommunity {
-		return connect.NewError(connect.CodeResourceExhausted,
-			fmt.Errorf("your plan includes %d members; upgrade to add more", plan.SeatCap))
+		return connect.Errorf(connect.CodeResourceExhausted,
+			"your plan includes %d members; upgrade to add more", plan.SeatCap)
 	}
-	return connect.NewError(connect.CodeResourceExhausted,
-		fmt.Errorf("all %d seats are in use; add seats under Billing to invite more", plan.SeatCap))
+	return connect.Errorf(connect.CodeResourceExhausted,
+		"all %d seats are in use; add seats under Billing to invite more", plan.SeatCap)
 }
 
 // CheckResources allows the create when the count cannot be read, quotas fail open.
@@ -50,6 +48,6 @@ func (s *Service) CheckResources(ctx context.Context, workspaceID string) error 
 	if used < plan.ResourceCap {
 		return nil
 	}
-	return connect.NewError(connect.CodeResourceExhausted, fmt.Errorf(
-		"your plan includes %d managed resources; delete some or upgrade to add more", plan.ResourceCap))
+	return connect.Errorf(connect.CodeResourceExhausted,
+		"your plan includes %d managed resources; delete some or upgrade to add more", plan.ResourceCap)
 }

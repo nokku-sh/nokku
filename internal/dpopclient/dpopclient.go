@@ -6,6 +6,7 @@
 package dpopclient
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -20,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	"github.com/nokku-sh/nokku/internal/dpop"
 )
@@ -137,48 +138,26 @@ func FetchNonce(ctx context.Context, httpc *http.Client, baseURL string) (string
 	return resp.Header.Get("DPoP-Nonce"), nil
 }
 
-// WrapUnary signs the request, and retries once when the server rejects the
-// proof with a stale nonce that came with a fresh one.
-func (c *Client) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := c.sign(ctx, req.Header(), req.Spec().Procedure); err != nil {
+// Intercept signs every call. A unary call is retried once when the server
+// rejects the proof with a stale nonce that came with a fresh one. A stream is
+// signed once and cannot retry, a stale-nonce rejection tears it down before
+// the first message lands. A failed stream still records the nonce, so the
+// next dial signs with it. A call that cannot be signed is never sent.
+func (c *Client) Intercept(next connect.ClientFunc) connect.ClientFunc {
+	return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {
+		info, _ := connect.CallInfoForClientContext(ctx)
+		if err := c.sign(ctx, info.RequestHeader(), spec.Procedure); err != nil {
 			return nil, err
 		}
-
-		resp, err := next(ctx, req)
-		if err != nil && c.LearnFromError(err) {
-			// Wipe the rejected proof before signing again.
-			req.Header().Del("DPoP")
-			if err = c.sign(ctx, req.Header(), req.Spec().Procedure); err != nil {
-				return nil, err
-			}
-			return next(ctx, req)
+		stream, err := next(ctx, spec)
+		if err != nil {
+			return nil, err
 		}
-		return resp, err
-	}
-}
-
-// WrapStreamingClient signs the stream once and cannot retry: a stale-nonce
-// rejection tears the stream down before the first message lands, surfacing
-// as an opaque write failure. A stream that cannot be signed is never sent,
-// its first Send or Receive returns the reason.
-func (c *Client) WrapStreamingClient(
-	next connect.StreamingClientFunc,
-) connect.StreamingClientFunc {
-	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
-		conn := next(ctx, spec)
-		if err := c.sign(ctx, conn.RequestHeader(), spec.Procedure); err != nil {
-			return &failedConn{StreamingClientConn: conn, err: err}
+		if spec.StreamType != connect.StreamTypeUnary {
+			return &learningStream{ClientStream: stream, c: c, info: info}, nil
 		}
-		return conn
+		return &retryStream{ClientStream: stream, c: c, ctx: ctx, spec: spec, next: next, info: info}, nil
 	}
-}
-
-// WrapStreamingHandler passes through, this is a client-side interceptor.
-func (c *Client) WrapStreamingHandler(
-	next connect.StreamingHandlerFunc,
-) connect.StreamingHandlerFunc {
-	return next
 }
 
 // Proof signs a DPoP proof for a request to urlPath on the configured API
@@ -205,20 +184,82 @@ func (c *Client) Learn(nonce string) {
 	c.learnedAt = time.Now()
 }
 
-// LearnFromError records a fresh nonce from a stale-nonce error response and
-// reports whether the server advertised one, so the caller retries once.
-func (c *Client) LearnFromError(err error) bool {
-	cerr, ok := errors.AsType[*connect.Error](err)
-	if !ok || connect.CodeOf(err) != connect.CodeUnauthenticated {
+// learnFrom records a fresh nonce from a stale-nonce rejection and reports
+// whether the server advertised one. v2 errors carry no metadata, the nonce
+// comes back as a response header or trailer.
+func (c *Client) learnFrom(info *connect.CallInfo, err error) bool {
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
 		return false
 	}
-	nonce := cerr.Meta().Get("DPoP-Nonce")
+	nonce := cmp.Or(info.ResponseHeader().Get("DPoP-Nonce"), info.ResponseTrailer().Get("DPoP-Nonce"))
 	c.Learn(nonce)
 	return nonce != ""
 }
 
+// retryStream keeps the request of a unary call, so a stale-nonce rejection
+// can be sent again with a fresh proof.
+type retryStream struct {
+	connect.ClientStream
+
+	c       *Client
+	ctx     context.Context
+	spec    connect.Spec
+	next    connect.ClientFunc
+	info    *connect.CallInfo
+	req     any
+	retried bool
+}
+
+func (r *retryStream) Send(msg any) error {
+	r.req = msg
+	return r.ClientStream.Send(msg)
+}
+
+func (r *retryStream) Receive(msg any) error {
+	err := r.ClientStream.Receive(msg)
+	if err == nil || r.retried || r.req == nil || !r.c.learnFrom(r.info, err) {
+		return err
+	}
+	r.retried = true
+	_ = r.ClientStream.Close()
+
+	// Wipe the rejected proof before signing again.
+	r.info.RequestHeader().Delete("DPoP")
+	if err = r.c.sign(r.ctx, r.info.RequestHeader(), r.spec.Procedure); err != nil {
+		return err
+	}
+	stream, err := r.next(r.ctx, r.spec)
+	if err != nil {
+		return err
+	}
+	r.ClientStream = stream
+	if err = stream.Send(r.req); err != nil {
+		return err
+	}
+	if err = stream.CloseSend(); err != nil {
+		return err
+	}
+	return stream.Receive(msg)
+}
+
+// learningStream records the nonce a rejected stream came back with.
+type learningStream struct {
+	connect.ClientStream
+
+	c    *Client
+	info *connect.CallInfo
+}
+
+func (l *learningStream) Receive(msg any) error {
+	err := l.ClientStream.Receive(msg)
+	if err != nil {
+		l.c.learnFrom(l.info, err)
+	}
+	return err
+}
+
 // Without a token only procedures marked unbound are signed.
-func (c *Client) sign(ctx context.Context, header http.Header, procedure string) error {
+func (c *Client) sign(ctx context.Context, header *connect.Header, procedure string) error {
 	if c.ua != "" {
 		header.Set("User-Agent", c.ua)
 	}
@@ -234,10 +275,7 @@ func (c *Client) sign(ctx context.Context, header http.Header, procedure string)
 	}
 	proof, err := c.proof(http.MethodPost, procedure, token)
 	if err != nil {
-		return connect.NewError(
-			connect.CodeInternal,
-			fmt.Errorf("failed to sign DPoP proof: %w", err),
-		)
+		return connect.Errorf(connect.CodeInternal, "failed to sign DPoP proof: %v", err).WithCause(err)
 	}
 	if token != "" {
 		// RFC 9449: MUST use the "DPoP" scheme for bound tokens.
@@ -316,15 +354,3 @@ func effectivePort(u *url.URL) string {
 	}
 	return ""
 }
-
-// failedConn stands in for a stream that could not be signed. The real conn only sends on Send or a close.
-type failedConn struct {
-	connect.StreamingClientConn
-
-	err error
-}
-
-func (c *failedConn) Send(any) error       { return c.err }
-func (c *failedConn) Receive(any) error    { return c.err }
-func (c *failedConn) CloseRequest() error  { return nil }
-func (c *failedConn) CloseResponse() error { return nil }

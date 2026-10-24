@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,8 +31,15 @@ func TestDashboardDaemons(t *testing.T) {
 		return err
 	})
 
-	viewer := nokkuv1connect.NewDashboardServiceClient(srv.Client(), srv.URL,
-		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)))
+	viewer := nokkuv1connect.NewDashboardServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header(
+				"Authorization",
+				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER),
+			),
+		),
+	)
 	res, err := viewer.GetDashboard(t.Context(), &nokkuv1.GetDashboardRequest{})
 	require.NoError(t, err)
 
@@ -56,11 +65,13 @@ func TestDashboardRecentChangesSkipRoutine(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR))
 
 	name := uniq("changes")
-	_, err := nokkuv1connect.NewTeamServiceClient(srv.Client(), srv.URL, editorAuth).
+	_, err := nokkuv1connect.NewTeamServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editorAuth)).
 		CreateTeam(t.Context(), &nokkuv1.CreateTeamRequest{Name: &name})
 	require.NoError(t, err)
 
-	dashboard := nokkuv1connect.NewDashboardServiceClient(srv.Client(), srv.URL, editorAuth)
+	dashboard := nokkuv1connect.NewDashboardServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editorAuth),
+	)
 	// The audit write is detached from the request, so the row shows up a moment later.
 	var changes []*nokkuv1.EventLog
 	require.Eventually(t, func() bool {

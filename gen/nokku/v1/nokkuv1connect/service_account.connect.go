@@ -5,58 +5,111 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// ServiceAccountServiceName is the fully-qualified name of the ServiceAccountService service.
 	ServiceAccountServiceName = "nokku.v1.ServiceAccountService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// ServiceAccountServiceGetServiceAccountProcedure is the fully-qualified name of the
+	// ServiceAccountServiceGetServiceAccountProcedure is the procedure name of the
 	// ServiceAccountService's GetServiceAccount RPC.
 	ServiceAccountServiceGetServiceAccountProcedure = "/nokku.v1.ServiceAccountService/GetServiceAccount"
-	// ServiceAccountServiceListServiceAccountsProcedure is the fully-qualified name of the
+	// ServiceAccountServiceListServiceAccountsProcedure is the procedure name of the
 	// ServiceAccountService's ListServiceAccounts RPC.
 	ServiceAccountServiceListServiceAccountsProcedure = "/nokku.v1.ServiceAccountService/ListServiceAccounts"
-	// ServiceAccountServiceCreateServiceAccountProcedure is the fully-qualified name of the
+	// ServiceAccountServiceCreateServiceAccountProcedure is the procedure name of the
 	// ServiceAccountService's CreateServiceAccount RPC.
 	ServiceAccountServiceCreateServiceAccountProcedure = "/nokku.v1.ServiceAccountService/CreateServiceAccount"
-	// ServiceAccountServiceUpdateServiceAccountProcedure is the fully-qualified name of the
+	// ServiceAccountServiceUpdateServiceAccountProcedure is the procedure name of the
 	// ServiceAccountService's UpdateServiceAccount RPC.
 	ServiceAccountServiceUpdateServiceAccountProcedure = "/nokku.v1.ServiceAccountService/UpdateServiceAccount"
-	// ServiceAccountServiceDeleteServiceAccountProcedure is the fully-qualified name of the
+	// ServiceAccountServiceDeleteServiceAccountProcedure is the procedure name of the
 	// ServiceAccountService's DeleteServiceAccount RPC.
 	ServiceAccountServiceDeleteServiceAccountProcedure = "/nokku.v1.ServiceAccountService/DeleteServiceAccount"
-	// ServiceAccountServiceCreateServiceAccountTokenProcedure is the fully-qualified name of the
+	// ServiceAccountServiceCreateServiceAccountTokenProcedure is the procedure name of the
 	// ServiceAccountService's CreateServiceAccountToken RPC.
 	ServiceAccountServiceCreateServiceAccountTokenProcedure = "/nokku.v1.ServiceAccountService/CreateServiceAccountToken"
-	// ServiceAccountServiceListServiceAccountTokensProcedure is the fully-qualified name of the
+	// ServiceAccountServiceListServiceAccountTokensProcedure is the procedure name of the
 	// ServiceAccountService's ListServiceAccountTokens RPC.
 	ServiceAccountServiceListServiceAccountTokensProcedure = "/nokku.v1.ServiceAccountService/ListServiceAccountTokens"
-	// ServiceAccountServiceRevokeServiceAccountTokenProcedure is the fully-qualified name of the
+	// ServiceAccountServiceRevokeServiceAccountTokenProcedure is the procedure name of the
 	// ServiceAccountService's RevokeServiceAccountToken RPC.
 	ServiceAccountServiceRevokeServiceAccountTokenProcedure = "/nokku.v1.ServiceAccountService/RevokeServiceAccountToken"
+)
+
+var (
+	serviceAccountServiceGetServiceAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("GetServiceAccount"),
+			Procedure:        ServiceAccountServiceGetServiceAccountProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	serviceAccountServiceListServiceAccountsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("ListServiceAccounts"),
+			Procedure:        ServiceAccountServiceListServiceAccountsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	serviceAccountServiceCreateServiceAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("CreateServiceAccount"),
+			Procedure:  ServiceAccountServiceCreateServiceAccountProcedure,
+		}
+	})
+	serviceAccountServiceUpdateServiceAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("UpdateServiceAccount"),
+			Procedure:  ServiceAccountServiceUpdateServiceAccountProcedure,
+		}
+	})
+	serviceAccountServiceDeleteServiceAccountSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("DeleteServiceAccount"),
+			Procedure:  ServiceAccountServiceDeleteServiceAccountProcedure,
+		}
+	})
+	serviceAccountServiceCreateServiceAccountTokenSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("CreateServiceAccountToken"),
+			Procedure:  ServiceAccountServiceCreateServiceAccountTokenProcedure,
+		}
+	})
+	serviceAccountServiceListServiceAccountTokensSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("ListServiceAccountTokens"),
+			Procedure:        ServiceAccountServiceListServiceAccountTokensProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	serviceAccountServiceRevokeServiceAccountTokenSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("RevokeServiceAccountToken"),
+			Procedure:  ServiceAccountServiceRevokeServiceAccountTokenProcedure,
+		}
+	})
 )
 
 // ServiceAccountServiceClient is a client for the nokku.v1.ServiceAccountService service.
@@ -72,152 +125,9 @@ type ServiceAccountServiceClient interface {
 }
 
 // NewServiceAccountServiceClient constructs a client for the nokku.v1.ServiceAccountService
-// service. By default, it uses the Connect protocol with the binary Protobuf Codec, asks for
-// gzipped responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply
-// the connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewServiceAccountServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ServiceAccountServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	serviceAccountServiceMethods := v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods()
-	return &serviceAccountServiceClient{
-		getServiceAccount: connect.NewClient[v1.GetServiceAccountRequest, v1.GetServiceAccountResponse](
-			httpClient,
-			baseURL+ServiceAccountServiceGetServiceAccountProcedure,
-			connect.WithSchema(serviceAccountServiceMethods.ByName("GetServiceAccount")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		listServiceAccounts: connect.NewClient[v1.ListServiceAccountsRequest, v1.ListServiceAccountsResponse](
-			httpClient,
-			baseURL+ServiceAccountServiceListServiceAccountsProcedure,
-			connect.WithSchema(serviceAccountServiceMethods.ByName("ListServiceAccounts")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		createServiceAccount: connect.NewClient[v1.CreateServiceAccountRequest, v1.CreateServiceAccountResponse](
-			httpClient,
-			baseURL+ServiceAccountServiceCreateServiceAccountProcedure,
-			connect.WithSchema(serviceAccountServiceMethods.ByName("CreateServiceAccount")),
-			connect.WithClientOptions(opts...),
-		),
-		updateServiceAccount: connect.NewClient[v1.UpdateServiceAccountRequest, v1.UpdateServiceAccountResponse](
-			httpClient,
-			baseURL+ServiceAccountServiceUpdateServiceAccountProcedure,
-			connect.WithSchema(serviceAccountServiceMethods.ByName("UpdateServiceAccount")),
-			connect.WithClientOptions(opts...),
-		),
-		deleteServiceAccount: connect.NewClient[v1.DeleteServiceAccountRequest, v1.DeleteServiceAccountResponse](
-			httpClient,
-			baseURL+ServiceAccountServiceDeleteServiceAccountProcedure,
-			connect.WithSchema(serviceAccountServiceMethods.ByName("DeleteServiceAccount")),
-			connect.WithClientOptions(opts...),
-		),
-		createServiceAccountToken: connect.NewClient[v1.CreateServiceAccountTokenRequest, v1.CreateServiceAccountTokenResponse](
-			httpClient,
-			baseURL+ServiceAccountServiceCreateServiceAccountTokenProcedure,
-			connect.WithSchema(serviceAccountServiceMethods.ByName("CreateServiceAccountToken")),
-			connect.WithClientOptions(opts...),
-		),
-		listServiceAccountTokens: connect.NewClient[v1.ListServiceAccountTokensRequest, v1.ListServiceAccountTokensResponse](
-			httpClient,
-			baseURL+ServiceAccountServiceListServiceAccountTokensProcedure,
-			connect.WithSchema(serviceAccountServiceMethods.ByName("ListServiceAccountTokens")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		revokeServiceAccountToken: connect.NewClient[v1.RevokeServiceAccountTokenRequest, v1.RevokeServiceAccountTokenResponse](
-			httpClient,
-			baseURL+ServiceAccountServiceRevokeServiceAccountTokenProcedure,
-			connect.WithSchema(serviceAccountServiceMethods.ByName("RevokeServiceAccountToken")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// serviceAccountServiceClient implements ServiceAccountServiceClient.
-type serviceAccountServiceClient struct {
-	getServiceAccount         *connect.Client[v1.GetServiceAccountRequest, v1.GetServiceAccountResponse]
-	listServiceAccounts       *connect.Client[v1.ListServiceAccountsRequest, v1.ListServiceAccountsResponse]
-	createServiceAccount      *connect.Client[v1.CreateServiceAccountRequest, v1.CreateServiceAccountResponse]
-	updateServiceAccount      *connect.Client[v1.UpdateServiceAccountRequest, v1.UpdateServiceAccountResponse]
-	deleteServiceAccount      *connect.Client[v1.DeleteServiceAccountRequest, v1.DeleteServiceAccountResponse]
-	createServiceAccountToken *connect.Client[v1.CreateServiceAccountTokenRequest, v1.CreateServiceAccountTokenResponse]
-	listServiceAccountTokens  *connect.Client[v1.ListServiceAccountTokensRequest, v1.ListServiceAccountTokensResponse]
-	revokeServiceAccountToken *connect.Client[v1.RevokeServiceAccountTokenRequest, v1.RevokeServiceAccountTokenResponse]
-}
-
-// GetServiceAccount calls nokku.v1.ServiceAccountService.GetServiceAccount.
-func (c *serviceAccountServiceClient) GetServiceAccount(ctx context.Context, req *v1.GetServiceAccountRequest) (*v1.GetServiceAccountResponse, error) {
-	response, err := c.getServiceAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListServiceAccounts calls nokku.v1.ServiceAccountService.ListServiceAccounts.
-func (c *serviceAccountServiceClient) ListServiceAccounts(ctx context.Context, req *v1.ListServiceAccountsRequest) (*v1.ListServiceAccountsResponse, error) {
-	response, err := c.listServiceAccounts.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CreateServiceAccount calls nokku.v1.ServiceAccountService.CreateServiceAccount.
-func (c *serviceAccountServiceClient) CreateServiceAccount(ctx context.Context, req *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error) {
-	response, err := c.createServiceAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// UpdateServiceAccount calls nokku.v1.ServiceAccountService.UpdateServiceAccount.
-func (c *serviceAccountServiceClient) UpdateServiceAccount(ctx context.Context, req *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error) {
-	response, err := c.updateServiceAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteServiceAccount calls nokku.v1.ServiceAccountService.DeleteServiceAccount.
-func (c *serviceAccountServiceClient) DeleteServiceAccount(ctx context.Context, req *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error) {
-	response, err := c.deleteServiceAccount.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// CreateServiceAccountToken calls nokku.v1.ServiceAccountService.CreateServiceAccountToken.
-func (c *serviceAccountServiceClient) CreateServiceAccountToken(ctx context.Context, req *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error) {
-	response, err := c.createServiceAccountToken.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListServiceAccountTokens calls nokku.v1.ServiceAccountService.ListServiceAccountTokens.
-func (c *serviceAccountServiceClient) ListServiceAccountTokens(ctx context.Context, req *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error) {
-	response, err := c.listServiceAccountTokens.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// RevokeServiceAccountToken calls nokku.v1.ServiceAccountService.RevokeServiceAccountToken.
-func (c *serviceAccountServiceClient) RevokeServiceAccountToken(ctx context.Context, req *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error) {
-	response, err := c.revokeServiceAccountToken.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// service. Multiple service clients may share a single connect.Client.
+func NewServiceAccountServiceClient(client *connect.Client) ServiceAccountServiceClient {
+	return &serviceAccountServiceClient{client: client}
 }
 
 // ServiceAccountServiceHandler is an implementation of the nokku.v1.ServiceAccountService service.
@@ -232,119 +142,219 @@ type ServiceAccountServiceHandler interface {
 	RevokeServiceAccountToken(context.Context, *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error)
 }
 
-// NewServiceAccountServiceHandler builds an HTTP handler from the service implementation. It
-// returns the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewServiceAccountServiceHandler(svc ServiceAccountServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	serviceAccountServiceMethods := v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods()
-	serviceAccountServiceGetServiceAccountHandler := connect.NewUnaryHandlerSimple(
-		ServiceAccountServiceGetServiceAccountProcedure,
-		svc.GetServiceAccount,
-		connect.WithSchema(serviceAccountServiceMethods.ByName("GetServiceAccount")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
+// RegisterServiceAccountServiceHandler registers svc as the nokku.v1.ServiceAccountService
+// implementation on server.
+func RegisterServiceAccountServiceHandler(server *connect.Server, svc ServiceAccountServiceHandler) {
+	adapter := serviceAccountServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: serviceAccountServiceGetServiceAccountSpec(), Handler: adapter.getServiceAccount},
+		connect.Method{Spec: serviceAccountServiceListServiceAccountsSpec(), Handler: adapter.listServiceAccounts},
+		connect.Method{Spec: serviceAccountServiceCreateServiceAccountSpec(), Handler: adapter.createServiceAccount},
+		connect.Method{Spec: serviceAccountServiceUpdateServiceAccountSpec(), Handler: adapter.updateServiceAccount},
+		connect.Method{Spec: serviceAccountServiceDeleteServiceAccountSpec(), Handler: adapter.deleteServiceAccount},
+		connect.Method{Spec: serviceAccountServiceCreateServiceAccountTokenSpec(), Handler: adapter.createServiceAccountToken},
+		connect.Method{Spec: serviceAccountServiceListServiceAccountTokensSpec(), Handler: adapter.listServiceAccountTokens},
+		connect.Method{Spec: serviceAccountServiceRevokeServiceAccountTokenSpec(), Handler: adapter.revokeServiceAccountToken},
 	)
-	serviceAccountServiceListServiceAccountsHandler := connect.NewUnaryHandlerSimple(
-		ServiceAccountServiceListServiceAccountsProcedure,
-		svc.ListServiceAccounts,
-		connect.WithSchema(serviceAccountServiceMethods.ByName("ListServiceAccounts")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	serviceAccountServiceCreateServiceAccountHandler := connect.NewUnaryHandlerSimple(
-		ServiceAccountServiceCreateServiceAccountProcedure,
-		svc.CreateServiceAccount,
-		connect.WithSchema(serviceAccountServiceMethods.ByName("CreateServiceAccount")),
-		connect.WithHandlerOptions(opts...),
-	)
-	serviceAccountServiceUpdateServiceAccountHandler := connect.NewUnaryHandlerSimple(
-		ServiceAccountServiceUpdateServiceAccountProcedure,
-		svc.UpdateServiceAccount,
-		connect.WithSchema(serviceAccountServiceMethods.ByName("UpdateServiceAccount")),
-		connect.WithHandlerOptions(opts...),
-	)
-	serviceAccountServiceDeleteServiceAccountHandler := connect.NewUnaryHandlerSimple(
-		ServiceAccountServiceDeleteServiceAccountProcedure,
-		svc.DeleteServiceAccount,
-		connect.WithSchema(serviceAccountServiceMethods.ByName("DeleteServiceAccount")),
-		connect.WithHandlerOptions(opts...),
-	)
-	serviceAccountServiceCreateServiceAccountTokenHandler := connect.NewUnaryHandlerSimple(
-		ServiceAccountServiceCreateServiceAccountTokenProcedure,
-		svc.CreateServiceAccountToken,
-		connect.WithSchema(serviceAccountServiceMethods.ByName("CreateServiceAccountToken")),
-		connect.WithHandlerOptions(opts...),
-	)
-	serviceAccountServiceListServiceAccountTokensHandler := connect.NewUnaryHandlerSimple(
-		ServiceAccountServiceListServiceAccountTokensProcedure,
-		svc.ListServiceAccountTokens,
-		connect.WithSchema(serviceAccountServiceMethods.ByName("ListServiceAccountTokens")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	serviceAccountServiceRevokeServiceAccountTokenHandler := connect.NewUnaryHandlerSimple(
-		ServiceAccountServiceRevokeServiceAccountTokenProcedure,
-		svc.RevokeServiceAccountToken,
-		connect.WithSchema(serviceAccountServiceMethods.ByName("RevokeServiceAccountToken")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.ServiceAccountService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case ServiceAccountServiceGetServiceAccountProcedure:
-			serviceAccountServiceGetServiceAccountHandler.ServeHTTP(w, r)
-		case ServiceAccountServiceListServiceAccountsProcedure:
-			serviceAccountServiceListServiceAccountsHandler.ServeHTTP(w, r)
-		case ServiceAccountServiceCreateServiceAccountProcedure:
-			serviceAccountServiceCreateServiceAccountHandler.ServeHTTP(w, r)
-		case ServiceAccountServiceUpdateServiceAccountProcedure:
-			serviceAccountServiceUpdateServiceAccountHandler.ServeHTTP(w, r)
-		case ServiceAccountServiceDeleteServiceAccountProcedure:
-			serviceAccountServiceDeleteServiceAccountHandler.ServeHTTP(w, r)
-		case ServiceAccountServiceCreateServiceAccountTokenProcedure:
-			serviceAccountServiceCreateServiceAccountTokenHandler.ServeHTTP(w, r)
-		case ServiceAccountServiceListServiceAccountTokensProcedure:
-			serviceAccountServiceListServiceAccountTokensHandler.ServeHTTP(w, r)
-		case ServiceAccountServiceRevokeServiceAccountTokenProcedure:
-			serviceAccountServiceRevokeServiceAccountTokenHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedServiceAccountServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedServiceAccountServiceHandler struct{}
 
 func (UnimplementedServiceAccountServiceHandler) GetServiceAccount(context.Context, *v1.GetServiceAccountRequest) (*v1.GetServiceAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.ServiceAccountService.GetServiceAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.GetServiceAccount is not implemented")
 }
 
 func (UnimplementedServiceAccountServiceHandler) ListServiceAccounts(context.Context, *v1.ListServiceAccountsRequest) (*v1.ListServiceAccountsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.ServiceAccountService.ListServiceAccounts is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.ListServiceAccounts is not implemented")
 }
 
 func (UnimplementedServiceAccountServiceHandler) CreateServiceAccount(context.Context, *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.ServiceAccountService.CreateServiceAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.CreateServiceAccount is not implemented")
 }
 
 func (UnimplementedServiceAccountServiceHandler) UpdateServiceAccount(context.Context, *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.ServiceAccountService.UpdateServiceAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.UpdateServiceAccount is not implemented")
 }
 
 func (UnimplementedServiceAccountServiceHandler) DeleteServiceAccount(context.Context, *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.ServiceAccountService.DeleteServiceAccount is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.DeleteServiceAccount is not implemented")
 }
 
 func (UnimplementedServiceAccountServiceHandler) CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.ServiceAccountService.CreateServiceAccountToken is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.CreateServiceAccountToken is not implemented")
 }
 
 func (UnimplementedServiceAccountServiceHandler) ListServiceAccountTokens(context.Context, *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.ServiceAccountService.ListServiceAccountTokens is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.ListServiceAccountTokens is not implemented")
 }
 
 func (UnimplementedServiceAccountServiceHandler) RevokeServiceAccountToken(context.Context, *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.ServiceAccountService.RevokeServiceAccountToken is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.RevokeServiceAccountToken is not implemented")
+}
+
+type serviceAccountServiceClient struct {
+	client *connect.Client
+}
+
+func (c *serviceAccountServiceClient) GetServiceAccount(ctx context.Context, req *v1.GetServiceAccountRequest) (*v1.GetServiceAccountResponse, error) {
+	var res v1.GetServiceAccountResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceGetServiceAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) ListServiceAccounts(ctx context.Context, req *v1.ListServiceAccountsRequest) (*v1.ListServiceAccountsResponse, error) {
+	var res v1.ListServiceAccountsResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceListServiceAccountsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) CreateServiceAccount(ctx context.Context, req *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error) {
+	var res v1.CreateServiceAccountResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceCreateServiceAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) UpdateServiceAccount(ctx context.Context, req *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error) {
+	var res v1.UpdateServiceAccountResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceUpdateServiceAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) DeleteServiceAccount(ctx context.Context, req *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error) {
+	var res v1.DeleteServiceAccountResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceDeleteServiceAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) CreateServiceAccountToken(ctx context.Context, req *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error) {
+	var res v1.CreateServiceAccountTokenResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceCreateServiceAccountTokenSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) ListServiceAccountTokens(ctx context.Context, req *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error) {
+	var res v1.ListServiceAccountTokensResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceListServiceAccountTokensSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) RevokeServiceAccountToken(ctx context.Context, req *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error) {
+	var res v1.RevokeServiceAccountTokenResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceRevokeServiceAccountTokenSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type serviceAccountServiceHandler struct{ svc ServiceAccountServiceHandler }
+
+func (h serviceAccountServiceHandler) getServiceAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetServiceAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetServiceAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) listServiceAccounts(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListServiceAccountsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListServiceAccounts(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) createServiceAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CreateServiceAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CreateServiceAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) updateServiceAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.UpdateServiceAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.UpdateServiceAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) deleteServiceAccount(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteServiceAccountRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteServiceAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) createServiceAccountToken(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CreateServiceAccountTokenRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CreateServiceAccountToken(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) listServiceAccountTokens(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListServiceAccountTokensRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListServiceAccountTokens(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) revokeServiceAccountToken(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RevokeServiceAccountTokenRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RevokeServiceAccountToken(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

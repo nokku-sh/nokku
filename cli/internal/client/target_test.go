@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -48,12 +50,16 @@ func TestCreateTarget(t *testing.T) {
 
 	svc := &captureTargetService{}
 	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.NewTargetServiceHandler(svc))
+	srv := connect.NewServer()
+	nokkuv1connect.RegisterTargetServiceHandler(srv, svc)
+	connecthttp.Mount(mux, srv)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
 	c := &Client{State: &state.State{APIURL: server.URL, SessionToken: "sess-token"}}
-	c.targets = nokkuv1connect.NewTargetServiceClient(http.DefaultClient, server.URL)
+	c.targets = nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
+	)
 
 	created, err := c.CreateTarget(t.Context(), &state.Target{
 		CAID: "ca-1", HostPublicKey: "ssh-ed25519 AAAA", Endpoints: []string{"10.0.0.5"},
@@ -79,12 +85,16 @@ func TestDeleteTarget(t *testing.T) {
 
 	svc := &captureTargetService{}
 	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.NewTargetServiceHandler(svc))
+	srv := connect.NewServer()
+	nokkuv1connect.RegisterTargetServiceHandler(srv, svc)
+	connecthttp.Mount(mux, srv)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
 	c := &Client{State: &state.State{APIURL: server.URL, SessionToken: "sess-token"}}
-	c.targets = nokkuv1connect.NewTargetServiceClient(http.DefaultClient, server.URL)
+	c.targets = nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
+	)
 
 	require.NoError(t, c.DeleteTarget(t.Context(), &state.Target{ID: "target-1"}))
 	require.NotNil(t, svc.deleted)
@@ -118,12 +128,16 @@ func TestListSSHCAs(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.NewCertificateServiceHandler(listCAService{}))
+	srv := connect.NewServer()
+	nokkuv1connect.RegisterCertificateServiceHandler(srv, listCAService{})
+	connecthttp.Mount(mux, srv)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
 	c := &Client{State: &state.State{APIURL: server.URL, SessionToken: "sess-token"}}
-	c.certs = nokkuv1connect.NewCertificateServiceClient(http.DefaultClient, server.URL)
+	c.certs = nokkuv1connect.NewCertificateServiceClient(
+		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
+	)
 
 	cas, err := c.ListSSHCAs(t.Context())
 	require.NoError(t, err)
@@ -158,12 +172,16 @@ func TestListAllTargetsPages(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.NewTargetServiceHandler(pagedTargetService{total: 2*lookupLimit + 3}))
+	srv := connect.NewServer()
+	nokkuv1connect.RegisterTargetServiceHandler(srv, pagedTargetService{total: 2*lookupLimit + 3})
+	connecthttp.Mount(mux, srv)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
 	c := &Client{State: &state.State{APIURL: server.URL}}
-	c.targets = nokkuv1connect.NewTargetServiceClient(http.DefaultClient, server.URL)
+	c.targets = nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
+	)
 
 	targets, err := c.ListAllTargets(t.Context())
 	require.NoError(t, err)

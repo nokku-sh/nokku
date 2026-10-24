@@ -11,7 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"connectrpc.com/validate"
 
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -97,36 +98,47 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 }
 
-func (s *Server) withHandlerOptions(ctx context.Context) []connect.HandlerOption {
-	interceptors := []connect.Interceptor{
-		newTelemetry(ctx), // Outermost, so it sees the mapped code and the calls turned down before the handler.
+func (s *Server) serverInterceptors(ctx context.Context) []connect.ServerInterceptor {
+	interceptors := []connect.ServerInterceptor{
 		newTimeoutInterceptor(),
 		newStreamEndInterceptor(ctx),
-		&authNInterceptor{cfg: s.cfg},
-		s.cfg.Audit, // Audit wraps authorization so denied calls are recorded too.
-		errorInterceptor{},
-		&authorizationInterceptor{cfg: s.cfg},
+		(&authNInterceptor{cfg: s.cfg}).intercept,
+		s.cfg.Audit.Intercept, // Audit wraps authorization so denied calls are recorded too.
+		s.recoverRPC,          // Inside audit, so a call that panicked is recorded with its code.
+		errorInterceptor,
+		(&authorizationInterceptor{cfg: s.cfg}).intercept,
 		entitlement.NewGuardInterceptor(s.cfg.Entitlements),
-		validate.NewInterceptor(),
+		validate.NewServerInterceptor(),
 	}
+	// Outermost, so it sees the mapped code and the calls turned down before the handler.
+	if telemetry := newTelemetry(ctx); telemetry != nil {
+		interceptors = append([]connect.ServerInterceptor{telemetry}, interceptors...)
+	}
+	return interceptors
+}
 
-	return []connect.HandlerOption{
-		connect.WithCompressMinBytes(1024),
-		connect.WithReadMaxBytes(maxMessageBytes),
-		connect.WithInterceptors(interceptors...),
-		connect.WithRecover(
-			func(ctx context.Context, spec connect.Spec, _ http.Header, p any) error {
-				attrs := []slog.Attr{
-					slog.String("procedure", spec.Procedure),
-					slog.String("panic_type", fmt.Sprintf("%T", p)),
-				}
-				if s.cfg.Debug {
-					attrs = append(attrs, slog.String("stack", string(debug.Stack())))
-				}
-				slog.LogAttrs(ctx, slog.LevelError, "rpc panic recovered", attrs...)
-				return errInternal
-			},
-		),
+// recoverRPC answers a panic in a handler or interceptor with an internal error, like the HTTP recover does for routes.
+func (s *Server) recoverRPC(next connect.ServerFunc) connect.ServerFunc {
+	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
+		defer func() {
+			p := recover()
+			if p == nil {
+				return
+			}
+			if perr, ok := p.(error); ok && errors.Is(perr, http.ErrAbortHandler) {
+				panic(p)
+			}
+			attrs := []slog.Attr{
+				slog.String("procedure", spec.Procedure),
+				slog.String("panic_type", fmt.Sprintf("%T", p)),
+			}
+			if s.cfg.Debug {
+				attrs = append(attrs, slog.String("stack", string(debug.Stack())))
+			}
+			slog.LogAttrs(ctx, slog.LevelError, "rpc panic recovered", attrs...)
+			err = errInternal
+		}()
+		return next(ctx, spec, stream)
 	}
 }
 
@@ -172,29 +184,33 @@ func (s *Server) withTenant(h http.Handler) http.Handler {
 }
 
 func (s *Server) registerServices(ctx context.Context) {
-	opts := s.withHandlerOptions(ctx)
 	tickets := newSessionTickets()
-	s.mux.Handle(nokkuv1connect.NewWorkspaceServiceHandler(&workspaceService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewDashboardServiceHandler(&dashboardService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewTeamServiceHandler(&teamService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewUtilServiceHandler(&utilService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewTargetServiceHandler(&targetService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewTargetAccountServiceHandler(&targetAccountService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewDaemonServiceHandler(&daemonService{cfg: s.cfg, tickets: tickets}, opts...))
-	s.mux.Handle(nokkuv1connect.NewCertificateServiceHandler(&certificateService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewInvitationServiceHandler(&invitationService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewJoinTokenServiceHandler(&joinTokenService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewBillingServiceHandler(&billingService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewServiceAccountServiceHandler(&serviceAccountService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewAccountServiceHandler(&accountService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewAuthServiceHandler(&authService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewSSOServiceHandler(&ssoService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewSCIMServiceHandler(&scimService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewDaemonControlServiceHandler(newDaemonControlService(s.cfg), opts...))
-	s.mux.Handle(nokkuv1connect.NewRecordingServiceHandler(&recordingService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewLegalHoldServiceHandler(&legalHoldService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewAccessRequestServiceHandler(&accessRequestService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewAuditStreamServiceHandler(&auditStreamService{cfg: s.cfg}, opts...))
+	server := connect.NewServer(s.serverInterceptors(ctx)...)
+	nokkuv1connect.RegisterWorkspaceServiceHandler(server, &workspaceService{cfg: s.cfg})
+	nokkuv1connect.RegisterDashboardServiceHandler(server, &dashboardService{cfg: s.cfg})
+	nokkuv1connect.RegisterTeamServiceHandler(server, &teamService{cfg: s.cfg})
+	nokkuv1connect.RegisterUtilServiceHandler(server, &utilService{cfg: s.cfg})
+	nokkuv1connect.RegisterTargetServiceHandler(server, &targetService{cfg: s.cfg})
+	nokkuv1connect.RegisterTargetAccountServiceHandler(server, &targetAccountService{cfg: s.cfg})
+	nokkuv1connect.RegisterDaemonServiceHandler(server, &daemonService{cfg: s.cfg, tickets: tickets})
+	nokkuv1connect.RegisterCertificateServiceHandler(server, &certificateService{cfg: s.cfg})
+	nokkuv1connect.RegisterInvitationServiceHandler(server, &invitationService{cfg: s.cfg})
+	nokkuv1connect.RegisterJoinTokenServiceHandler(server, &joinTokenService{cfg: s.cfg})
+	nokkuv1connect.RegisterBillingServiceHandler(server, &billingService{cfg: s.cfg})
+	nokkuv1connect.RegisterServiceAccountServiceHandler(server, &serviceAccountService{cfg: s.cfg})
+	nokkuv1connect.RegisterAccountServiceHandler(server, &accountService{cfg: s.cfg})
+	nokkuv1connect.RegisterAuthServiceHandler(server, &authService{cfg: s.cfg})
+	nokkuv1connect.RegisterSSOServiceHandler(server, &ssoService{cfg: s.cfg})
+	nokkuv1connect.RegisterSCIMServiceHandler(server, &scimService{cfg: s.cfg})
+	nokkuv1connect.RegisterDaemonControlServiceHandler(server, newDaemonControlService(s.cfg))
+	nokkuv1connect.RegisterRecordingServiceHandler(server, &recordingService{cfg: s.cfg})
+	nokkuv1connect.RegisterLegalHoldServiceHandler(server, &legalHoldService{cfg: s.cfg})
+	nokkuv1connect.RegisterAccessRequestServiceHandler(server, &accessRequestService{cfg: s.cfg})
+	nokkuv1connect.RegisterAuditStreamServiceHandler(server, &auditStreamService{cfg: s.cfg})
+	connecthttp.Mount(s.mux, server,
+		connecthttp.WithCompressMinBytes(1024),
+		connecthttp.WithReadMaxBytes(maxMessageBytes),
+	)
 
 	static := web.Handler()
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

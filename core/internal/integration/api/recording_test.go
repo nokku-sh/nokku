@@ -16,7 +16,8 @@ import (
 	"time"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/storage"
 )
 
-type uploadStream = connect.ClientStreamForClientSimple[nokkuv1.UploadRecordingRequest, nokkuv1.UploadRecordingResponse]
+type uploadStream = nokkuv1connect.DaemonControlServiceUploadRecordingClientStream
 
 // openUpload starts an upload the way nokkud does. Canceling ctx is a daemon that dies.
 func openUpload(
@@ -41,13 +42,14 @@ func openUpload(
 	srv *httptest.Server,
 	key *ecdsa.PrivateKey,
 	token, id string,
-) *uploadStream {
+) uploadStream {
 	t.Helper()
 	ctx, call := connect.NewClientContext(ctx)
 	call.RequestHeader().Set("Authorization", "DPoP "+token)
 	call.RequestHeader().Set("DPoP",
 		dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceUploadRecordingProcedure, token))
-	stream, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).UploadRecording(ctx)
+	stream, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+		UploadRecording(ctx)
 	require.NoError(t, err)
 	require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
 		Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root")},
@@ -55,7 +57,7 @@ func openUpload(
 	return stream
 }
 
-func sendChunk(stream *uploadStream, chunk []byte) error {
+func sendChunk(stream uploadStream, chunk []byte) error {
 	return stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Chunk{Chunk: chunk}})
 }
 
@@ -250,7 +252,8 @@ func TestLateUploadKeepsItsStartTime(t *testing.T) {
 		call.RequestHeader().Set("DPoP", dpopProof(
 			t, cfg, key, nokkuv1connect.DaemonControlServiceUploadRecordingProcedure, enrolled.GetAccessToken(),
 		))
-		stream, err := nokkuv1connect.NewDaemonControlServiceClient(srv.Client(), srv.URL).UploadRecording(ctx)
+		stream, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+			UploadRecording(ctx)
 		require.NoError(t, err)
 		require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
 			Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root"), StartedAt: named},

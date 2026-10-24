@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -49,7 +49,7 @@ func (s *daemonControlService) EnrollDaemon(
 	ctx context.Context,
 	req *nokkuv1.EnrollDaemonRequest,
 ) (*nokkuv1.EnrollDaemonResponse, error) {
-	ci, ok := connect.CallInfoForHandlerContext(ctx)
+	ci, ok := connect.CallInfoForServerContext(ctx)
 	if !ok {
 		return nil, errInternal
 	}
@@ -102,7 +102,7 @@ func (s *daemonControlService) SyncDaemon(
 	ctx context.Context,
 	req *nokkuv1.SyncDaemonRequest,
 ) (*nokkuv1.SyncDaemonResponse, error) {
-	ci, ok := connect.CallInfoForHandlerContext(ctx)
+	ci, ok := connect.CallInfoForServerContext(ctx)
 	if !ok {
 		return nil, errInternal
 	}
@@ -173,17 +173,18 @@ func (s *daemonControlService) SignHostCertificate(
 
 func (s *daemonControlService) UploadRecording(
 	ctx context.Context,
-	stream *connect.ClientStream[nokkuv1.UploadRecordingRequest],
+	stream nokkuv1connect.DaemonControlServiceUploadRecordingServerStream,
 ) (*nokkuv1.UploadRecordingResponse, error) {
 	daemonID := actor.DaemonIDFromContext(ctx)
 	if daemonID == "" {
 		return nil, newError(connect.CodePermissionDenied, "only daemons can upload recordings")
 	}
 
-	if !stream.Receive() {
+	first, err := stream.Receive()
+	if err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
-	meta := stream.Msg().GetMeta()
+	meta := first.GetMeta()
 	if meta == nil || meta.GetRecordingId() == "" {
 		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
@@ -215,9 +216,15 @@ func (s *daemonControlService) UploadRecording(
 	// ended is the answer for an upload that was not taken whole.
 	var ended error
 	lastChecked := int64(0)
+	var recvErr error
 receive:
-	for stream.Receive() {
-		switch m := stream.Msg().GetMsg().(type) {
+	for {
+		msg, err := stream.Receive()
+		if err != nil {
+			recvErr = err
+			break
+		}
+		switch m := msg.GetMsg().(type) {
 		case *nokkuv1.UploadRecordingRequest_Chunk:
 			data := m.Chunk
 			if len(data) == 0 {
@@ -245,7 +252,7 @@ receive:
 			complete = true
 		}
 	}
-	interrupted := stream.Err() != nil && !errors.Is(stream.Err(), io.EOF)
+	interrupted := recvErr != nil && !errors.Is(recvErr, io.EOF)
 	if !complete && size < rec.SizeBytes {
 		// An earlier try stored more than this one. Committing would replace it with less.
 		abort()
@@ -367,14 +374,15 @@ func (s *daemonControlService) UnenrollDaemon(
 }
 
 // enrollBinding returns the DPoP key thumbprint. A missing proof is an error, daemons must enroll key-bound.
-func (s *daemonControlService) enrollBinding(ctx context.Context, ci connect.CallInfo) (string, error) {
+func (s *daemonControlService) enrollBinding(ctx context.Context, ci *connect.CallInfo) (string, error) {
 	svc := s.cfg.IAM
 	if svc.DPoP == nil {
 		return "", newError(connect.CodeUnimplemented, "DPoP is not configured")
 	}
 
 	ws, _ := actor.WorkspaceFromContext(ctx)
-	proof, err := iam.DPoPProof(ci.RequestHeader())
+	meta, _ := actor.RequestMetaFromContext(ctx)
+	proof, err := iam.DPoPProof(meta.Header)
 	if err != nil {
 		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")
 	}
@@ -398,7 +406,7 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci connect.Cal
 	return binding, nil
 }
 
-func requestMetadata(h http.Header) []byte {
+func requestMetadata(h *connect.Header) []byte {
 	metadata, _ := json.Marshal(map[string]string{
 		"user-agent": h.Get("User-Agent"),
 		"host":       h.Get("Host"),

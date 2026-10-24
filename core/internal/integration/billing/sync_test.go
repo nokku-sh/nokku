@@ -19,7 +19,8 @@ import (
 	"time"
 	"uuid"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -483,31 +484,37 @@ func TestLookup_WhenTheDatabaseDoesNotAnswer(t *testing.T) {
 	assert.NoError(t, ent.CheckResources(down, fake.workspaceID), "a count that fails must not block a create")
 }
 
+// signingCore signs nothing, the guard in front of it decides.
+type signingCore struct {
+	nokkuv1connect.UnimplementedCertificateServiceHandler
+}
+
+func (signingCore) SignSSHCertificate(
+	context.Context,
+	*nokkuv1.SignSSHCertificateRequest,
+) (*nokkuv1.SignSSHCertificateResponse, error) {
+	return &nokkuv1.SignSSHCertificateResponse{}, nil
+}
+
 // signViaGuard calls SignSSHCertificate through the guard, as the API serves it for the workspace.
 func signViaGuard(t *testing.T, ent *entitlement.Service, workspaceID string) error {
 	t.Helper()
-	pin := connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			return next(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), req)
+	pin := func(next connect.ServerFunc) connect.ServerFunc {
+		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
+			return next(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), spec, stream)
 		}
-	})
+	}
+	server := connect.NewServer(pin, entitlement.NewGuardInterceptor(ent))
+	nokkuv1connect.RegisterCertificateServiceHandler(server, signingCore{})
 	mux := http.NewServeMux()
-	mux.Handle(nokkuv1connect.CertificateServiceSignSSHCertificateProcedure, connect.NewUnaryHandler(
-		nokkuv1connect.CertificateServiceSignSSHCertificateProcedure,
-		func(context.Context, *connect.Request[nokkuv1.SignSSHCertificateRequest]) (
-			*connect.Response[nokkuv1.SignSSHCertificateResponse], error,
-		) {
-			return connect.NewResponse(&nokkuv1.SignSSHCertificateResponse{}), nil
-		},
-		connect.WithInterceptors(pin, entitlement.NewGuardInterceptor(ent)),
-	))
+	connecthttp.Mount(mux, server)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	client := connect.NewClient[nokkuv1.SignSSHCertificateRequest, nokkuv1.SignSSHCertificateResponse](
-		srv.Client(), srv.URL+nokkuv1connect.CertificateServiceSignSSHCertificateProcedure,
+	client := nokkuv1connect.NewCertificateServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
 	)
-	_, err := client.CallUnary(t.Context(), connect.NewRequest(&nokkuv1.SignSSHCertificateRequest{}))
+	_, err := client.SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{})
 	return err
 }
 

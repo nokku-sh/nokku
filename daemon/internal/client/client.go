@@ -12,7 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/cenkalti/backoff/v7"
 	"github.com/mizuchilabs/kata/buildinfo"
 
@@ -88,7 +89,9 @@ func New(
 		UnboundProcedures: map[string]bool{nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure: true},
 		UserAgent:         buildinfo.UserAgent("nokkud"),
 	})
-	c.ctl = nokkuv1connect.NewDaemonControlServiceClient(httpc, apiURL, connect.WithInterceptors(c.dpop))
+	// Unbounded like the v1 client, a sync carries every principal of the workspace.
+	transport := connecthttp.NewTransport(httpc, apiURL, connecthttp.WithReadMaxBytes(0))
+	c.ctl = nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(transport, c.dpop.Intercept))
 
 	if enrollToken != "" {
 		if err = c.enroll(ctx, enrollToken); err != nil {
@@ -181,9 +184,6 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 		if ctx.Err() != nil {
 			return nil
 		}
-		// A rejected stream may carry a fresh DPoP nonce for the next dial.
-		c.dpop.LearnFromError(err)
-
 		// Connect returns before the core answers, so only a stream that stayed up proves it was reachable.
 		if time.Since(start) > 2*heartbeatInterval {
 			b.Reset()

@@ -5,43 +5,59 @@
 package nokkuv1connect
 
 import (
-	connect "connectrpc.com/connect"
+	connect "connectrpc.com/connect/v2"
 	context "context"
-	errors "errors"
 	v1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// JoinTokenServiceName is the fully-qualified name of the JoinTokenService service.
 	JoinTokenServiceName = "nokku.v1.JoinTokenService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// JoinTokenServiceCreateJoinTokenProcedure is the fully-qualified name of the JoinTokenService's
+	// JoinTokenServiceCreateJoinTokenProcedure is the procedure name of the JoinTokenService's
 	// CreateJoinToken RPC.
 	JoinTokenServiceCreateJoinTokenProcedure = "/nokku.v1.JoinTokenService/CreateJoinToken"
-	// JoinTokenServiceListJoinTokensProcedure is the fully-qualified name of the JoinTokenService's
+	// JoinTokenServiceListJoinTokensProcedure is the procedure name of the JoinTokenService's
 	// ListJoinTokens RPC.
 	JoinTokenServiceListJoinTokensProcedure = "/nokku.v1.JoinTokenService/ListJoinTokens"
-	// JoinTokenServiceDeleteJoinTokenProcedure is the fully-qualified name of the JoinTokenService's
+	// JoinTokenServiceDeleteJoinTokenProcedure is the procedure name of the JoinTokenService's
 	// DeleteJoinToken RPC.
 	JoinTokenServiceDeleteJoinTokenProcedure = "/nokku.v1.JoinTokenService/DeleteJoinToken"
+)
+
+var (
+	joinTokenServiceCreateJoinTokenSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_join_token_proto.Services().ByName("JoinTokenService").Methods().ByName("CreateJoinToken"),
+			Procedure:  JoinTokenServiceCreateJoinTokenProcedure,
+		}
+	})
+	joinTokenServiceListJoinTokensSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_join_token_proto.Services().ByName("JoinTokenService").Methods().ByName("ListJoinTokens"),
+			Procedure:        JoinTokenServiceListJoinTokensProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	joinTokenServiceDeleteJoinTokenSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_join_token_proto.Services().ByName("JoinTokenService").Methods().ByName("DeleteJoinToken"),
+			Procedure:  JoinTokenServiceDeleteJoinTokenProcedure,
+		}
+	})
 )
 
 // JoinTokenServiceClient is a client for the nokku.v1.JoinTokenService service.
@@ -51,71 +67,10 @@ type JoinTokenServiceClient interface {
 	DeleteJoinToken(context.Context, *v1.DeleteJoinTokenRequest) (*v1.DeleteJoinTokenResponse, error)
 }
 
-// NewJoinTokenServiceClient constructs a client for the nokku.v1.JoinTokenService service. By
-// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
-// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
-// connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewJoinTokenServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) JoinTokenServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	joinTokenServiceMethods := v1.File_nokku_v1_join_token_proto.Services().ByName("JoinTokenService").Methods()
-	return &joinTokenServiceClient{
-		createJoinToken: connect.NewClient[v1.CreateJoinTokenRequest, v1.CreateJoinTokenResponse](
-			httpClient,
-			baseURL+JoinTokenServiceCreateJoinTokenProcedure,
-			connect.WithSchema(joinTokenServiceMethods.ByName("CreateJoinToken")),
-			connect.WithClientOptions(opts...),
-		),
-		listJoinTokens: connect.NewClient[v1.ListJoinTokensRequest, v1.ListJoinTokensResponse](
-			httpClient,
-			baseURL+JoinTokenServiceListJoinTokensProcedure,
-			connect.WithSchema(joinTokenServiceMethods.ByName("ListJoinTokens")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		deleteJoinToken: connect.NewClient[v1.DeleteJoinTokenRequest, v1.DeleteJoinTokenResponse](
-			httpClient,
-			baseURL+JoinTokenServiceDeleteJoinTokenProcedure,
-			connect.WithSchema(joinTokenServiceMethods.ByName("DeleteJoinToken")),
-			connect.WithClientOptions(opts...),
-		),
-	}
-}
-
-// joinTokenServiceClient implements JoinTokenServiceClient.
-type joinTokenServiceClient struct {
-	createJoinToken *connect.Client[v1.CreateJoinTokenRequest, v1.CreateJoinTokenResponse]
-	listJoinTokens  *connect.Client[v1.ListJoinTokensRequest, v1.ListJoinTokensResponse]
-	deleteJoinToken *connect.Client[v1.DeleteJoinTokenRequest, v1.DeleteJoinTokenResponse]
-}
-
-// CreateJoinToken calls nokku.v1.JoinTokenService.CreateJoinToken.
-func (c *joinTokenServiceClient) CreateJoinToken(ctx context.Context, req *v1.CreateJoinTokenRequest) (*v1.CreateJoinTokenResponse, error) {
-	response, err := c.createJoinToken.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// ListJoinTokens calls nokku.v1.JoinTokenService.ListJoinTokens.
-func (c *joinTokenServiceClient) ListJoinTokens(ctx context.Context, req *v1.ListJoinTokensRequest) (*v1.ListJoinTokensResponse, error) {
-	response, err := c.listJoinTokens.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
-// DeleteJoinToken calls nokku.v1.JoinTokenService.DeleteJoinToken.
-func (c *joinTokenServiceClient) DeleteJoinToken(ctx context.Context, req *v1.DeleteJoinTokenRequest) (*v1.DeleteJoinTokenResponse, error) {
-	response, err := c.deleteJoinToken.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
+// NewJoinTokenServiceClient constructs a client for the nokku.v1.JoinTokenService service. Multiple
+// service clients may share a single connect.Client.
+func NewJoinTokenServiceClient(client *connect.Client) JoinTokenServiceClient {
+	return &joinTokenServiceClient{client: client}
 }
 
 // JoinTokenServiceHandler is an implementation of the nokku.v1.JoinTokenService service.
@@ -125,57 +80,94 @@ type JoinTokenServiceHandler interface {
 	DeleteJoinToken(context.Context, *v1.DeleteJoinTokenRequest) (*v1.DeleteJoinTokenResponse, error)
 }
 
-// NewJoinTokenServiceHandler builds an HTTP handler from the service implementation. It returns the
-// path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewJoinTokenServiceHandler(svc JoinTokenServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	joinTokenServiceMethods := v1.File_nokku_v1_join_token_proto.Services().ByName("JoinTokenService").Methods()
-	joinTokenServiceCreateJoinTokenHandler := connect.NewUnaryHandlerSimple(
-		JoinTokenServiceCreateJoinTokenProcedure,
-		svc.CreateJoinToken,
-		connect.WithSchema(joinTokenServiceMethods.ByName("CreateJoinToken")),
-		connect.WithHandlerOptions(opts...),
+// RegisterJoinTokenServiceHandler registers svc as the nokku.v1.JoinTokenService implementation on
+// server.
+func RegisterJoinTokenServiceHandler(server *connect.Server, svc JoinTokenServiceHandler) {
+	adapter := joinTokenServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: joinTokenServiceCreateJoinTokenSpec(), Handler: adapter.createJoinToken},
+		connect.Method{Spec: joinTokenServiceListJoinTokensSpec(), Handler: adapter.listJoinTokens},
+		connect.Method{Spec: joinTokenServiceDeleteJoinTokenSpec(), Handler: adapter.deleteJoinToken},
 	)
-	joinTokenServiceListJoinTokensHandler := connect.NewUnaryHandlerSimple(
-		JoinTokenServiceListJoinTokensProcedure,
-		svc.ListJoinTokens,
-		connect.WithSchema(joinTokenServiceMethods.ByName("ListJoinTokens")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	joinTokenServiceDeleteJoinTokenHandler := connect.NewUnaryHandlerSimple(
-		JoinTokenServiceDeleteJoinTokenProcedure,
-		svc.DeleteJoinToken,
-		connect.WithSchema(joinTokenServiceMethods.ByName("DeleteJoinToken")),
-		connect.WithHandlerOptions(opts...),
-	)
-	return "/nokku.v1.JoinTokenService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case JoinTokenServiceCreateJoinTokenProcedure:
-			joinTokenServiceCreateJoinTokenHandler.ServeHTTP(w, r)
-		case JoinTokenServiceListJoinTokensProcedure:
-			joinTokenServiceListJoinTokensHandler.ServeHTTP(w, r)
-		case JoinTokenServiceDeleteJoinTokenProcedure:
-			joinTokenServiceDeleteJoinTokenHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
 }
 
 // UnimplementedJoinTokenServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedJoinTokenServiceHandler struct{}
 
 func (UnimplementedJoinTokenServiceHandler) CreateJoinToken(context.Context, *v1.CreateJoinTokenRequest) (*v1.CreateJoinTokenResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.JoinTokenService.CreateJoinToken is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.JoinTokenService.CreateJoinToken is not implemented")
 }
 
 func (UnimplementedJoinTokenServiceHandler) ListJoinTokens(context.Context, *v1.ListJoinTokensRequest) (*v1.ListJoinTokensResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.JoinTokenService.ListJoinTokens is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.JoinTokenService.ListJoinTokens is not implemented")
 }
 
 func (UnimplementedJoinTokenServiceHandler) DeleteJoinToken(context.Context, *v1.DeleteJoinTokenRequest) (*v1.DeleteJoinTokenResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.JoinTokenService.DeleteJoinToken is not implemented"))
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.JoinTokenService.DeleteJoinToken is not implemented")
+}
+
+type joinTokenServiceClient struct {
+	client *connect.Client
+}
+
+func (c *joinTokenServiceClient) CreateJoinToken(ctx context.Context, req *v1.CreateJoinTokenRequest) (*v1.CreateJoinTokenResponse, error) {
+	var res v1.CreateJoinTokenResponse
+	if err := c.client.CallUnary(ctx, joinTokenServiceCreateJoinTokenSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *joinTokenServiceClient) ListJoinTokens(ctx context.Context, req *v1.ListJoinTokensRequest) (*v1.ListJoinTokensResponse, error) {
+	var res v1.ListJoinTokensResponse
+	if err := c.client.CallUnary(ctx, joinTokenServiceListJoinTokensSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *joinTokenServiceClient) DeleteJoinToken(ctx context.Context, req *v1.DeleteJoinTokenRequest) (*v1.DeleteJoinTokenResponse, error) {
+	var res v1.DeleteJoinTokenResponse
+	if err := c.client.CallUnary(ctx, joinTokenServiceDeleteJoinTokenSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+type joinTokenServiceHandler struct{ svc JoinTokenServiceHandler }
+
+func (h joinTokenServiceHandler) createJoinToken(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CreateJoinTokenRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CreateJoinToken(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h joinTokenServiceHandler) listJoinTokens(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListJoinTokensRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListJoinTokens(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h joinTokenServiceHandler) deleteJoinToken(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteJoinTokenRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteJoinToken(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
 }

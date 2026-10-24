@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
-
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
@@ -104,7 +102,7 @@ func (u *Uploader) finish() error {
 func (u *Uploader) sendLoop(ctx context.Context) {
 	defer close(u.done)
 
-	var stream *connect.ClientStreamForClientSimple[nokkuv1.UploadRecordingRequest, nokkuv1.UploadRecordingResponse]
+	var stream *nokkuv1connect.DaemonControlServiceUploadRecordingClientStream
 	broken := false
 	for chunk := range u.chunks {
 		if broken {
@@ -145,10 +143,7 @@ func (u *Uploader) sendLoop(ctx context.Context) {
 	slog.Debug("recording uploaded", "session_id", u.sessionID)
 }
 
-func (u *Uploader) open(ctx context.Context) (
-	*connect.ClientStreamForClientSimple[nokkuv1.UploadRecordingRequest, nokkuv1.UploadRecordingResponse],
-	error,
-) {
+func (u *Uploader) open(ctx context.Context) (*nokkuv1connect.DaemonControlServiceUploadRecordingClientStream, error) {
 	stream, err := u.client.UploadRecording(ctx)
 	if err != nil {
 		return nil, err
@@ -164,7 +159,7 @@ func (u *Uploader) open(ctx context.Context) (
 	}); err != nil {
 		return nil, err
 	}
-	return stream, nil
+	return &stream, nil
 }
 
 // The stream is left open, the core marks the recording truncated.

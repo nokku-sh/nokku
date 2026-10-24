@@ -11,11 +11,12 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/realip"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 
 	nokkudaemon "github.com/nokku-sh/nokku/core/internal/daemon"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/config"
@@ -214,7 +215,7 @@ func (s *daemonService) CloseSession(
 // Relay bridges a raw byte stream to the daemon's sshd.
 func (s *daemonService) Relay(
 	ctx context.Context,
-	stream *connect.BidiStream[nokkuv1.RelayRequest, nokkuv1.RelayResponse],
+	stream nokkuv1connect.DaemonServiceRelayServerStream,
 ) error {
 	msg, err := stream.Receive()
 	if err != nil {
@@ -224,12 +225,12 @@ func (s *daemonService) Relay(
 	if !ok || start.Start == nil {
 		return connect.NewError(
 			connect.CodeInvalidArgument,
-			errors.New("first message must be RelayStart"),
+			"first message must be RelayStart",
 		)
 	}
 	daemonID := start.Start.GetDaemonId()
 	if daemonID == "" {
-		return connect.NewError(connect.CodeInvalidArgument, errors.New("daemon_id required"))
+		return connect.NewError(connect.CodeInvalidArgument, "daemon_id required")
 	}
 
 	// sshd is the real gate, but the pipe reaches hosts behind NAT and holds a pre-auth slot. It needs a grant.

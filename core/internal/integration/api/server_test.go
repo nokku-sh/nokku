@@ -11,7 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -26,7 +27,7 @@ import (
 // A public RPC must not buffer a body of any size before it is even validated.
 func TestRequestSizeLimit(t *testing.T) {
 	_, srv := newTestAPI(t)
-	_, err := nokkuv1connect.NewAuthServiceClient(srv.Client(), srv.URL).
+	_, err := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
 		ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{
 			Token: new(strings.Repeat("x", maxMessageBytes+1)),
 		})
@@ -43,7 +44,7 @@ func TestWorkspaceReadsBuiltInDaemonDefaults(t *testing.T) {
 	})
 
 	member := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	got, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+member)).
+	got, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+member))).
 		GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 	require.NoError(t, err)
 	assert.True(t,
@@ -115,11 +116,10 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 	// A bidi stream needs HTTP/2, which a proxy speaks to the core without TLS.
 	var h2c http.Protocols
 	h2c.SetUnencryptedHTTP2(true)
-	stream, err := nokkuv1connect.NewDaemonControlServiceClient(
-		&http.Client{Transport: &http.Transport{Protocols: &h2c}}, base,
-	).Connect(streamCtx)
+	stream, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(&http.Client{Transport: &http.Transport{Protocols: &h2c}}, base))).
+		Connect(streamCtx)
 	require.NoError(t, err)
-	defer func() { _ = stream.CloseRequest() }()
+	defer func() { _ = stream.CloseSend() }()
 	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
 		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
 	}))
