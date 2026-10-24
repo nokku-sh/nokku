@@ -34,7 +34,7 @@ require (
 	github.com/scim2/filter-parser/v2 v2.3.1
 	github.com/smallstep/truststore v0.13.0
 	github.com/stretchr/testify v1.12.1
-	github.com/stripe/stripe-go/v86 v86.4.2
+	github.com/stripe/stripe-go/v87 v87.0.0
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/tink-crypto/tink-go-hcvault/v2 v2.5.0
 	github.com/tink-crypto/tink-go/v2 v2.9.0
