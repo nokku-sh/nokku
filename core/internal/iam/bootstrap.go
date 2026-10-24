@@ -33,15 +33,15 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (string, er
 	ctx = actor.WithWorkspace(ctx, ws)
 
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		// Any Google account can sign in to the issuer, so it creates no accounts until an admin turns that on.
 		if err := s.seedProvider(ctx, SSOProvider{
 			ProviderID: "google",
 			Name:       "Google",
 			Enabled:    true,
 			OIDC: OIDCProvider{
-				IssuerURL:       "https://accounts.google.com",
-				ClientID:        cfg.GoogleClientID,
-				ClientSecret:    cfg.GoogleClientSecret,
-				JITProvisioning: true,
+				IssuerURL:    "https://accounts.google.com",
+				ClientID:     cfg.GoogleClientID,
+				ClientSecret: cfg.GoogleClientSecret,
 			},
 		}); err != nil {
 			return "", err

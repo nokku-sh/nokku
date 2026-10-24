@@ -199,13 +199,13 @@ Connect directly, or through a pooler in session mode. A pooler in transaction m
 
 A self-hosted core is one workspace. It is created on the first start, together with the owner.
 
-| Variable                                                                | Purpose                                                        |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `NOKKU_WORKSPACE_NAME`                                                  | Name on the sign-in page. Default `Nokku`                      |
-| `NOKKU_ADMIN_EMAIL`                                                     | Creates the owner while the workspace has no users             |
-| `NOKKU_ADMIN_NAME`                                                      | The owner's name                                               |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                              | Adds Google as a sign-in provider                              |
-| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` | Adds Microsoft. The tenant must be yours, `common` is refused  |
+| Variable                                                                | Purpose                                                       |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `NOKKU_WORKSPACE_NAME`                                                  | Name on the sign-in page. Default `Nokku`                     |
+| `NOKKU_ADMIN_EMAIL`                                                     | Creates the owner while the workspace has no users            |
+| `NOKKU_ADMIN_NAME`                                                      | The owner's name                                              |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                              | Adds Google for existing users. New accounts need an invite   |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` | Adds Microsoft. The tenant must be yours, `common` is refused |
 
 Other OIDC providers are added in the web app.
 
