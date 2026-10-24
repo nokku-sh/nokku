@@ -70,13 +70,24 @@ func (s *auditStreamService) UpdateAuditStream(
 	ctx context.Context,
 	req *nokkuv1.UpdateAuditStreamRequest,
 ) (*nokkuv1.UpdateAuditStreamResponse, error) {
-	row, err := s.cfg.Conn.Tenant().UpdateAuditStream(ctx, &db.UpdateAuditStreamParams{
-		ID:      req.GetId(),
-		URL:     req.Url,
-		Secret:  crypto.EncryptedBytes(req.GetSecret()),
-		Enabled: req.Enabled,
-	})
-	if err != nil {
+	var row *db.UpdateAuditStreamRow
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		prev, err := q.GetAuditStream(ctx, req.GetId())
+		if err != nil {
+			return err
+		}
+		// The secret goes out as a header or a signature to the URL, so a new URL must not inherit it.
+		if req.Url != nil && req.GetUrl() != prev.URL && req.Secret == nil {
+			return newError(connect.CodeInvalidArgument, "enter the secret again when the URL changes")
+		}
+		row, err = q.UpdateAuditStream(ctx, &db.UpdateAuditStreamParams{
+			ID:      req.GetId(),
+			URL:     req.Url,
+			Secret:  crypto.EncryptedBytes(req.GetSecret()),
+			Enabled: req.Enabled,
+		})
+		return err
+	}); err != nil {
 		return nil, err
 	}
 	if req.Url != nil {

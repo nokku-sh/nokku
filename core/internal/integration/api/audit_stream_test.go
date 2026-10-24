@@ -10,13 +10,52 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
+
+// The secret goes out as a header or a signature, so it stays with the URL it was entered for.
+func TestAuditStreamSecretStaysWithItsURL(t *testing.T) {
+	cfg, srv := enterprise(t)
+	owner := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+	)
+	streams := nokkuv1connect.NewAuditStreamServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner),
+	)
+	created, err := streams.CreateAuditStream(t.Context(), &nokkuv1.CreateAuditStreamRequest{
+		Kind:   nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK.Enum(),
+		Url:    new("https://splunk.example.com/services/collector/event"),
+		Secret: new("hec-token-1"),
+	})
+	require.NoError(t, err)
+	id := created.GetStream().GetId()
+	t.Cleanup(func() {
+		_, _ = streams.DeleteAuditStream(t.Context(), &nokkuv1.DeleteAuditStreamRequest{Id: &id})
+	})
+
+	moved := &nokkuv1.UpdateAuditStreamRequest{Id: &id, Url: new("https://attacker.example.com/collector")}
+	_, err = streams.UpdateAuditStream(t.Context(), moved)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a new URL without the secret: %v", err)
+	moved.Secret = new("hec-token-2")
+	_, err = streams.UpdateAuditStream(t.Context(), moved)
+	require.NoError(t, err, "a new URL with its secret")
+	moved.Secret = nil
+	_, err = streams.UpdateAuditStream(t.Context(), moved)
+	require.NoError(t, err, "the same URL keeps the stored secret")
+	_, err = streams.UpdateAuditStream(t.Context(), &nokkuv1.UpdateAuditStreamRequest{Id: &id, Enabled: new(false)})
+	require.NoError(t, err, "a toggle needs no secret")
+}
 
 // A destination that hangs must not hold back the streams behind it.
 func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
