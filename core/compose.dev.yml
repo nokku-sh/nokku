@@ -49,13 +49,18 @@ services:
   vault:
     image: docker.io/hashicorp/vault:2.1.2
     container_name: vault
-    # TLS with a self-signed cert, nokku only talks https to Vault. Clients set VAULT_SKIP_VERIFY=true.
-    command: ["server", "-dev", "-dev-tls"]
+    # TLS from a CA made at every start, nokku only talks https to Vault. task containers copies the CA to
+    # data/vault/vault-ca.pem, where VAULT_CACERT points.
+    command: ["server", "-dev", "-dev-tls", "-dev-tls-cert-dir=/tmp"]
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: "root"
-      VAULT_ADDR: "https://0.0.0.0:8200"
+      VAULT_ADDR: "https://127.0.0.1:8200"
       VAULT_API_ADDR: "https://0.0.0.0:8200"
-      VAULT_SKIP_VERIFY: "true"
+      VAULT_CACERT: "/tmp/vault-ca.pem"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 1s
+      retries: 30
     cap_add:
       - IPC_LOCK
     ports:

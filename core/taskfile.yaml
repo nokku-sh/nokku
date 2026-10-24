@@ -12,10 +12,12 @@ tasks:
       - task: dev
 
   containers:
-    desc: Start the dev containers of compose.dev.yml, then wait for Postgres
+    desc: Start the dev containers of compose.dev.yml, wait for Postgres and Vault, and copy out Vault's CA
     cmds:
       - docker compose -f compose.dev.yml up -d
-      - docker compose -f compose.dev.yml up -d --wait postgres
+      - docker compose -f compose.dev.yml up -d --wait postgres vault
+      - mkdir -p data/vault
+      - docker compose -f compose.dev.yml cp vault:/tmp/vault-ca.pem data/vault/vault-ca.pem
 
   backend:
     desc: Run backend

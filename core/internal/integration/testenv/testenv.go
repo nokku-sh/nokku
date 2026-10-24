@@ -6,8 +6,10 @@ package testenv
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -124,11 +126,12 @@ func Keycloak(t *testing.T) string {
 	return root
 }
 
-// Vault starts a dev server and returns its host and port. It serves TLS, nokku only talks https to Vault.
-func Vault(t *testing.T) string {
+// Vault starts a dev server and returns its host and port, and the file of the CA its TLS certificate comes from.
+// nokku only talks https to Vault.
+func Vault(t *testing.T) (addr, caFile string) {
 	t.Helper()
 	c, err := run(t.Context(), vaultImage,
-		testcontainers.WithCmd("server", "-dev", "-dev-tls"),
+		testcontainers.WithCmd("server", "-dev", "-dev-tls", "-dev-tls-cert-dir=/tmp"),
 		testcontainers.WithEnv(map[string]string{"VAULT_DEV_ROOT_TOKEN_ID": VaultToken}),
 		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
 			hc.CapAdd = append(hc.CapAdd, "IPC_LOCK")
@@ -140,7 +143,15 @@ func Vault(t *testing.T) string {
 	)
 	testcontainers.CleanupContainer(t, c)
 	require.NoError(t, err, "start vault")
-	addr, err := c.PortEndpoint(t.Context(), "8200/tcp", "")
+	addr, err = c.PortEndpoint(t.Context(), "8200/tcp", "")
 	require.NoError(t, err)
-	return addr
+
+	rc, err := c.CopyFileFromContainer(t.Context(), "/tmp/vault-ca.pem")
+	require.NoError(t, err, "copy the vault CA")
+	defer func() { _ = rc.Close() }()
+	ca, err := io.ReadAll(rc)
+	require.NoError(t, err)
+	caFile = filepath.Join(t.TempDir(), "vault-ca.pem")
+	require.NoError(t, os.WriteFile(caFile, ca, 0o600))
+	return addr, caFile
 }

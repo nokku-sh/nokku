@@ -18,9 +18,15 @@ import (
 // testVaultKey starts a Vault, creates a transit key on it and returns the key's KMS URI.
 func testVaultKey(t *testing.T) (*api.Client, string, string) {
 	t.Helper()
-	addr := testenv.Vault(t)
-	// The dev server has a self-signed cert.
-	t.Setenv("VAULT_SKIP_VERIFY", "true")
+	addr, caFile := testenv.Vault(t)
+	// Verified like a real install. Whatever a dev shell exports for another Vault must not leak in.
+	for _, name := range []string{
+		"VAULT_SKIP_VERIFY", "VAULT_CAPATH", "VAULT_CLIENT_CERT", "VAULT_CLIENT_KEY",
+		"VAULT_TLS_SERVER_NAME", "VAULT_NAMESPACE",
+	} {
+		t.Setenv(name, "")
+	}
+	t.Setenv("VAULT_CACERT", caFile)
 	t.Setenv("VAULT_TOKEN", testenv.VaultToken)
 	cfg := api.DefaultConfig()
 	cfg.Address = "https://" + addr
