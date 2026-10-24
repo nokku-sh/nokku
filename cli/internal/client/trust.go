@@ -44,6 +44,12 @@ func keeps(ca, pin string) bool {
 // Asks the way ssh asks about a host key. cause is the verification that failed.
 func (c *Client) confirmServer(ctx context.Context, interactive bool, cause error) error {
 	api := c.State.APIURL
+	// A server this machine trusted before is never asked about again, like a changed host key in ssh.
+	if c.State.APICA != "" || c.State.SessionToken != "" {
+		return fmt.Errorf("the certificate of %s no longer comes from a CA this machine trusts, the connection "+
+			"may be intercepted. If the CA really changed, run nk login --pin with the pin from the Nokku web app: %w",
+			api, cause)
+	}
 	if !interactive || !term.IsTerminal(int(os.Stdin.Fd())) {
 		return fmt.Errorf("this machine does not trust the certificate of %s. Run nk login --pin with the pin "+
 			"from the Nokku web app, it is under Profile, Security. Or pass --ca-file: %w", api, cause)
@@ -57,22 +63,16 @@ func (c *Client) confirmServer(ctx context.Context, interactive bool, cause erro
 		return err
 	}
 
+	// The web app shows the pin of the first CA. Only that one is shown and kept, so the pin compared is the pin kept.
+	pin := trust.Pin(certs[0])
 	fmt.Fprintf(os.Stderr, "\nThe certificate of %s comes from a CA this machine does not know.\n\n", api)
-	for _, cert := range certs {
-		// The name is not verified yet.
-		fmt.Fprintf(os.Stderr, "  %s\n  %s\n\n", ui.PlainLine(cert.Subject.CommonName), ui.Bold(trust.Pin(cert)))
-	}
+	// The name is not verified yet.
+	fmt.Fprintf(os.Stderr, "  %s\n  %s\n\n", ui.PlainLine(certs[0].Subject.CommonName), ui.Bold(pin))
 	fmt.Fprintln(os.Stderr, "Compare the pin with the one in the Nokku web app, under Profile, Security or Settings.")
 	if !ask("Trust this CA for "+api+"?", false) {
 		return errors.New("the server is not trusted, nothing was sent to it")
 	}
-	// The server may name a chain, its certificate comes from one of them.
-	for _, cert := range certs {
-		if err = c.keepCA(ctx, trust.Pin(cert)); err == nil {
-			return nil
-		}
-	}
-	return err
+	return c.keepCA(ctx, pin)
 }
 
 // keepCA checks the advertised CA against pin, stores it, and reconnects with it.

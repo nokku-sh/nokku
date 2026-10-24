@@ -79,6 +79,20 @@ func TestSyncUntrustedServerWithoutPin(t *testing.T) {
 	assert.Empty(t, c.State.APICA)
 }
 
+// A server that once came from a kept CA and now does not may be intercepted, so nk does not offer the new one.
+func TestSyncRefusesChangedCA(t *testing.T) {
+	setTestDirs(t)
+	srv := privateServer(t)
+	kept := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: selfSignedCA(t, &x509.Certificate{}).Raw}))
+	c := &Client{State: &state.State{APIURL: srv.URL, Token: "nk_sa_test"}}
+	c.State.APICA = kept
+	require.NoError(t, c.dial())
+
+	err := c.Sync(t.Context(), true)
+	require.ErrorContains(t, err, "no longer comes from a CA this machine trusts")
+	assert.Equal(t, kept, c.State.APICA, "the kept CA stays")
+}
+
 // output is what fn prints to stderr, where prompts and notices go.
 func output(t *testing.T, fn func()) string {
 	t.Helper()

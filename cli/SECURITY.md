@@ -76,6 +76,7 @@ A core whose certificate comes from a private CA is trusted through that CA, and
 
 - `nk login --pin sha256:...` fetches the CA the core advertises at `/ca.crt` and keeps it only when its public key matches the pin. It then connects again with that CA as the only root, so a server that merely copied the CA is refused. The pin comes from the web app or from your admin.
 - Without a pin, `nk login` on a terminal shows the pin of the advertised CA and asks, the way `ssh` asks about a host key. Without a terminal it fails.
+- It only asks on first contact. Once `nk` kept a CA or holds a session for the core, a certificate from another CA is refused as a possible interception. A real change needs `--pin` again.
 - `--ca-file` takes the CA from a file instead.
 
 The CA is stored in `~/.config/nk/config.json` and dropped when `--api` changes. After that every request is verified the normal way, against the system roots plus that CA. `nk` offers once to install the CA into the system trust store, so the browser sign-in works too. It only offers a CA that is limited to the core's own name and can vouch for no IP address, like the core's built-in one, and the answer defaults to no. Any other CA has to be installed by hand. `nk logout` asks whether a CA that `nk` installed goes out again. Without a terminal it stays.
