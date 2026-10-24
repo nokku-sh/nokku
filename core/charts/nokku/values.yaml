@@ -22,6 +22,8 @@ securityContext: {}
 service:
   type: ClusterIP
   port: 80
+  # Traefik needs traefik.ingress.kubernetes.io/service.serversscheme: h2c here, see the README.
+  annotations: {}
 
 container:
   port: 3000
@@ -98,6 +100,9 @@ app:
     autoMigrate: true
   # Where recordings go. A relative folder lands on the persistent volume, s3://bucket?region=... is a bucket.
   storageURL: file://./data
+  # Sets NOKKU_TRUSTED_PROXIES, the IPs or CIDRs of the ingress or gateway pods, like 10.42.0.0/16.
+  # Only they may send plain HTTP and name the client. Empty trusts nothing but the pod itself.
+  trustedProxies: ""
   extraEnv: []
   extraEnvFrom: []
 

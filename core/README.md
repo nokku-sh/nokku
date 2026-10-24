@@ -20,9 +20,9 @@ This folder is the core: one Go binary with the API, the web app and the certifi
 
 Your servers keep working when the core is down. They enforce what they last synced, and a valid certificate still logs in.
 
-| Part       | Folder              | What it does                                           |
-| ---------- | ------------------- | ------------------------------------------------------ |
-| **Core**   | `core` (this one)   | Users, access, certificate authorities, SSO, audit log |
+| Part       | Folder                | What it does                                           |
+| ---------- | --------------------- | ------------------------------------------------------ |
+| **Core**   | `core` (this one)     | Users, access, certificate authorities, SSO, audit log |
 | **Daemon** | [`daemon`](../daemon) | Runs on a server and keeps its SSH access in sync      |
 | **CLI**    | [`cli`](../cli)       | Signs you in on your machine, then plain `ssh` works   |
 
@@ -97,7 +97,68 @@ It listens on port 3000 and answers https and plain HTTP there. Https is for who
 - forward with HTTP/2 without TLS (h2c), because `nk` and `nokkud` speak gRPC
 - allow WebSockets, for the terminal in the browser
 
-The [Caddyfile](./Caddyfile) is a working example. A proxy on the same machine or in a private network, like a Docker network or a cluster, is trusted as it is. Set `NOKKU_TRUSTED_PROXIES` to the proxy's address when that is a public one, or to trust nothing but your proxy.
+The [Caddyfile](./Caddyfile) is a working example. Only a proxy on the same machine is trusted as it is. Set `NOKKU_TRUSTED_PROXIES` to your proxy's address or network, like the Docker network in `compose.prod.yml` or the ingress pods in a cluster. The Helm chart takes it as `app.trustedProxies`.
+
+Whatever you trust there can name any client address. That address goes into the audit log and rate limits, and a CA's `source-address` is checked against it. So trust the proxy and nothing else.
+
+### Traefik
+
+Traefik sends `X-Forwarded-Proto` and `X-Forwarded-For` by itself. It drops those headers when a client sends them, as long as you leave `forwardedHeaders.insecure` off on the entrypoint. Leave it off, unless another proxy you control sits in front.
+
+**Docker.** Put Traefik and Nokku on a network with a fixed subnet and trust that subnet, the way `compose.prod.yml` does for Caddy. Keep anything else off that network.
+
+```yaml
+networks:
+  proxy:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+
+services:
+  nokku:
+    networks: [proxy]
+    environment:
+      NOKKU_TRUSTED_PROXIES: 172.29.0.0/16
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.nokku.rule: Host(`nokku.example.com`)
+      traefik.http.routers.nokku.tls.certresolver: letsencrypt
+      traefik.http.services.nokku.loadbalancer.server.port: "3000"
+      traefik.http.services.nokku.loadbalancer.server.scheme: h2c
+```
+
+**Kubernetes.** Nokku sees the address of the Traefik pod, and pods get a new one when they restart. So trust the pod network, for example `10.42.0.0/16` on k3s. `kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'` shows yours. Every pod in the cluster is in that network, so also allow only Traefik to reach Nokku with a NetworkPolicy, where your network plugin enforces them. The health probes come from the node, most plugins let them through.
+
+```yaml
+# values.yaml
+app:
+  trustedProxies: 10.42.0.0/16
+service:
+  annotations:
+    traefik.ingress.kubernetes.io/service.serversscheme: h2c
+ingress:
+  enabled: true
+  className: traefik
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nokku-from-traefik
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nokku
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system # where Traefik runs
+```
+
+Traefik only sees real client addresses when its own Service keeps them, with `externalTrafficPolicy: Local` on a LoadBalancer or NodePort. Otherwise every client shows up as a node address.
 
 ### Without a proxy
 
@@ -108,8 +169,6 @@ export NOKKU_BASE_URL=nokku.lan:3000
 ```
 
 The core makes a CA of its own and issues its certificate from it. There is nothing to turn on and nothing to renew by hand. The CA key is stored encrypted in the database. The CA can only sign for the host name in `NOKKU_BASE_URL`, so a machine that installs it trusts it for Nokku and nothing else. A browser that asks for `http://nokku.lan:3000` is sent to https.
-
-By default the core takes any machine in a private network for its proxy and believes the client address it names. Without a proxy, set `NOKKU_TRUSTED_PROXIES=127.0.0.1` so it believes none.
 
 No machine knows that CA at first. The start log shows its pin. The web app shows it too: the full `nk login` command, pin included, is under **Profile, Security**. Before your first sign-in, run this on your own machine with the pin from the log:
 
@@ -148,47 +207,47 @@ The web app shows the exact commands, with a token, under **Infrastructure, Daem
 
 Everything is set with environment variables. Most installs only touch these:
 
-| Variable                                          | Purpose                                                              |
-| ------------------------------------------------- | -------------------------------------------------------------------- |
-| `NOKKU_SECRET`                                    | **Required.** At least 32 characters                                 |
-| `NOKKU_BASE_URL`                                  | Public host name, with the port if the proxy uses an unusual one     |
-| `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`    | Where PostgreSQL is                                                  |
-| `NOKKU_ADMIN_EMAIL`                               | Creates the owner account on the first start                         |
-| `NOKKU_TRUSTED_PROXIES`                           | Your reverse proxy as IPs or CIDRs, when it has a public address     |
-| `NOKKU_SMTP_HOST`, `NOKKU_EMAIL_SENDER`           | Turns on email sign-in links and mailed invitations                  |
+| Variable                                       | Purpose                                                          |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| `NOKKU_SECRET`                                 | **Required.** At least 32 characters                             |
+| `NOKKU_BASE_URL`                               | Public host name, with the port if the proxy uses an unusual one |
+| `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | Where PostgreSQL is                                              |
+| `NOKKU_ADMIN_EMAIL`                            | Creates the owner account on the first start                     |
+| `NOKKU_TRUSTED_PROXIES`                        | Your reverse proxy as IPs or CIDRs, when it has a public address |
+| `NOKKU_SMTP_HOST`, `NOKKU_EMAIL_SENDER`        | Turns on email sign-in links and mailed invitations              |
 
 The rest is below, grouped by topic. Open what you need.
 
 <details>
 <summary><b>Core</b></summary>
 
-| Variable                | Default                 | Purpose                                                              |
-| ----------------------- | ----------------------- | -------------------------------------------------------------------- |
-| `NOKKU_SECRET`          |                         | **Required**, at least 32 characters                                 |
-| `NOKKU_BASE_URL`        | `localhost:3000`        | Public host name, for links, cookies and passkeys. Never an IP       |
-| `NOKKU_TLS_CA`          |                         | PEM file with the private CA of your proxy, so `nk` and `nokkud` can pin it |
-| `NOKKU_PORT`            | `3000`                  | Port the core listens on, for https and for the proxy's plain HTTP   |
-| `NOKKU_TRUSTED_PROXIES` | loopback and private    | Comma-separated proxy IPs or CIDRs that may send plain HTTP and name the client |
-| `NOKKU_DEBUG`           | `false`                 | Debug logging, same as `--debug`                                     |
-| `NOKKU_LICENSE_KEY`     |                         | License key. It can also be activated in the web app                 |
-| `NOKKU_LICENSE_OFFLINE` | `false`                 | Never ask `license.nokku.sh` for the renewed key                     |
+| Variable                | Default          | Purpose                                                                         |
+| ----------------------- | ---------------- | ------------------------------------------------------------------------------- |
+| `NOKKU_SECRET`          |                  | **Required**, at least 32 characters                                            |
+| `NOKKU_BASE_URL`        | `localhost:3000` | Public host name, for links, cookies and passkeys. Never an IP                  |
+| `NOKKU_TLS_CA`          |                  | PEM file with the private CA of your proxy, so `nk` and `nokkud` can pin it     |
+| `NOKKU_PORT`            | `3000`           | Port the core listens on, for https and for the proxy's plain HTTP              |
+| `NOKKU_TRUSTED_PROXIES` | loopback         | Comma-separated proxy IPs or CIDRs that may send plain HTTP and name the client |
+| `NOKKU_DEBUG`           | `false`          | Debug logging, same as `--debug`                                                |
+| `NOKKU_LICENSE_KEY`     |                  | License key. It can also be activated in the web app                            |
+| `NOKKU_LICENSE_OFFLINE` | `false`          | Never ask `license.nokku.sh` for the renewed key                                |
 
 </details>
 
 <details>
 <summary><b>Database</b></summary>
 
-| Variable                | Default      | Purpose                                                    |
-| ----------------------- | ------------ | ---------------------------------------------------------- |
-| `PGHOST`                | `localhost`  | Host                                                       |
-| `PGPORT`                | `5432`       | Port                                                       |
-| `PGDATABASE`            | `nokku`      | Database name                                              |
-| `PGUSER`                | `postgres`   | User. It owns the schema and runs the migrations           |
-| `PGPASSWORD`            | `postgres`   | Password                                                   |
-| `PGSSLMODE`             | `disable`    | libpq SSL mode                                             |
-| `NOKKU_DB_APP_PASSWORD` | `PGPASSWORD` | Password of the two runtime roles, set at start            |
-| `NOKKU_DB_MAX_CONNS`    | `20`         | Largest pool size                                          |
-| `NOKKU_DB_AUTOMIGRATE`  | `true`       | Apply migrations on start. Turn off to run them yourself   |
+| Variable                | Default      | Purpose                                                  |
+| ----------------------- | ------------ | -------------------------------------------------------- |
+| `PGHOST`                | `localhost`  | Host                                                     |
+| `PGPORT`                | `5432`       | Port                                                     |
+| `PGDATABASE`            | `nokku`      | Database name                                            |
+| `PGUSER`                | `postgres`   | User. It owns the schema and runs the migrations         |
+| `PGPASSWORD`            | `postgres`   | Password                                                 |
+| `PGSSLMODE`             | `disable`    | libpq SSL mode                                           |
+| `NOKKU_DB_APP_PASSWORD` | `PGPASSWORD` | Password of the two runtime roles, set at start          |
+| `NOKKU_DB_MAX_CONNS`    | `20`         | Largest pool size                                        |
+| `NOKKU_DB_AUTOMIGRATE`  | `true`       | Apply migrations on start. Turn off to run them yourself |
 
 Connect directly, or through a pooler in session mode. A pooler in transaction mode, like PgBouncer with `pool_mode = transaction`, does not work. Nokku keeps state on the connection.
 
@@ -216,13 +275,13 @@ Lost every passkey? Run `./nokku admin-link` on the server, with the same enviro
 <details>
 <summary><b>Email</b></summary>
 
-| Variable               | Default | Purpose                                   |
-| ---------------------- | ------- | ----------------------------------------- |
-| `NOKKU_SMTP_HOST`      |         | SMTP relay. Mail is off while this is unset |
-| `NOKKU_SMTP_PORT`      | `587`   | 465 is implicit TLS, 587 is STARTTLS      |
-| `NOKKU_SMTP_USERNAME`  |         | Username                                  |
-| `NOKKU_SMTP_PASSWORD`  |         | Password. A login the relay rejects fails the start |
-| `NOKKU_EMAIL_SENDER`   |         | From address, required with SMTP          |
+| Variable              | Default | Purpose                                             |
+| --------------------- | ------- | --------------------------------------------------- |
+| `NOKKU_SMTP_HOST`     |         | SMTP relay. Mail is off while this is unset         |
+| `NOKKU_SMTP_PORT`     | `587`   | 465 is implicit TLS, 587 is STARTTLS                |
+| `NOKKU_SMTP_USERNAME` |         | Username                                            |
+| `NOKKU_SMTP_PASSWORD` |         | Password. A login the relay rejects fails the start |
+| `NOKKU_EMAIL_SENDER`  |         | From address, required with SMTP                    |
 
 Any SMTP relay works. Without email, people sign in with passkeys or an identity provider, and nobody can be invited. An invitation ends in a mailed link that proves the address, so new accounts then only come from an identity provider.
 
@@ -233,11 +292,11 @@ Any SMTP relay works. Without email, people sign in with passkeys or an identity
 
 Session recordings go to a local folder by default. They are encrypted before they are stored, wherever that is. Avatars live in the database.
 
-| Variable                | Default         | Purpose                                     |
-| ----------------------- | --------------- | ------------------------------------------- |
-| `NOKKU_STORAGE_URL`     | `file://./data` | Where recordings go, a folder or a bucket   |
-| `AWS_ACCESS_KEY_ID`     |                 | S3 access key, with an `s3://` URL          |
-| `AWS_SECRET_ACCESS_KEY` |                 | S3 secret key                               |
+| Variable                | Default         | Purpose                                   |
+| ----------------------- | --------------- | ----------------------------------------- |
+| `NOKKU_STORAGE_URL`     | `file://./data` | Where recordings go, a folder or a bucket |
+| `AWS_ACCESS_KEY_ID`     |                 | S3 access key, with an `s3://` URL        |
+| `AWS_SECRET_ACCESS_KEY` |                 | S3 secret key                             |
 
 A folder is `file:///data`, created when it is missing. A bucket is `s3://nokku?region=auto&endpoint=https%3A%2F%2Fs3.example.com&use_path_style=true`. Leave out `endpoint` for AWS itself, `use_path_style` is for MinIO. The URL takes the parameters of [gocloud's S3 driver](https://gocloud.dev/howto/blob/#s3).
 

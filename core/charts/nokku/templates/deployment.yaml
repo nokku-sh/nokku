@@ -55,6 +55,10 @@ spec:
               value: {{ .Values.container.port | quote }}
             - name: NOKKU_DEBUG
               value: {{ .Values.app.debug | quote }}
+            {{- with .Values.app.trustedProxies }}
+            - name: NOKKU_TRUSTED_PROXIES
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.app.otlpEndpoint }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ . | quote }}

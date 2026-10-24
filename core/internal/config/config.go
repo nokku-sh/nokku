@@ -68,8 +68,9 @@ type EnvConfig struct {
 	Secret  string  `env:"NOKKU_SECRET"`
 	SaaS    bool    `env:"NOKKU_SAAS"`
 	Debug   bool
-	// TrustedProxies may send plain HTTP and name the client. Unset, that is this machine and the private ranges.
-	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES" envDefault:"127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"`
+	// TrustedProxies may send plain HTTP and name the client, whose address a source-address option is matched
+	// against. Unset, that is this machine only, any other private address could claim to be anyone.
+	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES" envDefault:"127.0.0.0/8,::1/128"`
 }
 
 type Config struct {

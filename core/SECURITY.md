@@ -75,12 +75,12 @@ A rotation does not un-leak anything. If the old secret and an old database dump
 
 With a KMS, the key that unlocks everything lives in the KMS and not in an environment variable. This needs an Enterprise license. Community installs use `NOKKU_SECRET`.
 
-| Variable                 | Purpose                                                                             |
-| ------------------------ | ----------------------------------------------------------------------------------- |
-| `KMS_URI`                | The KMS key that wraps the keyset                                                   |
-| `VAULT_TOKEN`            | Token for `hcvault://`                                                              |
-| `VAULT_SKIP_VERIFY`      | Skips Vault TLS verification. For testing only                                      |
-| `KEYSET_REWRAP_INTERVAL` | How often the keyset is wrapped again. Default 12h, at least 1h                     |
+| Variable                 | Purpose                                                                                |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `KMS_URI`                | The KMS key that wraps the keyset                                                      |
+| `VAULT_TOKEN`            | Token for `hcvault://`                                                                 |
+| `VAULT_SKIP_VERIFY`      | Skips Vault TLS verification. For testing only                                         |
+| `KEYSET_REWRAP_INTERVAL` | How often the keyset is wrapped again. Default 12h, at least 1h                        |
 | `KEYSET_ROTATE_INTERVAL` | How old the data key may get before the core rotates it. Default 2160h, 0 turns it off |
 
 `KMS_URI` takes one of:
@@ -117,7 +117,7 @@ Requiring single sign-on closes passkeys and email links for everyone else, and 
 ### Network
 
 - **The core is only reached over TLS.** It answers https on its port with a CA of its own. Plain HTTP on the same port is served only to a trusted proxy that holds the certificate, `compose.prod.yml` runs Caddy for this. Anyone else who asks in plain HTTP is sent to https. `nk` and `nokkud` never skip certificate verification. A private CA reaches them through a pin, see the README.
-- **Set `NOKKU_TRUSTED_PROXIES` to exactly your proxy.** The core takes plain HTTP and forwarded client-IP headers from these addresses only. Unset, that is the machine itself and the private ranges, so a proxy in a container network works as it is. It also means any machine in such a network can fake its address in the audit log and dodge rate limits. Without a proxy set it to `127.0.0.1`.
+- **Set `NOKKU_TRUSTED_PROXIES` to exactly your proxy.** The core takes plain HTTP and forwarded client-IP headers from these addresses only. Unset, that is the machine itself. Whoever is on this list can name any client address, in the audit log, for rate limits, and for the `source-address` of a CA, which relayed and browser sessions are checked against. Never put a network there that holds anything but your proxy.
 - **Leave `NOKKU_ALLOW_PRIVATE_NETWORKS` off unless you need it.** Workspace owners choose SSO provider URLs, so the core refuses to connect to private, loopback and link-local addresses. Set it to `true` only when every such address is trusted, like a self-hosted install with its identity provider on an internal network. Never turn it on when you host for other people.
 
 ### File storage
