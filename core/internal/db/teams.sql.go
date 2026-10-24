@@ -155,7 +155,7 @@ func (q *Queries) GetTeam(ctx context.Context, teamID string) (*Team, error) {
 
 const listTeamMembers = `-- name: ListTeamMembers :many
 SELECT
-  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.scim_external_id, u.created_at, u.updated_at,
+  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.scim_external_id, u.scim_managed, u.created_at, u.updated_at,
   tm.team_id
 FROM
   team_members tm
@@ -191,6 +191,7 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTe
 			&i.User.Role,
 			&i.User.Active,
 			&i.User.ScimExternalID,
+			&i.User.ScimManaged,
 			&i.User.CreatedAt,
 			&i.User.UpdatedAt,
 			&i.TeamID,

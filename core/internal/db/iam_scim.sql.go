@@ -150,7 +150,7 @@ func (q *Queries) ListSCIMTeams(ctx context.Context) ([]*Team, error) {
 
 const listSCIMUsers = `-- name: ListSCIMUsers :many
 SELECT
-  id, workspace_id, email, name, picture, role, active, scim_external_id, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, created_at, updated_at
 FROM
   users u
 WHERE
@@ -190,6 +190,7 @@ func (q *Queries) ListSCIMUsers(ctx context.Context, arg *ListSCIMUsersParams) (
 			&i.Role,
 			&i.Active,
 			&i.ScimExternalID,
+			&i.ScimManaged,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -254,5 +255,20 @@ type SetUserSCIMExternalIDParams struct {
 // NULL takes the link away. An id another account holds trips the unique constraint.
 func (q *Queries) SetUserSCIMExternalID(ctx context.Context, arg *SetUserSCIMExternalIDParams) error {
 	_, err := q.db.Exec(ctx, setUserSCIMExternalID, arg.ExternalID, arg.ID)
+	return err
+}
+
+const setUserSCIMManaged = `-- name: SetUserSCIMManaged :exec
+UPDATE users
+SET
+  scim_managed = TRUE,
+  updated_at = NOW()
+WHERE
+  id = $1
+`
+
+// Only for an account SCIM creates. One it links by address stays the workspace's to rename.
+func (q *Queries) SetUserSCIMManaged(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, setUserSCIMManaged, id)
 	return err
 }

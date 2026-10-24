@@ -115,6 +115,9 @@ func (s *Service) scimProvisionUser(
 			if err != nil {
 				return err
 			}
+			if err = q.SetUserSCIMManaged(ctx, u.ID); err != nil {
+				return err
+			}
 			created = true
 			if !active {
 				if u, err = s.SetUserActive(ctx, q, u.ID, false); err != nil {

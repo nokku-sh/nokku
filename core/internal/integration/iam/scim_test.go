@@ -338,10 +338,29 @@ func TestSCIMRenamesTheLogin(t *testing.T) {
 	c.do(http.MethodPatch, "/Users/"+admin.ID, patchOps(work("evil@"+testDomain())), nil)
 	assert.NotNil(t, e.userByEmail(t, o.ws, admin.Email), "the IdP renamed an account it never linked")
 
+	// Linking an account by its address does not make it the IdP's, the token would take over anyone by email.
+	member := e.user(t, o.ws, "member@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", scimUser(member.Email, "entra-2"), nil))
+	c.do(http.MethodPatch, "/Users/"+member.ID, patchOps(work("evil@"+testDomain())), nil)
+	assert.NotNil(t, e.userByEmail(t, o.ws, member.Email), "the IdP renamed an account it only linked")
+
+	// An account the IdP created and someone made admin is renamed in Nokku only.
+	boss := "boss@" + testDomain()
+	var promoted scimResource
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", scimUser(boss, "entra-3"), &promoted))
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		return q.UpdateUserRole(t.Context(), &db.UpdateUserRoleParams{
+			ID: promoted.ID, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN,
+		})
+	}))
+	rename := patchOps(work("evil@" + testDomain()))
+	assert.Equal(t, http.StatusConflict, c.do(http.MethodPatch, "/Users/"+promoted.ID, rename, nil))
+	assert.NotNil(t, e.userByEmail(t, o.ws, boss), "the IdP renamed an admin")
+
 	// Whoever could rename the owner would get the owner's sign-in links, linked or not.
 	owner := "/Users/" + o.owner.ID
 	require.Equal(t, http.StatusOK, c.do(http.MethodPut, owner, scimUser(o.owner.Email, "entra-0"), nil))
-	assert.Equal(t, http.StatusConflict, c.do(http.MethodPatch, owner, patchOps(work("ceo@"+testDomain())), nil))
+	c.do(http.MethodPatch, owner, patchOps(work("ceo@"+testDomain())), nil)
 	assert.NotNil(t, e.userByEmail(t, o.ws, o.owner.Email), "the IdP renamed the owner")
 }
 

@@ -361,6 +361,7 @@ type User struct {
 	Role           nokku.WorkspaceRole `json:"role"`
 	Active         bool                `json:"active"`
 	ScimExternalID *string             `json:"scimExternalId"`
+	ScimManaged    bool                `json:"scimManaged"`
 	CreatedAt      time.Time           `json:"createdAt"`
 	UpdatedAt      time.Time           `json:"updatedAt"`
 }

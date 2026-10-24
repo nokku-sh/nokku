@@ -46,6 +46,7 @@ CREATE TABLE users (
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5), -- 1=member, 2=viewer, 3=editor, 4=admin, 5=owner
   active BOOLEAN NOT NULL DEFAULT TRUE,
   scim_external_id TEXT, -- the identity provider's id for an account SCIM provisions
+  scim_managed BOOLEAN NOT NULL DEFAULT FALSE, -- SCIM created the account, so the identity provider owns its address
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, email),

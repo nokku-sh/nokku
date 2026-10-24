@@ -25,6 +25,15 @@ SET
 WHERE
   id = @id;
 
+-- name: SetUserSCIMManaged :exec
+-- Only for an account SCIM creates. One it links by address stays the workspace's to rename.
+UPDATE users
+SET
+  scim_managed = TRUE,
+  updated_at = NOW()
+WHERE
+  id = @id;
+
 -- name: SetTeamSCIMExternalID :one
 -- Like SetUserSCIMExternalID, for a SCIM group.
 UPDATE teams

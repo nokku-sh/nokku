@@ -2,7 +2,7 @@ package iam
 
 // SCIM Users are the workspace's users: id is the user id, userName the email, externalId is on the row.
 // Inbound, the primary emails entry wins over userName. Authentik sends a plain username there.
-// The IdP owns the address of the accounts it linked, so a changed one renames the login. Never the owner's.
+// The IdP owns the address of the accounts it created, so a changed one renames the login. Never an admin's.
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"uuid"
+
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	scim "github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
@@ -170,12 +172,18 @@ func (h scimUserHandler) apply(
 	externalID string,
 ) (scim.Resource, error) {
 	id := before.ID
-	// An account the IdP never linked keeps its address, and the request that links it does not rename yet.
-	rename := email != "" && email != before.Email && before.ScimExternalID != nil
+	// Only an account SCIM created and still links is renamed. Linking one by its address hands over no sign-in links.
+	rename := email != "" && email != before.Email && before.ScimManaged && before.ScimExternalID != nil
 	err := h.svc.conn.TenantTx(ctx, func(q *db.Queries) error {
 		if rename || (active != nil && !*active) {
 			if err := keepOwner(ctx, q, id); err != nil {
 				return err
+			}
+		}
+		if rename && before.Role >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN {
+			return scimerrors.ScimError{
+				Status: http.StatusConflict,
+				Detail: "the address of an admin is changed in Nokku, not by the identity provider",
 			}
 		}
 		// First, it locks the workspace row and every other path takes that before a user row.
