@@ -4,7 +4,6 @@ package nokku.v1;
 
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
-import "nokku/v1/certificates.proto";
 import "nokku/v1/daemon.proto";
 import "nokku/v1/util.proto";
 
@@ -18,6 +17,8 @@ service DashboardService {
 message GetDashboardRequest {}
 
 message GetDashboardResponse {
+  reserved 9;
+
   int32 targets = 1;
   int32 targets_online = 2;
   int32 targets_manual = 3;
@@ -26,7 +27,6 @@ message GetDashboardResponse {
   repeated Daemon pending_daemons = 6;
   repeated Daemon offline_daemons = 7;
   int32 users = 8;
-  repeated CertificateAuthority soonest_cas = 9;
   int64 recording_bytes = 10;
   int64 recording_quota_bytes = 11;
   repeated LiveSession live_sessions = 12;

@@ -96,7 +96,8 @@ app:
     user: postgres
     sslMode: disable
     autoMigrate: true
-  localStoragePath: data
+  # Where recordings go. A relative folder lands on the persistent volume, s3://bucket?region=... is a bucket.
+  storageURL: file://./data
   extraEnv: []
   extraEnvFrom: []
 

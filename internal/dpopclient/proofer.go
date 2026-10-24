@@ -5,9 +5,8 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// NewProofer builds a DPoP proofer over an internal/tpm machine signer. The salt in
-// opts namespaces the derived key and must come from the registry documented
-// in internal/README.md.
+// NewProofer builds a DPoP proofer over an internal/tpm machine signer. The key
+// lives in the state file opts names.
 func NewProofer(opts tpm.SignerOptions) (*dpop.Proofer, error) {
 	signer, err := tpm.NewSigner(opts)
 	if err != nil {

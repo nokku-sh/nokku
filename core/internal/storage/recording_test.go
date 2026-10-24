@@ -11,20 +11,15 @@ import (
 
 func TestCreateWriterRoundtrip(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("NOKKU_STORAGE", modeLocal)
-	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", dir)
+	t.Setenv("NOKKU_STORAGE_URL", "file://"+dir)
 
-	s, err := New(t.Context(), "")
+	s, err := New(t.Context())
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 
 	key := RecordingPath("ws-1", "00000000-0000-0000-0000-000000000001")
-	w, err := s.CreateWriter(
-		t.Context(),
-		key,
-		StoreOptions{ContentType: "application/octet-stream"},
-	)
+	w, err := s.CreateWriter(t.Context(), key)
 	if err != nil {
 		t.Fatalf("CreateWriter: %v", err)
 	}
@@ -76,7 +71,7 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 
 	// Partial stream (daemon died) must still commit.
 	key2 := RecordingPath("ws-1", "00000000-0000-0000-0000-000000000002")
-	w2, err := s.CreateWriter(t.Context(), key2, StoreOptions{})
+	w2, err := s.CreateWriter(t.Context(), key2)
 	if err != nil {
 		t.Fatalf("CreateWriter 2: %v", err)
 	}
@@ -100,19 +95,12 @@ func TestCreateWriterRoundtrip(t *testing.T) {
 
 // A workspace purge must never reach another workspace's recordings, even one whose id shares a prefix.
 func TestDeletePrefixStaysInsideWorkspace(t *testing.T) {
-	t.Setenv("NOKKU_STORAGE", modeLocal)
-	t.Setenv("NOKKU_LOCAL_STORAGE_PATH", t.TempDir())
-	s, err := New(t.Context(), "")
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	s := newLocal(t)
 
 	gone := []string{RecordingPath("ws-1", "rec-a"), RecordingPath("ws-1", "rec-b")}
-	kept := []string{RecordingPath("ws-10", "rec-c"), RecordingPath("ws-2", "rec-d"), AvatarPath("ws-1")}
+	kept := []string{RecordingPath("ws-10", "rec-c"), RecordingPath("ws-2", "rec-d"), "other/ws-1/x"}
 	for _, key := range append(gone, kept...) {
-		if _, err := s.Store(t.Context(), key, []byte("x"), StoreOptions{}); err != nil {
-			t.Fatalf("Store %s: %v", key, err)
-		}
+		write(t, s, key)
 	}
 
 	if err := s.DeletePrefix(t.Context(), RecordingPrefix("ws-1")); err != nil {

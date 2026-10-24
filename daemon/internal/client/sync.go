@@ -49,14 +49,21 @@ func (c *Client) syncDaemon(ctx context.Context) error {
 	for _, p := range res.GetPrincipals() {
 		principals[p.GetUsername()] = p.GetCertPrincipals()
 	}
-	previousCA, _ := c.cache.CAs()
-	c.cache.Replace(principals, res.GetConfig(), res.GetCaPublicKey(), res.GetRetiredCaKeys(), res.GetStateVersion())
+	previousHostCA := c.cache.HostCA()
+	c.cache.Replace(
+		principals,
+		res.GetConfig(),
+		res.GetCaPublicKey(),
+		res.GetHostCaPublicKey(),
+		res.GetRetiredCaKeys(),
+		res.GetStateVersion(),
+	)
 	c.srv.SetPolicy(sshd.PolicyFrom(res.GetConfig()))
 	c.srv.SetTrust(res.GetCaPublicKey(), res.GetRetiredCaKeys())
 	c.srv.DropRevoked()
 
-	// A new CA needs a new host certificate. The watcher signs it so a failure never holds back a revoke.
-	if res.GetCaPublicKey() != previousCA {
+	// A new host CA needs a new host certificate. The watcher signs it so a failure never holds back a revoke.
+	if res.GetHostCaPublicKey() != previousHostCA {
 		select {
 		case c.renew <- struct{}{}:
 		default:
@@ -66,8 +73,7 @@ func (c *Client) syncDaemon(ctx context.Context) error {
 }
 
 func (c *Client) renewHostCerts(ctx context.Context) error {
-	ca, _ := c.cache.CAs()
-	renewed, err := hostcerts.RenewHostCerts(ctx, c.config.TargetID, ca, c.signHostCert)
+	renewed, err := hostcerts.RenewHostCerts(ctx, c.config.TargetID, c.cache.HostCA(), c.signHostCert)
 	if err != nil || !renewed {
 		return err
 	}

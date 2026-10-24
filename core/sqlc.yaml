@@ -55,15 +55,6 @@ sql:
               pointer: true
 
           # Enum overrides
-          - column: "ssh_cas.key_type"
-            go_type:
-              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
-              type: "CertificateKeyType"
-          - column: "ssh_cas.allowed_key_types"
-            go_type:
-              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
-              type: "CertificateKeyType"
-              slice: true
           - column: "daemons.status"
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -107,6 +98,10 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "HashedToken"
+          - column: "device_grants.device_code_hash"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "HashedToken"
           - column: "join_tokens.token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
@@ -114,6 +109,10 @@ sql:
 
           # Encrypt (reversible) overrides
           - column: "ssh_cas.private_key"
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "EncryptedBytes"
+          - column: "ssh_cas.host_private_key"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "EncryptedBytes"

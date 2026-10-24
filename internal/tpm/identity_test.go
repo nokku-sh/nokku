@@ -18,7 +18,6 @@ import (
 func testOpts(t *testing.T, open func() (transport.TPMCloser, error)) SignerOptions {
 	t.Helper()
 	return SignerOptions{
-		Salt:      []byte("test-signer"),
 		StatePath: filepath.Join(t.TempDir(), "signer.json"),
 		OpenTPM:   open,
 	}
@@ -47,57 +46,47 @@ func pemOf(t *testing.T, s Signer) string {
 	return string(pubPEM)
 }
 
-func ecdsaPub(t *testing.T, s Signer) *ecdsa.PublicKey {
-	t.Helper()
-	pub, ok := s.Public().(*ecdsa.PublicKey)
-	require.True(t, ok, "Public() is %T, want *ecdsa.PublicKey", s.Public())
-	return pub
-}
-
 func TestSignerTPM(t *testing.T) {
-	open := simOpen(t)
+	opts := testOpts(t, simOpen(openSimulator(t)))
 
-	s1 := newTestSigner(t, open, nil)
-	pub1 := ecdsaPub(t, s1)
+	s1, err := NewSigner(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s1.Close() })
+	pub1 := testPub(t, s1)
 	assert.Equal(t, MethodTPM, s1.Method())
 
-	// The primary key is derived deterministically from the TPM seed, so a
-	// fresh signer must produce the same public key (nothing persisted but
-	// the public half).
-	s2 := newTestSigner(t, open, nil)
-	assert.True(t, pub1.Equal(s2.Public()), "TPM public key is not deterministic across restarts")
+	// The key file in the state brings the same key back after a restart.
+	s2, err := NewSigner(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s2.Close() })
+	assert.True(t, pub1.Equal(s2.Public()), "the TPM key changed across restarts")
 
 	digest := sha256.Sum256([]byte("hello nokku"))
-	sig, err := s1.Sign(rand.Reader, digest[:], crypto.SHA256)
+	sig, err := s2.Sign(rand.Reader, digest[:], crypto.SHA256)
 	require.NoError(t, err)
 	assert.True(t, ecdsa.VerifyASN1(pub1, digest[:], sig), "signature verification failed")
 }
 
-// TestSignerSaltIsolation verifies distinct salts yield distinct identities
-// on the same TPM.
-func TestSignerSaltIsolation(t *testing.T) {
-	open := simOpen(t)
+// Two state files on one TPM are two identities, the daemon's DPoP and host keys or two users' nk keys.
+func TestSignerStateFilesAreSeparate(t *testing.T) {
+	open := simOpen(openSimulator(t))
 
-	a := newTestSigner(t, open, func(o *SignerOptions) { o.Salt = []byte("nokku-daemon") })
-	b := newTestSigner(t, open, func(o *SignerOptions) { o.Salt = []byte("nokku-cli") })
-	assert.False(t, ecdsaPub(t, a).Equal(b.Public()), "distinct salts must derive distinct identities")
+	a := newTestSigner(t, open, nil)
+	b := newTestSigner(t, open, nil)
+	assert.False(t, testPub(t, a).Equal(b.Public()), "two state files must hold two keys")
 }
 
-// TestSignerIdentityChanged verifies a persisted public key that no longer
-// matches the machine fails with ErrIdentityChanged, unless Recreate is set.
+// TestSignerIdentityChanged verifies a key the TPM no longer loads fails with
+// ErrIdentityChanged, unless Recreate is set.
 func TestSignerIdentityChanged(t *testing.T) {
-	opts := testOpts(t, simOpen(t))
+	sim := openSimulator(t)
+	opts := testOpts(t, simOpen(sim))
 
 	s, err := NewSigner(opts)
 	require.NoError(t, err)
+	before := pemOf(t, s)
 	require.NoError(t, s.Close())
-
-	// Simulate a machine identity change: the persisted public half no
-	// longer matches the derived key.
-	st, err := loadState(opts.StatePath)
-	require.NoError(t, err)
-	st.PubKey = "-----BEGIN PUBLIC KEY-----\nCHANGED\n-----END PUBLIC KEY-----\n"
-	require.NoError(t, saveState(opts.StatePath, st))
+	clearTPM(t, sim)
 
 	_, err = NewSigner(opts)
 	require.ErrorIs(t, err, ErrIdentityChanged)
@@ -107,16 +96,30 @@ func TestSignerIdentityChanged(t *testing.T) {
 	s2, err := NewSigner(opts)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s2.Close() })
+	assert.NotEqual(t, before, pemOf(t, s2))
 
 	st2, err := loadState(opts.StatePath)
 	require.NoError(t, err)
 	assert.Equal(t, pemOf(t, s2), st2.PubKey, "recovered identity was not persisted")
 }
 
-func TestSignerRequiresSaltAndPath(t *testing.T) {
-	_, err := NewSigner(SignerOptions{StatePath: filepath.Join(t.TempDir(), "signer.json")})
-	require.Error(t, err, "NewSigner without salt succeeded")
-	_, err = NewSigner(SignerOptions{Salt: []byte("s")})
+// A TPM state without a key file, as the derived keys of older builds left it, is a changed identity.
+func TestSignerTPMStateWithoutKeyFile(t *testing.T) {
+	opts := testOpts(t, simOpen(openSimulator(t)))
+	require.NoError(t, saveState(opts.StatePath, &state{Method: MethodTPM, PubKey: "pem"}))
+
+	_, err := NewSigner(opts)
+	require.ErrorIs(t, err, ErrIdentityChanged)
+
+	opts.Recreate = true
+	s, err := NewSigner(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+	assert.Equal(t, MethodTPM, s.Method())
+}
+
+func TestSignerRequiresPath(t *testing.T) {
+	_, err := NewSigner(SignerOptions{})
 	require.Error(t, err, "NewSigner without state path succeeded")
 }
 
@@ -125,7 +128,7 @@ func TestSoftSignerRoundTrip(t *testing.T) {
 
 	s1, err := openSoft(opts, nil)
 	require.NoError(t, err)
-	pub1 := ecdsaPub(t, s1)
+	pub1 := testPub(t, s1)
 
 	digest := sha256.Sum256([]byte("hello nokku"))
 	sig, err := s1.Sign(rand.Reader, digest[:], crypto.SHA256)

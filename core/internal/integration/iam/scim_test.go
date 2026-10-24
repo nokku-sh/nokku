@@ -473,6 +473,19 @@ func TestSCIMGroupAdoptsAnUnlinkedTeam(t *testing.T) {
 		}
 	}
 
+	// Until a group takes it over, SCIM does not see the team. An IdP that syncs would delete it.
+	var list scimList
+	require.Equal(t, http.StatusOK, c.do(http.MethodGet, "/Groups", nil, &list))
+	for _, r := range list.Resources {
+		assert.NotEqual(t, team.ID, r.ID, "a team made by hand is listed")
+	}
+	assert.Equal(t, http.StatusNotFound, c.do(http.MethodGet, "/Groups/"+team.ID, nil, nil))
+	assert.Equal(t, http.StatusNotFound, c.do(http.MethodDelete, "/Groups/"+team.ID, nil, nil))
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		_, err := q.GetTeam(t.Context(), team.ID)
+		return err
+	}), "SCIM deleted a team made by hand")
+
 	var got scimResource
 	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Groups", group("pid-1"), &got))
 	assert.Equal(t, team.ID, got.ID, "a new team was made instead")

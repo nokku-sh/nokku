@@ -73,19 +73,6 @@ ORDER BY
 LIMIT
   5;
 
--- name: ListSoonestCAs :many
-SELECT
-  *
-FROM
-  ssh_cas
-WHERE
-  is_active = TRUE
-  AND not_after > NOW()
-ORDER BY
-  not_after ASC
-LIMIT
-  3;
-
 -- name: ListOpenRecordings :many
 -- A crashed daemon never closes its recordings, so only trust open ones behind a connected daemon.
 SELECT

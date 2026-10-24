@@ -50,6 +50,10 @@ var (
 		connect.CodeFailedPrecondition,
 		errors.New("a self-hosted server keeps its workspace"),
 	)
+	errLegalHold = connect.NewError(
+		connect.CodeFailedPrecondition,
+		errors.New("this workspace has legal holds, remove them first"),
+	)
 )
 
 // errRecordingStorageFull is not InvalidArgument, a daemon gives up on that.

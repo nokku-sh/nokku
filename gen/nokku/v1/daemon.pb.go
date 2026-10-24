@@ -1192,15 +1192,18 @@ func (x *SyncDaemonRequest) GetMetadata() map[string]string {
 }
 
 type SyncDaemonResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        *DaemonStatus          `protobuf:"varint,1,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
-	Config        *DaemonConfig          `protobuf:"bytes,2,opt,name=config" json:"config,omitempty"`
-	Principals    []*AccountPrincipals   `protobuf:"bytes,3,rep,name=principals" json:"principals,omitempty"`
-	StateVersion  *int64                 `protobuf:"varint,4,opt,name=state_version,json=stateVersion" json:"state_version,omitempty"`
-	CaPublicKey   *string                `protobuf:"bytes,5,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
-	RetiredCaKeys []*RetiredCAKey        `protobuf:"bytes,6,rep,name=retired_ca_keys,json=retiredCaKeys" json:"retired_ca_keys,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Status       *DaemonStatus          `protobuf:"varint,1,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
+	Config       *DaemonConfig          `protobuf:"bytes,2,opt,name=config" json:"config,omitempty"`
+	Principals   []*AccountPrincipals   `protobuf:"bytes,3,rep,name=principals" json:"principals,omitempty"`
+	StateVersion *int64                 `protobuf:"varint,4,opt,name=state_version,json=stateVersion" json:"state_version,omitempty"`
+	// The user CA key logins are checked against.
+	CaPublicKey   *string         `protobuf:"bytes,5,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
+	RetiredCaKeys []*RetiredCAKey `protobuf:"bytes,6,rep,name=retired_ca_keys,json=retiredCaKeys" json:"retired_ca_keys,omitempty"`
+	// The host CA key the daemon's host certificate has to come from.
+	HostCaPublicKey *string `protobuf:"bytes,7,opt,name=host_ca_public_key,json=hostCaPublicKey" json:"host_ca_public_key,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SyncDaemonResponse) Reset() {
@@ -1273,6 +1276,13 @@ func (x *SyncDaemonResponse) GetRetiredCaKeys() []*RetiredCAKey {
 		return x.RetiredCaKeys
 	}
 	return nil
+}
+
+func (x *SyncDaemonResponse) GetHostCaPublicKey() string {
+	if x != nil && x.HostCaPublicKey != nil {
+		return *x.HostCaPublicKey
+	}
+	return ""
 }
 
 type RetiredCAKey struct {
@@ -2484,7 +2494,7 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\bmetadata\x18\x03 \x03(\v2).nokku.v1.SyncDaemonRequest.MetadataEntryB\x15\xbaH\x12\x9a\x01\x0f\x10\x10\"\x04r\x02\x18@*\x05r\x03\x18\x80\x02R\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xba\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe7\x02\n" +
 	"\x12SyncDaemonResponse\x12.\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x16.nokku.v1.DaemonStatusR\x06status\x12.\n" +
 	"\x06config\x18\x02 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x12;\n" +
@@ -2493,7 +2503,8 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"principals\x12#\n" +
 	"\rstate_version\x18\x04 \x01(\x03R\fstateVersion\x12\"\n" +
 	"\rca_public_key\x18\x05 \x01(\tR\vcaPublicKey\x12>\n" +
-	"\x0fretired_ca_keys\x18\x06 \x03(\v2\x16.nokku.v1.RetiredCAKeyR\rretiredCaKeys\"n\n" +
+	"\x0fretired_ca_keys\x18\x06 \x03(\v2\x16.nokku.v1.RetiredCAKeyR\rretiredCaKeys\x12+\n" +
+	"\x12host_ca_public_key\x18\a \x01(\tR\x0fhostCaPublicKey\"n\n" +
 	"\fRetiredCAKey\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\x01 \x01(\tR\tpublicKey\x12?\n" +

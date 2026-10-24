@@ -62,12 +62,6 @@ LIMIT
 OFFSET
   sqlc.narg('offset');
 
--- name: ListUserIDs :many
-SELECT
-  id
-FROM
-  users;
-
 -- name: CountActiveUsers :one
 -- Names the workspace, billing counts seats as nokku_system.
 SELECT
@@ -142,3 +136,29 @@ DELETE FROM users
 WHERE
   id = @id
   AND role <> 5; -- owner
+
+-- name: PutAvatar :exec
+INSERT INTO
+  user_avatars (user_id, image, etag)
+VALUES
+  (@user_id, @image, @etag)
+ON CONFLICT (user_id) DO UPDATE
+SET
+  image = EXCLUDED.image,
+  etag = EXCLUDED.etag,
+  updated_at = NOW();
+
+-- name: GetAvatar :one
+SELECT
+  image,
+  etag,
+  updated_at
+FROM
+  user_avatars
+WHERE
+  user_id = @user_id;
+
+-- name: DeleteAvatar :exec
+DELETE FROM user_avatars
+WHERE
+  user_id = @user_id;

@@ -1,11 +1,11 @@
 // Package tpm provides a machine-bound signing identity backed by a TPM 2.0,
 // with a machine-wrapped software fallback for machines without one.
 //
-// [NewSigner] loads or creates the identity: a deterministic TPM-resident
-// ECDSA P-256 key when the TPM is usable, otherwise a software P-256 key
-// wrapped to the machine fingerprint. The private key never leaves the TPM
-// in the first case and never leaves the machine in the second. Every caller
-// namespaces its identity with [SignerOptions.Salt].
+// [NewSigner] loads or creates the identity: an ECDSA P-256 key the TPM
+// creates and wraps to itself when a TPM is usable, kept as a TSS2 key file,
+// otherwise a software P-256 key wrapped to the machine fingerprint. The
+// private key never leaves the TPM in the first case and never leaves the
+// machine in the second. Every state file holds a key of its own.
 //
 // A caller on a machine with another hardware key store, such as the macOS
 // Secure Enclave, plugs it in through [SignerOptions.Enclave]. It is tried
@@ -13,7 +13,11 @@
 package tpm
 
 import (
+	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -21,6 +25,7 @@ import (
 	"io"
 	"log/slog"
 
+	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/google/go-tpm/tpm2/transport"
 )
 
@@ -37,8 +42,8 @@ const (
 // since the key was created, so the caller must register the new public key.
 var ErrIdentityChanged = errors.New("tpm: machine identity changed since the key was created")
 
-// Signer is a machine-bound signing identity and a [crypto.Signer]. The TPM
-// key template pins SHA-256, so sign SHA-256 digests.
+// Signer is a machine-bound signing identity and a [crypto.Signer]. It signs
+// SHA-256 digests only.
 type Signer interface {
 	crypto.Signer
 	io.Closer
@@ -50,12 +55,9 @@ type Signer interface {
 
 // SignerOptions configures [NewSigner].
 type SignerOptions struct {
-	// Salt namespaces the key derivation. Two purposes sharing a salt on one
-	// machine share an identity, so every caller keeps its own constant.
-	Salt []byte
-	// StatePath is where the identity state is persisted. Only public
-	// material is stored for TPM keys, enclave keys add their opaque blob,
-	// software keys their wrapped private key.
+	// StatePath is where the identity state is persisted, with the TSS2 key
+	// file of a TPM key, the opaque blob of an enclave key, or the wrapped
+	// private key of a software key. Each path is an identity of its own.
 	StatePath string
 	// RequireTPM refuses the software fallback. An enclave key satisfies it.
 	RequireTPM bool
@@ -68,8 +70,9 @@ type SignerOptions struct {
 	// re-image does not brick them, and must then invalidate anything derived
 	// from the old public key, such as certificates. Leave it unset where the
 	// identity is bound to a server-side registration. An identity in a TPM
-	// that does not open, or of a method this build does not know, is never
-	// replaced: the first is often transient and the second may be newer.
+	// that does not open or load for another reason than a cleared TPM, or of
+	// a method this build does not know, is never replaced: the first is often
+	// transient and the second may be newer.
 	Recreate bool
 	// OpenTPM opens the TPM transport, defaulting to the platform device.
 	// Tests inject a simulator. The signer owns the returned closer.
@@ -82,9 +85,6 @@ type SignerOptions struct {
 // existing software identity is never silently upgraded to hardware later.
 // Concurrent calls for one state path, from any process, run one at a time.
 func NewSigner(opts SignerOptions) (Signer, error) {
-	if len(opts.Salt) == 0 {
-		return nil, errors.New("tpm: salt is required")
-	}
 	if opts.StatePath == "" {
 		return nil, errors.New("tpm: state path is required")
 	}
@@ -174,30 +174,79 @@ func openTPMIdentity(opts SignerOptions, st *state) (Signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	s, err := newTPMSigner(dev, opts.Salt)
+
+	if st != nil {
+		s, loadErr := loadTPMIdentity(dev, st)
+		switch {
+		case loadErr == nil:
+			return s, nil
+		case !errors.Is(loadErr, ErrIdentityChanged):
+			_ = dev.Close()
+			return nil, loadErr
+		case !opts.Recreate:
+			_ = dev.Close()
+			return nil, fmt.Errorf("%w, re-enroll to register a new key", loadErr)
+		}
+		slog.Warn("tpm: the TPM no longer loads the key, creating a new one", "error", loadErr)
+	}
+	s, err := createTPMIdentity(opts, dev)
 	if err != nil {
 		_ = dev.Close()
 		return nil, err
 	}
+	return s, nil
+}
 
-	// The persisted public half detects a TPM clear or replacement, the derived key changes with nothing stored.
-	if st != nil && st.PubKey != "" && st.PubKey != string(s.pem) {
-		if !opts.Recreate {
-			_ = s.Close()
-			return nil, fmt.Errorf(
-				"%w: the TPM key changed (TPM cleared or replaced), re-enroll to register the new key",
-				ErrIdentityChanged,
-			)
-		}
-		slog.Warn("tpm: TPM identity changed since last use, registering the new key")
+// A key file that does not parse, or that the TPM refuses as another TPM's, is a changed identity.
+func loadTPMIdentity(dev transport.TPMCloser, st *state) (*tpmSigner, error) {
+	key, err := keyfile.Decode(st.Data)
+	if err != nil {
+		return nil, fmt.Errorf("%w: the TPM key file does not parse: %w", ErrIdentityChanged, err)
 	}
-	if st == nil || st.PubKey != string(s.pem) {
-		if err = saveState(opts.StatePath, &state{Method: MethodTPM, PubKey: string(s.pem)}); err != nil {
-			_ = s.Close()
-			return nil, err
-		}
+	return newTPMSigner(dev, key)
+}
+
+// The new key signs a test digest before it is saved, so a half-working TPM never becomes an identity that
+// cannot log in. On error the caller still owns dev.
+func createTPMIdentity(opts SignerOptions, dev transport.TPMCloser) (*tpmSigner, error) {
+	key, err := createTPMKey(dev)
+	if err != nil {
+		return nil, err
+	}
+	s, err := newTPMSigner(dev, key)
+	if err != nil {
+		return nil, err
+	}
+	pubPEM, err := selfTest(s)
+	var file bytes.Buffer
+	if err == nil {
+		err = keyfile.Encode(&file, key)
+	}
+	if err == nil {
+		err = saveState(opts.StatePath, &state{Method: MethodTPM, PubKey: string(pubPEM), Data: file.Bytes()})
+	}
+	if err != nil {
+		s.flush()
+		return nil, err
 	}
 	return s, nil
+}
+
+// selfTest signs and verifies one digest with a new key and returns its public half in PEM.
+func selfTest(key crypto.Signer) ([]byte, error) {
+	pub, ok := key.Public().(*ecdsa.PublicKey)
+	if !ok {
+		return nil, errors.New("tpm: the new key is not ECDSA")
+	}
+	digest := sha256.Sum256([]byte("nokku key self test"))
+	sig, err := key.Sign(rand.Reader, digest[:], crypto.SHA256)
+	if err != nil {
+		return nil, fmt.Errorf("tpm: test signature: %w", err)
+	}
+	if !ecdsa.VerifyASN1(pub, digest[:], sig) {
+		return nil, errors.New("tpm: the test signature does not verify")
+	}
+	return pemEncodePublicKey(pub)
 }
 
 // pemEncodePublicKey returns the PKIX PEM encoding of pub.

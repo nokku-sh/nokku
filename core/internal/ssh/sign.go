@@ -2,21 +2,16 @@ package ssh
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"maps"
 	"math"
 	"net"
-	"slices"
 	"strings"
 	"time"
 	"uuid"
 
 	"golang.org/x/crypto/ssh"
-
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -67,7 +62,12 @@ func SignCertificate(
 	if len(principals) == 0 || len(principals) > maxPrincipals {
 		return nil, fmt.Errorf("a certificate takes 1 to %d principals, got %d", maxPrincipals, len(principals))
 	}
-	signer, err := getSigner(ca.PrivateKey.Bytes())
+	// The host key never signs a login, the user key never vouches for a server.
+	private := ca.PrivateKey
+	if certType == ssh.HostCert {
+		private = ca.HostPrivateKey
+	}
+	signer, err := getSigner(private.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CA signer: %w", err)
 	}
@@ -76,7 +76,7 @@ func SignCertificate(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse public key: %w", err)
 	}
-	if err := isAllowedKeyType(ca.AllowedKeyTypes, key); err != nil {
+	if err := acceptedKey(key); err != nil {
 		return nil, err
 	}
 
@@ -161,58 +161,14 @@ func SourceAddresses(list string) (string, error) {
 	return strings.Join(entries, ","), nil
 }
 
-func isAllowedKeyType(
-	allowed []nokkuv1.CertificateKeyType,
-	publicKey ssh.PublicKey,
-) error {
-	if len(allowed) == 0 {
+// acceptedKey takes the key types nk and nokkud make, and hardware security keys. RSA and DSA are refused.
+func acceptedKey(key ssh.PublicKey) error {
+	switch key.Type() {
+	case ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521, ssh.KeyAlgoED25519,
+		ssh.KeyAlgoSKECDSA256, ssh.KeyAlgoSKED25519:
 		return nil
 	}
-
-	keyType, err := getKeyType(publicKey)
-	if err != nil {
-		return err
-	}
-
-	if !slices.Contains(allowed, keyType) {
-		return fmt.Errorf(
-			"public key type %q is not allowed by certificate authority policy",
-			publicKey.Type(),
-		)
-	}
-
-	if keyType == nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA {
-		if cryptoKey, ok := publicKey.(ssh.CryptoPublicKey); ok {
-			if rsaKey, ok := cryptoKey.CryptoPublicKey().(*rsa.PublicKey); ok {
-				if rsaKey.Size()*8 < 2048 {
-					return errors.New("weak key: RSA keys must be at least 2048 bits")
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func getKeyType(publicKey ssh.PublicKey) (nokkuv1.CertificateKeyType, error) {
-	switch publicKey.Type() {
-	case ssh.KeyAlgoRSA:
-		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA, nil
-
-	case ssh.KeyAlgoECDSA256,
-		ssh.KeyAlgoECDSA384,
-		ssh.KeyAlgoECDSA521,
-		ssh.KeyAlgoSKECDSA256:
-		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA, nil
-
-	case ssh.KeyAlgoED25519,
-		ssh.KeyAlgoSKED25519:
-		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, nil
-
-	default:
-		// Drops DSA and experimental types.
-		return nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_UNSPECIFIED,
-			fmt.Errorf("unsupported public key type %q", publicKey.Type())
-	}
+	return fmt.Errorf("public key type %q is not accepted, use ECDSA or Ed25519", key.Type())
 }
 
 // UnixUint64 is a certificate validity bound, never before the epoch.

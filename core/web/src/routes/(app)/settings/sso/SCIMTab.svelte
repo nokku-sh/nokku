@@ -13,7 +13,7 @@
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { confirm } from '#lib/hooks/index.js';
-	import { requiredPlan, upgradeLink } from '#lib/plans.js';
+	import { usePlans } from '#lib/plans.js';
 	import { formatTs } from '#lib/utils.js';
 	import { ArrowRight, KeyRound, Plus, ShieldAlert, Trash2, UsersRound } from '@lucide/svelte';
 
@@ -35,8 +35,9 @@
 	let label = $state('');
 	let created = $state<{ token: string; baseUrl: string }>();
 
-	const plan = requiredPlan('scim');
-	const upgrade = $derived(upgradeLink('scim', mode));
+	const plans = usePlans();
+	const plan = $derived(plans.requiredPlan('scim'));
+	const upgrade = $derived(plans.upgradeLink('scim', mode));
 	// Tokens keep provisioning after a downgrade, so they stay listed and revocable.
 	const lapsed = $derived(available === false && !!tokens.data?.length);
 

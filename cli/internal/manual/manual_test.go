@@ -98,6 +98,104 @@ func TestScriptIsValidShell(t *testing.T) {
 	require.NoError(t, err, "generated script must parse: %s", out)
 }
 
+// runPlan runs the script of p on a fake /etc/ssh holding existing. sshd -t accepts the host as it is, and the
+// result only when reject is false.
+func runPlan(t *testing.T, p Plan, existing map[string]string, reject bool) (dir, out string, err error) {
+	t.Helper()
+	if _, lookErr := exec.LookPath("sh"); lookErr != nil {
+		t.Skip("sh not available")
+	}
+	dir = t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	require.NoError(t, os.Mkdir(bin, 0o755))
+	code := 0
+	if reject {
+		code = 1
+	}
+	stubs := map[string]string{
+		"bin/id":        "#!/bin/sh\necho 0\n",
+		"bin/systemctl": "#!/bin/sh\nexit 0\n",
+		"bin/sshd": fmt.Sprintf(
+			"#!/bin/sh\n[ \"$1\" = -t ] || exit 0\n[ -f %[1]s/checked ] && exit %[2]d\ntouch %[1]s/checked\n",
+			dir, code,
+		),
+	}
+	for name, body := range stubs {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o755))
+	}
+	for name, body := range existing {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644))
+	}
+
+	cmd := exec.Command("sh", "-s")
+	cmd.Stdin = strings.NewReader(strings.ReplaceAll(p.Script(), "/etc/ssh", dir))
+	cmd.Env = []string{"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH")}
+	b, err := cmd.CombinedOutput()
+	return dir, string(b), err
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(b)
+}
+
+func TestScriptWrites(t *testing.T) {
+	t.Parallel()
+	p := NewPlan("new-ca", map[string][]string{"root": {"p1"}}, Host{Accounts: []string{"root"}})
+	dir, out, err := runPlan(t, p, map[string]string{"nokku_ca.pub": "old-ca\n"}, false)
+	require.NoError(t, err, out)
+
+	assert.Equal(t, "new-ca\n", readFile(t, filepath.Join(dir, "nokku_ca.pub")))
+	assert.Equal(t, "p1\n", readFile(t, filepath.Join(dir, "nokku_principals/root")))
+	assert.NoFileExists(t, filepath.Join(dir, "nokku_ca.pub.nokku-bak"))
+	assert.True(t, ParseResult(out).Reloaded)
+}
+
+func TestScriptRollsBackWhenSSHDRejects(t *testing.T) {
+	t.Parallel()
+	p := NewPlan("new-ca", nil, Host{Accounts: []string{"root"}})
+	dir, out, err := runPlan(t, p, map[string]string{"nokku_ca.pub": "old-ca\n"}, true)
+	require.Error(t, err)
+
+	assert.Contains(t, out, "rolled back")
+	assert.Equal(t, "old-ca\n", readFile(t, filepath.Join(dir, "nokku_ca.pub")))
+	assert.NoFileExists(t, filepath.Join(dir, "sshd_config.d/60-nokku.conf"), "a new file is removed again")
+	assert.NoFileExists(t, filepath.Join(dir, "nokku_ca.pub.nokku-bak"))
+	assert.False(t, ParseResult(out).Reloaded)
+}
+
+// A write that fails halfway, like a full disk, rolls back the files written before it.
+func TestScriptRollsBackAFailedWrite(t *testing.T) {
+	t.Parallel()
+	p := NewPlan("new-ca", nil, Host{Accounts: []string{"root"}})
+	dir, out, err := runPlan(t, p, map[string]string{
+		"nokku_ca.pub": "old-ca\n",
+		// A directory where the staged file goes makes the write fail.
+		"nokku_principals/root.nokku-tmp/x": "",
+	}, false)
+	require.Error(t, err)
+
+	assert.Equal(t, "old-ca\n", readFile(t, filepath.Join(dir, "nokku_ca.pub")))
+	assert.NoFileExists(t, filepath.Join(dir, "sshd_config.d/60-nokku.conf"))
+	assert.False(t, ParseResult(out).Reloaded)
+}
+
+// A backup a dead run left behind must not be restored over the live file.
+func TestScriptDropsStaleBackups(t *testing.T) {
+	t.Parallel()
+	p := NewPlan("new-ca", nil, Host{Accounts: []string{"root"}})
+	dir, _, err := runPlan(t, p, map[string]string{
+		"nokku_ca.pub":           "live-ca\n",
+		"nokku_ca.pub.nokku-bak": "stale-ca\n",
+	}, true)
+	require.Error(t, err)
+
+	assert.Equal(t, "live-ca\n", readFile(t, filepath.Join(dir, "nokku_ca.pub")))
+}
+
 // runRemoveScript runs RemoveScript on a fake /etc/ssh with id, sshd and systemctl stubbed, and returns the dir.
 func runRemoveScript(t *testing.T, sshdExit int) (dir, out string, err error) {
 	t.Helper()

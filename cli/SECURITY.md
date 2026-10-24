@@ -49,11 +49,11 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 
 ### How nk protects your key
 
-- **With a TPM 2.0**, on Linux and Windows, your SSH private key is a deterministic primary key that never leaves the TPM. `nk` uses one automatically when it finds one.
+- **With a TPM 2.0**, on Linux and Windows, your SSH private key is created inside the TPM and never leaves it. The TPM wraps it to itself, and `nk` keeps that blob as a TSS2 key file in `~/.config/nk`. Using the key takes the file and the TPM, so another user on the machine cannot use it even when they may use the TPM. `nk` uses a TPM automatically when it finds one.
 - **Signing happens in a small background agent.** `nk` starts it on the first SSH connection and stops it after 30 idle minutes. `ssh` reads the key only through the agent socket, never directly.
-- **Without a TPM**, `nk` falls back to a software ECDSA P-256 key, wrapped with a key derived from the machine fingerprint. The state file is useless on another machine. On the machine itself it is only as safe as its file permissions.
+- **Without a TPM**, `nk` falls back to a software ECDSA P-256 key, wrapped with a key derived from the machine fingerprint. The state file is useless on another machine, unless that machine's ID is copied along, as a full backup or a VM clone does. On the machine itself it is only as safe as its file permissions.
 - **`--require-tpm` refuses the fallback.** Use it where a TPM is expected.
-- **On macOS**, `NK_SECURE_ENCLAVE=1` keeps new keys in the Secure Enclave, as an opaque blob only that Mac can use. This is experimental.
+- **On macOS**, the key is a software key by default. `NK_SECURE_ENCLAVE=1` keeps new keys in the Secure Enclave instead, as an opaque blob only that Mac can use. This is experimental.
 
 `nk doctor` shows which of these is in use.
 
@@ -78,7 +78,7 @@ A core whose certificate comes from a private CA is trusted through that CA, and
 - Without a pin, `nk login` on a terminal shows the pin of the advertised CA and asks, the way `ssh` asks about a host key. Without a terminal it fails.
 - `--ca-file` takes the CA from a file instead.
 
-The CA is stored in `~/.config/nk/config.json` and dropped when `--api` changes. After that every request is verified the normal way, against the system roots plus that CA. `nk` offers once to install the CA into the system trust store, so the browser sign-in works too. That step is optional and asks first. `nk logout` asks whether a CA that `nk` installed goes out again. Without a terminal it stays.
+The CA is stored in `~/.config/nk/config.json` and dropped when `--api` changes. After that every request is verified the normal way, against the system roots plus that CA. `nk` offers once to install the CA into the system trust store, so the browser sign-in works too. It only offers a CA that is limited to the core's own name and can vouch for no IP address, like the core's built-in one, and the answer defaults to no. Any other CA has to be installed by hand. `nk logout` asks whether a CA that `nk` installed goes out again. Without a terminal it stays.
 
 ### Releases
 

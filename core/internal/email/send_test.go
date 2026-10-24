@@ -30,7 +30,7 @@ func (m *mockSender) Send(_ context.Context, msg message) error {
 func newTestService(sender sender) *Service {
 	return &Service{
 		sender: sender,
-		cache:  cache.NewMemory(0),
+		cache:  cache.New[string, struct{}](cooldownEntries, cooldown),
 		From:   "noreply@system.nokku.sh",
 	}
 }
@@ -127,13 +127,13 @@ func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
 	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute); err != nil {
 		t.Fatal(err)
 	}
-	if svc.EmailChangeOnCooldown(ctx, "user-1") {
+	if svc.EmailChangeOnCooldown("user-1") {
 		t.Fatal("a sign-in link counts as an email change")
 	}
 	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", time.Hour); err != nil {
 		t.Fatalf("confirmation blocked by the sign-in link: %v", err)
 	}
-	if !svc.EmailChangeOnCooldown(ctx, "user-1") {
+	if !svc.EmailChangeOnCooldown("user-1") {
 		t.Error("no cooldown after a confirmation went out")
 	}
 	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", time.Hour); !errors.Is(err, ErrCooldown) {
@@ -150,19 +150,19 @@ func TestSendOwnerLinkEmail_CooldownPerAddress(t *testing.T) {
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	if svc.OwnerLinkOnCooldown(ctx, "a@b.io") {
+	if svc.OwnerLinkOnCooldown("a@b.io") {
 		t.Fatal("cooldown before any link went out")
 	}
 	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
-	if !svc.OwnerLinkOnCooldown(ctx, "a@b.io") {
+	if !svc.OwnerLinkOnCooldown("a@b.io") {
 		t.Error("no cooldown after the link went out")
 	}
 	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", 24*time.Hour); !errors.Is(err, ErrCooldown) {
 		t.Errorf("second link to the address = %v, want ErrCooldown", err)
 	}
-	if svc.OwnerLinkOnCooldown(ctx, "c@b.io") {
+	if svc.OwnerLinkOnCooldown("c@b.io") {
 		t.Error("another address shares the cooldown")
 	}
 	if len(sender.sent) != 1 {
@@ -208,20 +208,16 @@ func TestSendTemplate_SendErrorPropagatesWithoutCooldown(t *testing.T) {
 func TestSendTemplate_FullCooldownStoreSendsAnyway(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	svc.cache = cache.NewMemory(1)
-	if _, err := svc.cache.SetNX(t.Context(), "taken", nil, time.Hour); err != nil {
-		t.Fatal(err)
-	}
+	svc.cache = cache.New[string, struct{}](1, cooldown)
+	svc.cache.Set("taken", struct{}{})
 
-	for range 2 {
-		if err := svc.SendMagicLinkEmail(
-			t.Context(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", 15*time.Minute,
-		); err != nil {
-			t.Fatalf("SendMagicLinkEmail with a full cooldown store: %v", err)
-		}
+	if err := svc.SendMagicLinkEmail(
+		t.Context(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", 15*time.Minute,
+	); err != nil {
+		t.Fatalf("SendMagicLinkEmail with a full cooldown store: %v", err)
 	}
-	if len(sender.sent) != 2 {
-		t.Fatalf("sender called %d times, want 2", len(sender.sent))
+	if len(sender.sent) != 1 {
+		t.Fatalf("sender called %d times, want 1", len(sender.sent))
 	}
 }
 

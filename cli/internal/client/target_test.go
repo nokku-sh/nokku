@@ -171,3 +171,18 @@ func TestListAllTargetsPages(t *testing.T) {
 	assert.Equal(t, "t0", targets[0].Name)
 	assert.Equal(t, fmt.Sprintf("t%d", 2*lookupLimit+2), targets[len(targets)-1].Name)
 }
+
+func TestUnsafePrincipal(t *testing.T) {
+	t.Parallel()
+	for p, unsafe := range map[string]bool{
+		"0199a0a0-0000-7000-8000-000000000001@0199a0a0-0000-7000-8000-000000000002:deploy": false,
+		"":                    true,
+		"a b":                 true,
+		"a\tb":                true,
+		"p1\np2":              true,
+		`command="rm -rf" p1`: true,
+		"it's":                true,
+	} {
+		assert.Equal(t, unsafe, unsafePrincipal(p), "%q", p)
+	}
+}

@@ -62,8 +62,7 @@ services:
       # only honored from peers in this range.
       NOKKU_TRUSTED_PROXIES: 172.28.0.0/16
       # Local object storage (default backend), persisted on a volume.
-      NOKKU_STORAGE: local
-      NOKKU_LOCAL_STORAGE_PATH: /data
+      NOKKU_STORAGE_URL: file:///data
     volumes:
       - nokku-data:/data
     # Only reachable through the caddy reverse proxy.

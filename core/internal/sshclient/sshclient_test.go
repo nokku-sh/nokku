@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
 
@@ -16,7 +18,7 @@ func testConfig(t *testing.T, srv *sshtest.Server) Config {
 		HostPrincipal: srv.HostPrincipal,
 		Username:      "user",
 		Signer:        srv.UserSigner(t, srv.UserPrincipal, "user"),
-		CAKey:         srv.CAKey(),
+		HostCAs:       []ssh.PublicKey{srv.HostCAKey()},
 	}
 }
 
@@ -112,7 +114,7 @@ func TestDialTerminal_WrongCA(t *testing.T) {
 	rogue := sshtest.NewServer(t)
 
 	cfg := testConfig(t, srv)
-	cfg.CAKey = rogue.CAKey()
+	cfg.HostCAs = []ssh.PublicKey{rogue.HostCAKey()}
 
 	conn, err := net.Dial("tcp", srv.Addr())
 	if err != nil {

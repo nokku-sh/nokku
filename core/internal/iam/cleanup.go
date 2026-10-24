@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// cleanup hourly deletes expired tokens and known devices of every workspace.
+// cleanup hourly deletes expired tokens, known devices and device grants of every workspace.
 func (s *Service) cleanup(ctx context.Context) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
@@ -25,6 +25,9 @@ func (s *Service) cleanup(ctx context.Context) {
 		}
 		if _, err := s.conn.Sys().DeleteExpiredKnownDevices(ctx, now); err != nil {
 			slog.Error("failed to cleanup known devices", "error", err)
+		}
+		if _, err := s.conn.Sys().DeleteExpiredDeviceGrants(ctx, now); err != nil {
+			slog.Error("failed to cleanup device grants", "error", err)
 		}
 	}
 }

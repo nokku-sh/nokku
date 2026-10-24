@@ -318,6 +318,8 @@ WHERE
     retry_at IS NULL
     OR retry_at <= NOW()
   )
+ORDER BY
+  id
 `
 
 // Every enabled stream whose wait after a failure is over, across workspaces.

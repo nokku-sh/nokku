@@ -45,8 +45,7 @@ services:
       PGUSER: ${POSTGRES_USER:-nokku}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       PGSSLMODE: disable
-      NOKKU_STORAGE: local
-      NOKKU_LOCAL_STORAGE_PATH: /data
+      NOKKU_STORAGE_URL: file:///data
     volumes:
       - nokku-data:/data
     ports:

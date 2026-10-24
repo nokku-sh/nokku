@@ -73,7 +73,7 @@ func TestEnclaveSigner(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, MethodEnclave, s1.Method())
 	assert.Equal(t, MethodEnclave, IdentityMethod(opts.StatePath))
-	pub := ecdsaPub(t, s1)
+	pub := testPub(t, s1)
 
 	digest := sha256.Sum256([]byte("hello nokku"))
 	sig, err := s1.Sign(rand.Reader, digest[:], crypto.SHA256)
@@ -89,7 +89,7 @@ func TestEnclaveSigner(t *testing.T) {
 // TestEnclavePreferredOrder verifies a usable TPM wins over the enclave.
 func TestEnclavePreferredOrder(t *testing.T) {
 	opts := enclaveOpts(t, &fakeEnclave{})
-	opts.OpenTPM = simOpen(t)
+	opts.OpenTPM = simOpen(openSimulator(t))
 
 	s, err := NewSigner(opts)
 	require.NoError(t, err)

@@ -58,7 +58,8 @@ var denylist = func() []string {
 }()
 
 const (
-	slugCacheTTL = time.Minute
+	slugCacheTTL     = time.Minute
+	slugCacheEntries = 10_000
 	// unclaimedAfter is how long a signup may sit without a sign-in, so a squatted slug frees itself.
 	unclaimedAfter = 24 * time.Hour
 	purgeEvery     = time.Hour
@@ -75,7 +76,7 @@ type Resolver struct {
 	host   string // the root host without port
 	port   string
 	single actor.Workspace
-	slugs  *cache.Local[actor.Workspace]
+	slugs  *cache.TTL[string, actor.Workspace]
 }
 
 // New in self-host mode makes sure the one workspace exists.
@@ -86,7 +87,7 @@ func New(ctx context.Context, conn *db.Connection, baseURL string, saas bool) (*
 	}
 	r := &Resolver{conn: conn, saas: saas, scheme: u.Scheme, host: strings.ToLower(u.Hostname()), port: u.Port()}
 	if saas {
-		r.slugs = cache.NewLocal[actor.Workspace](slugCacheTTL)
+		r.slugs = cache.New[string, actor.Workspace](slugCacheEntries, slugCacheTTL)
 		go r.purgeUnclaimed(ctx)
 		return r, nil
 	}
@@ -148,7 +149,7 @@ func (r *Resolver) FromHost(ctx context.Context, host string) (actor.Workspace, 
 		return actor.Workspace{}, err
 	}
 	ws := r.workspace(row)
-	r.slugs.Put(slug, ws)
+	r.slugs.Set(slug, ws)
 	return ws, nil
 }
 
@@ -217,7 +218,8 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 			return err
 		}
 		for _, ws := range rows {
-			if err := q.DeleteWorkspace(ctx, ws.ID); err != nil {
+			// Nobody signed in, so no legal hold can keep it.
+			if _, err := q.DeleteWorkspace(ctx, ws.ID); err != nil {
 				return err
 			}
 			r.Forget(ws.Slug)
@@ -228,7 +230,7 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 
 // Create pins the transaction to the id the workspace is about to get, so it runs under RLS with no system role.
 func Create(ctx context.Context, conn *db.Connection, slug, name string) (*db.Workspace, error) {
-	ca, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 0)
+	ca, err := ssh.NewCA()
 	if err != nil {
 		return nil, err
 	}

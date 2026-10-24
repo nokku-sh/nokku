@@ -18,7 +18,7 @@ export const workspace = {
 		useQuery(
 			WorkspaceService.method.getWorkspace,
 			{},
-			{ select: (res) => res.baseUrl, staleTime: Infinity }
+			{ select: (res) => res.baseUrl, staleTime: Infinity, refetchInterval: false }
 		),
 	// A hosted workspace with no trial or plan. It signs no certificates until the owner subscribes, and is deleted
 	// on deleteAt. The layout's get() keeps it fresh, so opening a page does not refetch it.
@@ -26,7 +26,11 @@ export const workspace = {
 		useQuery(
 			WorkspaceService.method.getWorkspace,
 			{},
-			{ select: (res) => ({ inactive: res.inactive, deleteAt: res.deleteAt }), staleTime: Infinity }
+			{
+				select: (res) => ({ inactive: res.inactive, deleteAt: res.deleteAt }),
+				staleTime: Infinity,
+				refetchInterval: false
+			}
 		),
 
 	update: () => useMutation(WorkspaceService.method.updateWorkspace),
@@ -103,24 +107,29 @@ const cleanFilters = <T extends object>(filters?: T): Partial<T> =>
 	) as Partial<T>;
 
 export const util = {
-	// Public and cheap, so with an interval it doubles as the heartbeat.
-	getVersion: (interval?: () => number) =>
-		useQuery(UtilService.method.getVersion, undefined, () => ({
-			select: (res) => res.version,
-			...(interval && { refetchInterval: interval() })
-		})),
+	// Public and cheap. The footer reads it on every page, so it is also the heartbeat that notices an outage.
+	getVersion: () =>
+		useQuery(UtilService.method.getVersion, undefined, { select: (res) => res.version }),
 	// Who runs this server. Empty fields mean not configured, typical for self-hosting.
 	instanceInfo: () =>
-		useQuery(UtilService.method.getInstanceInfo, undefined, () => ({ staleTime: Infinity })),
+		useQuery(UtilService.method.getInstanceInfo, undefined, () => ({
+			staleTime: Infinity,
+			refetchInterval: false
+		})),
+	// Each page counts the whole filtered log, too heavy for the poll. Focus and new filters refresh it.
 	getLogs: (opts?: () => AuditQuery) =>
-		useQuery(UtilService.method.listAuditLogs, () => {
-			const { filter, limit, offset } = opts?.() ?? {};
-			return {
-				limit: limit ?? MAX_PAGE_SIZE,
-				offset: offset ?? 0,
-				filter: cleanFilters(filter) as AuditFilter
-			};
-		}),
+		useQuery(
+			UtilService.method.listAuditLogs,
+			() => {
+				const { filter, limit, offset } = opts?.() ?? {};
+				return {
+					limit: limit ?? MAX_PAGE_SIZE,
+					offset: offset ?? 0,
+					filter: cleanFilters(filter) as AuditFilter
+				};
+			},
+			{ refetchInterval: false }
+		),
 
 	exportLogs: () =>
 		useMutation(UtilService.method.exportAuditLogs, {
@@ -169,7 +178,7 @@ export function useFeatures() {
 	const features = useQuery(
 		WorkspaceService.method.getWorkspace,
 		{},
-		{ select: (res) => res.features, staleTime: Infinity }
+		{ select: (res) => res.features, staleTime: Infinity, refetchInterval: false }
 	);
 	return (feature: string) => (features.data ? features.data[feature] === true : undefined);
 }

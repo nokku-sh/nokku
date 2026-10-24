@@ -17,17 +17,12 @@
 	import {
 		ActionCell,
 		IdentityCell,
-		MachineCell,
 		StateCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import {
-		CertificateKeyType,
-		type CertificateAuthority
-	} from '#lib/gen/nokku/v1/certificates_pb.js';
-	import { enumLabel } from '#lib/utils.js';
+	import type { CertificateAuthority } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { KeyRound, Plus, Shield, ShieldAlert, ShieldCheck, ShieldOff } from '@lucide/svelte';
 
 	const sheet = useSheet();
@@ -73,20 +68,10 @@
 					? renderComponent(StateCell, { label: 'Active', tone: 'success', icon: ShieldCheck })
 					: renderComponent(StateCell, { label: 'Inactive', tone: 'muted', icon: ShieldOff })
 		}),
-		columnHelper.accessor('keyType', {
-			header: 'Key',
+		columnHelper.accessor('rotatedAt', {
+			header: 'Keys made',
 			meta: { hideBelow: 'md' },
-			cell: ({ row }) => {
-				let label = enumLabel(CertificateKeyType[row.original.keyType]).toLowerCase();
-				if (row.original.keyType !== CertificateKeyType.ED25519 && row.original.keyBits) {
-					label += ` ${row.original.keyBits}`;
-				}
-				return renderComponent(MachineCell, { value: label });
-			}
-		}),
-		columnHelper.accessor('notAfter', {
-			header: 'Valid until',
-			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.notAfter, warnWithin: 30 })
+			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.rotatedAt })
 		}),
 		columnHelper.accessor('createdAt', {
 			header: 'Created',
@@ -122,7 +107,7 @@
 										confirm({
 											title: `Emergency rollover of ${item.name}?`,
 											description:
-												'The current key stops being trusted at once and a new one replaces it. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
+												'The current keys stop being trusted at once and new ones replace them. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
 											confirmText: 'Roll over',
 											typeToConfirm: item.name,
 											onConfirm: () =>

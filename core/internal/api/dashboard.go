@@ -48,7 +48,6 @@ func (s *dashboardService) GetDashboard(
 		pending    []*db.Daemon
 		offline    []*db.Daemon
 		terminals  []*db.GetDaemonsByIDsRow
-		cas        []*db.SSHCA
 		recordings []*db.ListOpenRecordingsRow
 		hours      []*db.AuditActivityByHourRow
 		usedBytes  int64
@@ -68,9 +67,6 @@ func (s *dashboardService) GetDashboard(
 			if terminals, err = q.GetDaemonsByIDs(ctx, ids); err != nil {
 				return err
 			}
-		}
-		if cas, err = q.ListSoonestCAs(ctx); err != nil {
-			return err
 		}
 		if recordings, err = q.ListOpenRecordings(ctx, seenAfter); err != nil {
 			return err
@@ -93,7 +89,6 @@ func (s *dashboardService) GetDashboard(
 		DaemonsOnline:       &counts.DaemonsOnline,
 		RecordingBytes:      &usedBytes,
 		RecordingQuotaBytes: new(s.cfg.Entitlements.Resolve(ctx, wsID).RecordingStorageBytes),
-		SoonestCas:          db.CAsToProto(cas),
 		Activity:            make([]int32, 24),
 		Failures:            make([]int32, 24),
 	}

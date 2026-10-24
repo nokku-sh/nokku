@@ -67,6 +67,8 @@ Prefer to add the package repository yourself? The [package repository](https://
 
 On Linux and Windows, `nk` keeps your SSH key in a TPM 2.0 when the machine has one. The key never leaves the chip. Without a TPM it falls back to a software key that only works on this machine. Pass `--require-tpm` to refuse that fallback.
 
+On macOS the key is a software key by default. `NK_SECURE_ENCLAVE=1` keeps it in the Secure Enclave instead, which is still experimental.
+
 `nk doctor` shows whether a TPM is in use.
 
 > [!NOTE]
@@ -99,7 +101,7 @@ What it does:
 
 - It connects as root with your own `ssh`, so your keys and SSH config apply and a password is asked at most once.
 - It writes the Nokku CA, an sshd drop-in and one principals file per account.
-- It checks the result with `sshd -t` and rolls every file back if sshd rejects it.
+- It checks the result with `sshd -t` and rolls every file back if sshd rejects it, or if the run breaks off halfway.
 - Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
 
 Run it again whenever access changes. `nk sync` and `nk rm` find a server by its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
@@ -114,7 +116,9 @@ nk sync 10.0.0.5 --grant root=me --grant deploy=team:ops,alice@example.com --tag
 - The account has to exist on the server. If it does not, the sync stops and writes nothing.
 - Grants and tags are set once, with the new target. On a server Nokku already knows, both are ignored with a warning, so the web app stays the place to change access.
 
-Every user pins the host key that the last sync saw. When it changed, the sync stops and writes nothing. If you reinstalled the server, run it again with `--accept-host-key` to pin the new one.
+The first sync trusts the server the way your own `ssh` does. When `ssh` asks about the host key, answer as you would for any server. Without a terminal, as in CI, connect once with `ssh root@host` first.
+
+From then on the sync pins the host key it saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key` to pin the new one.
 
 For scripts, `--json` prints one object with the target, the files written and the stale principals files removed. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server cannot know its principals yet, so their files are empty and `grants` lists the subjects per account as you typed them.
 

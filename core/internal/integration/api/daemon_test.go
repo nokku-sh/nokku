@@ -167,7 +167,6 @@ func TestCreateSession(t *testing.T) {
 	_, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
 		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 			Name:      new(uniq("default")),
-			KeyType:   nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519.Enum(),
 			IsDefault: new(true),
 		})
 	require.NoError(t, err)
@@ -255,13 +254,12 @@ func TestCreateSession(t *testing.T) {
 			Name:           "sshtest",
 			PrivateKey:     ca.PrivateKey,
 			PublicKey:      ca.PublicKey,
-			NotBefore:      time.Now().Add(-time.Minute),
-			NotAfter:       time.Now().Add(time.Hour),
-			Lifetime:       time.Hour,
+			HostPrivateKey: ca.HostPrivateKey,
+			HostPublicKey:  ca.HostPublicKey,
 			UserDefaultTtl: ca.UserDefaultTtl,
 			UserMaxTtl:     ca.UserMaxTtl,
-			// The key of the session is made by the server, so every type is let in.
-			AllowedKeyTypes: []nokkuv1.CertificateKeyType{1, 2, 3},
+			HostDefaultTtl: ca.HostDefaultTtl,
+			HostMaxTtl:     ca.HostMaxTtl,
 		})
 		if err != nil {
 			return err
@@ -514,7 +512,6 @@ func seedDefaultCA(
 	created, err := nokkuv1connect.NewCertificateServiceClient(srv.Client(), srv.URL, adminAuth).
 		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 			Name:      new(uniq("default")),
-			KeyType:   nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519.Enum(),
 			IsDefault: new(true),
 		})
 	require.NoError(t, err)
@@ -539,7 +536,6 @@ func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 	create := func(name string, isDefault bool) string {
 		res, err := certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 			Name:      new(uniq(name)),
-			KeyType:   nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA.Enum(),
 			IsDefault: new(isDefault),
 		})
 		require.NoError(t, err)
@@ -584,7 +580,7 @@ func TestSyncDaemonReport(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	caKey := seedDefaultCA(t, srv, adminAuth).GetPublicKey()
+	ca := seedDefaultCA(t, srv, adminAuth)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 
@@ -595,7 +591,13 @@ func TestSyncDaemonReport(t *testing.T) {
 			PrivateIps: []string{"10.0.0.5:4022", "example.com:22", "nonsense"},
 		})
 	require.NoError(t, err)
-	assert.Equal(t, caKey, synced.GetCaPublicKey(), "the daemon trusts the CA of its target")
+	assert.Equal(t, ca.GetPublicKey(), synced.GetCaPublicKey(), "the daemon trusts the CA of its target")
+	assert.Equal(
+		t,
+		ca.GetHostPublicKey(),
+		synced.GetHostCaPublicKey(),
+		"and renews its host certificate from its host key",
+	)
 	assert.True(t, proto.Equal(db.DefaultDaemonConfig(), synced.GetConfig()),
 		"the daemon is told every setting, got %v", synced.GetConfig())
 
@@ -624,7 +626,7 @@ func TestSignHostCertificate(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	caKey := seedDefaultCA(t, srv, adminAuth).GetPublicKey()
+	caKey := seedDefaultCA(t, srv, adminAuth).GetHostPublicKey()
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 
 	hostKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -650,7 +652,7 @@ func TestSignHostCertificate(t *testing.T) {
 	assert.Equal(t, []string{enrolled.GetTargetId()}, cert.ValidPrincipals, "a daemon only signs for its own target")
 	ca, _, _, _, err := ssh.ParseAuthorizedKey([]byte(caKey))
 	require.NoError(t, err)
-	assert.Equal(t, ca.Marshal(), cert.SignatureKey.Marshal(), "signed by the CA of the target")
+	assert.Equal(t, ca.Marshal(), cert.SignatureKey.Marshal(), "signed by the host key of the target's CA")
 }
 
 // Unenrolling removes the daemon and spends its session with it.

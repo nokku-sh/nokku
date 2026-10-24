@@ -57,6 +57,17 @@ CREATE UNIQUE INDEX idx_users_owner ON users (workspace_id)
 WHERE
   role = 5;
 
+-- A picture someone uploaded, kept as a 128px JPEG of a few KB. Apart from users, so their queries never carry it.
+-- Someone an identity provider signs in shows the picture it sends, by its URL in users.picture.
+CREATE TABLE user_avatars (
+  user_id UUID PRIMARY KEY,
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id (),
+  image BYTEA NOT NULL,
+  etag TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
+);
+
 CREATE TABLE credentials (
   id TEXT PRIMARY KEY, -- webauthn credential id or uuidv7
   workspace_id UUID NOT NULL DEFAULT current_workspace_id (),
@@ -95,6 +106,27 @@ CREATE TABLE one_time_tokens (
 CREATE INDEX idx_one_time_tokens_expiry ON one_time_tokens (expires_at);
 
 CREATE INDEX idx_one_time_tokens_user ON one_time_tokens (user_id, purpose);
+
+-- The device flow of nk login. A grant waits here until someone approves or denies it in the browser.
+CREATE TABLE device_grants (
+  device_code_hash TEXT PRIMARY KEY, -- nk polls with the code, so it is kept like a token
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  user_code TEXT NOT NULL, -- what the person types, a handle and no secret, approving takes a session
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied')),
+  user_id UUID, -- who decided
+  approved_method TEXT, -- how the session that approved it signed in, the CLI session inherits it
+  ip TEXT NOT NULL DEFAULT '', -- of whoever started it, the approval page shows it
+  user_agent TEXT NOT NULL DEFAULT '',
+  polled_at TIMESTAMPTZ,
+  violations INTEGER NOT NULL DEFAULT 0, -- polls that came too fast, each widens the interval
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (workspace_id, user_code),
+  CHECK ((status = 'pending') = (user_id IS NULL)),
+  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_device_grants_expiry ON device_grants (expires_at);
 
 CREATE TABLE known_devices (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -195,6 +227,8 @@ CREATE TABLE teams (
   description TEXT,
   tags TEXT[] NOT NULL DEFAULT '{}',
   scim_external_id TEXT, -- the identity provider's id for a group SCIM provisions
+  -- SCIM only sees teams it made or took over. An IdP that syncs deletes every group it does not know.
+  scim_managed BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, id),
@@ -216,30 +250,30 @@ CREATE TABLE ssh_cas (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
-  private_key BYTEA NOT NULL, -- encrypted
-  public_key TEXT NOT NULL, -- OpenSSH wire format
-  previous_public_key TEXT, -- the key before the last rollover
-  previous_trusted_until TIMESTAMPTZ, -- its certificates are trusted until then
-  not_before TIMESTAMPTZ NOT NULL,
-  not_after TIMESTAMPTZ NOT NULL,
+  -- Two Ed25519 keys. The user key signs login certificates, the host key the certificates daemons present.
+  private_key BYTEA NOT NULL, -- user key, encrypted
+  public_key TEXT NOT NULL, -- OpenSSH wire format, what sshd's TrustedUserCAKeys holds
+  host_private_key BYTEA NOT NULL, -- encrypted
+  host_public_key TEXT NOT NULL, -- what @cert-authority in known_hosts holds
+  -- The keys before the last rollover. Their certificates are trusted until previous_trusted_until.
+  previous_public_key TEXT,
+  previous_host_public_key TEXT,
+  previous_trusted_until TIMESTAMPTZ,
+  -- An SSH CA key never expires. It changes only by rollover.
+  rotated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   is_default BOOLEAN NOT NULL DEFAULT FALSE,
-  key_type INTEGER NOT NULL, -- 1=rsa, 2=ecdsa, 3=ed25519
-  key_bits INTEGER NOT NULL,
   -- The settings below have no defaults here. ssh.NewCA holds the one set a new CA starts with.
-  lifetime INTERVAL NOT NULL, -- of the next key, a rollover reads it
   user_default_ttl INTERVAL NOT NULL,
   user_max_ttl INTERVAL NOT NULL,
   force_command TEXT NOT NULL DEFAULT '', -- runs instead of what the user asks for
   source_address TEXT NOT NULL DEFAULT '', -- addresses and CIDRs a login may come from, comma separated
   host_default_ttl INTERVAL NOT NULL,
   host_max_ttl INTERVAL NOT NULL,
-  allowed_key_types INTEGER[] NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
   UNIQUE (workspace_id, id),
-  CHECK (not_before < not_after),
   CHECK (user_default_ttl <= user_max_ttl),
   CHECK (host_default_ttl <= host_max_ttl)
 );
@@ -488,7 +522,7 @@ CREATE TABLE recordings (
   subject_id UUID,
   subject_name TEXT NOT NULL DEFAULT '', -- its email, or the name of a service account, when the session ran
   principal TEXT NOT NULL DEFAULT '',
-  key BYTEA NOT NULL, -- encrypts this recording's frames, stored encrypted
+  key BYTEA NOT NULL, -- encrypts this recording, stored encrypted
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ended_at TIMESTAMPTZ,
   size_bytes BIGINT NOT NULL DEFAULT 0,
@@ -668,9 +702,11 @@ EXECUTE FUNCTION bump_state_version ();
 CREATE TRIGGER bump_state_version_update
 AFTER
 UPDATE OF public_key,
+host_public_key,
 is_active,
 is_default ON ssh_cas FOR EACH ROW WHEN (
   OLD.public_key IS DISTINCT FROM NEW.public_key
+  OR OLD.host_public_key IS DISTINCT FROM NEW.host_public_key
   OR OLD.is_active IS DISTINCT FROM NEW.is_active
   OR OLD.is_default IS DISTINCT FROM NEW.is_default
 )
@@ -709,92 +745,6 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER expire_daemon_token
 AFTER DELETE ON daemons FOR EACH ROW
 EXECUTE FUNCTION expire_daemon_token ();
-
--- Console hints. A change is announced on commit as "<workspace id>:<table>", once per transaction, with no data.
-CREATE FUNCTION notify_change () RETURNS TRIGGER AS $$
-DECLARE
-  r JSONB;
-BEGIN
-  IF TG_OP = 'DELETE' THEN
-    r := to_jsonb(OLD);
-  ELSE
-    r := to_jsonb(NEW);
-  END IF;
-  -- workspaces has no workspace_id, its id is one.
-  PERFORM pg_notify('nokku_change', COALESCE(r ->> 'workspace_id', r ->> 'id') || ':' || TG_TABLE_NAME);
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
--- Sign-ins are left out, no list shows them to others. Keys and SCIM tokens are, see the triggers after the loop.
-DO $$
-DECLARE
-  t TEXT;
-BEGIN
-  FOREACH t IN ARRAY ARRAY[
-    'workspaces',
-    'workspace_subscriptions',
-    'users',
-    'sso_providers',
-    'join_tokens',
-    'join_token_grants',
-    'service_accounts',
-    'daemons',
-    'teams',
-    'team_members',
-    'ssh_cas',
-    'targets',
-    'target_accounts',
-    'grants',
-    'recordings',
-    'legal_holds',
-    'access_requests',
-    'audit_streams'
-  ] LOOP
-    EXECUTE format(
-      'CREATE TRIGGER notify_change AFTER INSERT OR DELETE ON %I
-         FOR EACH ROW EXECUTE FUNCTION notify_change ()',
-      t
-    );
-    -- Stamps move on a timer or with every use, nobody waits for them. Every other column is named, so a
-    -- statement that only stamps does not fire this. One that names a stamp and another column does.
-    EXECUTE format(
-      'CREATE TRIGGER notify_change_update AFTER UPDATE OF %s ON %I
-         FOR EACH ROW WHEN (OLD IS DISTINCT FROM NEW)
-         EXECUTE FUNCTION notify_change ()',
-      (
-        SELECT
-          string_agg(quote_ident(attname), ', ' ORDER BY attnum)
-        FROM
-          pg_attribute
-        WHERE
-          attrelid = t::REGCLASS
-          AND attnum > 0
-          AND NOT attisdropped
-          AND attgenerated = ''
-          AND attname NOT IN ('last_seen_at', 'last_used_at', 'last_sync_at', 'cursor_ts', 'cursor_id', 'last_sent_at')
-      ),
-      t
-    );
-  END LOOP;
-END $$;
-
-CREATE TRIGGER notify_change_insert
-AFTER INSERT ON access_tokens FOR EACH ROW WHEN (NEW.kind IN ('service_account', 'scim'))
-EXECUTE FUNCTION notify_change ();
-
-CREATE TRIGGER notify_change_delete
-AFTER DELETE ON access_tokens FOR EACH ROW WHEN (OLD.kind IN ('service_account', 'scim'))
-EXECUTE FUNCTION notify_change ();
-
--- A gap wider than the online window means this stamp brings the daemon online. Going offline is no write.
-CREATE TRIGGER notify_online
-AFTER
-UPDATE OF last_seen_at ON daemons FOR EACH ROW WHEN (
-  OLD.last_seen_at IS NULL
-  OR NEW.last_seen_at - OLD.last_seen_at > INTERVAL '30 seconds'
-)
-EXECUTE FUNCTION notify_change ();
 
 -- Roles and grants -----------------------------------------------------------
 -- nokku_app serves requests under RLS, nokku_system bypasses it. Neither is a member of the other.
@@ -854,10 +804,12 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'users',
+    'user_avatars',
     'credentials',
     'access_tokens',
     'known_devices',
     'one_time_tokens',
+    'device_grants',
     'sso_providers',
     'workspace_subscriptions',
     'join_tokens',

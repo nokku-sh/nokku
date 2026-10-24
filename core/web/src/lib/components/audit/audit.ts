@@ -108,14 +108,7 @@ export const areas: Area[] = [
 		value: 'sessions',
 		label: 'Sessions',
 		icon: SquareTerminal,
-		actions: [
-			'CreateSession',
-			'CloseSession',
-			'RelayOpen',
-			'RelayClose',
-			'GetRecording',
-			'RecordingScrubFailed'
-		]
+		actions: ['CreateSession', 'CloseSession', 'RelayOpen', 'RelayClose', 'GetRecording']
 	},
 	{
 		value: 'signins',
@@ -140,7 +133,6 @@ export const areas: Area[] = [
 			'DeleteWorkspace',
 			'PutSSOProvider',
 			'DeleteSSOProvider',
-			'SSOTested',
 			'CreateSCIMToken',
 			'DeleteSCIMToken',
 			'CreateLegalHold',
@@ -191,7 +183,6 @@ const labels: Record<string, string> = {
 	SessionIssued: 'Session started',
 	SessionRevoked: 'Session revoked',
 	CredentialAdded: 'Credential added',
-	SSOTested: 'Tested single sign-on',
 	EmailChanged: 'Email changed',
 	UserCreated: 'Account created',
 	UserDeleted: 'Account deleted',
@@ -200,7 +191,6 @@ const labels: Record<string, string> = {
 	RelayOpen: 'Relay opened',
 	RelayClose: 'Relay closed',
 	GetRecording: 'Played a recording',
-	RecordingScrubFailed: 'Recording scrub failed',
 	AddSubjects: 'Granted access',
 	RemoveSubjects: 'Revoked access',
 	RevokeAllAccess: 'Revoked all access',

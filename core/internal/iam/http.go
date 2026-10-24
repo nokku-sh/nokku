@@ -18,9 +18,17 @@ const (
 	sessionSeenEvery = time.Minute
 )
 
+// cookieName prefixes __Host- over https. A browser never takes such a cookie from a sibling host.
+func (s *Service) cookieName(name string) string {
+	if s.secure {
+		return "__Host-" + name
+	}
+	return name
+}
+
 func (s *Service) newCookie(name, value string, expires time.Time) *http.Cookie {
 	return &http.Cookie{ //nolint:gosec // Secure is set dynamically from the base URL scheme
-		Name:     name,
+		Name:     s.cookieName(name),
 		Value:    value,
 		Path:     "/",
 		Expires:  expires,
@@ -34,12 +42,9 @@ func (s *Service) ClearSessionCookie() *http.Cookie {
 	return s.newCookie(sessionCookieName, "", time.Unix(0, 0))
 }
 
-func sessionFromCookie(h http.Header) string {
-	return cookieFromHeader(h, sessionCookieName)
-}
-
-// cookieFromHeader exists because connect only exposes headers, not an [http.Request].
-func cookieFromHeader(h http.Header, name string) string {
+// cookieValue reads headers because connect only exposes those, not an [http.Request].
+func (s *Service) cookieValue(h http.Header, name string) string {
+	name = s.cookieName(name)
 	for _, line := range h.Values("Cookie") {
 		for pair := range strings.SplitSeq(line, ";") {
 			n, v, _ := strings.Cut(pair, "=")
@@ -55,7 +60,7 @@ func cookieFromHeader(h http.Header, name string) string {
 // Middleware attaches a cookie session's principal and continues either way. Header tokens belong to connect.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, tok, err := s.AuthenticateToken(r.Context(), sessionFromCookie(r.Header))
+		p, tok, err := s.AuthenticateToken(r.Context(), s.cookieValue(r.Header, sessionCookieName))
 		if err != nil || p.Kind != actor.KindUser {
 			next.ServeHTTP(w, r)
 			return

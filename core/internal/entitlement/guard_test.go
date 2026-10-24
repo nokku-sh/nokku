@@ -149,7 +149,7 @@ func TestGuard_DeniesAFeatureThePlanLacks(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
-	assert.ErrorContains(t, err, "audit log export is not available on the Community plan")
+	assert.ErrorContains(t, err, "Audit log export is not available on the Community plan")
 }
 
 func TestGuard_AllowsPaidPlanAndUnpinnedContext(t *testing.T) {

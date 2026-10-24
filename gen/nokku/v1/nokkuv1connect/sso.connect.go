@@ -42,8 +42,6 @@ const (
 	// SSOServiceDeleteSSOProviderProcedure is the fully-qualified name of the SSOService's
 	// DeleteSSOProvider RPC.
 	SSOServiceDeleteSSOProviderProcedure = "/nokku.v1.SSOService/DeleteSSOProvider"
-	// SSOServiceGetSSOTestProcedure is the fully-qualified name of the SSOService's GetSSOTest RPC.
-	SSOServiceGetSSOTestProcedure = "/nokku.v1.SSOService/GetSSOTest"
 )
 
 // SSOServiceClient is a client for the nokku.v1.SSOService service.
@@ -51,8 +49,6 @@ type SSOServiceClient interface {
 	ListSSOProviders(context.Context, *v1.ListSSOProvidersRequest) (*v1.ListSSOProvidersResponse, error)
 	PutSSOProvider(context.Context, *v1.PutSSOProviderRequest) (*v1.PutSSOProviderResponse, error)
 	DeleteSSOProvider(context.Context, *v1.DeleteSSOProviderRequest) (*v1.DeleteSSOProviderResponse, error)
-	// GetSSOTest returns a test sign-in, only to the owner who ran it.
-	GetSSOTest(context.Context, *v1.GetSSOTestRequest) (*v1.GetSSOTestResponse, error)
 }
 
 // NewSSOServiceClient constructs a client for the nokku.v1.SSOService service. By default, it uses
@@ -85,13 +81,6 @@ func NewSSOServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(sSOServiceMethods.ByName("DeleteSSOProvider")),
 			connect.WithClientOptions(opts...),
 		),
-		getSSOTest: connect.NewClient[v1.GetSSOTestRequest, v1.GetSSOTestResponse](
-			httpClient,
-			baseURL+SSOServiceGetSSOTestProcedure,
-			connect.WithSchema(sSOServiceMethods.ByName("GetSSOTest")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -100,7 +89,6 @@ type sSOServiceClient struct {
 	listSSOProviders  *connect.Client[v1.ListSSOProvidersRequest, v1.ListSSOProvidersResponse]
 	putSSOProvider    *connect.Client[v1.PutSSOProviderRequest, v1.PutSSOProviderResponse]
 	deleteSSOProvider *connect.Client[v1.DeleteSSOProviderRequest, v1.DeleteSSOProviderResponse]
-	getSSOTest        *connect.Client[v1.GetSSOTestRequest, v1.GetSSOTestResponse]
 }
 
 // ListSSOProviders calls nokku.v1.SSOService.ListSSOProviders.
@@ -130,22 +118,11 @@ func (c *sSOServiceClient) DeleteSSOProvider(ctx context.Context, req *v1.Delete
 	return nil, err
 }
 
-// GetSSOTest calls nokku.v1.SSOService.GetSSOTest.
-func (c *sSOServiceClient) GetSSOTest(ctx context.Context, req *v1.GetSSOTestRequest) (*v1.GetSSOTestResponse, error) {
-	response, err := c.getSSOTest.CallUnary(ctx, connect.NewRequest(req))
-	if response != nil {
-		return response.Msg, err
-	}
-	return nil, err
-}
-
 // SSOServiceHandler is an implementation of the nokku.v1.SSOService service.
 type SSOServiceHandler interface {
 	ListSSOProviders(context.Context, *v1.ListSSOProvidersRequest) (*v1.ListSSOProvidersResponse, error)
 	PutSSOProvider(context.Context, *v1.PutSSOProviderRequest) (*v1.PutSSOProviderResponse, error)
 	DeleteSSOProvider(context.Context, *v1.DeleteSSOProviderRequest) (*v1.DeleteSSOProviderResponse, error)
-	// GetSSOTest returns a test sign-in, only to the owner who ran it.
-	GetSSOTest(context.Context, *v1.GetSSOTestRequest) (*v1.GetSSOTestResponse, error)
 }
 
 // NewSSOServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -174,13 +151,6 @@ func NewSSOServiceHandler(svc SSOServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(sSOServiceMethods.ByName("DeleteSSOProvider")),
 		connect.WithHandlerOptions(opts...),
 	)
-	sSOServiceGetSSOTestHandler := connect.NewUnaryHandlerSimple(
-		SSOServiceGetSSOTestProcedure,
-		svc.GetSSOTest,
-		connect.WithSchema(sSOServiceMethods.ByName("GetSSOTest")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/nokku.v1.SSOService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SSOServiceListSSOProvidersProcedure:
@@ -189,8 +159,6 @@ func NewSSOServiceHandler(svc SSOServiceHandler, opts ...connect.HandlerOption) 
 			sSOServicePutSSOProviderHandler.ServeHTTP(w, r)
 		case SSOServiceDeleteSSOProviderProcedure:
 			sSOServiceDeleteSSOProviderHandler.ServeHTTP(w, r)
-		case SSOServiceGetSSOTestProcedure:
-			sSOServiceGetSSOTestHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -210,8 +178,4 @@ func (UnimplementedSSOServiceHandler) PutSSOProvider(context.Context, *v1.PutSSO
 
 func (UnimplementedSSOServiceHandler) DeleteSSOProvider(context.Context, *v1.DeleteSSOProviderRequest) (*v1.DeleteSSOProviderResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.SSOService.DeleteSSOProvider is not implemented"))
-}
-
-func (UnimplementedSSOServiceHandler) GetSSOTest(context.Context, *v1.GetSSOTestRequest) (*v1.GetSSOTestResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.SSOService.GetSSOTest is not implemented"))
 }

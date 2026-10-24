@@ -33,6 +33,8 @@ type Synced struct {
 	Principals  []*nokkuv1.AccountPrincipals
 	CAPublicKey string
 	RetiredCAs  []*nokkuv1.RetiredCAKey
+	// HostCAPublicKey is the key the daemon's host certificate has to come from.
+	HostCAPublicKey string
 }
 
 func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
@@ -85,6 +87,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		}
 		if err == nil {
 			res.CAPublicKey = ca.PublicKey
+			res.HostCAPublicKey = ca.HostPublicKey
 			if ca.PreviousPublicKey != nil && ca.PreviousTrustedUntil != nil &&
 				time.Now().Before(*ca.PreviousTrustedUntil) {
 				res.RetiredCAs = []*nokkuv1.RetiredCAKey{{

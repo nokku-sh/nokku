@@ -1,7 +1,6 @@
 package iam
 
 import (
-	"context"
 	"crypto"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -9,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 	"strings"
@@ -19,24 +19,33 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/cache"
 )
 
-var allowedAlgs = []jose.SignatureAlgorithm{
-	jose.EdDSA, jose.ES256, jose.ES384, jose.ES512, jose.RS256, jose.PS256,
-}
+// allowedAlgs is what nk and nokkud sign with, a P-256 key in a TPM or the Secure Enclave.
+var allowedAlgs = []jose.SignatureAlgorithm{jose.ES256}
 
 const (
 	dpopNonceTTL = 5 * time.Minute
 	dpopMaxSkew  = time.Minute
 	// A marker lives three minutes, so this is room for about 550 proofs a second.
-	dpopReplayEntries     = 100_000
-	dpopAnonReplayEntries = 10_000
+	dpopReplayEntries = 100_000
 )
 
-// DPoPVerifier nonces are a stateless HMAC over a time bucket. Nothing else can fill its replay caches.
+// DPoPVerifier nonces are a stateless HMAC over a time bucket. Only proofs of a session fill its replay cache.
 type DPoPVerifier struct {
-	secret     []byte
-	replay     *cache.Memory
-	anonReplay *cache.Memory
-	now        func() time.Time
+	secret []byte
+	replay *cache.TTL[[32]byte, struct{}]
+	now    func() time.Time
+}
+
+// DPoPProof is the request's proof, "" without one. Two DPoP headers are refused (RFC 9449 section 4.3).
+func DPoPProof(h http.Header) (string, error) {
+	proofs := h.Values("DPoP")
+	if len(proofs) > 1 {
+		return "", fmt.Errorf("%w: more than one DPoP header", errInvalidProof)
+	}
+	if len(proofs) == 0 {
+		return "", nil
+	}
+	return proofs[0], nil
 }
 
 func (v *DPoPVerifier) CurrentNonce() string {
@@ -61,10 +70,7 @@ func (v *DPoPVerifier) nonceValid(nonce string) bool {
 }
 
 // Verify returns the proof key's thumbprint (jkt). A binding has to match it before the jti takes room in the store.
-func (v *DPoPVerifier) Verify(
-	ctx context.Context,
-	proofJWT, accessToken, htm, htu, binding string,
-) (string, error) {
+func (v *DPoPVerifier) Verify(proofJWT, accessToken, htm, htu, binding string) (string, error) {
 	sig, err := jose.ParseSigned(proofJWT, allowedAlgs)
 	if err != nil {
 		return "", fmt.Errorf("%w: parse: %w", errInvalidProof, err)
@@ -111,10 +117,7 @@ func (v *DPoPVerifier) Verify(
 	if c.Nonce == "" || !v.nonceValid(c.Nonce) {
 		return "", ErrDPoPNonce
 	}
-	// Enrollment proofs have no access token yet.
-	replay := v.anonReplay
 	if accessToken != "" {
-		replay = v.replay
 		wantATH := DPoPATH(accessToken)
 		if subtle.ConstantTimeCompare([]byte(c.ATH), []byte(wantATH)) != 1 {
 			return "", fmt.Errorf("%w: ath mismatch", errInvalidProof)
@@ -129,29 +132,24 @@ func (v *DPoPVerifier) Verify(
 	if binding != "" && jkt != binding {
 		return "", errBindingMismatch
 	}
+	// A proof without a session is for enrollment or the device poll, and each spends something single-use. Anyone
+	// can sign one, so it gets no room in the store.
+	if accessToken == "" {
+		return jkt, nil
+	}
 
 	// Hashed so a long jti cannot bloat the store.
-	jti := sha256.Sum256([]byte(c.JTI))
-	// The iat check takes a proof for 2*dpopMaxSkew at most. The third is slack for a wall clock that steps back.
-	added, err := replay.SetNX(ctx, string(jti[:]), nil, 3*dpopMaxSkew)
-	if err != nil {
-		// The proof may be fine, so this is no errInvalidProof.
-		return "", fmt.Errorf("dpop replay store: %w", err)
-	}
-	if !added {
+	if !v.replay.SetNX(sha256.Sum256([]byte(c.JTI)), struct{}{}) {
 		return "", errReplay
 	}
 	return jkt, nil
 }
 
-func (v *DPoPVerifier) verifySession(
-	ctx context.Context,
-	proofJWT, accessToken, htm, htu, binding string,
-) error {
+func (v *DPoPVerifier) verifySession(proofJWT, accessToken, htm, htu, binding string) error {
 	if binding == "" {
 		return fmt.Errorf("%w: session is not DPoP-bound", errInvalidProof)
 	}
-	_, err := v.Verify(ctx, proofJWT, accessToken, htm, htu, binding)
+	_, err := v.Verify(proofJWT, accessToken, htm, htu, binding)
 	return err
 }
 

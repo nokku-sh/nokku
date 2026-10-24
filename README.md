@@ -31,7 +31,7 @@ That is the whole workflow. No new SSH client and no `authorized_keys` to clean 
 - **No passwords anywhere.** People sign in with a passkey, Google, Microsoft or any OIDC provider.
 - **Access you can read.** This person or team, on this server, as this account. A revoke applies at once.
 - **Access that runs out.** On the paid plans, grant a server for an hour or a week, or let people ask and an admin approve. It ends by itself.
-- **Keys that stay in hardware.** Your SSH key lives in a TPM 2.0 when the machine has one and never leaves the chip.
+- **Keys that stay in hardware.** On Linux and Windows your SSH key lives in a TPM 2.0 when the machine has one and never leaves the chip. On macOS the Secure Enclave is experimental, so a Mac uses a software key unless you turn it on.
 - **No bastion in the path.** Every server serves its own SSH connections, and keeps doing so when the core is down.
 - **No open ports needed.** A server behind NAT is reached through the relay, encrypted end to end.
 - **Recorded sessions and an audit log.** Recordings are encrypted before they are stored. On the paid plans, stream the log to your SIEM and export who can reach what for your auditor.

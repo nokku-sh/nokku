@@ -88,6 +88,9 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 		}
 		return a.daemonAccepted(ctx, caller.ID, procedure)
 	}
+	if access.GetPeopleOnly() && caller.Kind == actor.KindServiceAccount {
+		return db.ErrPermissionDenied
+	}
 	if access.GetSelf() {
 		return nil
 	}

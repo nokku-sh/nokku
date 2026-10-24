@@ -231,21 +231,15 @@ Any SMTP relay works. Without email, people sign in with passkeys or an identity
 <details>
 <summary><b>File storage</b></summary>
 
-Avatars and session recordings go to a local folder by default. Recordings are encrypted before they are stored, whichever you pick.
+Session recordings go to a local folder by default. They are encrypted before they are stored, wherever that is. Avatars live in the database.
 
-| Variable                     | Default        | Purpose                                         |
-| ---------------------------- | -------------- | ----------------------------------------------- |
-| `NOKKU_STORAGE`              | `local`        | `local` or `s3`                                 |
-| `NOKKU_LOCAL_STORAGE_PATH`   | `data`         | Folder for local storage                        |
-| `NOKKU_S3_ENDPOINT`          |                | Any S3-compatible endpoint                      |
-| `NOKKU_S3_ACCESS_KEY_ID`     |                | Access key                                      |
-| `NOKKU_S3_SECRET_ACCESS_KEY` |                | Secret key                                      |
-| `NOKKU_S3_BUCKET`            | `nokku-assets` | Bucket                                          |
-| `NOKKU_S3_REGION`            | `auto`         | Region                                          |
-| `NOKKU_S3_USE_PATH_STYLE`    | `false`        | Path-style addressing, for MinIO                |
-| `NOKKU_S3_PUBLIC_URL`        |                | Public base URL, to serve avatars from the bucket |
+| Variable                | Default         | Purpose                                     |
+| ----------------------- | --------------- | ------------------------------------------- |
+| `NOKKU_STORAGE_URL`     | `file://./data` | Where recordings go, a folder or a bucket   |
+| `AWS_ACCESS_KEY_ID`     |                 | S3 access key, with an `s3://` URL          |
+| `AWS_SECRET_ACCESS_KEY` |                 | S3 secret key                               |
 
-Read [the note on bucket permissions](./SECURITY.md#file-storage) before you set `NOKKU_S3_PUBLIC_URL`.
+A folder is `file:///data`, created when it is missing. A bucket is `s3://nokku?region=auto&endpoint=https%3A%2F%2Fs3.example.com&use_path_style=true`. Leave out `endpoint` for AWS itself, `use_path_style` is for MinIO. The URL takes the parameters of [gocloud's S3 driver](https://gocloud.dev/howto/blob/#s3).
 
 </details>
 

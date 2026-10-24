@@ -10,7 +10,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { LicensePurchaseURL, LicenseTrialURL } from '#lib/config.js';
 	import type { GetBillingResponse } from '#lib/gen/nokku/v1/billing_pb.js';
-	import { planName } from '#lib/plans.js';
+	import { usePlans } from '#lib/plans.js';
 	import type { Tone } from '#lib/tone.js';
 	import { formatTs } from '#lib/utils.js';
 	import { ExternalLink, KeyRound, ShieldAlert } from '@lucide/svelte';
@@ -18,6 +18,7 @@
 	let { billing, isOwner }: { billing: GetBillingResponse; isOwner: boolean } = $props();
 
 	const data = license.get();
+	const plans = usePlans();
 	const activate = license.activate();
 
 	const status = $derived(licenseStatus(data.data));
@@ -82,7 +83,7 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-xl font-semibold">
-				<h2>{planName(plan)} plan</h2>
+				<h2>{plans.planName(plan)} plan</h2>
 			</Card.Title>
 			<Card.Description>
 				{#if phase === 'none'}

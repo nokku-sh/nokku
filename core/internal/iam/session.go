@@ -149,7 +149,7 @@ func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding stri
 // RememberDevice returns nil for a browser the account has used before. A new one gets a cookie and a mail.
 func (s *Service) RememberDevice(ctx context.Context, header http.Header, remoteAddr string, u *db.User) *http.Cookie {
 	name := deviceCookiePrefix + u.ID
-	if raw := cookieFromHeader(header, name); raw != "" && s.seenDevice(ctx, u.ID, deviceKey(raw)) {
+	if raw := s.cookieValue(header, name); raw != "" && s.seenDevice(ctx, u.ID, deviceKey(raw)) {
 		return nil
 	}
 	token := crypto.RandomString(32)
@@ -313,4 +313,26 @@ func (s *Service) touchCredential(ctx context.Context, id string) {
 	if err != nil {
 		slog.Warn("failed to mark credential used", "error", err)
 	}
+}
+
+// recentSignIn is how old a browser session may be to add a way in or to move the account to another address.
+const recentSignIn = 10 * time.Minute
+
+// errSignInAgain is a session too old for what it asked. RequireRecentSignIn has ended it already.
+var errSignInAgain = errors.New("sign in again to continue")
+
+// RequireRecentSignIn takes a fresh browser session, so a stolen cookie cannot become a lasting passkey or a new
+// address. An old one ends here, so the sign-in page lets the browser in again instead of sending it straight back.
+func (s *Service) RequireRecentSignIn(ctx context.Context) error {
+	tok, ok := CurrentToken(ctx)
+	if !ok || tok.Kind != string(actor.KindUser) {
+		return errSignInAgain
+	}
+	if s.now().Sub(tok.CreatedAt) <= recentSignIn {
+		return nil
+	}
+	if err := s.conn.Tenant().DeleteAccessToken(ctx, tok.ID); err != nil {
+		return err
+	}
+	return errSignInAgain
 }

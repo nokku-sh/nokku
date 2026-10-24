@@ -1,13 +1,20 @@
 package client
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"encoding/pem"
 	"io"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,4 +101,46 @@ func TestOfferRemovalWithoutATerminal(t *testing.T) {
 		"The CA of https://nokku.test stays in the system trust store")
 
 	assert.Empty(t, output(t, func() { OfferRemoval(&state.State{APIURL: "https://nokku.test"}) }))
+}
+
+func selfSignedCA(t *testing.T, tmpl *x509.Certificate) *x509.Certificate {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	tmpl.SerialNumber = big.NewInt(1)
+	tmpl.IsCA, tmpl.BasicConstraintsValid = true, true
+	tmpl.NotBefore, tmpl.NotAfter = time.Now(), time.Now().Add(time.Hour)
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+	cert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	return cert
+}
+
+func TestScopedTo(t *testing.T) {
+	t.Parallel()
+	noIPs := []*net.IPNet{
+		{IP: net.IP{0, 0, 0, 0}, Mask: net.CIDRMask(0, 32)},
+		{IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)},
+	}
+	// The shape of the core's built-in CA, see core/internal/webpki.
+	builtin := selfSignedCA(t, &x509.Certificate{
+		PermittedDNSDomainsCritical: true,
+		PermittedDNSDomains:         []string{"nokku.example.com"},
+		ExcludedIPRanges:            noIPs,
+	})
+	assert.True(t, scopedTo(builtin, "nokku.example.com"))
+	assert.True(t, scopedTo(builtin, "NOKKU.example.com"))
+	assert.False(t, scopedTo(builtin, "other.example.com"))
+
+	assert.False(t, scopedTo(selfSignedCA(t, &x509.Certificate{}), "nokku.example.com"), "an unconstrained root")
+	assert.False(t, scopedTo(selfSignedCA(t, &x509.Certificate{
+		PermittedDNSDomainsCritical: true,
+		PermittedDNSDomains:         []string{"nokku.example.com"},
+	}), "nokku.example.com"), "a root that still vouches for any IP address")
+	assert.False(t, scopedTo(selfSignedCA(t, &x509.Certificate{
+		PermittedDNSDomainsCritical: true,
+		PermittedDNSDomains:         []string{"nokku.example.com", "example.org"},
+		ExcludedIPRanges:            noIPs,
+	}), "nokku.example.com"), "a root for more names than this server")
 }

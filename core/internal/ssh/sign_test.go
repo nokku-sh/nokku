@@ -1,7 +1,9 @@
 package ssh
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"maps"
@@ -10,8 +12,6 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
-
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -35,9 +35,13 @@ func TestSignCertificate_Errors(t *testing.T) {
 
 	badCA := &db.SSHCA{PrivateKey: []byte("garbage")}
 
-	rsaOnly := newTestCA(t)
-	rsaOnly.AllowedKeyTypes = []nokkuv1.CertificateKeyType{
-		nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA,
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 3072)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsaPub, err := MarshalPubKey(&rsaKey.PublicKey)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	tests := []struct {
@@ -48,7 +52,7 @@ func TestSignCertificate_Errors(t *testing.T) {
 	}{
 		{"invalid CA key", badCA, clientKey, "CA signer"},
 		{"invalid public key", ca, "not-a-key", "public key"},
-		{"disallowed key type", rsaOnly, clientKey, "not allowed"},
+		{"RSA key", ca, rsaPub, "not accepted"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,65 +86,34 @@ func TestBoundTTL(t *testing.T) {
 	}
 }
 
-func TestIsAllowedKeyType_WeakRSA(t *testing.T) {
-	key, err := rsa.GenerateKey(rand.Reader, 1024)
+func TestAcceptedKey(t *testing.T) {
+	_, ed, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pub, err := ssh.NewPublicKey(&key.PublicKey)
+	ec, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	allowed := []nokkuv1.CertificateKeyType{nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA}
-	if err := isAllowedKeyType(allowed, pub); err == nil || !strings.Contains(err.Error(), "2048") {
-		t.Errorf("error = %v, want weak-key rejection", err)
-	}
-
-	key2048, err := rsa.GenerateKey(rand.Reader, 2048)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 3072)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pub2048, err := ssh.NewPublicKey(&key2048.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := isAllowedKeyType(allowed, pub2048); err != nil {
-		t.Errorf("2048-bit RSA rejected: %v", err)
-	}
-}
-
-func TestGetKeyType(t *testing.T) {
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	edPub, _ := ssh.NewPublicKey(priv.Public())
-
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rsaPub, _ := ssh.NewPublicKey(&rsaKey.PublicKey)
-
-	tests := []struct {
-		name string
-		pub  ssh.PublicKey
-		want nokkuv1.CertificateKeyType
+	for name, tc := range map[string]struct {
+		key    any
+		accept bool
 	}{
-		{"ed25519", edPub, nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519},
-		{"rsa", rsaPub, nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := getKeyType(tt.pub)
-			if err != nil {
-				t.Fatalf("getKeyType() error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("getKeyType() = %v, want %v", got, tt.want)
-			}
-		})
+		"ed25519": {ed.Public(), true},
+		"p-256":   {&ec.PublicKey, true},
+		"rsa":     {&rsaKey.PublicKey, false},
+	} {
+		pub, err := ssh.NewPublicKey(tc.key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := acceptedKey(pub) == nil; got != tc.accept {
+			t.Errorf("acceptedKey(%s) = %v, want %v", name, got, tc.accept)
+		}
 	}
 }
 
@@ -206,7 +179,9 @@ func TestSignUserCertificate(t *testing.T) {
 	if v := validity(cert); v < 24*time.Hour || v > 24*time.Hour+2*time.Minute {
 		t.Errorf("expected ~24h validity, got %v", v)
 	}
-	checkCert(t, ca, cert, "user-123")
+	if err := checkCert(t, ca, cert, "user-123"); err != nil {
+		t.Fatalf("certificate failed verification: %v", err)
+	}
 }
 
 func TestSignHostCertificate(t *testing.T) {
@@ -234,7 +209,9 @@ func TestSignHostCertificate(t *testing.T) {
 	if v := validity(cert); v < 2160*time.Hour || v > 2160*time.Hour+2*time.Minute {
 		t.Errorf("expected ~2160h validity, got %v", v)
 	}
-	checkCert(t, ca, cert, "target-123")
+	if err := checkCert(t, ca, cert, "target-123"); err != nil {
+		t.Fatalf("certificate failed verification: %v", err)
+	}
 }
 
 func TestSignCertificateTTLBounds(t *testing.T) {
@@ -268,22 +245,25 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 	}
 }
 
-func TestSignCertificateRespectsAllowedKeyTypes(t *testing.T) {
+// A user certificate never vouches for a host, a host certificate never logs anyone in.
+func TestSignCertificateKeepsTheKeysApart(t *testing.T) {
 	ca := newTestCA(t)
-	ca.AllowedKeyTypes = []nokkuv1.CertificateKeyType{
-		nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519,
-	}
+	swapped := *ca
+	swapped.PublicKey, swapped.HostPublicKey = ca.HostPublicKey, ca.PublicKey
 
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	user, err := SignCertificate(ca, newTestKey(t), []string{"u"}, "k", 0, ssh.UserCert)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rsaPub, err := MarshalPubKey(&rsaKey.PublicKey)
+	if checkCert(t, &swapped, user, "u") == nil {
+		t.Error("a user certificate verified against the host key")
+	}
+	host, err := SignCertificate(ca, newTestKey(t), []string{"target-1"}, "k", 0, ssh.HostCert)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SignCertificate(ca, rsaPub, []string{"u"}, "k", 0, 0); err == nil {
-		t.Error("expected RSA key to be rejected by ED25519-only policy")
+	if checkCert(t, &swapped, host, "target-1") == nil {
+		t.Error("a host certificate verified against the user key")
 	}
 }
 

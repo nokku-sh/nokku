@@ -1,10 +1,5 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 
-type HTTPErrorBody = {
-	code?: number;
-	message?: string;
-};
-
 type ValidationError = {
 	field: string;
 	message: string;
@@ -108,46 +103,6 @@ const getDefaultDescription = (code: Code): string | undefined => {
 			return 'Data was lost or corrupted.';
 		default:
 			return undefined;
-	}
-};
-
-export const parseHTTPError = async (response: Response): Promise<ConnectError> => {
-	try {
-		const body: HTTPErrorBody = await response.json();
-		const code =
-			typeof body.code === 'number'
-				? httpStatusToCode(body.code)
-				: httpStatusToCode(response.status);
-		return new ConnectError(body.message ?? response.statusText, code);
-	} catch {
-		return new ConnectError(response.statusText, httpStatusToCode(response.status));
-	}
-};
-
-const httpStatusToCode = (status: number): Code => {
-	switch (status) {
-		case 400:
-			return Code.InvalidArgument;
-		case 401:
-			return Code.Unauthenticated;
-		case 403:
-			return Code.PermissionDenied;
-		case 404:
-			return Code.NotFound;
-		case 409:
-			return Code.AlreadyExists;
-		case 429:
-			return Code.ResourceExhausted;
-		case 499:
-			return Code.Canceled;
-		case 501:
-			return Code.Unimplemented;
-		case 503:
-			return Code.Unavailable;
-		case 504:
-			return Code.DeadlineExceeded;
-		default:
-			return Code.Internal;
 	}
 };
 

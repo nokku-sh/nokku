@@ -63,9 +63,6 @@ const (
 	// WorkspaceServiceCreateWorkspaceProcedure is the fully-qualified name of the WorkspaceService's
 	// CreateWorkspace RPC.
 	WorkspaceServiceCreateWorkspaceProcedure = "/nokku.v1.WorkspaceService/CreateWorkspace"
-	// WorkspaceServiceSubscribeChangesProcedure is the fully-qualified name of the WorkspaceService's
-	// SubscribeChanges RPC.
-	WorkspaceServiceSubscribeChangesProcedure = "/nokku.v1.WorkspaceService/SubscribeChanges"
 )
 
 // WorkspaceServiceClient is a client for the nokku.v1.WorkspaceService service.
@@ -80,7 +77,6 @@ type WorkspaceServiceClient interface {
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
 	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
-	SubscribeChanges(context.Context, *v1.SubscribeChangesRequest) (*connect.ServerStreamForClient[v1.SubscribeChangesResponse], error)
 }
 
 // NewWorkspaceServiceClient constructs a client for the nokku.v1.WorkspaceService service. By
@@ -157,12 +153,6 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("CreateWorkspace")),
 			connect.WithClientOptions(opts...),
 		),
-		subscribeChanges: connect.NewClient[v1.SubscribeChangesRequest, v1.SubscribeChangesResponse](
-			httpClient,
-			baseURL+WorkspaceServiceSubscribeChangesProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("SubscribeChanges")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -178,7 +168,6 @@ type workspaceServiceClient struct {
 	deleteUser        *connect.Client[v1.DeleteUserRequest, v1.DeleteUserResponse]
 	transferOwnership *connect.Client[v1.TransferOwnershipRequest, v1.TransferOwnershipResponse]
 	createWorkspace   *connect.Client[v1.CreateWorkspaceRequest, v1.CreateWorkspaceResponse]
-	subscribeChanges  *connect.Client[v1.SubscribeChangesRequest, v1.SubscribeChangesResponse]
 }
 
 // GetWorkspace calls nokku.v1.WorkspaceService.GetWorkspace.
@@ -271,11 +260,6 @@ func (c *workspaceServiceClient) CreateWorkspace(ctx context.Context, req *v1.Cr
 	return nil, err
 }
 
-// SubscribeChanges calls nokku.v1.WorkspaceService.SubscribeChanges.
-func (c *workspaceServiceClient) SubscribeChanges(ctx context.Context, req *v1.SubscribeChangesRequest) (*connect.ServerStreamForClient[v1.SubscribeChangesResponse], error) {
-	return c.subscribeChanges.CallServerStream(ctx, connect.NewRequest(req))
-}
-
 // WorkspaceServiceHandler is an implementation of the nokku.v1.WorkspaceService service.
 type WorkspaceServiceHandler interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
@@ -288,7 +272,6 @@ type WorkspaceServiceHandler interface {
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
 	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
-	SubscribeChanges(context.Context, *v1.SubscribeChangesRequest, *connect.ServerStream[v1.SubscribeChangesResponse]) error
 }
 
 // NewWorkspaceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -361,12 +344,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("CreateWorkspace")),
 		connect.WithHandlerOptions(opts...),
 	)
-	workspaceServiceSubscribeChangesHandler := connect.NewServerStreamHandlerSimple(
-		WorkspaceServiceSubscribeChangesProcedure,
-		svc.SubscribeChanges,
-		connect.WithSchema(workspaceServiceMethods.ByName("SubscribeChanges")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/nokku.v1.WorkspaceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case WorkspaceServiceGetWorkspaceProcedure:
@@ -389,8 +366,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceTransferOwnershipHandler.ServeHTTP(w, r)
 		case WorkspaceServiceCreateWorkspaceProcedure:
 			workspaceServiceCreateWorkspaceHandler.ServeHTTP(w, r)
-		case WorkspaceServiceSubscribeChangesProcedure:
-			workspaceServiceSubscribeChangesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -438,8 +413,4 @@ func (UnimplementedWorkspaceServiceHandler) TransferOwnership(context.Context, *
 
 func (UnimplementedWorkspaceServiceHandler) CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.CreateWorkspace is not implemented"))
-}
-
-func (UnimplementedWorkspaceServiceHandler) SubscribeChanges(context.Context, *v1.SubscribeChangesRequest, *connect.ServerStream[v1.SubscribeChangesResponse]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.WorkspaceService.SubscribeChanges is not implemented"))
 }

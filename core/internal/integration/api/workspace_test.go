@@ -3,9 +3,16 @@
 package api_test
 
 import (
+	"bytes"
+	"image"
+	"image/jpeg"
+	imgpng "image/png"
+	"net/http"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,7 +20,6 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/storage"
 )
 
 func TestTransferOwnership(t *testing.T) {
@@ -66,21 +72,61 @@ func TestTransferOwnershipAfterTheOwnerRowMoved(t *testing.T) {
 	assert.Equal(t, member.ID, seedOwner(t, cfg).ID)
 }
 
-func TestDeleteUserRemovesTheAvatar(t *testing.T) {
+// An avatar is kept in the database, shown to a session of the workspace only, and gone with its account.
+func TestAvatar(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ws := seedWorkspace(t, cfg)
 	user := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	avatar := storage.AvatarPath(user.ID)
-	_, err := cfg.Storage.Store(t.Context(), avatar, []byte("jpeg"), storage.StoreOptions{ContentType: "image/jpeg"})
+	token := sessionFor(t, cfg, user)
+
+	// A transparent, wider than tall PNG. The server crops it to a square.
+	var png bytes.Buffer
+	require.NoError(t, imgpng.Encode(&png, image.NewNRGBA(image.Rect(0, 0, 300, 200))))
+	set, err := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+token)).
+		SetAvatar(t.Context(), &nokkuv1.SetAvatarRequest{Image: png.Bytes()})
 	require.NoError(t, err)
+	picture := set.GetUser().GetPicture()
+	require.True(t, strings.HasPrefix(picture, "/avatars/"+user.ID+"?v="), "picture is %q", picture)
+
+	get := func(cookie string) *http.Response {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+picture, nil)
+		require.NoError(t, err)
+		if cookie != "" {
+			req.Header.Set("Cookie", "nokku_session="+cookie)
+		}
+		resp, err := srv.Client().Do(req)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = resp.Body.Close() })
+		return resp
+	}
+
+	resp := get(token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "image/jpeg", resp.Header.Get("Content-Type"))
+	img, err := jpeg.Decode(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, image.Rect(0, 0, 128, 128), img.Bounds())
+
+	assert.NotEqual(t, http.StatusOK, get("").StatusCode, "an avatar without a session")
 
 	admin := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL,
 		header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
 	_, err = admin.DeleteUser(t.Context(), &nokkuv1.DeleteUserRequest{UserId: &user.ID})
 	require.NoError(t, err)
+	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+		_, err := q.GetAvatar(t.Context(), user.ID)
+		assert.ErrorIs(t, err, pgx.ErrNoRows, "the photo outlived the account")
+		return nil
+	})
+}
 
-	_, err = cfg.Storage.Reader(t.Context(), avatar)
-	assert.Error(t, err, "the photo outlived the account")
+func TestAvatarRefusesWhatIsNoImage(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	user := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	_, err := nokkuv1connect.NewAccountServiceClient(srv.Client(), srv.URL,
+		header("Authorization", "Bearer "+sessionFor(t, cfg, user))).
+		SetAvatar(t.Context(), &nokkuv1.SetAvatarRequest{Image: []byte("<svg onload=alert(1)>")})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
 }
 
 // Admins manage users below them and never the owner or themselves.
@@ -146,37 +192,4 @@ func TestSelfHostHasOneWorkspace(t *testing.T) {
 			Slug: new("acme"), Name: new("Acme"), OwnerEmail: new("o@acme.test"),
 		})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "got %v", err)
-}
-
-func TestSubscribeChangesHearsAWrite(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	ws := seedWorkspace(t, cfg)
-	ctx, call := connect.NewClientContext(t.Context())
-	call.RequestHeader().
-		Set("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER))
-	stream, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL).
-		SubscribeChanges(ctx, &nokkuv1.SubscribeChangesRequest{})
-	require.NoError(t, err)
-	defer stream.Close()
-
-	require.True(t, stream.Receive(), "the first message opens the stream: %v", stream.Err())
-	assert.False(t, stream.Msg().GetEverything())
-
-	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
-		_, err := q.CreateTeam(t.Context(), &db.CreateTeamParams{Name: uniq("team"), Tags: []string{}})
-		return err
-	})
-	require.True(t, stream.Receive(), "a write is heard: %v", stream.Err())
-	assert.True(t, stream.Msg().GetEverything())
-}
-
-func TestSubscribeChangesNeedsASession(t *testing.T) {
-	_, srv := newTestAPI(t)
-	stream, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL).
-		SubscribeChanges(t.Context(), &nokkuv1.SubscribeChangesRequest{})
-	require.NoError(t, err)
-	defer stream.Close()
-
-	assert.False(t, stream.Receive())
-	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(stream.Err()))
 }

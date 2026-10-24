@@ -22,7 +22,8 @@ const (
 	challengeTTL       = 5 * time.Minute
 	ceremonyCookieName = "webauthn_session"
 	// A relying party is built per workspace host and kept for a while.
-	relyingPartyTTL = time.Hour
+	relyingPartyTTL     = time.Hour
+	relyingPartyEntries = 10_000
 )
 
 type webUser struct {
@@ -37,14 +38,14 @@ func (u *webUser) WebAuthnCredentials() []webauthn.Credential { return u.creds }
 
 type passkeyFlow struct {
 	svc   *Service
-	rps   *cache.Local[*webauthn.WebAuthn]
+	rps   *cache.TTL[string, *webauthn.WebAuthn]
 	state *sealed[webauthn.SessionData]
 }
 
 func newPasskeyFlow(svc *Service) *passkeyFlow {
 	return &passkeyFlow{
 		svc: svc,
-		rps: cache.NewLocal[*webauthn.WebAuthn](relyingPartyTTL),
+		rps: cache.New[string, *webauthn.WebAuthn](relyingPartyEntries, relyingPartyTTL),
 		state: &sealed[webauthn.SessionData]{
 			svc: svc, cookie: ceremonyCookieName, use: "webauthn:session", ttl: challengeTTL,
 		},
@@ -81,7 +82,7 @@ func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
 	if err != nil {
 		return nil, err
 	}
-	f.rps.Put(ws.ID, wa)
+	f.rps.Set(ws.ID, wa)
 	return wa, nil
 }
 
@@ -165,6 +166,11 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
+	if err := f.svc.RequireRecentSignIn(ctx); err != nil {
+		http.SetCookie(w, f.svc.ClearSessionCookie())
+		writeError(w, http.StatusUnauthorized, "sign in again to add a passkey")
+		return
+	}
 	creation, session, err := wa.BeginRegistration(wu)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "registration failed")
@@ -207,7 +213,7 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "this passkey cannot be registered")
 		return
 	}
-	f.svc.spendFlow(ctx, flowID)
+	f.svc.spendFlow(flowID)
 	f.svc.record(ctx, event{
 		Action: actionCredentialAdded,
 		Kind:   actor.KindUser,
@@ -268,7 +274,7 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, f.clearedCeremonyCookie())
-	f.svc.spendFlow(ctx, flowID)
+	f.svc.spendFlow(flowID)
 	f.svc.touchCredential(ctx, passkeyCredentialID(cred))
 	f.signIn(w, r, wu.user)
 }

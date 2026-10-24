@@ -29,18 +29,15 @@ const oidcCallbackPath = "/oidc/callback"
 type oidcFlow struct {
 	svc       *Service
 	state     *sealed[authorizeState]
-	providers *cache.Local[*oidc.Provider]
-	// tests holds finished test sign-ins until the settings page reads them.
-	tests *cache.Memory
+	providers *cache.TTL[string, *oidc.Provider]
 }
 
 type authorizeState struct {
-	ProviderID   string  `json:"provider_id"`
-	Nonce        string  `json:"nonce"`
-	PKCEVerifier string  `json:"pkce_verifier"`
-	ReturnTo     string  `json:"return_to,omitempty"`
-	LinkUserID   string  `json:"link_user_id,omitempty"`
-	Tester       *tester `json:"tester,omitempty"`
+	ProviderID   string `json:"provider_id"`
+	Nonce        string `json:"nonce"`
+	PKCEVerifier string `json:"pkce_verifier"`
+	ReturnTo     string `json:"return_to,omitempty"`
+	LinkUserID   string `json:"link_user_id,omitempty"`
 }
 
 // oidcIdentity is what the provider said about the person.
@@ -51,8 +48,11 @@ type oidcIdentity struct {
 	Name            string
 	Picture         string
 	JITProvisioning bool
-	// EmailUnverified is set when the provider says so. A missing claim counts as verified, Entra never sends it.
+	// EmailVerified and EmailUnverified are what the provider said. Entra says neither.
+	EmailVerified   bool
 	EmailUnverified bool
+	// TrustUnverifiedEmail takes an address the provider said nothing about as good enough to link an account.
+	TrustUnverifiedEmail bool
 	// LinkUserID skips the email lookup and links to that signed-in user.
 	LinkUserID string
 }
@@ -61,8 +61,7 @@ func newOIDCFlow(svc *Service) *oidcFlow {
 	return &oidcFlow{
 		svc:       svc,
 		state:     &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oidc", ttl: flowStateTTL},
-		providers: cache.NewLocal[*oidc.Provider](providerCacheTTL),
-		tests:     cache.NewMemory(testEntries),
+		providers: cache.New[string, *oidc.Provider](providerCacheEntries, providerCacheTTL),
 	}
 }
 
@@ -129,10 +128,6 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "invalid or expired login")
 		return
 	}
-	if st.Tester != nil {
-		h.finishTestFlow(w, r, flowID, st)
-		return
-	}
 	if q.Get("error") != "" {
 		fail(w, r, "login canceled")
 		return
@@ -142,7 +137,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "provider not configured")
 		return
 	}
-	idToken, claims, _, err := h.verify(r.Context(), q, cfg, st)
+	idToken, claims, err := h.verify(r.Context(), q, cfg, st)
 	if err != nil {
 		slog.Warn("oidc callback failed", "error", err, "provider", cfg.ProviderID)
 		fail(w, r, "login failed")
@@ -172,7 +167,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "login refused")
 		return
 	}
-	h.svc.spendFlow(r.Context(), flowID)
+	h.svc.spendFlow(flowID)
 	http.SetCookie(w, h.svc.newCookie(flowCookieName, "", time.Unix(0, 0)))
 	http.SetCookie(w, cookie)
 	if c := h.svc.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
@@ -187,23 +182,22 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, returnTo, http.StatusSeeOther)
 }
 
-// verify checks the provider's answer to an authorization that went through. The step says where it broke, for a test to show.
+// verify checks the provider's answer to an authorization that went through.
 func (h *oidcFlow) verify(
 	ctx context.Context,
 	q url.Values,
 	cfg *SSOProvider,
 	st authorizeState,
-) (*oidc.IDToken, map[string]any, nokkuv1.SSOTestStep, error) {
+) (*oidc.IDToken, map[string]any, error) {
 	ctx = h.svc.providerContext(ctx)
 	provider, err := h.discover(ctx, cfg.OIDC.IssuerURL)
 	if err != nil {
-		return nil, nil, nokkuv1.SSOTestStep_SSO_TEST_STEP_DISCOVERY, err
+		return nil, nil, err
 	}
 	// RFC 9207 mix-up attack protection.
 	if iss := q.Get("iss"); iss != "" &&
 		!strings.EqualFold(strings.TrimSuffix(iss, "/"), strings.TrimSuffix(cfg.OIDC.IssuerURL, "/")) {
-		return nil, nil, nokkuv1.SSOTestStep_SSO_TEST_STEP_AUTHORIZE,
-			fmt.Errorf("the answer came from issuer %q, not %q", iss, cfg.OIDC.IssuerURL)
+		return nil, nil, fmt.Errorf("the answer came from issuer %q, not %q", iss, cfg.OIDC.IssuerURL)
 	}
 	token, err := h.oauth2Config(ctx, &cfg.OIDC, provider).Exchange(
 		ctx,
@@ -211,42 +205,41 @@ func (h *oidcFlow) verify(
 		oauth2.VerifierOption(st.PKCEVerifier),
 	)
 	if err != nil {
-		return nil, nil, nokkuv1.SSOTestStep_SSO_TEST_STEP_TOKEN, err
-	}
-	idTokenFailed := func(err error) (*oidc.IDToken, map[string]any, nokkuv1.SSOTestStep, error) {
-		return nil, nil, nokkuv1.SSOTestStep_SSO_TEST_STEP_ID_TOKEN, err
+		return nil, nil, err
 	}
 	rawIDToken, _ := token.Extra("id_token").(string)
 	idToken, err := provider.Verifier(&oidc.Config{ClientID: cfg.OIDC.ClientID}).Verify(ctx, rawIDToken)
 	if err != nil {
-		return idTokenFailed(err)
+		return nil, nil, err
 	}
 	// at_hash is optional in the code flow and Keycloak omits it.
 	if idToken.AccessTokenHash != "" {
 		if err := idToken.VerifyAccessToken(token.AccessToken); err != nil {
-			return idTokenFailed(err)
+			return nil, nil, err
 		}
 	}
 	var claims map[string]any
 	if err := idToken.Claims(&claims); err != nil {
-		return idTokenFailed(err)
+		return nil, nil, err
 	}
 	nonce, _ := claims["nonce"].(string)
 	if subtle.ConstantTimeCompare([]byte(nonce), []byte(st.Nonce)) != 1 {
-		return idTokenFailed(errors.New("the nonce does not match the one this sign-in sent"))
+		return nil, nil, errors.New("the nonce does not match the one this sign-in sent")
 	}
-	return idToken, claims, nokkuv1.SSOTestStep_SSO_TEST_STEP_UNSPECIFIED, nil
+	return idToken, claims, nil
 }
 
 func identityFrom(cfg *SSOProvider, idToken *oidc.IDToken, claims map[string]any) oidcIdentity {
 	return oidcIdentity{
-		ProviderID:      cfg.ProviderID,
-		Subject:         idToken.Subject,
-		Email:           claimString(claims, "email"),
-		Name:            claimString(claims, "name"),
-		Picture:         claimString(claims, "picture"),
-		JITProvisioning: cfg.OIDC.JITProvisioning,
-		EmailUnverified: claimIsFalse(claims["email_verified"]),
+		ProviderID:           cfg.ProviderID,
+		Subject:              idToken.Subject,
+		Email:                claimString(claims, "email"),
+		Name:                 claimString(claims, "name"),
+		Picture:              claimString(claims, "picture"),
+		JITProvisioning:      cfg.OIDC.JITProvisioning,
+		EmailVerified:        claimIsTrue(claims["email_verified"]),
+		EmailUnverified:      claimIsFalse(claims["email_verified"]),
+		TrustUnverifiedEmail: cfg.OIDC.TrustUnverifiedEmail,
 	}
 }
 
@@ -270,7 +263,7 @@ func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, erro
 	return u, nil
 }
 
-// resolveIn runs in the caller's tx, so a test sign-in can make the same decision and roll it back.
+// resolveIn finds or creates the user in the caller's tx and links the identity to it.
 func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity) (*db.User, bool, error) {
 	cred, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
 		Type: string(MethodOIDC), Provider: id.ProviderID, Subject: id.Subject,
@@ -312,6 +305,9 @@ func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity
 			created = err == nil
 		case err == nil && u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER:
 			return nil, false, errOwnerLink
+		// Whoever sets this address at the provider would get the account, unless the provider vouches for it.
+		case err == nil && !id.EmailVerified && !id.TrustUnverifiedEmail:
+			return nil, false, errEmailUnverified
 		case err == nil && id.Name != "" && u.Name != id.Name:
 			// The provider owns the name.
 			u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Name: &id.Name})
@@ -346,7 +342,7 @@ func (h *oidcFlow) discover(ctx context.Context, issuer string) (*oidc.Provider,
 	if err != nil {
 		return nil, err
 	}
-	h.providers.Put(issuer, provider)
+	h.providers.Set(issuer, provider)
 	return provider, nil
 }
 

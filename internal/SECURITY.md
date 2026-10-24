@@ -48,8 +48,8 @@ The following are in scope for security reports:
 
 - The Nokku core, `nokkud`, and `nk` themselves (each has its own
   policy), except where the issue is in how they call these packages.
-- Access to the TPM device by a process on the same machine. The README's
-  trust model covers why the identity has no auth value.
+- A process on the same machine that can read a state file and open the TPM
+  device. The README's trust model covers why the key has no auth value.
 - Reading the software fallback key file on the machine it belongs to. The
   wrap only stops a copied file from working elsewhere.
 - Vulnerabilities in the TPM hardware, firmware, or go-tpm itself.
@@ -57,6 +57,4 @@ The following are in scope for security reports:
 ## Security Notes / Threat Model
 
 These packages hold the crypto `nokkud` and `nk` share, so a flaw here affects
-both. The README describes the machine identity trust model and
-the salt registry. Salts must differ per binary and purpose, or two binaries
-would derive the same identity from one TPM.
+both. The README describes the machine identity trust model.

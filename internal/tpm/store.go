@@ -17,7 +17,8 @@ var (
 	errBadState = errors.New("tpm: the signer state does not parse")
 )
 
-// TPM keys store only the public half, enclave keys add their blob, software keys their wrapped private key.
+// Data is the TPM key file, the enclave blob, or the wrapped private key of a software key. PubKey only shows which
+// key a state file holds, nothing reads it to sign.
 type state struct {
 	Method string `json:"method"`
 	PubKey string `json:"pubkey"`

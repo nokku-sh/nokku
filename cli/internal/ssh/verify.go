@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"strings"
 	"time"
 
+	"github.com/mizuchilabs/kata/fsutil"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 
@@ -97,4 +99,39 @@ func hostKeyAlgos(target *state.Target) []string {
 		return []string{ssh.KeyAlgoRSASHA512, ssh.KeyAlgoRSASHA256}
 	}
 	return []string{pinned.Type()}
+}
+
+// PinnedHostOptions has ssh accept nothing but the key a manual target was synced with. It writes knownHosts.
+func PinnedHostOptions(target *state.Target, knownHosts string) ([]string, error) {
+	key := strings.TrimSpace(target.HostPublicKey)
+	if !safeLine(key) {
+		return nil, fmt.Errorf("the pinned host key of %s is unusable, run again with --accept-host-key", target.Name)
+	}
+	if err := fsutil.WriteFile(knownHosts, []byte(target.ID+" "+key+"\n"), 0o600); err != nil {
+		return nil, fmt.Errorf("writing the pinned host key: %w", err)
+	}
+	opts := append(knownHostsOptions(target.ID, knownHosts), "-o", "StrictHostKeyChecking=yes")
+	if algos := hostKeyAlgos(target); len(algos) > 0 {
+		opts = append(opts, "-o", "HostKeyAlgorithms="+strings.Join(algos, ","))
+	}
+	return opts, nil
+}
+
+// AcceptHostOptions trusts whatever key the target shows. The user's known_hosts may still hold the replaced one.
+func AcceptHostOptions(target *state.Target, knownHosts string) []string {
+	return append(knownHostsOptions(target.ID, knownHosts), "-o", "StrictHostKeyChecking=accept-new")
+}
+
+// knownHostsOptions leaves ssh no trust but the file, no DNS and no command from the user's config.
+func knownHostsOptions(alias, knownHosts string) []string {
+	file := configValue(knownHosts)
+	return []string{
+		"-o", "HostKeyAlias=" + alias,
+		"-o", "UserKnownHostsFile=" + file,
+		"-o", "GlobalKnownHostsFile=" + file,
+		"-o", "VerifyHostKeyDNS=no",
+		// ssh before 8.5 has no KnownHostsCommand and would refuse to start.
+		"-o", "IgnoreUnknown=KnownHostsCommand",
+		"-o", "KnownHostsCommand=none",
+	}
 }

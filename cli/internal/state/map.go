@@ -47,17 +47,19 @@ func SSHCAs(cas []*nokkuv1.CertificateAuthority) []CA {
 			continue
 		}
 		entry := CA{
-			ID:        ca.GetId(),
-			Name:      ui.PlainLine(ca.GetName()),
-			PublicKey: ca.GetPublicKey(),
-			Default:   ca.GetIsDefault(),
+			ID:            ca.GetId(),
+			Name:          ui.PlainLine(ca.GetName()),
+			PublicKey:     ca.GetPublicKey(),
+			HostPublicKey: ca.GetHostPublicKey(),
+			Default:       ca.GetIsDefault(),
 		}
 		// AsTime turns an unset timestamp into 1970, not the zero time.
-		if ca.GetNotBefore() != nil {
-			entry.RotatedAt = ca.GetNotBefore().AsTime()
+		if ca.GetRotatedAt() != nil {
+			entry.RotatedAt = ca.GetRotatedAt().AsTime()
 		}
 		if ca.GetPreviousTrustedUntil() != nil {
 			entry.PreviousPublicKey = ca.GetPreviousPublicKey()
+			entry.PreviousHostPublicKey = ca.GetPreviousHostPublicKey()
 			entry.PreviousTrustedUntil = ca.GetPreviousTrustedUntil().AsTime()
 		}
 		out = append(out, entry)

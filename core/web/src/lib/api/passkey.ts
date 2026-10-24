@@ -1,3 +1,5 @@
+import { handleSessionExpired } from './client';
+
 interface PublicKeyCredentialUserEntity {
 	id: string;
 	name: string;
@@ -85,6 +87,8 @@ export async function registerPasskey(): Promise<void> {
 	});
 
 	if (!beginResponse.ok) {
+		// A session too old to add a passkey has ended. Signing in again comes back to this page.
+		if (beginResponse.status === 401) handleSessionExpired();
 		await fail(beginResponse, 'Failed to begin registration');
 	}
 

@@ -202,7 +202,7 @@ func TestRelayServesSSH(t *testing.T) {
 	must.NoError(err)
 	caKey, err := ssh.NewPublicKey(caPub)
 	must.NoError(err)
-	c.cache.Replace(map[string][]string{cur.Username: {"subject-1"}}, nil, "", nil, 1)
+	c.cache.Replace(map[string][]string{cur.Username: {"subject-1"}}, nil, "", "", nil, 1)
 	c.srv.SetTrust(string(ssh.MarshalAuthorizedKey(caKey)), nil)
 
 	_, userPriv, err := ed25519.GenerateKey(rand.Reader)

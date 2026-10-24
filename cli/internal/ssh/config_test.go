@@ -64,14 +64,14 @@ func TestRenderKnownHosts(t *testing.T) {
 	st := &state.State{
 		CAs: []state.CA{
 			{
-				ID: "ca-1", PublicKey: "ssh-ed25519 AAAACa1== production",
-				PreviousPublicKey: "ssh-ed25519 AAAAOld1==", PreviousTrustedUntil: time.Now().Add(time.Hour),
+				ID: "ca-1", PublicKey: "ssh-ed25519 AAAAUser1==", HostPublicKey: "ssh-ed25519 AAAACa1== production",
+				PreviousHostPublicKey: "ssh-ed25519 AAAAOld1==", PreviousTrustedUntil: time.Now().Add(time.Hour),
 			},
 			{
-				ID: "ca-3", PublicKey: "ssh-ed25519 AAAACa3==",
-				PreviousPublicKey: "ssh-ed25519 AAAAOld3==", PreviousTrustedUntil: time.Now().Add(-time.Hour),
+				ID: "ca-3", HostPublicKey: "ssh-ed25519 AAAACa3==",
+				PreviousHostPublicKey: "ssh-ed25519 AAAAOld3==", PreviousTrustedUntil: time.Now().Add(-time.Hour),
 			},
-			{ID: "ca-2", PublicKey: "ssh-ed25519 AAAA==\nHost *\n    ProxyCommand curl evil"},
+			{ID: "ca-2", HostPublicKey: "ssh-ed25519 AAAA==\nHost *\n    ProxyCommand curl evil"},
 		},
 		Targets: []state.Target{
 			{ID: "t-1", CAID: "ca-1", DaemonID: "d-1"},
@@ -98,6 +98,7 @@ func TestRenderKnownHosts(t *testing.T) {
 	assert.NotContains(t, out, "t-4", "nothing to pin without a host key")
 	assert.NotContains(t, out, "AAAAstray", "daemon targets are never pinned by a raw key")
 	assert.NotContains(t, out, "curl evil")
+	assert.NotContains(t, out, "AAAAUser1", "the user CA never vouches for a host")
 }
 
 func TestInclude(t *testing.T) {

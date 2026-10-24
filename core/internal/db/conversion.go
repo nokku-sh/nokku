@@ -301,28 +301,25 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 	}
 
 	return &nokkuv1.CertificateAuthority{
-		Id:                   &r.ID,
-		Name:                 &r.Name,
-		Description:          r.Description,
-		PublicKey:            &r.PublicKey,
-		NotBefore:            SafeTimestamp(&r.NotBefore),
-		NotAfter:             SafeTimestamp(&r.NotAfter),
-		IsActive:             &r.IsActive,
-		IsDefault:            &r.IsDefault,
-		KeyType:              &r.KeyType,
-		KeyBits:              &r.KeyBits,
-		CreatedAt:            SafeTimestamp(&r.CreatedAt),
-		UpdatedAt:            SafeTimestamp(&r.UpdatedAt),
-		UserDefaultTtl:       durationpb.New(r.UserDefaultTtl),
-		UserMaxTtl:           durationpb.New(r.UserMaxTtl),
-		ForceCommand:         &r.ForceCommand,
-		SourceAddress:        &r.SourceAddress,
-		AllowedKeyTypes:      r.AllowedKeyTypes,
-		Lifetime:             durationpb.New(r.Lifetime),
-		HostDefaultTtl:       durationpb.New(r.HostDefaultTtl),
-		HostMaxTtl:           durationpb.New(r.HostMaxTtl),
-		PreviousPublicKey:    r.PreviousPublicKey,
-		PreviousTrustedUntil: SafeTimestamp(r.PreviousTrustedUntil),
+		Id:                    &r.ID,
+		Name:                  &r.Name,
+		Description:           r.Description,
+		PublicKey:             &r.PublicKey,
+		HostPublicKey:         &r.HostPublicKey,
+		RotatedAt:             SafeTimestamp(&r.RotatedAt),
+		IsActive:              &r.IsActive,
+		IsDefault:             &r.IsDefault,
+		CreatedAt:             SafeTimestamp(&r.CreatedAt),
+		UpdatedAt:             SafeTimestamp(&r.UpdatedAt),
+		UserDefaultTtl:        durationpb.New(r.UserDefaultTtl),
+		UserMaxTtl:            durationpb.New(r.UserMaxTtl),
+		ForceCommand:          &r.ForceCommand,
+		SourceAddress:         &r.SourceAddress,
+		HostDefaultTtl:        durationpb.New(r.HostDefaultTtl),
+		HostMaxTtl:            durationpb.New(r.HostMaxTtl),
+		PreviousPublicKey:     r.PreviousPublicKey,
+		PreviousHostPublicKey: r.PreviousHostPublicKey,
+		PreviousTrustedUntil:  SafeTimestamp(r.PreviousTrustedUntil),
 	}
 }
 
@@ -336,12 +333,17 @@ func (r *GetCAsByIDsRow) ToProto() *nokkuv1.CertificateAuthority {
 		return nil
 	}
 	return &nokkuv1.CertificateAuthority{
-		Id:             &r.ID,
-		Name:           &r.Name,
-		PublicKey:      &r.PublicKey,
-		IsDefault:      &r.IsDefault,
-		UserDefaultTtl: durationpb.New(r.UserDefaultTtl),
-		UserMaxTtl:     durationpb.New(r.UserMaxTtl),
+		Id:                    &r.ID,
+		Name:                  &r.Name,
+		PublicKey:             &r.PublicKey,
+		HostPublicKey:         &r.HostPublicKey,
+		RotatedAt:             SafeTimestamp(&r.RotatedAt),
+		IsDefault:             &r.IsDefault,
+		UserDefaultTtl:        durationpb.New(r.UserDefaultTtl),
+		UserMaxTtl:            durationpb.New(r.UserMaxTtl),
+		PreviousPublicKey:     r.PreviousPublicKey,
+		PreviousHostPublicKey: r.PreviousHostPublicKey,
+		PreviousTrustedUntil:  SafeTimestamp(r.PreviousTrustedUntil),
 	}
 }
 

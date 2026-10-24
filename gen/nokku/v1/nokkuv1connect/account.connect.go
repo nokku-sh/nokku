@@ -39,6 +39,9 @@ const (
 	// AccountServiceUpdateAccountProcedure is the fully-qualified name of the AccountService's
 	// UpdateAccount RPC.
 	AccountServiceUpdateAccountProcedure = "/nokku.v1.AccountService/UpdateAccount"
+	// AccountServiceSetAvatarProcedure is the fully-qualified name of the AccountService's SetAvatar
+	// RPC.
+	AccountServiceSetAvatarProcedure = "/nokku.v1.AccountService/SetAvatar"
 	// AccountServiceRequestEmailChangeProcedure is the fully-qualified name of the AccountService's
 	// RequestEmailChange RPC.
 	AccountServiceRequestEmailChangeProcedure = "/nokku.v1.AccountService/RequestEmailChange"
@@ -66,6 +69,8 @@ const (
 type AccountServiceClient interface {
 	GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error)
 	UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error)
+	// SetAvatar stores a picture of one's own. An empty image removes it.
+	SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error)
 	RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error)
 	ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error)
 	RenameCredential(context.Context, *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error)
@@ -97,6 +102,12 @@ func NewAccountServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+AccountServiceUpdateAccountProcedure,
 			connect.WithSchema(accountServiceMethods.ByName("UpdateAccount")),
+			connect.WithClientOptions(opts...),
+		),
+		setAvatar: connect.NewClient[v1.SetAvatarRequest, v1.SetAvatarResponse](
+			httpClient,
+			baseURL+AccountServiceSetAvatarProcedure,
+			connect.WithSchema(accountServiceMethods.ByName("SetAvatar")),
 			connect.WithClientOptions(opts...),
 		),
 		requestEmailChange: connect.NewClient[v1.RequestEmailChangeRequest, v1.RequestEmailChangeResponse](
@@ -150,6 +161,7 @@ func NewAccountServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 type accountServiceClient struct {
 	getAccount          *connect.Client[v1.GetAccountRequest, v1.GetAccountResponse]
 	updateAccount       *connect.Client[v1.UpdateAccountRequest, v1.UpdateAccountResponse]
+	setAvatar           *connect.Client[v1.SetAvatarRequest, v1.SetAvatarResponse]
 	requestEmailChange  *connect.Client[v1.RequestEmailChangeRequest, v1.RequestEmailChangeResponse]
 	listCredentials     *connect.Client[v1.ListCredentialsRequest, v1.ListCredentialsResponse]
 	renameCredential    *connect.Client[v1.RenameCredentialRequest, v1.RenameCredentialResponse]
@@ -171,6 +183,15 @@ func (c *accountServiceClient) GetAccount(ctx context.Context, req *v1.GetAccoun
 // UpdateAccount calls nokku.v1.AccountService.UpdateAccount.
 func (c *accountServiceClient) UpdateAccount(ctx context.Context, req *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error) {
 	response, err := c.updateAccount.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// SetAvatar calls nokku.v1.AccountService.SetAvatar.
+func (c *accountServiceClient) SetAvatar(ctx context.Context, req *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error) {
+	response, err := c.setAvatar.CallUnary(ctx, connect.NewRequest(req))
 	if response != nil {
 		return response.Msg, err
 	}
@@ -244,6 +265,8 @@ func (c *accountServiceClient) DeleteAccount(ctx context.Context, req *v1.Delete
 type AccountServiceHandler interface {
 	GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error)
 	UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error)
+	// SetAvatar stores a picture of one's own. An empty image removes it.
+	SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error)
 	RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error)
 	ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error)
 	RenameCredential(context.Context, *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error)
@@ -271,6 +294,12 @@ func NewAccountServiceHandler(svc AccountServiceHandler, opts ...connect.Handler
 		AccountServiceUpdateAccountProcedure,
 		svc.UpdateAccount,
 		connect.WithSchema(accountServiceMethods.ByName("UpdateAccount")),
+		connect.WithHandlerOptions(opts...),
+	)
+	accountServiceSetAvatarHandler := connect.NewUnaryHandlerSimple(
+		AccountServiceSetAvatarProcedure,
+		svc.SetAvatar,
+		connect.WithSchema(accountServiceMethods.ByName("SetAvatar")),
 		connect.WithHandlerOptions(opts...),
 	)
 	accountServiceRequestEmailChangeHandler := connect.NewUnaryHandlerSimple(
@@ -323,6 +352,8 @@ func NewAccountServiceHandler(svc AccountServiceHandler, opts ...connect.Handler
 			accountServiceGetAccountHandler.ServeHTTP(w, r)
 		case AccountServiceUpdateAccountProcedure:
 			accountServiceUpdateAccountHandler.ServeHTTP(w, r)
+		case AccountServiceSetAvatarProcedure:
+			accountServiceSetAvatarHandler.ServeHTTP(w, r)
 		case AccountServiceRequestEmailChangeProcedure:
 			accountServiceRequestEmailChangeHandler.ServeHTTP(w, r)
 		case AccountServiceListCredentialsProcedure:
@@ -352,6 +383,10 @@ func (UnimplementedAccountServiceHandler) GetAccount(context.Context, *v1.GetAcc
 
 func (UnimplementedAccountServiceHandler) UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.UpdateAccount is not implemented"))
+}
+
+func (UnimplementedAccountServiceHandler) SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("nokku.v1.AccountService.SetAvatar is not implemented"))
 }
 
 func (UnimplementedAccountServiceHandler) RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error) {

@@ -43,9 +43,6 @@ service WorkspaceService {
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {
     option (access) = {public: true};
   }
-  rpc SubscribeChanges(SubscribeChangesRequest) returns (stream SubscribeChangesResponse) {
-    option (access) = {self: true};
-  }
 }
 
 message Workspace {
@@ -81,6 +78,17 @@ message GetWorkspaceResponse {
   google.protobuf.Timestamp delete_at = 4;
   // features is what every member may see, so any page can show a lock. GetBilling has the rest.
   map<string, bool> features = 5;
+  // catalog names every feature and the smallest plan that has it. It is the same for every workspace.
+  repeated PlanFeature catalog = 6;
+  // plan_names are the names people see, by plan code.
+  map<string, string> plan_names = 7;
+}
+
+message PlanFeature {
+  string key = 1;
+  string label = 2;
+  // plan is the code of the smallest plan that has the feature, every larger one has it too.
+  string plan = 3;
 }
 
 message UpdateWorkspaceRequest {
@@ -113,13 +121,6 @@ message CreateWorkspaceRequest {
 }
 message CreateWorkspaceResponse {
   string url = 1;
-}
-
-message SubscribeChangesRequest {}
-
-message SubscribeChangesResponse {
-  repeated string services = 1;
-  bool everything = 2;
 }
 
 // Users ----------------------------------------------------------------------

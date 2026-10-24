@@ -1,3 +1,4 @@
+// Package storage keeps the recordings, in a local directory or an S3 bucket, opened from one URL.
 package storage
 
 import (
@@ -6,131 +7,64 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/caarlos0/env/v11"
 	"gocloud.dev/blob"
-	"gocloud.dev/blob/fileblob"
-	"gocloud.dev/blob/s3blob"
+	_ "gocloud.dev/blob/fileblob" // file:// URLs
+	_ "gocloud.dev/blob/s3blob"   // s3:// URLs
 	"gocloud.dev/gcerrors"
 )
 
-const (
-	modeLocal = "local"
-	modeS3    = "s3"
-)
-
 type Storage struct {
-	Mode            string `env:"NOKKU_STORAGE"              envDefault:"local"`
-	Endpoint        string `env:"NOKKU_S3_ENDPOINT"`
-	AccessKeyID     string `env:"NOKKU_S3_ACCESS_KEY_ID"`
-	SecretAccessKey string `env:"NOKKU_S3_SECRET_ACCESS_KEY"`
-	Bucket          string `env:"NOKKU_S3_BUCKET"            envDefault:"nokku-assets"`
-	Region          string `env:"NOKKU_S3_REGION"            envDefault:"auto"`
-	UsePathStyle    bool   `env:"NOKKU_S3_USE_PATH_STYLE"    envDefault:"false"`
-	CDNURL          string `env:"NOKKU_S3_PUBLIC_URL"`
-	LocalPath       string `env:"NOKKU_LOCAL_STORAGE_PATH"   envDefault:"data"`
-	BaseURL         string
-
 	bucket *blob.Bucket
 }
 
-func New(ctx context.Context, baseURL string) (*Storage, error) {
-	s, err := env.ParseAs[Storage]()
+type config struct {
+	// URL is file:///dir, or s3://bucket?region=...&endpoint=...&use_path_style=true with credentials in AWS_*.
+	URL string `env:"NOKKU_STORAGE_URL" envDefault:"file://./data"`
+}
+
+func New(ctx context.Context) (*Storage, error) {
+	cfg, err := env.ParseAs[config]()
 	if err != nil {
 		return nil, err
 	}
-	s.BaseURL = baseURL
-
-	switch s.Mode {
-	case modeS3:
-		if err := s.initS3(ctx); err != nil {
-			return nil, err
-		}
-	case modeLocal:
-		if err := s.initLocal(); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf(
-			"invalid NOKKU_STORAGE mode %q (must be %q or %q)",
-			s.Mode,
-			modeLocal,
-			modeS3,
-		)
-	}
-
-	context.AfterFunc(ctx, func() { _ = s.bucket.Close() })
-	return &s, nil
-}
-
-func (s *Storage) initS3(ctx context.Context) error {
-	if s.Endpoint == "" {
-		return errors.New("NOKKU_S3_ENDPOINT is required in s3 mode")
-	}
-	if s.AccessKeyID == "" || s.SecretAccessKey == "" {
-		return errors.New(
-			"NOKKU_S3_ACCESS_KEY_ID and NOKKU_S3_SECRET_ACCESS_KEY are required in s3 mode",
-		)
-	}
-	if s.Bucket == "" {
-		return errors.New("NOKKU_S3_BUCKET is required in s3 mode")
-	}
-
-	awsCfg, err := config.LoadDefaultConfig(
-		ctx,
-		config.WithRegion(s.Region),
-		config.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(s.AccessKeyID, s.SecretAccessKey, ""),
-		),
-	)
+	u, err := bucketURL(cfg.URL)
 	if err != nil {
-		return fmt.Errorf("load aws config: %w", err)
+		return nil, err
 	}
-
-	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(s.Endpoint)
-		o.UsePathStyle = s.UsePathStyle
-	})
-
-	s.bucket, err = s3blob.OpenBucket(ctx, client, s.Bucket, nil)
+	bucket, err := blob.OpenBucket(ctx, u)
 	if err != nil {
-		return fmt.Errorf("open s3 bucket: %w", err)
+		return nil, fmt.Errorf("open NOKKU_STORAGE_URL: %w", err)
 	}
-
 	// Fail on boot, not on the first upload.
-	if _, err := s.bucket.Attributes(ctx, ".nokku-probe"); err != nil {
-		if code := gcerrors.Code(err); code != gcerrors.NotFound {
-			_ = s.bucket.Close()
-			return fmt.Errorf("s3 bucket unreachable: %w", err)
-		}
+	if _, err := bucket.Attributes(ctx, ".nokku-probe"); err != nil && gcerrors.Code(err) != gcerrors.NotFound {
+		_ = bucket.Close()
+		return nil, fmt.Errorf("storage unreachable: %w", err)
 	}
-
-	return nil
+	context.AfterFunc(ctx, func() { _ = bucket.Close() })
+	return &Storage{bucket: bucket}, nil
 }
 
-func (s *Storage) initLocal() error {
-	if err := os.MkdirAll(s.LocalPath, 0o750); err != nil {
-		return fmt.Errorf("create local storage path: %w", err)
-	}
-	absPath, err := filepath.Abs(s.LocalPath)
+// bucketURL creates a missing directory and keeps its temp files inside it, a rename across volumes fails in a
+// container. A URL that says otherwise wins.
+func bucketURL(raw string) (string, error) {
+	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("get absolute path: %w", err)
+		return "", fmt.Errorf("NOKKU_STORAGE_URL: %w", err)
 	}
-
-	s.bucket, err = fileblob.OpenBucket(absPath, &fileblob.Options{NoTempDir: true})
-	if err != nil {
-		return fmt.Errorf("open local bucket: %w", err)
+	if u.Scheme != "file" {
+		return raw, nil
 	}
-
-	return nil
+	q := u.Query()
+	for key, value := range map[string]string{"create_dir": "true", "no_tmp_dir": "true", "dir_file_mode": "0750"} {
+		if !q.Has(key) {
+			q.Set(key, value)
+		}
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
 
 func (s *Storage) Reader(ctx context.Context, name string) (io.ReadCloser, error) {
@@ -139,25 +73,6 @@ func (s *Storage) Reader(ctx context.Context, name string) (io.ReadCloser, error
 		return nil, fmt.Errorf("open reader: %w", err)
 	}
 	return reader, nil
-}
-
-func (s *Storage) Store(
-	ctx context.Context,
-	name string,
-	data []byte,
-	opts StoreOptions,
-) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	writerOpts := &blob.WriterOptions{
-		ContentType:  opts.ContentType,
-		CacheControl: opts.CacheControl,
-	}
-	if err := s.bucket.WriteAll(ctx, name, data, writerOpts); err != nil {
-		return "", fmt.Errorf("write data: %w", err)
-	}
-	return s.getURL(name), nil
 }
 
 func (s *Storage) Delete(ctx context.Context, name string) error {
@@ -197,43 +112,13 @@ func (s *Storage) DeletePrefix(ctx context.Context, prefix string) error {
 }
 
 // CreateWriter commits on Close, so a truncated upload leaves a partial object. Canceling ctx drops it.
-func (s *Storage) CreateWriter(
-	ctx context.Context,
-	name string,
-	opts StoreOptions,
-) (io.WriteCloser, error) {
+func (s *Storage) CreateWriter(ctx context.Context, name string) (io.WriteCloser, error) {
 	if name == "" {
 		return nil, errors.New("filename is empty")
 	}
-	w, err := s.bucket.NewWriter(ctx, name, &blob.WriterOptions{
-		ContentType:  opts.ContentType,
-		CacheControl: opts.CacheControl,
-	})
+	w, err := s.bucket.NewWriter(ctx, name, &blob.WriterOptions{ContentType: "application/octet-stream"})
 	if err != nil {
 		return nil, fmt.Errorf("open writer for %q: %w", name, err)
 	}
 	return w, nil
-}
-
-// PublicURL is false for local storage, which the server proxies.
-func (s *Storage) PublicURL(name string) (string, bool) {
-	if s.CDNURL == "" {
-		return "", false
-	}
-	return s.getURL(name), true
-}
-
-func (s *Storage) getURL(name string) string {
-	if s.CDNURL != "" {
-		return joinURL(s.CDNURL, name)
-	}
-	return joinURL(s.BaseURL, name)
-}
-
-func joinURL(base, name string) string {
-	u, err := url.JoinPath(base, name)
-	if err != nil {
-		return base + "/" + name
-	}
-	return u
 }

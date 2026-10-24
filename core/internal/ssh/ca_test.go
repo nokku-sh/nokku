@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/rsa"
+	"crypto/x509"
+	"errors"
 	"testing"
 	"time"
 
 	"golang.org/x/crypto/ssh"
-
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -18,19 +17,19 @@ import (
 func newTestCA(t *testing.T) *db.SSHCA {
 	t.Helper()
 
-	info, err := NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 8760*time.Hour)
+	info, err := NewCA()
 	if err != nil {
 		t.Fatalf("NewCA failed: %v", err)
 	}
 	return &db.SSHCA{
-		PrivateKey:      info.PrivateKey,
-		PublicKey:       info.PublicKey,
-		KeyType:         info.KeyType,
-		UserDefaultTtl:  24 * time.Hour,
-		UserMaxTtl:      168 * time.Hour,
-		HostDefaultTtl:  2160 * time.Hour,
-		HostMaxTtl:      4320 * time.Hour,
-		AllowedKeyTypes: []nokkuv1.CertificateKeyType{1, 2, 3},
+		PrivateKey:     info.PrivateKey,
+		PublicKey:      info.PublicKey,
+		HostPrivateKey: info.HostPrivateKey,
+		HostPublicKey:  info.HostPublicKey,
+		UserDefaultTtl: 24 * time.Hour,
+		UserMaxTtl:     168 * time.Hour,
+		HostDefaultTtl: 2160 * time.Hour,
+		HostMaxTtl:     4320 * time.Hour,
 	}
 }
 
@@ -48,24 +47,36 @@ func newTestKey(t *testing.T) string {
 	return pubStr
 }
 
-func checkCert(t *testing.T, ca *db.SSHCA, cert *ssh.Certificate, principal string) {
+func parseKey(t *testing.T, line string) ssh.PublicKey {
 	t.Helper()
-
-	caPub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(ca.PublicKey))
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
 	if err != nil {
 		t.Fatalf("failed to parse CA public key: %v", err)
 	}
+	return key
+}
+
+// checkCert verifies cert the way sshd and ssh do, a user certificate against the user key, a host one against the
+// host key.
+func checkCert(t *testing.T, ca *db.SSHCA, cert *ssh.Certificate, principal string) error {
+	t.Helper()
+	user, host := parseKey(t, ca.PublicKey), parseKey(t, ca.HostPublicKey)
 	checker := ssh.CertChecker{
 		IsUserAuthority: func(auth ssh.PublicKey) bool {
-			return bytes.Equal(auth.Marshal(), caPub.Marshal())
+			return bytes.Equal(auth.Marshal(), user.Marshal())
 		},
 		IsHostAuthority: func(auth ssh.PublicKey, _ string) bool {
-			return bytes.Equal(auth.Marshal(), caPub.Marshal())
+			return bytes.Equal(auth.Marshal(), host.Marshal())
 		},
 	}
-	if err := checker.CheckCert(principal, cert); err != nil {
-		t.Fatalf("certificate failed verification: %v", err)
+	if cert.CertType == ssh.HostCert {
+		return checker.CheckHostKey(principal+":22", nil, cert)
 	}
+	// CheckCert checks the signature but not who made it, sshd asks IsUserAuthority first.
+	if !checker.IsUserAuthority(cert.SignatureKey) {
+		return errors.New("the certificate does not come from the user key")
+	}
+	return checker.CheckCert(principal, cert)
 }
 
 func validity(cert *ssh.Certificate) time.Duration {
@@ -73,52 +84,24 @@ func validity(cert *ssh.Certificate) time.Duration {
 }
 
 func TestNewCA(t *testing.T) {
-	for _, kt := range []nokkuv1.CertificateKeyType{1, 2, 3} {
-		info, err := NewCA(kt, 0, 8760*time.Hour)
-		if err != nil {
-			t.Fatalf("NewCA(%v) failed: %v", kt, err)
-		}
-		if info.KeyType != kt {
-			t.Errorf("expected key type %v, got %v", kt, info.KeyType)
-		}
-		if info.PublicKey == "" {
-			t.Error("expected authorized-key public key")
-		}
-		if len(info.PrivateKey.Bytes()) == 0 {
-			t.Error("expected private key bytes")
-		}
-	}
-
-	// Unspecified defaults to ED25519
-	info, err := NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_UNSPECIFIED, 0, 0)
+	info, err := NewCA()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.KeyType != nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519 {
-		t.Errorf("expected ED25519 default, got %v", info.KeyType)
+	for name, key := range map[string]string{"user": info.PublicKey, "host": info.HostPublicKey} {
+		if got := parseKey(t, key).Type(); got != ssh.KeyAlgoED25519 {
+			t.Errorf("%s key is %s, want Ed25519", name, got)
+		}
 	}
-	if info.Lifetime != 365*24*time.Hour || !info.NotAfter.Equal(info.NotBefore.Add(info.Lifetime)) {
-		t.Errorf("no lifetime should mean a year, got %v until %v", info.Lifetime, info.NotAfter)
+	if info.PublicKey == info.HostPublicKey {
+		t.Error("the user and the host key must differ")
 	}
-}
-
-func TestGenerateKeyClampsBits(t *testing.T) {
-	kp, err := GenerateKey(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_RSA, 1024)
-	if err != nil {
-		t.Fatal(err)
+	for name, der := range map[string][]byte{"user": info.PrivateKey.Bytes(), "host": info.HostPrivateKey.Bytes()} {
+		if _, err := x509.ParsePKCS8PrivateKey(der); err != nil {
+			t.Errorf("%s private key is not PKCS#8: %v", name, err)
+		}
 	}
-	if kp.Bits != 2048 {
-		t.Errorf("expected RSA bits clamped to 2048, got %d", kp.Bits)
-	}
-	if _, ok := kp.Private.(*rsa.PrivateKey); !ok {
-		t.Errorf("expected *rsa.PrivateKey, got %T", kp.Private)
-	}
-
-	kp, err = GenerateKey(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ECDSA, 123)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if kp.Bits != 256 {
-		t.Errorf("expected ECDSA bits clamped to 256, got %d", kp.Bits)
+	if info.UserDefaultTtl != 16*time.Hour || info.UserMaxTtl != 7*24*time.Hour {
+		t.Errorf("user certificates default to %v, at most %v", info.UserDefaultTtl, info.UserMaxTtl)
 	}
 }

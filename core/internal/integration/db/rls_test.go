@@ -48,18 +48,20 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 	t.Helper()
 	_, err := c.sysPool.Exec(t.Context(), `
 		INSERT INTO credentials (id, workspace_id, user_id, type, data) VALUES ($2 || '-pk', $1, $2, 'passkey', 'x');
+		INSERT INTO user_avatars (workspace_id, user_id, image, etag) VALUES ($1, $2, 'jpeg', 'etag');
 		INSERT INTO access_tokens (token_hash, workspace_id, user_id, kind, method)
 		VALUES ($2 || '-s', $1, $2, 'user', 'passkey');
 		INSERT INTO known_devices (workspace_id, user_id, key, expires_at)
 		VALUES ($1, $2, 'cookie', NOW() + INTERVAL '1 day');
 		INSERT INTO one_time_tokens (token_hash, workspace_id, user_id, purpose, expires_at)
 		VALUES ($2 || '-ott', $1, $2, 'login', NOW() + INTERVAL '1 hour');
+		INSERT INTO device_grants (device_code_hash, workspace_id, user_code, expires_at)
+		VALUES ($2 || '-dg', $1, 'BCDF-GHJK', NOW() + INTERVAL '1 hour');
 		INSERT INTO sso_providers (workspace_id, provider_id) VALUES ($1, 'idp');
 		INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci');
-		INSERT INTO ssh_cas (workspace_id, name, private_key, public_key, not_before, not_after, key_type, key_bits,
-			lifetime, user_default_ttl, user_max_ttl, host_default_ttl, host_max_ttl, allowed_key_types)
-		VALUES ($1, 'ca', 'key', 'pub', NOW(), NOW() + INTERVAL '1 day', 3, 256,
-			'1 day', '1 hour', '1 hour', '1 hour', '1 hour', '{3}');
+		INSERT INTO ssh_cas (workspace_id, name, private_key, public_key, host_private_key, host_public_key,
+			user_default_ttl, user_max_ttl, host_default_ttl, host_max_ttl)
+		VALUES ($1, 'ca', 'key', 'pub', 'host-key', 'host-pub', '1 hour', '1 hour', '1 hour', '1 hour');
 		WITH t AS (
 			INSERT INTO join_tokens (id, workspace_id, kind, token_hash) VALUES (uuidv7(), $1, 1, 'hash') RETURNING id
 		)

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { sso, testHref } from '#lib/api/sso.svelte.js';
+	import { sso } from '#lib/api/sso.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { OIDCIcon } from '#lib/assets/index.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
@@ -18,7 +18,7 @@
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import { SSOProviderSchema } from '#lib/gen/nokku/v1/sso_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
-	import { FlaskConical, Globe, Info, KeyRound, LogIn, Plug, Settings2 } from '@lucide/svelte';
+	import { Globe, Info, KeyRound, LogIn, Plug, Settings2 } from '@lucide/svelte';
 	import RedirectURI from './RedirectURI.svelte';
 
 	let { mode }: { mode?: string } = $props();
@@ -57,6 +57,7 @@
 			clientId: model.clientId,
 			scopes: model.scopes,
 			jitProvisioning: model.jitProvisioning,
+			trustUnverifiedEmail: model.trustUnverifiedEmail,
 			clientSecret: '',
 			...connection
 		});
@@ -79,6 +80,26 @@
 			onConfirm: () => {
 				if (!model) return;
 				model.jitProvisioning = true;
+				save();
+			}
+		});
+	}
+
+	// An address nobody vouched for lets whoever sets it at the provider into that account, so turning it on asks first.
+	function setTrustEmail(on: boolean) {
+		if (!model) return;
+		if (!on) {
+			model.trustUnverifiedEmail = false;
+			save();
+			return;
+		}
+		void confirm({
+			title: `Trust addresses from ${model.name}?`,
+			description: `${model.name} does not say whether an address is verified. Whoever sets an address there then signs in to the account here that has it. Turn it on only when ${model.name} is your own directory, like your Entra tenant.`,
+			confirmText: 'Trust addresses',
+			onConfirm: () => {
+				if (!model) return;
+				model.trustUnverifiedEmail = true;
 				save();
 			}
 		});
@@ -209,15 +230,6 @@
 		{/if}
 	{/snippet}
 
-	{#snippet actions()}
-		{#if can.own && model}
-			<Button size="sm" href={testHref(model.providerId)} data-sveltekit-reload>
-				<FlaskConical data-icon="inline-start" />
-				Test sign-in
-			</Button>
-		{/if}
-	{/snippet}
-
 	{#if model}
 		<Tabs.Content value="overview" class="flex flex-col divide-y">
 			<Section
@@ -268,6 +280,23 @@
 							checked={model.jitProvisioning}
 							disabled={!can.own}
 							onCheckedChange={setJIT}
+						/>
+					</Field.Field>
+					<Field.Field orientation="horizontal">
+						<Field.Content>
+							<Field.Label for="provider-trust-email"
+								>Trust addresses it does not verify</Field.Label
+							>
+							<Field.Description>
+								Entra sends no email_verified, so existing accounts only link by address with this
+								on.
+							</Field.Description>
+						</Field.Content>
+						<Switch
+							id="provider-trust-email"
+							checked={model.trustUnverifiedEmail}
+							disabled={!can.own}
+							onCheckedChange={setTrustEmail}
 						/>
 					</Field.Field>
 					<Field.Field data-invalid={!scopesValid}>

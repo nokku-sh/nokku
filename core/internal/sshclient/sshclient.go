@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,12 +23,12 @@ const (
 	keepaliveInterval = 30 * time.Second
 )
 
-// Config HostPrincipal is the daemon's target id.
+// Config HostPrincipal is the daemon's target id. HostCAs are the host CA keys its certificate may come from.
 type Config struct {
 	HostPrincipal string
 	Username      string
 	Signer        ssh.Signer
-	CAKey         ssh.PublicKey
+	HostCAs       []ssh.PublicKey
 	Width         uint32
 	Height        uint32
 }
@@ -96,13 +97,14 @@ func DialTerminal(ctx context.Context, conn net.Conn, cfg Config) (*Terminal, er
 }
 
 func dial(conn net.Conn, cfg Config) (*Terminal, error) {
-	caKey := cfg.CAKey
 	config := &ssh.ClientConfig{
 		User: cfg.Username,
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(cfg.Signer)},
 		HostKeyCallback: (&ssh.CertChecker{
 			IsHostAuthority: func(auth ssh.PublicKey, _ string) bool {
-				return bytes.Equal(auth.Marshal(), caKey.Marshal())
+				return slices.ContainsFunc(cfg.HostCAs, func(ca ssh.PublicKey) bool {
+					return bytes.Equal(auth.Marshal(), ca.Marshal())
+				})
 			},
 		}).CheckHostKey,
 	}

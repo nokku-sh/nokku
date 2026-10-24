@@ -59,6 +59,31 @@ func TestServerDisconnectReapsCommand(t *testing.T) {
 	}
 }
 
+// A dropped client hangs up the shell like a closed terminal, so it can save its history and run its traps.
+func TestServerDisconnectHangsUpTheShell(t *testing.T) {
+	ca := newTestCA(t)
+	addr, closeFn := startTestServer(t, ca)
+	defer closeFn()
+	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	require.NoError(t, err, "dial")
+	sess, err := client.NewSession()
+	require.NoError(t, err, "new session")
+	stdout, err := sess.StdoutPipe()
+	require.NoError(t, err, "stdout")
+
+	mark := filepath.Join(t.TempDir(), "hup")
+	require.NoError(t, sess.Start("trap 'echo hup > "+mark+"; kill $!; exit 0' HUP; echo ready; sleep 30 & wait"))
+	line := make([]byte, len("ready\n"))
+	_, err = io.ReadFull(stdout, line)
+	require.NoError(t, err, "the trap is set once ready is out")
+
+	_ = client.Close()
+	assert.Eventually(t, func() bool {
+		_, statErr := os.Stat(mark)
+		return statErr == nil
+	}, 5*time.Second, 20*time.Millisecond, "the shell got no SIGHUP")
+}
+
 func TestServerSignalForwards(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
@@ -549,7 +574,8 @@ func TestNoTermWithoutPTY(t *testing.T) {
 	assert.Equal(t, "unset\n", string(out))
 }
 
-func TestFullRecordingEndsSession(t *testing.T) {
+// An interactive session ends at the cap, or a flood would switch recording off for what is typed next.
+func TestFullRecordingEndsAnInteractiveSession(t *testing.T) {
 	ca := newTestCA(t)
 	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{Record: true}}, func(s *Server) {
 		require.NoError(t, paths.Verify(), "verify paths")
@@ -562,8 +588,10 @@ func TestFullRecordingEndsSession(t *testing.T) {
 	sess, err := client.NewSession()
 	require.NoError(t, err, "new session")
 	defer sess.Close()
-	var stderr bytes.Buffer
-	sess.Stderr = &stderr
+	require.NoError(t, sess.RequestPty("xterm", 80, 24, ssh.TerminalModes{}), "request pty")
+	// The pty carries stdout and stderr alike.
+	var stdout bytes.Buffer
+	sess.Stdout = &stdout
 
 	done := make(chan error, 1)
 	go func() { done <- sess.Run("head -c 200000 /dev/urandom | base64; exec sleep 30") }()
@@ -575,5 +603,29 @@ func TestFullRecordingEndsSession(t *testing.T) {
 	case <-time.After(15 * time.Second):
 		t.Fatal("the session went on unrecorded")
 	}
-	assert.Contains(t, stderr.String(), "the recording of this session is full")
+	assert.Contains(t, stdout.String(), "the recording of this session is full")
+}
+
+// An exec session runs on past the cap, a git clone or rsync must not die halfway. The gap is on the audit trail.
+func TestFullRecordingKeepsAnExecSessionRunning(t *testing.T) {
+	ca := newTestCA(t)
+	log, events := auditLog()
+	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{Record: true}, Log: log}, func(s *Server) {
+		require.NoError(t, paths.Verify(), "verify paths")
+		s.maxRecording = 1024
+	})
+	defer closeFn()
+	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	require.NoError(t, err, "dial")
+	defer client.Close()
+	sess, err := client.NewSession()
+	require.NoError(t, err, "new session")
+	defer sess.Close()
+
+	out, err := sess.Output("head -c 200000 /dev/urandom | base64 -w0; echo; echo done")
+	require.NoError(t, err, "the session did not finish")
+	assert.Len(t, out, 266668+len("\ndone\n"), "output went missing past the cap")
+	assert.True(t, bytes.HasSuffix(out, []byte("\ndone\n")))
+	assert.Eventually(t, func() bool { return slices.Contains(events(), eventRecordingDegraded) },
+		5*time.Second, 20*time.Millisecond, "the unrecorded rest left no audit event")
 }

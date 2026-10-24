@@ -2,9 +2,6 @@ package tpm
 
 import (
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -60,23 +57,9 @@ func createEnclave(opts SignerOptions) (Signer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("tpm: open new enclave key: %w", err)
 	}
-	pub, ok := key.Public().(*ecdsa.PublicKey)
-	if !ok {
-		return nil, errors.New("tpm: enclave key is not ECDSA")
-	}
-
-	digest := sha256.Sum256(blob)
-	sig, err := key.Sign(rand.Reader, digest[:], crypto.SHA256)
+	pubPEM, err := selfTest(key)
 	if err != nil {
-		return nil, fmt.Errorf("tpm: enclave test signature: %w", err)
-	}
-	if !ecdsa.VerifyASN1(pub, digest[:], sig) {
-		return nil, errors.New("tpm: enclave test signature does not verify")
-	}
-
-	pubPEM, err := pemEncodePublicKey(pub)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("enclave: %w", err)
 	}
 	st := &state{Method: MethodEnclave, PubKey: string(pubPEM), Data: blob}
 	if err = saveState(opts.StatePath, st); err != nil {

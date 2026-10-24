@@ -6,18 +6,14 @@ INSERT INTO
     description,
     private_key,
     public_key,
-    not_before,
-    not_after,
-    key_type,
-    key_bits,
-    lifetime,
+    host_private_key,
+    host_public_key,
     user_default_ttl,
     user_max_ttl,
     force_command,
     source_address,
     host_default_ttl,
-    host_max_ttl,
-    allowed_key_types
+    host_max_ttl
   )
 VALUES
   (
@@ -25,18 +21,14 @@ VALUES
     @description,
     @private_key,
     @public_key,
-    @not_before,
-    @not_after,
-    @key_type,
-    @key_bits,
-    @lifetime,
+    @host_private_key,
+    @host_public_key,
     @user_default_ttl,
     @user_max_ttl,
     @force_command,
     @source_address,
     @host_default_ttl,
-    @host_max_ttl,
-    @allowed_key_types
+    @host_max_ttl
   )
 RETURNING
   *;
@@ -68,9 +60,10 @@ WHERE
   t.daemon_id = $1;
 
 -- name: GetDaemonCAKeys :one
--- The public half only. A daemon sync must not decrypt the private key.
+-- The public halves only. A daemon sync must not decrypt a private key.
 SELECT
   ca.public_key,
+  ca.host_public_key,
   ca.previous_public_key,
   ca.previous_trusted_until
 FROM
@@ -80,11 +73,17 @@ WHERE
   t.daemon_id = $1;
 
 -- name: GetCAsByIDs :many
+-- The public halves only, for clients to trust.
 SELECT
   id,
   workspace_id,
   name,
   public_key,
+  host_public_key,
+  previous_public_key,
+  previous_host_public_key,
+  previous_trusted_until,
+  rotated_at,
   is_default,
   user_default_ttl,
   user_max_ttl
@@ -107,21 +106,20 @@ SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
   is_active = COALESCE(sqlc.narg('is_active'), is_active),
-  lifetime = COALESCE(sqlc.narg('lifetime'), lifetime),
   user_default_ttl = COALESCE(sqlc.narg('user_default_ttl'), user_default_ttl),
   user_max_ttl = COALESCE(sqlc.narg('user_max_ttl'), user_max_ttl),
   force_command = COALESCE(sqlc.narg('force_command'), force_command),
   source_address = COALESCE(sqlc.narg('source_address'), source_address),
   host_default_ttl = COALESCE(sqlc.narg('host_default_ttl'), host_default_ttl),
   host_max_ttl = COALESCE(sqlc.narg('host_max_ttl'), host_max_ttl),
-  allowed_key_types = COALESCE(sqlc.narg('allowed_key_types'), allowed_key_types),
   updated_at = NOW()
 WHERE
   id = @ca_id
 RETURNING
   *;
 
--- The replaced key stays trusted for as long as a certificate it signed can live, unless revoke_previous drops it.
+-- The replaced user key stays trusted for as long as a certificate it signed can live, unless revoke_previous drops
+-- it. The replaced host key gets the same time, a daemon asks for a new host certificate at its next sync.
 -- name: ReplaceCA :one
 UPDATE ssh_cas
 SET
@@ -129,16 +127,19 @@ SET
     WHEN @revoke_previous::BOOLEAN THEN NULL
     ELSE public_key
   END,
+  previous_host_public_key = CASE
+    WHEN @revoke_previous::BOOLEAN THEN NULL
+    ELSE host_public_key
+  END,
   previous_trusted_until = CASE
     WHEN @revoke_previous::BOOLEAN THEN NULL
     ELSE NOW() + user_max_ttl
   END,
   private_key = @private_key,
   public_key = @public_key,
-  not_before = @not_before,
-  not_after = @not_after,
-  key_type = @key_type,
-  key_bits = @key_bits,
+  host_private_key = @host_private_key,
+  host_public_key = @host_public_key,
+  rotated_at = NOW(),
   updated_at = NOW()
 WHERE
   id = @ca_id
@@ -170,29 +171,3 @@ WHERE
   id = @ca_id
 RETURNING
   *;
-
--- skip_ids holds CAs whose rotation already failed this pass.
--- name: GetExpiringCAForUpdate :one
-SELECT
-  ca.*
-FROM
-  ssh_cas ca
-WHERE
-  ca.is_active = TRUE
-  AND ca.id <> ALL (COALESCE(@skip_ids::UUID[], '{}'))
-  AND NOW() BETWEEN ca.not_before AND ca.not_after
-  AND EXTRACT(
-    EPOCH
-    FROM
-      (NOW() - ca.not_before)
-  ) / EXTRACT(
-    EPOCH
-    FROM
-      (ca.not_after - ca.not_before)
-  ) >= 0.80::DOUBLE PRECISION
-ORDER BY
-  ca.not_after ASC
-LIMIT
-  1
-FOR UPDATE
-  SKIP LOCKED;

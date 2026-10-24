@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -33,6 +32,8 @@ const (
 	ssoErrorPath        = "/sso-error"
 	providerHTTPTimeout = 15 * time.Second
 	providerCacheTTL    = 10 * time.Minute
+	// One discovered provider per issuer, every workspace on the hosted service may bring its own.
+	providerCacheEntries = 10_000
 )
 
 var (
@@ -95,7 +96,7 @@ func (s *sealed[T]) put(w http.ResponseWriter, v T) (string, error) {
 // take refuses a state of another flow, an expired one, and one whose flow already ended in a login.
 func (s *sealed[T]) take(r *http.Request) (T, string, error) {
 	var e envelope[T]
-	raw, err := base64.RawURLEncoding.DecodeString(cookieFromHeader(r.Header, s.cookie))
+	raw, err := base64.RawURLEncoding.DecodeString(s.svc.cookieValue(r.Header, s.cookie))
 	n := s.svc.flowAEAD.NonceSize()
 	if err != nil || len(raw) <= n {
 		return e.State, "", errFlowState
@@ -107,17 +108,15 @@ func (s *sealed[T]) take(r *http.Request) (T, string, error) {
 	if s.svc.now().Unix() >= e.Expires {
 		return e.State, "", errFlowState
 	}
-	if _, err := s.svc.spent.Get(r.Context(), e.ID); err == nil {
+	if _, spent := s.svc.spent.Get(e.ID); spent {
 		return e.State, "", errFlowState
 	}
 	return e.State, e.ID, nil
 }
 
-// spendFlow makes a finished flow single use. A full store is logged and skipped, it must never block a login.
-func (s *Service) spendFlow(ctx context.Context, id string) {
-	if err := s.spent.Set(ctx, id, nil, flowStateTTL); err != nil {
-		slog.Warn("flow state not marked as spent", "error", err)
-	}
+// spendFlow makes a finished flow single use.
+func (s *Service) spendFlow(id string) {
+	s.spent.Set(id, struct{}{})
 }
 
 func claimString(m map[string]any, keys ...string) string {
@@ -143,6 +142,16 @@ func claimIsFalse(v any) bool {
 		return !v
 	case string:
 		return strings.EqualFold(v, "false")
+	}
+	return false
+}
+
+func claimIsTrue(v any) bool {
+	switch v := v.(type) {
+	case bool:
+		return v
+	case string:
+		return strings.EqualFold(v, "true")
 	}
 	return false
 }

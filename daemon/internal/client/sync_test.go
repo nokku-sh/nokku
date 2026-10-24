@@ -29,8 +29,9 @@ import (
 type fakeCore struct {
 	nokkuv1connect.UnimplementedDaemonControlServiceHandler
 
-	ca    string
-	signs atomic.Int32
+	ca     string
+	hostCA string
+	signs  atomic.Int32
 	// pending answers like a core that has not approved the daemon.
 	pending atomic.Bool
 	// enrolled holds the last enroll request.
@@ -59,9 +60,10 @@ func (b *fakeCore) SyncDaemon(
 		return &nokkuv1.SyncDaemonResponse{Status: nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING.Enum()}, nil
 	}
 	return &nokkuv1.SyncDaemonResponse{
-		Status:       nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
-		CaPublicKey:  &b.ca,
-		StateVersion: new(int64(7)),
+		Status:          nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
+		CaPublicKey:     &b.ca,
+		HostCaPublicKey: &b.hostCA,
+		StateVersion:    new(int64(7)),
 		Principals: []*nokkuv1.AccountPrincipals{
 			{Username: new("deploy"), CertPrincipals: []string{"subject-1"}},
 		},
@@ -125,7 +127,7 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
-	core := &fakeCore{ca: newTestCAKey(t)}
+	core := &fakeCore{ca: newTestCAKey(t), hostCA: newTestCAKey(t)}
 	c := newSyncClient(t, core)
 
 	must.NoError(c.syncDaemon(t.Context()), "a sync must not fail on the host certificate")
@@ -138,7 +140,7 @@ func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	select {
 	case <-c.renew:
 	default:
-		t.Fatal("a new CA did not wake the certificate watcher")
+		t.Fatal("a new host CA did not wake the certificate watcher")
 	}
 	must.Error(c.renewHostCerts(t.Context()), "the refused host certificate went unnoticed")
 	_, err := os.Stat(paths.HostKeyCert())

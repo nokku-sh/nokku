@@ -14,7 +14,7 @@
 	import { AccessRequestStatus, type AccessRequest } from '#lib/gen/nokku/v1/access_request_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import PlanBadge from '#lib/components/blocks/PlanBadge.svelte';
-	import { upgradeLink } from '#lib/plans.js';
+	import { usePlans } from '#lib/plans.js';
 	import { statusTone } from '#lib/tone.js';
 	import { enumLabel, formatHours, formatTs } from '#lib/utils.js';
 	import { durationMs } from '@bufbuild/protobuf/wkt';
@@ -29,6 +29,7 @@
 	const tags = $derived(ws.data?.requestableTags ?? []);
 	const filters = targetApi.filters(() => can.admin);
 	const info = util.instanceInfo();
+	const plans = usePlans();
 
 	let view = $state<'waiting' | 'answered'>('waiting');
 	let asking = $state(false);
@@ -99,7 +100,7 @@
 			</Card.Description>
 		</Card.Header>
 		{#if can.admin}
-			{@const upgrade = upgradeLink('access_requests', info.data?.mode)}
+			{@const upgrade = plans.upgradeLink('access_requests', info.data?.mode)}
 			<Card.Footer>
 				<Button
 					variant="outline"

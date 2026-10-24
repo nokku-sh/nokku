@@ -23,10 +23,12 @@ async function guard<T>(p: Promise<T>): Promise<T> {
 export const account = {
 	user: (): Promise<User> => guard(client.getAccount({})).then((r) => r.user as User),
 
-	update: (patch: { name?: string; picture?: string }) =>
-		guard(client.updateAccount({ name: patch.name, picture: patch.picture })).then(
-			(r) => r.user as User
-		),
+	update: (patch: { name?: string }) =>
+		guard(client.updateAccount({ name: patch.name })).then((r) => r.user as User),
+
+	/** An empty image removes the avatar. */
+	setAvatar: (image: Uint8Array): Promise<User> =>
+		guard(client.setAvatar({ image })).then((r) => r.user as User),
 
 	requestEmailChange: (newEmail: string): Promise<void> =>
 		guard(client.requestEmailChange({ newEmail })).then(() => undefined),

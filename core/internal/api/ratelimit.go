@@ -17,7 +17,7 @@ import (
 const (
 	generalPerMinute = 6000
 
-	// Auth endpoints are the spraying and enumeration surface. Guessing one account is capped per account in iam.
+	// Auth endpoints are the spraying and enumeration surface. Sign-in mails also wait out a cooldown per address.
 	authPerMinute = 300
 
 	// Anyone can start a device login and it parks a grant until it expires. This is how many one address can hold.
@@ -62,8 +62,10 @@ func clientIP(r *http.Request) (string, error) {
 	return realip.Bucket(r.Header, r.RemoteAddr), nil
 }
 
+// Enrolling a daemon is open to anyone with a token, so it is guessed at like a sign-in.
 func isAuthRoute(path string) bool {
-	return strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
+	return path == nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure ||
+		strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
 		strings.HasPrefix(path, "/nokku.v1.InvitationService/") ||
 		strings.HasPrefix(path, "/auth/") ||
 		strings.HasPrefix(path, "/oidc/") ||

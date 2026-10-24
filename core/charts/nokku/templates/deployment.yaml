@@ -71,8 +71,8 @@ spec:
               value: {{ .Values.app.database.sslMode | quote }}
             - name: NOKKU_DB_AUTOMIGRATE
               value: {{ .Values.app.database.autoMigrate | quote }}
-            - name: NOKKU_LOCAL_STORAGE_PATH
-              value: {{ .Values.app.localStoragePath | quote }}
+            - name: NOKKU_STORAGE_URL
+              value: {{ .Values.app.storageURL | quote }}
             - name: NOKKU_SECRET
               valueFrom:
                 secretKeyRef:

@@ -126,7 +126,7 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 	// No CA on a server means the default one of the workspace.
 	cas := []*string{nil}
 	for range n.cas {
-		ca, err := ssh.NewCA(nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519, 0, 0)
+		ca, err := ssh.NewCA()
 		if err != nil {
 			return err
 		}

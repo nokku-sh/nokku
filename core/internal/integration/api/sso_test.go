@@ -15,6 +15,10 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+
+	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
 // fakeIssuer serves a discovery document under any path, so each path is an issuer of its own.
@@ -191,4 +195,42 @@ func TestEnforceSSOIsGated(t *testing.T) {
 			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
 		})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "got %v", err)
+}
+
+// Requiring single sign-on signs out everyone a passkey or a mailed link let in, in the browser and in nk. The owner
+// keeps a way in, and sessions a provider started stay.
+func TestEnforceSSOEndsOtherSessions(t *testing.T) {
+	cfg, _ := newTestAPI(t)
+	srv := enterpriseServer(t)
+	ws := seedWorkspace(t, cfg)
+	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	issue := func(u *db.User, kind actor.Kind, method iam.Method) string {
+		_, token, err := cfg.IAM.IssueToken(wsCtx(t, cfg), iam.TokenParams{SubjectID: u.ID, Kind: kind, Method: method})
+		require.NoError(t, err)
+		return token
+	}
+	owner := issue(seedOwner(t, cfg), actor.KindUser, iam.MethodPasskey)
+	sessions := map[string]bool{
+		issue(member, actor.KindUser, iam.MethodPasskey):   false,
+		issue(member, actor.KindUser, iam.MethodMagicLink): false,
+		issue(member, actor.KindCLI, iam.MethodPasskey):    false,
+		issue(member, actor.KindUser, iam.MethodOIDC):      true,
+		issue(member, actor.KindCLI, iam.MethodOIDC):       true,
+		owner: true,
+	}
+
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+owner)).
+		UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
+			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
+		})
+	require.NoError(t, err)
+
+	for token, stays := range sessions {
+		_, tok, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), token)
+		if stays {
+			assert.NoError(t, err, "a %s session of kind %s was ended", tok.Method, tok.Kind)
+		} else {
+			assert.Error(t, err, "a session outlived the rule")
+		}
+	}
 }

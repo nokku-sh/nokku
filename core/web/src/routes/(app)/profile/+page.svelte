@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
-	import { httpFetch } from '#lib/api/client.js';
 	import { credentials } from '#lib/api/credential.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import DangerZone from '#lib/components/sheets/DangerZone.svelte';
@@ -29,6 +28,7 @@
 	const RoleIcon = $derived(roleIcon(me.data?.role || WorkspaceRole.MEMBER));
 
 	const updateProfile = user.updateProfile();
+	const setAvatar = user.setAvatar();
 	const deleteAccount = user.deleteAccount();
 	const requestEmailChange = user.requestEmailChange();
 	const creds = credentials.all();
@@ -50,6 +50,18 @@
 	}
 
 	const autoSave = useAutoSave(() => updateProfile.mutateAsync({ name: model?.name }));
+
+	// The crop comes at full size. The server keeps 128px, so a small copy is all it needs.
+	async function shrink(file: Blob, size = 256): Promise<Uint8Array> {
+		const bitmap = await createImageBitmap(file);
+		const canvas = document.createElement('canvas');
+		canvas.width = canvas.height = size;
+		canvas.getContext('2d')?.drawImage(bitmap, 0, 0, size, size);
+		bitmap.close();
+		const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+		if (!blob) throw new Error('The picture could not be read');
+		return new Uint8Array(await blob.arrayBuffer());
+	}
 
 	function askDelete() {
 		void confirm({
@@ -78,15 +90,10 @@
 				bind:src={() => model.picture ?? '', (v) => (model.picture = v)}
 				onCropped={async (file) => {
 					try {
-						const form = new FormData();
-						form.append('picture', file);
-						const res = await httpFetch('/upload/avatar', { method: 'POST', body: form });
-						// The upload only stores the file, UpdateAccount attaches it.
-						const { url } = await res.json();
-						await updateProfile.mutateAsync({ picture: url });
+						await setAvatar.mutateAsync(await shrink(file));
 						toast.success('Avatar updated');
 					} catch {
-						// httpFetch already toasted the error.
+						// The query client already toasted the error.
 					}
 				}}
 				onUnsupportedFile={(file) => toast.error(`Unsupported file type: ${file.type}`)}
@@ -103,7 +110,7 @@
 							aria-label="Remove avatar"
 							onclick={() => {
 								model.picture = '';
-								updateProfile.mutate({ picture: '' });
+								setAvatar.mutate(new Uint8Array());
 							}}
 						>
 							<Trash />

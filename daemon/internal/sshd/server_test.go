@@ -394,7 +394,7 @@ func TestServerLivePrincipals(t *testing.T) {
 	_, err = dial(t, l.Addr().String(), cur.Username, userCert(t, ca, testPrincipal))
 	must.Error(err, "expected auth to fail before the principal is granted")
 
-	cache.Replace(map[string][]string{cur.Username: {testPrincipal}}, nil, "", nil, 0)
+	cache.Replace(map[string][]string{cur.Username: {testPrincipal}}, nil, "", "", nil, 0)
 	client, err := dial(t, l.Addr().String(), cur.Username, userCert(t, ca, testPrincipal))
 	must.NoError(err, "dial after cache update")
 	defer client.Close()

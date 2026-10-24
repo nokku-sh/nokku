@@ -1087,14 +1087,14 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	" RevokeServiceAccountTokenRequest\x126\n" +
 	"\x12service_account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x10serviceAccountId\x12\x18\n" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"#\n" +
-	"!RevokeServiceAccountTokenResponse2\xb6\a\n" +
+	"!RevokeServiceAccountTokenResponse2\xba\a\n" +
 	"\x15ServiceAccountService\x12g\n" +
 	"\x11GetServiceAccount\x12\".nokku.v1.GetServiceAccountRequest\x1a#.nokku.v1.GetServiceAccountResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12m\n" +
-	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12m\n" +
-	"\x14CreateServiceAccount\x12%.nokku.v1.CreateServiceAccountRequest\x1a&.nokku.v1.CreateServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12m\n" +
+	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12o\n" +
+	"\x14CreateServiceAccount\x12%.nokku.v1.CreateServiceAccountRequest\x1a&.nokku.v1.CreateServiceAccountResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12m\n" +
 	"\x14UpdateServiceAccount\x12%.nokku.v1.UpdateServiceAccountRequest\x1a&.nokku.v1.UpdateServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12m\n" +
-	"\x14DeleteServiceAccount\x12%.nokku.v1.DeleteServiceAccountRequest\x1a&.nokku.v1.DeleteServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12|\n" +
-	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12|\n" +
+	"\x14DeleteServiceAccount\x12%.nokku.v1.DeleteServiceAccountRequest\x1a&.nokku.v1.DeleteServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12~\n" +
+	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12|\n" +
 	"\x18ListServiceAccountTokens\x12).nokku.v1.ListServiceAccountTokensRequest\x1a*.nokku.v1.ListServiceAccountTokensResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12|\n" +
 	"\x19RevokeServiceAccountToken\x12*.nokku.v1.RevokeServiceAccountTokenRequest\x1a+.nokku.v1.RevokeServiceAccountTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x03B\x94\x01\n" +
 	"\fcom.nokku.v1B\x13ServiceAccountProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"

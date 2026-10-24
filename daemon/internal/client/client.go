@@ -39,9 +39,6 @@ const (
 	retryUploadsWhenFull = time.Hour
 )
 
-// signerSalt namespaces the daemon's DPoP key. Salt registry: internal/README.md.
-const signerSalt = "nokku-daemon"
-
 var errDaemonRejected = errors.New("daemon rejected by core")
 
 type Client struct {
@@ -76,7 +73,6 @@ func New(
 	}
 	// The identity is bound to the enrollment, so only a new enrollment may recreate it.
 	proofer, err := dpopclient.NewProofer(tpm.SignerOptions{
-		Salt:       []byte(signerSalt),
 		StatePath:  paths.SignerStateFile(),
 		RequireTPM: requireTPM,
 		Recreate:   enrollToken != "",

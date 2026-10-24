@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { sso, testHref } from '#lib/api/sso.svelte.js';
+	import { sso } from '#lib/api/sso.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import InputGroupVariants from '#lib/components/blocks/InputGroupVariants.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { useSheet } from '#lib/hooks/index.js';
 	import { KeyRound } from '@lucide/svelte';
 	import RedirectURI from './RedirectURI.svelte';
 
@@ -22,6 +23,7 @@
 	];
 
 	const put = sso.put();
+	const sheet = useSheet();
 
 	let issuerUrl = $state('');
 	let clientId = $state('');
@@ -66,7 +68,7 @@
 		editId = false;
 	}
 
-	// Saved off, so nobody sees it on the sign-in page before the test passes. The test offers to turn it on.
+	// Saved off, so nobody sees it on the sign-in page before the owner turned it on and tried it.
 	async function submit() {
 		await put.mutateAsync({
 			providerId,
@@ -78,19 +80,20 @@
 			enabled: false,
 			jitProvisioning: false
 		});
-		location.assign(testHref(providerId));
-		return false;
+		const id = providerId;
+		reset();
+		await sheet.show(id);
 	}
 </script>
 
 <FormModal
 	bind:open
 	title="Add provider"
-	description="Create an OpenID Connect web app at your provider, then paste what it gives you."
+	description="Create an OpenID Connect web app at your provider, then paste what it gives you. It is saved turned off. Turn it on, then sign in from a private window to try it, your own session stays."
 	icon={KeyRound}
 	onOpenChange={(v) => !v && reset()}
 	onSubmit={submit}
-	submitLabel="Add and test"
+	submitLabel="Add provider"
 	submitDisabled={!valid}
 	classModal="sm:max-w-lg"
 >

@@ -191,6 +191,14 @@ func featuresProto(p entitlement.Plan) map[string]bool {
 	return features
 }
 
+func catalogProto() []*nokkuv1.PlanFeature {
+	out := make([]*nokkuv1.PlanFeature, len(entitlement.CatalogFeatures))
+	for i, f := range entitlement.CatalogFeatures {
+		out[i] = &nokkuv1.PlanFeature{Key: new(f.Code), Label: new(f.Label), Plan: new(f.Plan)}
+	}
+	return out
+}
+
 // quotasProto uses -1 for unlimited.
 func quotasProto(p entitlement.Plan) *nokkuv1.Quotas {
 	return &nokkuv1.Quotas{

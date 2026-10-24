@@ -27,6 +27,8 @@ const (
 	maxClientEnv          = 64
 	// Each queued signal costs a helper process once the command starts.
 	maxPendingSignals = 8
+	// How long an interactive shell gets after the hangup before it is killed.
+	hangupGrace = 5 * time.Second
 )
 
 type session struct {
@@ -65,9 +67,8 @@ type session struct {
 	exitMu sync.Mutex
 	exited bool
 
-	procMu   sync.Mutex
-	proc     *os.Process
-	wantKill bool
+	procMu sync.Mutex
+	proc   *os.Process
 
 	// Names of the signals that arrived before the command started, flushed by setProc. Guarded by procMu.
 	pendingSignals []string
@@ -152,9 +153,8 @@ func (sess *session) handleRequests() {
 		}
 	}
 
-	// The client is gone, so stop waiting on output a background process may still hold open.
+	// The client is gone. Canceling hangs up the command and stops waiting on output a background process holds.
 	sess.cancel()
-	sess.killProc()
 	if handlerDone != nil {
 		<-handlerDone
 		return
@@ -336,26 +336,12 @@ func (sess *session) signal(req *ssh.Request) {
 
 func (sess *session) setProc(p *os.Process) {
 	sess.procMu.Lock()
-	if sess.wantKill {
-		sess.procMu.Unlock()
-		_ = p.Kill()
-		return
-	}
 	sess.proc = p
 	pending := sess.pendingSignals
 	sess.pendingSignals = nil
 	sess.procMu.Unlock()
 	for _, name := range pending {
 		sess.signalProc(p.Pid, name)
-	}
-}
-
-func (sess *session) killProc() {
-	sess.procMu.Lock()
-	defer sess.procMu.Unlock()
-	sess.wantKill = true
-	if sess.proc != nil {
-		_ = sess.proc.Kill()
 	}
 }
 
@@ -438,6 +424,8 @@ func (sess *session) shellCmd() (*exec.Cmd, error) {
 	shell := sess.sysUser.Shell
 	// #nosec G204 - running the authenticated user's shell is the SSH server's purpose.
 	cmd := exec.CommandContext(sess.ctx, shell)
+	// An ended session hangs up its command, so a shell saves its history and runs its traps. WaitDelay then kills.
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGHUP) }
 	cmd.Args = []string{"-" + filepath.Base(shell)}
 	if sess.rawCmd != "" {
 		cmd.Args = []string{filepath.Base(shell), "-c", sess.rawCmd}
@@ -490,6 +478,7 @@ func (sess *session) runPTY() {
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = sess.tty, sess.tty, sess.tty
 		// The pty becomes the controlling terminal of the new session.
 		cmd.SysProcAttr.Setctty = true
+		cmd.WaitDelay = hangupGrace
 		return cmd.Start()
 	})
 	if err != nil {
@@ -615,15 +604,16 @@ func (sess *session) startRecorder(width, height int) {
 	sess.rec = rec
 }
 
-// Ending the session at the size limit means nothing runs unrecorded and a flood cannot switch recording off.
+// An interactive session ends at the size limit, so a flood cannot switch recording off for what is typed next. An
+// exec session runs on unrecorded, its command line is already in the audit log and transfers like git clone or
+// rsync must not die halfway.
 func (sess *session) recordingFull() {
-	sess.recordingDegraded("size limit reached, session ended")
-	notice := "nokkud: the recording of this session is full, closing it"
-	if sess.ptmx != nil {
-		_, _ = io.WriteString(sess, "\r\n"+notice+"\r\n")
-	} else {
-		_, _ = io.WriteString(sess.Stderr(), notice+"\n")
+	if sess.ptmx == nil {
+		sess.recordingDegraded("size limit reached, the rest of the output is not recorded")
+		return
 	}
+	sess.recordingDegraded("size limit reached, session ended")
+	_, _ = io.WriteString(sess, "\r\nnokkud: the recording of this session is full, closing it\r\n")
 	sess.exit(1)
 }
 
@@ -660,7 +650,7 @@ func startPiped(cmd *exec.Cmd) (stdin io.WriteCloser, stdout io.ReadCloser, err 
 		_ = stdin.Close()
 		return nil, nil, err
 	}
-	// Bounds Wait when a background process keeps stderr open.
+	// Bounds Wait when a background process keeps stderr open, and the grace after a hangup.
 	cmd.WaitDelay = time.Second
 	return stdin, stdout, cmd.Start()
 }

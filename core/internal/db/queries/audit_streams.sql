@@ -79,7 +79,9 @@ WHERE
   AND (
     retry_at IS NULL
     OR retry_at <= NOW()
-  );
+  )
+ORDER BY
+  id;
 
 -- name: ListAuditLogsAfter :many
 -- The events after the cursor in a stable order. A row is stamped when its insert starts and commits a moment

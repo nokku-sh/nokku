@@ -143,3 +143,38 @@ func TestOpenLegalHoldKeepsWhatFollows(t *testing.T) {
 		t.Fatal("retention deleted an audit row under an open hold")
 	}
 }
+
+// Deleting the workspace would take its held recordings and the hold itself, and leave its audit rows unprotected.
+func TestLegalHoldKeepsTheWorkspace(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+
+	var hold *db.LegalHold
+	asOwner(t, c, f, func(q *db.Queries) (err error) {
+		hold, err = q.CreateLegalHold(t.Context(), &db.CreateLegalHoldParams{
+			Reason:   "incident 7",
+			StartsAt: time.Now().Add(-time.Hour),
+		})
+		return err
+	})
+
+	asOwner(t, c, f, func(q *db.Queries) error {
+		deleted, err := q.DeleteWorkspace(t.Context(), f.ws)
+		if err != nil {
+			return err
+		}
+		if deleted != 0 {
+			t.Fatal("a workspace under a legal hold was deleted")
+		}
+		_, err = q.DeleteLegalHold(t.Context(), hold.ID)
+		return err
+	})
+
+	asOwner(t, c, f, func(q *db.Queries) error {
+		deleted, err := q.DeleteWorkspace(t.Context(), f.ws)
+		if deleted != 1 {
+			t.Fatalf("after release: deleted %d workspaces, want 1", deleted)
+		}
+		return err
+	})
+}

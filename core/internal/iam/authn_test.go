@@ -18,7 +18,6 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
-	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
 func TestRequestCredential(t *testing.T) {
@@ -39,7 +38,7 @@ func TestRequestCredential(t *testing.T) {
 			if tt.authorization != "" {
 				header.Set("Authorization", tt.authorization)
 			}
-			if got := requestCredential(header); got != tt.want {
+			if got := (&Service{}).requestCredential(header); got != tt.want {
 				t.Fatalf("requestCredential() = %q, want %q", got, tt.want)
 			}
 		})
@@ -48,7 +47,7 @@ func TestRequestCredential(t *testing.T) {
 	t.Run("cookie", func(t *testing.T) {
 		header := http.Header{}
 		header.Add("Cookie", sessionCookieName+"=cookietok")
-		if got := requestCredential(header); got != "cookietok" {
+		if got := (&Service{}).requestCredential(header); got != "cookietok" {
 			t.Fatalf("requestCredential() = %q, want cookietok", got)
 		}
 	})
@@ -57,10 +56,9 @@ func TestRequestCredential(t *testing.T) {
 func newTestVerifier(t *testing.T, now func() time.Time) *DPoPVerifier {
 	t.Helper()
 	return &DPoPVerifier{
-		secret:     []byte("test-secret"),
-		replay:     cache.NewMemory(100),
-		anonReplay: cache.NewMemory(2),
-		now:        now,
+		secret: []byte("test-secret"),
+		replay: cache.New[[32]byte, struct{}](100, 3*dpopMaxSkew),
+		now:    now,
 	}
 }
 
@@ -226,23 +224,14 @@ func TestAdvertiseDPoPNonce(t *testing.T) {
 	})
 }
 
-// Anonymous callers can fill the device grant store, so replay markers must not live there.
-func TestDPoPReplayStoreIsNotShared(t *testing.T) {
-	// New only keeps the connection, nothing here reaches the database.
-	svc, err := New(t.Context(), Deps{Conn: &db.Connection{}, Secret: []byte("test-secret")})
-	if err != nil {
-		t.Fatalf("build iam service: %v", err)
-	}
-	if svc.DPoP.replay == svc.Device.grants {
-		t.Fatal("DPoP replay markers share the store anonymous callers write to")
-	}
-}
-
 // Anyone can send a proof without an access token, a flood must not get signed-in callers refused.
+// Anyone can sign a proof without a session, so it never takes room in the replay store. What it is for, enrolling
+// a daemon or polling a device grant, is single-use anyway.
 func TestDPoPAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
 	const htu = "https://nokku.example.com/x"
 	now := time.Unix(1_800_000_000, 0)
 	v := newTestVerifier(t, func() time.Time { return now })
+	v.replay = cache.New[[32]byte, struct{}](2, 3*dpopMaxSkew)
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatalf("generate key: %v", err)
@@ -253,20 +242,19 @@ func TestDPoPAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
 			ath = DPoPATH(token)
 		}
 		proof := signProof(t, key, htu, ath, v.CurrentNonce(), now)
-		_, err := v.Verify(t.Context(), proof, token, http.MethodPost, htu, "")
+		_, err := v.Verify(proof, token, http.MethodPost, htu, "")
 		return err
 	}
 
-	for range 2 {
+	for range 10 {
 		if err := verify(""); err != nil {
 			t.Fatalf("anonymous proof: %v", err)
 		}
 	}
-	if err := verify(""); err == nil {
-		t.Fatal("anonymous proof accepted with a full anonymous store")
-	}
-	if err := verify("session-token"); err != nil {
-		t.Fatalf("session proof refused after an anonymous flood: %v", err)
+	for range 2 {
+		if err := verify("session-token"); err != nil {
+			t.Fatalf("session proof refused after an anonymous flood: %v", err)
+		}
 	}
 }
 
@@ -275,7 +263,7 @@ func TestDPoPWrongKeyLeavesNoMarker(t *testing.T) {
 	const htu, token = "https://nokku.example.com/x", "session-token"
 	now := time.Unix(1_800_000_000, 0)
 	v := newTestVerifier(t, func() time.Time { return now })
-	v.replay = cache.NewMemory(1)
+	v.replay = cache.New[[32]byte, struct{}](1, 3*dpopMaxSkew)
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatalf("generate key: %v", err)
@@ -288,7 +276,7 @@ func TestDPoPWrongKeyLeavesNoMarker(t *testing.T) {
 	proof := func() string { return signProof(t, key, htu, DPoPATH(token), v.CurrentNonce(), now) }
 
 	verify := func(proof, binding string) error {
-		_, err := v.Verify(t.Context(), proof, token, http.MethodPost, htu, binding)
+		_, err := v.Verify(proof, token, http.MethodPost, htu, binding)
 		return err
 	}
 
@@ -301,5 +289,20 @@ func TestDPoPWrongKeyLeavesNoMarker(t *testing.T) {
 	}
 	if err := verify(once, binding); !errors.Is(err, errReplay) {
 		t.Fatalf("replayed proof = %v, want errReplay", err)
+	}
+}
+
+func TestDPoPProofRefusesTwoHeaders(t *testing.T) {
+	h := http.Header{}
+	if proof, err := DPoPProof(h); proof != "" || err != nil {
+		t.Fatalf("DPoPProof() without a header = %q, %v", proof, err)
+	}
+	h.Add("DPoP", "a.b.c")
+	if proof, err := DPoPProof(h); proof != "a.b.c" || err != nil {
+		t.Fatalf("DPoPProof() = %q, %v, want a.b.c", proof, err)
+	}
+	h.Add("DPoP", "d.e.f")
+	if _, err := DPoPProof(h); !errors.Is(err, errInvalidProof) {
+		t.Fatalf("DPoPProof() with two headers: err = %v, want errInvalidProof", err)
 	}
 }

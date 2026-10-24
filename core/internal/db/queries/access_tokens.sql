@@ -120,3 +120,19 @@ DELETE FROM access_tokens
 WHERE
   id = @id
   AND kind = 'scim';
+
+-- name: DeleteNonSSOSessions :execrows
+-- Requiring single sign-on ends the sessions a passkey or a mailed link started, in the browser and in nk. The owner
+-- keeps theirs, the way in when a provider breaks.
+DELETE FROM access_tokens
+WHERE
+  kind IN ('user', 'cli')
+  AND method <> 'oidc'
+  AND user_id NOT IN (
+    SELECT
+      id
+    FROM
+      users
+    WHERE
+      role = 5
+  );

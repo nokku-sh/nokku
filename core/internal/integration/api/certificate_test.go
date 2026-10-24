@@ -189,7 +189,6 @@ func TestCARestrictions(t *testing.T) {
 
 	created, err := admin.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
 		Name:          new(uniq("restricted")),
-		KeyType:       nokkuv1.CertificateKeyType_CERTIFICATE_KEY_TYPE_ED25519.Enum(),
 		ForceCommand:  new(" /usr/local/bin/backup "),
 		SourceAddress: new("10.0.0.0/8, 192.0.2.7"),
 	})

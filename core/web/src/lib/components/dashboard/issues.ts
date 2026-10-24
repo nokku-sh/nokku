@@ -2,7 +2,6 @@ import type { Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
 import type { GetDashboardResponse } from '#lib/gen/nokku/v1/dashboard_pb.js';
 import type { Tone } from '#lib/tone.js';
 import { formatTs } from '#lib/utils.js';
-import { timestampDate } from '@bufbuild/protobuf/wkt';
 
 export type Issue = {
 	id: string;
@@ -36,7 +35,6 @@ export function isFresh(d: GetDashboardResponse | undefined): boolean {
 	return !!d && d.targets === 0 && d.daemons === 0;
 }
 
-const DAY = 24 * 3600_000;
 const toneRank: Record<Tone, number> = {
 	destructive: 0,
 	warning: 1,
@@ -70,21 +68,6 @@ export function issuesOf(d: GetDashboardResponse): Issue[] {
 				? `Last seen ${formatTs(daemon.lastSeenAt, 'relative')}. Its targets are unreachable.`
 				: 'It never connected. Check that nokkud runs on the host.',
 			href: `/infrastructure/daemons?id=${daemon.id}`
-		});
-	}
-
-	for (const ca of d.soonestCas) {
-		const left = ca.notAfter ? timestampDate(ca.notAfter).getTime() - Date.now() : Infinity;
-		if (left > 14 * DAY) continue;
-		const urgent = left < 3 * DAY;
-		issues.push({
-			id: `ca-${ca.id}`,
-			tone: urgent ? 'destructive' : 'warning',
-			title: `${ca.name} expires ${formatTs(ca.notAfter, 'relative')}`,
-			detail: urgent
-				? 'Roll it over now. Logins signed by it stop working when it expires.'
-				: 'Roll it over before then, or logins signed by it stop working.',
-			href: `/certificates?id=${ca.id}`
 		});
 	}
 

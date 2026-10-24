@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	// Recording stops at this compressed size and OnLimit ends the session.
+	// Recording stops at this compressed size and calls OnLimit.
 	maxSize     = 50 << 20
 	maxIdleTime = 2 * time.Second
 	// A crash loses at most this much of the tail of a recording.

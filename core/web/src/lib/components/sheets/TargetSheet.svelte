@@ -70,7 +70,7 @@
 	// The server only learns a new CA key from nk sync.
 	const caRotated = $derived.by(() => {
 		const rotatedAt = (caList.find((c) => c.id === entity?.caId) ?? caList.find((c) => c.isDefault))
-			?.notBefore;
+			?.rotatedAt;
 		const syncedAt = entity?.lastSyncAt;
 		return !!syncedAt && !!rotatedAt && timestampDate(rotatedAt) > timestampDate(syncedAt);
 	});

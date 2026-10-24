@@ -99,7 +99,8 @@ func (s *recordingService) GetRecording(
 
 	buf := make([]byte, 32<<10)
 	for {
-		n, readErr := fr.Read(buf)
+		// Tink reads one 4 KiB segment at a time, ReadFull fills the chunk.
+		n, readErr := io.ReadFull(fr, buf)
 		if n > 0 {
 			if err = stream.Send(&nokkuv1.GetRecordingResponse{
 				Msg: &nokkuv1.GetRecordingResponse_Chunk{Chunk: buf[:n]},
@@ -110,11 +111,12 @@ func (s *recordingService) GetRecording(
 		if readErr == nil {
 			continue
 		}
-		if errors.Is(readErr, io.EOF) {
+		if errors.Is(readErr, io.EOF) || errors.Is(readErr, io.ErrUnexpectedEOF) {
 			return nil
 		}
-		slog.Error("read recording frame", "recording_id", rec.ID, "error", readErr)
-		return errInternal
+		// What was sent is all that verified, the rest of the object was cut off or changed.
+		slog.Error("read recording", "recording_id", rec.ID, "error", readErr)
+		return newError(connect.CodeDataLoss, "the recording is damaged or was cut short, it ends here")
 	}
 }
 

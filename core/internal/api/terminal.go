@@ -29,8 +29,9 @@ const (
 	wsShellExited websocket.StatusCode = 4000
 
 	// The browser opens the socket right after CreateSession.
-	sessionTicketTTL = 30 * time.Second
-	sessionIdle      = 30 * time.Minute
+	sessionTicketTTL     = 30 * time.Second
+	sessionTicketEntries = 10_000
+	sessionIdle          = 30 * time.Minute
 
 	// sshclient chunks at 32 KB, below the burst, so WaitN is valid.
 	webStdoutRate  = 512 << 10
@@ -39,22 +40,20 @@ const (
 
 // sessionTicket is what CreateSession authorized, cached until the websocket trades it in.
 type sessionTicket struct {
-	WorkspaceID string `json:"workspace_id"`
-	DaemonID    string `json:"daemon_id"`
-	UserID      string `json:"user_id"`
-	Username    string `json:"username"`
+	WorkspaceID string
+	DaemonID    string
+	UserID      string
+	Username    string
 }
 
-func putSessionTicket(ctx context.Context, c *cache.Memory, sessionID string, t sessionTicket) error {
-	b, err := json.Marshal(t)
-	if err != nil {
-		return err
-	}
-	return c.Set(ctx, "websession:"+sessionID, b, sessionTicketTTL)
+// sessionTickets go from CreateSession to the websocket that opens right after.
+func newSessionTickets() *cache.TTL[string, sessionTicket] {
+	return cache.New[string, sessionTicket](sessionTicketEntries, sessionTicketTTL)
 }
 
 type terminalHandler struct {
-	cfg *config.Config
+	cfg     *config.Config
+	tickets *cache.TTL[string, sessionTicket]
 }
 
 // handleWebSocket runs one shell for as long as the socket is open. A reload or a dropped connection ends it.
@@ -66,9 +65,8 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	}
 
 	// GetDel makes the ticket single use.
-	var ticket sessionTicket
-	raw, err := t.cfg.Cache.GetDel(r.Context(), "websession:"+sessionID)
-	if err != nil || json.Unmarshal(raw, &ticket) != nil {
+	ticket, ok := t.tickets.GetDel(sessionID)
+	if !ok {
 		writeJSONError(w, http.StatusNotFound, "session not found")
 		return
 	}

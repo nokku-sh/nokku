@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/access.proto.
  */
 export const file_nokku_v1_access: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIl0KBkFjY2VzcxIOCgZwdWJsaWMYASABKAgSDAoEc2VsZhgCIAEoCBIlCgRyb2xlGAMgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZRIOCgZkYWVtb24YBCABKAgqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzQowBCgxjb20ubm9ra3UudjFCC0FjY2Vzc1Byb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_google_protobuf_descriptor]);
+  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxInIKBkFjY2VzcxIOCgZwdWJsaWMYASABKAgSDAoEc2VsZhgCIAEoCBIlCgRyb2xlGAMgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZRIOCgZkYWVtb24YBCABKAgSEwoLcGVvcGxlX29ubHkYBSABKAgqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzQowBCgxjb20ubm9ra3UudjFCC0FjY2Vzc1Byb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_google_protobuf_descriptor]);
 
 /**
  * @generated from message nokku.v1.Access
@@ -37,6 +37,13 @@ export type Access = Message<"nokku.v1.Access"> & {
    * @generated from field: bool daemon = 4;
    */
   daemon: boolean;
+
+  /**
+   * people_only refuses service accounts, so a leaked token cannot mint more credentials for itself.
+   *
+   * @generated from field: bool people_only = 5;
+   */
+  peopleOnly: boolean;
 };
 
 /**

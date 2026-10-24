@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
-	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -43,6 +42,8 @@ func (s *workspaceService) GetWorkspace(
 		BaseUrl:   new(ws.BaseURL),
 		Inactive:  new(st.Plan.Name == entitlement.PlanInactive),
 		Features:  featuresProto(st.Plan),
+		Catalog:   catalogProto(),
+		PlanNames: entitlement.PlanNames,
 	}
 	if st.Sub != nil {
 		resp.DeleteAt = db.SafeTimestamp(deletionDate(st.Sub))
@@ -60,6 +61,7 @@ func (s *workspaceService) UpdateWorkspace(
 		if err != nil {
 			return err
 		}
+		wasEnforced := base.Settings.GetEnforceSso()
 		// Each field the request sets replaces the stored one whole. Merge would keep a stored timeout under a zero one.
 		if settings := req.GetSettings(); settings != nil {
 			settings.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
@@ -72,6 +74,12 @@ func (s *workspaceService) UpdateWorkspace(
 			Description: req.Description,
 			Settings:    base.Settings,
 		})
+		if err != nil || wasEnforced || !base.Settings.GetEnforceSso() {
+			return err
+		}
+		// A passkey session would outlive the rule by up to 30 days otherwise.
+		ended, err := q.DeleteNonSSOSessions(ctx)
+		audit.Set(ctx, "sessions_ended", ended)
 		return err
 	}); err != nil {
 		return nil, err
@@ -88,6 +96,14 @@ func (s *workspaceService) DeleteWorkspace(
 		return nil, errSingleWorkspace
 	}
 	ws, _ := actor.WorkspaceFromContext(ctx)
+	// Asked before billing, a held workspace must not lose its subscription and then stay.
+	holds, err := s.cfg.Conn.Tenant().CountLegalHolds(ctx)
+	if err != nil {
+		return nil, errInternal
+	}
+	if holds > 0 {
+		return nil, errLegalHold
+	}
 	if err := s.cfg.Billing.Cancel(ctx, ws.ID, true, ""); err != nil {
 		return nil, errInternal
 	}
@@ -97,28 +113,18 @@ func (s *workspaceService) DeleteWorkspace(
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
-// deleteWorkspace removes ws with its recordings and avatars.
+// deleteWorkspace removes ws with its recordings. The database refuses while a legal hold exists.
 func deleteWorkspace(ctx context.Context, cfg *config.Config, ws actor.Workspace) error {
 	ctx = actor.WithWorkspace(ctx, ws)
-	// Avatars are stored by user id, so the ids are read while the rows exist.
-	userIDs, err := cfg.Conn.Tenant().ListUserIDs(ctx)
+	deleted, err := cfg.Conn.Tenant().DeleteWorkspace(ctx, ws.ID)
 	if err != nil {
 		return err
 	}
-	if err := cfg.Conn.Tenant().DeleteWorkspace(ctx, ws.ID); err != nil {
-		return err
+	if deleted == 0 {
+		return errLegalHold
 	}
 	cfg.Tenant.Forget(ws.Slug)
 	cfg.Record.PurgeWorkspace(ctx, ws.ID)
-
-	// Detached like PurgeWorkspace, a big workspace would outlast the request.
-	avatarCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
-	go func() {
-		defer cancel()
-		for _, id := range userIDs {
-			deleteAvatar(avatarCtx, cfg, id)
-		}
-	}()
 	return nil
 }
 
@@ -135,7 +141,7 @@ func (s *workspaceService) CreateWorkspace(
 	}
 	// Asked before anything exists. A workspace whose owner gets no mail would sit there until the purge.
 	addr := strings.ToLower(strings.TrimSpace(req.GetOwnerEmail()))
-	if s.cfg.Email.OwnerLinkOnCooldown(ctx, addr) {
+	if s.cfg.Email.OwnerLinkOnCooldown(addr) {
 		return nil, newError(
 			connect.CodeResourceExhausted,
 			"a sign-in link went to this address a moment ago, try again later",
@@ -272,7 +278,6 @@ func (s *workspaceService) DeleteUser(
 	}); err != nil {
 		return nil, err
 	}
-	deleteAvatar(ctx, s.cfg, req.GetUserId())
 	return &nokkuv1.DeleteUserResponse{}, nil
 }
 
@@ -313,37 +318,4 @@ func (s *workspaceService) TransferOwnership(
 		return nil, err
 	}
 	return &nokkuv1.TransferOwnershipResponse{}, nil
-}
-
-// streamLife ends a stream so the client comes back through authentication.
-const streamLife = 10 * time.Minute
-
-// SubscribeChanges costs a goroutine per stream and no database connection.
-func (s *workspaceService) SubscribeChanges(
-	ctx context.Context,
-	_ *nokkuv1.SubscribeChangesRequest,
-	stream *connect.ServerStream[nokkuv1.SubscribeChangesResponse],
-) error {
-	ctx, cancel := context.WithTimeout(ctx, streamLife)
-	defer cancel()
-	sub := s.cfg.Live.Subscribe(actor.WorkspaceIDFromContext(ctx))
-	defer sub.Close()
-
-	// Without a first message the client cannot tell when it is subscribed.
-	if err := stream.Send(&nokkuv1.SubscribeChangesResponse{}); err != nil {
-		return err
-	}
-	for {
-		change, err := sub.Next(ctx)
-		if err != nil {
-			return nil
-		}
-		res := &nokkuv1.SubscribeChangesResponse{Services: change.Services}
-		if change.Everything {
-			res.Everything = new(true)
-		}
-		if err := stream.Send(res); err != nil {
-			return err
-		}
-	}
 }

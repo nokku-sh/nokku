@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -70,7 +72,7 @@ func TestVerifyHostDaemon(t *testing.T) {
 	caSigner := newSigner(t)
 	target := state.Target{ID: verifyTargetID, Name: "prod", DaemonID: "d", CAID: "ca"}
 	trust(t, &state.State{
-		CAs:     []state.CA{{ID: "ca", PublicKey: string(ssh.MarshalAuthorizedKey(caSigner.PublicKey()))}},
+		CAs:     []state.CA{{ID: "ca", HostPublicKey: string(ssh.MarshalAuthorizedKey(caSigner.PublicKey()))}},
 		Targets: []state.Target{target},
 	})
 
@@ -134,4 +136,66 @@ func TestPrivateAddr(t *testing.T) {
 	} {
 		assert.Equal(t, want, privateAddr(addr), addr)
 	}
+}
+
+// pinnedSSH runs the real ssh against addr with opts and returns what it printed. Login always fails, the server
+// lets nobody in, so the output tells a refused host key from a refused login.
+func pinnedSSH(t *testing.T, addr string, opts []string) string {
+	t.Helper()
+	host, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+	args := []string{
+		"-F", "/dev/null", "-p", port,
+		"-o", "BatchMode=yes", "-o", "IdentityAgent=none", "-o", "IdentitiesOnly=yes",
+	}
+	args = append(args, opts...)
+	out, _ := exec.CommandContext(t.Context(), "ssh", append(args, "--", host, "true")...).CombinedOutput()
+	return string(out)
+}
+
+func TestPinnedHostOptions(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("ssh"); err != nil {
+		t.Skip("ssh not available")
+	}
+	host := newSigner(t)
+	addr := sshServer(t, host)
+	pin := func(key ssh.PublicKey) []string {
+		target := &state.Target{
+			ID: verifyTargetID, Name: "web", HostPublicKey: string(ssh.MarshalAuthorizedKey(key)),
+		}
+		opts, err := PinnedHostOptions(target, filepath.Join(t.TempDir(), "known_hosts"))
+		require.NoError(t, err)
+		return opts
+	}
+
+	out := pinnedSSH(t, addr, pin(host.PublicKey()))
+	assert.NotContains(t, out, "Host key verification failed", out)
+	assert.Contains(t, out, "Permission denied", "the pinned host gets as far as the login")
+
+	out = pinnedSSH(t, addr, pin(newSigner(t).PublicKey()))
+	assert.Contains(t, out, "Host key verification failed", "an impostor is refused before any login")
+}
+
+func TestPinnedHostOptionsRefusesAnUnusableKey(t *testing.T) {
+	t.Parallel()
+	target := &state.Target{ID: verifyTargetID, Name: "web", HostPublicKey: "ssh-ed25519 AAAA\nbad"}
+	_, err := PinnedHostOptions(target, filepath.Join(t.TempDir(), "known_hosts"))
+	require.Error(t, err)
+}
+
+func TestAcceptHostOptions(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("ssh"); err != nil {
+		t.Skip("ssh not available")
+	}
+	host := newSigner(t)
+	addr := sshServer(t, host)
+	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
+
+	out := pinnedSSH(t, addr, AcceptHostOptions(&state.Target{ID: verifyTargetID}, knownHosts))
+	assert.Contains(t, out, "Permission denied", out)
+	written, err := os.ReadFile(knownHosts)
+	require.NoError(t, err)
+	assert.Contains(t, string(written), verifyTargetID+" ", "the key is stored under the target id")
 }

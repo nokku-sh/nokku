@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -119,12 +118,13 @@ func (s *daemonControlService) SyncDaemon(
 		return nil, err
 	}
 	return &nokkuv1.SyncDaemonResponse{
-		Status:        res.Status,
-		Config:        res.Config,
-		Principals:    res.Principals,
-		CaPublicKey:   &res.CAPublicKey,
-		RetiredCaKeys: res.RetiredCAs,
-		StateVersion:  &res.Version,
+		Status:          res.Status,
+		Config:          res.Config,
+		Principals:      res.Principals,
+		CaPublicKey:     &res.CAPublicKey,
+		RetiredCaKeys:   res.RetiredCAs,
+		HostCaPublicKey: &res.HostCAPublicKey,
+		StateVersion:    &res.Version,
 	}, nil
 }
 
@@ -197,10 +197,6 @@ func (s *daemonControlService) UploadRecording(
 	if err != nil {
 		return nil, err
 	}
-	// A scrub of what an earlier try left would write over this upload.
-	uploaded := sync.OnceFunc(s.cfg.Record.BeginUpload(rec.ID))
-	defer uploaded()
-
 	// A daemon that dies takes ctx with it. What arrived by then is the evidence, so the writer outlives it.
 	wctx, abort := context.WithCancel(context.WithoutCancel(ctx))
 	defer abort()
@@ -266,11 +262,6 @@ receive:
 		return nil, err
 	}
 
-	// Whatever is stored gets scrubbed, the part of a cut upload too.
-	uploaded()
-	if rec.SizeBytes > 0 {
-		s.cfg.Record.ScrubRecording(ctx, rec)
-	}
 	switch {
 	case ended != nil:
 		// What was stored is kept as a cut recording.
@@ -383,9 +374,12 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci connect.Cal
 	}
 
 	ws, _ := actor.WorkspaceFromContext(ctx)
+	proof, err := iam.DPoPProof(ci.RequestHeader())
+	if err != nil {
+		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")
+	}
 	binding, err := svc.DPoP.Verify(
-		ctx,
-		ci.RequestHeader().Get("DPoP"),
+		proof,
 		"",
 		http.MethodPost,
 		ws.BaseURL+nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure,

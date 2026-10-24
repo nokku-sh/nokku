@@ -111,13 +111,6 @@ function formatRelative(ts: Timestamp, short = false): string {
 	return isFuture ? `in ${str}` : `${str} ago`;
 }
 
-/** Excludes 0/UNSPECIFIED. */
-export function enumToArray<T extends object>(e: T): { name: string; value: number }[] {
-	return Object.entries(e)
-		.filter(([, v]) => typeof v === 'number' && v !== 0)
-		.map(([name, value]) => ({ name, value: value as number }));
-}
-
 export function enumLabel(value: string | undefined): string {
 	if (!value) return '';
 	return value

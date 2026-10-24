@@ -50,8 +50,8 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 
 Every signing identity is ECDSA P-256. The daemon authenticates to the core with DPoP, and its session token is bound to that key.
 
-- **With a TPM 2.0**, or a vTPM on AWS, GCP, Azure, Proxmox and others, the key is generated inside the TPM and never leaves it. It is derived deterministically, so it survives reboots without storing anything.
-- **Restrict the TPM device to the daemon.** The TPM primary is created without an auth value or PCR policy, so any process that can open `/dev/tpmrm0` can use the identity.
+- **With a TPM 2.0**, or a vTPM on AWS, GCP, Azure, Proxmox and others, the key is generated inside the TPM and never leaves it. The TPM wraps it to itself, and that blob is kept in a TSS2 key file under `/var/lib/nokkud`, readable by root only. Using the key takes the blob and the TPM. A blob copied to another machine does not load there.
+- **Keep `/var/lib/nokkud` to root.** The key has no auth value or PCR policy, so a process that can read the state files and open `/dev/tpmrm0` can use the identity. Access to the TPM alone is not enough.
 - **Without a TPM**, the daemon uses a software key wrapped with a key derived from the machine fingerprint (`/etc/machine-id` and friends). That only stops someone from copying the state file to another machine. It is not encryption against anyone who can read the file, because the fingerprint is public. The key is only as strong as the file permissions.
 - **Run with `--require-tpm` on servers that have a TPM.** The daemon then refuses to fall back to the software key.
 
@@ -69,9 +69,8 @@ System `sshd` on port 22 is never touched. It is your way back in if Nokku misbe
 
 ### Recordings on the server
 
-- Recordings are written unredacted to `/var/lib/nokkud/recordings/` and uploaded to the core. The daemon does no redaction of its own.
-- The core scrubs credential patterns after the upload completes. That is best effort. A failed scrub leaves the upload as it is and raises a `RecordingScrubFailed` audit event. It is not retried.
-- Anyone with access to the recordings directory, or to the core's storage, can read what was on the terminal.
+- Recordings are written to `/var/lib/nokkud/recordings/` and uploaded to the core. Nothing is redacted, by the daemon or the core. A secret printed on the terminal is in the recording. Typed passwords are not, input is only recorded while the terminal echoes.
+- Anyone with access to the recordings directory can read what was on the terminal. On the core every recording is encrypted with a key of its own.
 
 ### Account limits
 
@@ -101,7 +100,8 @@ Sessions never go through PAM. A granted user runs with their own OS privileges 
 - **A daemon that syncs applies a revoke at once** and closes the connections that were open on it.
 - **An approval can be taken back.** A daemon set back to pending drops its principals and its CA at the next sync. The core signs no certificates for its server until it is approved again.
 - **A retired CA has a deadline.** After a CA rollover the core sends the previous key with a deadline, and the daemon trusts it until then, so certificates it signed keep working. An emergency rollover sends no previous key, which ends that trust at the next sync. That sync also closes the connections still open on a certificate of a CA it no longer trusts.
-- **A sync never waits for the host certificate.** Principals and trusted CAs are applied as soon as they arrive. The host certificate is renewed apart from them, at half of its lifetime or when the CA changes. A signing failure cannot hold back a revoke.
+- **A sync never waits for the host certificate.** Principals and trusted CAs are applied as soon as they arrive. The host certificate is renewed apart from them, at half of its lifetime or when the CA's host key changes. A signing failure cannot hold back a revoke.
+- **Logins and host certificates use different keys.** Every CA has a user key, which signs logins, and a host key, which signs the daemon's host certificate. The daemon checks logins against the user key only.
 
 ### What a session may do
 
@@ -124,4 +124,5 @@ Sessions never go through PAM. A granted user runs with their own OS privileges 
 - **SFTP**, and so modern `scp`, is audited as a `subsystem` event. File contents are not recorded.
 - **Recordings stream to the core live.** Any that the core did not fully receive (offline, upload error, crash) are uploaded again every few minutes. Once the core confirms a recording, the local file is deleted. The core then holds the only copy and its retention applies.
 - **A recording that waits too long is dropped**, with a warning in the log: after 30 days, or oldest first once the waiting ones pass 1 GiB.
-- **Recording fails open, except at the size cap.** A session that cannot be recorded (under 512 MiB free, a file error) still runs, so a full disk never locks admins out. Every gap raises a `recording_degraded` audit event with the reason. A recording that reaches the 50 MB cap ends its session with a notice, so flooding output cannot switch recording off.
+- **Recording fails open, except for interactive sessions at the size cap.** A session that cannot be recorded (under 512 MiB free, a file error) still runs, so a full disk never locks admins out. Every gap raises a `recording_degraded` audit event with the reason.
+- **At the 50 MB cap an interactive session ends** with a notice, so flooding output cannot switch recording off for what is typed next. **An `exec` session runs on** with the rest of its output unrecorded, so `git clone`, `rsync` or `pg_dump` over ssh finish. Its command line is in the audit log either way. Such a recording closes at the cap, so the console stops listing the session as live and the recording has no exit code.

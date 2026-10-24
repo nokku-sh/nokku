@@ -25,6 +25,8 @@ var skipPrefixes = []string{
 const (
 	maxTarget    = 256
 	maxUserAgent = 512
+	// auditWriteTimeout bounds what a slow database adds to a request.
+	auditWriteTimeout = 10 * time.Second
 )
 
 type eventKey struct{}
@@ -111,14 +113,7 @@ func (s *Service) Record(ctx context.Context, e *Event) {
 		e.UserAgent = cut(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
 	}
 
-	// Detached so a slow DB cannot stall a login.
-	actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-	go func() {
-		defer cancel()
-		if err := s.Append(actx, e); err != nil {
-			slog.Warn("failed to write auth audit log", "action", e.Action, "error", err)
-		}
-	}()
+	s.write(ctx, e)
 }
 
 // finish skips unauthenticated calls and calls outside a workspace, the sign-in flows record their own.
@@ -141,18 +136,21 @@ func (s *Service) finish(ctx context.Context, e *Event, header http.Header, peer
 		e.Details["code"] = connect.CodeOf(err).String()
 	}
 
-	actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-	go func() {
-		defer cancel()
-		if e.ActorName == "" && (p.Kind == actor.KindUser || p.Kind == actor.KindCLI) {
-			if u, err := s.conn.Tenant().GetUser(actx, p.ID); err == nil {
-				e.ActorName = u.Email
-			}
+	if e.ActorName == "" && (p.Kind == actor.KindUser || p.Kind == actor.KindCLI) {
+		if u, err := s.conn.Tenant().GetUser(ctx, p.ID); err == nil {
+			e.ActorName = u.Email
 		}
-		if err := s.Append(actx, e); err != nil {
-			slog.Warn("failed to write audit log", "action", e.Action, "error", err)
-		}
-	}()
+	}
+	s.write(ctx, e)
+}
+
+// write runs before the answer goes out, so a shutdown loses no row and a client that hangs up does not stop it.
+func (s *Service) write(ctx context.Context, e *Event) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), auditWriteTimeout)
+	defer cancel()
+	if err := s.Append(ctx, e); err != nil {
+		slog.Error("failed to write audit log", "action", e.Action, "error", err)
+	}
 }
 
 // requestTarget reads only id, name and *_id fields, so no secret in the request can reach the log.

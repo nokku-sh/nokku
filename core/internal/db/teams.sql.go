@@ -76,7 +76,7 @@ INSERT INTO
 VALUES
   ($1, $2, COALESCE($3::TEXT[], '{}'))
 RETURNING
-  id, workspace_id, name, description, tags, scim_external_id, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
 `
 
 type CreateTeamParams struct {
@@ -95,6 +95,7 @@ func (q *Queries) CreateTeam(ctx context.Context, arg *CreateTeamParams) (*Team,
 		&i.Description,
 		&i.Tags,
 		&i.ScimExternalID,
+		&i.ScimManaged,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -106,7 +107,7 @@ DELETE FROM teams
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, description, tags, scim_external_id, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
 `
 
 func (q *Queries) DeleteTeam(ctx context.Context, teamID string) (*Team, error) {
@@ -119,6 +120,7 @@ func (q *Queries) DeleteTeam(ctx context.Context, teamID string) (*Team, error) 
 		&i.Description,
 		&i.Tags,
 		&i.ScimExternalID,
+		&i.ScimManaged,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -127,7 +129,7 @@ func (q *Queries) DeleteTeam(ctx context.Context, teamID string) (*Team, error) 
 
 const getTeam = `-- name: GetTeam :one
 SELECT
-  id, workspace_id, name, description, tags, scim_external_id, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
 FROM
   teams
 WHERE
@@ -144,6 +146,7 @@ func (q *Queries) GetTeam(ctx context.Context, teamID string) (*Team, error) {
 		&i.Description,
 		&i.Tags,
 		&i.ScimExternalID,
+		&i.ScimManaged,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -204,7 +207,7 @@ func (q *Queries) ListTeamMembers(ctx context.Context, teamID string) ([]*ListTe
 
 const listTeams = `-- name: ListTeams :many
 SELECT
-  te.id, te.workspace_id, te.name, te.description, te.tags, te.scim_external_id, te.created_at, te.updated_at,
+  te.id, te.workspace_id, te.name, te.description, te.tags, te.scim_external_id, te.scim_managed, te.created_at, te.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   teams te
@@ -259,6 +262,7 @@ func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListT
 			&i.Team.Description,
 			&i.Team.Tags,
 			&i.Team.ScimExternalID,
+			&i.Team.ScimManaged,
 			&i.Team.CreatedAt,
 			&i.Team.UpdatedAt,
 			&i.TotalCount,
@@ -275,7 +279,7 @@ func (q *Queries) ListTeams(ctx context.Context, arg *ListTeamsParams) ([]*ListT
 
 const listTeamsForUser = `-- name: ListTeamsForUser :many
 SELECT
-  t.id, t.workspace_id, t.name, t.description, t.tags, t.scim_external_id, t.created_at, t.updated_at
+  t.id, t.workspace_id, t.name, t.description, t.tags, t.scim_external_id, t.scim_managed, t.created_at, t.updated_at
 FROM
   teams t
   JOIN team_members tm ON tm.team_id = t.id
@@ -301,6 +305,7 @@ func (q *Queries) ListTeamsForUser(ctx context.Context, userID string) ([]*Team,
 			&i.Description,
 			&i.Tags,
 			&i.ScimExternalID,
+			&i.ScimManaged,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -341,7 +346,7 @@ SET
 WHERE
   id = $4
 RETURNING
-  id, workspace_id, name, description, tags, scim_external_id, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
 `
 
 type UpdateTeamParams struct {
@@ -366,6 +371,7 @@ func (q *Queries) UpdateTeam(ctx context.Context, arg *UpdateTeamParams) (*Team,
 		&i.Description,
 		&i.Tags,
 		&i.ScimExternalID,
+		&i.ScimManaged,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

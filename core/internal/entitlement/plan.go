@@ -34,17 +34,26 @@ type Feature struct {
 	Plan string
 }
 
+// CatalogFeatures is the one list of what a plan has. The console reads it through GetWorkspace.
 var CatalogFeatures = []Feature{
 	{FeatureOIDC, "OIDC single sign-on", PlanCommunity},
-	{FeatureEnforceSSO, "enforced single sign-on", PlanPro},
-	{FeatureAuditExport, "audit log export", PlanPro},
-	{FeatureExpiringAccess, "expiring access", PlanPro},
-	{FeatureAccessReview, "the access review report", PlanPro},
-	{FeatureIdleTimeout, "the idle session timeout", PlanPro},
+	{FeatureEnforceSSO, "Enforced single sign-on", PlanPro},
+	{FeatureAuditExport, "Audit log export", PlanPro},
+	{FeatureExpiringAccess, "Expiring access", PlanPro},
+	{FeatureAccessReview, "Access review report", PlanPro},
+	{FeatureIdleTimeout, "Idle session timeout", PlanPro},
 	{FeatureSCIM, "SCIM provisioning", PlanEnterprise},
-	{FeatureAccessRequests, "access requests", PlanEnterprise},
-	{FeatureAuditStreaming, "audit log streaming", PlanEnterprise},
-	{FeatureLegalHold, "legal hold", PlanEnterprise},
+	{FeatureAccessRequests, "Access requests", PlanEnterprise},
+	{FeatureAuditStreaming, "Audit log streaming", PlanEnterprise},
+	{FeatureLegalHold, "Legal hold", PlanEnterprise},
+}
+
+// PlanNames are the names people see, by plan code.
+var PlanNames = map[string]string{
+	PlanCommunity:  "Community",
+	PlanPro:        "Pro",
+	PlanEnterprise: "Enterprise",
+	PlanInactive:   "inactive",
 }
 
 const unlimited int64 = -1

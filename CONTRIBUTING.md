@@ -45,8 +45,8 @@ Both are static (`CGO_ENABLED=0`). The move of `nokkud` needs root, so the task
 calls `sudo`.
 
 `internal/` holds what the two share. Every change there ships in both
-binaries. Never change a registered salt (see `internal/README.md`). It
-silently rotates every machine identity derived from it.
+binaries. Never change the state file format of `internal/tpm` without a
+migration. A key that no longer loads means every machine re-enrolls.
 
 ## The core
 

@@ -63,7 +63,6 @@ func TestCreateNeedsOptIn(t *testing.T) {
 // TestSignerOverBridge runs the bridge under tpm.NewSigner like nk does: create, self-test, persist, reopen.
 func TestSignerOverBridge(t *testing.T) {
 	opts := tpm.SignerOptions{
-		Salt:      []byte("test-signer"),
 		StatePath: filepath.Join(t.TempDir(), "signer.json"),
 		Enclave:   software,
 	}

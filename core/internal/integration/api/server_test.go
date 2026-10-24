@@ -78,8 +78,10 @@ func TestUnknownServiceIsNotFound(t *testing.T) {
 
 // A deploy lets a request that is under way finish, and ends the streams at once.
 func TestShutdownLetsARequestFinish(t *testing.T) {
-	cfg, _ := newTestAPI(t)
-	member := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	member := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 
 	free, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -103,16 +105,24 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 		return resp.StatusCode == http.StatusOK
 	}, 5*time.Second, 20*time.Millisecond, "the server never listened")
 
-	// The deadline only matters when the stream does not end with the shutdown.
+	// A daemon's control stream lives as long as the daemon. The deadline only matters when the shutdown misses it.
 	streamCtx, giveUp := context.WithTimeout(t.Context(), 3*time.Second)
 	defer giveUp()
 	streamCtx, call := connect.NewClientContext(streamCtx)
-	call.RequestHeader().Set("Authorization", "Bearer "+member)
-	stream, err := nokkuv1connect.NewWorkspaceServiceClient(http.DefaultClient, base).
-		SubscribeChanges(streamCtx, &nokkuv1.SubscribeChangesRequest{})
+	token := enrolled.GetAccessToken()
+	call.RequestHeader().Set("Authorization", "DPoP "+token)
+	call.RequestHeader().Set("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceConnectProcedure, token))
+	// A bidi stream needs HTTP/2, which a proxy speaks to the core without TLS.
+	var h2c http.Protocols
+	h2c.SetUnencryptedHTTP2(true)
+	stream, err := nokkuv1connect.NewDaemonControlServiceClient(
+		&http.Client{Transport: &http.Transport{Protocols: &h2c}}, base,
+	).Connect(streamCtx)
 	require.NoError(t, err)
-	defer stream.Close()
-	require.True(t, stream.Receive(), "the stream never opened: %v", stream.Err())
+	defer func() { _ = stream.CloseRequest() }()
+	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
+		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
+	}))
 
 	// The body arrives after the shutdown began, so the handler runs inside the grace.
 	body, send := io.Pipe()
@@ -135,7 +145,10 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	shutdown()
 
-	for stream.Receive() {
+	for {
+		if _, err := stream.Receive(); err != nil {
+			break
+		}
 	}
 	require.NoError(t, streamCtx.Err(), "a stream outlived the root ctx")
 

@@ -224,8 +224,11 @@ message SyncDaemonResponse {
   DaemonConfig config = 2;
   repeated AccountPrincipals principals = 3;
   int64 state_version = 4;
+  // The user CA key logins are checked against.
   string ca_public_key = 5;
   repeated RetiredCAKey retired_ca_keys = 6;
+  // The host CA key the daemon's host certificate has to come from.
+  string host_ca_public_key = 7;
 }
 
 message RetiredCAKey {

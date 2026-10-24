@@ -59,7 +59,7 @@ func sendChunk(stream *uploadStream, chunk []byte) error {
 	return stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Chunk{Chunk: chunk}})
 }
 
-// uploadMiB returns the answer the daemon got. Zeros are no gzip stream, so the scrub gives up on them.
+// uploadMiB returns the answer the daemon got.
 func uploadMiB(
 	t *testing.T,
 	cfg *config.Config,
@@ -163,8 +163,8 @@ func TestUploadRecordingKeepsWhatADeadDaemonSent(t *testing.T) {
 	assert.EqualValues(t, whole.Len(), storedBytes(t, cfg, id))
 }
 
-// The part a dead daemon left is scrubbed, it may be all there ever is. So is the whole file that replaces it.
-func TestCutRecordingIsScrubbed(t *testing.T) {
+// The part a dead daemon left is kept, it may be all there ever is. The whole file replaces it later.
+func TestCutRecordingIsKept(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
@@ -207,12 +207,11 @@ func TestCutRecordingIsScrubbed(t *testing.T) {
 	die()
 
 	require.Eventually(t, func() bool {
-		return strings.Contains(stored(), "DB_PASSWORD=<redacted>")
-	}, 10*time.Second, 20*time.Millisecond, "the part was not scrubbed")
-	assert.NotContains(t, stored(), "VhT9xNq2mLb4Zw")
+		return strings.Contains(stored(), "DB_PASSWORD")
+	}, 10*time.Second, 20*time.Millisecond, "the part was not kept")
 	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
-	assert.False(t, rec.Complete, "the scrub made the cut recording a whole one")
+	assert.False(t, rec.Complete, "a cut recording counts as whole")
 
 	var whole bytes.Buffer
 	zw = gzip.NewWriter(&whole)
@@ -227,10 +226,8 @@ func TestCutRecordingIsScrubbed(t *testing.T) {
 	_, err = stream.CloseAndReceive()
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
-		got := stored()
-		return strings.Contains(got, "done") && strings.Contains(got, "DB_PASSWORD=<redacted>")
-	}, 10*time.Second, 20*time.Millisecond, "the whole file did not replace the part, or was not scrubbed")
-	assert.NotContains(t, stored(), "VhT9xNq2mLb4Zw")
+		return strings.Contains(stored(), "done")
+	}, 10*time.Second, 20*time.Millisecond, "the whole file did not replace the part")
 }
 
 // A late upload keeps the time it began. A start from a wrong clock counts as now, or retention would take it at once.
@@ -284,7 +281,7 @@ func TestUploadRecordingIsClosedWhenStorageCannotOpen(t *testing.T) {
 	id := uuid.NewV7().String()
 
 	// A file where the workspace's directory belongs, before the upload starts.
-	dir := filepath.Join(os.Getenv("NOKKU_LOCAL_STORAGE_PATH"), filepath.Dir(storage.RecordingPath(workspaceID, id)))
+	dir := filepath.Join(storageDir, filepath.Dir(storage.RecordingPath(workspaceID, id)))
 	require.NoError(t, os.RemoveAll(dir))
 	require.NoError(t, os.MkdirAll(filepath.Dir(dir), 0o700))
 	require.NoError(t, os.WriteFile(dir, nil, 0o600))
@@ -310,7 +307,7 @@ func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
 	stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
 	require.NoError(t, sendChunk(stream, make([]byte, 32<<10)))
 	// The object is written next to where it ends up. Without that directory the commit fails.
-	dir := filepath.Join(os.Getenv("NOKKU_LOCAL_STORAGE_PATH"), filepath.Dir(storage.RecordingPath(workspaceID, id)))
+	dir := filepath.Join(storageDir, filepath.Dir(storage.RecordingPath(workspaceID, id)))
 	require.Eventually(t, func() bool {
 		_, err := os.Stat(dir)
 		return err == nil

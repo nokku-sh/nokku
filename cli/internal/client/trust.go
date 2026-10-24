@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -105,7 +106,8 @@ func systemTrusts(ctx context.Context, api string) bool {
 	return !trust.Untrusted(err)
 }
 
-// The browser sign-in needs the CA, a passkey does not work behind a certificate warning. Asked once.
+// The browser sign-in needs the CA, a passkey does not work behind a certificate warning. Asked once, and only for a
+// CA that can vouch for this server alone, like the core's own.
 func offerInstall(api string, ca []byte) bool {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return false
@@ -114,16 +116,24 @@ func offerInstall(api string, ca []byte) bool {
 		api,
 		"/",
 	) + trust.CAPath + " if the browser warns about the certificate."
-	fmt.Fprintln(os.Stderr, "Your browser has to trust this CA too, or the sign-in page shows a certificate warning.")
-	if !ask("Install it into the system trust store? This may ask for your password.", true) {
+	certs, err := trust.ParseBundle(ca)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, ui.Yellow(fmt.Sprintf("warning: the CA cannot be installed: %v", err)))
 		fmt.Fprintln(os.Stderr, manual)
 		return false
 	}
-	certs, err := trust.ParseBundle(ca)
-	if err == nil {
-		err = truststore.Install(certs[0], truststore.WithFirefox(), truststore.WithPrefix("nokku-"))
+	host := apiHost(api)
+	if !scopedTo(certs[0], host) {
+		fmt.Fprintf(os.Stderr, "This CA is not limited to %s, so nk does not install it for every site.\n", host)
+		fmt.Fprintln(os.Stderr, manual)
+		return false
 	}
-	if err != nil {
+	fmt.Fprintln(os.Stderr, "Your browser has to trust this CA too, or the sign-in page shows a certificate warning.")
+	if !ask("Install it into the system trust store? This may ask for your password.", false) {
+		fmt.Fprintln(os.Stderr, manual)
+		return false
+	}
+	if err = truststore.Install(certs[0], truststore.WithFirefox(), truststore.WithPrefix("nokku-")); err != nil {
 		fmt.Fprintln(os.Stderr, ui.Yellow(fmt.Sprintf("warning: the CA was not installed: %v", err)))
 		fmt.Fprintln(os.Stderr, manual)
 		return false
@@ -135,6 +145,33 @@ func offerInstall(api string, ca []byte) bool {
 			"Most browsers read it. "+manual)
 	}
 	return true
+}
+
+// scopedTo reports whether ca vouches for host and the names below it only, never an IP address. A root in the
+// system trust store is trusted by every program, so a wider one could be used against any site.
+func scopedTo(ca *x509.Certificate, host string) bool {
+	if !ca.PermittedDNSDomainsCritical || len(ca.PermittedDNSDomains) != 1 ||
+		!strings.EqualFold(ca.PermittedDNSDomains[0], host) || len(ca.PermittedIPRanges) > 0 {
+		return false
+	}
+	var v4, v6 bool
+	for _, n := range ca.ExcludedIPRanges {
+		switch ones, bits := n.Mask.Size(); {
+		case ones == 0 && bits == 32:
+			v4 = true
+		case ones == 0 && bits == 128:
+			v6 = true
+		}
+	}
+	return v4 && v6
+}
+
+func apiHost(api string) string {
+	u, err := url.Parse(api)
+	if err != nil {
+		return api
+	}
+	return u.Hostname()
 }
 
 // OfferRemoval asks at sign-out, after it nk has no certificate left to remove the CA with.

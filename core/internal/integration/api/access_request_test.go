@@ -16,12 +16,20 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/api"
+	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
 
 // enterpriseServer serves the test workspace on an Enterprise license of its own, the shared server stays unlicensed.
 func enterpriseServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	_, srv := enterprise(t)
+	return srv
+}
+
+// enterprise is enterpriseServer with the config it runs on, for what runs beside the server.
+func enterprise(t *testing.T) (*config.Config, *httptest.Server) {
 	t.Helper()
 	cfg, _ := newTestAPI(t)
 	pubHex, key := issueLicense(t, entitlement.PlanEnterprise)
@@ -37,7 +45,7 @@ func enterpriseServer(t *testing.T) *httptest.Server {
 	_, err = nokkuv1connect.NewBillingServiceClient(srv.Client(), srv.URL, header("Authorization", "Bearer "+owner)).
 		ActivateLicense(t.Context(), &nokkuv1.ActivateLicenseRequest{Key: &key})
 	require.NoError(t, err)
-	return srv
+	return &local, srv
 }
 
 func TestAccessRequestFlow(t *testing.T) {

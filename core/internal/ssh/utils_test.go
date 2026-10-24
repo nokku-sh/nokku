@@ -1,11 +1,8 @@
 package ssh
 
 import (
-	"crypto/ecdsa"
 	"crypto/ed25519"
-	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"testing"
@@ -14,75 +11,45 @@ import (
 )
 
 func TestGetSigner(t *testing.T) {
-	// PEM-encoded PKCS#8 RSA key (what tink/sshgen emits).
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	_, ed, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rsaDER, err := x509.MarshalPKCS8PrivateKey(rsaKey)
+	der, err := x509.MarshalPKCS8PrivateKey(ed)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rsaPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: rsaDER})
-
-	// PKCS#1 PEM.
-	pkcs1PEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(rsaKey),
-	})
-
-	// EC PEM.
-	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	signer, err := getSigner(der)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("getSigner() error: %v", err)
 	}
-	ecDER, err := x509.MarshalECPrivateKey(ecKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ecPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: ecDER})
-
-	// Raw OpenSSH private key.
-	_, edKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	opensshPEM, err := ssh.MarshalPrivateKey(edKey, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := []struct {
-		name string
-		key  []byte
-	}{
-		{"pkcs8 pem", rsaPEM},
-		{"pkcs1 pem", pkcs1PEM},
-		{"ec pem", ecPEM},
-		{"openssh pem", pem.EncodeToMemory(opensshPEM)},
-		{"raw der", rsaDER},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			signer, err := getSigner(tt.key)
-			if err != nil {
-				t.Fatalf("getSigner() error: %v", err)
-			}
-			if signer == nil {
-				t.Fatal("getSigner() = nil")
-			}
-			if len(signer.PublicKey().Marshal()) == 0 {
-				t.Error("signer has empty public key")
-			}
-		})
+	if signer.PublicKey().Type() != ssh.KeyAlgoED25519 {
+		t.Errorf("signer is %s, want Ed25519", signer.PublicKey().Type())
 	}
 }
 
-func TestGetSigner_RejectsGarbage(t *testing.T) {
-	for _, raw := range [][]byte{nil, []byte("not a key"), []byte("-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----")} {
+// The core stores CA keys as PKCS#8 DER and nothing else, so anything else is not one of its keys.
+func TestGetSigner_RejectsOtherForms(t *testing.T) {
+	_, ed, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(ed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	openssh, err := ssh.MarshalPrivateKey(ed, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, raw := range map[string][]byte{
+		"nil":         nil,
+		"garbage":     []byte("not a key"),
+		"pkcs8 pem":   pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}),
+		"openssh pem": pem.EncodeToMemory(openssh),
+	} {
 		if _, err := getSigner(raw); err == nil {
-			t.Errorf("getSigner(%q): want error", raw)
+			t.Errorf("getSigner(%s): want error", name)
 		}
 	}
 }

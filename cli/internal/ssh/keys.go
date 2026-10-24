@@ -15,13 +15,9 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// Salt registry: internal/README.md.
-const sshSalt = "nokku-cli-ssh"
-
 // TPM or Secure Enclave when one is usable, otherwise a software key wrapped to this machine.
 func newSSHSigner(requireTPM bool) (tpm.Signer, error) {
 	return tpm.NewSigner(tpm.SignerOptions{
-		Salt:       []byte(sshSalt),
 		StatePath:  paths.SSHSignerFile(),
 		RequireTPM: requireTPM,
 		Recreate:   true,

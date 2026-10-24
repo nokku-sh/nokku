@@ -13,6 +13,7 @@ import (
 // encryptedColumns is every column holding keyset ciphertext. One missing here loses its data on a rotation.
 var encryptedColumns = []struct{ table, column string }{
 	{"ssh_cas", "private_key"},
+	{"ssh_cas", "host_private_key"},
 	{"sso_providers", "config"},
 	{"recordings", "key"},
 	{"web_ca", "private_key"},

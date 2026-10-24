@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto"
@@ -20,6 +21,9 @@ type OIDCProvider struct {
 	ClientSecret    string   `json:"client_secret,omitempty"`
 	Scopes          []string `json:"scopes,omitempty"`
 	JITProvisioning bool     `json:"jit_provisioning,omitempty"`
+	// TrustUnverifiedEmail links an existing account by an address the provider sends without email_verified, as
+	// Entra does. A provider that says false is never trusted, and the owner is never linked by email.
+	TrustUnverifiedEmail bool `json:"trust_unverified_email,omitempty"`
 }
 
 type SSOProvider struct {
@@ -149,4 +153,11 @@ func ssoProviderFromRow(row *db.SsoProvider) (*SSOProvider, error) {
 		}
 	}
 	return p, nil
+}
+
+// CheckIssuer loads the issuer's discovery document, so a typo fails on save and not at the first sign-in.
+// It skips the discovery cache, an issuer that is typed but never saved must not stay in it.
+func (s *Service) CheckIssuer(ctx context.Context, issuer string) error {
+	_, err := oidc.NewProvider(s.providerContext(ctx), issuer)
+	return err
 }

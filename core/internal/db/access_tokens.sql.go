@@ -129,6 +129,31 @@ func (q *Queries) DeleteExpiredAccessTokens(ctx context.Context, now *time.Time)
 	return result.RowsAffected(), nil
 }
 
+const deleteNonSSOSessions = `-- name: DeleteNonSSOSessions :execrows
+DELETE FROM access_tokens
+WHERE
+  kind IN ('user', 'cli')
+  AND method <> 'oidc'
+  AND user_id NOT IN (
+    SELECT
+      id
+    FROM
+      users
+    WHERE
+      role = 5
+  )
+`
+
+// Requiring single sign-on ends the sessions a passkey or a mailed link started, in the browser and in nk. The owner
+// keeps theirs, the way in when a provider breaks.
+func (q *Queries) DeleteNonSSOSessions(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteNonSSOSessions)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteSCIMToken = `-- name: DeleteSCIMToken :exec
 DELETE FROM access_tokens
 WHERE

@@ -16,16 +16,12 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// hostKeySalt namespaces the host key. Salt registry: internal/README.md.
-const hostKeySalt = "nokku-daemon-host"
-
 // Tests swap it.
 var newHostSigner = tpm.NewSigner
 
 // The host key is not the enrollment anchor, so an identity change just gets a fresh key and a renewed cert.
 func loadHostKey() (ssh.Signer, io.Closer, error) {
 	signer, err := newHostSigner(tpm.SignerOptions{
-		Salt:      []byte(hostKeySalt),
 		StatePath: paths.HostSignerStateFile(),
 		Recreate:  true,
 	})

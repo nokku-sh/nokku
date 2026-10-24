@@ -14,7 +14,6 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/live"
 )
 
 const (
@@ -64,10 +63,9 @@ type Pool struct {
 	// fresh holds daemons connected since the last heartbeat.
 	fresh map[string]struct{}
 	conn  connection
-	hub   *live.Hub
 }
 
-func New(ctx context.Context, conn connection, hub *live.Hub) *Pool {
+func New(ctx context.Context, conn connection) *Pool {
 	p := &Pool{
 		byID:          make(map[string]*daemonConn),
 		byWksp:        make(map[string]map[string]struct{}),
@@ -79,7 +77,6 @@ func New(ctx context.Context, conn connection, hub *live.Hub) *Pool {
 		versions:      make(map[string]int64),
 		fresh:         make(map[string]struct{}),
 		conn:          conn,
-		hub:           hub,
 	}
 
 	go p.heartbeat(ctx)
@@ -225,16 +222,6 @@ func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 		p.UnregisterRelay(id)
 	}
 	c.cancel()
-
-	// Offline is a stamp growing old and no write tells the consoles, so this does.
-	time.AfterFunc(db.DaemonOnlineWindow, func() {
-		p.mu.RLock()
-		_, back := p.byID[daemonID]
-		p.mu.RUnlock()
-		if !back {
-			p.hub.Changed(wksp, "daemons")
-		}
-	})
 }
 
 func (p *Pool) poke(workspaceID string) {

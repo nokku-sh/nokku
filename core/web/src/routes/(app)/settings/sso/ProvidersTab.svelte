@@ -12,12 +12,11 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { WorkspaceSettingsSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
 	import { confirm, sheetLink, useCreate, useSheet } from '#lib/hooks/index.js';
-	import { requiredPlan, upgradeLink } from '#lib/plans.js';
+	import { usePlans } from '#lib/plans.js';
 	import { create as createMessage } from '@bufbuild/protobuf';
 	import { ArrowRight, ChevronRight, KeyRound, Plus } from '@lucide/svelte';
 	import AddProviderModal from './AddProviderModal.svelte';
 	import ProviderSheet from './ProviderSheet.svelte';
-	import TestResult from './TestResult.svelte';
 
 	interface Props {
 		readonly?: boolean;
@@ -37,7 +36,8 @@
 	const enforced = $derived(ws.data?.settings?.enforceSso ?? false);
 	const anyEnabled = $derived((providers.data ?? []).some((p) => p.enabled));
 	const locked = $derived(enforceAvailable === false && !enforced);
-	const upgrade = $derived(upgradeLink('enforce_sso', mode));
+	const plans = usePlans();
+	const upgrade = $derived(plans.upgradeLink('enforce_sso', mode));
 
 	// Only the switch is sent. A downgraded workspace may turn it off, and nothing else rides along to be refused.
 	function setEnforced(on: boolean) {
@@ -47,7 +47,6 @@
 
 {#if !readonly}
 	<AddProviderModal bind:open={create.open} />
-	<TestResult providers={providers.data} {mode} />
 {/if}
 <ProviderSheet {mode} />
 
@@ -127,7 +126,7 @@
 		<Card.Header>
 			<Card.Title class="flex flex-wrap items-center gap-2">
 				<h2>Require single sign-on</h2>
-				{#if locked}<Badge variant="outline">{requiredPlan('enforce_sso')}</Badge>{/if}
+				{#if locked}<Badge variant="outline">{plans.requiredPlan('enforce_sso')}</Badge>{/if}
 			</Card.Title>
 			<Card.Description>
 				Passkeys and email links stop working for everyone but the owner. The owner keeps both to
@@ -149,7 +148,7 @@
 							? confirm({
 									title: 'Require single sign-on?',
 									description:
-										'From now on only your identity providers sign people in. The owner can still use a passkey or an email link. Test a provider first, so you know sign-in works.',
+										'From now on only your identity providers sign people in. Everyone else who signed in with a passkey or an email link is signed out, in the browser and in nk. The owner can still use both. Try a provider first, so you know sign-in works.',
 									confirmText: 'Require it',
 									onConfirm: () => setEnforced(true)
 								})
@@ -160,7 +159,7 @@
 		{#if locked}
 			<Card.Footer class="flex flex-wrap items-center justify-between gap-2 border-t">
 				<p id="enforce-locked" class="text-sm text-muted-foreground">
-					Your plan does not include it. {requiredPlan('enforce_sso')} does.
+					Your plan does not include it. {plans.requiredPlan('enforce_sso')} does.
 				</p>
 				{#if !readonly}
 					<Button

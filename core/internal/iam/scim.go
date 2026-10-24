@@ -7,7 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/elimity-com/scim"
 	scimerrors "github.com/elimity-com/scim/errors"
@@ -15,10 +15,16 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-const scimMountPath = "/scim/v2"
+const (
+	scimMountPath = "/scim/v2"
+	// A server per workspace that syncs, kept a while so a sync does not build one per request.
+	scimServerTTL     = time.Hour
+	scimServerEntries = 10_000
+)
 
 // SCIMBaseURL is where the workspace's identity provider sends users and groups.
 func SCIMBaseURL(ctx context.Context) string {
@@ -27,14 +33,13 @@ func SCIMBaseURL(ctx context.Context) string {
 
 type SCIMFlow struct {
 	svc     *Service
-	mu      sync.Mutex
-	servers map[string]scim.Server
+	servers *cache.TTL[string, scim.Server]
 }
 
 func newSCIMFlow(svc *Service) *SCIMFlow {
 	// Azure sends booleans as strings, which is not spec behavior.
 	schema.SetAllowStringValues(true)
-	return &SCIMFlow{svc: svc, servers: map[string]scim.Server{}}
+	return &SCIMFlow{svc: svc, servers: cache.New[string, scim.Server](scimServerEntries, scimServerTTL)}
 }
 
 func (s *Service) SCIMHandler() http.Handler {
@@ -72,9 +77,7 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *SCIMFlow) serverFor(ws actor.Workspace) (scim.Server, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if s, ok := f.servers[ws.ID]; ok {
+	if s, ok := f.servers.Get(ws.ID); ok {
 		return s, nil
 	}
 	s, err := scim.NewServer(
@@ -91,7 +94,7 @@ func (f *SCIMFlow) serverFor(ws actor.Workspace) (scim.Server, error) {
 	if err != nil {
 		return scim.Server{}, err
 	}
-	f.servers[ws.ID] = s
+	f.servers.Set(ws.ID, s)
 	return s, nil
 }
 

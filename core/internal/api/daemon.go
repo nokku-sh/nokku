@@ -17,12 +17,14 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
 type daemonService struct {
-	cfg *config.Config
+	cfg     *config.Config
+	tickets *cache.TTL[string, sessionTicket]
 }
 
 func (s *daemonService) GetDaemon(
@@ -141,14 +143,12 @@ func (s *daemonService) CreateSession(
 
 	sessionID := uuid.NewV7().String()
 	username := req.GetUsername()
-	if err := putSessionTicket(ctx, s.cfg.Cache, sessionID, sessionTicket{
+	s.tickets.Set(sessionID, sessionTicket{
 		WorkspaceID: daemon.WorkspaceID,
 		DaemonID:    daemon.ID,
 		UserID:      userID,
 		Username:    username,
-	}); err != nil {
-		return nil, err
-	}
+	})
 	return &nokkuv1.CreateSessionResponse{
 		Session: &nokkuv1.DaemonSession{
 			SessionId: &sessionID,

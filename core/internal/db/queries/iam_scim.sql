@@ -44,3 +44,40 @@ FROM
   teams
 WHERE
   name = @name;
+
+-- name: AdoptTeamSCIM :one
+UPDATE teams
+SET
+  scim_managed = TRUE,
+  updated_at = NOW()
+WHERE
+  id = @id
+RETURNING
+  *;
+
+-- name: GetSCIMTeam :one
+SELECT
+  *
+FROM
+  teams
+WHERE
+  id = @id
+  AND scim_managed;
+
+-- name: ListSCIMTeams :many
+SELECT
+  *
+FROM
+  teams
+WHERE
+  scim_managed
+ORDER BY
+  id;
+
+-- name: DeleteSCIMTeam :one
+DELETE FROM teams
+WHERE
+  id = @id
+  AND scim_managed
+RETURNING
+  id;

@@ -34,7 +34,7 @@ func (s *certificateService) CreateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.CreateCertificateAuthorityRequest,
 ) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
-	ca, err := ssh.NewCA(req.GetKeyType(), req.GetKeyBits(), req.GetLifetime().AsDuration())
+	ca, err := ssh.NewCA()
 	if err != nil {
 		slog.Error("failed to generate CA", "error", err)
 		return nil, errInternal
@@ -45,9 +45,6 @@ func (s *certificateService) CreateCertificateAuthority(
 	}
 	ca.ForceCommand = strings.TrimSpace(req.GetForceCommand())
 	ca.Name, ca.Description = req.GetName(), req.Description
-	if len(req.GetAllowedKeyTypes()) > 0 {
-		ca.AllowedKeyTypes = req.GetAllowedKeyTypes()
-	}
 	if req.GetUserDefaultTtl() != nil {
 		ca.UserDefaultTtl = req.GetUserDefaultTtl().AsDuration()
 	}
@@ -113,17 +110,14 @@ func (s *certificateService) UpdateCertificateAuthority(
 	req *nokkuv1.UpdateCertificateAuthorityRequest,
 ) (*nokkuv1.UpdateCertificateAuthorityResponse, error) {
 	params := &db.UpdateCAParams{
-		CaID:        req.GetId(),
-		Name:        req.Name,
-		Description: req.Description,
-		IsActive:    req.IsActive,
-		// An update replaces the list, empty allows every key type. The query keeps the old one for nil.
-		AllowedKeyTypes: append([]nokkuv1.CertificateKeyType{}, req.GetAllowedKeyTypes()...),
-		Lifetime:        optDuration(req.GetLifetime()),
-		UserDefaultTtl:  optDuration(req.GetUserDefaultTtl()),
-		UserMaxTtl:      optDuration(req.GetUserMaxTtl()),
-		HostDefaultTtl:  optDuration(req.GetHostDefaultTtl()),
-		HostMaxTtl:      optDuration(req.GetHostMaxTtl()),
+		CaID:           req.GetId(),
+		Name:           req.Name,
+		Description:    req.Description,
+		IsActive:       req.IsActive,
+		UserDefaultTtl: optDuration(req.GetUserDefaultTtl()),
+		UserMaxTtl:     optDuration(req.GetUserMaxTtl()),
+		HostDefaultTtl: optDuration(req.GetHostDefaultTtl()),
+		HostMaxTtl:     optDuration(req.GetHostMaxTtl()),
 	}
 	// Unset keeps what the CA has, empty takes the restriction away.
 	if req.ForceCommand != nil {
@@ -178,16 +172,7 @@ func (s *certificateService) RolloverCertificateAuthority(
 		if err != nil {
 			return err
 		}
-
-		keyType := ca.KeyType
-		if req.KeyType != nil {
-			keyType = req.GetKeyType()
-		}
-		keyBits := ca.KeyBits
-		if req.KeyBits != nil {
-			keyBits = req.GetKeyBits()
-		}
-		result, err = ssh.Rollover(ctx, q, ca, keyType, keyBits, req.GetRevokePrevious())
+		result, err = ssh.Rollover(ctx, q, ca, req.GetRevokePrevious())
 		return err
 	}); err != nil {
 		return nil, err

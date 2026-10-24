@@ -58,11 +58,12 @@ func (s *ssoService) PutSSOProvider(
 		Name:       req.GetName(),
 		Enabled:    req.GetEnabled(),
 		OIDC: iam.OIDCProvider{
-			IssuerURL:       req.GetIssuerUrl(),
-			ClientID:        req.GetClientId(),
-			ClientSecret:    req.GetClientSecret(),
-			Scopes:          req.GetScopes(),
-			JITProvisioning: req.GetJitProvisioning(),
+			IssuerURL:            req.GetIssuerUrl(),
+			ClientID:             req.GetClientId(),
+			ClientSecret:         req.GetClientSecret(),
+			Scopes:               req.GetScopes(),
+			JITProvisioning:      req.GetJitProvisioning(),
+			TrustUnverifiedEmail: req.GetTrustUnverifiedEmail(),
 		},
 	})
 	if errors.Is(err, iam.ErrSecretRequired) {
@@ -88,30 +89,17 @@ func (s *ssoService) DeleteSSOProvider(
 	return &nokkuv1.DeleteSSOProviderResponse{}, nil
 }
 
-func (s *ssoService) GetSSOTest(
-	ctx context.Context,
-	req *nokkuv1.GetSSOTestRequest,
-) (*nokkuv1.GetSSOTestResponse, error) {
-	test, err := s.cfg.IAM.SSOTest(ctx, req.GetId())
-	if errors.Is(err, iam.ErrNotFound) {
-		return nil, errNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &nokkuv1.GetSSOTestResponse{Test: test}, nil
-}
-
 func providerToProto(p *iam.SSOProvider) *nokkuv1.SSOProvider {
 	return &nokkuv1.SSOProvider{
-		ProviderId:      &p.ProviderID,
-		Name:            &p.Name,
-		Enabled:         &p.Enabled,
-		IssuerUrl:       &p.OIDC.IssuerURL,
-		ClientId:        &p.OIDC.ClientID,
-		Scopes:          p.OIDC.Scopes,
-		JitProvisioning: &p.OIDC.JITProvisioning,
-		CreatedAt:       db.SafeTimestamp(&p.CreatedAt),
-		UpdatedAt:       db.SafeTimestamp(&p.UpdatedAt),
+		ProviderId:           &p.ProviderID,
+		Name:                 &p.Name,
+		Enabled:              &p.Enabled,
+		IssuerUrl:            &p.OIDC.IssuerURL,
+		ClientId:             &p.OIDC.ClientID,
+		Scopes:               p.OIDC.Scopes,
+		JitProvisioning:      &p.OIDC.JITProvisioning,
+		TrustUnverifiedEmail: &p.OIDC.TrustUnverifiedEmail,
+		CreatedAt:            db.SafeTimestamp(&p.CreatedAt),
+		UpdatedAt:            db.SafeTimestamp(&p.UpdatedAt),
 	}
 }

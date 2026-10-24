@@ -81,11 +81,13 @@ func (WorkspaceRole) EnumDescriptor() ([]byte, []int) {
 }
 
 type Access struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Public        *bool                  `protobuf:"varint,1,opt,name=public" json:"public,omitempty"`
-	Self          *bool                  `protobuf:"varint,2,opt,name=self" json:"self,omitempty"`
-	Role          *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	Daemon        *bool                  `protobuf:"varint,4,opt,name=daemon" json:"daemon,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Public *bool                  `protobuf:"varint,1,opt,name=public" json:"public,omitempty"`
+	Self   *bool                  `protobuf:"varint,2,opt,name=self" json:"self,omitempty"`
+	Role   *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Daemon *bool                  `protobuf:"varint,4,opt,name=daemon" json:"daemon,omitempty"`
+	// people_only refuses service accounts, so a leaked token cannot mint more credentials for itself.
+	PeopleOnly    *bool `protobuf:"varint,5,opt,name=people_only,json=peopleOnly" json:"people_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -148,6 +150,13 @@ func (x *Access) GetDaemon() bool {
 	return false
 }
 
+func (x *Access) GetPeopleOnly() bool {
+	if x != nil && x.PeopleOnly != nil {
+		return *x.PeopleOnly
+	}
+	return false
+}
+
 var file_nokku_v1_access_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
@@ -169,12 +178,14 @@ var File_nokku_v1_access_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_access_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"y\n" +
+	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\x9a\x01\n" +
 	"\x06Access\x12\x16\n" +
 	"\x06public\x18\x01 \x01(\bR\x06public\x12\x12\n" +
 	"\x04self\x18\x02 \x01(\bR\x04self\x12+\n" +
 	"\x04role\x18\x03 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x12\x16\n" +
-	"\x06daemon\x18\x04 \x01(\bR\x06daemon*\xb4\x01\n" +
+	"\x06daemon\x18\x04 \x01(\bR\x06daemon\x12\x1f\n" +
+	"\vpeople_only\x18\x05 \x01(\bR\n" +
+	"peopleOnly*\xb4\x01\n" +
 	"\rWorkspaceRole\x12\x1e\n" +
 	"\x1aWORKSPACE_ROLE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15WORKSPACE_ROLE_MEMBER\x10\x01\x12\x19\n" +

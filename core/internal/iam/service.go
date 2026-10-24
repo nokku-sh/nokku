@@ -45,7 +45,6 @@ const (
 	actionSessionRevoked  action = "SessionRevoked"
 	actionEmailChanged    action = "EmailChanged"
 	actionCredentialAdded action = "CredentialAdded" //nolint:gosec // an audit action name, not a credential
-	actionSSOTested       action = "SSOTested"
 )
 
 type event struct {
@@ -90,7 +89,7 @@ type Service struct {
 	// flowAEAD seals flow state into its cookie. XChaCha, anyone can start a flow and random nonces must never run out.
 	flowAEAD cipher.AEAD
 	// spent holds the ids of flows that ended in a login, see spendFlow.
-	spent *cache.Memory
+	spent *cache.TTL[string, struct{}]
 
 	sendMagicLink  func(ctx context.Context, userID, email, link string, expiry time.Duration) error
 	sendSignupLink func(ctx context.Context, email, name, workspace, link string, expiry time.Duration) error
@@ -129,14 +128,14 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 	if s.flowAEAD, err = chacha20poly1305.NewX(flowKey); err != nil {
 		return nil, err
 	}
-	s.spent = cache.NewMemory(spentFlowEntries)
+	s.spent = cache.New[string, struct{}](spentFlowEntries, flowStateTTL)
 	s.DPoP = &DPoPVerifier{
-		secret:     d.Secret,
-		replay:     cache.NewMemory(dpopReplayEntries),
-		anonReplay: cache.NewMemory(dpopAnonReplayEntries),
-		now:        s.now,
+		secret: d.Secret,
+		// The iat check takes a proof for 2*dpopMaxSkew at most. The third is slack for a wall clock that steps back.
+		replay: cache.New[[32]byte, struct{}](dpopReplayEntries, 3*dpopMaxSkew),
+		now:    s.now,
 	}
-	s.Device = &DeviceFlow{svc: s, grants: cache.NewMemory(deviceGrantEntries)}
+	s.Device = &DeviceFlow{svc: s}
 	s.OIDC = newOIDCFlow(s)
 	s.Passkey = newPasskeyFlow(s)
 	s.SCIM = newSCIMFlow(s)

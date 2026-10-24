@@ -18,7 +18,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/access"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/billing"
-	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/daemon"
@@ -26,10 +25,8 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/email"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 	"github.com/nokku-sh/nokku/core/internal/iam"
-	"github.com/nokku-sh/nokku/core/internal/live"
 	"github.com/nokku-sh/nokku/core/internal/realip"
 	"github.com/nokku-sh/nokku/core/internal/recording"
-	"github.com/nokku-sh/nokku/core/internal/ssh"
 	"github.com/nokku-sh/nokku/core/internal/storage"
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 	"github.com/nokku-sh/nokku/core/internal/webpki"
@@ -83,9 +80,7 @@ type Config struct {
 	Audit        *audit.Service
 	Email        *email.Service
 	Pool         *daemon.Pool
-	Live         *live.Hub
 	Storage      *storage.Storage
-	Cache        *cache.Memory
 	Record       *recording.Service
 	Billing      *billing.Stripe
 	Entitlements *entitlement.Service
@@ -116,11 +111,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Web terminal tickets only. Everything an anonymous caller can write to has a store of its own.
-	cfg.Cache = cache.NewMemory(10_000)
-	cfg.Live = live.New()
-	go cfg.Live.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
-	cfg.Pool = daemon.New(ctx, cfg.Conn, cfg.Live)
+	cfg.Pool = daemon.New(ctx, cfg.Conn)
 	go cfg.Pool.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
 	cfg.Email, err = email.New(ctx, cfg.FullURL())
 	if err != nil {
@@ -142,7 +133,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	cfg.Storage, err = storage.New(ctx, cfg.FullURL())
+	cfg.Storage, err = storage.New(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +189,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		}
 	}
 
-	go ssh.RotateExpiring(ctx, cfg.Conn)
 	return &cfg, nil
 }
 

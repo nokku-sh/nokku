@@ -35,7 +35,8 @@ const (
 	StreamDatadog = "datadog"
 )
 
-// streamLoop sends new events to every enabled stream until ctx ends.
+// streamLoop sends new events to every enabled stream until ctx ends. Each stream sends on its own, so a slow
+// destination or a long backlog holds up no other.
 func (s *Service) streamLoop(ctx context.Context) {
 	ticker := time.NewTicker(streamTick)
 	defer ticker.Stop()
@@ -58,9 +59,17 @@ func (s *Service) streamLoop(ctx context.Context) {
 				ok = s.entitlements.Resolve(ctx, st.WorkspaceID).Has(entitlement.FeatureAuditStreaming)
 				allowed[st.WorkspaceID] = ok
 			}
-			if ok {
-				s.deliver(ctx, st)
+			if !ok {
+				continue
 			}
+			// A stream still busy from an earlier tick is skipped, two at once would send the same events twice.
+			if _, busy := s.sending.LoadOrStore(st.ID, struct{}{}); busy {
+				continue
+			}
+			go func() {
+				defer s.sending.Delete(st.ID)
+				s.deliver(ctx, st)
+			}()
 		}
 	}
 }

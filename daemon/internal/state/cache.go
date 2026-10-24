@@ -26,6 +26,8 @@ type cacheJSON struct {
 	DaemonConfig *nokkuv1.DaemonConfig   `json:"daemon_config,omitempty"`
 	CA           string                  `json:"ca,omitempty"`
 	RetiredCAs   []*nokkuv1.RetiredCAKey `json:"retired_cas,omitempty"`
+	// HostCA signs the host certificate. Logins are only ever checked against CA and RetiredCAs.
+	HostCA string `json:"host_ca,omitempty"`
 }
 
 func NewCache() *Cache {
@@ -66,11 +68,18 @@ func (c *Cache) CAs() (active string, retired []*nokkuv1.RetiredCAKey) {
 	return c.data.CA, c.data.RetiredCAs
 }
 
+// HostCA returns the key the host certificate has to come from.
+func (c *Cache) HostCA() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.data.HostCA
+}
+
 // Replace swaps everything at once, so a concurrent login never sees an empty map mid-sync.
 func (c *Cache) Replace(
 	principals map[string][]string,
 	dc *nokkuv1.DaemonConfig,
-	ca string,
+	ca, hostCA string,
 	retiredCAs []*nokkuv1.RetiredCAKey,
 	version int64,
 ) {
@@ -83,6 +92,7 @@ func (c *Cache) Replace(
 		DaemonConfig: dc,
 		CA:           ca,
 		RetiredCAs:   retiredCAs,
+		HostCA:       hostCA,
 	}
 }
 

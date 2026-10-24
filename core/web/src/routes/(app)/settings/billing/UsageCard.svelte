@@ -3,11 +3,12 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { Progress } from '#lib/components/ui/progress/index.js';
 	import type { GetBillingResponse } from '#lib/gen/nokku/v1/billing_pb.js';
-	import { catalog, requiredPlan } from '#lib/plans.js';
+	import { usePlans } from '#lib/plans.js';
 	import { formatBytes, formatTs } from '#lib/utils.js';
 	import { Check, Lock } from '@lucide/svelte';
 
 	let { billing, mode }: { billing: GetBillingResponse; mode: string } = $props();
+	const plans = usePlans();
 
 	// -1 is unlimited. int64 fields arrive as number | bigint.
 	const seats = $derived({
@@ -112,7 +113,7 @@
 		<div class="flex flex-col gap-2">
 			<h3 class="text-sm font-medium">Features</h3>
 			<ul class="flex flex-col gap-2">
-				{#each catalog as f (f.key)}
+				{#each plans.catalog as f (f.key)}
 					{@const enabled = billing.features?.[f.key] === true}
 					<li class="flex items-center gap-2.5 text-sm">
 						{#if enabled}
@@ -124,7 +125,7 @@
 							{f.label}<span class="sr-only">{enabled ? ', included' : ', not included'}</span>
 						</span>
 						{#if !enabled}
-							<Badge variant="outline" class="ml-auto">{requiredPlan(f.key)}</Badge>
+							<Badge variant="outline" class="ml-auto">{plans.requiredPlan(f.key)}</Badge>
 						{/if}
 					</li>
 				{/each}

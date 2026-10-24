@@ -13,12 +13,13 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import type { GetBillingResponse } from '#lib/gen/nokku/v1/billing_pb.js';
-	import { planName } from '#lib/plans.js';
+	import { usePlans } from '#lib/plans.js';
 	import type { Tone } from '#lib/tone.js';
 	import { formatTs } from '#lib/utils.js';
 	import { CalendarX, CreditCard, ExternalLink, Info, ShieldAlert } from '@lucide/svelte';
 
 	let { billing, isOwner }: { billing: GetBillingResponse; isOwner: boolean } = $props();
+	const plans = usePlans();
 
 	// The trial warning shows from this many days before the end.
 	const TRIAL_WARN_DAYS = 7;
@@ -39,7 +40,7 @@
 	);
 	const trialEndingSoon = $derived(trialDaysLeft !== undefined && trialDaysLeft <= TRIAL_WARN_DAYS);
 
-	const title = $derived(isInactive ? 'No active plan' : `${planName(billing.plan)} plan`);
+	const title = $derived(isInactive ? 'No active plan' : `${plans.planName(billing.plan)} plan`);
 
 	const status = $derived.by((): { label: string; tone: Tone } | undefined => {
 		if (isInactive) return { label: 'Inactive', tone: 'destructive' };

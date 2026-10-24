@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
+	"unicode"
 
 	"connectrpc.com/connect"
 	"github.com/mizuchilabs/kata/buildinfo"
@@ -30,9 +32,6 @@ const (
 	dialTimeout = 3 * time.Second
 )
 
-// Salt registry: internal/README.md.
-const signerSalt = "nokku-cli"
-
 type Client struct {
 	State   *state.State
 	httpc   *http.Client
@@ -53,7 +52,6 @@ func New(s *state.State) (*Client, error) {
 	c := &Client{State: s}
 	if !s.IsServiceAccount() {
 		proofer, err := dpopclient.NewProofer(tpm.SignerOptions{
-			Salt:       []byte(signerSalt),
 			StatePath:  paths.SignerStateFile(),
 			RequireTPM: s.RequireTPM,
 			Recreate:   true,
@@ -214,9 +212,22 @@ func (c *Client) TargetPrincipals(ctx context.Context, t *state.Target) (map[str
 	}
 	grants := make(map[string][]string, len(res.GetPrincipals()))
 	for _, p := range res.GetPrincipals() {
+		if i := slices.IndexFunc(p.GetCertPrincipals(), unsafePrincipal); i >= 0 {
+			return nil, fmt.Errorf(
+				"the core sent an unusable principal %q, nothing was written",
+				p.GetCertPrincipals()[i],
+			)
+		}
 		grants[p.GetUsername()] = p.GetCertPrincipals()
 	}
 	return grants, nil
+}
+
+// unsafePrincipal would not stay one name on one line. sshd reads what follows a space as options, like command=.
+func unsafePrincipal(p string) bool {
+	return p == "" || strings.ContainsFunc(p, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.IsControl(r) || r == '"' || r == '\''
+	})
 }
 
 // ReportTarget also stamps the target's last sync.

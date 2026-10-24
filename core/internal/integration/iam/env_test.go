@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
@@ -243,8 +244,9 @@ func anon(ctx context.Context, ws actor.Workspace) context.Context {
 	return actor.WithWorkspace(ctx, ws)
 }
 
-// as is a request on the workspace's host signed in as u.
+// as is a request on the workspace's host from a browser that signed in as u a moment ago.
 func as(ctx context.Context, ws actor.Workspace, u *db.User) context.Context {
+	ctx = iam.ContextWithToken(ctx, db.AccessToken{Kind: string(actor.KindUser), CreatedAt: time.Now()})
 	return actor.ContextWithPrincipal(anon(ctx, ws), actor.Principal{ID: u.ID, Kind: actor.KindUser, Role: u.Role})
 }
 

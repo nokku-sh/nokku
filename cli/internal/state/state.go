@@ -23,15 +23,18 @@ type ServiceAccount struct {
 }
 
 type CA struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	PublicKey string `json:"public_key"`
-	Default   bool   `json:"default,omitzero"`
-	// RotatedAt is when the current key was issued.
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// PublicKey signs login certificates, HostPublicKey the host certificates daemons present.
+	PublicKey     string `json:"public_key"`
+	HostPublicKey string `json:"host_public_key,omitempty"`
+	Default       bool   `json:"default,omitzero"`
+	// RotatedAt is when the current keys were issued.
 	RotatedAt time.Time `json:"rotated_at,omitzero"`
-	// The key before the last rollover. Its certificates stay trusted until PreviousTrustedUntil.
-	PreviousPublicKey    string    `json:"previous_public_key,omitempty"`
-	PreviousTrustedUntil time.Time `json:"previous_trusted_until,omitzero"`
+	// The keys before the last rollover. Their certificates stay trusted until PreviousTrustedUntil.
+	PreviousPublicKey     string    `json:"previous_public_key,omitempty"`
+	PreviousHostPublicKey string    `json:"previous_host_public_key,omitempty"`
+	PreviousTrustedUntil  time.Time `json:"previous_trusted_until,omitzero"`
 }
 
 // KeysChangedAt is when TrustedKeys last changed, at a rotation or at the end of its grace period.
@@ -42,10 +45,19 @@ func (ca CA) KeysChangedAt() time.Time {
 	return ca.RotatedAt
 }
 
-// TrustedKeys returns the current key and, while it is still trusted, the one it replaced.
+// TrustedKeys returns the current user key and, while it is still trusted, the one it replaced.
 func (ca CA) TrustedKeys() []string {
-	keys := []string{strings.TrimSpace(ca.PublicKey)}
-	if prev := strings.TrimSpace(ca.PreviousPublicKey); prev != "" && time.Now().Before(ca.PreviousTrustedUntil) {
+	return ca.trusted(ca.PublicKey, ca.PreviousPublicKey)
+}
+
+// TrustedHostKeys returns the current host key and, while it is still trusted, the one it replaced.
+func (ca CA) TrustedHostKeys() []string {
+	return ca.trusted(ca.HostPublicKey, ca.PreviousHostPublicKey)
+}
+
+func (ca CA) trusted(current, previous string) []string {
+	keys := []string{strings.TrimSpace(current)}
+	if prev := strings.TrimSpace(previous); prev != "" && time.Now().Before(ca.PreviousTrustedUntil) {
 		keys = append(keys, prev)
 	}
 	return keys

@@ -59,22 +59,21 @@ func (*GetDashboardRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetDashboardResponse struct {
-	state               protoimpl.MessageState  `protogen:"open.v1"`
-	Targets             *int32                  `protobuf:"varint,1,opt,name=targets" json:"targets,omitempty"`
-	TargetsOnline       *int32                  `protobuf:"varint,2,opt,name=targets_online,json=targetsOnline" json:"targets_online,omitempty"`
-	TargetsManual       *int32                  `protobuf:"varint,3,opt,name=targets_manual,json=targetsManual" json:"targets_manual,omitempty"`
-	Daemons             *int32                  `protobuf:"varint,4,opt,name=daemons" json:"daemons,omitempty"`
-	DaemonsOnline       *int32                  `protobuf:"varint,5,opt,name=daemons_online,json=daemonsOnline" json:"daemons_online,omitempty"`
-	PendingDaemons      []*Daemon               `protobuf:"bytes,6,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
-	OfflineDaemons      []*Daemon               `protobuf:"bytes,7,rep,name=offline_daemons,json=offlineDaemons" json:"offline_daemons,omitempty"`
-	Users               *int32                  `protobuf:"varint,8,opt,name=users" json:"users,omitempty"`
-	SoonestCas          []*CertificateAuthority `protobuf:"bytes,9,rep,name=soonest_cas,json=soonestCas" json:"soonest_cas,omitempty"`
-	RecordingBytes      *int64                  `protobuf:"varint,10,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
-	RecordingQuotaBytes *int64                  `protobuf:"varint,11,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
-	LiveSessions        []*LiveSession          `protobuf:"bytes,12,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
-	Activity            []int32                 `protobuf:"varint,13,rep,packed,name=activity" json:"activity,omitempty"`
-	Failures            []int32                 `protobuf:"varint,14,rep,packed,name=failures" json:"failures,omitempty"`
-	RecentChanges       []*EventLog             `protobuf:"bytes,15,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Targets             *int32                 `protobuf:"varint,1,opt,name=targets" json:"targets,omitempty"`
+	TargetsOnline       *int32                 `protobuf:"varint,2,opt,name=targets_online,json=targetsOnline" json:"targets_online,omitempty"`
+	TargetsManual       *int32                 `protobuf:"varint,3,opt,name=targets_manual,json=targetsManual" json:"targets_manual,omitempty"`
+	Daemons             *int32                 `protobuf:"varint,4,opt,name=daemons" json:"daemons,omitempty"`
+	DaemonsOnline       *int32                 `protobuf:"varint,5,opt,name=daemons_online,json=daemonsOnline" json:"daemons_online,omitempty"`
+	PendingDaemons      []*Daemon              `protobuf:"bytes,6,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
+	OfflineDaemons      []*Daemon              `protobuf:"bytes,7,rep,name=offline_daemons,json=offlineDaemons" json:"offline_daemons,omitempty"`
+	Users               *int32                 `protobuf:"varint,8,opt,name=users" json:"users,omitempty"`
+	RecordingBytes      *int64                 `protobuf:"varint,10,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
+	RecordingQuotaBytes *int64                 `protobuf:"varint,11,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
+	LiveSessions        []*LiveSession         `protobuf:"bytes,12,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
+	Activity            []int32                `protobuf:"varint,13,rep,packed,name=activity" json:"activity,omitempty"`
+	Failures            []int32                `protobuf:"varint,14,rep,packed,name=failures" json:"failures,omitempty"`
+	RecentChanges       []*EventLog            `protobuf:"bytes,15,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -163,13 +162,6 @@ func (x *GetDashboardResponse) GetUsers() int32 {
 		return *x.Users
 	}
 	return 0
-}
-
-func (x *GetDashboardResponse) GetSoonestCas() []*CertificateAuthority {
-	if x != nil {
-		return x.SoonestCas
-	}
-	return nil
 }
 
 func (x *GetDashboardResponse) GetRecordingBytes() int64 {
@@ -318,8 +310,8 @@ var File_nokku_v1_dashboard_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\n" +
-	"\x18nokku/v1/dashboard.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x15nokku/v1/daemon.proto\x1a\x13nokku/v1/util.proto\"\x15\n" +
-	"\x13GetDashboardRequest\"\x98\x05\n" +
+	"\x18nokku/v1/dashboard.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x15nokku/v1/daemon.proto\x1a\x13nokku/v1/util.proto\"\x15\n" +
+	"\x13GetDashboardRequest\"\xdd\x04\n" +
 	"\x14GetDashboardResponse\x12\x18\n" +
 	"\atargets\x18\x01 \x01(\x05R\atargets\x12%\n" +
 	"\x0etargets_online\x18\x02 \x01(\x05R\rtargetsOnline\x12%\n" +
@@ -328,16 +320,15 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\x0edaemons_online\x18\x05 \x01(\x05R\rdaemonsOnline\x129\n" +
 	"\x0fpending_daemons\x18\x06 \x03(\v2\x10.nokku.v1.DaemonR\x0ependingDaemons\x129\n" +
 	"\x0foffline_daemons\x18\a \x03(\v2\x10.nokku.v1.DaemonR\x0eofflineDaemons\x12\x14\n" +
-	"\x05users\x18\b \x01(\x05R\x05users\x12?\n" +
-	"\vsoonest_cas\x18\t \x03(\v2\x1e.nokku.v1.CertificateAuthorityR\n" +
-	"soonestCas\x12'\n" +
+	"\x05users\x18\b \x01(\x05R\x05users\x12'\n" +
 	"\x0frecording_bytes\x18\n" +
 	" \x01(\x03R\x0erecordingBytes\x122\n" +
 	"\x15recording_quota_bytes\x18\v \x01(\x03R\x13recordingQuotaBytes\x12:\n" +
 	"\rlive_sessions\x18\f \x03(\v2\x15.nokku.v1.LiveSessionR\fliveSessions\x12\x1a\n" +
 	"\bactivity\x18\r \x03(\x05R\bactivity\x12\x1a\n" +
 	"\bfailures\x18\x0e \x03(\x05R\bfailures\x129\n" +
-	"\x0erecent_changes\x18\x0f \x03(\v2\x12.nokku.v1.EventLogR\rrecentChanges\"\xfb\x01\n" +
+	"\x0erecent_changes\x18\x0f \x03(\v2\x12.nokku.v1.EventLogR\rrecentChangesJ\x04\b\t\x10\n" +
+	"\"\xfb\x01\n" +
 	"\vLiveSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tdaemon_id\x18\x02 \x01(\tR\bdaemonId\x12\x1f\n" +
@@ -371,24 +362,22 @@ var file_nokku_v1_dashboard_proto_goTypes = []any{
 	(*GetDashboardResponse)(nil),  // 1: nokku.v1.GetDashboardResponse
 	(*LiveSession)(nil),           // 2: nokku.v1.LiveSession
 	(*Daemon)(nil),                // 3: nokku.v1.Daemon
-	(*CertificateAuthority)(nil),  // 4: nokku.v1.CertificateAuthority
-	(*EventLog)(nil),              // 5: nokku.v1.EventLog
-	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(*EventLog)(nil),              // 4: nokku.v1.EventLog
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
 var file_nokku_v1_dashboard_proto_depIdxs = []int32{
 	3, // 0: nokku.v1.GetDashboardResponse.pending_daemons:type_name -> nokku.v1.Daemon
 	3, // 1: nokku.v1.GetDashboardResponse.offline_daemons:type_name -> nokku.v1.Daemon
-	4, // 2: nokku.v1.GetDashboardResponse.soonest_cas:type_name -> nokku.v1.CertificateAuthority
-	2, // 3: nokku.v1.GetDashboardResponse.live_sessions:type_name -> nokku.v1.LiveSession
-	5, // 4: nokku.v1.GetDashboardResponse.recent_changes:type_name -> nokku.v1.EventLog
-	6, // 5: nokku.v1.LiveSession.started_at:type_name -> google.protobuf.Timestamp
-	0, // 6: nokku.v1.DashboardService.GetDashboard:input_type -> nokku.v1.GetDashboardRequest
-	1, // 7: nokku.v1.DashboardService.GetDashboard:output_type -> nokku.v1.GetDashboardResponse
-	7, // [7:8] is the sub-list for method output_type
-	6, // [6:7] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	2, // 2: nokku.v1.GetDashboardResponse.live_sessions:type_name -> nokku.v1.LiveSession
+	4, // 3: nokku.v1.GetDashboardResponse.recent_changes:type_name -> nokku.v1.EventLog
+	5, // 4: nokku.v1.LiveSession.started_at:type_name -> google.protobuf.Timestamp
+	0, // 5: nokku.v1.DashboardService.GetDashboard:input_type -> nokku.v1.GetDashboardRequest
+	1, // 6: nokku.v1.DashboardService.GetDashboard:output_type -> nokku.v1.GetDashboardResponse
+	6, // [6:7] is the sub-list for method output_type
+	5, // [5:6] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_dashboard_proto_init() }
@@ -397,7 +386,6 @@ func file_nokku_v1_dashboard_proto_init() {
 		return
 	}
 	file_nokku_v1_access_proto_init()
-	file_nokku_v1_certificates_proto_init()
 	file_nokku_v1_daemon_proto_init()
 	file_nokku_v1_util_proto_init()
 	type x struct{}

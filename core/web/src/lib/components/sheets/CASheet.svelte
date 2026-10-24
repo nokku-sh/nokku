@@ -9,16 +9,12 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
-	import {
-		CertificateAuthoritySchema,
-		CertificateKeyType
-	} from '#lib/gen/nokku/v1/certificates_pb.js';
+	import { CertificateAuthoritySchema } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
-	import { enumToArray, formatTs } from '#lib/utils.js';
+	import { formatTs } from '#lib/utils.js';
 	import type { Duration } from '@bufbuild/protobuf/wkt';
 	import {
 		Ban,
@@ -29,6 +25,7 @@
 		Info,
 		KeyRound,
 		PenLine,
+		Server,
 		Settings2,
 		ShieldOff
 	} from '@lucide/svelte';
@@ -71,7 +68,6 @@
 		});
 	}
 
-	const keyTypes = enumToArray(CertificateKeyType);
 	let signOpen = $state(false);
 
 	const lifetimes: {
@@ -84,10 +80,22 @@
 		{ key: 'hostMaxTtl', label: 'Longest allowed' }
 	];
 
-	function setLifetime(key: (typeof lifetimes)[number]['key'] | 'lifetime', value: Duration) {
+	function setLifetime(key: (typeof lifetimes)[number]['key'], value: Duration) {
 		if (!model) return;
 		model[key] = value;
 		save();
+	}
+
+	// A planned rotation keeps the old keys trusted for as long as a user certificate can live, so nobody is cut off.
+	function askRotate() {
+		if (!entity) return;
+		void confirm({
+			title: `Rotate the keys of ${entity.name}?`,
+			description:
+				'New keys replace both. The old ones stay trusted until the certificates they signed run out, so nobody is cut off. Run nk sync on servers without the daemon before then.',
+			confirmText: 'Rotate',
+			onConfirm: () => rollover.mutateAsync({ id: entity.id, revokePrevious: false })
+		});
 	}
 
 	function askRollover() {
@@ -95,7 +103,7 @@
 		void confirm({
 			title: `Emergency rollover of ${entity.name}?`,
 			description:
-				'The current key stops being trusted at once and a new one replaces it. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
+				'The current keys stop being trusted at once and new ones replace them. People get a new certificate at their next connection. Servers without the daemon trust the old key until the next nk sync.',
 			confirmText: 'Roll over',
 			typeToConfirm: entity.name,
 			onConfirm: () => rollover.mutateAsync({ id: entity.id, revokePrevious: true })
@@ -169,34 +177,41 @@
 	{#if model && entity}
 		<Tabs.Content value="overview" class="flex flex-col divide-y">
 			<Section
-				title="Public key"
+				title="User key"
 				icon={KeyRound}
-				description="Servers trust certificates signed by this key."
+				description="Servers let in logins whose certificate this key signed. It is what sshd's TrustedUserCAKeys holds."
 			>
 				<CodeSnippet code={entity.publicKey} language="openssh" wrap />
 			</Section>
 
+			<Section
+				title="Host key"
+				icon={Server}
+				description="People trust a daemon whose host certificate this key signed. It never signs a login."
+			>
+				<CodeSnippet code={entity.hostPublicKey} language="openssh" wrap />
+			</Section>
+
 			{#if entity.previousPublicKey}
 				<Section
-					title="Previous key"
+					title="Previous keys"
 					icon={History}
 					description={entity.previousTrustedUntil
 						? `Replaced by a rollover. Still trusted until ${formatTs(entity.previousTrustedUntil)}.`
 						: 'Replaced by a rollover.'}
 				>
 					<CodeSnippet code={entity.previousPublicKey} language="openssh" wrap />
+					{#if entity.previousHostPublicKey}
+						<CodeSnippet code={entity.previousHostPublicKey} language="openssh" wrap />
+					{/if}
 				</Section>
 			{/if}
 
 			<Section title="Identity" icon={Fingerprint}>
 				<DetailList
 					items={[
-						{
-							label: 'Algorithm',
-							value: `${CertificateKeyType[entity.keyType]}${entity.keyBits ? ` ${entity.keyBits}` : ''}`
-						},
-						{ label: 'Valid from', value: formatTs(entity.notBefore) },
-						{ label: 'Valid until', value: formatTs(entity.notAfter) }
+						{ label: 'Algorithm', value: 'Ed25519' },
+						{ label: 'Keys made', value: formatTs(entity.rotatedAt) }
 					]}
 				/>
 			</Section>
@@ -246,38 +261,7 @@
 				</Field.Group>
 			</Section>
 
-			<Section
-				title="Accepted client keys"
-				icon={KeyRound}
-				description="Only these key types can get a certificate from this CA."
-			>
-				<ToggleGroup.Root
-					type="multiple"
-					variant="outline"
-					size="sm"
-					aria-label="Accepted key types"
-					disabled={!can.edit}
-					value={model.allowedKeyTypes.map(String)}
-					onValueChange={(v) => {
-						model.allowedKeyTypes = v.map(Number) as CertificateKeyType[];
-						save();
-					}}
-				>
-					{#each keyTypes as k (k.value)}
-						<ToggleGroup.Item value={String(k.value)}>{k.name}</ToggleGroup.Item>
-					{/each}
-				</ToggleGroup.Root>
-			</Section>
-
 			<Section title="Certificate lifetime" icon={Clock}>
-				<Field.Field>
-					<Field.Label>The CA itself expires after</Field.Label>
-					<DurationInput
-						value={model.lifetime}
-						disabled={!can.edit}
-						onchange={(v) => setLifetime('lifetime', v)}
-					/>
-				</Field.Field>
 				<div class="grid gap-4 sm:grid-cols-2">
 					<Field.Field>
 						<Field.Label>User certificates</Field.Label>
@@ -311,7 +295,9 @@
 					</Field.Field>
 				</div>
 				<Field.Description>
-					Short user certificates are the safest. nk renews them on its own before each login.
+					Short user certificates are the safest, a server without the daemon only drops access when
+					they expire. nk renews them on its own before each login. The CA keys themselves never
+					expire, rotate them below.
 				</Field.Description>
 			</Section>
 
@@ -350,8 +336,15 @@
 				actions={can.edit
 					? [
 							{
+								title: 'Rotate keys',
+								description:
+									'Replace both keys. The old ones stay trusted for a while, nobody is cut off.',
+								label: 'Rotate',
+								onClick: askRotate
+							},
+							{
 								title: 'Emergency rollover',
-								description: 'Revoke the key now and replace it. Use when it may have leaked.',
+								description: 'Revoke the keys now and replace them. Use when they may have leaked.',
 								label: 'Roll over',
 								onClick: askRollover
 							},

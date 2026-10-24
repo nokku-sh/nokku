@@ -217,30 +217,64 @@ func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 	wantMail(true, "a forgotten key is mailed again")
 }
 
-// Anyone can start device logins. Filling their store must not stop a browser from signing in.
-func TestDeviceFloodStaysInItsStore(t *testing.T) {
+// Only a workspace's own host can approve a code, so the root host of the hosted service starts none.
+func TestDeviceFlowNeedsAWorkspace(t *testing.T) {
+	e := newTestEnv(t)
+	rec := httptest.NewRecorder()
+	e.svc.Device.Begin(rec, httptest.NewRequest(http.MethodPost, "/auth/device", nil))
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "invalid_request")
+}
+
+// A code is decided once, and a decided grant is answered once.
+func TestDeviceGrantIsSpent(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	d := newPasskeyDevice()
-	d.enroll(t, e, o.ws, "flood@"+testDomain())
-	ctx := anon(t.Context(), o.ws)
-
-	// The store holds 10 000 entries, two per grant.
-	full := false
-	for range 10_000 {
-		rec := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/auth/device", nil)
-		e.svc.Device.Begin(rec, r.WithContext(ctx))
-		if rec.Code != http.StatusOK {
-			full = true
-			break
-		}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	grant := beginDevice(t, e, o.ws)
+	decide := func(handler http.HandlerFunc) int {
+		return devicePost(
+			o.ws, handler, "/auth/device/verify", "192.0.2.1:1", url.Values{"user_code": {grant.UserCode}}, o.owner,
+		).Code
 	}
-	require.True(t, full, "the device store takes grants without bound")
 
-	answer, cookies := d.assertion(t, e.svc, o.ws)
-	login := post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
-	require.Equal(t, http.StatusOK, login.Code, "a passkey login could not finish: %s", login.Body.String())
-	replay := post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
-	assert.Equal(t, http.StatusBadRequest, replay.Code, "a finished login could not be marked as spent")
+	require.Equal(t, http.StatusOK, decide(e.svc.Device.Verify))
+	assert.Equal(t, http.StatusBadRequest, decide(e.svc.Device.Verify), "a code was approved twice")
+	assert.Equal(t, http.StatusBadRequest, decide(e.svc.Device.Deny), "an approved code was denied after")
+
+	require.Equal(t, http.StatusOK, pollDevice(t, e, o.ws, grant, key).Code)
+	again := pollDevice(t, e, o.ws, grant, key)
+	assert.Equal(t, http.StatusBadRequest, again.Code)
+	assert.Contains(t, again.Body.String(), "expired_token", "a grant gave two sessions")
+}
+
+// The CLI session signs in the way the browser session that approved it did. Enforcing single sign-on reads it.
+func TestCLISessionKeepsTheApproversMethod(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	grant := beginDevice(t, e, o.ws)
+
+	r := httptest.NewRequest(http.MethodPost, "/auth/device/verify",
+		strings.NewReader(url.Values{"user_code": {grant.UserCode}}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	ctx := iam.ContextWithToken(as(r.Context(), o.ws, o.owner), db.AccessToken{Method: string(iam.MethodPasskey)})
+	approved := httptest.NewRecorder()
+	e.svc.Device.Verify(approved, r.WithContext(ctx))
+	require.Equal(t, http.StatusOK, approved.Code, approved.Body.String())
+	require.Equal(t, http.StatusOK, pollDevice(t, e, o.ws, grant, key).Code)
+
+	var methods []string
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		rows, err := q.ListUserSessions(t.Context(), o.owner.ID)
+		for _, row := range rows {
+			if row.Kind == string(actor.KindCLI) {
+				methods = append(methods, row.Method)
+			}
+		}
+		return err
+	}))
+	assert.Equal(t, []string{string(iam.MethodPasskey)}, methods)
 }

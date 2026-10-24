@@ -14,12 +14,11 @@
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { useLiveChanges } from '#lib/api/changes.svelte.js';
 	import { isLeaving } from '#lib/api/client.js';
 	import { connection } from '#lib/api/connection.svelte.js';
 	import { liveSessions } from '#lib/api/terminal.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { util, workspace } from '#lib/api/workspaces.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import { pendingDeviceCode, returnTo } from '#lib/store.svelte.js';
 	import { Code, ConnectError } from '@connectrpc/connect';
 	import { CloudOff, RotateCw, TriangleAlert } from '@lucide/svelte';
@@ -37,12 +36,7 @@
 		[ws.error, me.error].some((e) => e && ConnectError.from(e).code !== Code.Unauthenticated)
 	);
 
-	useLiveChanges(() => !booting);
-
 	const RETURN_WINDOW = 30 * 60_000;
-
-	// Most pages don't poll, so without a heartbeat an outage only shows on the next request.
-	util.getVersion(() => (connection.down ? 10_000 : 15_000));
 
 	// With the server gone a route import fails and SvelteKit swaps the app for the error page, so try it first.
 	let cleared: string | undefined;

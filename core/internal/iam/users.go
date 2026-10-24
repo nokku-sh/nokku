@@ -57,11 +57,10 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, e
 	return u, nil
 }
 
-func (s *Service) UpdateSelf(ctx context.Context, name, picture *string) (*db.User, error) {
+func (s *Service) UpdateSelf(ctx context.Context, name *string) (*db.User, error) {
 	u, err := s.conn.Tenant().UpdateUser(ctx, &db.UpdateUserParams{
-		ID:      actor.UserIDFromContext(ctx),
-		Name:    name,
-		Picture: picture,
+		ID:   actor.UserIDFromContext(ctx),
+		Name: name,
 	})
 	if err != nil {
 		return nil, mapNotFound(err)

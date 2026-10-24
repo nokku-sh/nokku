@@ -173,13 +173,14 @@ func (s *Server) withTenant(h http.Handler) http.Handler {
 
 func (s *Server) registerServices(ctx context.Context) {
 	opts := s.withHandlerOptions(ctx)
+	tickets := newSessionTickets()
 	s.mux.Handle(nokkuv1connect.NewWorkspaceServiceHandler(&workspaceService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewDashboardServiceHandler(&dashboardService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewTeamServiceHandler(&teamService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewUtilServiceHandler(&utilService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewTargetServiceHandler(&targetService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewTargetAccountServiceHandler(&targetAccountService{cfg: s.cfg}, opts...))
-	s.mux.Handle(nokkuv1connect.NewDaemonServiceHandler(&daemonService{cfg: s.cfg}, opts...))
+	s.mux.Handle(nokkuv1connect.NewDaemonServiceHandler(&daemonService{cfg: s.cfg, tickets: tickets}, opts...))
 	s.mux.Handle(nokkuv1connect.NewCertificateServiceHandler(&certificateService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewInvitationServiceHandler(&invitationService{cfg: s.cfg}, opts...))
 	s.mux.Handle(nokkuv1connect.NewJoinTokenServiceHandler(&joinTokenService{cfg: s.cfg}, opts...))
@@ -210,10 +211,9 @@ func (s *Server) registerServices(ctx context.Context) {
 	s.mux.Handle("GET "+webpki.Path, s.cfg.WebPKI)
 
 	protec := chain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
-	s.mux.Handle("GET /avatars/{id}", serveAvatar(s.cfg))
-	s.mux.Handle("POST /upload/avatar", protec(uploadAvatar(s.cfg)))
+	s.mux.Handle("GET /avatars/{id}", protec(serveAvatar(s.cfg)))
 
-	terminal := &terminalHandler{cfg: s.cfg}
+	terminal := &terminalHandler{cfg: s.cfg, tickets: tickets}
 	s.mux.Handle("GET /terminal/ws", protec(func(w http.ResponseWriter, r *http.Request) {
 		// A terminal is a stream, it ends with the root ctx like the RPC ones.
 		rctx, release := endWith(r.Context(), ctx)

@@ -9,9 +9,80 @@ import (
 	"context"
 )
 
+const adoptTeamSCIM = `-- name: AdoptTeamSCIM :one
+UPDATE teams
+SET
+  scim_managed = TRUE,
+  updated_at = NOW()
+WHERE
+  id = $1
+RETURNING
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
+`
+
+func (q *Queries) AdoptTeamSCIM(ctx context.Context, id string) (*Team, error) {
+	row := q.db.QueryRow(ctx, adoptTeamSCIM, id)
+	var i Team
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Description,
+		&i.Tags,
+		&i.ScimExternalID,
+		&i.ScimManaged,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
+const deleteSCIMTeam = `-- name: DeleteSCIMTeam :one
+DELETE FROM teams
+WHERE
+  id = $1
+  AND scim_managed
+RETURNING
+  id
+`
+
+func (q *Queries) DeleteSCIMTeam(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, deleteSCIMTeam, id)
+	var id_2 string
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
+const getSCIMTeam = `-- name: GetSCIMTeam :one
+SELECT
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
+FROM
+  teams
+WHERE
+  id = $1
+  AND scim_managed
+`
+
+func (q *Queries) GetSCIMTeam(ctx context.Context, id string) (*Team, error) {
+	row := q.db.QueryRow(ctx, getSCIMTeam, id)
+	var i Team
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Description,
+		&i.Tags,
+		&i.ScimExternalID,
+		&i.ScimManaged,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const getTeamByName = `-- name: GetTeamByName :one
 SELECT
-  id, workspace_id, name, description, tags, scim_external_id, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
 FROM
   teams
 WHERE
@@ -29,10 +100,52 @@ func (q *Queries) GetTeamByName(ctx context.Context, name string) (*Team, error)
 		&i.Description,
 		&i.Tags,
 		&i.ScimExternalID,
+		&i.ScimManaged,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
+}
+
+const listSCIMTeams = `-- name: ListSCIMTeams :many
+SELECT
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
+FROM
+  teams
+WHERE
+  scim_managed
+ORDER BY
+  id
+`
+
+func (q *Queries) ListSCIMTeams(ctx context.Context) ([]*Team, error) {
+	rows, err := q.db.Query(ctx, listSCIMTeams)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Team
+	for rows.Next() {
+		var i Team
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Name,
+			&i.Description,
+			&i.Tags,
+			&i.ScimExternalID,
+			&i.ScimManaged,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listSCIMUsers = `-- name: ListSCIMUsers :many
@@ -98,7 +211,7 @@ SET
 WHERE
   id = $2
 RETURNING
-  id, workspace_id, name, description, tags, scim_external_id, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, created_at, updated_at
 `
 
 type SetTeamSCIMExternalIDParams struct {
@@ -117,6 +230,7 @@ func (q *Queries) SetTeamSCIMExternalID(ctx context.Context, arg *SetTeamSCIMExt
 		&i.Description,
 		&i.Tags,
 		&i.ScimExternalID,
+		&i.ScimManaged,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

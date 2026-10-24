@@ -1,8 +1,8 @@
 # Shared packages
 
 Go packages the daemon (`nokkud`) and the CLI (`nk`) share. They hold the
-security primitives both need so they cannot drift apart: both derive their
-identities from the same machine TPM, so the crypto that does this must have
+security primitives both need so they cannot drift apart: both keep their
+identities in the same machine TPM, so the crypto that does this must have
 exactly one implementation. The core does not use them.
 
 ## Packages
@@ -29,49 +29,35 @@ exactly one implementation. The core does not use them.
 - **tpm** - machine-bound ECDSA P-256 signing identities. `Signer` is a
   persisted identity, TPM-backed when a TPM 2.0 is usable with a
   machine-wrapped software fallback otherwise. `NewSigner` loads or creates
-  it and `SignerOptions.Salt` namespaces the key per binary and purpose.
+  it, and every `SignerOptions.StatePath` is an identity of its own.
   `SignerOptions.Enclave` plugs in another hardware key store, such as the
   macOS Secure Enclave, tried after the TPM and before the software key.
   A `.lock` file beside the state file keeps two processes from creating
   different keys at once.
 
-## Salts
-
-`tpm` is generic and knows nothing about products: every binary that uses it
-defines its own salt constants and passes them to `NewSigner`. When one
-machine runs several Nokku binaries, their salts must differ per purpose or
-two binaries would silently derive the same identity from the same TPM. The
-salt registry is therefore a convention, not code: each binary owns its
-constants, and new purposes get new constants there.
-
-The registry today:
-
-| Salt                | Binary and purpose       |
-| ------------------- | ------------------------ |
-| `nokku-daemon`      | nokkud DPoP proofing key |
-| `nokku-daemon-host` | nokkud host key          |
-| `nokku-cli`         | nk DPoP proofing key     |
-| `nokku-cli-ssh`     | nk user SSH signing key  |
-
-Never change a registered salt. It would silently rotate every machine
-identity derived from it.
-
 ## Machine identity trust model
 
-A TPM-backed identity cannot be extracted: the private key never leaves the
-device. The primary is created without an auth value or PCR policy, so any
-process that can open the TPM device (`/dev/tpmrm0` on Linux) can use the
-identity. Restrict the device to the owning daemon's uid. A stored auth value
-would have to live beside the caller's state file and buys nothing, and PCR
-sealing breaks on kernel and firmware updates.
+A TPM key is created inside the TPM under the owner's storage root key, in
+the TSS2 key file format that `ssh-tpm-agent` and the OpenSSL TPM providers
+use (via [go-tpm-keyfiles](https://github.com/foxboron/go-tpm-keyfiles)).
+The TPM only hands out the private half wrapped to itself, and that blob is
+kept in the 0600 state file. Using the key takes both: the blob and access
+to the TPM device. The blob loads on no other TPM, and a TPM clear makes it
+unloadable, which `NewSigner` reports as `ErrIdentityChanged`. Every state
+file holds a random key of its own, so another user on the machine, or
+another binary, cannot rebuild it from the TPM alone.
 
-An enclave identity (`SignerOptions.Enclave`) is not derived, so its opaque
-key blob is kept in the state file. The blob only opens on the machine that
-created it, and like the TPM key it carries no auth value: any process that
-can read the state file as the owning user can ask the enclave to sign. A new
-enclave key must sign a test digest before it is persisted, so a half-working
-enclave falls back to the software key instead of becoming an identity that
-cannot log in.
+The key has no auth value and no PCR policy. A stored auth value would have
+to live beside the blob and adds nothing, and PCR sealing breaks on kernel
+and firmware updates. The file permissions on the state file are the
+boundary on the machine.
+
+An enclave identity (`SignerOptions.Enclave`) works the same way: its opaque
+key blob is kept in the state file and only opens on the machine that
+created it, with no auth value. Any process that can read the state file as
+the owning user can ask the enclave to sign. A new enclave or TPM key must
+sign a test digest before it is persisted, so a half-working key store falls
+back to the software key instead of becoming an identity that cannot log in.
 
 The software fallback wraps the key with a key derived from the machine's
 public fingerprint (`id.MachineID`). That stops a key file copied to another

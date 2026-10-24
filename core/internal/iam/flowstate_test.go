@@ -26,7 +26,7 @@ func newSealedTestService(t *testing.T, secure bool) (*Service, *time.Time) {
 	return &Service{
 		secure:   secure,
 		flowAEAD: aead,
-		spent:    cache.NewMemory(10),
+		spent:    cache.New[string, struct{}](10, flowStateTTL),
 		now:      func() time.Time { return now },
 	}, &now
 }
@@ -85,7 +85,7 @@ func TestSealedFlowState(t *testing.T) {
 		t.Error("the state of one flow opened in another")
 	}
 
-	svc.spendFlow(t.Context(), id)
+	svc.spendFlow(id)
 	if _, _, err := store.take(reqWith(cookie.Value)); err == nil {
 		t.Error("the state of a finished login was accepted again")
 	}

@@ -1,6 +1,7 @@
 package entitlement
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 
@@ -144,15 +145,5 @@ func featureLabel(code string) string {
 }
 
 func displayName(plan string) string {
-	switch plan {
-	case PlanCommunity:
-		return "Community"
-	case PlanPro:
-		return "Pro"
-	case PlanEnterprise:
-		return "Enterprise"
-	case PlanInactive:
-		return "inactive"
-	}
-	return plan
+	return cmp.Or(PlanNames[plan], plan)
 }

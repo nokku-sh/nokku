@@ -6,18 +6,16 @@ import (
 	"cmp"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"math/big"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
+	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
@@ -37,55 +35,46 @@ const (
 	grantDenied     = "denied"
 )
 
-// deviceGrantEntries bounds the waiting grants. Anyone can start one, so they have a store nothing else lives in.
-const deviceGrantEntries = 10_000
-
+// DeviceFlow keeps its grants in device_grants, under the workspace of the host like every tenant row.
 type DeviceFlow struct {
-	svc    *Service
-	grants *cache.Memory
-}
-
-// deviceGrant is stored under the device code, and under the user code until someone decides on it.
-type deviceGrant struct {
-	DeviceCode  string `json:"device_code"`
-	UserCode    string `json:"user_code"`
-	WorkspaceID string `json:"workspace_id"`
-	Status      string `json:"status"`
-	UserID      string `json:"user_id,omitempty"`
-	// Who asked. The approval page shows it, so a code someone else started stands out.
-	IP        string `json:"ip,omitempty"`
-	UserAgent string `json:"user_agent,omitempty"`
-}
-
-type pollState struct {
-	last       time.Time
-	violations int
+	svc *Service
 }
 
 func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// Only a workspace's own host can approve a code, the root host of the hosted service has none to offer.
+	if actor.WorkspaceIDFromContext(ctx) == "" {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "invalid_request", "error_description": "sign in at the URL of your workspace",
+		})
+		return
+	}
+
 	deviceCode := crypto.RandomString(32)
-	userCode, err := randomUserCode()
+	var userCode string
+	var err error
+	// Two grants of one workspace may draw the same user code, rarely.
+	for range 3 {
+		if userCode, err = randomUserCode(); err != nil {
+			break
+		}
+		err = h.svc.conn.Tenant().CreateDeviceGrant(ctx, &db.CreateDeviceGrantParams{
+			DeviceCodeHash: crypto.HashToken(deviceCode),
+			UserCode:       userCode,
+			Ip:             strings.ToValidUTF8(realip.Client(r.Header, r.RemoteAddr), ""),
+			UserAgent:      truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxUserAgent),
+			ExpiresAt:      h.svc.now().Add(grantTTL),
+		})
+		if !db.IsUniqueViolation(err) {
+			break
+		}
+	}
 	if err != nil {
 		writeOAuthError(w, "server_error")
 		return
 	}
 
-	g := deviceGrant{
-		DeviceCode:  deviceCode,
-		UserCode:    userCode,
-		WorkspaceID: actor.WorkspaceIDFromContext(r.Context()),
-		Status:      grantPending,
-		IP:          strings.ToValidUTF8(realip.Client(r.Header, r.RemoteAddr), ""),
-		UserAgent:   truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxUserAgent),
-	}
-	b, _ := json.Marshal(g)
-	if err := h.grants.Set(r.Context(), "device:code:"+deviceCode, b, grantTTL); err != nil ||
-		h.grants.Set(r.Context(), "device:user:"+userCode, b, grantTTL) != nil {
-		writeOAuthError(w, "server_error")
-		return
-	}
-
-	base := baseURL(r.Context())
+	base := baseURL(ctx)
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"device_code":               deviceCode,
 		"user_code":                 userCode,
@@ -99,14 +88,12 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 // Info tells the approver who asked for a code. It does not spend the code.
 func (h *DeviceFlow) Info(w http.ResponseWriter, r *http.Request) {
 	userCode := normalizeUserCode(r.URL.Query().Get("user_code"))
-	var g deviceGrant
-	b, err := h.grants.Get(r.Context(), "device:user:"+userCode)
-	if err != nil || json.Unmarshal(b, &g) != nil || g.Status != grantPending ||
-		g.WorkspaceID != actor.WorkspaceIDFromContext(r.Context()) {
+	g, err := h.svc.conn.Tenant().GetPendingDeviceGrant(r.Context(), userCode)
+	if err != nil {
 		writeError(w, http.StatusNotFound, "invalid or expired code")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]string{"ip": g.IP, "user_agent": g.UserAgent})
+	WriteJSON(w, http.StatusOK, map[string]string{"ip": g.Ip, "user_agent": g.UserAgent})
 }
 
 func (h *DeviceFlow) Verify(w http.ResponseWriter, r *http.Request) {
@@ -117,8 +104,11 @@ func (h *DeviceFlow) Deny(w http.ResponseWriter, r *http.Request) {
 	h.decide(w, r, false)
 }
 
+// decide spends the code. The CLI session inherits how the approving session signed in, so enforcing single sign-on
+// can tell it apart.
 func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 	p, ok := actor.PrincipalFromContext(r.Context())
+	tok, _ := CurrentToken(r.Context())
 	if !ok || p.Kind != actor.KindUser {
 		writeError(w, http.StatusUnauthorized, "sign in to approve a device")
 		return
@@ -130,29 +120,17 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 		return
 	}
 
-	// A code of another workspace is not consumed, its own host decides it.
-	var g deviceGrant
-	b, err := h.grants.Get(r.Context(), "device:user:"+userCode)
-	if err != nil || json.Unmarshal(b, &g) != nil || g.Status != grantPending ||
-		g.WorkspaceID != actor.WorkspaceIDFromContext(r.Context()) {
-		writeError(w, http.StatusBadRequest, "invalid or expired code")
-		return
-	}
-	// Consuming the user code makes the decision single-use.
-	if b, err = h.grants.GetDel(r.Context(), "device:user:"+userCode); err != nil || json.Unmarshal(b, &g) != nil {
-		writeError(w, http.StatusBadRequest, "invalid or expired code")
-		return
-	}
-
+	status := grantDenied
 	if approve {
-		g.Status = grantApproved
-	} else {
-		g.Status = grantDenied
+		status = grantApproved
 	}
-	g.UserID = p.ID
-	b, _ = json.Marshal(g)
-	if err := h.grants.Set(r.Context(), "device:code:"+g.DeviceCode, b, grantTTL); err != nil {
-		writeOAuthError(w, "server_error")
+	if _, err := h.svc.conn.Tenant().DecideDeviceGrant(r.Context(), &db.DecideDeviceGrantParams{
+		Status:         status,
+		UserID:         &p.ID,
+		ApprovedMethod: new(tok.Method),
+		UserCode:       userCode,
+	}); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid or expired code")
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -166,27 +144,29 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := h.grants.Get(ctx, "device:code:"+deviceCode)
+	hash := crypto.HashToken(deviceCode)
+	g, err := h.svc.conn.Tenant().GetDeviceGrant(ctx, hash)
 	if err != nil {
 		writeOAuthError(w, "expired_token")
 		return
 	}
-	var g deviceGrant
-	if err := json.Unmarshal(b, &g); err != nil || g.WorkspaceID != actor.WorkspaceIDFromContext(ctx) {
-		writeOAuthError(w, "expired_token")
-		return
+	consume := func() bool {
+		_, err := h.svc.conn.Tenant().ConsumeDeviceGrant(ctx, &db.ConsumeDeviceGrantParams{
+			DeviceCodeHash: hash, Status: g.Status,
+		})
+		return err == nil
 	}
 
 	switch g.Status {
 	case grantPending:
-		if h.pollTrack(ctx, deviceCode) {
+		if h.tooFast(ctx, g) {
 			writeOAuthError(w, "slow_down")
 			return
 		}
 		writeOAuthError(w, "authorization_pending")
 	case grantDenied:
-		// Consume it so a CLI left polling doesn't audit the denial every poll.
-		if _, err := h.grants.GetDel(ctx, "device:code:"+deviceCode); err != nil {
+		// Consumed, so a CLI left polling doesn't audit the denial every poll.
+		if !consume() {
 			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
 		}
@@ -195,13 +175,13 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			event{
 				Action: actionLoginDenied,
 				Method: MethodDevice,
-				UserID: g.UserID,
+				UserID: deref(g.UserID),
 				Detail: "access denied",
 			},
 		)
 		writeOAuthError(w, "access_denied")
 	case grantApproved:
-		u, err := h.svc.getUser(ctx, g.UserID)
+		u, err := h.svc.getUser(ctx, deref(g.UserID))
 		if err != nil || !u.Active {
 			writeOAuthError(w, "access_denied")
 			return
@@ -220,7 +200,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Consume before issuing so racing polls never yield two sessions.
-		if _, err := h.grants.GetDel(ctx, "device:code:"+deviceCode); err != nil {
+		if !consume() {
 			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
 		}
@@ -228,7 +208,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		sess, token, err := h.svc.IssueToken(ctx, TokenParams{
 			SubjectID: u.ID,
 			Kind:      actor.KindCLI,
-			Method:    MethodDevice,
+			Method:    Method(cmp.Or(deref(g.ApprovedMethod), string(MethodDevice))),
 			Binding:   binding,
 			Label:     cmp.Or(truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel), "Terminal"),
 			TTL:       deviceSessionTTL,
@@ -254,7 +234,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			"access_token": token,
 			"token_type":   "DPoP",
 			"method":       string(MethodDevice),
-			"user_id":      g.UserID,
+			"user_id":      u.ID,
 		}
 		if sess.ExpiresAt != nil {
 			resp["expires_in"] = int(time.Until(*sess.ExpiresAt).Seconds())
@@ -270,45 +250,30 @@ func (h *DeviceFlow) Nonce(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string, error) {
-	proof := r.Header.Get("DPoP")
+	proof, err := DPoPProof(r.Header)
+	if err != nil {
+		return "", err
+	}
 	if proof == "" {
 		return "", ErrDPoPNonce
 	}
-	return h.svc.DPoP.Verify(ctx, proof, "", r.Method, baseURL(ctx)+r.URL.Path, "")
+	return h.svc.DPoP.Verify(proof, "", r.Method, baseURL(ctx)+r.URL.Path, "")
 }
 
-// pollTrack reports a too-fast poll. The interval grows per slow_down, a cache failure allows the poll.
-func (h *DeviceFlow) pollTrack(ctx context.Context, deviceCode string) bool {
-	key := "device:poll:" + deviceCode
-	var st pollState
-	if b, err := h.grants.Get(ctx, key); err == nil {
-		st = decodePollState(b)
+// tooFast reports a poll inside the interval. Each one widens it, the way RFC 8628 asks of slow_down. A note that
+// fails lets the poll through.
+func (h *DeviceFlow) tooFast(ctx context.Context, g *db.DeviceGrant) bool {
+	now := h.svc.now()
+	required := deviceInterval + time.Duration(g.Violations)*slowDownPenalty
+	note := &db.NoteDeviceGrantPollParams{DeviceCodeHash: g.DeviceCodeHash, PolledAt: &now, Violations: g.Violations}
+	fast := g.PolledAt != nil && now.Sub(*g.PolledAt) < required
+	if fast {
+		note.PolledAt, note.Violations = g.PolledAt, g.Violations+1
 	}
-
-	required := deviceInterval + time.Duration(st.violations)*slowDownPenalty
-	now := time.Now()
-	if !st.last.IsZero() && now.Sub(st.last) < required {
-		st.violations++
-		_ = h.grants.Set(ctx, key, encodePollState(st), grantTTL)
-		return true
+	if err := h.svc.conn.Tenant().NoteDeviceGrantPoll(ctx, note); err != nil {
+		slog.Warn("failed to note a device poll", "error", err)
 	}
-	st.last = now
-	_ = h.grants.Set(ctx, key, encodePollState(st), grantTTL)
-	return false
-}
-
-func encodePollState(st pollState) []byte {
-	return []byte(strconv.FormatInt(st.last.UnixNano(), 10) + ":" + strconv.Itoa(st.violations))
-}
-
-func decodePollState(b []byte) pollState {
-	lastS, vS, _ := strings.Cut(string(b), ":")
-	nano, err := strconv.ParseInt(lastS, 10, 64)
-	if err != nil {
-		return pollState{}
-	}
-	v, _ := strconv.Atoi(vS)
-	return pollState{last: time.Unix(0, nano), violations: v}
+	return fast
 }
 
 // randomUserCode is a correlation handle, not a secret, approval needs a session. The charset avoids 0/O/1/I.

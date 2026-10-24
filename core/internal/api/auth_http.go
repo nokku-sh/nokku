@@ -30,7 +30,6 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 
 	// Optional auth on login lets a signed-in user link a provider.
 	mux.Handle("GET /oidc/login", optAuth(svc.OIDC.Login))
-	mux.Handle("GET /oidc/test", optAuth(svc.OIDC.Test))
 	mux.Handle("POST /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
 	mux.Handle("GET /oidc/callback", http.HandlerFunc(svc.OIDC.Callback))
 

@@ -9,6 +9,8 @@ message Access {
   bool self = 2;
   WorkspaceRole role = 3;
   bool daemon = 4;
+  // people_only refuses service accounts, so a leaked token cannot mint more credentials for itself.
+  bool people_only = 5;
 }
 
 enum WorkspaceRole {

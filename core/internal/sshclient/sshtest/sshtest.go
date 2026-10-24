@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	crand "crypto/rand"
-	"encoding/pem"
+	"crypto/x509"
 	"errors"
 	"net"
 	"slices"
@@ -35,13 +35,16 @@ type Server struct {
 	windowChanges []struct{ Cols, Rows uint32 }
 	connUser      string
 
-	ca        ssh.Signer
-	caPriv    ed25519.PrivateKey
-	hostKey   ssh.Signer
-	listener  net.Listener
-	conns     map[net.Conn]struct{}
-	connsMu   sync.Mutex
-	closeOnce sync.Once
+	// ca signs the logins it lets in, hostCA its own host certificate, like the two keys of a real CA.
+	ca         ssh.Signer
+	caPriv     ed25519.PrivateKey
+	hostCA     ssh.Signer
+	hostCAPriv ed25519.PrivateKey
+	hostKey    ssh.Signer
+	listener   net.Listener
+	conns      map[net.Conn]struct{}
+	connsMu    sync.Mutex
+	closeOnce  sync.Once
 }
 
 func NewServer(t testing.TB) *Server {
@@ -56,10 +59,12 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 	if err != nil {
 		t.Fatalf("generate CA key: %v", err)
 	}
-	caSigner, err := ssh.NewSignerFromKey(caPriv)
+	caSigner := mustSigner(t, caPriv)
+	_, hostCAPriv, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
-		t.Fatalf("CA signer: %v", err)
+		t.Fatalf("generate host CA key: %v", err)
 	}
+	hostCASigner := mustSigner(t, hostCAPriv)
 
 	hostPub, hostPriv, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
@@ -77,7 +82,7 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 		ValidAfter:      nokkussh.UnixUint64(time.Now().Add(-time.Minute).Unix()),
 		ValidBefore:     nokkussh.UnixUint64(time.Now().Add(time.Hour).Unix()),
 	}
-	if err := hostCert.SignCert(crand.Reader, caSigner); err != nil {
+	if err := hostCert.SignCert(crand.Reader, hostCASigner); err != nil {
 		t.Fatalf("sign host cert: %v", err)
 	}
 	hostSigner, err := ssh.NewCertSigner(hostCert, mustSigner(t, hostPriv))
@@ -96,6 +101,8 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 		HostPrincipal: hostPrincipal,
 		ca:            caSigner,
 		caPriv:        caPriv,
+		hostCA:        hostCASigner,
+		hostCAPriv:    hostCAPriv,
 		hostKey:       hostSigner,
 		listener:      ln,
 		conns:         make(map[net.Conn]struct{}),
@@ -107,39 +114,48 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 
 func (s *Server) Addr() string { return s.listener.Addr().String() }
 
-func (s *Server) CAKey() ssh.PublicKey { return s.ca.PublicKey() }
+// HostCAKey is the key the server's host certificate comes from.
+func (s *Server) HostCAKey() ssh.PublicKey { return s.hostCA.PublicKey() }
 
 // CA returns a row so callers exercise the real cert-minting path.
 func (s *Server) CA(t testing.TB) *db.SSHCA {
 	t.Helper()
-	return caRow(t, s.caPriv)
+	return caRow(t, s.caPriv, s.hostCAPriv)
 }
 
 // NewCA generates a CA row no server trusts, for handshake-failure tests.
 func NewCA(t testing.TB) *db.SSHCA {
 	t.Helper()
-	_, priv, err := ed25519.GenerateKey(crand.Reader)
+	_, user, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
 		t.Fatalf("generate CA key: %v", err)
 	}
-	return caRow(t, priv)
+	_, host, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate host CA key: %v", err)
+	}
+	return caRow(t, user, host)
 }
 
-func caRow(t testing.TB, priv ed25519.PrivateKey) *db.SSHCA {
+// caRow stores the keys as PKCS#8, the only form the core reads.
+func caRow(t testing.TB, user, host ed25519.PrivateKey) *db.SSHCA {
 	t.Helper()
-	privPEM, err := ssh.MarshalPrivateKey(priv, "")
-	if err != nil {
-		t.Fatalf("marshal CA private key: %v", err)
-	}
-	signer, err := ssh.NewSignerFromKey(priv)
-	if err != nil {
-		t.Fatalf("CA signer: %v", err)
+	der := func(priv ed25519.PrivateKey) crypto.EncryptedBytes {
+		b, err := x509.MarshalPKCS8PrivateKey(priv)
+		if err != nil {
+			t.Fatalf("marshal CA private key: %v", err)
+		}
+		return b
 	}
 	return &db.SSHCA{
-		PrivateKey:     crypto.EncryptedBytes(pem.EncodeToMemory(privPEM)),
-		PublicKey:      nokkussh.MarshalKey(signer.PublicKey()),
+		PrivateKey:     der(user),
+		PublicKey:      nokkussh.MarshalKey(mustSigner(t, user).PublicKey()),
+		HostPrivateKey: der(host),
+		HostPublicKey:  nokkussh.MarshalKey(mustSigner(t, host).PublicKey()),
 		UserDefaultTtl: time.Hour,
 		UserMaxTtl:     24 * time.Hour,
+		HostDefaultTtl: time.Hour,
+		HostMaxTtl:     24 * time.Hour,
 		IsActive:       true,
 	}
 }

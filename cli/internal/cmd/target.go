@@ -14,12 +14,12 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/cli/internal/client"
 	"github.com/nokku-sh/nokku/cli/internal/manual"
-	"github.com/nokku-sh/nokku/cli/internal/paths"
 	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/cli/internal/ui"
@@ -103,6 +103,11 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	if ca == nil || strings.TrimSpace(ca.PublicKey) == "" {
 		return fmt.Errorf("the certificate authority of %s is missing, run nk login and try again", target.Name)
 	}
+
+	if dest, err = dest.trust(target, cmd.Bool("accept-host-key")); err != nil {
+		return err
+	}
+	defer dest.close(ctx)
 
 	fmt.Fprintf(progress, "Connecting with: %s\n", dest)
 	h, err := probe(ctx, dest, target.HostPublicKey, seeds, cmd.Bool("accept-host-key"))
@@ -317,6 +322,10 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if !cmd.Bool("keep-host") {
+		if dest, err = dest.trust(target, cmd.Bool("accept-host-key")); err != nil {
+			return err
+		}
+		defer dest.close(ctx)
 		fmt.Printf("Connecting with: %s\n", dest)
 		// The address may lead to another machine by now, which must keep its own config.
 		if _, err = probe(ctx, dest, target.HostPublicKey, nil, cmd.Bool("accept-host-key")); err != nil {
@@ -519,6 +528,10 @@ func endpointRemote(ep, port string) remote {
 type remote struct {
 	host string
 	port string
+	// dir holds the pinned known_hosts and the socket of the shared connection, for one run only.
+	dir    string
+	opts   []string
+	pinned bool
 }
 
 func (r remote) String() string {
@@ -554,18 +567,54 @@ func (r remote) resolve(ctx context.Context) remote {
 	return r
 }
 
-func (r remote) run(ctx context.Context, command, stdin string) (string, error) {
-	args := append(r.portArgs(), "-l", "root",
-		// Like answering yes on first contact, a changed key is still refused.
-		"-o", "StrictHostKeyChecking=accept-new",
-	)
+// trust decides how this run checks the host. ssh accepts nothing but a pinned key, accept takes what the host
+// shows, and a new target is left to the operator's own known_hosts. close ends it.
+func (r remote) trust(target *state.Target, accept bool) (remote, error) {
+	dir, err := os.MkdirTemp("", "nk-sync-")
+	if err != nil {
+		return r, err
+	}
+	r.dir = dir
+	knownHosts := filepath.Join(dir, "known_hosts")
+	switch {
+	case target.ID == "" || target.HostPublicKey == "":
+	case accept:
+		r.opts = ssh.AcceptHostOptions(target, knownHosts)
+	default:
+		if r.opts, err = ssh.PinnedHostOptions(target, knownHosts); err != nil {
+			_ = os.RemoveAll(dir)
+			return r, err
+		}
+		r.pinned = true
+	}
+	return r, nil
+}
+
+// close ends the shared connection, which would otherwise outlive nk for ControlPersist.
+func (r remote) close(ctx context.Context) {
+	if r.dir == "" {
+		return
+	}
 	if runtime.GOOS != "windows" {
+		exitCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		//nolint:gosec // argv, not a shell, and -- ends the options
+		_ = exec.CommandContext(exitCtx, "ssh", "-o", r.controlPath(), "-O", "exit", "--", r.host).Run()
+	}
+	_ = os.RemoveAll(r.dir)
+}
+
+// A socket of this run only. A master from another run checked its host its own way and is never reused.
+func (r remote) controlPath() string {
+	return `ControlPath="` + filepath.Join(r.dir, "cm") + `"`
+}
+
+func (r remote) run(ctx context.Context, command, stdin string) (string, error) {
+	args := append(r.portArgs(), "-l", "root")
+	args = append(args, r.opts...)
+	if runtime.GOOS != "windows" && r.dir != "" {
 		// Share one connection, so a password or key prompt comes only once.
-		args = append(args,
-			"-o", "ControlMaster=auto",
-			"-o", `ControlPath="`+filepath.Join(paths.ConfigDir(), "cm-%C")+`"`,
-			"-o", "ControlPersist=30s",
-		)
+		args = append(args, "-o", "ControlMaster=auto", "-o", r.controlPath(), "-o", "ControlPersist=30s")
 	}
 	// -- keeps a host that starts with - from being read as a flag.
 	args = append(args, "--", r.host, command)
@@ -577,6 +626,10 @@ func (r remote) run(ctx context.Context, command, stdin string) (string, error) 
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if ee, ok := errors.AsType[*exec.ExitError](err); ok && ee.ExitCode() == 255 {
+		if r.pinned {
+			return out.String(), fmt.Errorf("could not connect as root, check that this works: %s. "+
+				"If ssh refused the host key because the server was reinstalled, run again with --accept-host-key", r)
+		}
 		return out.String(), fmt.Errorf("could not connect as root, check that this works: %s", r)
 	}
 	return out.String(), err

@@ -14,6 +14,10 @@ service AccountService {
   rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
     option (access) = {self: true};
   }
+  // SetAvatar stores a picture of one's own. An empty image removes it.
+  rpc SetAvatar(SetAvatarRequest) returns (SetAvatarResponse) {
+    option (access) = {self: true};
+  }
   rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse) {
     option (access) = {self: true};
   }
@@ -80,13 +84,19 @@ message GetAccountResponse {
 }
 
 message UpdateAccountRequest {
+  reserved 2;
+
   string name = 1 [(buf.validate.field).string.max_len = 256];
-  string picture = 2 [(buf.validate.field).string = {
-    max_len: 2048
-    uri_ref: true
-  }];
 }
 message UpdateAccountResponse {
+  User user = 1;
+}
+
+message SetAvatarRequest {
+  // A JPEG, PNG or GIF. The server crops it to a square and keeps 128px.
+  bytes image = 1 [(buf.validate.field).bytes.max_len = 2097152];
+}
+message SetAvatarResponse {
   User user = 1;
 }
 

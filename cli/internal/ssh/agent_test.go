@@ -39,7 +39,6 @@ func e2eSigner(t *testing.T) tpm.Signer {
 	t.Helper()
 
 	opts := tpm.SignerOptions{
-		Salt:      []byte(sshSalt),
 		StatePath: filepath.Join(t.TempDir(), "ssh-signer.json"),
 	}
 	if err := tpm.Available(); err == nil {
@@ -172,7 +171,6 @@ func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 
 	// An unusable TPM forces the software path, so the real device is never touched.
 	soft, err := tpm.NewSigner(tpm.SignerOptions{
-		Salt:      []byte(sshSalt),
 		StatePath: paths.SSHSignerFile(),
 		OpenTPM: func() (transport.TPMCloser, error) {
 			return nil, errors.New("no TPM in this test")

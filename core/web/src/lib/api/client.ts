@@ -5,7 +5,7 @@ import { Code, ConnectError } from '@connectrpc/connect';
 import { toast } from 'svelte-sonner';
 import { returnTo } from '#lib/store.svelte.js';
 import { connection } from './connection.svelte';
-import { formatConnectError, parseHTTPError } from './error-formatter';
+import { formatConnectError } from './error-formatter';
 
 // The id keeps a failing poll from stacking the same toast.
 function toastError(error: ConnectError) {
@@ -22,7 +22,8 @@ export const queryClient = new QueryClient({
 			refetchOnReconnect: true,
 			refetchOnWindowFocus: true,
 			refetchIntervalInBackground: false,
-			refetchInterval: 300000 // 5min
+			// What other people change shows up within this, on the tab in front.
+			refetchInterval: 15_000
 		},
 		mutations: {
 			retry: false
@@ -100,16 +101,3 @@ export const authTransport = createConnectTransport({
 	fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
 	jsonOptions: { ignoreUnknownFields: true }
 });
-
-export async function httpFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-	const response = await fetch(input, { credentials: 'include', ...init });
-	if (!response.ok) {
-		const err = await parseHTTPError(response);
-		if (err.code !== Code.Unauthenticated) {
-			const formatted = formatConnectError(err);
-			toast.error(formatted.title, { description: formatted.description });
-		}
-		throw err;
-	}
-	return response;
-}

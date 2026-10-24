@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { GetDashboardResponse } from '#lib/gen/nokku/v1/dashboard_pb.js';
-	import { formatBytes, formatTs } from '#lib/utils.js';
+	import { formatBytes } from '#lib/utils.js';
 	import type { Tone } from '#lib/tone.js';
 	import { headline, type Issue } from './issues';
 
@@ -24,7 +24,6 @@
 
 	const recording = $derived(data?.liveSessions.filter((s) => s.recording).length ?? 0);
 	const quota = $derived(Number(data?.recordingQuotaBytes ?? -1));
-	const nextCA = $derived(data?.soonestCas[0]);
 
 	// Ticks the "refreshed" age without a refetch.
 	let now = $state(Date.now());
@@ -80,9 +79,6 @@
 				`${data.liveSessions.length} live${recording ? ` · ${recording} recording` : ''}`
 			)}
 			{@render row('users', String(data.users))}
-			{#if nextCA}
-				{@render row('ca', `${nextCA.name} rolls over ${formatTs(nextCA.notAfter, 'relative')}`)}
-			{/if}
 			{@render row(
 				'storage',
 				quota < 0

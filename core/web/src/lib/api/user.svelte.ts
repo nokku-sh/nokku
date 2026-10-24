@@ -58,13 +58,22 @@ export const user = {
 				const loaded = pages.reduce((n, p) => n + p.logs.length, 0);
 				return loaded < last.total ? loaded : undefined;
 			},
+			// A poll would fetch every loaded page again.
+			refetchInterval: false,
 			enabled: enabled()
 		}));
 	},
 
 	updateProfile: () =>
-		createMutation<User, Error, { name?: string; picture?: string }>(() => ({
+		createMutation<User, Error, { name?: string }>(() => ({
 			mutationFn: (variables) => account.update(variables),
+			onSuccess: (updated) => {
+				queryClient.setQueryData(['account'], updated);
+			}
+		})),
+	setAvatar: () =>
+		createMutation<User, Error, Uint8Array>(() => ({
+			mutationFn: (image) => account.setAvatar(image),
 			onSuccess: (updated) => {
 				queryClient.setQueryData(['account'], updated);
 			}

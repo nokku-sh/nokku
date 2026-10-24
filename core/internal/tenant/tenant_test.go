@@ -12,9 +12,14 @@ import (
 )
 
 func TestFromHostParsesWithoutTheDatabase(t *testing.T) {
-	r := &Resolver{saas: true, scheme: "https", host: "nokku.sh", slugs: cache.NewLocal[actor.Workspace](time.Minute)}
+	r := &Resolver{
+		saas:   true,
+		scheme: "https",
+		host:   "nokku.sh",
+		slugs:  cache.New[string, actor.Workspace](10, time.Minute),
+	}
 	cached := actor.Workspace{ID: "1", Slug: "acme", BaseURL: "https://acme.nokku.sh"}
-	r.slugs.Put("acme", cached)
+	r.slugs.Set("acme", cached)
 
 	root, err := r.FromHost(t.Context(), "nokku.sh")
 	require.NoError(t, err)

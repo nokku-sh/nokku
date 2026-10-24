@@ -53,7 +53,7 @@ The core holds the signing keys of your SSH certificate authorities. Whoever con
 - Back it up together with the database. One is useless without the other.
 - Treat license keys and OIDC client secrets the same way.
 
-How it works: the secrets in the database are encrypted by one keyset, which is stored in the database too. The keyset is wrapped by a key derived from `NOKKU_SECRET`, or by a KMS key when `KMS_URI` is set. Each recording is encrypted with its own key, and that key is one more secret in the database.
+How it works: the secrets in the database are encrypted by one keyset, which is stored in the database too. The keyset is wrapped by a key derived from `NOKKU_SECRET`, or by a KMS key when `KMS_URI` is set. Each recording is encrypted with its own key in Tink's AES-GCM-HKDF streaming format, with the recording's id as associated data, so a cut or swapped object fails to play. That key is one more secret in the database.
 
 ### Rotating the secret
 
@@ -107,7 +107,12 @@ A workspace has exactly one owner, and nobody else can hand the workspace on. Wh
 - **The link in the log.** Until the owner has a passkey or a linked provider, every start prints a 24 hour sign-in link, and `./nokku admin-link` prints one on demand. Anyone who reads the server's log or runs commands on the machine can become the owner. Keep both to people you trust with the workspace, and add a passkey right after the first sign-in.
 - **A linked identity provider.** A provider never becomes the owner by matching the email address. The owner links it once while signed in, under **Profile, Security**. After that, whoever controls that account at the provider is the owner.
 
-Requiring single sign-on closes passkeys and email links for everyone else. It leaves them open for the owner on purpose, so a broken provider can still be fixed.
+Requiring single sign-on closes passkeys and email links for everyone else, and signs out the sessions they started, in the browser and in `nk`. It leaves them open for the owner on purpose, so a broken provider can still be fixed.
+
+### Identity providers
+
+- **An account links by address only when the provider vouches for it.** A provider that sends `email_verified: true` links to the account with that address. One that sends `false` never does. Entra sends nothing at all, so it only links when the owner turns on **Trust addresses it does not verify** for that provider. Do that only for a directory you run, like your own Entra tenant, never for one where people pick their own address.
+- **New ways in need a fresh sign-in.** Adding a passkey or changing the email address takes a session from the last 10 minutes. An older one is signed out and has to sign in again, so a stolen session cookie cannot turn into a lasting passkey.
 
 ### Network
 
@@ -117,9 +122,7 @@ Requiring single sign-on closes passkeys and email links for everyone else. It l
 
 ### File storage
 
-Recordings are encrypted before they are stored, on local disk and on S3 alike.
-
-If you set `NOKKU_S3_PUBLIC_URL` to serve avatars straight from the bucket, grant public read on the `avatars/` prefix only. Never make the whole bucket public. Recordings live under `videos/`.
+Recordings are encrypted before they are stored, on local disk and on S3 alike. Nothing in the bucket has to be public, the core serves everything itself.
 
 ### Database
 
@@ -142,9 +145,11 @@ cosign verify ghcr.io/nokku-sh/nokku:<version> \
 
 ## What to know about the design
 
-**The core is down, access is not.** Daemons enforce the access they last synced, and a certificate stays valid until it expires. Revoking access is immediate on servers that are in sync. A server that missed the sync is bounded by the certificate lifetime, so keep user certificates short.
+**The core is down, access is not.** Daemons enforce the access they last synced, and a certificate stays valid until it expires. Revoking access is immediate on servers that are in sync. A server that missed the sync is bounded by the certificate lifetime, so keep user certificates short. They default to 16 hours, and `nk` renews them on its own.
 
-**Session recordings.** Daemons stream recordings to the core, where they are encrypted at rest. Credential scrubbing runs after an upload ends, also one that broke off, and replaces what was stored with a redacted copy. Between upload and scrub the stored recording is unredacted, though still encrypted. Scrubbing is best effort. A failed scrub is logged and the recording is kept as uploaded, and the matching is heuristic, so it cannot catch every secret.
+**CA keys never expire.** Like OpenSSH's own CA keys, they change only when you rotate them. Every CA has two Ed25519 keys: a user key that signs logins and a host key that signs the host certificates of daemons, so neither can stand in for the other. **Rotate** replaces both and keeps the old ones trusted until the certificates they signed run out. **Emergency rollover** distrusts the old keys at once, for a key that may have leaked. Servers set up with `nk sync` learn the new user key at their next `nk sync`. A KMS keeps the keys safe at rest, but the core decrypts them to sign, so a compromised core is what a rollover is for.
+
+**Session recordings.** Daemons stream recordings to the core, where each is encrypted with a key of its own. Nothing is redacted: a secret printed on the terminal is in the recording, so treat recordings like the servers they come from. Typed passwords are not recorded, the daemon records input only while the terminal echoes. Every playback is written to the audit log.
 
 **Row-level security is a safety net, not a wall.** Every tenant row belongs to one workspace, and a request only sees the rows of its own. The policy is the only workspace filter, queries name none. A connection with no workspace set sees nothing. This protects against application bugs. It does not protect against a compromised core: it holds the password of `nokku_system` too, and the workspace setting is an ordinary session variable. Queries are parameterized through sqlc, which is the defense against injection.
 

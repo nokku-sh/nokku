@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"strings"
@@ -41,11 +43,47 @@ func (s *accountService) UpdateAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateAccountRequest,
 ) (*nokkuv1.UpdateAccountResponse, error) {
-	u, err := s.cfg.IAM.UpdateSelf(ctx, req.Name, req.Picture)
+	u, err := s.cfg.IAM.UpdateSelf(ctx, req.Name)
 	if err != nil {
 		return nil, errInternal
 	}
 	return &nokkuv1.UpdateAccountResponse{User: u.ToProto()}, nil
+}
+
+// SetAvatar keeps the picture in the database and points users.picture at it, by a URL that changes with it.
+func (s *accountService) SetAvatar(
+	ctx context.Context,
+	req *nokkuv1.SetAvatarRequest,
+) (*nokkuv1.SetAvatarResponse, error) {
+	userID := actor.UserIDFromContext(ctx)
+	var image []byte
+	var etag, picture string
+	if len(req.GetImage()) > 0 {
+		var err error
+		if image, err = avatarJPEG(req.GetImage()); err != nil {
+			return nil, newError(connect.CodeInvalidArgument, err.Error())
+		}
+		sum := sha256.Sum256(image)
+		etag = hex.EncodeToString(sum[:8])
+		picture = "/avatars/" + userID + "?v=" + etag
+	}
+
+	var u *db.User
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+		if image == nil {
+			err = q.DeleteAvatar(ctx, userID)
+		} else {
+			err = q.PutAvatar(ctx, &db.PutAvatarParams{UserID: userID, Image: image, Etag: etag})
+		}
+		if err != nil {
+			return err
+		}
+		u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: userID, Picture: &picture})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.SetAvatarResponse{User: u.ToProto()}, nil
 }
 
 // RequestEmailChange mails the confirm link to the new address and a cancel link to the current one.
@@ -57,11 +95,18 @@ func (s *accountService) RequestEmailChange(
 	if err != nil {
 		return nil, errAccountNotFound
 	}
+	if err := s.cfg.IAM.RequireRecentSignIn(ctx); err != nil {
+		// The web app reads Unauthenticated as a session to sign in again, and comes back here after.
+		if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {
+			setCookie(ci, s.cfg.IAM.ClearSessionCookie())
+		}
+		return nil, newError(connect.CodeUnauthenticated, "sign in again to change your email")
+	}
 	if !s.cfg.Email.HasSMTP() {
 		return nil, newError(connect.CodeUnimplemented, "this server sends no mail, ask your administrator")
 	}
 	// Asked first, a refused request must not replace the pending change.
-	if s.cfg.Email.EmailChangeOnCooldown(ctx, u.ID) {
+	if s.cfg.Email.EmailChangeOnCooldown(u.ID) {
 		return nil, newError(connect.CodeResourceExhausted, "you asked for a change a moment ago, try again later")
 	}
 	confirm, cancel, err := s.cfg.IAM.RequestEmailChange(ctx, u, req.GetNewEmail())
@@ -209,7 +254,6 @@ func (s *accountService) DeleteAccount(
 	ctx context.Context,
 	_ *nokkuv1.DeleteAccountRequest,
 ) (*nokkuv1.DeleteAccountResponse, error) {
-	userID := actor.UserIDFromContext(ctx)
 	err := s.cfg.IAM.DeleteSelf(ctx)
 	switch {
 	case errors.Is(err, iam.ErrOwner):
@@ -219,7 +263,6 @@ func (s *accountService) DeleteAccount(
 	case err != nil:
 		return nil, errInternal
 	}
-	deleteAvatar(ctx, s.cfg, userID)
 	// The session cookie is HttpOnly, only a server response can clear it.
 	if ci, ok := connect.CallInfoForHandlerContext(ctx); ok {
 		setCookie(ci, s.cfg.IAM.ClearSessionCookie())

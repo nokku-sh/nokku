@@ -41,6 +41,8 @@ const (
 var (
 	testCfg    *config.Config
 	testServer *httptest.Server
+	// storageDir is where the test server keeps recordings.
+	storageDir string
 )
 
 // TestMain keeps a developer's shell env from pointing the test server at real Stripe, KMS, S3, SMTP or providers.
@@ -50,7 +52,7 @@ func TestMain(m *testing.M) {
 		"NOKKU_TLS_CA",
 		"NOKKU_TRUSTED_PROXIES",
 		"NOKKU_LICENSE_KEY",
-		"NOKKU_STORAGE",
+		"NOKKU_STORAGE_URL",
 		"NOKKU_SMTP_HOST",
 		"NOKKU_ADMIN_EMAIL",
 		"NOKKU_ADMIN_NAME",
@@ -68,9 +70,9 @@ func TestMain(m *testing.M) {
 		os.Unsetenv(key)
 	}
 	stop := testenv.Postgres()
-	storage, _ := os.MkdirTemp("", "nokku-api-test")
+	storageDir, _ = os.MkdirTemp("", "nokku-api-test")
 	os.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
-	os.Setenv("NOKKU_LOCAL_STORAGE_PATH", storage)
+	os.Setenv("NOKKU_STORAGE_URL", "file://"+storageDir)
 	// A test that holds a license key must not ask the real license worker for a new one.
 	os.Setenv("NOKKU_LICENSE_OFFLINE", "true")
 	// Saving a provider fetches its discovery document, and the test issuers listen on loopback.
@@ -92,7 +94,7 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	cancel()
 	testServer.Close()
-	_ = os.RemoveAll(storage)
+	_ = os.RemoveAll(storageDir)
 	stop()
 	os.Exit(code)
 }

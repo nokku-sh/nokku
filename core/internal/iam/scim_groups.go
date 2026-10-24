@@ -1,6 +1,7 @@
 package iam
 
 // SCIM Groups are workspace teams. The SCIM id is the team id, members reference user ids, externalId is on the row.
+// SCIM only sees the teams it made or took over, an IdP that syncs deletes every group it does not know.
 
 import (
 	"context"
@@ -56,9 +57,12 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 			}
 		case err != nil:
 			return err
-		case team.ScimExternalID != nil:
+		case team.ScimManaged:
 			// Another group of the provider holds it, adopting would let the two overwrite each other.
 			return scimerrors.ScimErrorUniqueness
+		}
+		if team, err = q.AdoptTeamSCIM(ctx, team.ID); err != nil {
+			return err
 		}
 		if team, err = linkTeamSCIM(ctx, q, team, scimAttrString(attrs["externalId"])); err != nil {
 			return err
@@ -75,7 +79,7 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 func (h scimGroupHandler) Get(r *http.Request, id string) (scim.Resource, error) {
 	var res scim.Resource
 	err := h.tx(r.Context(), id, func(q *db.Queries) error {
-		team, err := q.GetTeam(r.Context(), id)
+		team, err := q.GetSCIMTeam(r.Context(), id)
 		if err != nil {
 			return err
 		}
@@ -88,12 +92,12 @@ func (h scimGroupHandler) Get(r *http.Request, id string) (scim.Resource, error)
 func (h scimGroupHandler) GetAll(r *http.Request, params scim.ListRequestParams) (scim.Page, error) {
 	var all []scim.Resource
 	err := h.tx(r.Context(), "", func(q *db.Queries) error {
-		rows, err := q.ListTeams(r.Context(), &db.ListTeamsParams{})
+		teams, err := q.ListSCIMTeams(r.Context())
 		if err != nil {
 			return err
 		}
-		for _, row := range rows {
-			res, err := groupResource(r.Context(), q, h.ws, &row.Team)
+		for _, team := range teams {
+			res, err := groupResource(r.Context(), q, h.ws, team)
 			if err != nil {
 				return err
 			}
@@ -111,7 +115,7 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 	ctx := r.Context()
 	var res scim.Resource
 	err := h.tx(ctx, id, func(q *db.Queries) error {
-		team, err := q.GetTeam(ctx, id)
+		team, err := q.GetSCIMTeam(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -135,7 +139,7 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 
 func (h scimGroupHandler) Delete(r *http.Request, id string) error {
 	return h.tx(r.Context(), id, func(q *db.Queries) error {
-		_, err := q.DeleteTeam(r.Context(), id)
+		_, err := q.DeleteSCIMTeam(r.Context(), id)
 		return err
 	})
 }
@@ -145,7 +149,7 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 	var res scim.Resource
 	changed := false
 	err := h.tx(ctx, id, func(q *db.Queries) error {
-		team, err := q.GetTeam(ctx, id)
+		team, err := q.GetSCIMTeam(ctx, id)
 		if err != nil {
 			return err
 		}

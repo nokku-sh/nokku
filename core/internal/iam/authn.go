@@ -20,7 +20,7 @@ func (s *Service) Authenticate(
 	header http.Header,
 	procedure string,
 ) (actor.Principal, db.AccessToken, error) {
-	token := requestCredential(header)
+	token := s.requestCredential(header)
 	p, tok, err := s.AuthenticateToken(ctx, token)
 	if err != nil {
 		return actor.Principal{}, db.AccessToken{}, err
@@ -80,11 +80,14 @@ func (s *Service) verifySessionProof(
 	header http.Header,
 	procedure, token, binding string,
 ) error {
-	proof := header.Get("DPoP")
+	proof, err := DPoPProof(header)
+	if err != nil {
+		return err
+	}
 	if proof == "" {
 		return ErrDPoPRequired
 	}
-	return s.DPoP.verifySession(ctx, proof, token, http.MethodPost, baseURL(ctx)+procedure, binding)
+	return s.DPoP.verifySession(proof, token, http.MethodPost, baseURL(ctx)+procedure, binding)
 }
 
 // AdvertiseDPoPNonce also sends the canonical API URL, so a recovering client corrects the htu it signs.
@@ -93,7 +96,7 @@ func (s *Service) AdvertiseDPoPNonce(ctx context.Context, h http.Header) {
 	h.Set("DPoP-Nonce", s.DPoP.CurrentNonce())
 }
 
-func requestCredential(h http.Header) string {
+func (s *Service) requestCredential(h http.Header) string {
 	if a := h.Get("Authorization"); a != "" {
 		for _, scheme := range []string{"bearer ", "dpop "} {
 			if len(a) >= len(scheme) && strings.EqualFold(a[:len(scheme)], scheme) {
@@ -101,5 +104,5 @@ func requestCredential(h http.Header) string {
 			}
 		}
 	}
-	return cookieFromHeader(h, sessionCookieName)
+	return s.cookieValue(h, sessionCookieName)
 }

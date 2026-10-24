@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -137,6 +138,24 @@ func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 	answer, cookies = d.assertion(t, e.svc, o.ws)
 	rec = post(ctx, e.svc.Passkey.FinishLogin, answer, cookies)
 	assert.Equal(t, http.StatusOK, rec.Code, "the real device: %s", rec.Body.String())
+}
+
+// A stolen cookie must not become a passkey. A session from more than a few minutes ago signs in again first, and
+// ends, so the sign-in page lets the browser in.
+func TestPasskeyRegistrationNeedsARecentSignIn(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	alice := e.user(t, o.ws, "alice@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	sess, _, err := e.svc.IssueToken(anon(t.Context(), o.ws), iam.TokenParams{
+		SubjectID: alice.ID, Kind: actor.KindUser, Method: iam.MethodPasskey,
+	})
+	require.NoError(t, err)
+	sess.CreatedAt = time.Now().Add(-time.Hour)
+	ctx := iam.ContextWithToken(as(t.Context(), o.ws, alice), *sess)
+
+	begin := post(ctx, e.svc.Passkey.BeginRegistration, "", nil)
+	assert.Equal(t, http.StatusUnauthorized, begin.Code, begin.Body.String())
+	assert.Zero(t, e.sessions(t, o.ws, alice.ID), "the old session lives on")
 }
 
 // A ceremony belongs to the account that started it, and neither it nor the sign-in can be played twice.

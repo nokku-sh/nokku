@@ -128,11 +128,7 @@ func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *iam.Service) *oidcFlow
 func (h *oidcIDPHarness) startOIDCFlowFrom(t *testing.T, svc *iam.Service, login *http.Request) *oidcFlowRun {
 	t.Helper()
 	loginRec := httptest.NewRecorder()
-	start := svc.OIDC.Login
-	if login.URL.Path == "/oidc/test" {
-		start = svc.OIDC.Test
-	}
-	start(loginRec, login)
+	svc.OIDC.Login(loginRec, login)
 
 	authorizeURL := loginRec.Header().Get("Location")
 	if authorizeURL == "" {
@@ -183,19 +179,16 @@ func (h *oidcIDPHarness) runOIDCFlow(
 
 func (h *oidcIDPHarness) setup(t *testing.T, jit bool) (*testEnv, *iam.Service) {
 	t.Helper()
+	return h.setupProvider(t, iam.OIDCProvider{JITProvisioning: jit})
+}
+
+func (h *oidcIDPHarness) setupProvider(t *testing.T, p iam.OIDCProvider) (*testEnv, *iam.Service) {
+	t.Helper()
 	e := newTestEnv(t)
 	h.org = e.org(t)
 	h.email = "alice@" + testDomain()
-	e.provider(t, h.org.ws, iam.SSOProvider{
-		ProviderID: testProviderID,
-		Name:       "Test OIDC",
-		OIDC: iam.OIDCProvider{
-			IssuerURL:       h.issuer,
-			ClientID:        h.m.ClientID,
-			ClientSecret:    h.m.ClientSecret,
-			JITProvisioning: jit,
-		},
-	})
+	p.IssuerURL, p.ClientID, p.ClientSecret = h.issuer, h.m.ClientID, h.m.ClientSecret
+	e.provider(t, h.org.ws, iam.SSOProvider{ProviderID: testProviderID, Name: "Test OIDC", OIDC: p})
 	return e, e.svc
 }
 
@@ -360,6 +353,34 @@ func TestOIDCFlowMissingEmailVerified(t *testing.T) {
 	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
 	if e.userByEmail(t, h.org.ws, h.email) == nil {
 		t.Error("a provider without the claim could not sign in")
+	}
+}
+
+// Without email_verified the provider does not vouch for the address, so it only claims an account when the owner
+// said it may.
+func TestOIDCFlowMissingEmailVerifiedLinksOnlyWhenTrusted(t *testing.T) {
+	for name, trust := range map[string]bool{"refused": false, "trusted": true} {
+		t.Run(name, func(t *testing.T) {
+			h := newOIDCIdP(t)
+			h.user()
+			h.mintBadToken(t, map[string]any{"email_verified": nil})
+			e, svc := h.setupProvider(t, iam.OIDCProvider{TrustUnverifiedEmail: trust})
+			member := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+
+			rec := h.runOIDCFlow(t, svc, "")
+			linked := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject)
+			if !trust {
+				wantSSOFailure(t, rec)
+				if linked != nil {
+					t.Error("an address nobody vouched for claimed an account")
+				}
+				return
+			}
+			wantSSOSuccess(t, rec)
+			if linked == nil || linked.UserID != member.ID {
+				t.Error("a trusted provider could not link the account")
+			}
+		})
 	}
 }
 

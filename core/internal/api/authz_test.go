@@ -132,6 +132,9 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 		if classes != 1 {
 			t.Errorf("%s is in %d authorization classes, want exactly 1", procedure, classes)
 		}
+		if access.GetPeopleOnly() && access.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
+			t.Errorf("%s is people_only without a role", procedure)
+		}
 	}
 }
 
@@ -229,6 +232,33 @@ func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 		err := a.authorize(as(tt.role), tt.procedure)
 		if (err == nil) != tt.allowed {
 			t.Errorf("%s on %s: err = %v, want allowed=%v", tt.role, tt.procedure, err, tt.allowed)
+		}
+	}
+}
+
+// A service account token must not mint credentials that outlive revoking it.
+func TestAuthorizePeopleOnly(t *testing.T) {
+	a := &authorizationInterceptor{}
+	editor := nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR
+	as := func(kind actor.Kind) context.Context {
+		return actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "p1", Kind: kind, Role: editor})
+	}
+	tests := []struct {
+		kind      actor.Kind
+		procedure string
+		allowed   bool
+	}{
+		{actor.KindServiceAccount, nokkuv1connect.ServiceAccountServiceCreateServiceAccountTokenProcedure, false},
+		{actor.KindServiceAccount, nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, false},
+		{actor.KindServiceAccount, nokkuv1connect.ServiceAccountServiceListServiceAccountsProcedure, true},
+		{actor.KindServiceAccount, nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
+		{actor.KindUser, nokkuv1connect.ServiceAccountServiceCreateServiceAccountTokenProcedure, true},
+		{actor.KindCLI, nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, true},
+	}
+	for _, tt := range tests {
+		err := a.authorize(as(tt.kind), tt.procedure)
+		if (err == nil) != tt.allowed {
+			t.Errorf("%s on %s: err = %v, want allowed=%v", tt.kind, tt.procedure, err, tt.allowed)
 		}
 	}
 }

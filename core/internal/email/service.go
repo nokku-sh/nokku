@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	htmltemplate "html/template"
-	"io"
 	"log/slog"
 	"math"
 	"net/textproto"
@@ -20,7 +19,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/cache"
 )
 
-// The templates are edited by hand, an .html and a .txt per mail.
+// The templates are built with react-email in the email repo, an .html and a .txt per mail.
 //
 //go:embed templates
 var templates embed.FS
@@ -43,7 +42,7 @@ const (
 // Service only delivers when an SMTP host is set.
 type Service struct {
 	sender sender
-	cache  *cache.Memory
+	cache  *cache.TTL[string, struct{}]
 	appURL string
 
 	From string `env:"NOKKU_EMAIL_SENDER"`
@@ -82,7 +81,7 @@ func New(ctx context.Context, appURL string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc.appURL, svc.cache, svc.sender = appURL, cache.NewMemory(cooldownEntries), noopSender{}
+	svc.appURL, svc.cache, svc.sender = appURL, cache.New[string, struct{}](cooldownEntries, cooldown), noopSender{}
 
 	if svc.SMTPHost == "" {
 		slog.Warn("email delivery disabled, set NOKKU_SMTP_HOST to enable it")
@@ -137,9 +136,9 @@ func (s *Service) SendOwnerLinkEmail(ctx context.Context, email, link string, ex
 }
 
 // OwnerLinkOnCooldown is asked before the next workspace is made, its mail would not go out.
-func (s *Service) OwnerLinkOnCooldown(ctx context.Context, email string) bool {
-	_, err := s.cache.Get(ctx, cooldownKey(email, magicLink))
-	return err == nil
+func (s *Service) OwnerLinkOnCooldown(email string) bool {
+	_, on := s.cache.Get(cooldownKey(email, magicLink))
+	return on
 }
 
 // SendEmailChangeConfirm goes to the new address, the account only switches once the link is used.
@@ -162,9 +161,9 @@ func (s *Service) SendEmailChangeConfirm(
 }
 
 // EmailChangeOnCooldown is asked before a new change replaces the pending one.
-func (s *Service) EmailChangeOnCooldown(ctx context.Context, userID string) bool {
-	_, err := s.cache.Get(ctx, cooldownKey(userID, emailConfirm))
-	return err == nil
+func (s *Service) EmailChangeOnCooldown(userID string) bool {
+	_, on := s.cache.Get(cooldownKey(userID, emailConfirm))
+	return on
 }
 
 // SendSignupLinkEmail goes to someone without an account yet, so the cooldown is keyed by the address.
@@ -358,11 +357,8 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	}
 
 	key := cooldownKey(req.userID, req.template+req.ref)
-	claimed, err := s.cache.SetNX(ctx, key, nil, cooldown)
-	// A full store must not hold back a reset or an alert, signups can fill it from outside.
-	if err != nil {
-		slog.Warn("email cooldown not recorded, sending anyway", "error", err)
-	} else if !claimed {
+	// A full store drops its oldest entry, so a flood of signups cannot hold back a reset or an alert.
+	if !s.cache.SetNX(key, struct{}{}) {
 		return ErrCooldown
 	}
 
@@ -374,7 +370,7 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 		HTML:    body.html,
 	})
 	if err != nil {
-		_ = s.cache.Delete(context.WithoutCancel(ctx), key)
+		s.cache.Delete(key)
 	}
 	return err
 }
@@ -391,41 +387,24 @@ type body struct {
 	html string
 }
 
+// Parsed once. The templates are embedded, so a broken one fails the tests and the start, never a send.
+var (
+	htmlTemplates = htmltemplate.Must(htmltemplate.New("").Funcs(templateFuncs).Option("missingkey=error").
+			ParseFS(templates, "templates/*.html"))
+	textTemplates = texttemplate.Must(texttemplate.New("").Funcs(templateFuncs).Option("missingkey=error").
+			ParseFS(templates, "templates/*.txt"))
+)
+
 // render fills both parts of a template. The text part goes through text/template, html escaping would break its URLs.
 func render(name string, data any) (body, error) {
-	html, err := renderFile("templates/"+name+".html", data, func(src string) (executor, error) {
-		return htmltemplate.New(name).Funcs(templateFuncs).Option("missingkey=error").Parse(src)
-	})
-	if err != nil {
-		return body{}, err
+	var html, text bytes.Buffer
+	if err := htmlTemplates.ExecuteTemplate(&html, name+".html", data); err != nil {
+		return body{}, fmt.Errorf("render %s.html: %w", name, err)
 	}
-	text, err := renderFile("templates/"+name+".txt", data, func(src string) (executor, error) {
-		return texttemplate.New(name).Funcs(templateFuncs).Option("missingkey=error").Parse(src)
-	})
-	if err != nil {
-		return body{}, err
+	if err := textTemplates.ExecuteTemplate(&text, name+".txt", data); err != nil {
+		return body{}, fmt.Errorf("render %s.txt: %w", name, err)
 	}
-	return body{text: text, html: html}, nil
-}
-
-type executor interface {
-	Execute(w io.Writer, data any) error
-}
-
-func renderFile(path string, data any, parse func(string) (executor, error)) (string, error) {
-	content, err := templates.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("template %s not found: %w", path, err)
-	}
-	tmpl, err := parse(string(content))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template %s: %w", path, err)
-	}
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute template %s: %w", path, err)
-	}
-	return buf.String(), nil
+	return body{text: text.String(), html: html.String()}, nil
 }
 
 // lifetime words how long a link works in its largest whole unit, "24 hours" and not "24h0m0s".

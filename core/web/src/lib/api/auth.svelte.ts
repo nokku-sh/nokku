@@ -8,7 +8,12 @@ const client = createClient(AuthService, authTransport);
 
 export const auth = {
 	// What this workspace lets people sign in with. Public.
-	options: () => useQuery(AuthService.method.getLoginOptions, {}, { staleTime: Infinity }),
+	options: () =>
+		useQuery(
+			AuthService.method.getLoginOptions,
+			{},
+			{ staleTime: Infinity, refetchInterval: false }
+		),
 
 	// Always succeeds from the outside, so the form reveals no accounts.
 	requestMagicLink: () => useMutation(AuthService.method.requestMagicLink),
