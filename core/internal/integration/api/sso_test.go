@@ -3,6 +3,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -224,11 +225,20 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 		owner: true,
 	}
 
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner))).
-		UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
-			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
-		})
+	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
+	)
+	_, err := workspaces.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
+		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
+	})
 	require.NoError(t, err)
+	// The workspace is shared, and a mailed link fails in every test that runs after this one.
+	t.Cleanup(func() {
+		_, err := workspaces.UpdateWorkspace(context.WithoutCancel(t.Context()), &nokkuv1.UpdateWorkspaceRequest{
+			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)},
+		})
+		assert.NoError(t, err, "turning single sign-on back off")
+	})
 
 	for token, stays := range sessions {
 		_, tok, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), token)
