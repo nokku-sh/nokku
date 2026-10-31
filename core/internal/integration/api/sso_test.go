@@ -252,17 +252,18 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
 		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
 	)
+	var original *db.Workspace
+	inWorkspace(t, cfg, ws, func(q *db.Queries) (err error) {
+		original, err = q.GetWorkspace(t.Context())
+		return err
+	})
+	// The workspace is shared. A mailed link fails in every test after this one, and an explicit false shows in others.
+	t.Cleanup(func() { restoreWorkspace(context.WithoutCancel(t.Context()), t, cfg, original) })
+
 	_, err := workspaces.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
 		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
 	}))
 	require.NoError(t, err)
-	// The workspace is shared, and a mailed link fails in every test that runs after this one.
-	t.Cleanup(func() {
-		_, err := workspaces.UpdateWorkspace(context.WithoutCancel(t.Context()), masked(&nokkuv1.UpdateWorkspaceRequest{
-			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)},
-		}))
-		assert.NoError(t, err, "turning single sign-on back off")
-	})
 
 	for token, stays := range sessions {
 		_, tok, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), token, accessTokens...)

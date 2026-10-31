@@ -158,8 +158,13 @@ func TestRetireSweep(t *testing.T) {
 	out, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
 	require.NoError(t, err)
 
+	// The sweep spans workspaces and takes what earlier tests left too, only this daemon counts.
 	var events []*audit.Event
-	record := func(_ context.Context, e *audit.Event) { events = append(events, e) }
+	record := func(_ context.Context, e *audit.Event) {
+		if e.Target == out.DaemonID {
+			events = append(events, e)
+		}
+	}
 
 	require.NoError(t, daemon.Retire(f.ctx, f.conn, nil, time.Time{}, record))
 	assert.Empty(t, events, "retired a daemon that was just made")
@@ -168,7 +173,6 @@ func TestRetireSweep(t *testing.T) {
 	require.NoError(t, daemon.Retire(f.ctx, f.conn, nil, time.Time{}, record))
 	require.Len(t, events, 1)
 	assert.Equal(t, "RetireDaemon", events[0].Action)
-	assert.Equal(t, out.DaemonID, events[0].Target)
 	require.Error(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
 		_, err := q.GetDaemon(f.ctx, out.DaemonID)
 		return err

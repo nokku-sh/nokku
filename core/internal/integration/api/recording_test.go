@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -499,6 +500,10 @@ func objectExists(workspaceID, objectID string) bool {
 func storedObjects(t *testing.T, workspaceID string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(filepath.Dir(objectPath(workspaceID, "any")))
+	// The directory comes with the first object, and the tests that break storage take it away.
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
 	require.NoError(t, err)
 	var names []string
 	for _, entry := range entries {
