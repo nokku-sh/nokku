@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
 
   vault:
-    image: docker.io/hashicorp/vault:2.1.2
+    image: docker.io/hashicorp/vault:2.2.1
     container_name: vault
     # TLS from a CA made at every start, nokku only talks https to Vault. task containers copies the CA to
     # data/vault/vault-ca.pem, where VAULT_CACERT points.
@@ -68,7 +68,7 @@ services:
     restart: unless-stopped
 
   mailpit:
-    image: docker.io/axllent/mailpit:v1.31.6
+    image: docker.io/axllent/mailpit:v1.32.0
     container_name: mailpit
     ports:
       - "1025:1025"
