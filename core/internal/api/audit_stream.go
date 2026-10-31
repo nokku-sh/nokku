@@ -3,14 +3,15 @@ package api
 import (
 	"context"
 	"fmt"
+	"uuid"
 
 	"connectrpc.com/connect/v2"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/config"
-	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -41,6 +42,11 @@ func (s *auditStreamService) CreateAuditStream(
 	req *nokkuv1.CreateAuditStreamRequest,
 ) (*nokkuv1.CreateAuditStreamResponse, error) {
 	kind := db.AuditStreamKind(req.GetKind())
+	id := uuid.NewV7().String()
+	secret, err := s.cfg.Keyset.Seal(audit.SecretAAD(actor.WorkspaceIDFromContext(ctx), id), []byte(req.GetSecret()))
+	if err != nil {
+		return nil, err
+	}
 	var row *db.CreateAuditStreamRow
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		n, err := q.CountAuditStreams(ctx)
@@ -52,9 +58,10 @@ func (s *auditStreamService) CreateAuditStream(
 				fmt.Sprintf("a workspace has at most %d streams", maxAuditStreams))
 		}
 		row, err = q.CreateAuditStream(ctx, &db.CreateAuditStreamParams{
+			ID:     id,
 			Kind:   kind,
 			URL:    req.GetUrl(),
-			Secret: crypto.EncryptedBytes(req.GetSecret()),
+			Secret: secret,
 		})
 		return err
 	}); err != nil {
@@ -70,6 +77,9 @@ func (s *auditStreamService) UpdateAuditStream(
 	ctx context.Context,
 	req *nokkuv1.UpdateAuditStreamRequest,
 ) (*nokkuv1.UpdateAuditStreamResponse, error) {
+	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
+		return nil, err
+	}
 	var row *db.UpdateAuditStreamRow
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		prev, err := q.GetAuditStream(ctx, req.GetId())
@@ -80,10 +90,20 @@ func (s *auditStreamService) UpdateAuditStream(
 		if req.Url != nil && req.GetUrl() != prev.URL && req.Secret == nil {
 			return newError(connect.CodeInvalidArgument, "enter the secret again when the URL changes")
 		}
+		// Nil keeps the stored secret. The ids come from the row, a request may spell a UUID in capitals.
+		var secret []byte
+		if req.Secret != nil {
+			if secret, err = s.cfg.Keyset.Seal(
+				audit.SecretAAD(prev.WorkspaceID, prev.ID),
+				[]byte(req.GetSecret()),
+			); err != nil {
+				return err
+			}
+		}
 		row, err = q.UpdateAuditStream(ctx, &db.UpdateAuditStreamParams{
-			ID:      req.GetId(),
+			ID:      prev.ID,
 			URL:     req.Url,
-			Secret:  crypto.EncryptedBytes(req.GetSecret()),
+			Secret:  secret,
 			Enabled: req.Enabled,
 		})
 		return err

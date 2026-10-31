@@ -1,13 +1,11 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
-	"strings"
 	"time"
 )
 
@@ -29,20 +27,6 @@ func (rw *responseWriter) Unwrap() http.ResponseWriter {
 func (rw *responseWriter) Flush() {
 	rc := http.NewResponseController(rw.ResponseWriter)
 	_ = rc.Flush()
-}
-
-// quietHandshakes sends what net/http logs itself to debug, an untrusted certificate makes a line per connection.
-type quietHandshakes struct{ slog.Handler }
-
-func (h quietHandshakes) Handle(ctx context.Context, r slog.Record) error {
-	if strings.HasPrefix(r.Message, "http: TLS handshake error") ||
-		strings.HasPrefix(r.Message, "http2: server: error reading preface") {
-		if !h.Enabled(ctx, slog.LevelDebug) {
-			return nil
-		}
-		r.Level = slog.LevelDebug
-	}
-	return h.Handler.Handle(ctx, r)
 }
 
 // withLogger only writes a line for a request the server failed. It logs the path only, query strings carry tokens.

@@ -17,7 +17,59 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/dashboard.proto.
  */
 export const file_nokku_v1_dashboard: GenFile = /*@__PURE__*/
-  fileDesc("Chhub2trdS92MS9kYXNoYm9hcmQucHJvdG8SCG5va2t1LnYxIhUKE0dldERhc2hib2FyZFJlcXVlc3QioQMKFEdldERhc2hib2FyZFJlc3BvbnNlEg8KB3RhcmdldHMYASABKAUSFgoOdGFyZ2V0c19vbmxpbmUYAiABKAUSFgoOdGFyZ2V0c19tYW51YWwYAyABKAUSDwoHZGFlbW9ucxgEIAEoBRIWCg5kYWVtb25zX29ubGluZRgFIAEoBRIpCg9wZW5kaW5nX2RhZW1vbnMYBiADKAsyEC5ub2trdS52MS5EYWVtb24SKQoPb2ZmbGluZV9kYWVtb25zGAcgAygLMhAubm9ra3UudjEuRGFlbW9uEg0KBXVzZXJzGAggASgFEhcKD3JlY29yZGluZ19ieXRlcxgKIAEoAxIdChVyZWNvcmRpbmdfcXVvdGFfYnl0ZXMYCyABKAMSLAoNbGl2ZV9zZXNzaW9ucxgMIAMoCzIVLm5va2t1LnYxLkxpdmVTZXNzaW9uEhAKCGFjdGl2aXR5GA0gAygFEhAKCGZhaWx1cmVzGA4gAygFEioKDnJlY2VudF9jaGFuZ2VzGA8gAygLMhIubm9ra3UudjEuRXZlbnRMb2dKBAgJEAoitAEKC0xpdmVTZXNzaW9uEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRITCgtkYWVtb25fbmFtZRgDIAEoCRIQCgh1c2VybmFtZRgEIAEoCRIPCgd1c2VyX2lkGAUgASgJEi4KCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCXJlY29yZGluZxgHIAEoCBILCgN3ZWIYCCABKAgybAoQRGFzaGJvYXJkU2VydmljZRJYCgxHZXREYXNoYm9hcmQSHS5ub2trdS52MS5HZXREYXNoYm9hcmRSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0RGFzaGJvYXJkUmVzcG9uc2UiCZACAcLzGAIYAkKPAQoMY29tLm5va2t1LnYxQg5EYXNoYm9hcmRQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_daemon, file_nokku_v1_util]);
+  fileDesc("Chhub2trdS92MS9kYXNoYm9hcmQucHJvdG8SCG5va2t1LnYxIrQBCgtMaXZlU2Vzc2lvbhIKCgJpZBgBIAEoCRIRCglkYWVtb25faWQYAiABKAkSEwoLZGFlbW9uX25hbWUYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSDwoHdXNlcl9pZBgFIAEoCRIRCglyZWNvcmRpbmcYBiABKAgSCwoDd2ViGAcgASgIEi4KCnN0YXJ0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhUKE0dldERhc2hib2FyZFJlcXVlc3QimwMKFEdldERhc2hib2FyZFJlc3BvbnNlEg8KB3RhcmdldHMYASABKAUSFgoOdGFyZ2V0c19vbmxpbmUYAiABKAUSFgoOdGFyZ2V0c19tYW51YWwYAyABKAUSDwoHZGFlbW9ucxgEIAEoBRIWCg5kYWVtb25zX29ubGluZRgFIAEoBRIpCg9wZW5kaW5nX2RhZW1vbnMYBiADKAsyEC5ub2trdS52MS5EYWVtb24SKQoPb2ZmbGluZV9kYWVtb25zGAcgAygLMhAubm9ra3UudjEuRGFlbW9uEg0KBXVzZXJzGAggASgFEhcKD3JlY29yZGluZ19ieXRlcxgJIAEoAxIdChVyZWNvcmRpbmdfcXVvdGFfYnl0ZXMYCiABKAMSLAoNbGl2ZV9zZXNzaW9ucxgLIAMoCzIVLm5va2t1LnYxLkxpdmVTZXNzaW9uEhAKCGFjdGl2aXR5GAwgAygFEhAKCGZhaWx1cmVzGA0gAygFEioKDnJlY2VudF9jaGFuZ2VzGA4gAygLMhIubm9ra3UudjEuRXZlbnRMb2cybAoQRGFzaGJvYXJkU2VydmljZRJYCgxHZXREYXNoYm9hcmQSHS5ub2trdS52MS5HZXREYXNoYm9hcmRSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0RGFzaGJvYXJkUmVzcG9uc2UiCZACAcLzGAIYAkKPAQoMY29tLm5va2t1LnYxQg5EYXNoYm9hcmRQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_daemon, file_nokku_v1_util]);
+
+/**
+ * @generated from message nokku.v1.LiveSession
+ */
+export type LiveSession = Message<"nokku.v1.LiveSession"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string daemon_id = 2;
+   */
+  daemonId: string;
+
+  /**
+   * @generated from field: string daemon_name = 3;
+   */
+  daemonName: string;
+
+  /**
+   * @generated from field: string username = 4;
+   */
+  username: string;
+
+  /**
+   * @generated from field: string user_id = 5;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: bool recording = 6;
+   */
+  recording: boolean;
+
+  /**
+   * @generated from field: bool web = 7;
+   */
+  web: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 8;
+   */
+  startedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.LiveSession.
+ * Use `create(LiveSessionSchema)` to create a new message.
+ */
+export const LiveSessionSchema: GenMessage<LiveSession> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_dashboard, 0);
 
 /**
  * @generated from message nokku.v1.GetDashboardRequest
@@ -30,7 +82,7 @@ export type GetDashboardRequest = Message<"nokku.v1.GetDashboardRequest"> & {
  * Use `create(GetDashboardRequestSchema)` to create a new message.
  */
 export const GetDashboardRequestSchema: GenMessage<GetDashboardRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_dashboard, 0);
+  messageDesc(file_nokku_v1_dashboard, 1);
 
 /**
  * @generated from message nokku.v1.GetDashboardResponse
@@ -77,32 +129,32 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   users: number;
 
   /**
-   * @generated from field: int64 recording_bytes = 10;
+   * @generated from field: int64 recording_bytes = 9;
    */
   recordingBytes: bigint;
 
   /**
-   * @generated from field: int64 recording_quota_bytes = 11;
+   * @generated from field: int64 recording_quota_bytes = 10;
    */
   recordingQuotaBytes: bigint;
 
   /**
-   * @generated from field: repeated nokku.v1.LiveSession live_sessions = 12;
+   * @generated from field: repeated nokku.v1.LiveSession live_sessions = 11;
    */
   liveSessions: LiveSession[];
 
   /**
-   * @generated from field: repeated int32 activity = 13;
+   * @generated from field: repeated int32 activity = 12;
    */
   activity: number[];
 
   /**
-   * @generated from field: repeated int32 failures = 14;
+   * @generated from field: repeated int32 failures = 13;
    */
   failures: number[];
 
   /**
-   * @generated from field: repeated nokku.v1.EventLog recent_changes = 15;
+   * @generated from field: repeated nokku.v1.EventLog recent_changes = 14;
    */
   recentChanges: EventLog[];
 };
@@ -112,58 +164,6 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
  * Use `create(GetDashboardResponseSchema)` to create a new message.
  */
 export const GetDashboardResponseSchema: GenMessage<GetDashboardResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_dashboard, 1);
-
-/**
- * @generated from message nokku.v1.LiveSession
- */
-export type LiveSession = Message<"nokku.v1.LiveSession"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
-
-  /**
-   * @generated from field: string daemon_id = 2;
-   */
-  daemonId: string;
-
-  /**
-   * @generated from field: string daemon_name = 3;
-   */
-  daemonName: string;
-
-  /**
-   * @generated from field: string username = 4;
-   */
-  username: string;
-
-  /**
-   * @generated from field: string user_id = 5;
-   */
-  userId: string;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp started_at = 6;
-   */
-  startedAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: bool recording = 7;
-   */
-  recording: boolean;
-
-  /**
-   * @generated from field: bool web = 8;
-   */
-  web: boolean;
-};
-
-/**
- * Describes the message nokku.v1.LiveSession.
- * Use `create(LiveSessionSchema)` to create a new message.
- */
-export const LiveSessionSchema: GenMessage<LiveSession> = /*@__PURE__*/
   messageDesc(file_nokku_v1_dashboard, 2);
 
 /**

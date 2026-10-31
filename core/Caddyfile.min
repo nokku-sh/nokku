@@ -1,0 +1,24 @@
+# Reverse proxy for a Nokku without a domain, see compose.min.yml. SITE_ADDRESS
+# is injected by compose from NOKKU_BASE_URL.
+#
+# Caddy issues the certificate from a CA of its own. Clients have to be given
+# its root, see "Without a domain" in the README. This is for trying it out.
+{
+	# Clients get the root by hand, there is nothing to install in the container.
+	skip_install_trust
+}
+
+{$SITE_ADDRESS} {
+	tls internal
+	# The core serves the SPA over HTTP/1.1 and Connect/gRPC over
+	# unencrypted HTTP/2 (h2c), so advertise both to the upstream.
+	# WebSockets (/terminal/ws) are proxied transparently.
+	reverse_proxy nokku:3000 {
+		# Holds requests during a restart instead of a 502. A POST that reached the core never runs twice.
+		lb_try_duration 10s
+		lb_try_interval 100ms
+		transport http {
+			versions h2c 1.1
+		}
+	}
+}

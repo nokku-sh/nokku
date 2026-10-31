@@ -370,7 +370,7 @@ func isTestBinary() bool {
 // Like under sshd, a lock shell stops SFTP too. The subsystem must not start beside the shell.
 func TestServerSFTPRefusedByLockShell(t *testing.T) {
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) {
 		lookup := s.lookupAccount
 		s.lookupAccount = func(name string) (*account, error) {
 			account, err := lookup(name)

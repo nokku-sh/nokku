@@ -1,9 +1,12 @@
 package kms
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/vault/api"
 	"github.com/scaleway/scaleway-sdk-go/scw"
@@ -13,28 +16,29 @@ import (
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
+const (
+	// vaultTokenTimeout caps one renewal of VAULT_TOKEN.
+	vaultTokenTimeout = 15 * time.Second
+	// vaultTokenRetry is how soon a failed renewal of VAULT_TOKEN tries again.
+	vaultTokenRetry = time.Minute
+	// vaultTokenCheck is the longest between two renewals, so a token outlives a Vault down for less than its period.
+	vaultTokenCheck = time.Hour
+)
+
 // kmsKEK returns the key encryption key behind uri. It never leaves the KMS, every wrap is a call to it.
-func (t *TinkEncryptor) kmsKEK(uri string) (tink.AEAD, error) {
+func (k *Keyset) kmsKEK(uri string) (tink.AEAD, error) {
 	provider, _, _ := strings.Cut(uri, "://")
 
 	var client registry.KMSClient
 	var err error
 	switch provider {
 	case "hcvault":
-		if t.VaultToken == "" {
-			return nil, errors.New("VAULT_TOKEN required for hcvault")
-		}
 		hostPort, _, _ := strings.Cut(strings.TrimPrefix(uri, "hcvault://"), "/")
-		// DefaultConfig reads VAULT_SKIP_VERIFY itself and then skips the certificate check.
-		vaultClient, vaultErr := api.NewClient(&api.Config{
-			Address:    "https://" + hostPort,
-			HttpClient: api.DefaultConfig().HttpClient,
-		})
+		vault, vaultErr := k.vaultClient(hostPort)
 		if vaultErr != nil {
 			return nil, vaultErr
 		}
-		vaultClient.SetToken(t.VaultToken)
-		client, err = hcvault.NewClientWithAEADOptions("hcvault://"+hostPort, vaultClient.Logical())
+		client, err = hcvault.NewClientWithAEADOptions("hcvault://"+hostPort, vault.Logical())
 	case "scw-kms":
 		region, _, ok := strings.Cut(strings.TrimPrefix(uri, "scw-kms://regions/"), "/keys/")
 		if !ok || region == "" {
@@ -48,4 +52,76 @@ func (t *TinkEncryptor) kmsKEK(uri string) (tink.AEAD, error) {
 		return nil, err
 	}
 	return client.GetAEAD(uri)
+}
+
+// vaultClient talks https to the Vault at hostPort with VAULT_TOKEN. It asks Vault nothing yet.
+func (k *Keyset) vaultClient(hostPort string) (*api.Client, error) {
+	if k.VaultToken == "" {
+		return nil, errors.New("VAULT_TOKEN required for hcvault")
+	}
+	// DefaultConfig brings the request timeout and retries. It reads VAULT_SKIP_VERIFY and skips the certificate check.
+	cfg := api.DefaultConfig()
+	cfg.Address = "https://" + hostPort
+	client, err := api.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	client.SetToken(k.VaultToken)
+	k.vault = client
+	return client, nil
+}
+
+// VaultTokenLoop keeps VAULT_TOKEN alive, an ended one stops the core from opening its keyset at the next start.
+func (k *Keyset) VaultTokenLoop(ctx context.Context) {
+	if k.vault == nil {
+		return
+	}
+	for {
+		next, err := k.renewVaultToken(ctx)
+		if err != nil {
+			next = vaultTokenRetry
+			slog.Error("VAULT_TOKEN was not renewed, once it ends the core can't start", "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(next):
+		}
+	}
+}
+
+// renewVaultToken returns when to renew next. A token that isn't periodic hits Vault's limit, so it warns every time.
+func (k *Keyset) renewVaultToken(ctx context.Context) (time.Duration, error) {
+	ctx, cancel := context.WithTimeout(ctx, vaultTokenTimeout)
+	defer cancel()
+	tokens := k.vault.Auth().Token()
+	self, err := tokens.LookupSelfWithContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	ttl, err := self.TokenTTL()
+	if err != nil {
+		return 0, err
+	}
+	// A root token never ends.
+	if ttl == 0 {
+		return vaultTokenCheck, nil
+	}
+	renewable, err := self.TokenIsRenewable()
+	if err != nil {
+		return 0, err
+	}
+	if renewable {
+		renewed, err := tokens.RenewSelfWithContext(ctx, 0)
+		if err != nil {
+			return 0, err
+		}
+		if ttl, err = renewed.TokenTTL(); err != nil {
+			return 0, err
+		}
+	}
+	if self.Data["period"] == nil {
+		slog.Warn("VAULT_TOKEN is not periodic, the core can't start once it ends", "ends_in", ttl)
+	}
+	return min(ttl/2, vaultTokenCheck), nil
 }

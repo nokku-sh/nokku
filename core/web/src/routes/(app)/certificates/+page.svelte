@@ -2,11 +2,10 @@
 	import { page } from '$app/state';
 	import { ca } from '#lib/api/certificates.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { confirm, createModalState, useCreate, useSheet } from '#lib/hooks/index.js';
+	import { confirm, useCreate, useSheet } from '#lib/hooks/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import CreateCAModal from '#lib/components/modals/CreateCAModal.svelte';
 	import CASheet from '#lib/components/sheets/CASheet.svelte';
-	import SignModal from '#lib/components/modals/SignModal.svelte';
 	import {
 		DataTable,
 		bulkDelete,
@@ -14,21 +13,15 @@
 		createAppColumnHelper,
 		type BulkAction
 	} from '#lib/components/tables/index.js';
-	import {
-		ActionCell,
-		IdentityCell,
-		StateCell,
-		TimeCell
-	} from '#lib/components/tables/cells/index.js';
+	import { ActionCell, IdentityCell, TimeCell } from '#lib/components/tables/cells/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import type { CertificateAuthority } from '#lib/gen/nokku/v1/certificates_pb.js';
-	import { KeyRound, Plus, Shield, ShieldAlert, ShieldCheck, ShieldOff } from '@lucide/svelte';
+	import { Plus, Shield, ShieldAlert } from '@lucide/svelte';
 
 	const sheet = useSheet();
 	const can = user.can();
 	const create = useCreate();
-	const signModal = createModalState<CertificateAuthority>({} as CertificateAuthority);
 
 	const caData = ca.list();
 	const deleteCA = ca.delete();
@@ -60,14 +53,6 @@
 					detail: row.original.description
 				})
 		}),
-		columnHelper.accessor('isActive', {
-			header: 'Status',
-			// Turning a CA off happens in its sheet, with a confirm.
-			cell: ({ row }) =>
-				row.original.isActive
-					? renderComponent(StateCell, { label: 'Active', tone: 'success', icon: ShieldCheck })
-					: renderComponent(StateCell, { label: 'Inactive', tone: 'muted', icon: ShieldOff })
-		}),
 		columnHelper.accessor('rotatedAt', {
 			header: 'Keys made',
 			meta: { hideBelow: 'md' },
@@ -89,13 +74,6 @@
 					label: item.name,
 					id: item.id,
 					link: true,
-					inlineActions: [
-						{
-							label: 'Sign',
-							icon: KeyRound,
-							onClick: () => signModal.openWith({ ...item })
-						}
-					],
 					menuActions: !can.edit
 						? []
 						: [
@@ -141,7 +119,6 @@
 
 <CreateCAModal bind:open={create.open} />
 <CASheet />
-<SignModal bind:open={signModal.open} ca={signModal.selected} />
 
 <PageHeader
 	title="Certificate authorities"

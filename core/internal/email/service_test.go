@@ -26,18 +26,18 @@ func TestRenderTemplates(t *testing.T) {
 			},
 		},
 		{
-			name: "signup-link",
-			data: signupTemplateData{
-				UserName:   "Ada",
+			name: "invite",
+			data: inviteTemplateData{
 				Workspace:  "Acme",
-				LinkURL:    "https://acme.nokku.sh/invite/verify?token=t",
-				Expiration: "15 minutes",
+				Role:       "editor",
+				LinkURL:    "https://acme.nokku.sh/invite?token=t",
+				Expiration: "7 days",
 			},
 			contains: []string{
 				"Acme.",
-				"Ada",
-				"https://acme.nokku.sh/invite/verify?token=t",
-				"15 minutes",
+				"editor",
+				"https://acme.nokku.sh/invite?token=t",
+				"7 days",
 			},
 		},
 
@@ -88,6 +88,22 @@ func TestRenderTemplates(t *testing.T) {
 				"New sign-in from",
 				"https://app.nokku.sh/profile/security",
 				"Web browser",
+				"203.0.113.7",
+			},
+		},
+		{
+			name: "new-way-in",
+			data: newWayInTemplateData{
+				ProfileURL: "https://app.nokku.sh/profile/security",
+				What:       `The passkey "MacBook"`,
+				EventTime:  "just now",
+				IPAddress:  "203.0.113.7",
+			},
+			contains: []string{
+				"A new way into your account.",
+				"can now sign in to your account",
+				"https://app.nokku.sh/profile/security",
+				"MacBook",
 				"203.0.113.7",
 			},
 		},

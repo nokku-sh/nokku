@@ -154,7 +154,7 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	return &nokkuv1.Target{
 		Id:            &t.ID,
 		DaemonId:      t.DaemonID,
-		CaId:          t.CaID,
+		CaId:          &t.CaID,
 		Description:   t.Description,
 		Name:          &t.Name,
 		Endpoints:     t.Endpoints,
@@ -234,14 +234,8 @@ func UsersToProto(rows []*ListUsersRow) []*nokkuv1.User {
 	return mapSlice(rows, func(r *ListUsersRow) *nokkuv1.User { return r.User.ToProto() })
 }
 
-const DaemonOnlineWindow = 30 * time.Second
-
 // MaxTargetAccounts stops a host from reporting accounts without bound.
 const MaxTargetAccounts = 1000
-
-func SeenRecently(t *time.Time) bool {
-	return t != nil && time.Since(*t) < DaemonOnlineWindow
-}
 
 // DefaultDaemonConfig must match nokkud's DefaultPolicy, which covers the time before its first sync.
 func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
@@ -273,26 +267,26 @@ func ResolveDaemonConfig(cfg *nokkuv1.DaemonConfig) *nokkuv1.DaemonConfig {
 	return resolved
 }
 
-func (d *Daemon) ToProto() *nokkuv1.Daemon {
+// ToProto takes online from the caller. It means connected right now, which only the pool knows.
+func (d *Daemon) ToProto(online bool) *nokkuv1.Daemon {
 	if d == nil {
 		return nil
 	}
-	metadata := jsonMap("daemons.metadata", d.Metadata)
 	return &nokkuv1.Daemon{
 		Id:         &d.ID,
 		Name:       &d.Name,
 		Status:     &d.Status,
 		Config:     d.EffectiveConfig(),
-		Online:     new(SeenRecently(d.LastSeenAt)),
+		Online:     &online,
 		LastSeenAt: SafeTimestamp(d.LastSeenAt),
-		Metadata:   metadata,
+		Version:    &d.Version,
 		UpdatedAt:  SafeTimestamp(&d.UpdatedAt),
 		CreatedAt:  SafeTimestamp(&d.CreatedAt),
 	}
 }
 
-func DaemonsToProto(rows []*ListDaemonsRow) []*nokkuv1.Daemon {
-	return mapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon { return r.Daemon.ToProto() })
+func DaemonsToProto(rows []*ListDaemonsRow, online func(daemonID string) bool) []*nokkuv1.Daemon {
+	return mapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon { return r.Daemon.ToProto(online(r.Daemon.ID)) })
 }
 
 func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
@@ -307,7 +301,6 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 		PublicKey:             &r.PublicKey,
 		HostPublicKey:         &r.HostPublicKey,
 		RotatedAt:             SafeTimestamp(&r.RotatedAt),
-		IsActive:              &r.IsActive,
 		IsDefault:             &r.IsDefault,
 		CreatedAt:             SafeTimestamp(&r.CreatedAt),
 		UpdatedAt:             SafeTimestamp(&r.UpdatedAt),
@@ -315,8 +308,7 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 		UserMaxTtl:            durationpb.New(r.UserMaxTtl),
 		ForceCommand:          &r.ForceCommand,
 		SourceAddress:         &r.SourceAddress,
-		HostDefaultTtl:        durationpb.New(r.HostDefaultTtl),
-		HostMaxTtl:            durationpb.New(r.HostMaxTtl),
+		HostTtl:               durationpb.New(r.HostTtl),
 		PreviousPublicKey:     r.PreviousPublicKey,
 		PreviousHostPublicKey: r.PreviousHostPublicKey,
 		PreviousTrustedUntil:  SafeTimestamp(r.PreviousTrustedUntil),
@@ -358,24 +350,6 @@ func (p *ListTargetAccountsRow) ToProto() *nokkuv1.TargetAccount {
 	out.ServiceAccountIds = p.ServiceAccountIds
 	out.ExpiresAt = expiries(p.ExpiringIds, p.ExpiresAt)
 	return out
-}
-
-func (h *LegalHold) ToProto() *nokkuv1.LegalHold {
-	if h == nil {
-		return nil
-	}
-	return &nokkuv1.LegalHold{
-		Id:        &h.ID,
-		Reason:    &h.Reason,
-		StartsAt:  SafeTimestamp(&h.StartsAt),
-		EndsAt:    SafeTimestamp(h.EndsAt),
-		CreatedBy: h.CreatedBy,
-		CreatedAt: SafeTimestamp(&h.CreatedAt),
-	}
-}
-
-func LegalHoldsToProto(rows []*LegalHold) []*nokkuv1.LegalHold {
-	return mapSlice(rows, func(h *LegalHold) *nokkuv1.LegalHold { return h.ToProto() })
 }
 
 // The status and kind columns hold the enum names in lower case, without the prefix.
@@ -450,17 +424,28 @@ func TargetAccountsToProto(rows []*ListTargetAccountsRow) []*nokkuv1.TargetAccou
 	return mapSlice(rows, func(r *ListTargetAccountsRow) *nokkuv1.TargetAccount { return r.ToProto() })
 }
 
+func (r *ListInvitesRow) ToProto() *nokkuv1.Invitation {
+	return &nokkuv1.Invitation{
+		Email:     &r.Email,
+		Role:      r.Role,
+		ExpiresAt: SafeTimestamp(&r.ExpiresAt),
+		CreatedAt: SafeTimestamp(&r.CreatedAt),
+	}
+}
+
+func InvitesToProto(rows []*ListInvitesRow) []*nokkuv1.Invitation {
+	return mapSlice(rows, func(r *ListInvitesRow) *nokkuv1.Invitation { return r.ToProto() })
+}
+
 func (t *JoinToken) ToProto() *nokkuv1.JoinToken {
 	out := &nokkuv1.JoinToken{
 		Id:          &t.ID,
-		Kind:        &t.Kind,
 		Label:       &t.Label,
 		ExpiresAt:   SafeTimestamp(t.ExpiresAt),
 		MaxUses:     t.MaxUses,
 		Uses:        &t.Uses,
 		AutoApprove: &t.AutoApprove,
 		CaId:        t.CaID,
-		Role:        t.Role,
 		Tags:        t.Tags,
 		Ephemeral:   new(t.RetireAfter != nil),
 		CreatedAt:   SafeTimestamp(&t.CreatedAt),

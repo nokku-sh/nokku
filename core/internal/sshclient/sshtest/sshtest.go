@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	crand "crypto/rand"
-	"crypto/x509"
 	"errors"
 	"net"
 	"slices"
@@ -15,7 +14,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/nokku-sh/nokku/core/internal/crypto"
+	"github.com/nokku-sh/nokku/internal/login"
+
 	"github.com/nokku-sh/nokku/core/internal/db"
 	nokkussh "github.com/nokku-sh/nokku/core/internal/ssh"
 )
@@ -36,15 +36,13 @@ type Server struct {
 	connUser      string
 
 	// ca signs the logins it lets in, hostCA its own host certificate, like the two keys of a real CA.
-	ca         ssh.Signer
-	caPriv     ed25519.PrivateKey
-	hostCA     ssh.Signer
-	hostCAPriv ed25519.PrivateKey
-	hostKey    ssh.Signer
-	listener   net.Listener
-	conns      map[net.Conn]struct{}
-	connsMu    sync.Mutex
-	closeOnce  sync.Once
+	ca        ssh.Signer
+	hostCA    ssh.Signer
+	hostKey   ssh.Signer
+	listener  net.Listener
+	conns     map[net.Conn]struct{}
+	connsMu   sync.Mutex
+	closeOnce sync.Once
 }
 
 func NewServer(t testing.TB) *Server {
@@ -55,17 +53,12 @@ func NewServer(t testing.TB) *Server {
 // NewServerFor is for tests that run against real target and user ids.
 func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 	t.Helper()
-	_, caPriv, err := ed25519.GenerateKey(crand.Reader)
-	if err != nil {
-		t.Fatalf("generate CA key: %v", err)
-	}
-	caSigner := mustSigner(t, caPriv)
-	_, hostCAPriv, err := ed25519.GenerateKey(crand.Reader)
-	if err != nil {
-		t.Fatalf("generate host CA key: %v", err)
-	}
-	hostCASigner := mustSigner(t, hostCAPriv)
+	return NewServerSignedBy(t, hostPrincipal, userPrincipal, newSigner(t), newSigner(t))
+}
 
+// NewServerSignedBy trusts the logins ca signs and presents a host certificate hostCA signs, the two keys of a CA.
+func NewServerSignedBy(t testing.TB, hostPrincipal, userPrincipal string, ca, hostCA ssh.Signer) *Server {
+	t.Helper()
 	hostPub, hostPriv, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
 		t.Fatalf("generate host key: %v", err)
@@ -82,7 +75,7 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 		ValidAfter:      nokkussh.UnixUint64(time.Now().Add(-time.Minute).Unix()),
 		ValidBefore:     nokkussh.UnixUint64(time.Now().Add(time.Hour).Unix()),
 	}
-	if err := hostCert.SignCert(crand.Reader, hostCASigner); err != nil {
+	if err := hostCert.SignCert(crand.Reader, hostCA); err != nil {
 		t.Fatalf("sign host cert: %v", err)
 	}
 	hostSigner, err := ssh.NewCertSigner(hostCert, mustSigner(t, hostPriv))
@@ -99,10 +92,8 @@ func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 	s := &Server{
 		UserPrincipal: userPrincipal,
 		HostPrincipal: hostPrincipal,
-		ca:            caSigner,
-		caPriv:        caPriv,
-		hostCA:        hostCASigner,
-		hostCAPriv:    hostCAPriv,
+		ca:            ca,
+		hostCA:        hostCA,
 		hostKey:       hostSigner,
 		listener:      ln,
 		conns:         make(map[net.Conn]struct{}),
@@ -117,46 +108,25 @@ func (s *Server) Addr() string { return s.listener.Addr().String() }
 // HostCAKey is the key the server's host certificate comes from.
 func (s *Server) HostCAKey() ssh.PublicKey { return s.hostCA.PublicKey() }
 
-// CA returns a row so callers exercise the real cert-minting path.
-func (s *Server) CA(t testing.TB) *db.SSHCA {
+// CA is the row of the CA the server trusts. CASigner is its user key, the way ssh.CASigner returns it.
+func (s *Server) CA() *db.SSHCA { return caRow(s.ca, s.hostCA) }
+
+func (s *Server) CASigner() ssh.Signer { return s.ca }
+
+// NewCA is a CA no server trusts, for handshake-failure tests, with its user key.
+func NewCA(t testing.TB) (*db.SSHCA, ssh.Signer) {
 	t.Helper()
-	return caRow(t, s.caPriv, s.hostCAPriv)
+	user := newSigner(t)
+	return caRow(user, newSigner(t)), user
 }
 
-// NewCA generates a CA row no server trusts, for handshake-failure tests.
-func NewCA(t testing.TB) *db.SSHCA {
-	t.Helper()
-	_, user, err := ed25519.GenerateKey(crand.Reader)
-	if err != nil {
-		t.Fatalf("generate CA key: %v", err)
-	}
-	_, host, err := ed25519.GenerateKey(crand.Reader)
-	if err != nil {
-		t.Fatalf("generate host CA key: %v", err)
-	}
-	return caRow(t, user, host)
-}
-
-// caRow stores the keys as PKCS#8, the only form the core reads.
-func caRow(t testing.TB, user, host ed25519.PrivateKey) *db.SSHCA {
-	t.Helper()
-	der := func(priv ed25519.PrivateKey) crypto.EncryptedBytes {
-		b, err := x509.MarshalPKCS8PrivateKey(priv)
-		if err != nil {
-			t.Fatalf("marshal CA private key: %v", err)
-		}
-		return b
-	}
+func caRow(user, host ssh.Signer) *db.SSHCA {
 	return &db.SSHCA{
-		PrivateKey:     der(user),
-		PublicKey:      nokkussh.MarshalKey(mustSigner(t, user).PublicKey()),
-		HostPrivateKey: der(host),
-		HostPublicKey:  nokkussh.MarshalKey(mustSigner(t, host).PublicKey()),
+		PublicKey:      nokkussh.MarshalKey(user.PublicKey()),
+		HostPublicKey:  nokkussh.MarshalKey(host.PublicKey()),
 		UserDefaultTtl: time.Hour,
 		UserMaxTtl:     24 * time.Hour,
-		HostDefaultTtl: time.Hour,
-		HostMaxTtl:     24 * time.Hour,
-		IsActive:       true,
+		HostTtl:        time.Hour,
 	}
 }
 
@@ -175,7 +145,7 @@ func (s *Server) UserSigner(t testing.TB, subject, username string) ssh.Signer {
 		Key:             pub,
 		CertType:        ssh.UserCert,
 		KeyId:           "sshtest-user",
-		ValidPrincipals: []string{nokkussh.LoginPrincipal(subject, s.HostPrincipal, username)},
+		ValidPrincipals: []string{login.Principal(subject, s.HostPrincipal, username)},
 		ValidAfter:      nokkussh.UnixUint64(time.Now().Add(-time.Minute).Unix()),
 		ValidBefore:     nokkussh.UnixUint64(time.Now().Add(time.Hour).Unix()),
 		Extensions: map[string]string{
@@ -272,7 +242,7 @@ func (s *Server) handle(c net.Conn) {
 			if !bytes.Equal(cert.SignatureKey.Marshal(), s.ca.PublicKey().Marshal()) {
 				return nil, errors.New("certificate not signed by the test CA")
 			}
-			want := nokkussh.LoginPrincipal(s.UserPrincipal, s.HostPrincipal, conn.User())
+			want := login.Principal(s.UserPrincipal, s.HostPrincipal, conn.User())
 			if !slices.Contains(cert.ValidPrincipals, want) {
 				return nil, errors.New("principal not authorized")
 			}
@@ -385,4 +355,12 @@ func mustSigner(t testing.TB, priv ed25519.PrivateKey) ssh.Signer {
 		t.Fatalf("signer: %v", err)
 	}
 	return signer
+}
+
+func newSigner(t testing.TB) ssh.Signer {
+	_, priv, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	return mustSigner(t, priv)
 }

@@ -32,7 +32,6 @@ func TestCreateJoinTokenWithGrants(t *testing.T) {
 	)
 
 	created, err := tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-		Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 		Tags:      []string{"sandbox"},
 		Ephemeral: new(true),
 		Grants: []*nokkuv1.JoinTokenGrant{
@@ -56,26 +55,12 @@ func TestCreateJoinTokenWithGrants(t *testing.T) {
 	assert.Equal(t, []string{member.ID}, token.GetGrants()[0].GetUserIds())
 
 	_, err = tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-		Kind:   nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("dev"), TeamIds: []string{member.ID}}},
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a user id is not a team, got %v", err)
 
 	_, err = tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-		Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 		RetireAfter: durationpb.New(time.Hour),
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "retire_after without ephemeral, got %v", err)
-
-	_, err = tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-		Kind:   nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE.Enum(),
-		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("dev"), UserIds: []string{member.ID}}},
-	})
-	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "grants on an invite, got %v", err)
-
-	// The test server sends no mail, and an invite ends in a mailed link.
-	_, err = tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-		Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE.Enum(),
-	})
-	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "an invite without mail, got %v", err)
 }

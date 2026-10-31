@@ -1,18 +1,26 @@
-# Minimal deployment for Nokku: just the core and Postgres.
+# Minimal deployment for Nokku: the core, Postgres and Caddy, no domain needed.
 #
 #   cp .env.prod.example .env   # fill in your values
 #   docker compose -f compose.min.yml up -d
 #
-# No reverse proxy. The app is published on host port 3000. For a try on this
-# machine set NOKKU_BASE_URL=localhost:3000. For other machines give the host
-# a name, the core then serves https with a CA of its own:
-#   NOKKU_BASE_URL=nokku.lan:3000
-# See "Without a proxy" in the README. compose.prod.yml runs Caddy instead.
+# For a try on this machine set NOKKU_BASE_URL=localhost:3000 and open
+# http://localhost:3000. For other machines give the host a name, like
+# NOKKU_BASE_URL=nokku.lan. Caddy then serves it on port 443 with a
+# certificate from its own CA. See "Without a domain" in the README.
+# compose.prod.yml gets a real certificate instead.
 name: nokku
+
+networks:
+  nokku:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
 
 volumes:
   pgdata:
   nokku-data:
+  caddy-data:
+  caddy-config:
 
 services:
   postgres:
@@ -22,7 +30,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       POSTGRES_DB: ${POSTGRES_DB:-nokku}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 10s
@@ -30,6 +38,8 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+    networks:
+      - nokku
 
   nokku:
     image: ${NOKKU_IMAGE:-ghcr.io/nokku-sh/nokku:latest}
@@ -37,7 +47,7 @@ services:
       postgres:
         condition: service_healthy
     env_file: .env
-    # Schema migrations run automatically on boot (NOKKU_DB_AUTOMIGRATE=true).
+    # The schema is migrated on every start.
     environment:
       PGHOST: postgres
       PGPORT: "5432"
@@ -45,9 +55,35 @@ services:
       PGUSER: ${POSTGRES_USER:-nokku}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       PGSSLMODE: disable
-      NOKKU_STORAGE_URL: file:///data
+      # Only Caddy may name the client. The port below reaches the core through
+      # the network gateway, a private address that would be trusted otherwise.
+      NOKKU_TRUSTED_PROXIES: 172.28.0.10
+      NOKKU_STORAGE_URL: file:///home/nonroot/recordings
     volumes:
-      - nokku-data:/data
+      # The image runs as nonroot. A volume on its home takes that owner, one on /data would stay root's.
+      - nokku-data:/home/nonroot
+    # For NOKKU_BASE_URL=localhost:3000, a browser on this machine only.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     restart: unless-stopped
+    networks:
+      - nokku
+
+  caddy:
+    image: docker.io/library/caddy:2-alpine
+    depends_on:
+      - nokku
+    environment:
+      SITE_ADDRESS: ${NOKKU_BASE_URL:?NOKKU_BASE_URL is required in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.min:/etc/caddy/Caddyfile:ro
+      # Holds the CA. Keep it, or every client needs the new root.
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    networks:
+      nokku:
+        ipv4_address: 172.28.0.10

@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -125,7 +126,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "viewer may not sync, got %v", err)
 }
 
-func TestUpdateTargetReplacesLists(t *testing.T) {
+func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	targetID := seedTarget(t, cfg, workspaceID)
@@ -139,23 +140,31 @@ func TestUpdateTargetReplacesLists(t *testing.T) {
 		),
 	)
 
-	updated, err := editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
+	updated, err := editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
 		Id:        &targetID,
 		Endpoints: []string{"10.0.0.1:22"},
 		Tags:      []string{"prod"},
-	})
+	}))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"prod"}, updated.GetTarget().GetTags())
 	name := updated.GetTarget().GetName()
 
-	updated, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
+	updated, err = editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
 		Id:        &targetID,
 		Endpoints: []string{"10.0.0.9:22"},
-	})
+	}))
 	require.NoError(t, err)
-	assert.Empty(t, updated.GetTarget().GetTags(), "an update replaces the tags, the last one can go")
+	assert.Equal(t, []string{"prod"}, updated.GetTarget().GetTags(), "a list the update leaves out stays")
 	assert.Equal(t, []string{"10.0.0.9:22"}, updated.GetTarget().GetEndpoints())
 	assert.Equal(t, name, updated.GetTarget().GetName(), "unset fields stay as they are")
+
+	updated, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
+		Id:         &targetID,
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, updated.GetTarget().GetTags(), "naming a list with nothing in it clears it")
+	assert.Equal(t, []string{"10.0.0.9:22"}, updated.GetTarget().GetEndpoints())
 }
 
 type accessFixture struct {
@@ -573,4 +582,20 @@ func TestNewServerSeedsGrants(t *testing.T) {
 	listed, err := targets.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{Query: new(name)})
 	require.NoError(t, err)
 	assert.Empty(t, listed.GetTargets(), "a refused grant leaves no target behind")
+}
+
+// Deleting a server that runs nokkud takes its daemon along, so no daemon is left without a server.
+func TestDeleteTargetTakesItsDaemon(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	admin := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
+	_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+
+	_, err := nokkuv1connect.NewTargetServiceClient(admin).DeleteTarget(t.Context(),
+		&nokkuv1.DeleteTargetRequest{Id: enrolled.TargetId})
+	require.NoError(t, err)
+	_, err = nokkuv1connect.NewDaemonServiceClient(admin).GetDaemon(t.Context(),
+		&nokkuv1.GetDaemonRequest{Id: enrolled.Id})
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "the daemon was left behind")
 }

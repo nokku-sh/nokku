@@ -1,92 +1,47 @@
 package crypto
 
 import (
-	"errors"
-	"hash/crc32"
-	"strings"
-	"uuid"
+	"slices"
+
+	"github.com/nokku-sh/nokku/internal/nktoken"
 )
 
-var errInvalidToken = errors.New("malformed token")
-
-type Token struct {
-	ID        string      // empty when no ID requested
-	Plaintext string      // shown once
-	Hash      HashedToken // hex-encoded
-}
-
-type ParsedToken struct {
-	ID     string
-	Secret string
-}
-
-func NewSecret() (raw string, hash HashedToken) {
-	raw = RandomString(32)
-	return raw, HashToken(raw)
-}
-
-// NewToken with an id makes the plaintext "id_secret", so Parse can recover the id.
-func NewToken(id string) *Token {
-	plaintext := RandomString(32)
-	if id != "" {
-		plaintext = id + "_" + plaintext
-	}
-	return &Token{ID: id, Plaintext: plaintext, Hash: HashToken(plaintext)}
-}
-
-// Parse handles "uuid_secret" and bare "secret". The secret may itself contain underscores.
-func Parse(raw string) (*ParsedToken, error) {
-	if raw == "" {
-		return nil, errInvalidToken
-	}
-
-	id, secret, ok := strings.Cut(raw, "_")
-	if !ok {
-		return &ParsedToken{Secret: raw}, nil
-	}
-	if _, err := uuid.Parse(id); err != nil {
-		return &ParsedToken{Secret: raw}, nil
-	}
-	return &ParsedToken{ID: id, Secret: secret}, nil
-}
+// TokenKind says what a token is for. It is the part between "nk_" and the random body, so a token used where it
+// does not belong is refused before any lookup, and a secret scanner knows it for one of ours.
+type TokenKind string
 
 const (
-	KeyPrefixServiceAccount = "nk_sa_"
-	KeyPrefixSCIM           = "nk_scim_"
-
-	keyBodyBytes = 24 // 32 chars of base64url
-	keyCheckLen  = 6  // base62 digits, enough for any crc32
+	TokenSession        TokenKind = "sess"   // a browser session cookie
+	TokenCLI            TokenKind = "cli"    // nk's session
+	TokenDaemon         TokenKind = "daemon" // nokkud's session
+	TokenServiceAccount TokenKind = nktoken.KindServiceAccount
+	TokenSCIM           TokenKind = "scim"
+	TokenLogin          TokenKind = "login"  // the sign-in link
+	TokenEmailChange    TokenKind = "email"  // confirms a new address
+	TokenEmailRevert    TokenKind = "revert" // takes the old address back
+	TokenInvite         TokenKind = "invite" // the link that creates an invited account
+	TokenEnroll         TokenKind = nktoken.KindEnroll
+	TokenDeviceCode     TokenKind = "device" // what nk polls with during nk login
 )
 
-const base62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
-// NewKey makes "<prefix><random><checksum>". The checksum lets CheckKey reject a typo without a lookup.
-func NewKey(prefix string) (raw string, hash HashedToken) {
-	body := prefix + RandomString(keyBodyBytes)
-	raw = body + keyCheck(body)
+// NewToken makes "nk_<kind>_<random><checksum>", the one format of every secret the server hands out. Only the hash
+// is stored, the plaintext is shown once.
+func NewToken(kind TokenKind) (raw string, hash HashedToken) {
+	raw = nktoken.New(string(kind))
 	return raw, HashToken(raw)
 }
 
-// HasKeyPrefix tells a key from a session secret, which is random and may start with "nk_".
-func HasKeyPrefix(raw string) bool {
-	return strings.HasPrefix(raw, KeyPrefixServiceAccount) || strings.HasPrefix(raw, KeyPrefixSCIM)
+// CheckToken tells a token of one of kinds from anything else: a typo, a token of another kind, one of an older
+// format. It runs before any lookup. It is a format check, not authentication.
+func CheckToken(raw string, kinds ...TokenKind) bool {
+	return slices.ContainsFunc(kinds, func(kind TokenKind) bool { return nktoken.Valid(raw, string(kind)) })
 }
 
-// CheckKey is a format check, not authentication.
-func CheckKey(raw string) bool {
-	if len(raw) <= keyCheckLen || !strings.HasPrefix(raw, "nk_") {
-		return false
+// TokenHash is [CheckToken] and [HashToken] in one, so no lookup can skip the check. ok is false for a token
+// CheckToken refuses.
+func TokenHash(raw string, kinds ...TokenKind) (hash HashedToken, ok bool) {
+	if !CheckToken(raw, kinds...) {
+		return "", false
 	}
-	body, check := raw[:len(raw)-keyCheckLen], raw[len(raw)-keyCheckLen:]
-	return keyCheck(body) == check
-}
-
-func keyCheck(body string) string {
-	n := crc32.ChecksumIEEE([]byte(body))
-	var out [keyCheckLen]byte
-	for i := keyCheckLen - 1; i >= 0; i-- {
-		out[i] = base62[n%62]
-		n /= 62
-	}
-	return string(out[:])
+	return HashToken(raw), true
 }

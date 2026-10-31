@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/logx"
@@ -19,11 +18,9 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/cli/internal/ui"
+	"github.com/nokku-sh/nokku/internal/nktoken"
 	"github.com/nokku-sh/nokku/internal/trust"
 )
-
-// Service account tokens use a plain Bearer header, without DPoP binding.
-const saPrefix = "nk_sa_"
 
 var jsonFlag = &cli.BoolFlag{Name: "json", Usage: "Output machine-readable JSON"}
 
@@ -71,11 +68,6 @@ func Root() *cli.Command {
 				Sources: cli.EnvVars("NK_REQUIRE_TPM"),
 			},
 			&cli.StringFlag{
-				Name:    "pin",
-				Usage:   "Fingerprint of the server's private CA (sha256:...) from the web app. Without it nk asks",
-				Sources: cli.EnvVars("NK_API_PIN"),
-			},
-			&cli.StringFlag{
 				Name:    "ca-file",
 				Usage:   "PEM file with the private CA of the Nokku API",
 				Sources: cli.EnvVars("NK_CA_FILE"),
@@ -93,10 +85,11 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	s := state.Load()
 	s.Token = os.Getenv("NK_TOKEN")
 	s.RequireTPM = cmd.Bool("require-tpm")
-	s.Pin = cmd.String("pin")
 
-	if s.Token != "" && !strings.HasPrefix(s.Token, saPrefix) {
-		return nil, errors.New("NK_TOKEN must be a service account token starting with " + saPrefix)
+	// A cut or mistyped key, or one of the older format, gets a clear answer before any call.
+	if s.Token != "" && !nktoken.Valid(s.Token, nktoken.KindServiceAccount) {
+		return nil, errors.New("NK_TOKEN is not a whole service account key, those start with nk_" +
+			nktoken.KindServiceAccount + "_. A key of the older format no longer works, create a new one")
 	}
 	if api := cmd.String("api"); s.APIURL != api && (s.APIURL == "" || cmd.IsSet("api")) {
 		// Another server never gets this session or shows its targets.
@@ -115,7 +108,7 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 		if err != nil {
 			return nil, fmt.Errorf("CA file: %w", err)
 		}
-		if _, err = trust.ParseBundle(ca); err != nil {
+		if err = trust.CheckBundle(ca); err != nil {
 			return nil, fmt.Errorf("CA file %s: %w", path, err)
 		}
 		s.APICA = string(ca)

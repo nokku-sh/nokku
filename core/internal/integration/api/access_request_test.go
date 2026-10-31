@@ -171,9 +171,9 @@ func TestIdleTimeoutTurnsOff(t *testing.T) {
 		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
 	)
 	set := func(d time.Duration) *nokkuv1.WorkspaceSettings {
-		res, err := client.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
+		res, err := client.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(d)},
-		})
+		}))
 		require.NoError(t, err)
 		return res.GetWorkspace().GetSettings()
 	}

@@ -76,19 +76,18 @@ func (SubjectKind) EnumDescriptor() ([]byte, []int) {
 }
 
 type TargetAccount struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Id                *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	TargetId          *string                `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
-	Username          *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
-	UserIds           []string               `protobuf:"bytes,4,rep,name=user_ids,json=userIds" json:"user_ids,omitempty"`
-	TeamIds           []string               `protobuf:"bytes,5,rep,name=team_ids,json=teamIds" json:"team_ids,omitempty"`
-	ServiceAccountIds []string               `protobuf:"bytes,6,rep,name=service_account_ids,json=serviceAccountIds" json:"service_account_ids,omitempty"`
-	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	SeenAt            *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=seen_at,json=seenAt" json:"seen_at,omitempty"`
-	// expires_at holds the subjects whose grant ends, by subject id. The others hold it for good.
-	ExpiresAt     map[string]*timestamppb.Timestamp `protobuf:"bytes,9,rep,name=expires_at,json=expiresAt" json:"expires_at,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState            `protogen:"open.v1"`
+	Id                *string                           `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	TargetId          *string                           `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
+	Username          *string                           `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
+	UserIds           []string                          `protobuf:"bytes,4,rep,name=user_ids,json=userIds" json:"user_ids,omitempty"`
+	TeamIds           []string                          `protobuf:"bytes,5,rep,name=team_ids,json=teamIds" json:"team_ids,omitempty"`
+	ServiceAccountIds []string                          `protobuf:"bytes,6,rep,name=service_account_ids,json=serviceAccountIds" json:"service_account_ids,omitempty"`
+	CreatedAt         *timestamppb.Timestamp            `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	SeenAt            *timestamppb.Timestamp            `protobuf:"bytes,8,opt,name=seen_at,json=seenAt" json:"seen_at,omitempty"`
+	ExpiresAt         map[string]*timestamppb.Timestamp `protobuf:"bytes,9,rep,name=expires_at,json=expiresAt" json:"expires_at,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *TargetAccount) Reset() {
@@ -305,11 +304,10 @@ func (x *ListTargetAccountsResponse) GetTotal() int32 {
 }
 
 type AddSubjectsRequest struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Id         *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	SubjectIds []string               `protobuf:"bytes,2,rep,name=subject_ids,json=subjectIds" json:"subject_ids,omitempty"`
-	Kind       *SubjectKind           `protobuf:"varint,3,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
-	// expires_at ends the grants then, unset is for good. A subject that already holds the account gets it as well.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	SubjectIds    []string               `protobuf:"bytes,2,rep,name=subject_ids,json=subjectIds" json:"subject_ids,omitempty"`
+	Kind          *SubjectKind           `protobuf:"varint,3,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
 	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

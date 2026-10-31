@@ -30,12 +30,15 @@
 	});
 	const config = $derived(settings.defaultDaemonConfig!);
 
-	// Only the daemon defaults are sent, so a setting the plan no longer allows never blocks the save.
-	const autoSave = useAutoSave(() =>
-		update.mutateAsync({
-			settings: create(WorkspaceSettingsSchema, { defaultDaemonConfig: config })
-		})
-	);
+	// Only the switches flipped since the last save go out, so a setting the plan no longer allows never blocks it.
+	const flipped: Partial<Record<Toggle['key'], boolean>> = {};
+	const autoSave = useAutoSave(async () => {
+		const changes = { ...flipped };
+		await update.mutateAsync({ settings: { defaultDaemonConfig: changes } });
+		for (const [key, value] of Object.entries(changes) as [Toggle['key'], boolean][]) {
+			if (flipped[key] === value) delete flipped[key];
+		}
+	});
 
 	const has = useFeatures();
 	const idleMinutes = $derived(
@@ -126,6 +129,7 @@
 								disabled={!canEdit}
 								onCheckedChange={(v) => {
 									config[t.key] = v;
+									flipped[t.key] = v;
 									autoSave.save();
 								}}
 							/>

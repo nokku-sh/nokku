@@ -115,10 +115,9 @@ func (listCAService) ListCertificateAuthorities(
 				Id:        new("0199a0a0-0000-7000-8000-000000000001"),
 				Name:      new("default"),
 				PublicKey: new("ssh-ed25519 AAAA"),
-				IsActive:  new(true),
 				IsDefault: new(true),
 			},
-			{Id: new("0199a0a0-0000-7000-8000-000000000002"), Name: new("retired")},
+			{Id: new("0199a0a0-0000-7000-8000-000000000002"), Name: new("staging")},
 		},
 	}, nil
 }
@@ -141,10 +140,11 @@ func TestListSSHCAs(t *testing.T) {
 
 	cas, err := c.ListSSHCAs(t.Context())
 	require.NoError(t, err)
-	require.Len(t, cas, 1, "inactive CAs are left out")
+	require.Len(t, cas, 2, "every CA of the workspace is offered")
 	assert.Equal(t, "default", cas[0].Name)
 	assert.True(t, cas[0].Default)
 	assert.Equal(t, "ssh-ed25519 AAAA", cas[0].PublicKey)
+	assert.False(t, cas[1].Default)
 }
 
 type pagedTargetService struct {
@@ -188,19 +188,4 @@ func TestListAllTargetsPages(t *testing.T) {
 	require.Len(t, targets, 2*lookupLimit+3, "every page is read")
 	assert.Equal(t, "t0", targets[0].Name)
 	assert.Equal(t, fmt.Sprintf("t%d", 2*lookupLimit+2), targets[len(targets)-1].Name)
-}
-
-func TestUnsafePrincipal(t *testing.T) {
-	t.Parallel()
-	for p, unsafe := range map[string]bool{
-		"0199a0a0-0000-7000-8000-000000000001@0199a0a0-0000-7000-8000-000000000002:deploy": false,
-		"":                    true,
-		"a b":                 true,
-		"a\tb":                true,
-		"p1\np2":              true,
-		`command="rm -rf" p1`: true,
-		"it's":                true,
-	} {
-		assert.Equal(t, unsafe, unsafePrincipal(p), "%q", p)
-	}
 }

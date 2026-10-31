@@ -4,8 +4,7 @@ package iam
 import (
 	"context"
 	"crypto/cipher"
-	"crypto/hkdf"
-	"crypto/sha256"
+	"crypto/rand"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -13,11 +12,15 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 
+	"github.com/nokku-sh/nokku/internal/dpop"
+
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/cache"
+	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/egress"
+	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
 type Method string
@@ -56,11 +59,11 @@ type event struct {
 	Detail string
 }
 
-// Deps requires Conn and Secret.
+// Deps requires Conn and Keyset.
 type Deps struct {
 	Conn *db.Connection
-	// Secret keys the DPoP server nonce and the flow cookies.
-	Secret []byte
+	// Keyset seals the configs of SSO providers.
+	Keyset *kms.Keyset
 	// Audit gets the sign-in events. Unset, they are not recorded.
 	Audit *audit.Service
 	// Secure marks cookies, true when the server is reached over https.
@@ -72,14 +75,17 @@ type Deps struct {
 
 	// SendMagicLink mails a sign-in link. Unset, the login page offers none.
 	SendMagicLink func(ctx context.Context, userID, email, link string, expiry time.Duration) error
-	// SendSignupLink mails the link that creates an invited account.
-	SendSignupLink func(ctx context.Context, email, name, workspace, link string, expiry time.Duration) error
+	// SendInvite mails the link that creates an invited account. Unset, the admin gets the link to hand over.
+	SendInvite func(ctx context.Context, email, workspace, role, link string, expiry time.Duration) error
 	// SendNewLogin tells an account about a sign-in from a device new to it.
 	SendNewLogin func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
+	// SendNewWayIn tells an account about a passkey or provider it gained.
+	SendNewWayIn func(ctx context.Context, userID, email, credentialID, what, ip string) error
 }
 
 type Service struct {
 	conn    *db.Connection
+	keys    *kms.Keyset
 	audit   *audit.Service
 	secure  bool
 	now     func() time.Time
@@ -91,50 +97,52 @@ type Service struct {
 	// spent holds the ids of flows that ended in a login, see spendFlow.
 	spent *cache.TTL[string, struct{}]
 
-	sendMagicLink  func(ctx context.Context, userID, email, link string, expiry time.Duration) error
-	sendSignupLink func(ctx context.Context, email, name, workspace, link string, expiry time.Duration) error
-	sendNewLogin   func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
+	sendMagicLink func(ctx context.Context, userID, email, link string, expiry time.Duration) error
+	sendInvite    func(ctx context.Context, email, workspace, role, link string, expiry time.Duration) error
+	sendNewLogin  func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
+	sendNewWayIn  func(ctx context.Context, userID, email, credentialID, what, ip string) error
 
-	DPoP    *DPoPVerifier
+	DPoP    *dpop.Verifier
 	Device  *DeviceFlow
 	OIDC    *oidcFlow
 	Passkey *passkeyFlow
 	SCIM    *SCIMFlow
 }
 
+// A marker lives for dpop.ReplayWindow, three minutes, so this is room for about 550 proofs a second.
+const dpopReplayEntries = 100_000
+
 func New(ctx context.Context, d Deps) (*Service, error) {
-	if d.Conn == nil || len(d.Secret) == 0 {
-		return nil, errors.New("iam: conn and secret are required")
+	if d.Conn == nil || d.Keyset == nil {
+		return nil, errors.New("iam: conn and keyset are required")
 	}
 	s := &Service{
-		conn:           d.Conn,
-		audit:          d.Audit,
-		secure:         d.Secure,
-		now:            time.Now,
-		canJoin:        d.CanJoin,
-		strict:         d.StrictEmail,
-		sendMagicLink:  d.SendMagicLink,
-		sendSignupLink: d.SendSignupLink,
-		sendNewLogin:   d.SendNewLogin,
+		conn:          d.Conn,
+		keys:          d.Keyset,
+		audit:         d.Audit,
+		secure:        d.Secure,
+		now:           time.Now,
+		canJoin:       d.CanJoin,
+		strict:        d.StrictEmail,
+		sendMagicLink: d.SendMagicLink,
+		sendInvite:    d.SendInvite,
+		sendNewLogin:  d.SendNewLogin,
+		sendNewWayIn:  d.SendNewWayIn,
 	}
 	var err error
 	if s.idp, err = egress.NewClient(providerHTTPTimeout); err != nil {
 		return nil, err
 	}
-	flowKey, err := hkdf.Key(sha256.New, d.Secret, nil, "nokku flow cookie v1", chacha20poly1305.KeySize)
-	if err != nil {
-		return nil, err
-	}
+	// Random per boot, like the replay stores below. After a restart clients fetch a new nonce and a sign-in starts over.
+	nonceKey, flowKey := make([]byte, 32), make([]byte, chacha20poly1305.KeySize)
+	_, _ = rand.Read(nonceKey)
+	_, _ = rand.Read(flowKey)
 	if s.flowAEAD, err = chacha20poly1305.NewX(flowKey); err != nil {
 		return nil, err
 	}
 	s.spent = cache.New[string, struct{}](spentFlowEntries, flowStateTTL)
-	s.DPoP = &DPoPVerifier{
-		secret: d.Secret,
-		// The iat check takes a proof for 2*dpopMaxSkew at most. The third is slack for a wall clock that steps back.
-		replay: cache.New[[32]byte, struct{}](dpopReplayEntries, 3*dpopMaxSkew),
-		now:    s.now,
-	}
+	replay := cache.New[[32]byte, struct{}](dpopReplayEntries, dpop.ReplayWindow)
+	s.DPoP = dpop.NewVerifier(nonceKey, func(jti [32]byte) bool { return replay.SetNX(jti, struct{}{}) }, s.now)
 	s.Device = &DeviceFlow{svc: s}
 	s.OIDC = newOIDCFlow(s)
 	s.Passkey = newPasskeyFlow(s)
@@ -173,6 +181,26 @@ func (s *Service) record(ctx context.Context, e event) {
 		OK:        e.Action != actionLoginDenied,
 		Details:   details,
 	})
+}
+
+// credentialAdded records a new way into the account and mails it, so a stolen session that adds one shows up in
+// the inbox. id tells two of them apart, what names it in the mail.
+func (s *Service) credentialAdded(ctx context.Context, r *http.Request, u *db.User, method Method, id, what string) {
+	s.record(
+		ctx,
+		event{Action: actionCredentialAdded, Kind: actor.KindUser, Method: method, UserID: u.ID, Email: u.Email},
+	)
+	if s.sendNewWayIn == nil {
+		return
+	}
+	ip := realip.Client(r.Header, r.RemoteAddr)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mailTimeout)
+	go func() {
+		defer cancel()
+		if err := s.sendNewWayIn(ctx, u.ID, u.Email, id, what, ip); err != nil {
+			slog.Warn("new sign-in method email not sent", "error", err)
+		}
+	}()
 }
 
 // notifyNewDevice is detached, the sign-in does not wait for the mail.

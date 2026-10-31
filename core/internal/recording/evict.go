@@ -6,15 +6,15 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/storage"
 )
 
 // minEvictAge keeps a recording whatever the cap says, so nobody can push out what they just did.
 const minEvictAge = 24 * time.Hour
 
-// MakeRoom evicts the oldest recordings over the cap, but nothing under minEvictAge. A failed lookup never refuses.
-func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string, size int64) bool {
+// MakeRoom evicts the oldest recordings over the cap, but nothing under minEvictAge. A failed lookup never refuses. It
+// runs when an upload starts and counts what is stored, so a workspace can pass the cap by what its open uploads hold.
+// The cap is a stop for abuse, that much over it does no harm.
+func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string) bool {
 	capBytes, err := s.limits.RecordingStorageBytes(ctx, workspaceID)
 	if err != nil {
 		slog.Warn("recording storage cap lookup failed", "error", err, "workspace_id", workspaceID)
@@ -23,18 +23,8 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 	if capBytes <= 0 {
 		return true
 	}
-	var used int64
-	if err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		// Uploads running side by side see each other through their rows.
-		if size > 0 {
-			err = q.SetRecordingSize(ctx, &db.SetRecordingSizeParams{ID: recordingID, SizeBytes: size})
-			if err != nil {
-				return err
-			}
-		}
-		used, err = q.SumRecordingBytes(ctx)
-		return err
-	}); err != nil {
+	used, err := s.conn.Tenant().SumRecordingBytes(ctx)
+	if err != nil {
 		slog.Warn("recording storage lookup failed", "error", err, "workspace_id", workspaceID)
 		return true
 	}
@@ -58,13 +48,9 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string,
 				slog.Warn("recording eviction failed", "error", err, "workspace_id", workspaceID)
 				return true
 			}
-			// A legal hold made since the list keeps it.
+			// Deleted since the list.
 			if deleted == 0 {
 				continue
-			}
-			// Best effort, a stray object goes with the workspace purge.
-			if err := s.store.Delete(ctx, storage.RecordingPath(workspaceID, v.ID)); err != nil {
-				slog.Warn("delete evicted recording object", "recording_id", v.ID, "error", err)
 			}
 			over -= v.SizeBytes
 			evicted++

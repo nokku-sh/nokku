@@ -18,9 +18,11 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+
+	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// Without a grant nothing is signed. The daemon and nk sync are handed the very same principals.
+// Without a grant nothing is signed. The daemon is handed the very principal the certificate carries.
 func TestSignSSHCertificate(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -34,9 +36,10 @@ func TestSignSSHCertificate(t *testing.T) {
 	otherID := seedTarget(t, cfg, workspaceID)
 
 	memberToken := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	member, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken)
+	member, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken, accessTokens...)
 	require.NoError(t, err)
 	wantPrincipal := member.ID + "@" + targetID + ":root"
+	nkToken := cliSessionFor(t, cfg, &db.User{ID: member.ID})
 
 	principals := nokkuv1connect.NewTargetAccountServiceClient(
 		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
@@ -59,7 +62,7 @@ func TestSignSSHCertificate(t *testing.T) {
 	sshPub, err := gossh.NewPublicKey(pub)
 	require.NoError(t, err)
 	sign := func(target string) ([]string, error) {
-		res, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+memberToken))).
+		res, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+nkToken))).
 			SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
 				TargetId:  &target,
 				PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
@@ -78,10 +81,10 @@ func TestSignSSHCertificate(t *testing.T) {
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err),
 		"a daemon nobody approved got a certificate signed, %v", err)
 	_, err = nokkuv1connect.NewDaemonServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
-		UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+		UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
 			Id:     new(enrolled.GetId()),
 			Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
-		})
+		}))
 	require.NoError(t, err)
 
 	signed, err := sign(targetID)
@@ -99,15 +102,6 @@ func TestSignSSHCertificate(t *testing.T) {
 	require.Len(t, synced.GetPrincipals(), 1)
 	assert.Equal(t, []string{wantPrincipal}, synced.GetPrincipals()[0].GetCertPrincipals(),
 		"the daemon must be told the principal the certificate carries")
-
-	listed, err := nokkuv1connect.NewTargetServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
-		GetTargetPrincipals(t.Context(), &nokkuv1.GetTargetPrincipalsRequest{
-			TargetId: &targetID,
-		})
-	require.NoError(t, err)
-	require.Len(t, listed.GetPrincipals(), 1)
-	assert.Equal(t, []string{wantPrincipal}, listed.GetPrincipals()[0].GetCertPrincipals(),
-		"nk sync must write the principal the certificate carries")
 
 	_, err = principals.RemoveSubjects(t.Context(), &nokkuv1.RemoveSubjectsRequest{
 		Id:         grant.Id,
@@ -203,20 +197,20 @@ func TestCARestrictions(t *testing.T) {
 	assert.Equal(t, "/usr/local/bin/backup", ca.GetForceCommand())
 	assert.Equal(t, "10.0.0.0/8,192.0.2.7", ca.GetSourceAddress())
 
-	_, err = admin.UpdateCertificateAuthority(t.Context(), &nokkuv1.UpdateCertificateAuthorityRequest{
+	_, err = admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
 		Id: ca.Id, SourceAddress: new("the office"),
-	})
+	}))
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
 
 	// An update that names neither keeps both, an empty one takes the restriction away.
-	renamed, err := admin.UpdateCertificateAuthority(t.Context(), &nokkuv1.UpdateCertificateAuthorityRequest{
+	renamed, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
 		Id: ca.Id, Name: new(uniq("renamed")),
-	})
+	}))
 	require.NoError(t, err)
 	assert.Equal(t, "10.0.0.0/8,192.0.2.7", renamed.GetCertificateAuthority().GetSourceAddress())
-	cleared, err := admin.UpdateCertificateAuthority(t.Context(), &nokkuv1.UpdateCertificateAuthorityRequest{
+	cleared, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
 		Id: ca.Id, SourceAddress: new(""),
-	})
+	}))
 	require.NoError(t, err)
 	assert.Empty(t, cleared.GetCertificateAuthority().GetSourceAddress())
 	assert.Equal(t, "/usr/local/bin/backup", cleared.GetCertificateAuthority().GetForceCommand())
@@ -247,9 +241,46 @@ func TestDefaultCAMoves(t *testing.T) {
 	second := seedDefaultCA(t, srv, adminAuth).GetId()
 	assert.Equal(t, []string{second}, defaults(), "a new default takes it from the old one")
 
-	_, err := admin.UpdateCertificateAuthority(t.Context(), &nokkuv1.UpdateCertificateAuthorityRequest{
+	_, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
 		Id: &first, IsDefault: new(true),
-	})
+	}))
 	require.NoError(t, err)
 	assert.Equal(t, []string{first}, defaults(), "the default moves back to an older CA")
+}
+
+// A server made without a CA gets the default. The default, and a CA a server still uses, cannot be deleted.
+func TestDeleteCAInUse(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	adminAuth := header("Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
+	client := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)
+	certs := nokkuv1connect.NewCertificateServiceClient(client)
+	targets := nokkuv1connect.NewTargetServiceClient(client)
+	deleteCA := func(id string) error {
+		_, err := certs.DeleteCertificateAuthority(t.Context(), &nokkuv1.DeleteCertificateAuthorityRequest{Id: &id})
+		return err
+	}
+
+	defaultID := seedDefaultCA(t, srv, adminAuth).GetId()
+	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("no-ca"))})
+	require.NoError(t, err)
+	target := created.GetTarget()
+	assert.Equal(t, defaultID, target.GetCaId(), "a server made without a CA gets the default")
+	require.ErrorContains(t, deleteCA(defaultID), "the default", "the default stays")
+
+	other, err := certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
+		Name: new(uniq("other")),
+	})
+	require.NoError(t, err)
+	otherID := other.GetCertificateAuthority().GetId()
+	_, err = targets.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{Id: target.Id, CaId: &otherID}))
+	require.NoError(t, err)
+	err = deleteCA(otherID)
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
+	require.ErrorContains(t, err, "servers still use", "a CA a server uses stays")
+
+	_, err = targets.DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: target.Id})
+	require.NoError(t, err)
+	assert.NoError(t, deleteCA(otherID), "a CA no server uses goes")
 }

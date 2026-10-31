@@ -16,8 +16,8 @@ const (
 
 func TestFromAccess(t *testing.T) {
 	t.Parallel()
-	res := &nokkuv1.GetMyAccessResponse{
-		Subject: &nokkuv1.GetMyAccessResponse_User{User: &nokkuv1.User{Id: new("u"), Name: new("alice")}},
+	res := &nokkuv1.GetSubjectAccessResponse{
+		Subject: &nokkuv1.GetSubjectAccessResponse_User{User: &nokkuv1.User{Id: new("u"), Name: new("alice")}},
 		CertificateAuthorities: []*nokkuv1.CertificateAuthority{
 			{Id: new(caID), Name: new("ssh"), PublicKey: new("ssh-ed25519 AAAA")},
 			{Id: new("not-a-uuid"), Name: new("odd")},
@@ -41,8 +41,8 @@ func TestFromAccess(t *testing.T) {
 // Names are printed by nk ls, nk doctor and in warnings.
 func TestFromAccessDropsControlCharacters(t *testing.T) {
 	t.Parallel()
-	c := FromAccess(&nokkuv1.GetMyAccessResponse{
-		Subject: &nokkuv1.GetMyAccessResponse_User{
+	c := FromAccess(&nokkuv1.GetSubjectAccessResponse{
+		Subject: &nokkuv1.GetSubjectAccessResponse_User{
 			User: &nokkuv1.User{Id: new("u"), Name: new("al\x1b[2Jice"), Email: new("a@b.example\x07")},
 		},
 		CertificateAuthorities: []*nokkuv1.CertificateAuthority{{Id: new(caID), Name: new("ssh\x1b[31m")}},

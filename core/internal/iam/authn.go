@@ -1,6 +1,7 @@
 package iam
 
-// Every bearer is one lookup in access_tokens, inside the request's workspace. The kind of the row says what it is.
+// Every bearer is one lookup in access_tokens, inside the request's workspace. Its prefix says what it is, and the
+// kinds a caller takes are checked before the lookup.
 
 import (
 	"context"
@@ -10,7 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/internal/dpop"
+
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -21,12 +25,11 @@ func (s *Service) Authenticate(
 	procedure string,
 ) (actor.Principal, db.AccessToken, error) {
 	token := s.requestCredential(header)
-	p, tok, err := s.AuthenticateToken(ctx, token)
+	// A SCIM key works on the SCIM API only.
+	p, tok, err := s.AuthenticateToken(ctx, token,
+		crypto.TokenSession, crypto.TokenCLI, crypto.TokenDaemon, crypto.TokenServiceAccount)
 	if err != nil {
 		return actor.Principal{}, db.AccessToken{}, err
-	}
-	if p.Kind == actor.KindSCIM {
-		return actor.Principal{}, db.AccessToken{}, errInvalidCredentials
 	}
 	if tok.Binding != "" {
 		if err := s.verifySessionProof(ctx, header, procedure, token, tok.Binding); err != nil {
@@ -37,12 +40,14 @@ func (s *Service) Authenticate(
 	return p, tok, nil
 }
 
-// AuthenticateToken loads the account for user and CLI sessions, so inactive accounts fail closed.
+// AuthenticateToken takes a token of one of kinds. It loads the account for user and CLI sessions, so inactive
+// accounts fail closed.
 func (s *Service) AuthenticateToken(
 	ctx context.Context,
 	token string,
+	kinds ...crypto.TokenKind,
 ) (actor.Principal, db.AccessToken, error) {
-	tok, err := s.verifyToken(ctx, token)
+	tok, err := s.verifyToken(ctx, token, kinds...)
 	if err != nil {
 		return actor.Principal{}, db.AccessToken{}, err
 	}
@@ -80,14 +85,15 @@ func (s *Service) verifySessionProof(
 	header http.Header,
 	procedure, token, binding string,
 ) error {
-	proof, err := DPoPProof(header)
+	proof, err := dpop.ProofFrom(header)
 	if err != nil {
 		return err
 	}
 	if proof == "" {
 		return ErrDPoPRequired
 	}
-	return s.DPoP.verifySession(proof, token, http.MethodPost, baseURL(ctx)+procedure, binding)
+	_, err = s.DPoP.Verify(proof, token, http.MethodPost, baseURL(ctx)+procedure, binding)
+	return err
 }
 
 // AdvertiseDPoPNonce also sends the canonical API URL, so a recovering client corrects the htu it signs.

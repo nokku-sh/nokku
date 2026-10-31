@@ -1,6 +1,7 @@
 package sshd
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net"
@@ -68,10 +69,10 @@ func (st *connState) close() {
 }
 
 func (s *Server) forwardingAllowed(conn *ssh.ServerConn) bool {
-	return s.policy.Load().AllowForwarding && certExt(conn, "permit-port-forwarding")
+	return s.access.Load().policy.AllowForwarding && certExt(conn, "permit-port-forwarding")
 }
 
-func (s *Server) serveDirectTCPIP(st *connState, newCh ssh.NewChannel) {
+func (s *Server) serveDirectTCPIP(_ context.Context, st *connState, newCh ssh.NewChannel) {
 	var d tcpipChannelData
 	if err := ssh.Unmarshal(newCh.ExtraData(), &d); err != nil {
 		_ = newCh.Reject(ssh.ConnectionFailed, "bad direct-tcpip request")
@@ -133,7 +134,7 @@ func (s *Server) tcpipForward(st *connState, payload []byte) (bool, []byte) {
 	if st.forwards == nil || st.forwards[forwardKey(f)] != nil || !st.acquireChannel() {
 		return false, nil
 	}
-	ln, err := listenAs(st.user, forwardAddr(f, s.policy.Load().GatewayPorts))
+	ln, err := listenAs(st.user, forwardAddr(f, s.access.Load().policy.GatewayPorts))
 	if err != nil {
 		st.releaseChannel()
 		return false, nil

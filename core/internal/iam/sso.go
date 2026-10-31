@@ -1,6 +1,6 @@
 package iam
 
-// OIDC providers of a workspace. The config, secret included, is one JSON blob encrypted at rest.
+// OIDC providers of a workspace. The config, secret included, is one JSON blob sealed to its row.
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -21,8 +22,8 @@ type OIDCProvider struct {
 	ClientSecret    string   `json:"client_secret,omitempty"`
 	Scopes          []string `json:"scopes,omitempty"`
 	JITProvisioning bool     `json:"jit_provisioning,omitempty"`
-	// TrustUnverifiedEmail links an existing account by an address the provider sends without email_verified, as
-	// Entra does. A provider that says false is never trusted, and the owner is never linked by email.
+	// TrustUnverifiedEmail takes an address the provider sends without email_verified, as Entra does, to link an
+	// account or create one. A provider that says false is never trusted, and the owner is never linked by email.
 	TrustUnverifiedEmail bool `json:"trust_unverified_email,omitempty"`
 }
 
@@ -42,7 +43,7 @@ func (s *Service) ListSSOProviders(ctx context.Context) ([]SSOProvider, error) {
 	}
 	out := make([]SSOProvider, 0, len(rows))
 	for _, row := range rows {
-		p, err := ssoProviderFromRow(row)
+		p, err := s.ssoProviderFromRow(row)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +57,7 @@ func (s *Service) GetSSOProvider(ctx context.Context, providerID string) (*SSOPr
 	if err != nil {
 		return nil, mapNotFound(err)
 	}
-	return ssoProviderFromRow(row)
+	return s.ssoProviderFromRow(row)
 }
 
 // loginProvider is a provider that may sign people in right now.
@@ -75,18 +76,18 @@ func (s *Service) loginProvider(ctx context.Context, providerID string) (*SSOPro
 func (s *Service) PutSSOProvider(ctx context.Context, p SSOProvider) (*SSOProvider, error) {
 	var out *SSOProvider
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		out, err = putSSOProvider(ctx, q, p)
+		out, err = s.putSSOProvider(ctx, q, p)
 		return err
 	})
 	return out, err
 }
 
-func putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProvider, error) {
+func (s *Service) putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProvider, error) {
 	var prev *SSOProvider
 	row, err := q.GetSSOProvider(ctx, p.ProviderID)
 	switch {
 	case err == nil:
-		prev, _ = ssoProviderFromRow(row)
+		prev, _ = s.ssoProviderFromRow(row)
 	case !errors.Is(err, pgx.ErrNoRows):
 		return nil, err
 	}
@@ -106,7 +107,11 @@ func putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProv
 			return nil, err
 		}
 	}
-	cfg, err := json.Marshal(p.OIDC) //nolint:gosec // encrypted before it is stored
+	cfg, err := json.Marshal(p.OIDC) //nolint:gosec // sealed before it is stored
+	if err != nil {
+		return nil, err
+	}
+	sealed, err := s.keys.Seal(SSOConfigAAD(actor.WorkspaceIDFromContext(ctx), p.ProviderID), cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -114,12 +119,12 @@ func putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvider) (*SSOProv
 		ProviderID: p.ProviderID,
 		Name:       p.Name,
 		Enabled:    p.Enabled,
-		Config:     crypto.EncryptedBytes(cfg),
+		Config:     sealed,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return ssoProviderFromRow(row)
+	return s.ssoProviderFromRow(row)
 }
 
 // DeleteSSOProvider also unlinks every identity the provider vouched for.
@@ -139,7 +144,11 @@ func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) erro
 	})
 }
 
-func ssoProviderFromRow(row *db.SsoProvider) (*SSOProvider, error) {
+func (s *Service) ssoProviderFromRow(row *db.SsoProvider) (*SSOProvider, error) {
+	cfg, err := s.keys.Open(SSOConfigAAD(row.WorkspaceID, row.ProviderID), row.Config)
+	if err != nil {
+		return nil, err
+	}
 	p := &SSOProvider{
 		ProviderID: row.ProviderID,
 		Name:       row.Name,
@@ -147,12 +156,15 @@ func ssoProviderFromRow(row *db.SsoProvider) (*SSOProvider, error) {
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
 	}
-	if len(row.Config) > 0 {
-		if err := json.Unmarshal(row.Config, &p.OIDC); err != nil {
-			return nil, err
-		}
+	if err := json.Unmarshal(cfg, &p.OIDC); err != nil {
+		return nil, err
 	}
 	return p, nil
+}
+
+// SSOConfigAAD is where the config of a provider is sealed.
+func SSOConfigAAD(workspaceID, providerID string) crypto.AAD {
+	return crypto.AAD{Table: "sso_providers", Column: "config", Workspace: workspaceID, Row: providerID}
 }
 
 // CheckIssuer loads the issuer's discovery document, so a typo fails on save and not at the first sign-in.

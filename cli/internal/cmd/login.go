@@ -64,9 +64,6 @@ func logoutCMD() *cli.Command {
 				return err
 			}
 			fmt.Println("Signed out. Removed credentials, certificates, and cached state")
-			if loadErr == nil {
-				client.OfferRemoval(s)
-			}
 			return nil
 		},
 	}

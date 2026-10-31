@@ -11,11 +11,6 @@ name: nokku
 
 networks:
   nokku:
-    ipam:
-      config:
-        # Fixed subnet so NOKKU_TRUSTED_PROXIES can trust the proxy container
-        # (caddy) regardless of the IP Docker assigns it.
-        - subnet: 172.28.0.0/16
 
 volumes:
   pgdata:
@@ -31,7 +26,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       POSTGRES_DB: ${POSTGRES_DB:-nokku}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 10s
@@ -49,7 +44,7 @@ services:
         condition: service_healthy
     # All NOKKU_*, OAuth, email and storage settings come from .env.
     env_file: .env
-    # Schema migrations run automatically on boot (NOKKU_DB_AUTOMIGRATE=true).
+    # The schema is migrated on every start.
     environment:
       # Point the app at the services in this stack.
       PGHOST: postgres
@@ -58,14 +53,12 @@ services:
       PGUSER: ${POSTGRES_USER:-nokku}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       PGSSLMODE: disable
-      # Caddy runs on the same internal network, forwarded client headers are
-      # only honored from peers in this range.
-      NOKKU_TRUSTED_PROXIES: 172.28.0.0/16
       # Local object storage (default backend), persisted on a volume.
-      NOKKU_STORAGE_URL: file:///data
+      NOKKU_STORAGE_URL: file:///home/nonroot/recordings
     volumes:
-      - nokku-data:/data
-    # Only reachable through the caddy reverse proxy.
+      # The image runs as nonroot. A volume on its home takes that owner, one on /data would stay root's.
+      - nokku-data:/home/nonroot
+    # Only Caddy reaches it, so only Caddy can name the client. Don't publish the port.
     # The app listens on 0.0.0.0:3000 by default (NOKKU_PORT in .env to change).
     expose:
       - "3000"

@@ -36,8 +36,8 @@ type Recording struct {
 	SubjectId   *string                `protobuf:"bytes,9,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
 	Principal   *string                `protobuf:"bytes,10,opt,name=principal" json:"principal,omitempty"`
 	SubjectName *string                `protobuf:"bytes,11,opt,name=subject_name,json=subjectName" json:"subject_name,omitempty"`
-	// held is true while a legal hold keeps it, it can't be deleted then.
-	Held          *bool `protobuf:"varint,12,opt,name=held" json:"held,omitempty"`
+	// live is a session still running as far as the core can tell, ended_at unset behind a connected daemon.
+	Live          *bool `protobuf:"varint,12,opt,name=live" json:"live,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -149,9 +149,9 @@ func (x *Recording) GetSubjectName() string {
 	return ""
 }
 
-func (x *Recording) GetHeld() bool {
-	if x != nil && x.Held != nil {
-		return *x.Held
+func (x *Recording) GetLive() bool {
+	if x != nil && x.Live != nil {
+		return *x.Live
 	}
 	return false
 }
@@ -258,8 +258,8 @@ type RecordingMeta struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RecordingId   *string                `protobuf:"bytes,1,opt,name=recording_id,json=recordingId" json:"recording_id,omitempty"`
 	Username      *string                `protobuf:"bytes,2,opt,name=username" json:"username,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
-	Principal     *string                `protobuf:"bytes,4,opt,name=principal" json:"principal,omitempty"`
+	Principal     *string                `protobuf:"bytes,3,opt,name=principal" json:"principal,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -308,13 +308,6 @@ func (x *RecordingMeta) GetUsername() string {
 	return ""
 }
 
-func (x *RecordingMeta) GetStartedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.StartedAt
-	}
-	return nil
-}
-
 func (x *RecordingMeta) GetPrincipal() string {
 	if x != nil && x.Principal != nil {
 		return *x.Principal
@@ -322,8 +315,19 @@ func (x *RecordingMeta) GetPrincipal() string {
 	return ""
 }
 
+func (x *RecordingMeta) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
 type RecordingFinal struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SizeBytes *int64                 `protobuf:"varint,1,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
+	CutReason *string                `protobuf:"bytes,2,opt,name=cut_reason,json=cutReason" json:"cut_reason,omitempty"`
+	// ended_at is when the session ended, which a late upload can be long after.
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=ended_at,json=endedAt" json:"ended_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -356,6 +360,27 @@ func (x *RecordingFinal) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RecordingFinal.ProtoReflect.Descriptor instead.
 func (*RecordingFinal) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_recordings_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RecordingFinal) GetSizeBytes() int64 {
+	if x != nil && x.SizeBytes != nil {
+		return *x.SizeBytes
+	}
+	return 0
+}
+
+func (x *RecordingFinal) GetCutReason() string {
+	if x != nil && x.CutReason != nil {
+		return *x.CutReason
+	}
+	return ""
+}
+
+func (x *RecordingFinal) GetEndedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndedAt
+	}
+	return nil
 }
 
 type UploadRecordingResponse struct {
@@ -774,7 +799,7 @@ const file_nokku_v1_recordings_proto_rawDesc = "" +
 	"\tprincipal\x18\n" +
 	" \x01(\tR\tprincipal\x12!\n" +
 	"\fsubject_name\x18\v \x01(\tR\vsubjectName\x12\x12\n" +
-	"\x04held\x18\f \x01(\bR\x04held\"\x98\x01\n" +
+	"\x04live\x18\f \x01(\bR\x04live\"\x98\x01\n" +
 	"\x16UploadRecordingRequest\x12-\n" +
 	"\x04meta\x18\x01 \x01(\v2\x17.nokku.v1.RecordingMetaH\x00R\x04meta\x12\x16\n" +
 	"\x05chunk\x18\x02 \x01(\fH\x00R\x05chunk\x120\n" +
@@ -782,11 +807,16 @@ const file_nokku_v1_recordings_proto_rawDesc = "" +
 	"\x03msg\"\xc4\x01\n" +
 	"\rRecordingMeta\x12+\n" +
 	"\frecording_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vrecordingId\x12#\n" +
-	"\busername\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18 R\busername\x129\n" +
+	"\busername\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18 R\busername\x12&\n" +
+	"\tprincipal\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x01R\tprincipal\x129\n" +
 	"\n" +
-	"started_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12&\n" +
-	"\tprincipal\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x01R\tprincipal\"\x10\n" +
-	"\x0eRecordingFinal\"[\n" +
+	"started_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\"\x98\x01\n" +
+	"\x0eRecordingFinal\x12&\n" +
+	"\n" +
+	"size_bytes\x18\x01 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\tsizeBytes\x12'\n" +
+	"\n" +
+	"cut_reason\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\tcutReason\x125\n" +
+	"\bended_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\"[\n" +
 	"\x17UploadRecordingResponse\x12!\n" +
 	"\frecording_id\x18\x01 \x01(\tR\vrecordingId\x12\x1d\n" +
 	"\n" +
@@ -853,19 +883,20 @@ var file_nokku_v1_recordings_proto_depIdxs = []int32{
 	2,  // 2: nokku.v1.UploadRecordingRequest.meta:type_name -> nokku.v1.RecordingMeta
 	3,  // 3: nokku.v1.UploadRecordingRequest.final:type_name -> nokku.v1.RecordingFinal
 	11, // 4: nokku.v1.RecordingMeta.started_at:type_name -> google.protobuf.Timestamp
-	0,  // 5: nokku.v1.ListRecordingsResponse.recordings:type_name -> nokku.v1.Recording
-	2,  // 6: nokku.v1.GetRecordingResponse.meta:type_name -> nokku.v1.RecordingMeta
-	7,  // 7: nokku.v1.RecordingService.GetRecording:input_type -> nokku.v1.GetRecordingRequest
-	5,  // 8: nokku.v1.RecordingService.ListRecordings:input_type -> nokku.v1.ListRecordingsRequest
-	9,  // 9: nokku.v1.RecordingService.DeleteRecording:input_type -> nokku.v1.DeleteRecordingRequest
-	8,  // 10: nokku.v1.RecordingService.GetRecording:output_type -> nokku.v1.GetRecordingResponse
-	6,  // 11: nokku.v1.RecordingService.ListRecordings:output_type -> nokku.v1.ListRecordingsResponse
-	10, // 12: nokku.v1.RecordingService.DeleteRecording:output_type -> nokku.v1.DeleteRecordingResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	11, // 5: nokku.v1.RecordingFinal.ended_at:type_name -> google.protobuf.Timestamp
+	0,  // 6: nokku.v1.ListRecordingsResponse.recordings:type_name -> nokku.v1.Recording
+	2,  // 7: nokku.v1.GetRecordingResponse.meta:type_name -> nokku.v1.RecordingMeta
+	7,  // 8: nokku.v1.RecordingService.GetRecording:input_type -> nokku.v1.GetRecordingRequest
+	5,  // 9: nokku.v1.RecordingService.ListRecordings:input_type -> nokku.v1.ListRecordingsRequest
+	9,  // 10: nokku.v1.RecordingService.DeleteRecording:input_type -> nokku.v1.DeleteRecordingRequest
+	8,  // 11: nokku.v1.RecordingService.GetRecording:output_type -> nokku.v1.GetRecordingResponse
+	6,  // 12: nokku.v1.RecordingService.ListRecordings:output_type -> nokku.v1.ListRecordingsResponse
+	10, // 13: nokku.v1.RecordingService.DeleteRecording:output_type -> nokku.v1.DeleteRecordingResponse
+	11, // [11:14] is the sub-list for method output_type
+	8,  // [8:11] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_recordings_proto_init() }

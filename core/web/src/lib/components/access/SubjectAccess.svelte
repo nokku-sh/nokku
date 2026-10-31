@@ -8,8 +8,9 @@
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
+	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
-	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
+	import { AccessBlock, type Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import { Clock, Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -34,6 +35,19 @@
 	const revoking = new SvelteSet<string>();
 
 	type Grant = { account: TargetAccount; direct: boolean; via: string[] };
+
+	// The grants stand, but nobody gets in with them today.
+	const blocked: Partial<Record<AccessBlock, { label: string; title: string }>> = {
+		[AccessBlock.USER_INACTIVE]: {
+			label: 'Deactivated',
+			title: 'The account is deactivated, these grants let nobody in until it is reactivated.'
+		},
+		[AccessBlock.DAEMON_NOT_APPROVED]: {
+			label: 'Not approved',
+			title:
+				'The daemon of this server waits for approval or was rejected, nobody gets in until it is approved.'
+		}
+	};
 
 	function grants(t: Target): Grant[] {
 		return t.accounts
@@ -63,7 +77,9 @@
 			: targets
 	);
 	const shown = $derived(showAll ? filtered : filtered.slice(0, PAGE));
-	const accountCount = $derived(targets.reduce((n, t) => n + grants(t).length, 0));
+	// A marked target holds grants that let nobody in today, it does not count as a way in.
+	const usable = $derived(targets.filter((t) => !t.blocked));
+	const accountCount = $derived(usable.reduce((n, t) => n + grants(t).length, 0));
 
 	function summary(list: Grant[]) {
 		const direct = list.filter((g) => g.direct).length;
@@ -77,11 +93,18 @@
 <div class="flex flex-col gap-3">
 	<div class="flex items-start justify-between gap-3">
 		<p class="text-sm text-muted-foreground">
-			{#if targets.length}
-				{name} can log in to <span class="font-medium text-foreground">{targets.length}</span>
-				{targets.length === 1 ? 'target' : 'targets'} with
+			{#if usable.length}
+				{name} can log in to <span class="font-medium text-foreground">{usable.length}</span>
+				{usable.length === 1 ? 'target' : 'targets'} with
 				<span class="font-medium text-foreground">{accountCount}</span>
 				{accountCount === 1 ? 'login account' : 'login accounts'}.
+				{#if targets.length > usable.length}
+					The marked {targets.length - usable.length === 1 ? 'one lets' : 'ones let'} nobody in yet.
+				{/if}
+			{:else if targets.length}
+				{name} holds access to
+				<span class="font-medium text-foreground">{targets.length}</span>
+				{targets.length === 1 ? 'target' : 'targets'}, none lets them in today.
 			{:else if !access.isLoading}
 				{name} can't log in anywhere yet.
 			{/if}
@@ -129,12 +152,20 @@
 						<Server class="size-4" />
 					</div>
 					<div class="min-w-0 flex-1">
-						<a
-							href={`/infrastructure/targets?id=${t.id}&tab=access`}
-							class="block truncate text-sm font-medium hover:underline"
-						>
-							{t.name}
-						</a>
+						<div class="flex items-center gap-2">
+							<a
+								href={`/infrastructure/targets?id=${t.id}&tab=access`}
+								class="block truncate text-sm font-medium hover:underline"
+							>
+								{t.name}
+							</a>
+							{#if t.blocked && blocked[t.blocked]}
+								<Badge variant="warning" title={blocked[t.blocked]?.title}>
+									<ShieldOff data-icon="inline-start" />
+									{blocked[t.blocked]?.label}
+								</Badge>
+							{/if}
+						</div>
 						<p class="truncate text-xs text-muted-foreground">
 							{summary(list) || t.description}
 						</p>

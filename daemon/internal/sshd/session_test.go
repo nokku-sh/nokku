@@ -3,7 +3,6 @@ package sshd
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"errors"
 	"io"
 	"net"
@@ -11,7 +10,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -202,23 +200,22 @@ func TestServerForceCommandBlocksEnv(t *testing.T) {
 	is.Equal("force:", string(out))
 }
 
-// captureSink lets tests assert what the daemon would have uploaded.
-type captureSink struct {
-	mu      sync.Mutex
-	data    bytes.Buffer
-	closed  chan struct{}
-	closeDo sync.Once
-}
-
-func (s *captureSink) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.data.Write(p)
-}
-
-func (s *captureSink) Close() error {
-	s.closeDo.Do(func() { close(s.closed) })
-	return nil
+// recordedCast waits for the one recording a session closed whole, and returns what it holds.
+func recordedCast(t *testing.T) (name, cast string) {
+	t.Helper()
+	var files []string
+	require.Eventually(t, func() bool {
+		files, _ = filepath.Glob(filepath.Join(paths.RecordsDir(), "*.cast.gz"))
+		return len(files) == 1
+	}, 5*time.Second, 10*time.Millisecond, "the session left no whole recording")
+	f, err := os.Open(files[0])
+	require.NoError(t, err)
+	defer f.Close()
+	gr, err := gzip.NewReader(f)
+	require.NoError(t, err, "the recording is not gzip")
+	data, err := io.ReadAll(gr)
+	require.NoError(t, err, "read recording")
+	return strings.TrimSuffix(filepath.Base(files[0]), ".cast.gz"), string(data)
 }
 
 func TestPlainSessionRecorded(t *testing.T) {
@@ -228,24 +225,12 @@ func TestPlainSessionRecorded(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", dir)
 	must.NoError(paths.Verify(), "verify paths")
 
-	sink := &captureSink{closed: make(chan struct{})}
-	factory := func(context.Context, string, string, string) io.WriteCloser { return sink }
-
 	cur := currentUser(t)
 	ca := newTestCA(t)
-	principals := func(username string) []string {
-		if username == cur {
-			return []string{testPrincipal}
-		}
-		return nil
-	}
-	srv, err := New(Options{
-		Principals:    principals,
-		Policy:        Policy{Record: true},
-		RecordingSink: factory,
-	})
+	srv, err := New(nil)
 	must.NoError(err, "new server")
-	srv.SetTrust(string(ssh.MarshalAuthorizedKey(ca.pub)), nil)
+	srv.SetAccess(testAccess(t, ca))
+	withPolicy(Policy{Record: true})(srv)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	must.NoError(err, "listen")
 	defer func() { _ = l.Close() }()
@@ -274,20 +259,10 @@ func TestPlainSessionRecorded(t *testing.T) {
 	must.NoError(sess.Wait(), "wait")
 	is.Equal("piped-input\n", string(out))
 
-	// finish closes the recorder before the exit status is sent, so the sink is complete once Wait returns.
-	select {
-	case <-sink.closed:
-	case <-time.After(5 * time.Second):
-		t.Fatal("recording sink was never closed")
-	}
-
-	gr, err := gzip.NewReader(&sink.data)
-	must.NoError(err, "sink data is not gzip")
-	cast, err := io.ReadAll(gr)
-	must.NoError(err, "read recording")
-	is.Contains(string(cast), `"o"`, "plain sessions must still record output")
-	is.Contains(string(cast), "on-stderr", "stderr leaves the machine too, so it is recorded")
-	is.NotContains(string(cast), `"i"`, "plain sessions must not record stdin")
+	_, cast := recordedCast(t)
+	is.Contains(cast, `"o"`, "plain sessions must still record output")
+	is.Contains(cast, "on-stderr", "stderr leaves the machine too, so it is recorded")
+	is.NotContains(cast, `"i"`, "plain sessions must not record stdin")
 }
 
 // /etc/nologin refuses the login itself, so it stops forwards as well as sessions.
@@ -301,7 +276,7 @@ func TestLoginDeniedByNologin(t *testing.T) {
 	must.NoError(os.WriteFile(nologin, []byte("maintenance\n"), 0o644))
 
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}}, func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}), func(s *Server) {
 		s.nologinFile = nologin
 	})
 	defer closeFn()
@@ -339,31 +314,12 @@ func TestRecordingCorrelatesWebSessionID(t *testing.T) {
 			t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 			must.NoError(paths.Verify(), "verify paths")
 
-			var mu sync.Mutex
-			var gotID string
-			sink := &captureSink{closed: make(chan struct{})}
-			factory := func(_ context.Context, sessionID, _, _ string) io.WriteCloser {
-				mu.Lock()
-				gotID = sessionID
-				mu.Unlock()
-				return sink
-			}
-
 			cur := currentUser(t)
 			ca := newTestCA(t)
-			principals := func(username string) []string {
-				if username == cur {
-					return []string{testPrincipal}
-				}
-				return nil
-			}
-			srv, err := New(Options{
-				Principals:    principals,
-				Policy:        Policy{Record: true},
-				RecordingSink: factory,
-			})
+			srv, err := New(nil)
 			must.NoError(err, "new server")
-			srv.SetTrust(string(ssh.MarshalAuthorizedKey(ca.pub)), nil)
+			srv.SetAccess(testAccess(t, ca))
+			withPolicy(Policy{Record: true})(srv)
 			l, err := net.Listen("tcp", "127.0.0.1:0")
 			must.NoError(err, "listen")
 			defer func() { _ = l.Close() }()
@@ -390,14 +346,7 @@ func TestRecordingCorrelatesWebSessionID(t *testing.T) {
 			_, err = sess.Output("printf env-recorded")
 			must.NoError(err, "exec")
 
-			select {
-			case <-sink.closed:
-			case <-time.After(5 * time.Second):
-				t.Fatal("recording sink was never closed")
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
+			gotID, _ := recordedCast(t)
 			if tc.wantPromoted {
 				is.Equal(webSessionID, gotID, "recording must carry the key id's session id")
 			} else {
@@ -509,7 +458,7 @@ func TestSessionConnectionEnv(t *testing.T) {
 func TestMissingHomeRunsInRoot(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "gone")
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) {
 		lookup := s.lookupAccount
 		s.lookupAccount = func(name string) (*account, error) {
 			account, err := lookup(name)
@@ -577,7 +526,7 @@ func TestNoTermWithoutPTY(t *testing.T) {
 // An interactive session ends at the cap, or a flood would switch recording off for what is typed next.
 func TestFullRecordingEndsAnInteractiveSession(t *testing.T) {
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{Record: true}}, func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{Record: true}), func(s *Server) {
 		require.NoError(t, paths.Verify(), "verify paths")
 		s.maxRecording = 1024
 	})
@@ -606,11 +555,33 @@ func TestFullRecordingEndsAnInteractiveSession(t *testing.T) {
 	assert.Contains(t, stdout.String(), "the recording of this session is full")
 }
 
+// Exec has a cap far below a shell's. This binary output stays well under 50 MB and still stops the recording.
+func TestExecRecordingStopsAtItsOwnCap(t *testing.T) {
+	ca := newTestCA(t)
+	log, events := auditLog()
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(Policy{Record: true}), func(*Server) {
+		require.NoError(t, paths.Verify(), "verify paths")
+	})
+	defer closeFn()
+	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	require.NoError(t, err, "dial")
+	defer client.Close()
+	sess, err := client.NewSession()
+	require.NoError(t, err, "new session")
+	defer sess.Close()
+
+	out, err := sess.Output("head -c 8388608 /dev/urandom")
+	require.NoError(t, err, "the session did not finish")
+	assert.Len(t, out, 8<<20, "output went missing past the cap")
+	assert.Eventually(t, func() bool { return slices.Contains(events(), eventRecordingDegraded) },
+		5*time.Second, 20*time.Millisecond, "the recording ran past the exec cap")
+}
+
 // An exec session runs on past the cap, a git clone or rsync must not die halfway. The gap is on the audit trail.
 func TestFullRecordingKeepsAnExecSessionRunning(t *testing.T) {
 	ca := newTestCA(t)
 	log, events := auditLog()
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{Record: true}, Log: log}, func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(Policy{Record: true}), func(s *Server) {
 		require.NoError(t, paths.Verify(), "verify paths")
 		s.maxRecording = 1024
 	})

@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"log/slog"
-	"strings"
 
 	"connectrpc.com/connect/v2"
 
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -43,9 +43,12 @@ func (s *accountService) UpdateAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateAccountRequest,
 ) (*nokkuv1.UpdateAccountResponse, error) {
+	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
+		return nil, err
+	}
 	u, err := s.cfg.IAM.UpdateSelf(ctx, req.Name)
 	if err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.UpdateAccountResponse{User: u.ToProto()}, nil
 }
@@ -95,13 +98,6 @@ func (s *accountService) RequestEmailChange(
 	if err != nil {
 		return nil, errAccountNotFound
 	}
-	if err := s.cfg.IAM.RequireRecentSignIn(ctx); err != nil {
-		// The web app reads Unauthenticated as a session to sign in again, and comes back here after.
-		if ci, ok := connect.CallInfoForServerContext(ctx); ok {
-			setCookie(ci, s.cfg.IAM.ClearSessionCookie())
-		}
-		return nil, newError(connect.CodeUnauthenticated, "sign in again to change your email")
-	}
 	if !s.cfg.Email.HasSMTP() {
 		return nil, newError(connect.CodeUnimplemented, "this server sends no mail, ask your administrator")
 	}
@@ -120,12 +116,12 @@ func (s *accountService) RequestEmailChange(
 	case errors.Is(err, iam.ErrManagedAccount):
 		return nil, errEmailManaged
 	case err != nil:
-		return nil, errInternal
+		return nil, err
 	}
 
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	base := ws.BaseURL + "/email-change?"
-	newEmail := strings.ToLower(strings.TrimSpace(req.GetNewEmail()))
+	newEmail := iam.NormalizeEmail(req.GetNewEmail())
 	err = s.cfg.Email.SendEmailChangeConfirm(ctx, u.ID, newEmail, base+"token="+confirm, iam.EmailChangeTTL)
 	if err == nil {
 		err = s.cfg.Email.SendEmailChangeNotice(
@@ -152,7 +148,7 @@ func (s *accountService) ListCredentials(
 ) (*nokkuv1.ListCredentialsResponse, error) {
 	creds, err := s.cfg.IAM.ListCredentials(ctx)
 	if err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	credentials := make([]*nokkuv1.AccountCredential, 0, len(creds))
 	for _, c := range creds {
@@ -166,7 +162,7 @@ func (s *accountService) RenameCredential(
 	req *nokkuv1.RenameCredentialRequest,
 ) (*nokkuv1.RenameCredentialResponse, error) {
 	if err := s.cfg.IAM.RenameCredential(ctx, req.GetId(), req.GetLabel()); err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.RenameCredentialResponse{}, nil
 }
@@ -182,7 +178,7 @@ func (s *accountService) RemoveCredential(
 	case errors.Is(err, iam.ErrLastCredential):
 		return nil, errLastLoginMethod
 	case err != nil:
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.RemoveCredentialResponse{}, nil
 }
@@ -194,7 +190,7 @@ func (s *accountService) ListAccountSessions(
 	current, _ := iam.CurrentToken(ctx)
 	sessions, err := s.cfg.IAM.ListSessions(ctx)
 	if err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	out := make([]*nokkuv1.AccountSession, 0, len(sessions))
 	for _, sess := range sessions {
@@ -206,6 +202,7 @@ func (s *accountService) ListAccountSessions(
 			Current:    new(sess.ID == current.ID),
 			ExpiresAt:  db.SafeTimestamp(sess.ExpiresAt),
 			LastSeenAt: db.SafeTimestamp(sess.LastSeenAt),
+			FreshFor:   durationpb.New(s.cfg.IAM.FreshFor(sess)),
 			UserAgent:  new(sess.UserAgent),
 			Ip:         new(sess.Ip),
 		})
@@ -213,7 +210,7 @@ func (s *accountService) ListAccountSessions(
 	// The list also shows where the account is remembered. Those rows are no sessions.
 	devices, err := s.cfg.IAM.ListDevices(ctx)
 	if err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	for _, d := range devices {
 		out = append(out, &nokkuv1.AccountSession{
@@ -241,10 +238,10 @@ func (s *accountService) RemoveSession(
 	}
 	// The id names a session or a remembered device, the list mixes both.
 	if err := s.cfg.IAM.DeleteOwnSession(ctx, req.GetId()); err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	if err := s.cfg.IAM.ForgetDevice(ctx, req.GetId()); err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.RemoveSessionResponse{}, nil
 }
@@ -261,7 +258,7 @@ func (s *accountService) DeleteAccount(
 	case errors.Is(err, iam.ErrNotFound):
 		return nil, errAccountNotFound
 	case err != nil:
-		return nil, errInternal
+		return nil, err
 	}
 	// The session cookie is HttpOnly, only a server response can clear it.
 	if ci, ok := connect.CallInfoForServerContext(ctx); ok {

@@ -31,7 +31,6 @@ func TestPlanMatrix(t *testing.T) {
 				FeatureIdleTimeout:    false,
 				FeatureAccessRequests: false,
 				FeatureAuditStreaming: false,
-				FeatureLegalHold:      false,
 			},
 		},
 		{
@@ -50,7 +49,6 @@ func TestPlanMatrix(t *testing.T) {
 				FeatureIdleTimeout:    true,
 				FeatureAccessRequests: false,
 				FeatureAuditStreaming: false,
-				FeatureLegalHold:      false,
 			},
 		},
 		{
@@ -69,7 +67,6 @@ func TestPlanMatrix(t *testing.T) {
 				FeatureIdleTimeout:    true,
 				FeatureAccessRequests: true,
 				FeatureAuditStreaming: true,
-				FeatureLegalHold:      true,
 			},
 		},
 	}

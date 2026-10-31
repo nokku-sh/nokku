@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -23,8 +23,12 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
-// serviceAccountCertTTL caps a service account's certificate, so a leaked token leaves an hour of access, not days.
-const serviceAccountCertTTL = time.Hour
+const (
+	// serviceAccountCertTTL caps a service account's certificate, so a leaked token leaves an hour of access, not days.
+	serviceAccountCertTTL = time.Hour
+	// daemonlessCertTTL caps a certificate for a server set up with nk sync, so a revoke lands there within the hour.
+	daemonlessCertTTL = time.Hour
+)
 
 type certificateService struct {
 	cfg *config.Config
@@ -34,15 +38,12 @@ func (s *certificateService) CreateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.CreateCertificateAuthorityRequest,
 ) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
-	ca, err := ssh.NewCA()
+	source, err := ssh.SourceAddresses(req.GetSourceAddress())
 	if err != nil {
-		slog.Error("failed to generate CA", "error", err)
-		return nil, errInternal
-	}
-
-	if ca.SourceAddress, err = ssh.SourceAddresses(req.GetSourceAddress()); err != nil {
 		return nil, newError(connect.CodeInvalidArgument, err.Error())
 	}
+	ca := ssh.NewCA()
+	ca.SourceAddress = source
 	ca.ForceCommand = strings.TrimSpace(req.GetForceCommand())
 	ca.Name, ca.Description = req.GetName(), req.Description
 	if req.GetUserDefaultTtl() != nil {
@@ -51,16 +52,13 @@ func (s *certificateService) CreateCertificateAuthority(
 	if req.GetUserMaxTtl() != nil {
 		ca.UserMaxTtl = req.GetUserMaxTtl().AsDuration()
 	}
-	if req.GetHostDefaultTtl() != nil {
-		ca.HostDefaultTtl = req.GetHostDefaultTtl().AsDuration()
-	}
-	if req.GetHostMaxTtl() != nil {
-		ca.HostMaxTtl = req.GetHostMaxTtl().AsDuration()
+	if req.GetHostTtl() != nil {
+		ca.HostTtl = req.GetHostTtl().AsDuration()
 	}
 
 	var result *db.SSHCA
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if result, err = q.CreateCA(ctx, ca); err != nil {
+		if result, err = ssh.CreateCA(ctx, q, s.cfg.Keyset, ca); err != nil {
 			return err
 		}
 		if !req.GetIsDefault() {
@@ -109,15 +107,16 @@ func (s *certificateService) UpdateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.UpdateCertificateAuthorityRequest,
 ) (*nokkuv1.UpdateCertificateAuthorityResponse, error) {
+	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
+		return nil, err
+	}
 	params := &db.UpdateCAParams{
 		CaID:           req.GetId(),
 		Name:           req.Name,
 		Description:    req.Description,
-		IsActive:       req.IsActive,
 		UserDefaultTtl: optDuration(req.GetUserDefaultTtl()),
 		UserMaxTtl:     optDuration(req.GetUserMaxTtl()),
-		HostDefaultTtl: optDuration(req.GetHostDefaultTtl()),
-		HostMaxTtl:     optDuration(req.GetHostMaxTtl()),
+		HostTtl:        optDuration(req.GetHostTtl()),
 	}
 	// Unset keeps what the CA has, empty takes the restriction away.
 	if req.ForceCommand != nil {
@@ -131,7 +130,7 @@ func (s *certificateService) UpdateCertificateAuthority(
 		params.SourceAddress = &list
 	}
 
-	// Only becoming the default moves it. Unsetting leaves none, which the enroll fallback and the UI handle.
+	// Only becoming the default moves it, so a workspace never ends up without one.
 	var result *db.SSHCA
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if result, err = q.UpdateCA(ctx, params); err != nil {
@@ -155,7 +154,26 @@ func (s *certificateService) DeleteCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.DeleteCertificateAuthorityRequest,
 ) (*nokkuv1.DeleteCertificateAuthorityResponse, error) {
-	if _, err := s.cfg.Conn.Tenant().DeleteCA(ctx, req.GetId()); err != nil {
+	// The lock keeps the CA from becoming the default between the check and the delete.
+	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		ca, err := q.GetCAForUpdate(ctx, req.GetId())
+		if err != nil {
+			return err
+		}
+		// Servers and enroll tokens without a CA of their own fall back to the default.
+		if ca.IsDefault {
+			return newError(connect.CodeFailedPrecondition, "make another certificate authority the default first")
+		}
+		_, err = q.DeleteCA(ctx, ca.ID)
+		return err
+	})
+	if db.IsRestrictViolation(err) {
+		return nil, newError(
+			connect.CodeFailedPrecondition,
+			"servers still use this certificate authority, move them first",
+		)
+	}
+	if err != nil {
 		return nil, err
 	}
 
@@ -172,7 +190,7 @@ func (s *certificateService) RolloverCertificateAuthority(
 		if err != nil {
 			return err
 		}
-		result, err = ssh.Rollover(ctx, q, ca, req.GetRevokePrevious())
+		result, err = ssh.Rollover(ctx, q, s.cfg.Keyset, ca, req.GetRevokePrevious())
 		return err
 	}); err != nil {
 		return nil, err
@@ -190,11 +208,17 @@ func (s *certificateService) SignSSHCertificate(
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
 	caller, _ := actor.PrincipalFromContext(ctx)
+	// A browser cookie must not turn into a certificate for any key it pastes. People sign through nk.
+	if caller.Kind == actor.KindUser {
+		return nil, newError(connect.CodePermissionDenied, "sign certificates with nk or a service account")
+	}
 
 	var ca *db.SSHCA
+	var signer gossh.Signer
 	var principals []string
 	// until is when the first grant in the certificate ends, nil when all of them are for good.
 	var until *time.Time
+	var daemonless bool
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		target, err := q.GetTarget(ctx, req.GetTargetId())
 		if err != nil {
@@ -208,42 +232,34 @@ func (s *certificateService) SignSSHCertificate(
 		if err != nil {
 			return err
 		}
-		if len(accounts) == 0 {
+		if len(accounts) == 0 || !accounts[0].UserOk {
 			return newError(connect.CodePermissionDenied, "you have no access to this server")
 		}
+		// A daemon that is not approved may still hold the principals of its last sync. It gets no certificates to match.
+		if !accounts[0].DaemonOk {
+			return newError(connect.CodeFailedPrecondition, "the daemon of this server is not approved")
+		}
+		daemonless = target.DaemonID == nil
 		for _, a := range accounts {
-			principals = append(principals, ssh.LoginPrincipal(caller.ID, target.ID, a.Username))
+			principals = append(principals, login.Principal(caller.ID, target.ID, a.Username))
+			// A server set up with nk sync has one fixed rule, it takes a certificate that names it and the account.
+			if daemonless {
+				principals = append(principals, login.ServerPrincipal(target.ID, a.Username))
+			}
 			if end := a.Until(); end != nil && (until == nil || end.Before(*until)) {
 				until = end
 			}
 		}
-		// A daemon that is not approved may still hold the principals of its last sync. It gets no certificates to match.
-		if target.DaemonID != nil {
-			daemon, err := q.GetDaemon(ctx, *target.DaemonID)
-			if err != nil {
-				return err
-			}
-			if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-				return newError(connect.CodeFailedPrecondition, "the daemon of this server is not approved")
-			}
+		if ca, err = q.GetCA(ctx, target.CaID); err != nil {
+			return err
 		}
-		if target.CaID == nil {
-			return newError(connect.CodeFailedPrecondition, "this server has no certificate authority")
-		}
-		if ca, err = q.GetCA(ctx, *target.CaID); err != nil {
+		if signer, err = ssh.CASigner(ctx, q, s.cfg.Keyset, ca.ID, gossh.UserCert); err != nil {
 			return err
 		}
 		return q.TouchAccessUsage(ctx, &db.TouchAccessUsageParams{TargetID: target.ID, SubjectID: caller.ID})
 	}); err != nil {
 		return nil, err
 	}
-	if !ca.IsActive {
-		return nil, newError(
-			connect.CodeFailedPrecondition,
-			"certificate authority is not active",
-		)
-	}
-
 	ttl := req.GetTtl().AsDuration()
 	if caller.Kind == actor.KindServiceAccount {
 		// The cap follows the token the account called with, not the account.
@@ -260,9 +276,14 @@ func (s *certificateService) SignSSHCertificate(
 			return nil, newError(connect.CodePermissionDenied, "you have no access to this server")
 		}
 	}
+	if daemonless {
+		// Nothing tells such a server about a revoke, the certificate running out is what ends the access.
+		ttl = min(ssh.UserTTL(ca, ttl), daemonlessCertTTL)
+	}
 
 	cert, err := ssh.SignCertificate(
 		ca,
+		signer,
 		req.GetPublicKey(),
 		principals,
 		fmt.Sprintf("nokku:login:%s:%s", caller.Kind, caller.ID),
@@ -270,7 +291,7 @@ func (s *certificateService) SignSSHCertificate(
 		gossh.UserCert,
 	)
 	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, err.Error())
+		return nil, err
 	}
 
 	expiry := ssh.TimeFromUnix(cert.ValidBefore)

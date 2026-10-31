@@ -1,19 +1,24 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"time"
 
 	"connectrpc.com/connect/v2"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/email"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// invitationService is the only way an invite becomes an account. The mailed link proves the address.
+// invitationService is the only way an invite becomes an account.
 type invitationService struct {
 	cfg *config.Config
 }
@@ -22,10 +27,7 @@ func (s *invitationService) GetInvitation(
 	ctx context.Context,
 	req *nokkuv1.GetInvitationRequest,
 ) (*nokkuv1.GetInvitationResponse, error) {
-	token, err := s.cfg.IAM.LookupInvite(ctx, req.GetToken())
-	if errors.Is(err, iam.ErrInviteSpent) {
-		return nil, errInviteInvalid
-	}
+	inv, err := s.cfg.IAM.LookupInvite(ctx, req.GetToken())
 	if err != nil {
 		return nil, err
 	}
@@ -36,33 +38,101 @@ func (s *invitationService) GetInvitation(
 	}
 	return &nokkuv1.GetInvitationResponse{
 		WorkspaceName: &ws.Name,
-		Role:          token.Role,
-		ExpiresAt:     db.SafeTimestamp(token.ExpiresAt),
+		Role:          inv.Role,
+		ExpiresAt:     db.SafeTimestamp(&inv.ExpiresAt),
+		Email:         &inv.Email,
 	}, nil
 }
 
-// AcceptInvitation mails a signup link. The account exists once it is used.
+// AcceptInvitation creates the account and signs it in, the way ConsumeMagicLink signs in.
 func (s *invitationService) AcceptInvitation(
 	ctx context.Context,
 	req *nokkuv1.AcceptInvitationRequest,
 ) (*nokkuv1.AcceptInvitationResponse, error) {
-	if !s.cfg.Email.HasSMTP() {
-		return nil, newError(connect.CodeUnimplemented, "this server sends no mail, so it takes no invitations")
+	ci, err := callInfo(ctx)
+	if err != nil {
+		return nil, err
 	}
-	err := s.cfg.IAM.RequestSignupLink(ctx, req.GetToken(), req.GetEmail(), req.GetName())
+	u, cookie, err := s.cfg.IAM.AcceptInvite(ctx, req.GetToken(), req.GetName())
 	switch {
-	case errors.Is(err, iam.ErrInviteSpent):
-		return nil, errInviteInvalid
 	case errors.Is(err, iam.ErrEmailTaken):
 		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists, sign in instead")
-	case errors.Is(err, iam.ErrEmailRejected):
-		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
-	case errors.Is(err, iam.ErrMailNotSent):
-		return nil, errMailNotSent
-	case errors.Is(err, iam.ErrSSORequired):
-		return nil, errSSORequired
 	case err != nil:
 		return nil, err
 	}
-	return &nokkuv1.AcceptInvitationResponse{}, nil
+	audit.SetTarget(ctx, u.ID)
+	setCookie(ci, cookie)
+	meta, _ := actor.RequestMetaFromContext(ctx)
+	if c := s.cfg.IAM.RememberDevice(ctx, meta.Header, meta.RemoteAddr, u); c != nil {
+		setCookie(ci, c)
+	}
+	return &nokkuv1.AcceptInvitationResponse{User: u.ToProto()}, nil
+}
+
+// CreateInvitation replaces an earlier invite of the address. The link comes back only when no mail goes out.
+func (s *invitationService) CreateInvitation(
+	ctx context.Context,
+	req *nokkuv1.CreateInvitationRequest,
+) (*nokkuv1.CreateInvitationResponse, error) {
+	role := cmp.Or(req.GetRole(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	if !db.CanAssign(callerRole(ctx), role) {
+		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
+	}
+	address := iam.NormalizeEmail(req.GetEmail())
+	audit.SetTarget(ctx, address)
+	audit.Set(ctx, "role", db.RoleLabel(role))
+	now := time.Now()
+	link, err := s.cfg.IAM.Invite(ctx, address, role)
+	switch {
+	case errors.Is(err, iam.ErrEmailTaken):
+		return nil, newError(connect.CodeAlreadyExists, "this address already has an account here")
+	case errors.Is(err, iam.ErrEmailRejected):
+		return nil, newError(connect.CodeInvalidArgument, "this email address cannot receive mail")
+	case errors.Is(err, email.ErrCooldown):
+		return nil, newError(connect.CodeResourceExhausted,
+			"an invite went to this address in the last 15 minutes, try again later")
+	case errors.Is(err, iam.ErrMailNotSent):
+		return nil, errMailNotSent
+	case err != nil:
+		return nil, err
+	}
+	out := &nokkuv1.CreateInvitationResponse{
+		Invitation: &nokkuv1.Invitation{
+			Email:     &address,
+			Role:      &role,
+			ExpiresAt: db.SafeTimestamp(new(now.Add(iam.InviteTTL))),
+			CreatedAt: db.SafeTimestamp(&now),
+		},
+	}
+	if link != "" {
+		out.Link = &link
+	}
+	return out, nil
+}
+
+func (s *invitationService) ListInvitations(
+	ctx context.Context,
+	_ *nokkuv1.ListInvitationsRequest,
+) (*nokkuv1.ListInvitationsResponse, error) {
+	rows, err := s.cfg.Conn.Tenant().ListInvites(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &nokkuv1.ListInvitationsResponse{Invitations: db.InvitesToProto(rows)}, nil
+}
+
+func (s *invitationService) DeleteInvitation(
+	ctx context.Context,
+	req *nokkuv1.DeleteInvitationRequest,
+) (*nokkuv1.DeleteInvitationResponse, error) {
+	address := iam.NormalizeEmail(req.GetEmail())
+	audit.SetTarget(ctx, address)
+	n, err := s.cfg.Conn.Tenant().DeleteInvite(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, newError(connect.CodeNotFound, "no pending invite for this address")
+	}
+	return &nokkuv1.DeleteInvitationResponse{}, nil
 }

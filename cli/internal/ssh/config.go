@@ -14,6 +14,8 @@ import (
 
 	"github.com/mizuchilabs/kata/fsutil"
 
+	"github.com/nokku-sh/nokku/internal/login"
+
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
@@ -21,10 +23,7 @@ import (
 const header = "# Managed by Nokku. nk regenerates this file, do not edit it.\n\n"
 
 // Held to what the core itself allows. Anything wider could claim a real host like github.com or reach the shell.
-var (
-	targetName  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
-	accountName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9._-]*$`)
-)
+var targetName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 func WriteConfigs(s *state.State) error {
 	config := renderSSHConfig(s, HostAliases(s), nkCommand())
@@ -162,7 +161,7 @@ func sameFile(a, b string) bool {
 }
 
 func usable(t state.Target) bool {
-	return len(t.Usernames) > 0 && targetName.MatchString(t.Name) && accountName.MatchString(t.Usernames[0])
+	return len(t.Usernames) > 0 && targetName.MatchString(t.Name) && login.ValidUsername(t.Usernames[0])
 }
 
 // Control characters are the only thing that can break out of a key line.

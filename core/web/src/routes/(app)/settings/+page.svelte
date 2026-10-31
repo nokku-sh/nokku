@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { users, util, workspace } from '#lib/api/workspaces.svelte.js';
 	import NokkuCaret from '#lib/assets/nokku_caret.svelte';
@@ -62,10 +63,11 @@
 	const remove = workspace.delete();
 
 	const nameValid = () => (model?.name.trim().length ?? 0) >= 3;
-	// Settings are left out on purpose, the server keeps what isn't sent.
 	const autoSave = useAutoSave(() =>
 		nameValid()
-			? update.mutateAsync({ name: model?.name.trim(), description: model?.description })
+			? draft.save(({ name, description }) =>
+					update.mutateAsync({ name: name?.trim(), description })
+				)
 			: Promise.reject(new Error('name too short'))
 	);
 	const save = () => can.own && nameValid() && autoSave.save();
@@ -208,15 +210,14 @@
 			<Card.Header>
 				<Card.Title><h2>Connect</h2></Card.Title>
 				<Card.Description>
-					What <code class="font-mono">nk</code>, <code class="font-mono">nokkud</code> and support
-					ask for{info.data?.caPin ? '. The CA pin lets them trust this server' : ''}
+					What <code class="font-mono">nk</code>, <code class="font-mono">nokkud</code> and support ask
+					for
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-3">
 				<DetailList
 					items={[
 						{ label: 'Address', value: baseUrl.data, mono: true, copy: true, wide: true },
-						{ label: 'CA pin', value: info.data?.caPin, mono: true, copy: true, wide: true },
 						{ label: 'Workspace ID', value: ws.data.id, mono: true, copy: true, wide: true },
 						{
 							label: 'Mode',
@@ -242,14 +243,16 @@
 						'Removes every user, team, target, certificate, recording and the audit log. Active subscriptions are canceled. Export the audit log first if you need a record.',
 					label: 'Delete',
 					onClick: () =>
-						confirm({
-							title: 'Delete workspace?',
-							description:
-								'This permanently deletes the workspace with its recordings and audit log, and cancels any active subscription. Enrolled servers keep what they last synced, so certificates already signed work until they expire. Remove nokkud from them afterwards. This cannot be undone.',
-							confirmText: 'Delete workspace',
-							typeToConfirm: ws.data?.name,
-							onConfirm: () => remove.mutateAsync({})
-						})
+						whenFresh(() =>
+							confirm({
+								title: 'Delete workspace?',
+								description:
+									'This permanently deletes the workspace with its recordings and audit log, and cancels any active subscription. Enrolled servers keep what they last synced, so certificates already signed work until they expire. Remove nokkud from them afterwards. This cannot be undone.',
+								confirmText: 'Delete workspace',
+								typeToConfirm: ws.data?.name,
+								onConfirm: () => remove.mutateAsync({})
+							})
+						)
 				}
 			]}
 		/>

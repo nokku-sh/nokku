@@ -9,6 +9,7 @@ import type { MessageInitShape } from '@bufbuild/protobuf';
 import { InvitationService } from '#lib/gen/nokku/v1/invitation_pb.js';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
+import { usePatch } from './mask';
 
 // The host picks the workspace, so none of these name one.
 export const workspace = {
@@ -33,7 +34,7 @@ export const workspace = {
 			}
 		),
 
-	update: () => useMutation(WorkspaceService.method.updateWorkspace),
+	update: () => usePatch(WorkspaceService.method.updateWorkspace),
 	delete: () =>
 		useMutation(WorkspaceService.method.deleteWorkspace, {
 			onSuccess: () => {
@@ -91,8 +92,20 @@ export const invite = {
 			() => ({ token: extract(token) }),
 			() => ({ enabled: !!extract(token), retry: false })
 		),
-	// Fails when the mail could not go out, so the page never claims a link is on its way.
-	accept: () => useMutation(InvitationService.method.acceptInvitation)
+	// Creates the account and signs in. Only this spends the invite, opening the page does not.
+	accept: () => useMutation(InvitationService.method.acceptInvitation),
+	// Admins only, so a sheet mounted for everyone asks only while it is open.
+	list: (enabled: MaybeGetter<boolean>) =>
+		useQuery(InvitationService.method.listInvitations, {}, () => ({
+			enabled: extract(enabled),
+			select: (res) => res.invitations
+		})),
+	// Fails when the mail could not go out, so the sheet never claims an invite is on its way.
+	create: () => useMutation(InvitationService.method.createInvitation),
+	remove: () =>
+		useMutation(InvitationService.method.deleteInvitation, {
+			onSuccess: () => toast.success('Invite revoked')
+		})
 };
 
 export type AuditFilter = MessageInitShape<typeof AuditLogFilterSchema>;

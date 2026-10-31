@@ -1,0 +1,219 @@
+CreateSession alice accepted deploy: error permission_denied "you don't have permission to do that"
+CreateSession alice accepted ops: error permission_denied "you don't have permission to do that"
+CreateSession alice accepted root: ticket
+CreateSession alice pending deploy: error permission_denied "you don't have permission to do that"
+CreateSession alice pending ops: error permission_denied "you don't have permission to do that"
+CreateSession alice pending root: error permission_denied "you don't have permission to do that"
+CreateSession alice rejected deploy: error permission_denied "you don't have permission to do that"
+CreateSession alice rejected ops: error permission_denied "you don't have permission to do that"
+CreateSession alice rejected root: error permission_denied "you don't have permission to do that"
+CreateSession bob accepted deploy: ticket
+CreateSession bob accepted ops: error permission_denied "you don't have permission to do that"
+CreateSession bob accepted root: error permission_denied "you don't have permission to do that"
+CreateSession bob pending deploy: error permission_denied "you don't have permission to do that"
+CreateSession bob pending ops: error permission_denied "you don't have permission to do that"
+CreateSession bob pending root: error permission_denied "you don't have permission to do that"
+CreateSession bob rejected deploy: error permission_denied "you don't have permission to do that"
+CreateSession bob rejected ops: error permission_denied "you don't have permission to do that"
+CreateSession bob rejected root: error permission_denied "you don't have permission to do that"
+CreateSession carol accepted deploy: error permission_denied "you don't have permission to do that"
+CreateSession carol accepted ops: ticket
+CreateSession carol accepted root: error permission_denied "you don't have permission to do that"
+CreateSession carol pending deploy: error permission_denied "you don't have permission to do that"
+CreateSession carol pending ops: error permission_denied "you don't have permission to do that"
+CreateSession carol pending root: error permission_denied "you don't have permission to do that"
+CreateSession carol rejected deploy: error permission_denied "you don't have permission to do that"
+CreateSession carol rejected ops: error permission_denied "you don't have permission to do that"
+CreateSession carol rejected root: error permission_denied "you don't have permission to do that"
+CreateSession ci accepted deploy: error permission_denied "only people can do this, not a service account"
+CreateSession ci accepted ops: error permission_denied "only people can do this, not a service account"
+CreateSession ci accepted root: error permission_denied "only people can do this, not a service account"
+CreateSession ci pending deploy: error permission_denied "only people can do this, not a service account"
+CreateSession ci pending ops: error permission_denied "only people can do this, not a service account"
+CreateSession ci pending root: error permission_denied "only people can do this, not a service account"
+CreateSession ci rejected deploy: error permission_denied "only people can do this, not a service account"
+CreateSession ci rejected ops: error permission_denied "only people can do this, not a service account"
+CreateSession ci rejected root: error permission_denied "only people can do this, not a service account"
+CreateSession dave accepted deploy: error unauthenticated "iam: no session token"
+CreateSession dave accepted ops: error unauthenticated "iam: no session token"
+CreateSession dave accepted root: error unauthenticated "iam: no session token"
+CreateSession dave pending deploy: error unauthenticated "iam: no session token"
+CreateSession dave pending ops: error unauthenticated "iam: no session token"
+CreateSession dave pending root: error unauthenticated "iam: no session token"
+CreateSession dave rejected deploy: error unauthenticated "iam: no session token"
+CreateSession dave rejected ops: error unauthenticated "iam: no session token"
+CreateSession dave rejected root: error unauthenticated "iam: no session token"
+CreateSession eve accepted deploy: error permission_denied "you don't have permission to do that"
+CreateSession eve accepted ops: error permission_denied "you don't have permission to do that"
+CreateSession eve accepted root: error permission_denied "you don't have permission to do that"
+CreateSession eve pending deploy: error permission_denied "you don't have permission to do that"
+CreateSession eve pending ops: error permission_denied "you don't have permission to do that"
+CreateSession eve pending root: error permission_denied "you don't have permission to do that"
+CreateSession eve rejected deploy: error permission_denied "you don't have permission to do that"
+CreateSession eve rejected ops: error permission_denied "you don't have permission to do that"
+CreateSession eve rejected root: error permission_denied "you don't have permission to do that"
+ExportAccessReport accepted deploy service_account ci: via -, active true, expires none, last certificate set, enforced true, stale false
+ExportAccessReport accepted deploy user bob: via staff, active true, expires none, last certificate set, enforced true, stale false
+ExportAccessReport accepted deploy user dave: via staff, active false, expires none, last certificate none, enforced false, stale false
+ExportAccessReport accepted ops user carol: via -, active true, expires set, last certificate set, enforced true, stale false
+ExportAccessReport accepted root user alice: via -, active true, expires none, last certificate set, enforced true, stale false
+ExportAccessReport accepted root user dave: via -, active false, expires none, last certificate none, enforced false, stale false
+ExportAccessReport daemonless deploy service_account ci: via -, active true, expires none, last certificate set, enforced true, stale false
+ExportAccessReport daemonless deploy user bob: via staff, active true, expires none, last certificate set, enforced true, stale false
+ExportAccessReport daemonless deploy user dave: via staff, active false, expires none, last certificate none, enforced false, stale false
+ExportAccessReport daemonless ops user carol: via -, active true, expires set, last certificate set, enforced true, stale false
+ExportAccessReport daemonless root user alice: via -, active true, expires none, last certificate set, enforced true, stale false
+ExportAccessReport daemonless root user dave: via -, active false, expires none, last certificate none, enforced false, stale false
+ExportAccessReport on community: error permission_denied "Access review report is not available on the Community plan"
+ExportAccessReport pending deploy service_account ci: via -, active true, expires none, last certificate none, enforced false, stale false
+ExportAccessReport pending deploy user bob: via staff, active true, expires none, last certificate none, enforced false, stale false
+ExportAccessReport pending deploy user dave: via staff, active false, expires none, last certificate none, enforced false, stale false
+ExportAccessReport pending ops user carol: via -, active true, expires set, last certificate none, enforced false, stale false
+ExportAccessReport pending root user alice: via -, active true, expires none, last certificate none, enforced false, stale false
+ExportAccessReport pending root user dave: via -, active false, expires none, last certificate none, enforced false, stale false
+ExportAccessReport rejected deploy service_account ci: via -, active true, expires none, last certificate none, enforced false, stale false
+ExportAccessReport rejected deploy user bob: via staff, active true, expires none, last certificate none, enforced false, stale false
+ExportAccessReport rejected deploy user dave: via staff, active false, expires none, last certificate none, enforced false, stale false
+ExportAccessReport rejected ops user carol: via -, active true, expires set, last certificate none, enforced false, stale false
+ExportAccessReport rejected root user alice: via -, active true, expires none, last certificate none, enforced false, stale false
+ExportAccessReport rejected root user dave: via -, active false, expires none, last certificate none, enforced false, stale false
+GetSubjectAccess by admin of alice accepted: accounts [root], expiring []
+GetSubjectAccess by admin of alice daemonless: accounts [root], expiring []
+GetSubjectAccess by admin of alice pending: accounts [root], expiring [], blocked daemon_not_approved
+GetSubjectAccess by admin of alice rejected: accounts [root], expiring [], blocked daemon_not_approved
+GetSubjectAccess by admin of alice: cas [ca-active]
+GetSubjectAccess by admin of alice: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by admin of bob accepted: accounts [deploy], expiring []
+GetSubjectAccess by admin of bob daemonless: accounts [deploy], expiring []
+GetSubjectAccess by admin of bob pending: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess by admin of bob rejected: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess by admin of bob: cas [ca-active]
+GetSubjectAccess by admin of bob: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by admin of carol accepted: accounts [ops], expiring [ops]
+GetSubjectAccess by admin of carol daemonless: accounts [ops], expiring [ops]
+GetSubjectAccess by admin of carol pending: accounts [ops], expiring [ops], blocked daemon_not_approved
+GetSubjectAccess by admin of carol rejected: accounts [ops], expiring [ops], blocked daemon_not_approved
+GetSubjectAccess by admin of carol: cas [ca-active]
+GetSubjectAccess by admin of carol: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by admin of ci accepted: accounts [deploy], expiring []
+GetSubjectAccess by admin of ci daemonless: accounts [deploy], expiring []
+GetSubjectAccess by admin of ci pending: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess by admin of ci rejected: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess by admin of ci: cas [ca-active]
+GetSubjectAccess by admin of ci: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by admin of dave accepted: accounts [deploy root], expiring [], blocked user_inactive
+GetSubjectAccess by admin of dave daemonless: accounts [deploy root], expiring [], blocked user_inactive
+GetSubjectAccess by admin of dave pending: accounts [deploy root], expiring [], blocked user_inactive
+GetSubjectAccess by admin of dave rejected: accounts [deploy root], expiring [], blocked user_inactive
+GetSubjectAccess by admin of dave: cas [ca-active]
+GetSubjectAccess by admin of dave: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by admin of eve: cas []
+GetSubjectAccess by admin of eve: daemons []
+GetSubjectAccess by admin of eve: no targets
+GetSubjectAccess by admin of nobody accepted: accounts [backup], expiring []
+GetSubjectAccess by admin of nobody daemonless: accounts [backup], expiring []
+GetSubjectAccess by admin of nobody pending: accounts [backup], expiring []
+GetSubjectAccess by admin of nobody rejected: accounts [backup], expiring []
+GetSubjectAccess by admin of nobody: cas [ca-active]
+GetSubjectAccess by admin of nobody: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by admin of staff accepted: accounts [deploy], expiring []
+GetSubjectAccess by admin of staff daemonless: accounts [deploy], expiring []
+GetSubjectAccess by admin of staff pending: accounts [deploy], expiring []
+GetSubjectAccess by admin of staff rejected: accounts [deploy], expiring []
+GetSubjectAccess by admin of staff: cas [ca-active]
+GetSubjectAccess by admin of staff: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by alice of alice accepted: accounts [root], expiring []
+GetSubjectAccess by alice of alice daemonless: accounts [root], expiring []
+GetSubjectAccess by alice of alice pending: accounts [root], expiring [], blocked daemon_not_approved
+GetSubjectAccess by alice of alice rejected: accounts [root], expiring [], blocked daemon_not_approved
+GetSubjectAccess by alice of alice: cas [ca-active]
+GetSubjectAccess by alice of alice: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by bob of bob accepted: accounts [deploy], expiring []
+GetSubjectAccess by bob of bob daemonless: accounts [deploy], expiring []
+GetSubjectAccess by bob of bob pending: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess by bob of bob rejected: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess by bob of bob: cas [ca-active]
+GetSubjectAccess by bob of bob: daemons [accepted-daemon pending-daemon rejected-daemon]
+GetSubjectAccess by bob of staff: error permission_denied "you don't have permission to do that"
+GetSubjectAccess of self as alice accepted: accounts [root], expiring []
+GetSubjectAccess of self as alice daemonless: accounts [root], expiring []
+GetSubjectAccess of self as alice pending: accounts [root], expiring [], blocked daemon_not_approved
+GetSubjectAccess of self as alice rejected: accounts [root], expiring [], blocked daemon_not_approved
+GetSubjectAccess of self as alice: cas [ca-active]
+GetSubjectAccess of self as alice: subject user alice
+GetSubjectAccess of self as bob accepted: accounts [deploy], expiring []
+GetSubjectAccess of self as bob daemonless: accounts [deploy], expiring []
+GetSubjectAccess of self as bob pending: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess of self as bob rejected: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess of self as bob: cas [ca-active]
+GetSubjectAccess of self as bob: subject user bob
+GetSubjectAccess of self as carol accepted: accounts [ops], expiring [ops]
+GetSubjectAccess of self as carol daemonless: accounts [ops], expiring [ops]
+GetSubjectAccess of self as carol pending: accounts [ops], expiring [ops], blocked daemon_not_approved
+GetSubjectAccess of self as carol rejected: accounts [ops], expiring [ops], blocked daemon_not_approved
+GetSubjectAccess of self as carol: cas [ca-active]
+GetSubjectAccess of self as carol: subject user carol
+GetSubjectAccess of self as ci accepted: accounts [deploy], expiring []
+GetSubjectAccess of self as ci daemonless: accounts [deploy], expiring []
+GetSubjectAccess of self as ci pending: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess of self as ci rejected: accounts [deploy], expiring [], blocked daemon_not_approved
+GetSubjectAccess of self as ci: cas [ca-active]
+GetSubjectAccess of self as ci: subject service account ci
+GetSubjectAccess of self as dave: error unauthenticated "iam: no session token"
+GetSubjectAccess of self as eve: cas []
+GetSubjectAccess of self as eve: no targets
+GetSubjectAccess of self as eve: subject user eve
+Relay alice accepted: error unavailable "daemon did not accept relay"
+Relay alice pending: error permission_denied "you don't have permission to do that"
+Relay alice rejected: error permission_denied "you don't have permission to do that"
+Relay bob accepted: error unavailable "daemon did not accept relay"
+Relay bob pending: error permission_denied "you don't have permission to do that"
+Relay bob rejected: error permission_denied "you don't have permission to do that"
+Relay carol accepted: error unavailable "daemon did not accept relay"
+Relay carol pending: error permission_denied "you don't have permission to do that"
+Relay carol rejected: error permission_denied "you don't have permission to do that"
+Relay ci accepted: error unavailable "daemon did not accept relay"
+Relay ci pending: error permission_denied "you don't have permission to do that"
+Relay ci rejected: error permission_denied "you don't have permission to do that"
+Relay dave accepted: error unauthenticated "iam: no session token"
+Relay dave pending: error unauthenticated "iam: no session token"
+Relay dave rejected: error unauthenticated "iam: no session token"
+Relay eve accepted: error permission_denied "you don't have permission to do that"
+Relay eve pending: error permission_denied "you don't have permission to do that"
+Relay eve rejected: error permission_denied "you don't have permission to do that"
+SignSSHCertificate alice accepted: principals [alice@accepted:root]
+SignSSHCertificate alice browser session accepted: error permission_denied "sign certificates with nk or a service account"
+SignSSHCertificate alice daemonless: principals [alice@daemonless:root daemonless:root]
+SignSSHCertificate alice pending: error failed_precondition "the daemon of this server is not approved"
+SignSSHCertificate alice rejected: error failed_precondition "the daemon of this server is not approved"
+SignSSHCertificate bob accepted: principals [bob@accepted:deploy]
+SignSSHCertificate bob daemonless: principals [bob@daemonless:deploy daemonless:deploy]
+SignSSHCertificate bob pending: error failed_precondition "the daemon of this server is not approved"
+SignSSHCertificate bob rejected: error failed_precondition "the daemon of this server is not approved"
+SignSSHCertificate carol accepted: principals [carol@accepted:ops]
+SignSSHCertificate carol daemonless: principals [carol@daemonless:ops daemonless:ops]
+SignSSHCertificate carol pending: error failed_precondition "the daemon of this server is not approved"
+SignSSHCertificate carol rejected: error failed_precondition "the daemon of this server is not approved"
+SignSSHCertificate ci accepted: principals [ci@accepted:deploy]
+SignSSHCertificate ci daemonless: principals [ci@daemonless:deploy daemonless:deploy]
+SignSSHCertificate ci pending: error failed_precondition "the daemon of this server is not approved"
+SignSSHCertificate ci rejected: error failed_precondition "the daemon of this server is not approved"
+SignSSHCertificate dave accepted: error unauthenticated "iam: no session token"
+SignSSHCertificate dave daemonless: error unauthenticated "iam: no session token"
+SignSSHCertificate dave pending: error unauthenticated "iam: no session token"
+SignSSHCertificate dave rejected: error unauthenticated "iam: no session token"
+SignSSHCertificate eve accepted: error permission_denied "you have no access to this server"
+SignSSHCertificate eve daemonless: error permission_denied "you have no access to this server"
+SignSSHCertificate eve pending: error permission_denied "you have no access to this server"
+SignSSHCertificate eve rejected: error permission_denied "you have no access to this server"
+SyncDaemon accepted deploy: [bob@accepted:deploy ci@accepted:deploy]
+SyncDaemon accepted ops: [carol@accepted:ops]
+SyncDaemon accepted root: [alice@accepted:root]
+SyncDaemon accepted: ca key ca-active.user-key, host ca key ca-active.host-key
+SyncDaemon accepted: status accepted
+SyncDaemon pending: ca key none, host ca key none
+SyncDaemon pending: no principals
+SyncDaemon pending: status pending
+SyncDaemon rejected: ca key none, host ca key none
+SyncDaemon rejected: no principals
+SyncDaemon rejected: status rejected

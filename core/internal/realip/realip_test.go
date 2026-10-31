@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// setProxies restores the empty, secure default after the test.
+// setProxies restores the default after the test.
 func setProxies(t *testing.T, proxies ...string) {
 	t.Helper()
 	if err := SetTrustedProxies(proxies); err != nil {
@@ -18,7 +18,7 @@ func setProxies(t *testing.T, proxies ...string) {
 	})
 }
 
-func TestGetRemoteIP_NoTrustedProxies(t *testing.T) {
+func TestGetRemoteIP_DefaultPublicPeer(t *testing.T) {
 	setProxies(t)
 
 	tests := []struct {
@@ -28,7 +28,7 @@ func TestGetRemoteIP_NoTrustedProxies(t *testing.T) {
 		want       string
 	}{
 		{
-			name: "headers are ignored without trusted proxies",
+			name: "a public peer cannot forward",
 			header: http.Header{
 				"X-Forwarded-For": {"203.0.113.9"},
 				"True-Client-Ip":  {"203.0.113.10"},
@@ -57,6 +57,38 @@ func TestGetRemoteIP_NoTrustedProxies(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Bucket(tt.header, tt.remoteAddr); got != tt.want {
 				t.Errorf("Bucket() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// Without a list the proxy on this machine or a private network is trusted for one hop, whatever the client's range.
+func TestGetRemoteIP_DefaultPrivatePeer(t *testing.T) {
+	setProxies(t)
+
+	tests := []struct {
+		name       string
+		forwarded  string
+		remoteAddr string
+		want       string
+	}{
+		{"a proxy in a docker network", "203.0.113.9", "172.28.0.3:5555", "203.0.113.9"},
+		{"a proxy on this machine", "203.0.113.9", "127.0.0.1:5555", "203.0.113.9"},
+		{"a proxy on a v6 private network", "203.0.113.9", "[fd00::3]:5555", "203.0.113.9"},
+		{"a client on the LAN is not skipped", "192.168.1.50", "10.42.0.7:5555", "192.168.1.50"},
+		{"a client-sent left entry is not the client", "198.51.100.99, 192.168.1.50", "10.42.0.7:5555", "192.168.1.50"},
+		{"no header is the peer", "", "10.42.0.7:5555", "10.42.0.7"},
+		{"carrier-grade NAT is not private", "203.0.113.9", "100.64.0.1:5555", "100.64.0.1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := http.Header{}
+			if tt.forwarded != "" {
+				header.Set("X-Forwarded-For", tt.forwarded)
+			}
+			if got := Client(header, tt.remoteAddr); got != tt.want {
+				t.Errorf("Client() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -186,7 +218,8 @@ func TestGetRemoteIP_HeaderIPCanonicalization(t *testing.T) {
 	}{
 		{"v4-mapped v6 normalized to v4", "::ffff:203.0.113.1", "203.0.113.1"},
 		{"v6 collapsed to /64", "2001:db8:abcd:1234:5678:9abc:def0:1234", "2001:db8:abcd:1234::"},
-		{"a port is not an IP, the peer wins", "203.0.113.1:8080", "10.1.2.3"},
+		{"a port is dropped", "203.0.113.1:8080", "203.0.113.1"},
+		{"a v6 address with a port", "[2001:db8:abcd:1234::1]:443", "2001:db8:abcd:1234::"},
 	}
 
 	for _, tt := range tests {

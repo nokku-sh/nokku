@@ -3,18 +3,20 @@ edition = "2023";
 package nokku.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
-// AuditStreamService sends audit events to a SIEM or a webhook as they happen. Each stream keeps a cursor, so a
-// destination that is down gets what it missed once it is back.
 service AuditStreamService {
   rpc ListAuditStreams(ListAuditStreamsRequest) returns (ListAuditStreamsResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateAuditStream(CreateAuditStreamRequest) returns (CreateAuditStreamResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      feature: "audit_streaming"
+    };
   }
   rpc UpdateAuditStream(UpdateAuditStreamRequest) returns (UpdateAuditStreamResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
@@ -22,9 +24,11 @@ service AuditStreamService {
   rpc DeleteAuditStream(DeleteAuditStreamRequest) returns (DeleteAuditStreamResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
-  // TestAuditStream sends one made up event and answers with what the destination said.
   rpc TestAuditStream(TestAuditStreamRequest) returns (TestAuditStreamResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      feature: "audit_streaming"
+    };
   }
 }
 
@@ -80,12 +84,21 @@ message UpdateAuditStreamRequest {
     prefix: "https://"
     max_len: 2048
   }];
-  // secret unset keeps the one stored.
   string secret = 3 [(buf.validate.field).string = {
     min_len: 8
     max_len: 1024
   }];
   bool enabled = 4;
+  google.protobuf.FieldMask update_mask = 5 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).field_mask = {
+      in: [
+        "url",
+        "secret",
+        "enabled"
+      ]
+    }
+  ];
 }
 message UpdateAuditStreamResponse {
   AuditStream stream = 1;

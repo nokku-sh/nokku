@@ -4,14 +4,8 @@ INSERT INTO
 VALUES
   (@token_hash, @user_id, @purpose, @expires_at, sqlc.narg('email'));
 
--- name: PutSignupToken :exec
-INSERT INTO
-  one_time_tokens (token_hash, purpose, expires_at, email, data)
-VALUES
-  (@token_hash, 'signup', @expires_at, @email, @data);
-
 -- name: ConsumeToken :one
--- Spends a token of a user. A signup token has none, see ConsumeSignupToken.
+-- Spends a token of a user. An invite has none, see ConsumeInvite.
 DELETE FROM one_time_tokens
 WHERE
   token_hash = @token_hash
@@ -20,16 +14,6 @@ WHERE
   AND expires_at > NOW()
 RETURNING
   user_id::UUID AS user_id;
-
--- name: ConsumeSignupToken :one
-DELETE FROM one_time_tokens
-WHERE
-  token_hash = @token_hash
-  AND purpose = 'signup'
-  AND expires_at > NOW()
-RETURNING
-  email::TEXT AS email,
-  data;
 
 -- name: ConsumeEmailToken :one
 DELETE FROM one_time_tokens
@@ -79,3 +63,51 @@ WHERE
 DELETE FROM one_time_tokens
 WHERE
   expires_at < @now;
+
+-- name: PutInvite :exec
+INSERT INTO
+  one_time_tokens (token_hash, purpose, email, role, expires_at)
+VALUES
+  (@token_hash, 'invite', @email, @role, @expires_at);
+
+-- name: GetInvite :one
+SELECT
+  email::TEXT AS email,
+  role,
+  expires_at
+FROM
+  one_time_tokens
+WHERE
+  token_hash = @token_hash
+  AND purpose = 'invite'
+  AND expires_at > NOW();
+
+-- name: ConsumeInvite :one
+DELETE FROM one_time_tokens
+WHERE
+  token_hash = @token_hash
+  AND purpose = 'invite'
+  AND expires_at > NOW()
+RETURNING
+  email::TEXT AS email,
+  role;
+
+-- name: ListInvites :many
+SELECT
+  email::TEXT AS email,
+  role,
+  expires_at,
+  created_at
+FROM
+  one_time_tokens
+WHERE
+  purpose = 'invite'
+  AND expires_at > NOW()
+ORDER BY
+  created_at DESC;
+
+-- name: DeleteInvite :execrows
+DELETE FROM one_time_tokens
+WHERE
+  purpose = 'invite'
+  AND email = @email::TEXT;

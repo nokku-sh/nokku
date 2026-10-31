@@ -70,6 +70,10 @@ func (s *serviceAccountService) UpdateServiceAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateServiceAccountRequest,
 ) (*nokkuv1.UpdateServiceAccountResponse, error) {
+	named, err := applyMask(req, req.GetUpdateMask())
+	if err != nil {
+		return nil, err
+	}
 	// No role keeps the one it has.
 	role := req.GetRole()
 	if role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED && !db.CanAssign(callerRole(ctx), role) {
@@ -81,14 +85,14 @@ func (s *serviceAccountService) UpdateServiceAccount(
 		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
 			return err
 		}
-		updatedID, err := q.UpdateServiceAccount(ctx, &db.UpdateServiceAccountParams{
+		params := &db.UpdateServiceAccountParams{
 			ServiceAccountID: req.GetId(),
 			Name:             req.Name,
 			Description:      req.Description,
 			Role:             role,
-			// An update replaces the tags. The query keeps the old ones for nil.
-			Tags: append([]string{}, req.GetTags()...),
-		})
+			Tags:             maskedList(named("tags"), req.GetTags()),
+		}
+		updatedID, err := q.UpdateServiceAccount(ctx, params)
 		if err != nil {
 			return err
 		}

@@ -21,7 +21,6 @@ var (
 
 type Connection struct {
 	AppPassword string `env:"NOKKU_DB_APP_PASSWORD"`
-	AutoMigrate bool   `env:"NOKKU_DB_AUTOMIGRATE"  envDefault:"true"`
 	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"20"`
 
 	// Pool serves request traffic as nokku_app, under RLS.
@@ -31,10 +30,33 @@ type Connection struct {
 	sysPool *pgxpool.Pool
 }
 
+// Migrate brings the schema up to date and sets the passwords of the two runtime roles. It is the only code that
+// logs in as the owner role (PGUSER), and only the server runs it.
+func Migrate(ctx context.Context) error {
+	c, config, err := settings()
+	if err != nil {
+		return err
+	}
+	return c.setupSchema(ctx, config.ConnConfig)
+}
+
+// NewConnection opens the two runtime pools and changes nothing in the database, so a command can run next to the
+// server.
 func NewConnection(ctx context.Context) (*Connection, error) {
-	c, err := env.ParseAs[Connection]()
+	c, config, err := settings()
 	if err != nil {
 		return nil, err
+	}
+	if err := c.createPools(ctx, config); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func settings() (*Connection, *pgxpool.Config, error) {
+	c, err := env.ParseAs[Connection]()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	defaults := map[string]string{
@@ -54,21 +76,13 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 
 	config, err := c.poolConfig()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// Falling back to PGPASSWORD keeps single-credential dev setups working.
 	if c.AppPassword == "" {
 		c.AppPassword = config.ConnConfig.Password
 	}
-	if c.AutoMigrate {
-		if err := c.setupSchema(ctx, config.ConnConfig); err != nil {
-			return nil, err
-		}
-	}
-	if err := c.createPools(ctx, config); err != nil {
-		return nil, err
-	}
-	return &c, nil
+	return &c, config, nil
 }
 
 func (c *Connection) poolConfig() (*pgxpool.Config, error) {

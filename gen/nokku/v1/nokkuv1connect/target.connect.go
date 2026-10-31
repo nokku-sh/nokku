@@ -37,14 +37,9 @@ const (
 	// TargetServiceGetSubjectAccessProcedure is the procedure name of the TargetService's
 	// GetSubjectAccess RPC.
 	TargetServiceGetSubjectAccessProcedure = "/nokku.v1.TargetService/GetSubjectAccess"
-	// TargetServiceGetMyAccessProcedure is the procedure name of the TargetService's GetMyAccess RPC.
-	TargetServiceGetMyAccessProcedure = "/nokku.v1.TargetService/GetMyAccess"
 	// TargetServiceGetTargetFiltersProcedure is the procedure name of the TargetService's
 	// GetTargetFilters RPC.
 	TargetServiceGetTargetFiltersProcedure = "/nokku.v1.TargetService/GetTargetFilters"
-	// TargetServiceGetTargetPrincipalsProcedure is the procedure name of the TargetService's
-	// GetTargetPrincipals RPC.
-	TargetServiceGetTargetPrincipalsProcedure = "/nokku.v1.TargetService/GetTargetPrincipals"
 	// TargetServiceSyncTargetUsersProcedure is the procedure name of the TargetService's
 	// SyncTargetUsers RPC.
 	TargetServiceSyncTargetUsersProcedure = "/nokku.v1.TargetService/SyncTargetUsers"
@@ -102,27 +97,11 @@ var (
 			IdempotencyLevel: connect.IdempotencyNoSideEffects,
 		}
 	})
-	targetServiceGetMyAccessSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetMyAccess"),
-			Procedure:        TargetServiceGetMyAccessProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
 	targetServiceGetTargetFiltersSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType:       connect.StreamTypeUnary,
 			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetTargetFilters"),
 			Procedure:        TargetServiceGetTargetFiltersProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
-	targetServiceGetTargetPrincipalsSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetTargetPrincipals"),
-			Procedure:        TargetServiceGetTargetPrincipalsProcedure,
 			IdempotencyLevel: connect.IdempotencyNoSideEffects,
 		}
 	})
@@ -159,9 +138,7 @@ type TargetServiceClient interface {
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
-	GetMyAccess(context.Context, *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
-	GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error)
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
 	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
@@ -181,9 +158,7 @@ type TargetServiceHandler interface {
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
-	GetMyAccess(context.Context, *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
-	GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error)
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
 	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
@@ -200,9 +175,7 @@ func RegisterTargetServiceHandler(server *connect.Server, svc TargetServiceHandl
 		connect.Method{Spec: targetServiceUpdateTargetSpec(), Handler: adapter.updateTarget},
 		connect.Method{Spec: targetServiceDeleteTargetSpec(), Handler: adapter.deleteTarget},
 		connect.Method{Spec: targetServiceGetSubjectAccessSpec(), Handler: adapter.getSubjectAccess},
-		connect.Method{Spec: targetServiceGetMyAccessSpec(), Handler: adapter.getMyAccess},
 		connect.Method{Spec: targetServiceGetTargetFiltersSpec(), Handler: adapter.getTargetFilters},
-		connect.Method{Spec: targetServiceGetTargetPrincipalsSpec(), Handler: adapter.getTargetPrincipals},
 		connect.Method{Spec: targetServiceSyncTargetUsersSpec(), Handler: adapter.syncTargetUsers},
 		connect.Method{Spec: targetServiceGetAccessGraphSpec(), Handler: adapter.getAccessGraph},
 		connect.Method{Spec: targetServiceListAccessGraphTargetsSpec(), Handler: adapter.listAccessGraphTargets},
@@ -236,16 +209,8 @@ func (UnimplementedTargetServiceHandler) GetSubjectAccess(context.Context, *v1.G
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetSubjectAccess is not implemented")
 }
 
-func (UnimplementedTargetServiceHandler) GetMyAccess(context.Context, *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetMyAccess is not implemented")
-}
-
 func (UnimplementedTargetServiceHandler) GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetTargetFilters is not implemented")
-}
-
-func (UnimplementedTargetServiceHandler) GetTargetPrincipals(context.Context, *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetTargetPrincipals is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error) {
@@ -312,25 +277,9 @@ func (c *targetServiceClient) GetSubjectAccess(ctx context.Context, req *v1.GetS
 	return &res, nil
 }
 
-func (c *targetServiceClient) GetMyAccess(ctx context.Context, req *v1.GetMyAccessRequest) (*v1.GetMyAccessResponse, error) {
-	var res v1.GetMyAccessResponse
-	if err := c.client.CallUnary(ctx, targetServiceGetMyAccessSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
 func (c *targetServiceClient) GetTargetFilters(ctx context.Context, req *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error) {
 	var res v1.GetTargetFiltersResponse
 	if err := c.client.CallUnary(ctx, targetServiceGetTargetFiltersSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *targetServiceClient) GetTargetPrincipals(ctx context.Context, req *v1.GetTargetPrincipalsRequest) (*v1.GetTargetPrincipalsResponse, error) {
-	var res v1.GetTargetPrincipalsResponse
-	if err := c.client.CallUnary(ctx, targetServiceGetTargetPrincipalsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -434,36 +383,12 @@ func (h targetServiceHandler) getSubjectAccess(ctx context.Context, _ connect.Sp
 	return stream.Send(res)
 }
 
-func (h targetServiceHandler) getMyAccess(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.GetMyAccessRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.GetMyAccess(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
 func (h targetServiceHandler) getTargetFilters(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.GetTargetFiltersRequest
 	if err := stream.Receive(&req); err != nil {
 		return err
 	}
 	res, err := h.svc.GetTargetFilters(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h targetServiceHandler) getTargetPrincipals(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.GetTargetPrincipalsRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.GetTargetPrincipals(ctx, &req)
 	if err != nil {
 		return err
 	}

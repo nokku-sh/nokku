@@ -6,6 +6,8 @@ import (
 
 	"connectrpc.com/connect/v2"
 
+	"github.com/nokku-sh/nokku/internal/dpop"
+
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -43,10 +45,10 @@ func inject(ctx context.Context, p actor.Principal, tok db.AccessToken) context.
 // which a database that is briefly away must not cause.
 func (a *authNInterceptor) fail(ctx context.Context, header *connect.Header, err error) error {
 	if !iam.IsCredentialError(err) {
-		return toConnectError(err)
+		return toConnectError(ctx, err)
 	}
 	// A fresh DPoP nonce, re-signing with it fixes these two.
-	if header != nil && (errors.Is(err, iam.ErrDPoPNonce) || errors.Is(err, iam.ErrDPoPRequired)) {
+	if header != nil && (errors.Is(err, dpop.ErrNonce) || errors.Is(err, iam.ErrDPoPRequired)) {
 		a.cfg.IAM.AdvertiseDPoPNonce(ctx, header)
 	}
 	return connect.NewError(connect.CodeUnauthenticated, err.Error()).WithCause(err)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,7 +19,7 @@ func TestServerMaxConnections(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { s.conns = make(chan struct{}, 1) })
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.conns = make(chan struct{}, 1) })
 	defer closeFn()
 
 	auth := userCert(t, ca, testPrincipal)
@@ -49,7 +48,7 @@ func TestServerMaxStartups(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { s.localStartups = make(chan struct{}, 1) })
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.localStartups = make(chan struct{}, 1) })
 	defer closeFn()
 
 	// A raw TCP connection that never completes the handshake holds the single pre-auth slot.
@@ -78,7 +77,7 @@ func TestServerMaxStartupsReleasedAfterHandshake(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	slots := make(chan struct{}, 1)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { s.localStartups = slots })
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.localStartups = slots })
 	defer closeFn()
 
 	auth := userCert(t, ca, testPrincipal)
@@ -99,7 +98,7 @@ func TestServerMaxChannels(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { s.maxChannels = 2 })
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.maxChannels = 2 })
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -134,7 +133,6 @@ func TestServerClientAlive(t *testing.T) {
 	addr, closeFn := startTestServerOpts(
 		t,
 		ca,
-		Options{},
 		func(s *Server) { s.aliveInterval = 100 * time.Millisecond },
 	)
 	defer closeFn()
@@ -172,7 +170,6 @@ func TestServerClientAliveSilent(t *testing.T) {
 	addr, closeFn := startTestServerOpts(
 		t,
 		ca,
-		Options{},
 		func(s *Server) { s.aliveInterval = 100 * time.Millisecond },
 	)
 	defer closeFn()
@@ -204,7 +201,7 @@ func TestServerClientAliveSilent(t *testing.T) {
 func TestServerBackgroundProcessReleasesConnection(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { s.conns = make(chan struct{}, 1) })
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.conns = make(chan struct{}, 1) })
 	defer closeFn()
 
 	auth := userCert(t, ca, testPrincipal)
@@ -233,7 +230,7 @@ func TestServerBackgroundProcessReleasesConnection(t *testing.T) {
 func TestServerBackgroundProcessOnPTYReleasesConnection(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { s.conns = make(chan struct{}, 1) })
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.conns = make(chan struct{}, 1) })
 	defer closeFn()
 
 	auth := userCert(t, ca, testPrincipal)
@@ -263,7 +260,7 @@ func TestStartupSlotsPerSource(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	s, err := New(Options{Principals: func(string) []string { return nil }})
+	s, err := New(nil)
 	must.NoError(err)
 
 	addr := func(ip string) net.Addr { return net.TCPAddrFromAddrPort(netip.MustParseAddrPort(ip)) }
@@ -306,17 +303,7 @@ func TestDropRevoked(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	var srv *Server
-	var revoked atomic.Bool
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) {
-		srv = s
-		allowed := s.principals
-		s.principals = func(username string) []string {
-			if revoked.Load() {
-				return nil
-			}
-			return allowed(username)
-		}
-	})
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { srv = s })
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -329,6 +316,7 @@ func TestDropRevoked(t *testing.T) {
 	}()
 
 	// A sync that changes nothing for this user leaves the connection alone.
+	srv.SetAccess(testAccess(t, ca))
 	srv.DropRevoked()
 	select {
 	case <-gone:
@@ -336,7 +324,9 @@ func TestDropRevoked(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 	}
 
-	revoked.Store(true)
+	revoked := testAccess(t, ca)
+	revoked.Principals = nil
+	srv.SetAccess(revoked)
 	srv.DropRevoked()
 	select {
 	case <-gone:
@@ -349,19 +339,13 @@ func TestDropRevoked(t *testing.T) {
 func TestRevokeDuringHandshake(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	var revoked atomic.Bool
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) {
-		allowed := s.principals
-		s.principals = func(username string) []string {
-			if revoked.Load() {
-				return nil
-			}
-			return allowed(username)
-		}
+	revoked := testAccess(t, ca)
+	revoked.Principals = nil
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) {
 		// The account lookup runs after the principal check, so this revoke lands mid-handshake.
 		lookup := s.lookupAccount
 		s.lookupAccount = func(name string) (*account, error) {
-			revoked.Store(true)
+			s.SetAccess(revoked)
 			s.DropRevoked()
 			return lookup(name)
 		}
@@ -387,7 +371,7 @@ func TestDropRevokedCA(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	var srv *Server
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { srv = s })
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { srv = s })
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -400,11 +384,13 @@ func TestDropRevokedCA(t *testing.T) {
 	}()
 
 	// A rollover that keeps the old key trusted leaves the connection alone.
-	next := string(ssh.MarshalAuthorizedKey(newTestCA(t).pub))
-	srv.SetTrust(next, []*nokkuv1.RetiredCAKey{{
+	next := newTestCA(t)
+	rolled := testAccess(t, next)
+	rolled.RetiredCAs = []*nokkuv1.RetiredCAKey{{
 		PublicKey:    new(string(ssh.MarshalAuthorizedKey(ca.pub))),
 		TrustedUntil: timestamppb.New(time.Now().Add(time.Hour)),
-	}})
+	}}
+	srv.SetAccess(rolled)
 	srv.DropRevoked()
 	select {
 	case <-gone:
@@ -412,7 +398,7 @@ func TestDropRevokedCA(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 	}
 
-	srv.SetTrust(next, nil)
+	srv.SetAccess(testAccess(t, next))
 	srv.DropRevoked()
 	select {
 	case <-gone:

@@ -3,22 +3,23 @@ package state
 import (
 	"log/slog"
 	"time"
-	"uuid"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/cli/internal/ui"
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/login"
+
+	"github.com/nokku-sh/nokku/cli/internal/ui"
 )
 
 // FromAccess drops ids that are no UUID, they end up in file paths and ssh files. Names lose their control characters.
-func FromAccess(res *nokkuv1.GetMyAccessResponse) Cache {
+func FromAccess(res *nokkuv1.GetSubjectAccessResponse) Cache {
 	var c Cache
 	switch subject := res.GetSubject().(type) {
-	case *nokkuv1.GetMyAccessResponse_User:
+	case *nokkuv1.GetSubjectAccessResponse_User:
 		u := subject.User
 		c.User = &User{ID: u.GetId(), Name: ui.PlainLine(u.GetName()), Email: ui.PlainLine(u.GetEmail())}
-	case *nokkuv1.GetMyAccessResponse_ServiceAccount:
+	case *nokkuv1.GetSubjectAccessResponse_ServiceAccount:
 		sa := subject.ServiceAccount
 		c.ServiceAccount = &ServiceAccount{ID: sa.GetId(), Name: ui.PlainLine(sa.GetName())}
 	}
@@ -54,9 +55,6 @@ func SSHCAs(cas []*nokkuv1.CertificateAuthority) []CA {
 			Default:       ca.GetIsDefault(),
 		}
 		// AsTime turns an unset timestamp into 1970, not the zero time.
-		if ca.GetRotatedAt() != nil {
-			entry.RotatedAt = ca.GetRotatedAt().AsTime()
-		}
 		if ca.GetPreviousTrustedUntil() != nil {
 			entry.PreviousPublicKey = ca.GetPreviousPublicKey()
 			entry.PreviousHostPublicKey = ca.GetPreviousHostPublicKey()
@@ -77,7 +75,6 @@ func MapTarget(t *nokkuv1.Target) Target {
 		Usernames:     plainAll(t.GetUsernames()),
 		Until:         untilAll(t.GetUsernameExpiresAt()),
 		HostPublicKey: t.GetHostPublicKey(),
-		Metadata:      t.GetMetadata(),
 	}
 }
 
@@ -99,15 +96,9 @@ func plainAll(values []string) []string {
 	return values
 }
 
-// ValidID takes only the canonical form, which is safe as a path segment and ssh token.
-func ValidID(id string) bool {
-	u, err := uuid.Parse(id)
-	return err == nil && u.String() == id
-}
-
 func validIDs(ids ...string) bool {
 	for _, id := range ids {
-		if !ValidID(id) {
+		if !login.ValidID(id) {
 			slog.Warn("ignoring core entry with an invalid id", "id", id)
 			return false
 		}

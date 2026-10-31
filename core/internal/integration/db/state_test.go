@@ -23,7 +23,7 @@ import (
 
 // stateFixture is one workspace where user u reaches account p on a daemon target directly and through team.
 type stateFixture struct {
-	ws, owner, u, team, daemon, target, account string
+	ws, owner, u, team, daemon, target, account, ca string
 }
 
 func newStateFixture(t *testing.T, c *conn) stateFixture {
@@ -36,6 +36,7 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		daemon:  uuid.NewV7().String(),
 		target:  uuid.NewV7().String(),
 		account: uuid.NewV7().String(),
+		ca:      uuid.NewV7().String(),
 	}
 	// The simple protocol substitutes arguments client-side, which allows several statements in one Exec.
 	_, err := c.sysPool.Exec(t.Context(), `
@@ -44,12 +45,15 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		VALUES ($2, $1, $2 || '@test', 5), ($3, $1, $3 || '@test', 2);
 		INSERT INTO teams (id, workspace_id, name) VALUES ($4, $1, 'team');
 		INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $3, $4);
+		INSERT INTO ssh_cas (id, workspace_id, name, public_key, host_public_key, is_default,
+			user_default_ttl, user_max_ttl, host_ttl)
+		VALUES ($8, $1, 'default', 'pub', 'host-pub', TRUE, '1 hour', '1 hour', '1 hour');
 		INSERT INTO daemons (id, workspace_id, name, status) VALUES ($5, $1, 'd', 2);
-		INSERT INTO targets (id, workspace_id, daemon_id, name) VALUES ($6, $1, $5, 't');
+		INSERT INTO targets (id, workspace_id, daemon_id, name, ca_id) VALUES ($6, $1, $5, 't', $8);
 		INSERT INTO target_accounts (id, workspace_id, target_id, username) VALUES ($7, $1, $6, 'deploy');
 		INSERT INTO grants (account_id, workspace_id, user_id) VALUES ($7, $1, $3);
 		INSERT INTO grants (account_id, workspace_id, team_id) VALUES ($7, $1, $4);
-	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.owner, f.u, f.team, f.daemon, f.target, f.account)
+	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.owner, f.u, f.team, f.daemon, f.target, f.account, f.ca)
 	if err != nil {
 		t.Fatalf("seed fixture: %v", err)
 	}
@@ -240,9 +244,9 @@ func TestStateVersionIgnoresHeartbeatWrites(t *testing.T) {
 
 	before := stateVersion(t, c, f.ws)
 	asOwner(t, c, f, func(q *db.Queries) error {
-		if err := q.UpdateDaemonMetadata(t.Context(), &db.UpdateDaemonMetadataParams{
+		if err := q.UpdateDaemonVersion(t.Context(), &db.UpdateDaemonVersionParams{
 			DaemonID: f.daemon,
-			Metadata: []byte(`{"host":"x"}`),
+			Version:  "1.0.0",
 		}); err != nil {
 			return err
 		}
@@ -308,7 +312,7 @@ func TestRecordingKeepsTheSubjectsName(t *testing.T) {
 	id := uuid.NewV7().String()
 	asOwner(t, c, f, func(q *db.Queries) error {
 		_, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
-			ID: id, DaemonID: f.daemon, Username: "deploy", SubjectID: &f.u, Key: crypto.EncryptedBytes("k"),
+			ID: id, DaemonID: f.daemon, Username: "deploy", SubjectID: &f.u, Key: []byte("k"),
 		})
 		if err != nil {
 			return err
@@ -428,11 +432,8 @@ func TestRedeemTokenOnce(t *testing.T) {
 	hash := crypto.HashedToken("h-" + id)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		_, err := q.CreateJoinToken(t.Context(), &db.CreateJoinTokenParams{
-			ID:        id,
-			Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE,
 			TokenHash: hash,
 			MaxUses:   new(int32(1)),
-			Role:      new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER),
 		})
 		return err
 	})
@@ -442,9 +443,7 @@ func TestRedeemTokenOnce(t *testing.T) {
 	var wg sync.WaitGroup
 	for range n {
 		wg.Go(func() {
-			_, err := c.Sys().RedeemJoinToken(t.Context(), &db.RedeemJoinTokenParams{
-				ID: id, Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE, TokenHash: hash,
-			})
+			_, err := c.Sys().RedeemJoinToken(t.Context(), hash)
 			if err == nil {
 				wins.Add(1)
 			} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -474,10 +473,10 @@ func TestSyncReportSkipsUnchangedRows(t *testing.T) {
 	}
 	report := func(endpoints []string) {
 		t.Helper()
-		if err := c.Sys().UpdateDaemonMetadata(t.Context(), &db.UpdateDaemonMetadataParams{
-			DaemonID: f.daemon, Metadata: []byte(`{"host": "a"}`),
+		if err := c.Sys().UpdateDaemonVersion(t.Context(), &db.UpdateDaemonVersionParams{
+			DaemonID: f.daemon, Version: "1.0.0",
 		}); err != nil {
-			t.Fatalf("report daemon metadata: %v", err)
+			t.Fatalf("report daemon version: %v", err)
 		}
 		if err := c.Sys().UpdateTargetReport(t.Context(), &db.UpdateTargetReportParams{
 			TargetID: f.target, Metadata: []byte(`{"os": "linux"}`), Endpoints: endpoints,

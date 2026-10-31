@@ -2,13 +2,11 @@ package daemon
 
 import (
 	"context"
-	"errors"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
 
@@ -107,7 +105,8 @@ func startTestSession(t *testing.T, p *Pool, srv *sshtest.Server, sessionID stri
 			SessionID:     sessionID,
 			Username:      "user",
 			UserID:        "u1",
-			CA:            srv.CA(t),
+			CA:            srv.CA(),
+			CASigner:      srv.CASigner(),
 			HostPrincipal: srv.HostPrincipal,
 		})
 		res <- result{s, err}
@@ -157,7 +156,8 @@ func TestPool_StartSession_EndsWithContext(t *testing.T) {
 		SessionID:     "web-ctx",
 		Username:      "user",
 		UserID:        "u1",
-		CA:            srv.CA(t),
+		CA:            srv.CA(),
+		CASigner:      srv.CASigner(),
 		HostPrincipal: srv.HostPrincipal,
 	})
 	if err != nil {
@@ -263,29 +263,6 @@ collect:
 	}
 }
 
-// A deactivated or missing CA must not mint web-session certificates, whatever the rest of the config says.
-func TestPool_StartSession_RejectsInactiveCA(t *testing.T) {
-	p := newTestPool(t)
-	cases := map[string]*db.SSHCA{
-		"missing":  nil,
-		"inactive": {},
-	}
-	for name, ca := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, err := p.StartSession(t.Context(), SessionConfig{
-				DaemonID:  "d1",
-				SessionID: "s1",
-				UserID:    "u1",
-				Username:  "root",
-				CA:        ca,
-			})
-			if !errors.Is(err, ErrCAInactive) {
-				t.Fatalf("StartSession err = %v, want ErrCAInactive", err)
-			}
-		})
-	}
-}
-
 // A CA the server does not trust fails the dial, and no slot or session is left behind.
 func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 	p := newTestPool(t)
@@ -295,6 +272,7 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 	c := testConn(t, p)
 	go serveRelayRequests(t, p, c, srv.Addr())
 
+	rogue, rogueSigner := sshtest.NewCA(t)
 	errCh := make(chan error, 1)
 	go func() {
 		_, err := p.StartSession(t.Context(), SessionConfig{
@@ -302,7 +280,8 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 			SessionID:     "web-2",
 			Username:      "user",
 			UserID:        "u1",
-			CA:            sshtest.NewCA(t),
+			CA:            rogue,
+			CASigner:      rogueSigner,
 			HostPrincipal: srv.HostPrincipal,
 		})
 		errCh <- err

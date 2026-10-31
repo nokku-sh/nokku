@@ -31,6 +31,11 @@ tasks:
     cmds:
       - go test -race -count=1 -cover ./...
 
+  smoke:
+    desc: Run the end-to-end smoke test, the real binaries against throwaway containers, needs Docker
+    cmds:
+      - cd core && go test -tags integration,smoke -count=1 -v -timeout 20m ./internal/integration/smoke/...
+
   lint:
     desc: Run go vet & lint on the whole repo
     cmds:

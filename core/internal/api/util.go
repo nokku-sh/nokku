@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"math"
 	"time"
 
@@ -40,7 +39,6 @@ func (s *utilService) GetInstanceInfo(
 ) (*nokkuv1.GetInstanceInfoResponse, error) {
 	op := s.cfg.Email.Operator
 	saas := s.cfg.SaaS
-	meta, _ := actor.RequestMetaFromContext(ctx)
 	return &nokkuv1.GetInstanceInfoResponse{
 		OperatorName: &op.Name,
 		SupportEmail: &op.SupportEmail,
@@ -50,7 +48,6 @@ func (s *utilService) GetInstanceInfo(
 		ImprintUrl:   &op.ImprintURL,
 		Mode:         new(s.cfg.Mode()),
 		Signup:       new(saas && actor.WorkspaceIDFromContext(ctx) == ""),
-		CaPin:        new(s.cfg.WebPKI.Pin(meta)),
 	}, nil
 }
 
@@ -86,7 +83,7 @@ func (s *utilService) Whoami(
 		if err != nil {
 			return nil, err
 		}
-		out.Daemon = d.ToProto()
+		out.Daemon = d.ToProto(s.cfg.Pool.IsConnected(d.ID))
 	case actor.KindSCIM:
 		// SCIM tokens never reach connect.
 	}
@@ -114,8 +111,7 @@ func (s *utilService) ListAuditLogs(
 
 	events, total, err := s.cfg.Audit.List(ctx, params)
 	if err != nil {
-		slog.Error("failed to list audit logs", "error", err)
-		return nil, errInternal
+		return nil, err
 	}
 	days := s.cfg.Entitlements.Resolve(ctx, actor.WorkspaceIDFromContext(ctx)).AuditRetentionDays
 	retention := int32(min(days, math.MaxInt32)) //nolint:gosec // clamped to int32 just before
@@ -131,8 +127,7 @@ func (s *utilService) ListMyActivity(
 	params.Limit, params.Offset = req.GetLimit(), req.GetOffset()
 	events, total, err := s.cfg.Audit.List(ctx, params)
 	if err != nil {
-		slog.Error("failed to list activity", "error", err)
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.ListMyActivityResponse{Logs: eventLogs(events), Total: &total}, nil
 }
@@ -155,8 +150,7 @@ func (s *utilService) ExportAuditLogs(
 		return nil, newError(connect.CodeFailedPrecondition, err.Error())
 	}
 	if err != nil {
-		slog.Error("failed to export audit logs", "error", err)
-		return nil, errInternal
+		return nil, err
 	}
 
 	ext := "json"
@@ -180,8 +174,7 @@ func (s *utilService) ExportAccessReport(
 	}
 	data, err := access.Report(rows, req.GetFormat())
 	if err != nil {
-		slog.Error("failed to render the access report", "error", err)
-		return nil, errInternal
+		return nil, err
 	}
 
 	ext, contentType := "json", "application/json"

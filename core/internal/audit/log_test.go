@@ -4,31 +4,39 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-func TestNewEventSkipsReads(t *testing.T) {
+func TestRecordsSkipsReadsAndQuietCalls(t *testing.T) {
 	tests := []struct {
-		procedure string
-		audited   bool
+		method  protoreflect.FullName
+		audited bool
 	}{
-		{"/nokku.v1.TargetService/DeleteTarget", true},
-		{"/nokku.v1.CertificateService/SignSSHCertificate", true},
-		{"/nokku.v1.FutureService/FrobnicateThing", true},
-		{"/nokku.v1.TargetService/GetTarget", false},
-		{"/nokku.v1.TargetService/ListTargets", false},
-		{"/nokku.v1.TargetService/SyncTargetUsers", false},
-		{"/nokku.v1.DaemonControlService/Connect", false},
+		{"nokku.v1.TargetService.DeleteTarget", true},
+		{"nokku.v1.CertificateService.SignSSHCertificate", true},
+		{"nokku.v1.TargetService.SyncTargetUsers", true},
+		{"nokku.v1.DaemonControlService.UploadRecording", true},
+		{"nokku.v1.TargetService.GetTarget", false},
+		{"nokku.v1.TargetService.ListTargets", false},
+		{"nokku.v1.RecordingService.GetRecording", false},
+		{"nokku.v1.DaemonControlService.SyncDaemon", false},
+		{"nokku.v1.DaemonControlService.Connect", false},
+		{"nokku.v1.DaemonService.Relay", false},
 	}
 	for _, tt := range tests {
-		e := newEvent(tt.procedure)
-		if (e != nil) != tt.audited {
-			t.Errorf("%s audited = %v, want %v", tt.procedure, e != nil, tt.audited)
+		d, err := protoregistry.GlobalFiles.FindDescriptorByName(tt.method)
+		if err != nil {
+			t.Fatalf("%s: %v", tt.method, err)
+		}
+		if got := Records(d); got != tt.audited {
+			t.Errorf("%s audited = %v, want %v", tt.method, got, tt.audited)
 		}
 	}
-	if e := newEvent("/nokku.v1.TargetService/DeleteTarget"); e.Action != "DeleteTarget" {
-		t.Errorf("action = %q, want DeleteTarget", e.Action)
+	if !Records(nil) {
+		t.Error("a call without a schema was skipped")
 	}
 }
 

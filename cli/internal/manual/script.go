@@ -2,8 +2,9 @@ package manual
 
 import (
 	"fmt"
-	"slices"
 	"strings"
+
+	"github.com/nokku-sh/nokku/internal/login"
 )
 
 const (
@@ -18,9 +19,11 @@ const (
 )
 
 // systemd calls the unit sshd on RHEL and ssh on Debian, the pid file covers hosts without systemd.
-const reloadSSHD = `if systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null ||
+const reloadSSHD = `nk_reloaded=''
+if systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null ||
   { [ -f /run/sshd.pid ] && kill -HUP "$(cat /run/sshd.pid)"; } ||
   { [ -f /var/run/sshd.pid ] && kill -HUP "$(cat /var/run/sshd.pid)"; }; then
+  nk_reloaded=1
   echo '` + reloadMarker + `'
 fi
 `
@@ -44,9 +47,9 @@ if [ -f ` + caPath + ` ]; then
   rm -f ` + caPath + `
   echo "removed   ` + caPath + `"
 fi
-if [ -d ` + principalsDir + ` ]; then
-  rm -rf ` + principalsDir + `
-  echo "removed   ` + principalsDir + `"
+if [ -d ` + oldPrincipalsDir + ` ]; then
+  rm -rf ` + oldPrincipalsDir + `
+  echo "removed   ` + oldPrincipalsDir + `"
 fi
 ` + reloadSSHD
 
@@ -58,28 +61,25 @@ type File struct {
 
 type Plan struct {
 	Files []File
-	// Stale are principals files whose account no longer exists.
-	Stale []string
+	// targetID is what the drop-in names, a placeholder before the target exists.
+	targetID string
 }
 
-// NewPlan gives an account without grants an empty file, so a revoked grant denies by default.
-func NewPlan(caKey string, grants map[string][]string, h Host) Plan {
-	p := Plan{Files: []File{
-		{Path: caPath, Content: strings.TrimSpace(caKey) + "\n"},
-		{
-			Path:    dropInPath,
-			Content: "TrustedUserCAKeys " + caPath + "\nAuthorizedPrincipalsFile " + principalsDir + "/%u\n",
-		},
-	}}
-	for _, name := range h.Accounts {
-		p.Files = append(p.Files, File{Path: principalsDir + "/" + name, Content: renderPrincipals(grants[name])})
-	}
-	for _, name := range h.Principals {
-		if safeName(name) && !slices.Contains(h.Accounts, name) {
-			p.Stale = append(p.Stale, principalsDir+"/"+name)
+// NewPlan writes the CA and a drop-in that takes the certificates the core signs for this server. An empty
+// targetID is a server Nokku does not know yet, which only a dry run shows.
+func NewPlan(caKey, targetID string) (Plan, error) {
+	shown := "<target-id>"
+	if targetID != "" {
+		// The id lands in sshd_config, where a line break would add a directive.
+		if !login.ValidID(targetID) {
+			return Plan{}, fmt.Errorf("the core sent an unusable target id %q, nothing was written", targetID)
 		}
+		shown = targetID
 	}
-	return p
+	return Plan{targetID: shown, Files: []File{
+		{Path: caPath, Content: strings.TrimSpace(caKey) + "\n"},
+		{Path: dropInPath, Content: "TrustedUserCAKeys " + caPath + "\n" + login.PrincipalsCommand(shown)},
+	}}, nil
 }
 
 // Script refuses a host with a broken sshd config, rolls back on any exit before sshd accepts the result, then reloads.
@@ -87,7 +87,7 @@ func (p Plan) Script() string {
 	var b strings.Builder
 	b.WriteString("set -e\n" + requireRoot)
 	b.WriteString("sshd -t || { echo 'the sshd config on this host is already invalid, fix it first' >&2; exit 1; }\n")
-	fmt.Fprintf(&b, "mkdir -p %s %s\nchmod 0755 %s\n", q(principalsDir), q(dropInDir), q(principalsDir))
+	fmt.Fprintf(&b, "mkdir -p %s\n", q(dropInDir))
 
 	paths := make([]string, len(p.Files))
 	for i, f := range p.Files {
@@ -123,16 +123,23 @@ func (p Plan) Script() string {
 	b.WriteString("  echo 'sshd rejected the new config, every file was rolled back' >&2\n  exit 1\nfi\n")
 	b.WriteString(clearTraps + "\n")
 	fmt.Fprintf(&b, "for f in %s; do rm -f \"$f.nokku-bak\"; done\n", strings.Join(paths, " "))
-	for _, path := range p.Stale {
-		fmt.Fprintf(&b, "rm -f %s\necho \"removed   %s\"\n", q(path), path)
-	}
 
 	b.WriteString(reloadSSHD)
+	// A running sshd may still read the old files, so they go once it has reloaded without them.
+	fmt.Fprintf(
+		&b,
+		"if [ -n \"$nk_reloaded\" ] && [ -d %[1]s ]; then\n  rm -rf %[1]s\n  echo \"removed   %[2]s\"\nfi\n",
+		q(oldPrincipalsDir),
+		oldPrincipalsDir,
+	)
 
-	// A reload does not prove sshd read the drop-in. A config without the Include line ignores it.
+	// A reload does not prove sshd read the drop-in. A config without the Include line ignores it. sshd -T prints
+	// each setting as a lowercase keyword and its value.
+	command, _, _ := strings.Cut(login.PrincipalsCommand(p.targetID), "\n")
+	keyword, value, _ := strings.Cut(command, " ")
 	fmt.Fprintf(&b, "nk_cfg=$(sshd -T 2>/dev/null || true)\n")
 	fmt.Fprintf(&b, "if echo \"$nk_cfg\" | grep -qi %s && echo \"$nk_cfg\" | grep -qi %s; then\n",
-		q("^trustedusercakeys "+caPath), q("^authorizedprincipalsfile "+principalsDir+"/%u"))
+		q("^trustedusercakeys "+caPath), q("^"+strings.ToLower(keyword)+" "+value))
 	fmt.Fprintf(&b, "  echo '%s'\nfi\n", verifyMarker)
 	return b.String()
 }

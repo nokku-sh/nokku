@@ -243,7 +243,7 @@ func userNameFilter(v *scimfilter.Validator) *string {
 	if !ok {
 		return nil
 	}
-	return new(normalizeEmail(s))
+	return new(NormalizeEmail(s))
 }
 
 func userResource(u *db.User) scim.Resource {
@@ -269,7 +269,7 @@ func userResource(u *db.User) scim.Resource {
 
 func scimEmail(attrs scim.ResourceAttributes) string {
 	for _, v := range []any{attrs["emails"], attrs["userName"]} {
-		if email := normalizeEmail(scimEmailValue(v)); strings.Contains(email, "@") {
+		if email := NormalizeEmail(scimEmailValue(v)); strings.Contains(email, "@") {
 			return email
 		}
 	}
@@ -303,7 +303,7 @@ func scimPatchedLogin(opName string, expr filter.Expression, value any) string {
 		if !byFilter && !scimAttrBool(m["primary"], false) && m["type"] != "work" {
 			continue
 		}
-		if s := normalizeEmail(scimAttrString(m["value"])); strings.Contains(s, "@") {
+		if s := NormalizeEmail(scimAttrString(m["value"])); strings.Contains(s, "@") {
 			return s
 		}
 	}

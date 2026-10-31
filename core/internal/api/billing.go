@@ -92,8 +92,7 @@ func (s *billingService) CreateCheckout(
 		)
 	}
 	if err != nil {
-		slog.Error("failed to create checkout", "error", err)
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.CreateCheckoutResponse{
 		Url: &url,
@@ -110,7 +109,7 @@ func (s *billingService) CreatePortal(
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	url, err := s.cfg.Billing.Portal(ctx, ws)
 	if err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.CreatePortalResponse{
 		Url: &url,
@@ -130,7 +129,7 @@ func (s *billingService) CancelSubscription(
 		req.GetImmediate(),
 		req.GetReason(),
 	); err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.CancelSubscriptionResponse{}, nil
 }
@@ -176,8 +175,7 @@ func (s *billingService) ActivateLicense(
 		errors.Is(err, entitlement.ErrLicenseUnsupported):
 		return nil, newError(connect.CodeFailedPrecondition, err.Error())
 	case err != nil:
-		slog.Error("failed to activate license", "error", err)
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.ActivateLicenseResponse{}, nil
 }

@@ -13,14 +13,13 @@ import (
 func TestDashboardCounts(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	seenAfter := time.Now().Add(-db.DaemonOnlineWindow)
 
 	// A second workspace, its rows must not show up in the counts.
 	newStateFixture(t, c)
-	counts := func() (got *db.DashboardCountsRow) {
+	counts := func(connected ...string) (got *db.DashboardCountsRow) {
 		t.Helper()
 		asOwner(t, c, f, func(q *db.Queries) (err error) {
-			got, err = q.DashboardCounts(t.Context(), seenAfter)
+			got, err = q.DashboardCounts(t.Context(), connected)
 			return err
 		})
 		return got
@@ -31,8 +30,7 @@ func TestDashboardCounts(t *testing.T) {
 		t.Fatalf("offline daemon: got %+v", got)
 	}
 
-	touchDaemon(t, c, f.daemon, time.Now())
-	if got = counts(); got.TargetsOnline != 1 {
+	if got = counts(f.daemon); got.TargetsOnline != 1 {
 		t.Errorf("online daemon: targets online = %d, want 1", got.TargetsOnline)
 	}
 }
@@ -50,27 +48,72 @@ func TestListOpenRecordings(t *testing.T) {
 				return err
 			}
 		}
-		_, err := q.SetRecordingComplete(t.Context(), &db.SetRecordingCompleteParams{ID: closed, Complete: true})
+		_, err := q.FinishRecordingUpload(t.Context(), &db.FinishRecordingUploadParams{
+			ID: closed, Complete: true, EndedAt: new(time.Now()),
+		})
 		return err
 	})
-	seenAfter := time.Now().Add(-db.DaemonOnlineWindow)
-	list := func() (rows []*db.ListOpenRecordingsRow) {
+	list := func(connected ...string) (rows []*db.ListOpenRecordingsRow) {
 		t.Helper()
 		asOwner(t, c, f, func(q *db.Queries) (err error) {
-			rows, err = q.ListOpenRecordings(t.Context(), seenAfter)
+			rows, err = q.ListOpenRecordings(t.Context(), connected)
 			return err
 		})
 		return rows
 	}
 
-	// A daemon that stopped reporting may have died mid session.
+	// A daemon that is not connected may have died mid session.
 	if rows := list(); len(rows) != 0 {
 		t.Fatalf("offline daemon: got %d open recordings, want 0", len(rows))
 	}
 
-	touchDaemon(t, c, f.daemon, time.Now())
-	if rows := list(); len(rows) != 1 || rows[0].ID != open || rows[0].DaemonName != "d" {
+	if rows := list(f.daemon); len(rows) != 1 || rows[0].ID != open || rows[0].DaemonName != "d" {
 		t.Errorf("online daemon: got %+v, want only %s on d", rows, open)
+	}
+}
+
+// The recordings page calls a session live by the same rule as the dashboard.
+func TestListRecordingsMarksWhatIsLive(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	running, ended, stale := uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String()
+	asOwner(t, c, f, func(q *db.Queries) error {
+		for _, id := range []string{running, ended, stale} {
+			if _, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
+				ID: id, DaemonID: f.daemon, Username: "deploy", Key: []byte("key"),
+			}); err != nil {
+				return err
+			}
+		}
+		_, err := q.FinishRecordingUpload(t.Context(), &db.FinishRecordingUploadParams{
+			ID: ended, EndedAt: new(time.Now()),
+		})
+		return err
+	})
+	if _, err := c.sysPool.Exec(t.Context(),
+		`UPDATE recordings SET started_at = NOW() - INTERVAL '25 hours' WHERE id = $1`, stale); err != nil {
+		t.Fatalf("age a recording: %v", err)
+	}
+	live := func(connected ...string) map[string]bool {
+		t.Helper()
+		got := map[string]bool{}
+		asOwner(t, c, f, func(q *db.Queries) error {
+			rows, err := q.ListRecordings(t.Context(), &db.ListRecordingsParams{
+				Connected: connected, Limit: new(int32(10)), Offset: new(int32(0)),
+			})
+			for _, row := range rows {
+				got[row.Recording.ID] = row.Live
+			}
+			return err
+		})
+		return got
+	}
+
+	if got := live(); got[running] || got[ended] || got[stale] {
+		t.Errorf("offline daemon: got %v, want nothing live", got)
+	}
+	if got := live(f.daemon); !got[running] || got[ended] || got[stale] {
+		t.Errorf("online daemon: got %v, want only %s", got, running)
 	}
 }
 
@@ -78,7 +121,7 @@ func TestAuditActivityByHour(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 	for _, ok := range []bool{true, true, false} {
-		if err := c.Sys().InsertAuditLog(t.Context(), &db.InsertAuditLogParams{
+		if err := c.Tenant().InsertAuditLog(pinned(t, f.ws), &db.InsertAuditLogParams{
 			WorkspaceID: f.ws,
 			ActorID:     f.owner,
 			ActorKind:   "user",
@@ -102,13 +145,6 @@ func TestAuditActivityByHour(t *testing.T) {
 	}
 	if events != 3 || failures != 1 {
 		t.Errorf("got %d events and %d failures, want 3 and 1", events, failures)
-	}
-}
-
-func touchDaemon(t *testing.T, c *conn, id string, at time.Time) {
-	t.Helper()
-	if _, err := c.sysPool.Exec(t.Context(), `UPDATE daemons SET last_seen_at = $2 WHERE id = $1`, id, at); err != nil {
-		t.Fatalf("touch daemon: %v", err)
 	}
 }
 

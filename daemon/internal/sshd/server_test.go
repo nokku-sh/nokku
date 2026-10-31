@@ -3,6 +3,8 @@ package sshd
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"io"
+	"log/slog"
 	"maps"
 	"net"
 	"os"
@@ -17,7 +19,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/daemon/internal/paths"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
@@ -86,30 +87,15 @@ func userCertOpts(
 // The default principals allow testPrincipal for the current user only.
 func startTestServer(t *testing.T, ca testCA) (addr string, closeFn func()) {
 	t.Helper()
-	return startTestServerOpts(t, ca, Options{})
+	return startTestServerOpts(t, ca)
 }
 
-func startTestServerOpts(
-	t *testing.T,
-	ca testCA,
-	extra Options,
-	tweaks ...func(*Server),
-) (addr string, closeFn func()) {
+func startTestServerOpts(t *testing.T, ca testCA, tweaks ...func(*Server)) (addr string, closeFn func()) {
 	t.Helper()
-	cur, err := user.Current()
-	require.NoError(t, err, "current user")
-	principals := func(username string) []string {
-		if username == cur.Username {
-			return []string{testPrincipal}
-		}
-		return nil
-	}
-
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	extra.Principals = principals
-	srv, err := New(extra)
+	srv, err := New(nil)
 	require.NoError(t, err, "new server")
-	srv.SetTrust(string(ssh.MarshalAuthorizedKey(ca.pub)), nil)
+	srv.SetAccess(testAccess(t, ca))
 	for _, tweak := range tweaks {
 		tweak(srv)
 	}
@@ -117,6 +103,30 @@ func startTestServerOpts(
 	require.NoError(t, err, "listen")
 	go srv.Serve(t.Context(), l)
 	return l.Addr().String(), func() { _ = l.Close() }
+}
+
+// testAccess trusts ca and lets testPrincipal log in as the current user. Every policy switch is off.
+func testAccess(t *testing.T, ca testCA) *state.Access {
+	t.Helper()
+	off := new(false)
+	return &state.Access{
+		Principals:   map[string][]string{currentUser(t): {testPrincipal}},
+		CA:           string(ssh.MarshalAuthorizedKey(ca.pub)),
+		DaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: off, AllowForwarding: off, AllowAgentForwarding: off},
+	}
+}
+
+func withLog(log *slog.Logger) func(*Server) {
+	return func(s *Server) { s.log = log }
+}
+
+// withPolicy turns on only the switches of p. A config from the core leaves the unset ones on.
+func withPolicy(p Policy) func(*Server) {
+	return func(s *Server) {
+		a := *s.access.Load()
+		a.policy = p
+		s.access.Store(&a)
+	}
 }
 
 func dial(t *testing.T, addr, username string, auth ssh.AuthMethod) (*ssh.Client, error) {
@@ -266,13 +276,10 @@ func TestServerDeniesCertificateOfAnotherServerOrAccount(t *testing.T) {
 	ca := newTestCA(t)
 	cur := currentUser(t)
 	here := "subject@this-server:" + cur
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) {
-		s.principals = func(username string) []string {
-			if username == cur {
-				return []string{here}
-			}
-			return nil
-		}
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) {
+		a := testAccess(t, ca)
+		a.Principals = map[string][]string{cur: {here}}
+		s.SetAccess(a)
 	})
 	defer closeFn()
 
@@ -317,86 +324,36 @@ func currentUser(t *testing.T) string {
 	return cur.Username
 }
 
-// If the host key changed, every known_hosts entry would break on daemon restart.
-func TestHostKeysStable(t *testing.T) {
-	is := assert.New(t)
-	must := require.New(t)
-	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-
-	s1, c1, err := loadHostKey()
-	must.NoError(err, "load host key")
-	defer c1.Close()
-	first := s1.PublicKey().Marshal()
-
-	s2, c2, err := loadHostKey()
-	must.NoError(err, "reload host key")
-	defer c2.Close()
-	second := s2.PublicKey().Marshal()
-	is.Equal(first, second)
-}
-
-func TestHostKeysDropStaleCert(t *testing.T) {
-	must := require.New(t)
-	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-
-	// Seed a public key for a different identity plus a certificate for it.
-	otherPub, _, err := ed25519.GenerateKey(rand.Reader)
-	must.NoError(err, "generate other key")
-	sshPub, err := ssh.NewPublicKey(otherPub)
-	must.NoError(err, "encode other key")
-	must.NoError(os.WriteFile(
-		paths.HostKeyPub(), ssh.MarshalAuthorizedKey(sshPub), 0o644,
-	), "write stale public key")
-	must.NoError(os.WriteFile(paths.HostKeyCert(), []byte("stale"), 0o644), "write stale cert")
-
-	_, closer, err := loadHostKey()
-	must.NoError(err, "load host key")
-	defer closer.Close()
-
-	_, err = os.Stat(paths.HostKeyCert())
-	must.ErrorIs(err, os.ErrNotExist, "certificate for a previous identity must be dropped")
-}
-
 func TestNewWithoutTrustedCA(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(Options{
-		Principals: func(string) []string {
-			return nil
-		},
-	})
+	srv, err := New(nil)
 	must.NoError(err, "expected server to start without a trusted CA")
-	is.Empty(srv.trustedCAs)
+	is.Empty(srv.access.Load().ca)
+	is.Empty(srv.access.Load().retired)
 }
 
 func TestServerLivePrincipals(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	cur, err := user.Current()
-	require.NoError(t, err, "current user")
 
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	cache := state.NewCache()
-	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(Options{
-		Principals: func(username string) []string {
-			return cache.CertPrincipals(username)
-		},
-	})
+	srv, err := New(nil)
 	must.NoError(err, "new server")
-	srv.SetTrust(string(ssh.MarshalAuthorizedKey(ca.pub)), nil)
+	granted := testAccess(t, ca)
+	srv.SetAccess(&state.Access{CA: granted.CA, DaemonConfig: granted.DaemonConfig})
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	must.NoError(err, "listen")
 	go srv.Serve(t.Context(), l)
 	defer l.Close()
 
-	_, err = dial(t, l.Addr().String(), cur.Username, userCert(t, ca, testPrincipal))
+	_, err = dial(t, l.Addr().String(), currentUser(t), userCert(t, ca, testPrincipal))
 	must.Error(err, "expected auth to fail before the principal is granted")
 
-	cache.Replace(map[string][]string{cur.Username: {testPrincipal}}, nil, "", "", nil, 0)
-	client, err := dial(t, l.Addr().String(), cur.Username, userCert(t, ca, testPrincipal))
-	must.NoError(err, "dial after cache update")
+	srv.SetAccess(granted)
+	client, err := dial(t, l.Addr().String(), currentUser(t), userCert(t, ca, testPrincipal))
+	must.NoError(err, "dial after the grant synced")
 	defer client.Close()
 
 	sess, err := client.NewSession()
@@ -410,10 +367,10 @@ func TestServerLivePrincipals(t *testing.T) {
 func TestPolicyFrom(t *testing.T) {
 	t.Parallel()
 	is := assert.New(t)
-	is.Equal(DefaultPolicy, PolicyFrom(nil))
-	is.Equal(DefaultPolicy, PolicyFrom(&nokkuv1.DaemonConfig{}))
+	is.Equal(defaultPolicy, policyFrom(nil))
+	is.Equal(defaultPolicy, policyFrom(&nokkuv1.DaemonConfig{}))
 
-	got := PolicyFrom(&nokkuv1.DaemonConfig{RecordSessions: new(false), GatewayPorts: new(true)})
+	got := policyFrom(&nokkuv1.DaemonConfig{RecordSessions: new(false), GatewayPorts: new(true)})
 	is.False(got.Record)
 	is.True(got.GatewayPorts)
 	is.True(got.AllowForwarding, "unset field lost its default")
@@ -433,7 +390,7 @@ func TestServeConnReportsRelayedClient(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	var srv *Server
-	_, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) {
+	_, closeFn := startTestServerOpts(t, ca, func(s *Server) {
 		srv = s
 		// No pre-auth slot at all: only a relayed connection gets through.
 		s.startups = make(chan struct{})
@@ -453,7 +410,7 @@ func TestServeConnReportsRelayedClient(t *testing.T) {
 		must.NoError(dialErr)
 		sshd, acceptErr := l.Accept()
 		must.NoError(acceptErr)
-		go srv.ServeConn(relayed{Conn: sshd, remote: &net.TCPAddr{IP: net.ParseIP(from)}})
+		go srv.ServeConn(t.Context(), relayed{Conn: sshd, remote: &net.TCPAddr{IP: net.ParseIP(from)}})
 		conn, chans, reqs, sshErr := ssh.NewClientConn(client, "relay", &ssh.ClientConfig{
 			User:            currentUser(t),
 			Auth:            []ssh.AuthMethod{office},
@@ -479,4 +436,21 @@ func TestServeConnReportsRelayedClient(t *testing.T) {
 	out, err := sess.Output("echo $SSH_CLIENT")
 	must.NoError(err)
 	is.True(strings.HasPrefix(string(out), "203.0.113.7 0 "), "SSH_CLIENT = %q, want the relayed address", out)
+}
+
+// Relayed connections hold at most half the slots, so people on the relay never lock out a direct login.
+func TestRelayCapLeavesRoomForDirectLogins(t *testing.T) {
+	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
+	srv, err := New(nil)
+	require.NoError(t, err)
+	assert.Less(t, cap(srv.relayed), cap(srv.conns), "relayed connections could take every slot")
+
+	for range cap(srv.relayed) {
+		srv.relayed <- struct{}{}
+	}
+	server, client := net.Pipe()
+	srv.ServeConn(t.Context(), server)
+	_, err = client.Read(make([]byte, 1))
+	require.ErrorIs(t, err, io.EOF, "a relayed connection past the relay cap was served")
+	assert.Empty(t, srv.conns, "a refused relay kept a connection slot")
 }

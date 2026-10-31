@@ -3,13 +3,7 @@ import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
-
-export const sign = {
-	user: () =>
-		useMutation(CertificateService.method.signSSHCertificate, {
-			onSuccess: () => toast.success('Certificate signed')
-		})
-};
+import { usePatch } from './mask';
 
 export const ca = {
 	get: (id: MaybeGetter<string | undefined>) =>
@@ -30,7 +24,7 @@ export const ca = {
 		useMutation(CertificateService.method.createCertificateAuthority, {
 			onSuccess: () => toast.success('Certificate authority created')
 		}),
-	update: () => useMutation(CertificateService.method.updateCertificateAuthority),
+	update: () => usePatch(CertificateService.method.updateCertificateAuthority),
 	delete: () => useMutation(CertificateService.method.deleteCertificateAuthority),
 	deleteMany: () =>
 		useBulkMutation(

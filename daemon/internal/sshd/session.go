@@ -18,17 +18,20 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/nokku-sh/nokku/internal/login"
+
 	"github.com/nokku-sh/nokku/daemon/internal/recording"
 )
 
 const (
-	// Marks control-plane certificates for a web terminal. Keep in sync with the core's mintSessionCert.
-	webSessionKeyIDPrefix = "nokku:web:session:"
-	maxClientEnv          = 64
+	maxClientEnv = 64
 	// Each queued signal costs a helper process once the command starts.
 	maxPendingSignals = 8
 	// How long an interactive shell gets after the hangup before it is killed.
 	hangupGrace = 5 * time.Second
+	// A tenth of a shell's cap. Over exec, pg_dump, tar and git are binary noise in a recording, and at the full cap a
+	// nightly job would push people's sessions out of a workspace's storage.
+	maxExecRecording = 5 << 20
 )
 
 type session struct {
@@ -80,7 +83,7 @@ type recOut struct {
 	rec *recording.Recorder
 }
 
-func (s *Server) serveSession(st *connState, newCh ssh.NewChannel) {
+func (s *Server) serveSession(ctx context.Context, st *connState, newCh ssh.NewChannel) {
 	conn := st.conn
 	ch, reqs, err := newCh.Accept()
 	if err != nil {
@@ -89,7 +92,7 @@ func (s *Server) serveSession(st *connState, newCh ssh.NewChannel) {
 	}
 	defer ch.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	sess := &session{
 		Channel:   ch,
@@ -495,7 +498,7 @@ func (sess *session) runPTY() {
 
 	// Read once, a running session keeps the rule it started with. Only keystrokes count, output does not.
 	touch := func() {}
-	if idle := sess.server.policy.Load().IdleTimeout; idle > 0 {
+	if idle := sess.server.access.Load().policy.IdleTimeout; idle > 0 {
 		timer := time.AfterFunc(idle, sess.idleOut)
 		defer timer.Stop()
 		touch = func() { timer.Reset(idle) }
@@ -560,26 +563,21 @@ func (sess *session) runPlain() {
 
 // No-op when recording is off or pty-req already built one.
 func (sess *session) startRecorder(width, height int) {
-	if sess.rec != nil || !sess.server.policy.Load().Record {
+	if sess.rec != nil || !sess.server.access.Load().policy.Record {
 		return
 	}
-	// The key id is signed by the CA, so a web session may label its recording with the core's session id.
+	// The key id is signed by the CA, so a web session may label its recording with the core's session id. That id
+	// names the recording file, so even a signed one passes only in canonical form.
 	recSessionID := sess.sessionID
 	keyID := sess.conn.Permissions.Extensions["nokku-cert-key-id"]
-	if id, ok := strings.CutPrefix(keyID, webSessionKeyIDPrefix); ok && canonicalUUID(id) {
+	if id, ok := strings.CutPrefix(keyID, login.WebSessionKeyIDPrefix); ok && login.ValidID(id) {
 		recSessionID = id
 	}
-	var sink io.WriteCloser
-	if sess.server.recordingSink != nil {
-		// WithoutCancel: the upload stream must outlive the session context, canceled during teardown.
-		sink = sess.server.recordingSink(
-			context.WithoutCancel(sess.ctx),
-			recSessionID,
-			sess.sysUser.Name,
-			sess.principal,
-		)
-	}
 	term, _ := sess.envValue("TERM")
+	maxSize := sess.server.maxRecording
+	if maxSize == 0 && sess.ptmx == nil {
+		maxSize = maxExecRecording
+	}
 	rec, err := recording.New(recording.Options{
 		Width:     width,
 		Height:    height,
@@ -588,20 +586,26 @@ func (sess *session) startRecorder(width, height int) {
 		User:      sess.sysUser.Name,
 		Principal: sess.principal,
 		Term:      term,
-		Sink:      sink,
-		OnLimit:   sess.recordingFull,
-		MaxSize:   sess.server.maxRecording,
+		OnCut:     sess.recordingCut,
+		MaxSize:   maxSize,
+		Uploads:   sess.server.uploads,
 	})
 	if err != nil {
 		// Recording fails open so a full disk never locks admins out, but the gap is always on the audit trail.
 		slog.Warn("session not recorded", "session_id", sess.sessionID, "error", err)
-		if sink != nil {
-			_ = sink.Close()
-		}
 		sess.recordingDegraded("not recorded: " + err.Error())
 		return
 	}
 	sess.rec = rec
+}
+
+// A write error leaves the session running unrecorded, like a recording that cannot start.
+func (sess *session) recordingCut(err error) {
+	if errors.Is(err, recording.ErrSizeLimit) {
+		sess.recordingFull()
+		return
+	}
+	sess.recordingDegraded("recording stopped: " + err.Error())
 }
 
 // An interactive session ends at the size limit, so a flood cannot switch recording off for what is typed next. An
@@ -628,12 +632,6 @@ func (sess *session) recordingDegraded(reason string) {
 	ev := sess.event(eventRecordingDegraded)
 	ev.Error = reason
 	sess.server.emit(ev)
-}
-
-// The id names the recording file, so only the lowercase hyphenated form passes, even from a signed key id.
-func canonicalUUID(s string) bool {
-	u, err := uuid.Parse(s)
-	return err == nil && u.String() == s
 }
 
 func (t recOut) Write(p []byte) (int, error) {

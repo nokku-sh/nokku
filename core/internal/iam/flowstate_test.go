@@ -11,7 +11,6 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
 )
 
@@ -105,42 +104,21 @@ func TestSealedFlowState(t *testing.T) {
 	}
 }
 
-// Only the profile page's own link request enters linking mode. A plain login never does, signed in or not.
-func TestLinkUserIDFor(t *testing.T) {
-	const uid = "01a05a0f-d857-723f-a3ed-c43125834aa5"
-	signedIn := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: uid, Kind: actor.KindUser})
-
-	tests := []struct {
-		name     string
-		query    string
-		site     string
-		signedIn bool
-		wantUID  string
-		wantErr  bool
-	}{
-		{"link from the profile page", "?link=true", "same-origin", true, uid, false},
-		{"plain login while signed in", "", "same-origin", true, "", false},
-		{"plain login typed into the address bar", "", "none", true, "", false},
-		{"link from a sibling workspace", "?link=true", "same-site", true, "", true},
-		{"link from another site", "?link=true", "cross-site", true, "", true},
-		{"link without fetch metadata", "?link=true", "", true, "", true},
-		{"link without a session", "?link=true", "same-origin", false, "", true},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			r := httptest.NewRequest(http.MethodGet, "/oidc/login"+test.query, nil)
-			if test.site != "" {
-				r.Header.Set("Sec-Fetch-Site", test.site)
-			}
-			ctx := t.Context()
-			if test.signedIn {
-				ctx = signedIn
-			}
-			got, err := linkUserIDFor(ctx, r)
-			if got != test.wantUID || (err != nil) != test.wantErr {
-				t.Errorf("linkUserIDFor = %q, %v, want %q, error %v", got, err, test.wantUID, test.wantErr)
-			}
-		})
+// A GET that adds a way in is taken only from the app itself, so a link on another site cannot end a session.
+func TestRequireFreshRefusesForeignGets(t *testing.T) {
+	var svc Service
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("the route ran") })
+	for _, site := range []string{"same-site", "cross-site", "none", ""} {
+		r := httptest.NewRequest(http.MethodGet, "/oidc/link", nil)
+		if site != "" {
+			r.Header.Set("Sec-Fetch-Site", site)
+		}
+		rec := httptest.NewRecorder()
+		svc.RequireFresh(next).ServeHTTP(rec, r)
+		if rec.Code != http.StatusForbidden || len(rec.Result().Cookies()) != 0 {
+			t.Errorf("Sec-Fetch-Site %q: code %d, cookies %v, want 403 and the session left alone",
+				site, rec.Code, rec.Result().Cookies())
+		}
 	}
 }
 

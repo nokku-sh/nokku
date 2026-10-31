@@ -4,13 +4,19 @@ package ssh_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 	"uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	gossh "golang.org/x/crypto/ssh"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -29,24 +35,23 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func rotationConn(t *testing.T) *db.Connection {
+func rotationConn(t *testing.T) (*db.Connection, *kms.Keyset) {
 	t.Helper()
 	conn, err := db.NewConnection(t.Context())
 	require.NoError(t, err)
-	enc, err := kms.New(t.Context(), conn, "test-secret-0123456789-0123456789")
+	t.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
+	keys, err := kms.New(t.Context(), conn, false)
 	require.NoError(t, err)
-	require.NoError(t, crypto.SetEncryptor(enc))
-	return conn
+	return conn, keys
 }
 
-func seedCA(t *testing.T, conn *db.Connection, workspaceID string) *db.SSHCA {
+func seedCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, workspaceID string) *db.SSHCA {
 	t.Helper()
-	info, err := ssh.NewCA()
-	require.NoError(t, err)
+	info := ssh.NewCA()
 	info.Name = "ca-" + uuid.NewV7().String()
 	var ca *db.SSHCA
 	require.NoError(t, conn.TenantTx(pinned(t, workspaceID), func(q *db.Queries) (err error) {
-		ca, err = q.CreateCA(t.Context(), info)
+		ca, err = ssh.CreateCA(t.Context(), q, keys, info)
 		return err
 	}))
 	return ca
@@ -70,18 +75,37 @@ func seedWorkspace(t *testing.T, conn *db.Connection) string {
 	return workspaceID
 }
 
+func signer(t *testing.T, conn *db.Connection, keys *kms.Keyset, ca *db.SSHCA, certType uint32) (gossh.Signer, error) {
+	t.Helper()
+	var s gossh.Signer
+	err := conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
+		s, err = ssh.CASigner(t.Context(), q, keys, ca.ID, certType)
+		return err
+	})
+	return s, err
+}
+
+func newPublicKey(t *testing.T) string {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	key, err := ssh.MarshalPubKey(pub)
+	require.NoError(t, err)
+	return key
+}
+
 func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
-	conn := rotationConn(t)
-	ca := seedCA(t, conn, seedWorkspace(t, conn))
+	conn, keys := rotationConn(t)
+	ca := seedCA(t, conn, keys, seedWorkspace(t, conn))
 
 	rollover := func(revoke bool) *db.SSHCA {
 		var next *db.SSHCA
-		require.NoError(t, conn.SysTx(t.Context(), func(q *db.Queries) (err error) {
+		require.NoError(t, conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
 			current, err := q.GetCAForUpdate(t.Context(), ca.ID)
 			if err != nil {
 				return err
 			}
-			next, err = ssh.Rollover(t.Context(), q, current, revoke)
+			next, err = ssh.Rollover(t.Context(), q, keys, current, revoke)
 			return err
 		}))
 		return next
@@ -99,9 +123,85 @@ func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
 	assert.WithinDuration(t, time.Now().Add(planned.UserMaxTtl), *planned.PreviousTrustedUntil, time.Minute,
 		"the replaced key is trusted for as long as its certificates can live")
 
+	// The key rows follow, the CA signs with the new keys only.
+	for certType, want := range map[uint32]string{gossh.UserCert: planned.PublicKey, gossh.HostCert: planned.HostPublicKey} {
+		s, err := signer(t, conn, keys, planned, certType)
+		require.NoError(t, err, "the CA does not sign after the rollover")
+		assert.Equal(t, want, ssh.MarshalKey(s.PublicKey()), "the rollover did not replace the key row")
+	}
+
 	emergency := rollover(true)
 	assert.NotEqual(t, planned.PublicKey, emergency.PublicKey)
 	assert.Nil(t, emergency.PreviousPublicKey, "an emergency rollover trusts no older key")
 	assert.Nil(t, emergency.PreviousHostPublicKey)
 	assert.Nil(t, emergency.PreviousTrustedUntil)
+}
+
+// The user key signs logins and the host key servers, and ssh-keygen reads what they sign as OpenSSH would.
+func TestCASignerSignsWithTheKeyOfItsKind(t *testing.T) {
+	conn, keys := rotationConn(t)
+	ca := seedCA(t, conn, keys, seedWorkspace(t, conn))
+
+	for _, c := range []struct {
+		certType           uint32
+		authority, other   string
+		principal, keygenL string
+	}{
+		{gossh.UserCert, ca.PublicKey, ca.HostPublicKey, "deploy", "user certificate"},
+		{gossh.HostCert, ca.HostPublicKey, ca.PublicKey, "web-1.example.com", "host certificate"},
+	} {
+		s, err := signer(t, conn, keys, ca, c.certType)
+		require.NoError(t, err)
+		cert, err := ssh.SignCertificate(ca, s, newPublicKey(t), []string{c.principal}, "test", time.Hour, c.certType)
+		require.NoError(t, err)
+		signedBy := ssh.MarshalKey(cert.SignatureKey)
+		assert.Equal(t, c.authority, signedBy, "a %s comes from the wrong key", c.keygenL)
+		assert.NotEqual(t, c.other, signedBy)
+
+		path := filepath.Join(t.TempDir(), "id-cert.pub")
+		require.NoError(t, os.WriteFile(path, []byte(ssh.MarshalKey(cert)+"\n"), 0o600))
+		out, err := exec.CommandContext(t.Context(), "ssh-keygen", "-L", "-f", path).CombinedOutput()
+		require.NoError(t, err, "ssh-keygen -L: %s", out)
+		authority, _, _, _, err := gossh.ParseAuthorizedKey([]byte(c.authority))
+		require.NoError(t, err)
+		assert.Contains(t, string(out), c.keygenL)
+		assert.Contains(t, string(out), "Signing CA: ED25519 "+gossh.FingerprintSHA256(authority))
+		assert.Contains(t, string(out), c.principal)
+	}
+}
+
+// A key row that does not belong to its CA signs nothing, whether it was swapped in or replaced.
+func TestCASignerRefusesAKeyThatIsNotTheCAs(t *testing.T) {
+	conn, keys := rotationConn(t)
+	ca := seedCA(t, conn, keys, seedWorkspace(t, conn))
+	put := func(kind string, sealed []byte) {
+		t.Helper()
+		require.NoError(t, conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) error {
+			return q.PutCAKey(t.Context(), &db.PutCAKeyParams{CaID: ca.ID, Kind: kind, PrivateKey: sealed})
+		}))
+	}
+
+	var host *db.GetCASigningKeyRow
+	require.NoError(t, conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
+		host, err = q.GetCASigningKey(t.Context(), &db.GetCASigningKeyParams{CaID: ca.ID, Kind: "host"})
+		return err
+	}))
+	put("user", host.PrivateKey)
+	_, err := signer(t, conn, keys, ca, gossh.UserCert)
+	require.Error(t, err, "the host key, moved to the user row, opened")
+
+	// Sealed for the right row, but not the key the CA publishes.
+	_, other, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	der, err := x509.MarshalPKCS8PrivateKey(other)
+	require.NoError(t, err)
+	aad := crypto.AAD{Table: "ssh_ca_keys", Column: "private_key", Workspace: ca.WorkspaceID, Row: ca.ID + "/user"}
+	sealed, err := keys.Seal(aad, der)
+	require.NoError(t, err)
+	put("user", sealed)
+	_, err = signer(t, conn, keys, ca, gossh.UserCert)
+	require.ErrorContains(t, err, "does not match", "a key the CA does not publish signs")
+
+	_, err = signer(t, conn, keys, ca, gossh.HostCert)
+	assert.NoError(t, err, "the host key is still the CA's")
 }

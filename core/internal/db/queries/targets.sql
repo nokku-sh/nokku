@@ -1,4 +1,5 @@
 -- name: CreateTarget :one
+-- No CA means the workspace default.
 INSERT INTO
   targets (
     ca_id,
@@ -11,7 +12,18 @@ INSERT INTO
   )
 VALUES
   (
-    @ca_id,
+    COALESCE(
+      sqlc.narg('ca_id')::UUID,
+      (
+        SELECT
+          id
+        FROM
+          ssh_cas
+        WHERE
+          workspace_id = current_workspace_id ()
+          AND is_default
+      )
+    ),
     @name,
     @description,
     @endpoints,
@@ -109,31 +121,8 @@ WHERE
 RETURNING
   *;
 
--- name: UpdateTargetCA :one
--- No id means the workspace default.
-UPDATE targets
-SET
-  ca_id = COALESCE(
-    sqlc.narg('ca_id'),
-    (
-      SELECT
-        id
-      FROM
-        ssh_cas
-      WHERE
-        workspace_id = targets.workspace_id
-        AND is_default = TRUE
-      LIMIT
-        1
-    )
-  )
-WHERE
-  targets.daemon_id = @daemon_id
-RETURNING
-  *;
-
 -- name: GetTargetsBySubject :many
--- For a user, grants to their teams count too. Subject UUIDs are unique across kinds.
+-- The targets a person or service account holds an account on, a team's own for a team, a daemon's for a daemon.
 SELECT
   t.*
 FROM
@@ -142,22 +131,20 @@ WHERE
   t.daemon_id = sqlc.arg('subject_id')::UUID
   OR t.id IN (
     SELECT
+      e.target_id
+    FROM
+      effective_access e
+    WHERE
+      e.subject_id = sqlc.arg('subject_id')::UUID
+  )
+  OR t.id IN (
+    SELECT
       p.target_id
     FROM
       live_grants g
       JOIN target_accounts p ON p.id = g.account_id
     WHERE
-      -- One array of ids, an OR over the teams would keep the lookup off the subject index.
-      g.subject_id = ANY (
-        ARRAY[sqlc.arg('subject_id')::UUID] || ARRAY(
-          SELECT
-            tm.team_id
-          FROM
-            team_members tm
-          WHERE
-            tm.user_id = sqlc.arg('subject_id')::UUID
-        )
-      )
+      g.team_id = sqlc.arg('subject_id')::UUID
   );
 
 -- name: GetWorkspaceTags :many

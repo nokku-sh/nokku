@@ -4,6 +4,8 @@ import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { plural, useBulkMutation } from './bulk';
 import { addSession, TerminalSession } from './terminal.svelte';
+import { usePatch, withMask } from './mask';
+import { LIVE } from './client';
 
 export const daemon = {
 	get: (id: MaybeGetter<string | undefined>) =>
@@ -20,7 +22,7 @@ export const daemon = {
 			limit?: number;
 			offset?: number;
 		},
-		when?: () => boolean
+		{ when, live = false }: { when?: () => boolean; live?: boolean } = {}
 	) =>
 		useQuery(
 			DaemonService.method.listDaemons,
@@ -29,7 +31,8 @@ export const daemon = {
 				offset: 0,
 				...opts?.()
 			}),
-			() => ({ enabled: when?.() ?? true })
+			// The daemons page passes live, online comes and goes.
+			() => ({ enabled: when?.() ?? true, ...(live && { refetchInterval: LIVE }) })
 		),
 	createSession: () =>
 		useMutation(DaemonService.method.createSession, {
@@ -45,10 +48,14 @@ export const daemon = {
 				);
 			}
 		}),
-	update: () => useMutation(DaemonService.method.updateDaemon),
+	update: () => usePatch(DaemonService.method.updateDaemon),
 	delete: () => useMutation(DaemonService.method.deleteDaemon),
 	approveMany: () =>
-		useBulkMutation(DaemonService.method.updateDaemon, (n) => `${plural(n, 'daemon')} approved`),
+		useBulkMutation(
+			DaemonService.method.updateDaemon,
+			(n) => `${plural(n, 'daemon')} approved`,
+			withMask(DaemonService.method.updateDaemon.input)
+		),
 	deleteMany: () =>
 		useBulkMutation(DaemonService.method.deleteDaemon, (n) => `${plural(n, 'daemon')} deleted`)
 };

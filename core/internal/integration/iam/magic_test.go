@@ -4,7 +4,6 @@ package iam_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -35,7 +34,7 @@ func (m *mailbox) deps() iam.Deps {
 			m.links <- link
 			return nil
 		},
-		SendSignupLink: func(_ context.Context, _, _, _, link string, _ time.Duration) error {
+		SendInvite: func(_ context.Context, _, _, _, link string, _ time.Duration) error {
 			m.links <- link
 			return nil
 		},
@@ -135,81 +134,6 @@ func TestMagicLinkHonorsEnforcedSSO(t *testing.T) {
 	assert.Equal(t, 1, e.sessions(t, o.ws, o.owner.ID))
 }
 
-func TestSignupLinkCreatesInvitedUser(t *testing.T) {
-	mail := newMailbox()
-	e := newTestEnvWith(t, mail.deps())
-	o := e.org(t)
-	ctx := anon(t.Context(), o.ws)
-	invite := e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, 1)
-	email := "new@" + testDomain()
-
-	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, o.owner.Email, "Dup"), iam.ErrEmailTaken)
-	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, "bogus", email, "New"), iam.ErrInviteSpent)
-	require.NoError(t, e.svc.RequestSignupLink(ctx, invite, email, "New"))
-	token := linkToken(t, mail.link(t))
-	assert.Nil(t, e.userByEmail(t, o.ws, email), "the account exists before the link was used")
-
-	u, cookie, err := e.svc.ConsumeMagicLink(ctx, token)
-	require.NoError(t, err)
-	assert.Equal(t, email, u.Email)
-	assert.Equal(t, "New", u.Name)
-	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, u.Role, "the role comes from the invite")
-	assert.NotNil(t, cookie)
-	assert.Equal(t, 1, e.sessions(t, o.ws, u.ID))
-
-	// The one-use invite is spent now.
-	_, err = e.svc.LookupInvite(ctx, invite)
-	require.ErrorIs(t, err, iam.ErrInviteSpent)
-	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, "late@"+testDomain(), ""), iam.ErrInviteSpent)
-}
-
-// The invite page must not say "check your email" for a mail that failed. On cooldown the earlier link still works.
-func TestUnsentSignupLinkIsAnError(t *testing.T) {
-	var link string
-	sendErr := errors.New("smtp send: 535 Authentication Failed")
-	e := newTestEnvWith(t, iam.Deps{SendSignupLink: func(_ context.Context, _, _, _, l string, _ time.Duration) error {
-		link = l
-		return sendErr
-	}})
-	o := e.org(t)
-	ctx := anon(t.Context(), o.ws)
-	invite := e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 0)
-
-	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, "lost@"+testDomain(), ""), iam.ErrMailNotSent)
-	_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, link))
-	require.ErrorIs(t, err, iam.ErrInvalidToken, "a link that was never mailed created an account")
-
-	sendErr = emailverify.ErrCooldown
-	require.NoError(t, e.svc.RequestSignupLink(ctx, invite, "lost@"+testDomain(), ""))
-}
-
-func TestSeatCapStopsSignup(t *testing.T) {
-	mail := newMailbox()
-	deps := mail.deps()
-	deps.CanJoin = func(_ context.Context, _ string, used int64) error {
-		if used >= 1 {
-			return errors.New("plan allows 1 seat")
-		}
-		return nil
-	}
-	e := newTestEnvWith(t, deps)
-	o := e.org(t)
-	ctx := anon(t.Context(), o.ws)
-
-	require.NoError(
-		t,
-		e.svc.RequestSignupLink(
-			ctx,
-			e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 0),
-			"two@"+testDomain(),
-			"",
-		),
-	)
-	_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, mail.link(t)))
-	require.ErrorIs(t, err, iam.ErrSeatLimit)
-	assert.Nil(t, e.userByEmail(t, o.ws, "two@"+testDomain()))
-}
-
 func TestBootstrapMakesTheOwnerOnce(t *testing.T) {
 	e := newTestEnv(t)
 	ws := e.workspace(t)
@@ -217,25 +141,26 @@ func TestBootstrapMakesTheOwnerOnce(t *testing.T) {
 	t.Setenv("NOKKU_ADMIN_EMAIL", email)
 	t.Setenv("NOKKU_ADMIN_NAME", "Admin")
 
-	first, err := e.svc.Bootstrap(t.Context(), ws)
+	needsLink, err := e.svc.Bootstrap(t.Context(), ws)
 	require.NoError(t, err)
-	assert.Contains(t, first, "/login/verify?token=", "an owner without a passkey gets a link")
+	assert.True(t, needsLink, "an owner without a passkey needs a link")
 	owner := e.userByEmail(t, ws, email)
 	require.NotNil(t, owner)
 	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, owner.Role)
 
-	// The second boot keeps the owner and only re-issues the link.
+	// The second boot keeps the owner.
 	t.Setenv("NOKKU_ADMIN_EMAIL", "other@"+testDomain())
-	second, err := e.svc.Bootstrap(t.Context(), ws)
+	needsLink, err = e.svc.Bootstrap(t.Context(), ws)
 	require.NoError(t, err)
-	assert.NotEqual(t, first, second, "every boot issues a fresh link")
+	assert.True(t, needsLink)
 	assert.Nil(t, e.userByEmail(t, ws, "other@"+testDomain()), "a second admin was made")
 
-	_, _, err = e.svc.ConsumeMagicLink(anon(t.Context(), ws), linkToken(t, first))
-	require.ErrorIs(t, err, iam.ErrInvalidToken, "the earlier link is replaced")
-
+	_, first, err := e.svc.AdminLink(t.Context(), ws)
+	require.NoError(t, err)
 	_, link, err := e.svc.AdminLink(t.Context(), ws)
 	require.NoError(t, err)
+	_, _, err = e.svc.ConsumeMagicLink(anon(t.Context(), ws), linkToken(t, first))
+	require.ErrorIs(t, err, iam.ErrInvalidToken, "a new link replaces the earlier one")
 	u, _, err := e.svc.ConsumeMagicLink(anon(t.Context(), ws), linkToken(t, link))
 	require.NoError(t, err)
 	assert.Equal(t, owner.ID, u.ID)
@@ -269,31 +194,6 @@ func TestLastCredentialStays(t *testing.T) {
 	})
 	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:c"), iam.ErrNotFound, "deleted another user's passkey")
 	_ = actor.KindUser
-}
-
-// Enforced SSO takes no link, so an invite must not make an account that cannot sign in.
-func TestEnforcedSSOKeepsTheInvite(t *testing.T) {
-	mail := newMailbox()
-	e := newTestEnvWith(t, mail.deps())
-	o := e.org(t)
-	ctx := anon(t.Context(), o.ws)
-	invite := e.invite(t, o.ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, 1)
-	email := "new@" + testDomain()
-
-	require.NoError(t, e.svc.RequestSignupLink(ctx, invite, email, "New"))
-	token := linkToken(t, mail.link(t))
-	e.setEnforceSSO(t, o.ws, true)
-
-	require.ErrorIs(t, e.svc.RequestSignupLink(ctx, invite, "late@"+testDomain(), ""), iam.ErrSSORequired)
-	_, _, err := e.svc.ConsumeMagicLink(ctx, token)
-	require.ErrorIs(t, err, iam.ErrSSORequired)
-	assert.Nil(t, e.userByEmail(t, o.ws, email), "an account that cannot sign in was made")
-	_, err = e.svc.LookupInvite(ctx, invite)
-	require.NoError(t, err, "the invite was spent")
-
-	e.setEnforceSSO(t, o.ws, false)
-	_, _, err = e.svc.ConsumeMagicLink(ctx, token)
-	require.NoError(t, err, "the refused link was spent")
 }
 
 // The environment names the issuer and the client. Whether the provider is on and who it lets in is the admin's.

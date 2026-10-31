@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 	"github.com/nokku-sh/nokku/cli/internal/state"
+	"github.com/nokku-sh/nokku/internal/nktoken"
 )
 
 func setHome(t *testing.T) {
@@ -27,7 +29,7 @@ func setHome(t *testing.T) {
 func runFlags(t *testing.T, args ...string) (*state.State, error) {
 	t.Helper()
 	// The flags read these, and a developer's shell must not leak in.
-	for _, env := range []string{"NK_API_URL", "NK_TTL", "NK_REQUIRE_TPM", "NK_API_PIN", "NK_CA_FILE", "NK_DEBUG"} {
+	for _, env := range []string{"NK_API_URL", "NK_TTL", "NK_REQUIRE_TPM", "NK_CA_FILE", "NK_DEBUG"} {
 		t.Setenv(env, "")
 		require.NoError(t, os.Unsetenv(env))
 	}
@@ -122,11 +124,18 @@ func TestLoadStateDropsCAOnServerChange(t *testing.T) {
 
 func TestLoadStateRejectsNonServiceToken(t *testing.T) {
 	setHome(t)
-	t.Setenv("NK_TOKEN", "sess-abc")
-	_, err := runFlags(t)
-	require.ErrorContains(t, err, "nk_sa_")
+	for _, token := range []string{
+		"nk_sess_" + strings.Repeat("a", 34),
+		"nk_sa_" + strings.Repeat("a", 38), // the format before the one for every token
+		"nk_sa_abc",
+		"nk_sa_" + strings.Repeat("a", 34), // a whole key with a wrong checksum
+	} {
+		t.Setenv("NK_TOKEN", token)
+		_, err := runFlags(t)
+		require.ErrorContains(t, err, "nk_sa_", "%q", token)
+	}
 
-	t.Setenv("NK_TOKEN", "nk_sa_abc")
+	t.Setenv("NK_TOKEN", nktoken.New("sa"))
 	s, err := runFlags(t)
 	require.NoError(t, err)
 	assert.True(t, s.IsServiceAccount())

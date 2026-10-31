@@ -16,10 +16,7 @@ import (
 func TestEditsMoveUpdatedAt(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	ca, err := ssh.NewCA()
-	if err != nil {
-		t.Fatalf("new ca: %v", err)
-	}
+	ca := ssh.NewCA()
 	ca.Name = "ca"
 	var caID, serviceAccount string
 	asOwner(t, c, f, func(q *db.Queries) error {
@@ -81,11 +78,11 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 
 	daemon, target := updatedAt("daemons", f.daemon), updatedAt("targets", f.target)
 	asOwner(t, c, f, func(q *db.Queries) error {
-		if err := q.TouchDaemons(t.Context(), []string{f.daemon}); err != nil {
+		if err := q.MarkDaemonSeen(t.Context(), f.daemon); err != nil {
 			return err
 		}
-		if err := q.UpdateDaemonMetadata(t.Context(), &db.UpdateDaemonMetadataParams{
-			DaemonID: f.daemon, Metadata: []byte(`{"host": "a"}`),
+		if err := q.UpdateDaemonVersion(t.Context(), &db.UpdateDaemonVersionParams{
+			DaemonID: f.daemon, Version: "1.0.0",
 		}); err != nil {
 			return err
 		}

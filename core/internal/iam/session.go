@@ -13,6 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/nokku-sh/nokku/internal/dpop"
+
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -23,8 +25,6 @@ const (
 	// The device cookie is per account. With one name every account switch would count as a new device.
 	deviceCookiePrefix = "nokku_device_"
 	deviceTTL          = 180 * 24 * time.Hour
-	// maxUserAgent keeps a hostile header from bloating the sessions table.
-	maxUserAgent = 512
 )
 
 type TokenParams struct {
@@ -39,20 +39,22 @@ type TokenParams struct {
 	TTL time.Duration
 }
 
+// tokenKinds is the token kind of each kind of access token.
+var tokenKinds = map[actor.Kind]crypto.TokenKind{
+	actor.KindUser:           crypto.TokenSession,
+	actor.KindCLI:            crypto.TokenCLI,
+	actor.KindDaemon:         crypto.TokenDaemon,
+	actor.KindServiceAccount: crypto.TokenServiceAccount,
+	actor.KindSCIM:           crypto.TokenSCIM,
+}
+
 // IssueToken pins the token to the request's workspace. The plaintext is returned once, only its hash is stored.
 func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToken, string, error) {
-	token, tokenHash := crypto.NewSecret()
-	switch p.Kind {
-	case actor.KindServiceAccount:
-		token, tokenHash = crypto.NewKey(crypto.KeyPrefixServiceAccount)
-	case actor.KindSCIM:
-		token, tokenHash = crypto.NewKey(crypto.KeyPrefixSCIM)
-	case actor.KindUser, actor.KindCLI, actor.KindDaemon:
-		// verifyToken would take a secret with a key prefix for a key with a bad checksum.
-		for crypto.HasKeyPrefix(token) {
-			token, tokenHash = crypto.NewSecret()
-		}
+	kind, ok := tokenKinds[p.Kind]
+	if !ok {
+		return nil, "", errors.New("iam: no token for kind " + string(p.Kind))
 	}
+	token, tokenHash := crypto.NewToken(kind)
 	now := s.now()
 	params := &db.CreateAccessTokenParams{
 		TokenHash: tokenHash,
@@ -69,8 +71,8 @@ func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToke
 		params.SubjectID = &p.SubjectID
 	}
 	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
-		params.UserAgent = truncate(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
-		params.Ip = strings.ToValidUTF8(realip.Bucket(meta.Header, meta.RemoteAddr), "")
+		params.UserAgent = meta.UserAgent()
+		params.Ip = meta.ClientIP()
 	}
 	if p.TTL > 0 {
 		params.ExpiresAt = new(now.Add(p.TTL))
@@ -153,14 +155,14 @@ func (s *Service) RememberDevice(ctx context.Context, header http.Header, remote
 		return nil
 	}
 	token := crypto.RandomString(32)
-	userAgent := header.Get("User-Agent")
+	meta := actor.RequestMeta{Header: header, RemoteAddr: remoteAddr}
 	d, err := s.addDevice(
 		ctx,
 		u,
 		deviceKey(token),
-		userAgent,
-		deviceNameFromUA(userAgent),
-		realip.Bucket(header, remoteAddr),
+		meta.UserAgent(),
+		deviceNameFromUA(header.Get("User-Agent")),
+		realip.Client(header, remoteAddr),
 	)
 	if err != nil {
 		slog.Error("failed to remember device", "error", err)
@@ -183,14 +185,15 @@ func (s *Service) seenDevice(ctx context.Context, userID, key string) bool {
 	return err == nil
 }
 
-// addDevice remembers a new device and mails the account. name is what the mail calls the device.
+// addDevice remembers a new device and mails the account. userAgent arrives cleaned for storage. The mail gets ip as
+// it came, only the row takes it cleaned. name is what the mail calls the device.
 func (s *Service) addDevice(ctx context.Context, u *db.User, key, userAgent, name, ip string) (*db.KnownDevice, error) {
 	now := s.now()
 	d, err := s.conn.Tenant().AddKnownDevice(ctx, &db.AddKnownDeviceParams{
 		UserID:    u.ID,
 		Key:       key,
 		Ip:        strings.ToValidUTF8(ip, ""),
-		UserAgent: truncate(strings.ToValidUTF8(userAgent, ""), maxUserAgent),
+		UserAgent: userAgent,
 		ExpiresAt: now.Add(deviceTTL),
 		Now:       now,
 	})
@@ -214,15 +217,17 @@ func (s *Service) ForgetDevice(ctx context.Context, id string) error {
 		DeleteKnownDevice(ctx, &db.DeleteKnownDeviceParams{UserID: actor.UserIDFromContext(ctx), ID: id})
 }
 
-// verifyToken only finds tokens of the request's workspace. A key with a bad checksum fails before any lookup.
-func (s *Service) verifyToken(ctx context.Context, token string) (db.AccessToken, error) {
+// verifyToken only finds tokens of the request's workspace. A token of another kind, a bad checksum or an older
+// format fails before any lookup.
+func (s *Service) verifyToken(ctx context.Context, token string, kinds ...crypto.TokenKind) (db.AccessToken, error) {
 	if token == "" {
 		return db.AccessToken{}, errNoSession
 	}
-	if crypto.HasKeyPrefix(token) && !crypto.CheckKey(token) {
+	hash, ok := crypto.TokenHash(token, kinds...)
+	if !ok {
 		return db.AccessToken{}, errInvalidCredentials
 	}
-	tok, err := s.conn.Tenant().GetAccessToken(ctx, crypto.HashToken(token))
+	tok, err := s.conn.Tenant().GetAccessToken(ctx, hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return db.AccessToken{}, errNoSession
 	}
@@ -263,7 +268,7 @@ func (s *Service) ListSessions(ctx context.Context) ([]*db.AccessToken, error) {
 // Logout needs the DPoP proof for header tokens, so a leaked token alone cannot end a session. A key is no session.
 func (s *Service) Logout(ctx context.Context, header http.Header, procedure string) error {
 	p, tok, err := s.Authenticate(ctx, header, procedure)
-	if errors.Is(err, ErrDPoPNonce) || errors.Is(err, ErrDPoPRequired) {
+	if errors.Is(err, dpop.ErrNonce) || errors.Is(err, ErrDPoPRequired) {
 		return err
 	}
 	if err != nil || (p.Kind != actor.KindUser && p.Kind != actor.KindCLI) {
@@ -315,11 +320,19 @@ func (s *Service) touchCredential(ctx context.Context, id string) {
 	}
 }
 
-// recentSignIn is how old a browser session may be to add a way in or to move the account to another address.
+// recentSignIn is how old a browser session may be for a call marked fresh, like handing out a credential.
 const recentSignIn = 10 * time.Minute
 
 // errSignInAgain is a session too old for what it asked. RequireRecentSignIn has ended it already.
 var errSignInAgain = errors.New("sign in again to continue")
+
+// FreshFor is how long a session can still make calls marked fresh. nk never can.
+func (s *Service) FreshFor(tok *db.AccessToken) time.Duration {
+	if tok.Kind != string(actor.KindUser) {
+		return 0
+	}
+	return max(0, recentSignIn-s.now().Sub(tok.CreatedAt))
+}
 
 // RequireRecentSignIn takes a fresh browser session, so a stolen cookie cannot become a lasting passkey or a new
 // address. An old one ends here, so the sign-in page lets the browser in again instead of sending it straight back.
@@ -328,7 +341,7 @@ func (s *Service) RequireRecentSignIn(ctx context.Context) error {
 	if !ok || tok.Kind != string(actor.KindUser) {
 		return errSignInAgain
 	}
-	if s.now().Sub(tok.CreatedAt) <= recentSignIn {
+	if s.FreshFor(&tok) > 0 {
 		return nil
 	}
 	if err := s.conn.Tenant().DeleteAccessToken(ctx, tok.ID); err != nil {

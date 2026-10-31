@@ -98,10 +98,9 @@ type AccessRequest struct {
 	DeciderName    *string                `protobuf:"bytes,12,opt,name=decider_name,json=deciderName" json:"decider_name,omitempty"`
 	DecidedAt      *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=decided_at,json=decidedAt" json:"decided_at,omitempty"`
 	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	// granted_until is when the grant of an approved request ends.
-	GrantedUntil  *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=granted_until,json=grantedUntil" json:"granted_until,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	GrantedUntil   *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=granted_until,json=grantedUntil" json:"granted_until,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AccessRequest) Reset() {
@@ -1101,15 +1100,15 @@ const file_nokku_v1_access_request_proto_rawDesc = "" +
 	"\x1eACCESS_REQUEST_STATUS_APPROVED\x10\x02\x12 \n" +
 	"\x1cACCESS_REQUEST_STATUS_DENIED\x10\x03\x12#\n" +
 	"\x1fACCESS_REQUEST_STATUS_CANCELLED\x10\x04\x12!\n" +
-	"\x1dACCESS_REQUEST_STATUS_EXPIRED\x10\x052\xf9\x06\n" +
-	"\x14AccessRequestService\x12y\n" +
-	"\x17ListRequestableAccounts\x12(.nokku.v1.ListRequestableAccountsRequest\x1a).nokku.v1.ListRequestableAccountsResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12j\n" +
-	"\x13CreateAccessRequest\x12$.nokku.v1.CreateAccessRequestRequest\x1a%.nokku.v1.CreateAccessRequestResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12d\n" +
+	"\x1dACCESS_REQUEST_STATUS_EXPIRED\x10\x052\xb6\a\n" +
+	"\x14AccessRequestService\x12\x8a\x01\n" +
+	"\x17ListRequestableAccounts\x12(.nokku.v1.ListRequestableAccountsRequest\x1a).nokku.v1.ListRequestableAccountsResponse\"\x1a\xc2\xf3\x18\x13\x18\x01:\x0faccess_requests\x90\x02\x01\x12}\n" +
+	"\x13CreateAccessRequest\x12$.nokku.v1.CreateAccessRequestRequest\x1a%.nokku.v1.CreateAccessRequestResponse\"\x19\xc2\xf3\x18\x15\x18\x01(\x01:\x0faccess_requests\x12d\n" +
 	"\x10GetAccessRequest\x12!.nokku.v1.GetAccessRequestRequest\x1a\".nokku.v1.GetAccessRequestResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12j\n" +
-	"\x12ListAccessRequests\x12#.nokku.v1.ListAccessRequestsRequest\x1a$.nokku.v1.ListAccessRequestsResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12m\n" +
-	"\x14ApproveAccessRequest\x12%.nokku.v1.ApproveAccessRequestRequest\x1a&.nokku.v1.ApproveAccessRequestResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12d\n" +
-	"\x11DenyAccessRequest\x12\".nokku.v1.DenyAccessRequestRequest\x1a#.nokku.v1.DenyAccessRequestResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12j\n" +
-	"\x13CancelAccessRequest\x12$.nokku.v1.CancelAccessRequestRequest\x1a%.nokku.v1.CancelAccessRequestResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12g\n" +
+	"\x12ListAccessRequests\x12#.nokku.v1.ListAccessRequestsRequest\x1a$.nokku.v1.ListAccessRequestsResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12\x80\x01\n" +
+	"\x14ApproveAccessRequest\x12%.nokku.v1.ApproveAccessRequestRequest\x1a&.nokku.v1.ApproveAccessRequestResponse\"\x19\xc2\xf3\x18\x15\x18\x04(\x01:\x0faccess_requests\x12f\n" +
+	"\x11DenyAccessRequest\x12\".nokku.v1.DenyAccessRequestRequest\x1a#.nokku.v1.DenyAccessRequestResponse\"\b\xc2\xf3\x18\x04\x18\x04(\x01\x12l\n" +
+	"\x13CancelAccessRequest\x12$.nokku.v1.CancelAccessRequestRequest\x1a%.nokku.v1.CancelAccessRequestResponse\"\b\xc2\xf3\x18\x04\x18\x01(\x01\x12g\n" +
 	"\x12SetRequestableTags\x12#.nokku.v1.SetRequestableTagsRequest\x1a$.nokku.v1.SetRequestableTagsResponse\"\x06\xc2\xf3\x18\x02\x18\x04B\x93\x01\n" +
 	"\fcom.nokku.v1B\x12AccessRequestProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

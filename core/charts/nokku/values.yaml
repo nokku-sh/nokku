@@ -16,8 +16,14 @@ serviceAccount:
 podAnnotations: {}
 podLabels: {}
 
-podSecurityContext: {}
-securityContext: {}
+# The image runs as 65532, fsGroup lets it write the volume.
+podSecurityContext:
+  fsGroup: 65532
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
 
 service:
   type: ClusterIP
@@ -53,21 +59,43 @@ httpRoute:
             type: PathPrefix
             value: /
 
+# Lets only your ingress controller or gateway reach Nokku. Anything else in the cluster that reaches it could name
+# any client address, see "Client addresses" in the README. Needs a network plugin that enforces policies.
+# A wrong namespace cuts Nokku off: the ingress answers 502 or 504 for every request. Anything else in the cluster
+# that calls Nokku directly, like a scraper or a nokkud pointed at the service, needs an entry in extraFrom.
+networkPolicy:
+  enabled: false
+  # Where your ingress controller or gateway proxy runs, like kube-system for Traefik on k3s.
+  namespaces: []
+  # More NetworkPolicy peers that may reach Nokku, like a podSelector, or an ipBlock with the node addresses for a
+  # controller on the host network.
+  extraFrom: []
+
 resources: {}
+
+# Holds liveness back until the core has started, a long migration killed halfway only starts over.
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 1
+  failureThreshold: 300
 
 livenessProbe:
   httpGet:
     path: /healthz
     port: http
-  initialDelaySeconds: 20
+  initialDelaySeconds: 0
   periodSeconds: 10
 
+# With one instance this wait is downtime. The tolerance keeps a short stall from taking the only pod out.
 readinessProbe:
   httpGet:
     path: /healthz
     port: http
-  initialDelaySeconds: 5
-  periodSeconds: 10
+  initialDelaySeconds: 0
+  periodSeconds: 1
+  failureThreshold: 5
 
 volumes: []
 volumeMounts: []
@@ -97,21 +125,22 @@ app:
     name: nokku
     user: postgres
     sslMode: disable
-    autoMigrate: true
   # Where recordings go. A relative folder lands on the persistent volume, s3://bucket?region=... is a bucket.
   storageURL: file://./data
-  # Sets NOKKU_TRUSTED_PROXIES, the IPs or CIDRs of the ingress or gateway pods, like 10.42.0.0/16.
-  # Only they may send plain HTTP and name the client. Empty trusts nothing but the pod itself.
+  # Sets NOKKU_TRUSTED_PROXIES. Empty trusts a proxy on a private network to name the client, like the ingress or
+  # gateway pods. Set IPs or CIDRs to trust only those, or to add a CDN or load balancer in front.
   trustedProxies: ""
+  # Sets KMS_URI, then secrets.secret stays empty. Credentials like VAULT_TOKEN go in extraEnvFrom.
+  kmsURI: ""
   extraEnv: []
   extraEnvFrom: []
 
 secrets:
   # Set existingSecret to re-use an already managed secret.
   existingSecret: ""
-  # Master secret for at-rest encryption, at least 32 characters. There is no
-  # default, a shared one would let anyone with a database dump read the CA
-  # keys. Generate with: openssl rand -hex 32
+  # Master secret for at-rest encryption, at least 32 characters. Leave it empty
+  # with app.kmsURI. There is no default, a shared one would let anyone with a
+  # database dump read the CA keys. Generate with: openssl rand -hex 32
   secret: ""
   # Used only when bundled PostgreSQL is disabled or custom credentials are needed.
   databasePassword: ""

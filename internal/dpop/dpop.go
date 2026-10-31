@@ -1,7 +1,8 @@
-// Package dpop signs DPoP (RFC 9449) proofs client-side with the machine's
-// signing key, TPM-backed or the software fallback. Every proof embeds the
-// public JWK, so the core can verify the signature and bind the session
-// to the key's thumbprint (jkt) without any pre-registration step.
+// Package dpop signs and verifies DPoP (RFC 9449) proofs. nk and nokkud sign
+// with the machine's signing key, TPM-backed or the software fallback. Every
+// proof embeds the public JWK, so the core verifies the signature and binds
+// the session to the key's thumbprint (jkt) without any pre-registration
+// step.
 package dpop
 
 import (

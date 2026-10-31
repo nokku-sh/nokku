@@ -21,6 +21,14 @@ func getSigner(der []byte) (ssh.Signer, error) {
 	return signer, nil
 }
 
+func ParsePublicKey(line string) (ssh.PublicKey, error) {
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
+	if err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
 func MarshalPubKey(key any) (string, error) {
 	pub, err := ssh.NewPublicKey(key)
 	if err != nil {

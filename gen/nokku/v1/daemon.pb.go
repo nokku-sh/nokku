@@ -11,6 +11,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
+	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -77,16 +78,17 @@ func (DaemonStatus) EnumDescriptor() ([]byte, []int) {
 }
 
 type Daemon struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Online        *bool                  `protobuf:"varint,3,opt,name=online" json:"online,omitempty"`
-	Status        *DaemonStatus          `protobuf:"varint,4,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
-	Config        *DaemonConfig          `protobuf:"bytes,5,opt,name=config" json:"config,omitempty"`
-	Metadata      map[string]string      `protobuf:"bytes,6,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	LastSeenAt    *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_seen_at,json=lastSeenAt" json:"last_seen_at,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name       *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Online     *bool                  `protobuf:"varint,3,opt,name=online" json:"online,omitempty"`
+	Status     *DaemonStatus          `protobuf:"varint,4,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
+	Config     *DaemonConfig          `protobuf:"bytes,5,opt,name=config" json:"config,omitempty"`
+	UpdatedAt  *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	CreatedAt  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	LastSeenAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_seen_at,json=lastSeenAt" json:"last_seen_at,omitempty"`
+	// version is nokkud's, as its last enroll or sync reported it.
+	Version       *string `protobuf:"bytes,10,opt,name=version" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -156,13 +158,6 @@ func (x *Daemon) GetConfig() *DaemonConfig {
 	return nil
 }
 
-func (x *Daemon) GetMetadata() map[string]string {
-	if x != nil {
-		return x.Metadata
-	}
-	return nil
-}
-
 func (x *Daemon) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
@@ -182,6 +177,13 @@ func (x *Daemon) GetLastSeenAt() *timestamppb.Timestamp {
 		return x.LastSeenAt
 	}
 	return nil
+}
+
+func (x *Daemon) GetVersion() string {
+	if x != nil && x.Version != nil {
+		return *x.Version
+	}
+	return ""
 }
 
 type DaemonConfig struct {
@@ -359,10 +361,12 @@ func (x *GetDaemonResponse) GetDaemon() *Daemon {
 }
 
 type UpdateDaemonRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Status        *DaemonStatus          `protobuf:"varint,2,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
-	Config        *DaemonConfig          `protobuf:"bytes,3,opt,name=config" json:"config,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Id     *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Status *DaemonStatus          `protobuf:"varint,2,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
+	Config *DaemonConfig          `protobuf:"bytes,3,opt,name=config" json:"config,omitempty"`
+	// update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,4,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -414,6 +418,13 @@ func (x *UpdateDaemonRequest) GetStatus() DaemonStatus {
 func (x *UpdateDaemonRequest) GetConfig() *DaemonConfig {
 	if x != nil {
 		return x.Config
+	}
+	return nil
+}
+
+func (x *UpdateDaemonRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
+	if x != nil {
+		return x.UpdateMask
 	}
 	return nil
 }
@@ -2407,23 +2418,21 @@ var File_nokku_v1_daemon_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/daemon.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x19nokku/v1/recordings.proto\"\xd1\x03\n" +
+	"\x15nokku/v1/daemon.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x19nokku/v1/recordings.proto\"\xf8\x02\n" +
 	"\x06Daemon\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
 	"\x06online\x18\x03 \x01(\bR\x06online\x12.\n" +
 	"\x06status\x18\x04 \x01(\x0e2\x16.nokku.v1.DaemonStatusR\x06status\x12.\n" +
-	"\x06config\x18\x05 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x12:\n" +
-	"\bmetadata\x18\x06 \x03(\v2\x1e.nokku.v1.Daemon.MetadataEntryR\bmetadata\x129\n" +
+	"\x06config\x18\x05 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x129\n" +
 	"\n" +
 	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\flast_seen_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastSeenAt\x1a;\n" +
-	"\rMetadataEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x99\x02\n" +
+	"lastSeenAt\x12\x18\n" +
+	"\aversion\x18\n" +
+	" \x01(\tR\aversionJ\x04\b\x06\x10\a\"\x99\x02\n" +
 	"\fDaemonConfig\x12'\n" +
 	"\x0frecord_sessions\x18\x01 \x01(\bR\x0erecordSessions\x12)\n" +
 	"\x10allow_forwarding\x18\x02 \x01(\bR\x0fallowForwarding\x124\n" +
@@ -2434,12 +2443,14 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\x10GetDaemonRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
 	"\x11GetDaemonResponse\x12(\n" +
-	"\x06daemon\x18\x01 \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"\x9b\x01\n" +
+	"\x06daemon\x18\x01 \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"\xd2\x02\n" +
 	"\x13UpdateDaemonRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12:\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x16.nokku.v1.DaemonStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12.\n" +
-	"\x06config\x18\x03 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\"\x16\n" +
+	"\x06config\x18\x03 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x12\xb4\x01\n" +
+	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskBw\xbaHt\xc8\x01\x01\xe2\x01n\x12\x06status\x12\x16config.record_sessions\x12\x17config.allow_forwarding\x12\x1dconfig.allow_agent_forwarding\x12\x14config.gateway_portsR\n" +
+	"updateMask\"\x16\n" +
 	"\x14UpdateDaemonResponse\"/\n" +
 	"\x13DeleteDaemonRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x16\n" +
@@ -2569,22 +2580,23 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\x19DAEMON_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15DAEMON_STATUS_PENDING\x10\x01\x12\x1a\n" +
 	"\x16DAEMON_STATUS_ACCEPTED\x10\x02\x12\x1a\n" +
-	"\x16DAEMON_STATUS_REJECTED\x10\x032\xb6\x05\n" +
+	"\x16DAEMON_STATUS_REJECTED\x10\x032\xbc\x05\n" +
 	"\rDaemonService\x12O\n" +
 	"\tGetDaemon\x12\x1a.nokku.v1.GetDaemonRequest\x1a\x1b.nokku.v1.GetDaemonResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12U\n" +
 	"\fUpdateDaemon\x12\x1d.nokku.v1.UpdateDaemonRequest\x1a\x1e.nokku.v1.UpdateDaemonResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12U\n" +
 	"\fDeleteDaemon\x12\x1d.nokku.v1.DeleteDaemonRequest\x1a\x1e.nokku.v1.DeleteDaemonResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12U\n" +
 	"\vListDaemons\x12\x1c.nokku.v1.ListDaemonsRequest\x1a\x1d.nokku.v1.ListDaemonsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12X\n" +
-	"\fListSessions\x12\x1d.nokku.v1.ListSessionsRequest\x1a\x1e.nokku.v1.ListSessionsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12X\n" +
-	"\rCreateSession\x12\x1e.nokku.v1.CreateSessionRequest\x1a\x1f.nokku.v1.CreateSessionResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12U\n" +
-	"\fCloseSession\x12\x1d.nokku.v1.CloseSessionRequest\x1a\x1e.nokku.v1.CloseSessionResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12D\n" +
-	"\x05Relay\x12\x16.nokku.v1.RelayRequest\x1a\x17.nokku.v1.RelayResponse\"\x06\xc2\xf3\x18\x02\x18\x01(\x010\x012\x8d\x05\n" +
+	"\fListSessions\x12\x1d.nokku.v1.ListSessionsRequest\x1a\x1e.nokku.v1.ListSessionsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12\\\n" +
+	"\rCreateSession\x12\x1e.nokku.v1.CreateSessionRequest\x1a\x1f.nokku.v1.CreateSessionResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x01(\x01H\x01\x12U\n" +
+	"\fCloseSession\x12\x1d.nokku.v1.CloseSessionRequest\x1a\x1e.nokku.v1.CloseSessionResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12F\n" +
+	"\x05Relay\x12\x16.nokku.v1.RelayRequest\x1a\x17.nokku.v1.RelayResponse\"\b\xc2\xf3\x18\x04\x18\x01P\x01(\x010\x012\x93\x05\n" +
 	"\x14DaemonControlService\x12U\n" +
-	"\fEnrollDaemon\x12\x1d.nokku.v1.EnrollDaemonRequest\x1a\x1e.nokku.v1.EnrollDaemonResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12O\n" +
+	"\fEnrollDaemon\x12\x1d.nokku.v1.EnrollDaemonRequest\x1a\x1e.nokku.v1.EnrollDaemonResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12Q\n" +
 	"\n" +
-	"SyncDaemon\x12\x1b.nokku.v1.SyncDaemonRequest\x1a\x1c.nokku.v1.SyncDaemonResponse\"\x06\xc2\xf3\x18\x02 \x01\x12J\n" +
-	"\aConnect\x12\x18.nokku.v1.ConnectRequest\x1a\x19.nokku.v1.ConnectResponse\"\x06\xc2\xf3\x18\x02 \x01(\x010\x01\x12V\n" +
-	"\vDaemonRelay\x12\x1c.nokku.v1.DaemonRelayRequest\x1a\x1d.nokku.v1.DaemonRelayResponse\"\x06\xc2\xf3\x18\x02 \x01(\x010\x01\x12j\n" +
+	"SyncDaemon\x12\x1b.nokku.v1.SyncDaemonRequest\x1a\x1c.nokku.v1.SyncDaemonResponse\"\b\xc2\xf3\x18\x04 \x01P\x01\x12L\n" +
+	"\aConnect\x12\x18.nokku.v1.ConnectRequest\x1a\x19.nokku.v1.ConnectResponse\"\b\xc2\xf3\x18\x04 \x01P\x01(\x010\x01\x12X\n" +
+	"\vDaemonRelay\x12\x1c.nokku.v1.DaemonRelayRequest\x1a\x1d.nokku.v1.DaemonRelayResponse\"\b\xc2\xf3\x18\x04 \x01P\x01(\x010\x01\x12j\n" +
 	"\x13SignHostCertificate\x12$.nokku.v1.SignHostCertificateRequest\x1a%.nokku.v1.SignHostCertificateResponse\"\x06\xc2\xf3\x18\x02 \x01\x12`\n" +
 	"\x0fUploadRecording\x12 .nokku.v1.UploadRecordingRequest\x1a!.nokku.v1.UploadRecordingResponse\"\x06\xc2\xf3\x18\x02 \x01(\x01\x12[\n" +
 	"\x0eUnenrollDaemon\x12\x1f.nokku.v1.UnenrollDaemonRequest\x1a .nokku.v1.UnenrollDaemonResponse\"\x06\xc2\xf3\x18\x02 \x01B\x8c\x01\n" +
@@ -2603,7 +2615,7 @@ func file_nokku_v1_daemon_proto_rawDescGZIP() []byte {
 }
 
 var file_nokku_v1_daemon_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nokku_v1_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_nokku_v1_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
 var file_nokku_v1_daemon_proto_goTypes = []any{
 	(DaemonStatus)(0),                   // 0: nokku.v1.DaemonStatus
 	(*Daemon)(nil),                      // 1: nokku.v1.Daemon
@@ -2647,38 +2659,38 @@ var file_nokku_v1_daemon_proto_goTypes = []any{
 	(*DaemonRelayResponse)(nil),         // 39: nokku.v1.DaemonRelayResponse
 	(*DaemonRelayReady)(nil),            // 40: nokku.v1.DaemonRelayReady
 	(*DaemonRelayClosed)(nil),           // 41: nokku.v1.DaemonRelayClosed
-	nil,                                 // 42: nokku.v1.Daemon.MetadataEntry
-	nil,                                 // 43: nokku.v1.EnrollDaemonRequest.MetadataEntry
-	nil,                                 // 44: nokku.v1.SyncDaemonRequest.MetadataEntry
-	(*timestamppb.Timestamp)(nil),       // 45: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),         // 46: google.protobuf.Duration
+	nil,                                 // 42: nokku.v1.EnrollDaemonRequest.MetadataEntry
+	nil,                                 // 43: nokku.v1.SyncDaemonRequest.MetadataEntry
+	(*timestamppb.Timestamp)(nil),       // 44: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),         // 45: google.protobuf.Duration
+	(*fieldmaskpb.FieldMask)(nil),       // 46: google.protobuf.FieldMask
 	(*UploadRecordingRequest)(nil),      // 47: nokku.v1.UploadRecordingRequest
 	(*UploadRecordingResponse)(nil),     // 48: nokku.v1.UploadRecordingResponse
 }
 var file_nokku_v1_daemon_proto_depIdxs = []int32{
 	0,  // 0: nokku.v1.Daemon.status:type_name -> nokku.v1.DaemonStatus
 	2,  // 1: nokku.v1.Daemon.config:type_name -> nokku.v1.DaemonConfig
-	42, // 2: nokku.v1.Daemon.metadata:type_name -> nokku.v1.Daemon.MetadataEntry
-	45, // 3: nokku.v1.Daemon.updated_at:type_name -> google.protobuf.Timestamp
-	45, // 4: nokku.v1.Daemon.created_at:type_name -> google.protobuf.Timestamp
-	45, // 5: nokku.v1.Daemon.last_seen_at:type_name -> google.protobuf.Timestamp
-	46, // 6: nokku.v1.DaemonConfig.idle_timeout:type_name -> google.protobuf.Duration
-	1,  // 7: nokku.v1.GetDaemonResponse.daemon:type_name -> nokku.v1.Daemon
-	0,  // 8: nokku.v1.UpdateDaemonRequest.status:type_name -> nokku.v1.DaemonStatus
-	2,  // 9: nokku.v1.UpdateDaemonRequest.config:type_name -> nokku.v1.DaemonConfig
+	44, // 2: nokku.v1.Daemon.updated_at:type_name -> google.protobuf.Timestamp
+	44, // 3: nokku.v1.Daemon.created_at:type_name -> google.protobuf.Timestamp
+	44, // 4: nokku.v1.Daemon.last_seen_at:type_name -> google.protobuf.Timestamp
+	45, // 5: nokku.v1.DaemonConfig.idle_timeout:type_name -> google.protobuf.Duration
+	1,  // 6: nokku.v1.GetDaemonResponse.daemon:type_name -> nokku.v1.Daemon
+	0,  // 7: nokku.v1.UpdateDaemonRequest.status:type_name -> nokku.v1.DaemonStatus
+	2,  // 8: nokku.v1.UpdateDaemonRequest.config:type_name -> nokku.v1.DaemonConfig
+	46, // 9: nokku.v1.UpdateDaemonRequest.update_mask:type_name -> google.protobuf.FieldMask
 	0,  // 10: nokku.v1.ListDaemonsRequest.status:type_name -> nokku.v1.DaemonStatus
 	1,  // 11: nokku.v1.ListDaemonsResponse.daemons:type_name -> nokku.v1.Daemon
 	31, // 12: nokku.v1.CreateSessionResponse.session:type_name -> nokku.v1.DaemonSession
 	31, // 13: nokku.v1.ListSessionsResponse.sessions:type_name -> nokku.v1.DaemonSession
-	43, // 14: nokku.v1.EnrollDaemonRequest.metadata:type_name -> nokku.v1.EnrollDaemonRequest.MetadataEntry
+	42, // 14: nokku.v1.EnrollDaemonRequest.metadata:type_name -> nokku.v1.EnrollDaemonRequest.MetadataEntry
 	0,  // 15: nokku.v1.EnrollDaemonResponse.status:type_name -> nokku.v1.DaemonStatus
 	2,  // 16: nokku.v1.EnrollDaemonResponse.config:type_name -> nokku.v1.DaemonConfig
-	44, // 17: nokku.v1.SyncDaemonRequest.metadata:type_name -> nokku.v1.SyncDaemonRequest.MetadataEntry
+	43, // 17: nokku.v1.SyncDaemonRequest.metadata:type_name -> nokku.v1.SyncDaemonRequest.MetadataEntry
 	0,  // 18: nokku.v1.SyncDaemonResponse.status:type_name -> nokku.v1.DaemonStatus
 	2,  // 19: nokku.v1.SyncDaemonResponse.config:type_name -> nokku.v1.DaemonConfig
 	19, // 20: nokku.v1.SyncDaemonResponse.principals:type_name -> nokku.v1.AccountPrincipals
 	22, // 21: nokku.v1.SyncDaemonResponse.retired_ca_keys:type_name -> nokku.v1.RetiredCAKey
-	45, // 22: nokku.v1.RetiredCAKey.trusted_until:type_name -> google.protobuf.Timestamp
+	44, // 22: nokku.v1.RetiredCAKey.trusted_until:type_name -> google.protobuf.Timestamp
 	29, // 23: nokku.v1.ConnectRequest.heartbeat:type_name -> nokku.v1.Heartbeat
 	30, // 24: nokku.v1.ConnectResponse.state_update:type_name -> nokku.v1.StateUpdate
 	32, // 25: nokku.v1.ConnectResponse.relay_open:type_name -> nokku.v1.RelayOpen
@@ -2763,7 +2775,7 @@ func file_nokku_v1_daemon_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_daemon_proto_rawDesc), len(file_nokku_v1_daemon_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   44,
+			NumMessages:   43,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

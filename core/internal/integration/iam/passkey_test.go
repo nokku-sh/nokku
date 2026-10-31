@@ -153,7 +153,7 @@ func TestPasskeyRegistrationNeedsARecentSignIn(t *testing.T) {
 	sess.CreatedAt = time.Now().Add(-time.Hour)
 	ctx := iam.ContextWithToken(as(t.Context(), o.ws, alice), *sess)
 
-	begin := post(ctx, e.svc.Passkey.BeginRegistration, "", nil)
+	begin := post(ctx, e.svc.RequireFresh(http.HandlerFunc(e.svc.Passkey.BeginRegistration)).ServeHTTP, "", nil)
 	assert.Equal(t, http.StatusUnauthorized, begin.Code, begin.Body.String())
 	assert.Zero(t, e.sessions(t, o.ws, alice.ID), "the old session lives on")
 }

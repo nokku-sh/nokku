@@ -159,14 +159,12 @@ func TestEndpointRemote(t *testing.T) {
 func TestSyncResultJSON(t *testing.T) {
 	t.Parallel()
 	target := &state.Target{Name: "web"}
-	plan := manual.NewPlan(
-		"ssh-ed25519 AAAA ca",
-		map[string][]string{"root": {"user-1"}},
-		manual.Host{Accounts: []string{"root"}, Principals: []string{"root", "gone"}},
-	)
+	plan, err := manual.NewPlan("ssh-ed25519 AAAA ca", "0199a0a0-0000-7000-8000-000000000002")
+	require.NoError(t, err)
 
+	var b []byte
 	for _, dryRun := range []bool{true, false} {
-		b, err := json.Marshal(newSyncResult(target, plan, nil, dryRun))
+		b, err = json.Marshal(newSyncResult(target, plan, nil, dryRun))
 		require.NoError(t, err)
 		var got struct {
 			Target string `json:"target"`
@@ -175,25 +173,22 @@ func TestSyncResultJSON(t *testing.T) {
 				Path    string `json:"path"`
 				Content string `json:"content"`
 			} `json:"files"`
-			Removed []string `json:"removed"`
 		}
 		require.NoError(t, json.Unmarshal(b, &got))
 
 		assert.Equal(t, "web", got.Target)
 		assert.Equal(t, dryRun, got.DryRun)
-		require.Len(t, got.Files, 3, "CA, drop-in, and one principals file")
-		assert.Equal(t, "/etc/ssh/nokku_principals/root", got.Files[2].Path)
-		assert.Equal(t, "user-1\n", got.Files[2].Content)
-		assert.Equal(t, []string{"/etc/ssh/nokku_principals/gone"}, got.Removed)
+		require.Len(t, got.Files, 2, "the CA and the drop-in")
+		assert.Equal(t, "/etc/ssh/nokku_ca.pub", got.Files[0].Path)
+		assert.Equal(t, "/etc/ssh/sshd_config.d/60-nokku.conf", got.Files[1].Path)
 	}
 
-	b, err := json.Marshal(newSyncResult(target, manual.Plan{}, nil, false))
+	b, err = json.Marshal(newSyncResult(target, plan, nil, false))
 	require.NoError(t, err)
-	assert.Contains(t, string(b), `"removed":[]`, "scripts get a list, never null")
 	assert.NotContains(t, string(b), "grants", "only a new target that starts with grants names them")
 
 	seeds := []client.Grant{{Account: "root", Subjects: []string{"me", "team:ops"}, Users: []string{"user-1"}}}
-	b, err = json.Marshal(newSyncResult(target, manual.Plan{}, seeds, true))
+	b, err = json.Marshal(newSyncResult(target, plan, seeds, true))
 	require.NoError(t, err)
 	assert.Contains(t, string(b), `"grants":{"root":["me","team:ops"]}`, "as typed, ids stay out")
 }

@@ -1,12 +1,10 @@
 <script lang="ts">
-	import SaveStatus from './SaveStatus.svelte';
 	import type { Snippet } from 'svelte';
 	import type { LucideIcon } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import type { SaveState } from '#lib/hooks/index.js';
 	import { cn } from '#lib/utils.js';
 	import { slide } from 'svelte/transition';
 
@@ -20,12 +18,8 @@
 		submitLabel?: string;
 		submitDisabled?: boolean;
 		onOpenChange?: (open: boolean) => void;
-		/** Between the header and the form, e.g. a stepper. */
-		before?: Snippet;
 		/** Replaces the submit button, e.g. with Back and Continue. */
 		footer?: Snippet;
-		/** Inline autosave status shown when there is no submit button */
-		saveState?: SaveState;
 		classModal?: string;
 		children: Snippet;
 	}
@@ -39,9 +33,7 @@
 		submitLabel = 'Create',
 		submitDisabled = false,
 		onOpenChange,
-		before,
 		footer,
-		saveState = 'idle',
 		classModal,
 		children
 	}: Props = $props();
@@ -78,25 +70,21 @@
 			{/if}
 		</Dialog.Header>
 
-		{@render before?.()}
-
 		<form onsubmit={submit}>
 			<Field.Group>{@render children()}</Field.Group>
 
-			{#if footer || onSubmit || saveState !== 'idle'}
+			{#if footer || onSubmit}
 				<div transition:slide={{ duration: 100 }}>
 					<Dialog.Footer class="mt-4 gap-2">
 						{#if footer}
 							{@render footer()}
-						{:else if onSubmit}
+						{:else}
 							<Button type="submit" disabled={submitting || submitDisabled}>
 								{#if submitting}
 									<Spinner data-icon="inline-start" />
 								{/if}
 								{submitLabel}
 							</Button>
-						{:else}
-							<SaveStatus state={saveState} />
 						{/if}
 					</Dialog.Footer>
 				</div>

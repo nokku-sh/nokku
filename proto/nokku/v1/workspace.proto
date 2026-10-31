@@ -4,6 +4,7 @@ package nokku.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 import "nokku/v1/account.proto";
@@ -18,7 +19,10 @@ service WorkspaceService {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
   rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (DeleteWorkspaceResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      fresh: true
+    };
   }
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
@@ -38,7 +42,10 @@ service WorkspaceService {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
   }
   rpc TransferOwnership(TransferOwnershipRequest) returns (TransferOwnershipResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      fresh: true
+    };
   }
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {
     option (access) = {public: true};
@@ -53,14 +60,12 @@ message Workspace {
   WorkspaceSettings settings = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
-  // requestable_tags names the targets members may ask access for. Set with SetRequestableTags.
   repeated string requestable_tags = 8;
 }
 
 message WorkspaceSettings {
   nokku.v1.DaemonConfig default_daemon_config = 1;
   bool enforce_sso = 2;
-  // session_idle_timeout closes interactive sessions on every daemon after that long without input. Zero is off.
   google.protobuf.Duration session_idle_timeout = 3 [(buf.validate.field).duration = {
     gte: {}
     lte: {seconds: 86400}
@@ -70,7 +75,6 @@ message WorkspaceSettings {
 message GetWorkspaceRequest {}
 message GetWorkspaceResponse {
   Workspace workspace = 1;
-  // base_url is where this workspace lives, the slug host on the hosted service. Callback and SCIM URLs start with it.
   string base_url = 2;
   // inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner subscribes.
   bool inactive = 3;
@@ -87,7 +91,6 @@ message GetWorkspaceResponse {
 message PlanFeature {
   string key = 1;
   string label = 2;
-  // plan is the code of the smallest plan that has the feature, every larger one has it too.
   string plan = 3;
 }
 
@@ -98,6 +101,22 @@ message UpdateWorkspaceRequest {
   }];
   string description = 2 [(buf.validate.field).string.max_len = 1000];
   WorkspaceSettings settings = 3;
+  google.protobuf.FieldMask update_mask = 4 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).field_mask = {
+      in: [
+        "name",
+        "description",
+        "settings.default_daemon_config.record_sessions",
+        "settings.default_daemon_config.allow_forwarding",
+        "settings.default_daemon_config.allow_agent_forwarding",
+        "settings.default_daemon_config.gateway_ports",
+        "settings.default_daemon_config.ephemeral",
+        "settings.enforce_sso",
+        "settings.session_idle_timeout"
+      ]
+    }
+  ];
 }
 message UpdateWorkspaceResponse {
   Workspace workspace = 1;

@@ -126,8 +126,9 @@
 					deleteConfig: can.edit
 						? {
 								itemName: row.original.name,
-								description:
-									'Everyone loses access to this target. Its login accounts and grants are removed.',
+								description: row.original.daemonId
+									? 'Everyone loses access to this target. Its login accounts, grants and daemon are removed.'
+									: 'Everyone loses access to this target. Its login accounts and grants are removed.',
 								typeToConfirm: row.original.name,
 								onDelete: () => deleteTarget.mutateAsync({ id: row.original.id })
 							}

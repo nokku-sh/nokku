@@ -69,8 +69,6 @@ export type GetBillingResponse = Message<"nokku.v1.GetBillingResponse"> & {
   subscription?: Subscription | undefined;
 
   /**
-   * held_quotas are the data limits of a plan that ended and still hold until held_until. Unset without a hold.
-   *
    * @generated from field: nokku.v1.Quotas held_quotas = 8;
    */
   heldQuotas?: Quotas | undefined;

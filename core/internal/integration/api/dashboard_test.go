@@ -27,7 +27,7 @@ func TestDashboardDaemons(t *testing.T) {
 
 	var all []*db.ListDaemonsRow
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
-		all, err = q.ListDaemons(t.Context(), &db.ListDaemonsParams{SeenAfter: time.Now().Add(-db.DaemonOnlineWindow)})
+		all, err = q.ListDaemons(t.Context(), &db.ListDaemonsParams{})
 		return err
 	})
 

@@ -14,22 +14,36 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-func newTestCA(t *testing.T) *db.SSHCA {
+// testCA is a CA row with the two signers CASigner would hand out for it.
+type testCA struct {
+	row        *db.SSHCA
+	user, host ssh.Signer
+}
+
+func newTestCA(t *testing.T) testCA {
 	t.Helper()
 
-	info, err := NewCA()
+	user, host, err := newKeys()
 	if err != nil {
-		t.Fatalf("NewCA failed: %v", err)
+		t.Fatalf("newKeys failed: %v", err)
 	}
-	return &db.SSHCA{
-		PrivateKey:     info.PrivateKey,
-		PublicKey:      info.PublicKey,
-		HostPrivateKey: info.HostPrivateKey,
-		HostPublicKey:  info.HostPublicKey,
-		UserDefaultTtl: 24 * time.Hour,
-		UserMaxTtl:     168 * time.Hour,
-		HostDefaultTtl: 2160 * time.Hour,
-		HostMaxTtl:     4320 * time.Hour,
+	signer := func(k caKey) ssh.Signer {
+		s, err := getSigner(k.private)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	return testCA{
+		row: &db.SSHCA{
+			PublicKey:      user.public,
+			HostPublicKey:  host.public,
+			UserDefaultTtl: 24 * time.Hour,
+			UserMaxTtl:     168 * time.Hour,
+			HostTtl:        2160 * time.Hour,
+		},
+		user: signer(user),
+		host: signer(host),
 	}
 }
 
@@ -84,23 +98,22 @@ func validity(cert *ssh.Certificate) time.Duration {
 }
 
 func TestNewCA(t *testing.T) {
-	info, err := NewCA()
+	user, host, err := newKeys()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, key := range map[string]string{"user": info.PublicKey, "host": info.HostPublicKey} {
-		if got := parseKey(t, key).Type(); got != ssh.KeyAlgoED25519 {
+	for name, key := range map[string]caKey{"user": user, "host": host} {
+		if got := parseKey(t, key.public).Type(); got != ssh.KeyAlgoED25519 {
 			t.Errorf("%s key is %s, want Ed25519", name, got)
 		}
-	}
-	if info.PublicKey == info.HostPublicKey {
-		t.Error("the user and the host key must differ")
-	}
-	for name, der := range map[string][]byte{"user": info.PrivateKey.Bytes(), "host": info.HostPrivateKey.Bytes()} {
-		if _, err := x509.ParsePKCS8PrivateKey(der); err != nil {
+		if _, err := x509.ParsePKCS8PrivateKey(key.private); err != nil {
 			t.Errorf("%s private key is not PKCS#8: %v", name, err)
 		}
 	}
+	if user.public == host.public {
+		t.Error("the user and the host key must differ")
+	}
+	info := NewCA()
 	if info.UserDefaultTtl != 16*time.Hour || info.UserMaxTtl != 7*24*time.Hour {
 		t.Errorf("user certificates default to %v, at most %v", info.UserDefaultTtl, info.UserMaxTtl)
 	}

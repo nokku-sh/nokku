@@ -3,11 +3,14 @@
 package api_test
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,6 +24,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/api"
+	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -157,4 +161,98 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 	require.NoError(t, send.Close())
 	assert.Equal(t, http.StatusOK, <-status, "a request under way was cut by the shutdown")
 	assert.NoError(t, <-stopped)
+}
+
+// The core only speaks plain HTTP. Its proxy forwards in h2c, and a client that connects by itself goes to https.
+func TestPlainHTTPIsForTheProxy(t *testing.T) {
+	cfg, _ := newTestAPI(t)
+	named := *cfg
+	named.BaseURL = "nokku.example.com"
+	base := startCore(t, &named)
+
+	var h2c http.Protocols
+	h2c.SetUnencryptedHTTP2(true)
+	req, err := http.NewRequestWithContext(
+		t.Context(), http.MethodPost, base+nokkuv1connect.UtilServiceGetVersionProcedure, strings.NewReader("{}"),
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	resp, err := (&http.Client{Transport: &http.Transport{Protocols: &h2c}}).Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "the proxy for a client on https is served")
+	assert.Equal(t, 2, resp.ProtoMajor, "nk and nokkud speak gRPC through the proxy, that needs h2c")
+
+	noFollow := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	resp, err = noFollow.Get(base + "/login?next=%2F")
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode, "a client that connects by itself is sent to https")
+	assert.Equal(t, "https://nokku.example.com/login?next=%2F", resp.Header.Get("Location"))
+}
+
+// startCore runs the real server of cfg on a free port, the way the binary does, and returns its address.
+func startCore(t *testing.T, cfg *config.Config) string {
+	t.Helper()
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	_, port, err := net.SplitHostPort(free.Addr().String())
+	require.NoError(t, err)
+	require.NoError(t, free.Close())
+	cfg.Port = port
+	base := "http://127.0.0.1:" + port
+
+	ctx, stop := context.WithCancel(context.WithoutCancel(t.Context()))
+	stopped := make(chan error, 1)
+	go func() { stopped <- api.New(cfg).Start(ctx) }()
+	t.Cleanup(func() {
+		stop()
+		assert.NoError(t, <-stopped)
+	})
+	require.Eventually(t, func() bool {
+		resp, err := http.Get(base + "/healthz")
+		if err != nil {
+			return false
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode == http.StatusOK
+	}, 5*time.Second, 20*time.Millisecond, "the server never listened")
+	return base
+}
+
+// The owner's link is a way into the workspace, and a log line can travel to a telemetry backend.
+func TestOwnerLinkStaysOutOfTheLog(t *testing.T) {
+	var out logLines
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&out, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	cfg, _ := newTestAPI(t)
+	fresh := *cfg
+	fresh.OwnerNeedsLink = true
+	startCore(t, &fresh)
+
+	assert.Contains(t, out.String(), "run nokku admin-link")
+	assert.NotContains(t, out.String(), "/login/verify")
+}
+
+// logLines collects what the server logs from its own goroutine.
+type logLines struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (l *logLines) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.Write(p)
+}
+
+func (l *logLines) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.String()
 }

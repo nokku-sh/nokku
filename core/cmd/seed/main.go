@@ -14,7 +14,6 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
-	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -56,7 +55,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	ctx, conn, ws, err := open(ctx, ec)
+	ctx, conn, keys, ws, err := open(ctx, ec)
 	if err != nil {
 		return err
 	}
@@ -69,7 +68,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		daemons:         cmd.Int("daemons"),
 	}
 	err = conn.TenantTx(ctx, func(q *db.Queries) error {
-		return seed(ctx, q, ws, n)
+		return seed(ctx, q, keys, ws, n)
 	})
 	// The names are random, now and then one is taken already.
 	if db.IsUniqueViolation(err) || errors.Is(err, pgx.ErrNoRows) {
@@ -85,27 +84,27 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// open takes only the database and the keys, the server may be running next to this. The ctx carries the first workspace.
-func open(ctx context.Context, ec config.EnvConfig) (context.Context, *db.Connection, *db.Workspace, error) {
+// open takes only the database and the keys, the server may be running next to this. The ctx carries the first
+// workspace. Keys and provider secrets are sealed with the keyset on their way into the database.
+func open(
+	ctx context.Context,
+	ec config.EnvConfig,
+) (context.Context, *db.Connection, *kms.Keyset, *db.Workspace, error) {
 	conn, err := db.NewConnection(ctx)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	ws, err := conn.Sys().GetFirstWorkspace(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil, nil, errors.New("there is no workspace yet, start the server once")
+		return nil, nil, nil, nil, errors.New("there is no workspace yet, start the server once")
 	}
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	// Keys and provider secrets are encrypted on their way into the database.
-	enc, err := kms.New(ctx, conn, ec.Secret)
+	keys, err := kms.New(ctx, conn, false)
 	if err != nil {
-		return nil, nil, nil, err
-	}
-	if err := crypto.SetEncryptor(enc); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: ec.FullURL()})
-	return ctx, conn, ws, nil
+	return ctx, conn, keys, ws, nil
 }

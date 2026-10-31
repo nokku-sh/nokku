@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/netip"
-	"regexp"
 	"slices"
 	"time"
 
@@ -13,14 +13,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
-	nokkussh "github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 type SyncInput struct {
 	DaemonID    string
-	Metadata    []byte
+	Version     string
 	ReqMetadata map[string]string
 	Users       []string
 	PrivateIPs  []string
@@ -37,8 +37,11 @@ type Synced struct {
 	HostCAPublicKey string
 }
 
+// Sync answers a server with what it may trust, then saves what the server reported about itself. The save runs on
+// its own, a failed one never keeps a server from its principal list.
 func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	res := &Synced{}
+	var targetID string
 	err := conn.TenantTx(ctx, func(q *db.Queries) error {
 		daemon, err := q.GetDaemon(ctx, in.DaemonID)
 		if err != nil {
@@ -67,66 +70,35 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			return err
 		}
 
-		// Never write status here, the combined update would clobber an admin's accept or reject.
-		if err := q.UpdateDaemonMetadata(ctx, &db.UpdateDaemonMetadataParams{
-			DaemonID: daemon.ID,
-			Metadata: in.Metadata,
-		}); err != nil {
-			return err
-		}
-
 		target, err := q.GetTargetByDaemon(ctx, &daemon.ID)
 		if err != nil {
 			return err
 		}
+		targetID = target.ID
 
-		// The daemon trusts exactly what it gets here, so only a target without a CA may answer empty.
 		ca, err := q.GetDaemonCAKeys(ctx, &daemon.ID)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		if err == nil {
-			res.CAPublicKey = ca.PublicKey
-			res.HostCAPublicKey = ca.HostPublicKey
-			if ca.PreviousPublicKey != nil && ca.PreviousTrustedUntil != nil &&
-				time.Now().Before(*ca.PreviousTrustedUntil) {
-				res.RetiredCAs = []*nokkuv1.RetiredCAKey{{
-					PublicKey:    ca.PreviousPublicKey,
-					TrustedUntil: timestamppb.New(*ca.PreviousTrustedUntil),
-				}}
-			}
-		}
-
-		targetMeta, err := json.Marshal(in.ReqMetadata)
 		if err != nil {
 			return err
 		}
-		if err := q.UpdateTargetReport(ctx, &db.UpdateTargetReportParams{
-			TargetID:  target.ID,
-			Metadata:  targetMeta,
-			Endpoints: validEndpoints(in.PrivateIPs),
-		}); err != nil {
-			return err
-		}
-
-		// Never deletes, a host that cannot enumerate users must not change who has access.
-		if err := q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
-			TargetID:    target.ID,
-			Usernames:   ValidUsers(in.Users),
-			MaxAccounts: db.MaxTargetAccounts,
-		}); err != nil {
-			return err
+		res.CAPublicKey = ca.PublicKey
+		res.HostCAPublicKey = ca.HostPublicKey
+		if ca.PreviousPublicKey != nil && ca.PreviousTrustedUntil != nil &&
+			time.Now().Before(*ca.PreviousTrustedUntil) {
+			res.RetiredCAs = []*nokkuv1.RetiredCAKey{{
+				PublicKey:    ca.PreviousPublicKey,
+				TrustedUntil: timestamppb.New(*ca.PreviousTrustedUntil),
+			}}
 		}
 
 		result, err := q.ListAccountSubjectsForTarget(ctx, target.ID)
 		if err != nil {
 			return err
 		}
-		// The host compares these as they are, see ssh.LoginPrincipal.
+		// The host compares these as they are, see login.Principal.
 		for _, p := range result {
 			principals := make([]string, 0, len(p.Ids))
 			for _, id := range p.Ids {
-				principals = append(principals, nokkussh.LoginPrincipal(id, target.ID, p.Username))
+				principals = append(principals, login.Principal(id, target.ID, p.Username))
 			}
 			res.Principals = append(res.Principals, &nokkuv1.AccountPrincipals{
 				Username:       &p.Username,
@@ -149,16 +121,49 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	if err != nil {
 		return nil, err
 	}
+	if targetID != "" {
+		if err := saveReport(ctx, conn, in, targetID); err != nil {
+			slog.Warn("server report not saved", "daemon_id", in.DaemonID, "error", err)
+		}
+	}
 	return res, nil
 }
 
-// usernameRE is the username pattern of the protos, keep them in sync.
-var usernameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9._-]*\$?$`)
+// saveReport keeps what the host said about itself. An account it adds has no grants yet, so the principal list
+// read before never misses one.
+func saveReport(ctx context.Context, conn connection, in SyncInput, targetID string) error {
+	targetMeta, err := json.Marshal(in.ReqMetadata)
+	if err != nil {
+		return err
+	}
+	return conn.TenantTx(ctx, func(q *db.Queries) error {
+		// Never write status here, the combined update would clobber an admin's accept or reject.
+		if err := q.UpdateDaemonVersion(ctx, &db.UpdateDaemonVersionParams{
+			DaemonID: in.DaemonID,
+			Version:  in.Version,
+		}); err != nil {
+			return err
+		}
+		if err := q.UpdateTargetReport(ctx, &db.UpdateTargetReportParams{
+			TargetID:  targetID,
+			Metadata:  targetMeta,
+			Endpoints: validEndpoints(in.PrivateIPs),
+		}); err != nil {
+			return err
+		}
+		// Never deletes, a host that cannot enumerate users must not change who has access.
+		return q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
+			TargetID:    targetID,
+			Usernames:   ValidUsers(in.Users),
+			MaxAccounts: db.MaxTargetAccounts,
+		})
+	})
+}
 
 // ValidUsers drops per entry, a host with one odd account must still sync.
 func ValidUsers(names []string) []string {
 	return slices.DeleteFunc(slices.Clone(names), func(name string) bool {
-		return len(name) > 32 || !usernameRE.MatchString(name)
+		return !login.ValidUsername(name)
 	})
 }
 

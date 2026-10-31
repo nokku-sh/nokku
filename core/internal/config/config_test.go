@@ -92,7 +92,7 @@ func TestUnsetEnvironmentIsTheLocalListener(t *testing.T) {
 	assert.Equal(t, "http://localhost:3000", ec.FullURL())
 }
 
-// Only a proxy on this machine works with nothing set. One in a private network has to be named.
+// With nothing set, a proxy on this machine or a private network names the client, so docker and k8s just work.
 func TestProxiesTrustedByDefault(t *testing.T) {
 	t.Setenv("NOKKU_TRUSTED_PROXIES", "")
 	ec, err := env.ParseAs[EnvConfig]()
@@ -100,12 +100,12 @@ func TestProxiesTrustedByDefault(t *testing.T) {
 	require.NoError(t, realip.SetTrustedProxies(ec.TrustedProxies))
 	t.Cleanup(func() { _ = realip.SetTrustedProxies(nil) })
 
-	forwarded := http.Header{"X-Forwarded-Proto": {"https"}}
-	for _, peer := range []string{"127.0.0.1", "::1"} {
-		assert.Equal(t, "https", realip.Proto(forwarded, net.JoinHostPort(peer, "4242")), peer)
+	forwarded := http.Header{"X-Forwarded-For": {"203.0.113.9"}}
+	for _, peer := range []string{"127.0.0.1", "::1", "10.42.0.7", "172.28.0.3", "192.168.1.20", "fd00::3"} {
+		assert.Equal(t, "203.0.113.9", realip.Client(forwarded, net.JoinHostPort(peer, "4242")), peer)
 	}
-	for _, peer := range []string{"10.42.0.7", "172.28.0.3", "192.168.1.20", "fd00::3", "203.0.113.7", "2001:db8::1"} {
-		assert.Empty(t, realip.Proto(forwarded, net.JoinHostPort(peer, "4242")), peer)
+	for _, peer := range []string{"203.0.113.7", "2001:db8::1"} {
+		assert.Equal(t, peer, realip.Client(forwarded, net.JoinHostPort(peer, "4242")), peer)
 	}
 
 	t.Setenv("NOKKU_TRUSTED_PROXIES", "203.0.113.7")

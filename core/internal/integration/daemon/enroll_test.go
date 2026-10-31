@@ -10,12 +10,16 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 // fixture is a connection plus a context pinned to a fresh workspace, like the tenant middleware pins a request.
@@ -43,13 +47,18 @@ func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, 
 		}); err != nil {
 			return err
 		}
-		params := &db.CreateJoinTokenParams{
-			ID:   uuid.NewV7().String(),
-			Kind: nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL,
+		// Like tenant.Create, every workspace has a default CA. Enroll and sync only read its public keys.
+		ca := ssh.NewCA()
+		ca.Name, ca.PublicKey, ca.HostPublicKey = "default", "pub", "host-pub"
+		created, err := q.CreateCA(ctx, ca)
+		if err != nil {
+			return err
 		}
-		token := crypto.NewToken(params.ID)
-		params.TokenHash = token.Hash
-		plaintext = token.Plaintext
+		if err := q.SetDefaultCA(ctx, created.ID); err != nil {
+			return err
+		}
+		params := &db.CreateJoinTokenParams{}
+		plaintext, params.TokenHash = crypto.NewToken(crypto.TokenEnroll)
 		if tweak != nil {
 			tweak(params)
 		}
@@ -187,4 +196,21 @@ func TestEnrollRejectsBadToken(t *testing.T) {
 	if quota {
 		t.Fatal("quota checked before the token verified")
 	}
+}
+
+// A server with a daemon is one resource toward the plan's cap. The daemon is part of its target.
+func TestEnrolledServerCountsOnce(t *testing.T) {
+	f, token := enrollToken(t, nil)
+	ws, _ := actor.WorkspaceFromContext(f.ctx)
+	count := func() int64 {
+		t.Helper()
+		n, err := f.conn.Sys().CountWorkspaceResources(f.ctx, ws.ID)
+		require.NoError(t, err)
+		return n
+	}
+
+	before := count()
+	_, err := enroll(t, f, daemon.EnrollInput{Token: token})
+	require.NoError(t, err)
+	assert.Equal(t, before+1, count())
 }

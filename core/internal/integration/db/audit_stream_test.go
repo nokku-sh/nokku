@@ -5,6 +5,7 @@ package db_test
 import (
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5"
 
@@ -16,7 +17,7 @@ func TestAuditLogsAfterTheCursor(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 	old := time.Now().Add(-time.Minute)
-	_, err := c.sysPool.Exec(t.Context(), `
+	_, err := pinnedConn(t, c, f.ws).Exec(t.Context(), `
 		INSERT INTO audit.audit_logs (workspace_id, action, ok, timestamp) VALUES
 			($1, 'First', TRUE, $2), ($1, 'Second', TRUE, $3), ($1, 'Fresh', TRUE, NOW());
 	`, pgx.QueryExecModeSimpleProtocol, f.ws, old, old.Add(time.Second))
@@ -34,7 +35,7 @@ func TestAuditLogsAfterTheCursor(t *testing.T) {
 		return rows
 	}
 
-	rows := after(old.Add(-time.Hour), "00000000-0000-0000-0000-000000000000")
+	rows := after(old.Add(-time.Hour), uuid.Nil().String())
 	if len(rows) != 2 || rows[0].Action != "First" || rows[1].Action != "Second" {
 		t.Fatalf("want First and Second in order, the fresh row waits: got %d rows", len(rows))
 	}

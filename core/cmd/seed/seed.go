@@ -12,6 +12,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
+	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/namegen"
@@ -53,7 +54,7 @@ type subjects struct {
 	users, teams, serviceAccounts []string
 }
 
-func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error {
+func seed(ctx context.Context, q *db.Queries, keys *kms.Keyset, ws *db.Workspace, n counts) error {
 	// Unique within the run. A name another run took fails the insert.
 	taken := map[string]bool{}
 	fresh := func() string {
@@ -106,7 +107,7 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 			return fmt.Errorf("service account: %w", err)
 		}
 		// The key is thrown away, nobody signs in as these.
-		_, hash := crypto.NewKey(crypto.KeyPrefixServiceAccount)
+		_, hash := crypto.NewToken(crypto.TokenServiceAccount)
 		tok := &db.CreateAccessTokenParams{
 			TokenHash: hash,
 			Kind:      string(actor.KindServiceAccount),
@@ -126,12 +127,9 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 	// No CA on a server means the default one of the workspace.
 	cas := []*string{nil}
 	for range n.cas {
-		ca, err := ssh.NewCA()
-		if err != nil {
-			return err
-		}
+		ca := ssh.NewCA()
 		ca.Name = fresh() + " CA"
-		row, err := q.CreateCA(ctx, ca)
+		row, err := ssh.CreateCA(ctx, q, keys, ca)
 		if err != nil {
 			return fmt.Errorf("certificate authority: %w", err)
 		}
@@ -165,7 +163,7 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 			Name:          fresh(),
 			Status:        status,
 			Config:        config,
-			Metadata:      []byte(`{"user-agent": "nokkud/seed (linux/amd64)"}`),
+			Version:       "seed",
 			KeyThumbprint: new(crypto.RandomString(43)),
 		})
 		if err != nil {

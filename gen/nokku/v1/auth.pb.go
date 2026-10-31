@@ -299,13 +299,12 @@ func (*GetLoginOptionsRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetLoginOptionsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkspaceName *string                `protobuf:"bytes,1,opt,name=workspace_name,json=workspaceName" json:"workspace_name,omitempty"`
-	MagicLink     *bool                  `protobuf:"varint,2,opt,name=magic_link,json=magicLink" json:"magic_link,omitempty"`
-	Passkey       *bool                  `protobuf:"varint,3,opt,name=passkey" json:"passkey,omitempty"`
-	Providers     []*SSOProviderInfo     `protobuf:"bytes,4,rep,name=providers" json:"providers,omitempty"`
-	// Mail goes out at all. magic_link is off while single sign-on is required, this is not.
-	EmailConfigured *bool `protobuf:"varint,5,opt,name=email_configured,json=emailConfigured" json:"email_configured,omitempty"`
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceName   *string                `protobuf:"bytes,1,opt,name=workspace_name,json=workspaceName" json:"workspace_name,omitempty"`
+	MagicLink       *bool                  `protobuf:"varint,2,opt,name=magic_link,json=magicLink" json:"magic_link,omitempty"`
+	Passkey         *bool                  `protobuf:"varint,3,opt,name=passkey" json:"passkey,omitempty"`
+	EmailConfigured *bool                  `protobuf:"varint,4,opt,name=email_configured,json=emailConfigured" json:"email_configured,omitempty"`
+	Providers       []*SSOProviderInfo     `protobuf:"bytes,5,rep,name=providers" json:"providers,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -361,18 +360,18 @@ func (x *GetLoginOptionsResponse) GetPasskey() bool {
 	return false
 }
 
-func (x *GetLoginOptionsResponse) GetProviders() []*SSOProviderInfo {
-	if x != nil {
-		return x.Providers
-	}
-	return nil
-}
-
 func (x *GetLoginOptionsResponse) GetEmailConfigured() bool {
 	if x != nil && x.EmailConfigured != nil {
 		return *x.EmailConfigured
 	}
 	return false
+}
+
+func (x *GetLoginOptionsResponse) GetProviders() []*SSOProviderInfo {
+	if x != nil {
+		return x.Providers
+	}
+	return nil
 }
 
 type SSOProviderInfo struct {
@@ -606,9 +605,9 @@ const file_nokku_v1_auth_proto_rawDesc = "" +
 	"\x0eworkspace_name\x18\x01 \x01(\tR\rworkspaceName\x12\x1d\n" +
 	"\n" +
 	"magic_link\x18\x02 \x01(\bR\tmagicLink\x12\x18\n" +
-	"\apasskey\x18\x03 \x01(\bR\apasskey\x127\n" +
-	"\tproviders\x18\x04 \x03(\v2\x19.nokku.v1.SSOProviderInfoR\tproviders\x12)\n" +
-	"\x10email_configured\x18\x05 \x01(\bR\x0femailConfigured\"F\n" +
+	"\apasskey\x18\x03 \x01(\bR\apasskey\x12)\n" +
+	"\x10email_configured\x18\x04 \x01(\bR\x0femailConfigured\x127\n" +
+	"\tproviders\x18\x05 \x03(\v2\x19.nokku.v1.SSOProviderInfoR\tproviders\"F\n" +
 	"\x0fSSOProviderInfo\x12\x1f\n" +
 	"\vprovider_id\x18\x01 \x01(\tR\n" +
 	"providerId\x12\x12\n" +

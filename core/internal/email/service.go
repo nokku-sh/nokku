@@ -16,6 +16,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
 )
 
@@ -76,6 +77,11 @@ type sendRequest struct {
 	data     any
 }
 
+const sendTimeout = 10 * time.Second
+
+// relayCheckTimeout bounds the check at boot. Tests shorten it.
+var relayCheckTimeout = 3 * time.Second
+
 func New(ctx context.Context, appURL string) (*Service, error) {
 	svc, err := env.ParseAs[Service]()
 	if err != nil {
@@ -91,11 +97,16 @@ func New(ctx context.Context, appURL string) (*Service, error) {
 	if svc.From == "" {
 		return nil, errors.New("NOKKU_EMAIL_SENDER is required when NOKKU_SMTP_HOST is set")
 	}
-	relay, err := newSMTPSender(svc.SMTPHost, svc.SMTPPort, svc.SMTPUsername, svc.SMTPPassword)
+	relay, err := newSMTPSender(svc.SMTPHost, svc.SMTPPort, svc.SMTPUsername, svc.SMTPPassword, sendTimeout)
 	if err != nil {
 		return nil, err
 	}
-	if err := relay.checkLogin(ctx); err != nil {
+	// A client of its own, go-mail keeps to ctx only while it dials and a relay that hangs must not hold up the start.
+	probe, err := newSMTPSender(svc.SMTPHost, svc.SMTPPort, svc.SMTPUsername, svc.SMTPPassword, relayCheckTimeout)
+	if err != nil {
+		return nil, err
+	}
+	if err := probe.checkLogin(ctx); err != nil {
 		// 535 is the relay refusing the credentials. Anything else may be an outage, the server still starts.
 		if e, ok := errors.AsType[*textproto.Error](err); ok && e.Code == 535 {
 			return nil, fmt.Errorf(
@@ -166,21 +177,23 @@ func (s *Service) EmailChangeOnCooldown(userID string) bool {
 	return on
 }
 
-// SendSignupLinkEmail goes to someone without an account yet, so the cooldown is keyed by the address.
-func (s *Service) SendSignupLinkEmail(
+// SendInviteEmail goes to someone without an account yet, so the cooldown is keyed by the address. Each workspace
+// has its own, another one's invite is none of its business.
+func (s *Service) SendInviteEmail(
 	ctx context.Context,
-	email, name, workspace, link string,
+	email, workspace, role, link string,
 	expiry time.Duration,
 ) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   email,
+		ref:      actor.WorkspaceIDFromContext(ctx),
 		to:       email,
 		subject:  "Join " + workspace + " on Nokku",
-		template: "signup-link",
-		data: signupTemplateData{
+		template: "invite",
+		data: inviteTemplateData{
 			Operator:   s.Operator,
-			UserName:   name,
 			Workspace:  workspace,
+			Role:       role,
 			LinkURL:    link,
 			Expiration: lifetime(expiry),
 		},
@@ -208,6 +221,7 @@ func (s *Service) SendEmailChangeNotice(
 	})
 }
 
+// SendNewLoginEmail goes out once per device, a second device signing in right after gets its own.
 func (s *Service) SendNewLoginEmail(
 	ctx context.Context,
 	userID, email, deviceID, deviceName, ip string,
@@ -217,11 +231,30 @@ func (s *Service) SendNewLoginEmail(
 		to:       email,
 		subject:  "New sign-in from " + deviceName,
 		template: "new-login",
+		ref:      deviceID,
 		data: newLoginTemplateData{
 			Operator:   s.Operator,
 			ProfileURL: s.appURL + "/profile/security",
 			DeviceID:   deviceID,
 			DeviceName: deviceName,
+			IPAddress:  ip,
+			EventTime:  time.Now().UTC().Format(mailTime),
+		},
+	})
+}
+
+// SendNewWayInEmail tells the account about a passkey or provider it gained, one mail for each.
+func (s *Service) SendNewWayInEmail(ctx context.Context, userID, email, credentialID, what, ip string) error {
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   userID,
+		to:       email,
+		subject:  "New way to sign in to your account",
+		template: "new-way-in",
+		ref:      credentialID,
+		data: newWayInTemplateData{
+			Operator:   s.Operator,
+			ProfileURL: s.appURL + "/profile/security",
+			What:       what,
 			IPAddress:  ip,
 			EventTime:  time.Now().UTC().Format(mailTime),
 		},

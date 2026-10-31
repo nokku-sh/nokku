@@ -33,7 +33,11 @@ func main() {
 			return ctx, nil
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			cfg, err := config.New(ctx, cmd)
+			// The database and the jobs outlive the signal until the server is done, a request in its shutdown
+			// grace still reaches the database and writes its audit event.
+			running, stop := context.WithCancel(context.WithoutCancel(ctx))
+			defer stop()
+			cfg, err := config.New(running, cmd)
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
@@ -66,7 +70,11 @@ func main() {
 					if err != nil {
 						return err
 					}
-					svc, err := iam.New(ctx, iam.Deps{Conn: conn, Secret: []byte(ec.Secret)})
+					keys, err := kms.New(ctx, conn, false)
+					if err != nil {
+						return err
+					}
+					svc, err := iam.New(ctx, iam.Deps{Conn: conn, Keyset: keys})
 					if err != nil {
 						return err
 					}
@@ -92,14 +100,16 @@ func main() {
 					"The current key is the one the server runs with: KMS_URI when " +
 					"set, NOKKU_SECRET otherwise. The new one is specified as:\n" +
 					"  secret:<value>  a new NOKKU_SECRET (at least 32 characters)\n" +
-					"  kms:<uri>       hcvault:// or scw-kms:// (Enterprise)\n\n" +
+					"  kms:<uri>       hcvault:// or scw-kms://\n\n" +
 					"Examples:\n" +
 					"  nokku rotate-secrets --new secret:NEW\n" +
 					"  nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku\n\n" +
+					"Pass the current kms:<uri> again after the KMS rotated its key, before " +
+					"old key versions are retired there.\n\n" +
 					"KMS credentials (VAULT_TOKEN, ...) are read from the environment. " +
 					"Run it with the server stopped, a running one cannot read what was " +
-					"re-encrypted. Then set NOKKU_SECRET or KMS_URI to the new value and " +
-					"start it. The server refuses to start with the old one.",
+					"re-encrypted. Then set NOKKU_SECRET or KMS_URI to the new value, remove " +
+					"the other one and start it. The server refuses to start with the old one.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "new",
@@ -113,18 +123,17 @@ func main() {
 					if err != nil {
 						return fmt.Errorf("failed to connect to database: %w", err)
 					}
-					ec, err := env.ParseAs[config.EnvConfig]()
-					if err != nil {
-						return err
-					}
-					enc, err := kms.New(ctx, conn, ec.Secret)
+					// False on the hosted service too, a move to a KMS opens a keyset the secret still wraps.
+					enc, err := kms.New(ctx, conn, false)
 					if err != nil {
 						return fmt.Errorf("current keys: %w", err)
 					}
 					if err := enc.Rotate(ctx, cmd.String("new")); err != nil {
 						return fmt.Errorf("failed to rotate: %w", err)
 					}
-					fmt.Println("keys rotated, set NOKKU_SECRET or KMS_URI to the new value and start the server")
+					fmt.Println(
+						"keys rotated, set NOKKU_SECRET or KMS_URI to the new value, remove the other and start the server",
+					)
 					return nil
 				},
 			},

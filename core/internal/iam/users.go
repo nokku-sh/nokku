@@ -13,8 +13,8 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// normalizeEmail matches the schema's email = lower(email) check.
-func normalizeEmail(email string) string {
+// NormalizeEmail matches the schema's email = lower(email) check.
+func NormalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
@@ -50,7 +50,7 @@ func (s *Service) getUser(ctx context.Context, id string) (*db.User, error) {
 }
 
 func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, error) {
-	u, err := s.conn.Tenant().GetUserByEmail(ctx, normalizeEmail(email))
+	u, err := s.conn.Tenant().GetUserByEmail(ctx, NormalizeEmail(email))
 	if err != nil {
 		return nil, mapNotFound(err)
 	}

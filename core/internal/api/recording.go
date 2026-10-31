@@ -16,7 +16,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/storage"
+	"github.com/nokku-sh/nokku/core/internal/recording"
 )
 
 type recordingService struct {
@@ -28,6 +28,7 @@ func (s *recordingService) ListRecordings(
 	req *nokkuv1.ListRecordingsRequest,
 ) (*nokkuv1.ListRecordingsResponse, error) {
 	params := &db.ListRecordingsParams{
+		Connected: s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
 		DaemonID:  req.DaemonId,
 		Username:  req.Username,
 		SubjectID: req.SubjectId,
@@ -55,7 +56,7 @@ func (s *recordingService) ListRecordings(
 			total = r.TotalCount
 		}
 		rec := r.Recording.ToProto()
-		rec.Held = &r.Held
+		rec.Live = &r.Live
 		recordings = append(recordings, rec)
 	}
 	return &nokkuv1.ListRecordingsResponse{
@@ -92,9 +93,11 @@ func (s *recordingService) GetRecording(
 	})
 
 	fr, err := s.cfg.Record.OpenReader(ctx, rec)
+	if errors.Is(err, recording.ErrNotStored) {
+		return newError(connect.CodeFailedPrecondition, err.Error())
+	}
 	if err != nil {
-		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
-		return errInternal
+		return err
 	}
 	defer func() { _ = fr.Close() }()
 
@@ -125,28 +128,9 @@ func (s *recordingService) DeleteRecording(
 	ctx context.Context,
 	req *nokkuv1.DeleteRecordingRequest,
 ) (*nokkuv1.DeleteRecordingResponse, error) {
-	q := s.cfg.Conn.Tenant()
-	deleted, err := q.DeleteRecording(ctx, req.GetRecordingId())
-	if err != nil {
+	// The object goes through the delete queue. Without its row and the key on it, nobody can read it meanwhile.
+	if _, err := s.cfg.Conn.Tenant().DeleteRecording(ctx, req.GetRecordingId()); err != nil {
 		return nil, err
-	}
-	if deleted == 0 {
-		held, err := q.RecordingHeld(ctx, req.GetRecordingId())
-		if err != nil {
-			return nil, err
-		}
-		if held {
-			return nil, newError(connect.CodeFailedPrecondition, "a legal hold keeps this recording, release it first")
-		}
-		// Gone already, and so is its object.
-		return &nokkuv1.DeleteRecordingResponse{}, nil
-	}
-	// Best effort, a stray object goes with the workspace purge.
-	if err := s.cfg.Storage.Delete(
-		ctx,
-		storage.RecordingPath(actor.WorkspaceIDFromContext(ctx), req.GetRecordingId()),
-	); err != nil {
-		slog.Warn("delete recording object", "recording_id", req.GetRecordingId(), "error", err)
 	}
 	return &nokkuv1.DeleteRecordingResponse{}, nil
 }

@@ -6,8 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"log/slog"
+	"net/http"
 	"net/url"
-	"strings"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 	"gocloud.dev/blob"
@@ -15,6 +18,9 @@ import (
 	_ "gocloud.dev/blob/s3blob"   // s3:// URLs
 	"gocloud.dev/gcerrors"
 )
+
+// probeTimeout bounds the check at boot, a bucket that hangs must not hold up the start. Tests shorten it.
+var probeTimeout = 5 * time.Second
 
 type Storage struct {
 	bucket *blob.Bucket
@@ -38,13 +44,37 @@ func New(ctx context.Context) (*Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open NOKKU_STORAGE_URL: %w", err)
 	}
-	// Fail on boot, not on the first upload.
-	if _, err := bucket.Attributes(ctx, ".nokku-probe"); err != nil && gcerrors.Code(err) != gcerrors.NotFound {
+	probe, cancel := context.WithTimeout(ctx, probeTimeout)
+	defer cancel()
+	_, err = bucket.Attributes(probe, ".nokku-probe")
+	switch {
+	case err == nil, gcerrors.Code(err) == gcerrors.NotFound:
+	case refused(err):
 		_ = bucket.Close()
-		return nil, fmt.Errorf("storage unreachable: %w", err)
+		return nil, fmt.Errorf("storage refused the core: %w", err)
+	default:
+		// Maybe a passing outage. Daemons keep their recordings until it ends, and logins don't need storage.
+		slog.Warn("storage unreachable, recordings wait on the daemons until it is back", "error", err)
 	}
 	context.AfterFunc(ctx, func() { _ = bucket.Close() })
 	return &Storage{bucket: bucket}, nil
+}
+
+// refused is storage that answered and said no, a wrong setting fails on boot and not on the first upload.
+func refused(err error) bool {
+	if errors.Is(err, fs.ErrPermission) {
+		return true
+	}
+	answer, ok := errors.AsType[interface {
+		error
+		HTTPStatusCode() int
+	}](err)
+	if !ok {
+		return false
+	}
+	// 0 is a request that got no answer. A 5xx or a 429 is the bucket having trouble, not a verdict.
+	status := answer.HTTPStatusCode()
+	return status > 0 && status < http.StatusInternalServerError && status != http.StatusTooManyRequests
 }
 
 // bucketURL creates a missing directory and keeps its temp files inside it, a rename across volumes fails in a
@@ -89,34 +119,18 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 	return nil
 }
 
-// DeletePrefix only takes directory prefixes, so "videos/a" can never match "videos/ab".
-func (s *Storage) DeletePrefix(ctx context.Context, prefix string) error {
-	if !strings.HasSuffix(prefix, "/") || strings.Trim(prefix, "/") == "" {
-		return fmt.Errorf("refusing to delete prefix %q", prefix)
-	}
-	var errs []error
-	iter := s.bucket.List(&blob.ListOptions{Prefix: prefix})
-	for {
-		obj, err := iter.Next(ctx)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if err := s.Delete(ctx, obj.Key); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Join(errs...)
-}
-
 // CreateWriter commits on Close, so a truncated upload leaves a partial object. Canceling ctx drops it.
 func (s *Storage) CreateWriter(ctx context.Context, name string) (io.WriteCloser, error) {
 	if name == "" {
 		return nil, errors.New("filename is empty")
 	}
-	w, err := s.bucket.NewWriter(ctx, name, &blob.WriterOptions{ContentType: "application/octet-stream"})
+	// The smallest part S3 takes, one at a time. The SDK's defaults hold 48 MiB
+	// per upload, and a live session keeps its upload open for hours.
+	w, err := s.bucket.NewWriter(ctx, name, &blob.WriterOptions{
+		ContentType:    "application/octet-stream",
+		BufferSize:     5 << 20,
+		MaxConcurrency: 1,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("open writer for %q: %w", name, err)
 	}

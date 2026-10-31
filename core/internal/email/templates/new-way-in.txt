@@ -1,0 +1,31 @@
+nokku.
+
+Security notice
+
+
+A new way into your account.
+
+{{ .What }} can now sign in to your account. Check that this was you.
+
+Added: {{ .What }}
+
+When: {{ .EventTime }}
+
+IP address: {{ .IPAddress }}
+
+If this was not you, remove it, then sign out the devices you do not know.
+
+Review how you sign in {{ .ProfileURL }}
+
+This is a security email about your account on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}this Nokku server{{ end }}. If you did not do this, {{ if .Operator.SupportEmail }}contact {{ .Operator.SupportEmail }}{{ else }}tell your administrator{{ end }}.
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

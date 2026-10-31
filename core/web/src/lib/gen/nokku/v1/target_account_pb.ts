@@ -61,8 +61,6 @@ export type TargetAccount = Message<"nokku.v1.TargetAccount"> & {
   seenAt?: Timestamp | undefined;
 
   /**
-   * expires_at holds the subjects whose grant ends, by subject id. The others hold it for good.
-   *
    * @generated from field: map<string, google.protobuf.Timestamp> expires_at = 9;
    */
   expiresAt: { [key: string]: Timestamp };
@@ -149,8 +147,6 @@ export type AddSubjectsRequest = Message<"nokku.v1.AddSubjectsRequest"> & {
   kind: SubjectKind;
 
   /**
-   * expires_at ends the grants then, unset is for good. A subject that already holds the account gets it as well.
-   *
    * @generated from field: google.protobuf.Timestamp expires_at = 4;
    */
   expiresAt?: Timestamp | undefined;

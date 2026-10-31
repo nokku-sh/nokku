@@ -1,15 +1,15 @@
 -- name: CreateDaemon :one
 -- Returns no row on a taken name or key, so the caller can retry in its tx. A target of that name counts as
--- taken too, checked up front because its insert would otherwise abort the tx.
+-- taken too, checked up front because its insert would otherwise abort the tx. No CA means the workspace default.
 WITH
   new_daemon AS (
     INSERT INTO
-      daemons (name, status, config, metadata, key_thumbprint, join_token_id, retire_after)
+      daemons (name, status, config, version, key_thumbprint, join_token_id, retire_after)
     SELECT
       @name AS name,
       @status AS status,
       COALESCE(@config, '{}'::jsonb) AS config,
-      COALESCE(@metadata, '{}'::jsonb) AS metadata,
+      @version AS version,
       @key_thumbprint AS key_thumbprint,
       sqlc.narg('join_token_id') AS join_token_id,
       sqlc.narg('retire_after') AS retire_after
@@ -28,13 +28,15 @@ WITH
   ),
   new_target AS (
     INSERT INTO
-      targets (daemon_id, name, metadata)
+      targets (daemon_id, name, ca_id)
     SELECT
-      id,
-      name,
-      COALESCE(sqlc.narg('metadata'), '{}'::jsonb)
+      d.id,
+      d.name,
+      COALESCE(sqlc.narg('ca_id')::UUID, ca.id)
     FROM
-      new_daemon
+      new_daemon d
+      LEFT JOIN ssh_cas ca ON ca.workspace_id = d.workspace_id
+      AND ca.is_default
     RETURNING
       id
   )
@@ -80,6 +82,15 @@ FROM
 WHERE
   id = ANY (sqlc.arg('daemon_ids')::UUID[]);
 
+-- name: GetDaemonConfigForUpdate :one
+SELECT
+  config
+FROM
+  daemons
+WHERE
+  id = @daemon_id
+FOR UPDATE;
+
 -- name: UpdateDaemon :one
 UPDATE daemons
 SET
@@ -90,28 +101,27 @@ SET
     ELSE @status
   END,
   config = COALESCE(sqlc.narg('config'), config),
-  metadata = COALESCE(sqlc.narg('metadata'), metadata),
   updated_at = NOW()
 WHERE
   id = @daemon_id
 RETURNING
   *;
 
--- name: UpdateDaemonMetadata :exec
+-- name: UpdateDaemonVersion :exec
 -- Every sync reports it, so an unchanged value must not rewrite the row.
 UPDATE daemons
 SET
-  metadata = @metadata
+  version = @version
 WHERE
   id = @daemon_id
-  AND metadata IS DISTINCT FROM @metadata::jsonb;
+  AND version <> @version;
 
--- name: TouchDaemons :exec
+-- name: MarkDaemonSeen :exec
 UPDATE daemons
 SET
   last_seen_at = NOW()
 WHERE
-  id = ANY (@daemon_ids::UUID[]);
+  id = @daemon_id;
 
 -- name: ListDaemons :many
 SELECT
@@ -130,7 +140,7 @@ WHERE
   )
   AND (
     sqlc.narg('online')::BOOLEAN IS NULL
-    OR COALESCE(d.last_seen_at > @seen_after::TIMESTAMPTZ, FALSE) = sqlc.narg('online')
+    OR COALESCE(d.id = ANY (@connected::UUID[]), FALSE) = sqlc.narg('online')
   )
 ORDER BY
   d.id ASC
@@ -147,7 +157,7 @@ RETURNING
   *;
 
 -- name: GetOfflineDaemonByTokenAndName :one
--- The one an ephemeral enrollment of the same name may replace. A daemon that is online keeps its name.
+-- The one an ephemeral enrollment of the same name may replace. A daemon that is connected keeps its name.
 SELECT
   *
 FROM
@@ -155,17 +165,16 @@ FROM
 WHERE
   join_token_id = @join_token_id
   AND name = @name
-  AND (
-    last_seen_at IS NULL
-    OR last_seen_at < @seen_before::TIMESTAMPTZ
-  );
+  AND NOT COALESCE(id = ANY (@connected::UUID[]), FALSE);
 
 -- name: DeleteRetiredDaemons :many
--- Across workspaces, so it runs as the system. A daemon never seen counts from its creation.
+-- Across workspaces, so it runs as the system. A daemon never seen counts from its creation, a connected one stays.
+-- Nothing counts from before the core started, a crash stamps no daemon as gone.
 DELETE FROM daemons
 WHERE
   retire_after IS NOT NULL
-  AND COALESCE(last_seen_at, created_at) < NOW() - retire_after
+  AND GREATEST(COALESCE(last_seen_at, created_at), @started_at::TIMESTAMPTZ) < NOW() - retire_after
+  AND NOT COALESCE(id = ANY (@connected::UUID[]), FALSE)
 RETURNING
   id,
   workspace_id,

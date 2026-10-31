@@ -8,7 +8,11 @@ import "nokku/v1/access.proto";
 
 service SCIMService {
   rpc CreateSCIMToken(CreateSCIMTokenRequest) returns (CreateSCIMTokenResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      fresh: true
+      feature: "scim"
+    };
   }
   rpc ListSCIMTokens(ListSCIMTokensRequest) returns (ListSCIMTokensResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
@@ -34,14 +38,13 @@ message CreateSCIMTokenRequest {
 }
 message CreateSCIMTokenResponse {
   string token = 1;
-  SCIMToken entry = 2;
-  string base_url = 3;
+  string base_url = 2;
+  SCIMToken entry = 3;
 }
 
 message ListSCIMTokensRequest {}
 message ListSCIMTokensResponse {
   repeated SCIMToken tokens = 1;
-  // Where the identity provider sends users and groups.
   string base_url = 2;
 }
 

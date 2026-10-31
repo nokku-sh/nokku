@@ -75,9 +75,9 @@ func (q *Queries) CountAuditStreams(ctx context.Context) (int32, error) {
 
 const createAuditStream = `-- name: CreateAuditStream :one
 INSERT INTO
-  audit_streams (kind, url, secret)
+  audit_streams (id, kind, url, secret)
 VALUES
-  ($1, $2, $3)
+  ($1, $2, $3, $4)
 RETURNING
   id,
   kind,
@@ -90,9 +90,10 @@ RETURNING
 `
 
 type CreateAuditStreamParams struct {
-	Kind   string                `json:"kind"`
-	URL    string                `json:"url"`
-	Secret crypto.EncryptedBytes `json:"secret"`
+	ID     string        `json:"id"`
+	Kind   string        `json:"kind"`
+	URL    string        `json:"url"`
+	Secret crypto.Sealed `json:"secret"`
 }
 
 type CreateAuditStreamRow struct {
@@ -106,9 +107,15 @@ type CreateAuditStreamRow struct {
 	CreatedAt    time.Time  `json:"createdAt"`
 }
 
-// A new stream starts with the events from now on. Never the secret back, it is not shown again.
+// A new stream starts with the events from now on. Never the secret back, it is not shown again. The id comes from
+// the caller, the secret is sealed to it.
 func (q *Queries) CreateAuditStream(ctx context.Context, arg *CreateAuditStreamParams) (*CreateAuditStreamRow, error) {
-	row := q.db.QueryRow(ctx, createAuditStream, arg.Kind, arg.URL, arg.Secret)
+	row := q.db.QueryRow(ctx, createAuditStream,
+		arg.ID,
+		arg.Kind,
+		arg.URL,
+		arg.Secret,
+	)
 	var i CreateAuditStreamRow
 	err := row.Scan(
 		&i.ID,
@@ -378,10 +385,10 @@ RETURNING
 `
 
 type UpdateAuditStreamParams struct {
-	URL     *string               `json:"url"`
-	Secret  crypto.EncryptedBytes `json:"secret"`
-	Enabled *bool                 `json:"enabled"`
-	ID      string                `json:"id"`
+	URL     *string       `json:"url"`
+	Secret  crypto.Sealed `json:"secret"`
+	Enabled *bool         `json:"enabled"`
+	ID      string        `json:"id"`
 }
 
 type UpdateAuditStreamRow struct {

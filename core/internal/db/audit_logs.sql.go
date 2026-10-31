@@ -11,13 +11,12 @@ import (
 )
 
 const deleteAuditLogsBefore = `-- name: DeleteAuditLogsBefore :execrows
-DELETE FROM audit.audit_logs a
+DELETE FROM audit.audit_logs
 WHERE
-  a.timestamp < $1
-  AND NOT legal_hold_covers (a.workspace_id, a.timestamp)
+  timestamp < $1
 `
 
-// The longest retention for every row, also the ones whose workspace is gone. A legal hold keeps its range.
+// The longest retention for every row, also the ones whose workspace is gone.
 func (q *Queries) DeleteAuditLogsBefore(ctx context.Context, cutoff time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAuditLogsBefore, cutoff)
 	if err != nil {
@@ -27,11 +26,10 @@ func (q *Queries) DeleteAuditLogsBefore(ctx context.Context, cutoff time.Time) (
 }
 
 const deleteWorkspaceAuditLogs = `-- name: DeleteWorkspaceAuditLogs :execrows
-DELETE FROM audit.audit_logs a
+DELETE FROM audit.audit_logs
 WHERE
-  a.workspace_id = $1
-  AND a.timestamp < $2
-  AND NOT legal_hold_covers (a.workspace_id, a.timestamp)
+  workspace_id = $1
+  AND timestamp < $2
 `
 
 type DeleteWorkspaceAuditLogsParams struct {
@@ -39,7 +37,6 @@ type DeleteWorkspaceAuditLogsParams struct {
 	Cutoff      time.Time `json:"cutoff"`
 }
 
-// A legal hold keeps its range.
 func (q *Queries) DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorkspaceAuditLogsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteWorkspaceAuditLogs, arg.WorkspaceID, arg.Cutoff)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto"
+	nokku "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
 const consumeEmailToken = `-- name: ConsumeEmailToken :one
@@ -42,26 +43,26 @@ func (q *Queries) ConsumeEmailToken(ctx context.Context, arg *ConsumeEmailTokenP
 	return &i, err
 }
 
-const consumeSignupToken = `-- name: ConsumeSignupToken :one
+const consumeInvite = `-- name: ConsumeInvite :one
 DELETE FROM one_time_tokens
 WHERE
   token_hash = $1
-  AND purpose = 'signup'
+  AND purpose = 'invite'
   AND expires_at > NOW()
 RETURNING
   email::TEXT AS email,
-  data
+  role
 `
 
-type ConsumeSignupTokenRow struct {
-	Email string `json:"email"`
-	Data  []byte `json:"data"`
+type ConsumeInviteRow struct {
+	Email string               `json:"email"`
+	Role  *nokku.WorkspaceRole `json:"role"`
 }
 
-func (q *Queries) ConsumeSignupToken(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeSignupTokenRow, error) {
-	row := q.db.QueryRow(ctx, consumeSignupToken, tokenHash)
-	var i ConsumeSignupTokenRow
-	err := row.Scan(&i.Email, &i.Data)
+func (q *Queries) ConsumeInvite(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeInviteRow, error) {
+	row := q.db.QueryRow(ctx, consumeInvite, tokenHash)
+	var i ConsumeInviteRow
+	err := row.Scan(&i.Email, &i.Role)
 	return &i, err
 }
 
@@ -81,7 +82,7 @@ type ConsumeTokenParams struct {
 	Purpose   string             `json:"purpose"`
 }
 
-// Spends a token of a user. A signup token has none, see ConsumeSignupToken.
+// Spends a token of a user. An invite has none, see ConsumeInvite.
 func (q *Queries) ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error) {
 	row := q.db.QueryRow(ctx, consumeToken, arg.TokenHash, arg.Purpose)
 	var user_id string
@@ -109,6 +110,21 @@ WHERE
 // Every tenant, runs as nokku_system.
 func (q *Queries) DeleteExpiredTokens(ctx context.Context, now time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredTokens, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteInvite = `-- name: DeleteInvite :execrows
+DELETE FROM one_time_tokens
+WHERE
+  purpose = 'invite'
+  AND email = $1::TEXT
+`
+
+func (q *Queries) DeleteInvite(ctx context.Context, email string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteInvite, email)
 	if err != nil {
 		return 0, err
 	}
@@ -143,6 +159,32 @@ func (q *Queries) DeleteUserTokens(ctx context.Context, arg *DeleteUserTokensPar
 	return err
 }
 
+const getInvite = `-- name: GetInvite :one
+SELECT
+  email::TEXT AS email,
+  role,
+  expires_at
+FROM
+  one_time_tokens
+WHERE
+  token_hash = $1
+  AND purpose = 'invite'
+  AND expires_at > NOW()
+`
+
+type GetInviteRow struct {
+	Email     string               `json:"email"`
+	Role      *nokku.WorkspaceRole `json:"role"`
+	ExpiresAt time.Time            `json:"expiresAt"`
+}
+
+func (q *Queries) GetInvite(ctx context.Context, tokenHash crypto.HashedToken) (*GetInviteRow, error) {
+	row := q.db.QueryRow(ctx, getInvite, tokenHash)
+	var i GetInviteRow
+	err := row.Scan(&i.Email, &i.Role, &i.ExpiresAt)
+	return &i, err
+}
+
 const getPendingTokenEmail = `-- name: GetPendingTokenEmail :one
 SELECT
   email::TEXT AS email
@@ -171,26 +213,73 @@ func (q *Queries) GetPendingTokenEmail(ctx context.Context, arg *GetPendingToken
 	return email, err
 }
 
-const putSignupToken = `-- name: PutSignupToken :exec
-INSERT INTO
-  one_time_tokens (token_hash, purpose, expires_at, email, data)
-VALUES
-  ($1, 'signup', $2, $3, $4)
+const listInvites = `-- name: ListInvites :many
+SELECT
+  email::TEXT AS email,
+  role,
+  expires_at,
+  created_at
+FROM
+  one_time_tokens
+WHERE
+  purpose = 'invite'
+  AND expires_at > NOW()
+ORDER BY
+  created_at DESC
 `
 
-type PutSignupTokenParams struct {
-	TokenHash crypto.HashedToken `json:"tokenHash"`
-	ExpiresAt time.Time          `json:"expiresAt"`
-	Email     *string            `json:"email"`
-	Data      []byte             `json:"data"`
+type ListInvitesRow struct {
+	Email     string               `json:"email"`
+	Role      *nokku.WorkspaceRole `json:"role"`
+	ExpiresAt time.Time            `json:"expiresAt"`
+	CreatedAt time.Time            `json:"createdAt"`
 }
 
-func (q *Queries) PutSignupToken(ctx context.Context, arg *PutSignupTokenParams) error {
-	_, err := q.db.Exec(ctx, putSignupToken,
+func (q *Queries) ListInvites(ctx context.Context) ([]*ListInvitesRow, error) {
+	rows, err := q.db.Query(ctx, listInvites)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListInvitesRow
+	for rows.Next() {
+		var i ListInvitesRow
+		if err := rows.Scan(
+			&i.Email,
+			&i.Role,
+			&i.ExpiresAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const putInvite = `-- name: PutInvite :exec
+INSERT INTO
+  one_time_tokens (token_hash, purpose, email, role, expires_at)
+VALUES
+  ($1, 'invite', $2, $3, $4)
+`
+
+type PutInviteParams struct {
+	TokenHash crypto.HashedToken   `json:"tokenHash"`
+	Email     *string              `json:"email"`
+	Role      *nokku.WorkspaceRole `json:"role"`
+	ExpiresAt time.Time            `json:"expiresAt"`
+}
+
+func (q *Queries) PutInvite(ctx context.Context, arg *PutInviteParams) error {
+	_, err := q.db.Exec(ctx, putInvite,
 		arg.TokenHash,
-		arg.ExpiresAt,
 		arg.Email,
-		arg.Data,
+		arg.Role,
+		arg.ExpiresAt,
 	)
 	return err
 }

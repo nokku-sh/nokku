@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { describeAgent } from '#lib/agent.js';
 	import { session, sessionKindLabel, sessionMethodLabel } from '#lib/api/session.svelte.js';
-	import { util } from '#lib/api/workspaces.svelte.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -23,8 +22,7 @@
 	const kindIcon = (kind: string) =>
 		kind === 'cli' ? Terminal : kind === 'device' ? Smartphone : Monitor;
 
-	const info = util.instanceInfo();
-	const login = $derived(nkLoginCommand(info.data?.caPin));
+	const login = nkLoginCommand();
 </script>
 
 <Card.Root id="sessions">

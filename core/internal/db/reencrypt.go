@@ -8,30 +8,36 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/nokku-sh/nokku/core/internal/crypto"
 )
 
-// encryptedColumns is every column holding keyset ciphertext. One missing here loses its data on a rotation.
-var encryptedColumns = []struct{ table, column string }{
-	{"ssh_cas", "private_key"},
-	{"ssh_cas", "host_private_key"},
-	{"sso_providers", "config"},
-	{"recordings", "key"},
-	{"web_ca", "private_key"},
-	{"audit_streams", "secret"},
+// sealedColumns is every column holding a crypto.Sealed. One missing here loses its data on a rotation. row is the
+// SQL for crypto.AAD.Row, it must give the same string as the code that seals the column.
+var sealedColumns = []struct{ table, column, row string }{
+	{"ssh_ca_keys", "private_key", "ca_id::TEXT || '/' || kind"},
+	{"sso_providers", "config", "provider_id"},
+	{"recordings", "key", "id::TEXT"},
+	{"audit_streams", "secret", "id::TEXT"},
 }
 
 const reencryptBatch = 1000
 
-// Reencrypt converts every ciphertext that does not start with prefix, in the caller's transaction.
-func (q *Queries) Reencrypt(ctx context.Context, prefix []byte, convert func([]byte) ([]byte, error)) error {
-	for _, c := range encryptedColumns {
+// Reencrypt converts every ciphertext that does not start with prefix, in the caller's transaction. convert gets the
+// associated data the column was sealed with.
+func (q *Queries) Reencrypt(
+	ctx context.Context,
+	prefix []byte,
+	convert func(aad crypto.AAD, ciphertext []byte) ([]byte, error),
+) error {
+	for _, c := range sealedColumns {
 		for {
 			// ctid is stable here, the rows are locked until the update.
 			rows, err := q.db.Query(ctx, fmt.Sprintf(
-				`SELECT ctid, %[2]s FROM %[1]s
+				`SELECT ctid, workspace_id::TEXT, %[3]s, %[2]s FROM %[1]s
 				WHERE length(%[2]s) > 0 AND substring(%[2]s FROM 1 FOR $2) <> $1
-				LIMIT %[3]d FOR UPDATE`,
-				c.table, c.column, reencryptBatch,
+				LIMIT %[4]d FOR UPDATE`,
+				c.table, c.column, c.row, reencryptBatch,
 			), prefix, len(prefix))
 			if err != nil {
 				return fmt.Errorf("reading %s.%s: %w", c.table, c.column, err)
@@ -39,9 +45,11 @@ func (q *Queries) Reencrypt(ctx context.Context, prefix []byte, convert func([]b
 			var ids []pgtype.TID
 			var values [][]byte
 			var id pgtype.TID
+			var workspace, row string
 			var value []byte
-			if _, err := pgx.ForEachRow(rows, []any{&id, &value}, func() error {
-				converted, err := convert(value)
+			if _, err := pgx.ForEachRow(rows, []any{&id, &workspace, &row, &value}, func() error {
+				aad := crypto.AAD{Table: c.table, Column: c.column, Workspace: workspace, Row: row}
+				converted, err := convert(aad, value)
 				if err != nil {
 					return err
 				}

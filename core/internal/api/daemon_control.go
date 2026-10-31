@@ -1,14 +1,17 @@
 package api
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
@@ -16,6 +19,8 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+	"github.com/nokku-sh/nokku/internal/dpop"
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/audit"
@@ -28,21 +33,33 @@ import (
 )
 
 const (
-	quotaCheckInterval = 1 << 20 // 1 MiB
-
 	// maxUploadBytes ends an upload. nokkud stops a recording at 50 MB, so only a daemon that ignores that gets here.
 	maxUploadBytes = 64 << 20
+
+	// maxOpenUploads bounds what one bad daemon costs. Every live session holds an upload open, which keeps up to 26 MiB
+	// of core memory on its way to a bucket and only counts toward the storage cap once stored. A try over the limit
+	// waits for its retry and loses nothing, the file stays on the daemon.
+	maxOpenUploads = 64
+
+	// storeTimeout bounds the commit and the transaction after it, each on its own.
+	storeTimeout = 30 * time.Second
 )
+
+// errRecordingFinalized tells the daemon the core holds the whole recording, so its copy can go.
+var errRecordingFinalized = connect.NewError(connect.CodeAlreadyExists, "recording is already finalized")
 
 // daemonControlService is everything a daemon calls. Connect and DaemonRelay come from the embedded pool.
 type daemonControlService struct {
 	*nokkudaemon.Pool
 
 	cfg *config.Config
+
+	uploadsMu sync.Mutex
+	uploads   map[string]int // open uploads by daemon
 }
 
 func newDaemonControlService(cfg *config.Config) *daemonControlService {
-	return &daemonControlService{Pool: cfg.Pool, cfg: cfg}
+	return &daemonControlService{Pool: cfg.Pool, cfg: cfg, uploads: map[string]int{}}
 }
 
 func (s *daemonControlService) EnrollDaemon(
@@ -62,8 +79,9 @@ func (s *daemonControlService) EnrollDaemon(
 	out, err := nokkudaemon.Enroll(ctx, s.cfg.Conn, nokkudaemon.EnrollInput{
 		Token:       req.GetToken(),
 		Binding:     binding,
-		Metadata:    requestMetadata(ci.RequestHeader()),
+		Version:     daemonVersion(ci.RequestHeader().Get("User-Agent")),
 		ReqMetadata: req.GetMetadata(),
+		Connected:   s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
 		// The token must verify before anything is spent on the cap, so it is checked here instead of in the guard.
 		CanCreate: func(ctx context.Context, workspaceID string) error {
 			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)
@@ -77,7 +95,7 @@ func (s *daemonControlService) EnrollDaemon(
 	}
 	token, err := s.cfg.IAM.IssueDaemonSession(ctx, out.DaemonID, binding)
 	if err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	// The call is public, so the audit interceptor has no actor for it.
 	s.cfg.Audit.Record(ctx, &audit.Event{
@@ -109,7 +127,7 @@ func (s *daemonControlService) SyncDaemon(
 
 	res, err := nokkudaemon.Sync(ctx, s.cfg.Conn, nokkudaemon.SyncInput{
 		DaemonID:    actor.DaemonIDFromContext(ctx),
-		Metadata:    requestMetadata(ci.RequestHeader()),
+		Version:     daemonVersion(ci.RequestHeader().Get("User-Agent")),
 		ReqMetadata: req.GetMetadata(),
 		Users:       req.GetUsers(),
 		PrivateIPs:  req.GetPrivateIps(),
@@ -135,9 +153,13 @@ func (s *daemonControlService) SignHostCertificate(
 ) (*nokkuv1.SignHostCertificateResponse, error) {
 	daemonID := actor.DaemonIDFromContext(ctx)
 	var ca *db.SSHCA
+	var signer gossh.Signer
 	var target *db.Target
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if ca, err = q.GetCAByDaemonID(ctx, &daemonID); err != nil {
+			return err
+		}
+		if signer, err = ssh.CASigner(ctx, q, s.cfg.Keyset, ca.ID, gossh.HostCert); err != nil {
 			return err
 		}
 		target, err = q.GetTargetByDaemon(ctx, &daemonID)
@@ -145,12 +167,9 @@ func (s *daemonControlService) SignHostCertificate(
 	}); err != nil {
 		return nil, err
 	}
-	if !ca.IsActive {
-		return nil, newError(connect.CodeFailedPrecondition, "certificate authority is not active")
-	}
-
 	cert, err := ssh.SignCertificate(
 		ca,
+		signer,
 		req.GetPublicKey(),
 		[]string{target.ID},
 		"nokku:provision:daemon:"+daemonID,
@@ -158,7 +177,7 @@ func (s *daemonControlService) SignHostCertificate(
 		gossh.HostCert,
 	)
 	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, err.Error())
+		return nil, err
 	}
 
 	audit.SetTarget(ctx, ca.ID)
@@ -189,40 +208,48 @@ func (s *daemonControlService) UploadRecording(
 		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 
+	release, ok := s.takeUploadSlot(daemonID)
+	if !ok {
+		return nil, errTooManyUploads
+	}
+	defer release()
+
 	// Asked before the row exists, so a refused upload leaves nothing behind. The daemon tries again later.
-	workspaceID := actor.WorkspaceIDFromContext(ctx)
-	if !s.cfg.Record.MakeRoom(ctx, workspaceID, meta.GetRecordingId(), 0) {
+	if !s.cfg.Record.MakeRoom(ctx, actor.WorkspaceIDFromContext(ctx), meta.GetRecordingId()) {
 		return nil, errRecordingStorageFull
 	}
 	rec, err := s.resolveUpload(ctx, daemonID, meta)
 	if err != nil {
 		return nil, err
 	}
+	audit.SetTarget(ctx, rec.ID)
 	// A daemon that dies takes ctx with it. What arrived by then is the evidence, so the writer outlives it.
 	wctx, abort := context.WithCancel(context.WithoutCancel(ctx))
 	defer abort()
-	w, err := s.cfg.Record.NewWriter(wctx, rec)
+	objectID := uuid.NewV7().String()
+	w, err := s.cfg.Record.NewWriter(wctx, rec, objectID)
 	if err != nil {
-		slog.Error("open recording object", "recording_id", rec.ID, "error", err)
-		// Nothing of this upload is stored, what an earlier try left still is.
-		if _, err := s.closeRecording(ctx, rec.ID, rec.SizeBytes, false); err != nil {
-			slog.Error("close recording", "recording_id", rec.ID, "error", err)
-		}
-		return nil, errInternal
+		return nil, fmt.Errorf("start recording %s: %w", rec.ID, err)
 	}
 
+	msgs, recvErr := receiveApart(ctx, stream)
 	var size int64
-	var complete bool
+	var final *nokkuv1.RecordingFinal
 	// ended is the answer for an upload that was not taken whole.
 	var ended error
-	lastChecked := int64(0)
-	var recvErr error
 receive:
-	for {
-		msg, err := stream.Receive()
-		if err != nil {
-			recvErr = err
-			break
+	for final == nil {
+		var msg *nokkuv1.UploadRecordingRequest
+		select {
+		case msg = <-msgs:
+		case err := <-recvErr:
+			if !errors.Is(err, io.EOF) {
+				ended = newError(connect.CodeUnknown, "recording stream interrupted")
+			}
+			break receive
+		case <-ctx.Done():
+			ended = newError(connect.CodeUnavailable, "the core is shutting down, the rest goes up later")
+			break receive
 		}
 		switch m := msg.GetMsg().(type) {
 		case *nokkuv1.UploadRecordingRequest_Chunk:
@@ -231,72 +258,157 @@ receive:
 				continue
 			}
 			if size+int64(len(data)) > maxUploadBytes {
-				// This code tells the daemon not to send the file again.
+				// The daemon keeps a refused file and stops sending it until its next start.
 				ended = newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
 				break receive
 			}
-			if size-lastChecked >= quotaCheckInterval {
-				lastChecked = size
-				if !s.cfg.Record.MakeRoom(ctx, workspaceID, rec.ID, size) {
-					ended = errRecordingStorageFull
-					break receive
-				}
-			}
 			if err := w.WriteChunk(data); err != nil {
-				slog.Error("write recording chunk", "recording_id", rec.ID, "error", err)
-				ended = errInternal
+				ended = fmt.Errorf("recording %s: %w", rec.ID, err)
 				break receive
 			}
 			size += int64(len(data))
 		case *nokkuv1.UploadRecordingRequest_Final:
-			complete = true
+			final = m.Final
 		}
 	}
-	interrupted := recvErr != nil && !errors.Is(recvErr, io.EOF)
-	if !complete && size < rec.SizeBytes {
-		// An earlier try stored more than this one. Committing would replace it with less.
-		abort()
-		_ = w.Close()
-		size = rec.SizeBytes
-	} else if err = w.Close(); err != nil {
-		slog.Error("commit recording object", "recording_id", rec.ID, "error", err)
-		// Nothing of this upload is stored, what an earlier try left still is.
-		ended, size, complete = errInternal, rec.SizeBytes, false
+	// Complete takes a recording nothing cut, of which every byte of the daemon's file arrived.
+	complete := ended == nil && final != nil && final.GetCutReason() == "" && final.GetSizeBytes() == size
+	if reason := final.GetCutReason(); reason != "" {
+		audit.Set(ctx, "cut_reason", reason)
+	}
+	if final != nil && final.GetSizeBytes() != size {
+		audit.Set(ctx, "missing_bytes", final.GetSizeBytes()-size)
 	}
 
-	rec, err = s.closeRecording(ctx, rec.ID, size, complete)
-	if err != nil {
+	// Only the last message says the session ended. Any other end of a stream is one try, the session may run on.
+	var endedAt *time.Time
+	if final != nil {
+		endedAt = new(time.Now())
+		if t := final.GetEndedAt(); t.IsValid() {
+			endedAt = new(t.AsTime())
+		}
+	}
+	if rec, err = s.storeUpload(ctx, rec, w, abort, &db.FinishRecordingUploadParams{
+		ID:        rec.ID,
+		ObjectID:  &objectID,
+		SizeBytes: size,
+		Complete:  complete,
+		EndedAt:   endedAt,
+	}); err != nil {
 		return nil, err
 	}
-
-	switch {
-	case ended != nil:
+	if ended != nil {
 		// What was stored is kept as a cut recording.
 		return nil, ended
-	case !complete && interrupted:
-		return nil, newError(connect.CodeUnknown, "recording stream interrupted")
 	}
-
 	return &nokkuv1.UploadRecordingResponse{
 		RecordingId: &rec.ID,
-		SizeBytes:   &size,
+		SizeBytes:   &rec.SizeBytes,
 	}, nil
 }
 
-// closeRecording ends the row however the upload went, or it would count as a live session and as no bytes.
-func (s *daemonControlService) closeRecording(
+// takeUploadSlot counts an upload against its daemon. release gives the slot back.
+func (s *daemonControlService) takeUploadSlot(daemonID string) (release func(), ok bool) {
+	s.uploadsMu.Lock()
+	defer s.uploadsMu.Unlock()
+	if s.uploads[daemonID] >= maxOpenUploads {
+		return nil, false
+	}
+	s.uploads[daemonID]++
+	return func() {
+		s.uploadsMu.Lock()
+		defer s.uploadsMu.Unlock()
+		if s.uploads[daemonID]--; s.uploads[daemonID] == 0 {
+			delete(s.uploads, daemonID)
+		}
+	}, true
+}
+
+// receiveApart runs Receive on its own, Receive does not watch ctx. A deploy ends ctx, and must not wait out its
+// grace on a quiet stream. The handler's return closes the stream, which ends the receiving too.
+func receiveApart(
 	ctx context.Context,
-	id string,
-	size int64,
-	complete bool,
+	stream nokkuv1connect.DaemonControlServiceUploadRecordingServerStream,
+) (<-chan *nokkuv1.UploadRecordingRequest, <-chan error) {
+	msgs := make(chan *nokkuv1.UploadRecordingRequest)
+	recvErr := make(chan error, 1)
+	go func() {
+		for {
+			msg, err := stream.Receive()
+			if err != nil {
+				recvErr <- err
+				return
+			}
+			select {
+			case msgs <- msg:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return msgs, recvErr
+}
+
+// storeUpload commits the object of this try, then keeps it under the row lock if it holds at least what is stored.
+// The commit stays out of the transaction, a bucket that hangs holds neither a row nor a connection. An object that
+// lost goes to the delete queue.
+func (s *daemonControlService) storeUpload(
+	ctx context.Context,
+	opened *db.Recording,
+	w *recording.Writer,
+	abort func(),
+	upload *db.FinishRecordingUploadParams,
 ) (*db.Recording, error) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	stored := upload.SizeBytes > 0
+	if !stored {
+		abort()
+	}
+	stop := time.AfterFunc(storeTimeout, abort)
+	defer stop.Stop()
+	var answer error
+	// Only Close cleans up after a writer, after abort it drops the object.
+	if err := w.Close(); err != nil && stored {
+		// Nothing of this try is stored, what an earlier one left still is.
+		stored, answer = false, fmt.Errorf("commit recording %s: %w", opened.ID, err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), storeTimeout)
 	defer cancel()
-	return s.cfg.Conn.Tenant().SetRecordingComplete(ctx, &db.SetRecordingCompleteParams{
-		ID:        id,
-		SizeBytes: size,
-		Complete:  complete,
+	var rec *db.Recording
+	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		var kept bool
+		row, err := q.LockRecording(ctx, opened.ID)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			answer = err
+		case err != nil:
+			return err
+		case !bytes.Equal(row.Key, opened.Key):
+			// Deleted and made again, or a rotation resealed the key. The daemon sends the file again either way.
+			answer = pgx.ErrNoRows
+		case row.Complete:
+			rec, answer = row, errRecordingFinalized
+		default:
+			kept = stored && upload.SizeBytes >= row.SizeBytes
+			// An earlier try stored more, or this one nothing. The larger copy wins, a shorter one that calls itself
+			// whole too.
+			next := &db.FinishRecordingUploadParams{ID: row.ID, SizeBytes: row.SizeBytes, EndedAt: upload.EndedAt}
+			if kept {
+				next = upload
+			}
+			if rec, err = q.FinishRecordingUpload(ctx, next); err != nil {
+				return err
+			}
+		}
+		if stored && !kept {
+			return q.QueueLostRecordingObject(ctx, *upload.ObjectID)
+		}
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return rec, answer
 }
 
 // resolveUpload resumes the recording when the daemon uploads its id again.
@@ -305,16 +417,20 @@ func (s *daemonControlService) resolveUpload(
 	daemonID string,
 	rm *nokkuv1.RecordingMeta,
 ) (*db.Recording, error) {
+	// The id is sealed into the recording's key. Postgres would hand back another spelling than a capital one.
+	if !login.ValidID(rm.GetRecordingId()) {
+		return nil, newError(connect.CodeInvalidArgument, "the recording id must be a lowercase UUID")
+	}
 	var rec *db.Recording
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		existing, err := q.GetRecording(ctx, rm.GetRecordingId())
 		if err == nil {
 			if existing.DaemonID == nil || *existing.DaemonID != daemonID {
-				// This code tells the daemon not to send the file again, it would block every later one.
+				// Refused, not AlreadyExists, so the daemon keeps its file and nobody can get another server's deleted.
 				return newError(connect.CodeInvalidArgument, "recording belongs to another daemon")
 			}
 			if existing.Complete {
-				return newError(connect.CodeInvalidArgument, "recording is already finalized")
+				return errRecordingFinalized
 			}
 			rec = existing
 			return nil
@@ -333,11 +449,16 @@ func (s *daemonControlService) resolveUpload(
 			if err != nil {
 				return err
 			}
-			p, ok := ssh.ParseLoginPrincipal(rm.GetPrincipal())
+			p, ok := login.ParsePrincipal(rm.GetPrincipal())
 			if !ok || p.TargetID != target.ID || p.Username != rm.GetUsername() {
 				return newError(connect.CodeInvalidArgument, "the principal does not match the session")
 			}
 			subjectID = &p.SubjectID
+		}
+		aad := recording.KeyAAD(actor.WorkspaceIDFromContext(ctx), rm.GetRecordingId())
+		key, err := s.cfg.Keyset.Seal(aad, recording.NewKey())
+		if err != nil {
+			return err
 		}
 		rec, err = q.CreateRecording(ctx, &db.CreateRecordingParams{
 			ID:        rm.GetRecordingId(),
@@ -345,9 +466,13 @@ func (s *daemonControlService) resolveUpload(
 			Username:  rm.GetUsername(),
 			SubjectID: subjectID,
 			Principal: rm.GetPrincipal(),
-			Key:       recording.NewKey(),
+			Key:       key,
 			StartedAt: startedAt,
 		})
+		if db.IsUniqueViolation(err) {
+			// Another upload of this id made the row first. AlreadyExists would tell the daemon to delete its file.
+			return newError(connect.CodeAborted, "another upload of this recording just started, try again")
+		}
 		return err
 	}); err != nil {
 		return nil, err
@@ -382,7 +507,7 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci *connect.Ca
 
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	meta, _ := actor.RequestMetaFromContext(ctx)
-	proof, err := iam.DPoPProof(meta.Header)
+	proof, err := dpop.ProofFrom(meta.Header)
 	if err != nil {
 		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")
 	}
@@ -394,7 +519,7 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci *connect.Ca
 		"",
 	)
 	if err != nil {
-		if errors.Is(err, iam.ErrDPoPNonce) {
+		if errors.Is(err, dpop.ErrNonce) {
 			svc.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
 			return "", newError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
@@ -406,10 +531,16 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci *connect.Ca
 	return binding, nil
 }
 
-func requestMetadata(h *connect.Header) []byte {
-	metadata, _ := json.Marshal(map[string]string{
-		"user-agent": h.Get("User-Agent"),
-		"host":       h.Get("Host"),
-	})
-	return metadata
+// daemonVersion takes the version out of nokkud's user agent, "nokkud/<version> (<os>/<arch>)". Any other agent,
+// or a version too long to be one, gives none.
+func daemonVersion(userAgent string) string {
+	rest, ok := strings.CutPrefix(userAgent, "nokkud/")
+	if !ok {
+		return ""
+	}
+	version, _, _ := strings.Cut(rest, " ")
+	if len(version) > 64 {
+		return ""
+	}
+	return version
 }

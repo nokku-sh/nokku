@@ -24,6 +24,7 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/sshd"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 	"github.com/nokku-sh/nokku/daemon/internal/sysutil"
+	"github.com/nokku-sh/nokku/internal/nktoken"
 	"github.com/nokku-sh/nokku/internal/tpm"
 	"github.com/nokku-sh/nokku/internal/trust"
 )
@@ -67,8 +68,7 @@ SSH certificates. The host sshd on port 22 is never touched.`,
 				Usage: "Enroll this host with Nokku, then exit",
 				Description: `Prompts for the enrollment token from the Nokku web app, or reads
 NOKKUD_ENROLL_TOKEN for unattended installs. The token never goes on the command line.
-A Nokku with a private certificate is trusted through NOKKUD_API_PIN, which the
-enroll command in the web app carries, or through NOKKUD_CA_FILE.
+A Nokku with a certificate from a private CA is trusted through NOKKUD_CA_FILE.
 Run it again to move the host to another Nokku. Restart the service afterwards.
 
 The service enrolls itself on start when NOKKUD_ENROLL_TOKEN is set and nothing is
@@ -105,11 +105,6 @@ enrolled yet, which is how a container joins. Once enrolled, the variable is ign
 				Sources: cli.EnvVars("NOKKUD_API_URL"),
 			},
 			&cli.StringFlag{
-				Name:    "api-pin",
-				Usage:   "Pin of the private CA of the Nokku API, read at enroll",
-				Sources: cli.EnvVars("NOKKUD_API_PIN"),
-			},
-			&cli.StringFlag{
 				Name:    "ca-file",
 				Usage:   "PEM file with the private CA of the Nokku API",
 				Sources: cli.EnvVars("NOKKUD_CA_FILE"),
@@ -130,38 +125,44 @@ func helper(ctx context.Context, cmd *cli.Command) error {
 // errNotEnrolled exits with EX_CONFIG, which the unit file does not restart.
 var errNotEnrolled = cli.Exit("nokkud: this host is not enrolled, run: sudo nokkud enroll", 78)
 
-// unenrollTimeout fits in Docker's default stop grace period.
-const unenrollTimeout = 8 * time.Second
+// Docker kills a container 10 s after asking it to stop, so ending sessions, uploads and unenroll share stopGrace.
+const (
+	stopGrace       = 9 * time.Second
+	unenrollTimeout = 2 * time.Second
+)
 
 func run(ctx context.Context, cmd *cli.Command) error {
 	if err := sysutil.IsRoot(); err != nil {
 		return err
 	}
-	cache, cfg, err := loadState(cmd)
+	st, err := loadState(cmd)
 	if err != nil {
 		return err
 	}
 	// Only an unenrolled host reads the variable, so a persistent one cannot re-enroll or move a host.
 	token := ""
-	if cfg.DaemonID == "" {
+	if st.DaemonID == "" {
 		if token = os.Getenv("NOKKUD_ENROLL_TOKEN"); token == "" {
 			return errNotEnrolled
 		}
 	}
-	cl, err := enrollHost(ctx, cmd, token, cache, cfg)
+	cl, err := enrollHost(ctx, cmd, token, st)
 	if err != nil {
 		return err
 	}
 
-	srv, err := sshd.New(sshd.Options{
-		Principals:    cache.CertPrincipals,
-		Policy:        sshd.PolicyFrom(cache.DaemonConfig()),
-		RecordingSink: cl.RecordingSink,
-	})
+	// Serving and uploading stop with ctx, so a client exit (rejection) must cancel it too.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	// The stop counts from here, cl.Run already waits for the relayed sessions to end.
+	stopped := make(chan time.Time, 1)
+	context.AfterFunc(ctx, func() { stopped <- time.Now() })
+	uploads := cl.StartUploads(ctx)
+	srv, err := sshd.New(uploads)
 	if err != nil {
 		return err
 	}
-	srv.SetTrust(cache.CAs())
+	srv.SetAccess(st.Access())
 	var lc net.ListenConfig
 	l, err := lc.Listen(ctx, "tcp", cmd.String("ssh-addr"))
 	if err != nil {
@@ -169,9 +170,6 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	}
 	slog.Info("starting nokkud", "version", buildinfo.Version, "ssh_addr", l.Addr())
 
-	// Serve stops with ctx, so a client exit (rejection) must cancel it too.
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	var wg sync.WaitGroup
 	wg.Go(func() { srv.Serve(ctx, l) })
 	addr, err := netip.ParseAddrPort(l.Addr().String())
@@ -180,9 +178,14 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	}
 	err = cl.Run(ctx, srv, addr)
 	cancel()
+	uploadsBy := (<-stopped).Add(stopGrace - unenrollTimeout)
+	// Serve returns once every session ended, so their recordings are closed and on their way to the core.
 	wg.Wait()
+	if !uploads.Wait(time.Until(uploadsBy)) {
+		slog.Warn("recordings still uploading at shutdown, the next start sends them")
+	}
 	// An ephemeral host is gone for good once it stops, so it takes its record with it.
-	if err == nil && cache.DaemonConfig().GetEphemeral() {
+	if err == nil && st.Access().DaemonConfig.GetEphemeral() {
 		unenroll(context.WithoutCancel(ctx), cl)
 	}
 	return err
@@ -203,7 +206,7 @@ func enroll(ctx context.Context, cmd *cli.Command) error {
 	if err := sysutil.IsRoot(); err != nil {
 		return err
 	}
-	cache, cfg, err := loadState(cmd)
+	st, err := loadState(cmd)
 	if err != nil {
 		return err
 	}
@@ -211,38 +214,26 @@ func enroll(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	if _, err = enrollHost(ctx, cmd, token, cache, cfg); err != nil {
+	if _, err = enrollHost(ctx, cmd, token, st); err != nil {
 		return err
 	}
 	fmt.Println("Enrolled. Start the daemon with: sudo systemctl restart nokkud")
 	return nil
 }
 
-// enrollHost builds the client, enrolling first when a token is given. The pin of a private CA is fetched
-// before, so the enroll call already trusts the core.
-func enrollHost(
-	ctx context.Context,
-	cmd *cli.Command,
-	token string,
-	cache *state.Cache,
-	cfg *state.Config,
-) (*client.Client, error) {
-	if pin := cmd.String("api-pin"); token != "" && pin != "" {
-		ca, err := trust.Bootstrap(ctx, cfg.APIURL, pin)
-		if err != nil {
-			return nil, err
-		}
-		cfg.APICA = string(ca)
-		if err = cfg.Save(); err != nil {
+// enrollHost builds the client, enrolling first when a token is given.
+func enrollHost(ctx context.Context, cmd *cli.Command, token string, st *state.State) (*client.Client, error) {
+	if token != "" {
+		if err := checkEnrollToken(token); err != nil {
 			return nil, err
 		}
 	}
-	cl, err := newDaemonClient(ctx, cmd, token, cache, cfg)
+	cl, err := newDaemonClient(ctx, cmd, token, st)
 	if trust.Untrusted(err) {
 		return nil, fmt.Errorf(
-			"this machine does not trust the certificate of %s. Copy the enroll command from the Nokku web app, "+
-				"it carries NOKKUD_API_PIN, or point NOKKUD_CA_FILE at the CA: %w",
-			cfg.APIURL,
+			"this machine does not trust the certificate of %s. If it comes from a private CA, "+
+				"point NOKKUD_CA_FILE at that CA: %w",
+			st.APIURL,
 			err,
 		)
 	}
@@ -253,13 +244,13 @@ func reset(ctx context.Context, cmd *cli.Command) error {
 	if err := sysutil.IsRoot(); err != nil {
 		return err
 	}
-	cache, cfg, err := loadState(cmd)
+	st, err := loadState(cmd)
 	if err != nil {
 		slog.Warn("load local state, removing it anyway", "error", err)
 		paths.Cleanup()
 		return nil
 	}
-	cl, err := newDaemonClient(ctx, cmd, "", cache, cfg)
+	cl, err := newDaemonClient(ctx, cmd, "", st)
 	if err != nil {
 		slog.Warn("delete daemon from core failed, local state removed", "error", err)
 		paths.Cleanup()
@@ -270,39 +261,35 @@ func reset(ctx context.Context, cmd *cli.Command) error {
 }
 
 // The API URL and its CA are bound to the enrollment, so they are persisted and flags only win when given.
-func loadState(cmd *cli.Command) (*state.Cache, *state.Config, error) {
+func loadState(cmd *cli.Command) (*state.State, error) {
 	if err := paths.Verify(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	cache := state.NewCache()
-	if err := cache.Load(); err != nil {
-		return nil, nil, err
+	st, err := state.Load()
+	if err != nil {
+		return nil, err
 	}
-	cfg := new(state.Config)
-	if err := cfg.Load(); err != nil {
-		return nil, nil, err
-	}
-	if api := strings.TrimRight(cmd.String("api"), "/"); cmd.IsSet("api") && api != cfg.APIURL {
+	if api := strings.TrimRight(cmd.String("api"), "/"); cmd.IsSet("api") && api != st.APIURL {
 		// The CA of one Nokku is never trusted for another.
-		cfg.APIURL, cfg.APICA = api, ""
+		st.APIURL, st.APICA = api, ""
 	}
-	if cfg.APIURL == "" {
-		cfg.APIURL = state.DefaultAPIURL
+	if st.APIURL == "" {
+		st.APIURL = state.DefaultAPIURL
 	}
-	if err := checkAPIURL(cfg.APIURL); err != nil {
-		return nil, nil, err
+	if err = checkAPIURL(st.APIURL); err != nil {
+		return nil, err
 	}
 	if path := cmd.String("ca-file"); path != "" {
-		ca, err := os.ReadFile(path) // #nosec G304 -- the operator names the file
-		if err != nil {
-			return nil, nil, fmt.Errorf("CA file: %w", err)
+		ca, readErr := os.ReadFile(path) // #nosec G304 -- the operator names the file
+		if readErr != nil {
+			return nil, fmt.Errorf("CA file: %w", readErr)
 		}
-		if _, err = trust.ParseBundle(ca); err != nil {
-			return nil, nil, fmt.Errorf("CA file %s: %w", path, err)
+		if err = trust.CheckBundle(ca); err != nil {
+			return nil, fmt.Errorf("CA file %s: %w", path, err)
 		}
-		cfg.APICA = string(ca)
+		st.APICA = string(ca)
 	}
-	return cache, cfg, cfg.Save()
+	return st, st.Save()
 }
 
 // A sync answer carries the CA the daemon trusts, so plain http would let anyone in transit log in as root.
@@ -319,6 +306,15 @@ func checkAPIURL(raw string) error {
 		return nil
 	}
 	return fmt.Errorf("the API URL %q must use https, plain http is only accepted for localhost", raw)
+}
+
+// checkEnrollToken catches an older "<id>_<secret>" token, a part of one or a typo before the core is asked.
+func checkEnrollToken(token string) error {
+	if !nktoken.Valid(token, nktoken.KindEnroll) {
+		return errors.New("this is not a whole enrollment token, those start with nk_" + nktoken.KindEnroll + "_. " +
+			"A token of the older format no longer works, create a new one in the web app")
+	}
+	return nil
 }
 
 // Tokens never go on argv, where any local user could read them.
@@ -338,14 +334,8 @@ func enrollToken() (string, error) {
 	return strings.TrimSpace(string(secret)), nil
 }
 
-func newDaemonClient(
-	ctx context.Context,
-	cmd *cli.Command,
-	token string,
-	cache *state.Cache,
-	cfg *state.Config,
-) (*client.Client, error) {
-	cl, err := client.New(ctx, cache, cfg, cmd.Bool("require-tpm"), token)
+func newDaemonClient(ctx context.Context, cmd *cli.Command, token string, st *state.State) (*client.Client, error) {
+	cl, err := client.New(ctx, st, cmd.Bool("require-tpm"), token)
 	if errors.Is(err, tpm.ErrIdentityChanged) {
 		return nil, fmt.Errorf(
 			"the daemon signing key no longer matches this machine, re-enroll with `sudo nokkud enroll`: %w",

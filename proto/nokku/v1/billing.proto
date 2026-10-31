@@ -38,7 +38,6 @@ message GetBillingResponse {
   int64 user_count = 5;
   int64 resource_count = 6;
   Subscription subscription = 7;
-  // held_quotas are the data limits of a plan that ended and still hold until held_until. Unset without a hold.
   Quotas held_quotas = 8;
   google.protobuf.Timestamp held_until = 9;
 }

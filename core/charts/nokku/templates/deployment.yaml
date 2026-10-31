@@ -73,15 +73,18 @@ spec:
               value: {{ .Values.app.database.user | quote }}
             - name: PGSSLMODE
               value: {{ .Values.app.database.sslMode | quote }}
-            - name: NOKKU_DB_AUTOMIGRATE
-              value: {{ .Values.app.database.autoMigrate | quote }}
             - name: NOKKU_STORAGE_URL
               value: {{ .Values.app.storageURL | quote }}
+            {{- with .Values.app.kmsURI }}
+            - name: KMS_URI
+              value: {{ . | quote }}
+            {{- end }}
             - name: NOKKU_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "nokku.secretName" . }}
                   key: NOKKU_SECRET
+                  optional: true
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
@@ -92,6 +95,10 @@ spec:
             {{- end }}
           {{- with .Values.app.extraEnvFrom }}
           envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with .Values.livenessProbe }}

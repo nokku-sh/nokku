@@ -1,0 +1,36 @@
+# route | session | session check | answer | session after
+# browser sessions are the nokku_session cookie. cli is a device flow session of nk: as the cookie on
+# plain HTTP routes, as Authorization: DPoP with a proof on RPCs. old is signed in 11m ago.
+POST /passkey/register/begin | browser fresh | accepted | 200 | session kept
+POST /passkey/register/begin | browser old | refused | 401 sign in again to continue | session ended
+POST /passkey/register/begin | cli | refused | 401 sign in to continue | session kept
+GET /oidc/link | browser fresh | accepted | 307 to the provider | session kept
+GET /oidc/link | browser old | refused | 303 to /login | session ended
+GET /oidc/link | cli | refused | 401 sign in to continue | session kept
+POST /auth/device/verify | browser fresh | accepted | 200 | session kept
+POST /auth/device/verify | browser old | refused | 401 sign in again to continue | session ended
+POST /auth/device/verify | cli | refused | 401 sign in to continue | session kept
+AccountService.RequestEmailChange | browser fresh | accepted | ok | session kept
+AccountService.RequestEmailChange | browser old | refused | unauthenticated: sign in again to continue | session ended
+AccountService.RequestEmailChange | cli | refused | permission_denied: do this in the web app | session kept
+InvitationService.CreateInvitation | browser fresh | accepted | ok | session kept
+InvitationService.CreateInvitation | browser old | refused | unauthenticated: sign in again to continue | session ended
+InvitationService.CreateInvitation | cli | refused | permission_denied: do this in the web app | session kept
+JoinTokenService.CreateJoinToken | browser fresh | accepted | ok | session kept
+JoinTokenService.CreateJoinToken | browser old | refused | unauthenticated: sign in again to continue | session ended
+JoinTokenService.CreateJoinToken | cli | refused | permission_denied: do this in the web app | session kept
+ServiceAccountService.CreateServiceAccountToken | browser fresh | accepted | ok | session kept
+ServiceAccountService.CreateServiceAccountToken | browser old | refused | unauthenticated: sign in again to continue | session ended
+ServiceAccountService.CreateServiceAccountToken | cli | refused | permission_denied: do this in the web app | session kept
+SCIMService.CreateSCIMToken | browser fresh | accepted | ok | session kept
+SCIMService.CreateSCIMToken | browser old | refused | unauthenticated: sign in again to continue | session ended
+SCIMService.CreateSCIMToken | cli | refused | permission_denied: do this in the web app | session kept
+SSOService.PutSSOProvider | browser fresh | accepted | ok | session kept
+SSOService.PutSSOProvider | browser old | refused | unauthenticated: sign in again to continue | session ended
+SSOService.PutSSOProvider | cli | refused | permission_denied: do this in the web app | session kept
+WorkspaceService.TransferOwnership | browser fresh | accepted | not_found: the new owner must be an active user of this workspace | session kept
+WorkspaceService.TransferOwnership | browser old | refused | unauthenticated: sign in again to continue | session ended
+WorkspaceService.TransferOwnership | cli | refused | permission_denied: do this in the web app | session kept
+WorkspaceService.DeleteWorkspace | browser fresh | accepted | failed_precondition: a self-hosted server keeps its workspace | session kept
+WorkspaceService.DeleteWorkspace | browser old | refused | unauthenticated: sign in again to continue | session ended
+WorkspaceService.DeleteWorkspace | cli | refused | permission_denied: do this in the web app | session kept

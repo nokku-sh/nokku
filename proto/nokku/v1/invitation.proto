@@ -5,7 +5,9 @@ package nokku.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
+import "nokku/v1/account.proto";
 
+// An invite names one address and one role, and works once. Only Join spends it, opening the link does not.
 service InvitationService {
   rpc GetInvitation(GetInvitationRequest) returns (GetInvitationResponse) {
     option (access) = {public: true};
@@ -14,6 +16,26 @@ service InvitationService {
   rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse) {
     option (access) = {public: true};
   }
+  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      fresh: true
+    };
+  }
+  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc DeleteInvitation(DeleteInvitationRequest) returns (DeleteInvitationResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
+}
+
+message Invitation {
+  string email = 1;
+  WorkspaceRole role = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  google.protobuf.Timestamp created_at = 4;
 }
 
 message GetInvitationRequest {
@@ -23,11 +45,44 @@ message GetInvitationResponse {
   string workspace_name = 1;
   WorkspaceRole role = 2;
   google.protobuf.Timestamp expires_at = 3;
+  string email = 4;
 }
 
 message AcceptInvitationRequest {
   string token = 1 [(buf.validate.field).string.min_len = 1];
-  string name = 2 [(buf.validate.field).string.max_len = 256];
-  string email = 3 [(buf.validate.field).string.email = true];
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
 }
-message AcceptInvitationResponse {}
+message AcceptInvitationResponse {
+  User user = 1;
+}
+
+message CreateInvitationRequest {
+  string email = 1 [(buf.validate.field).string.email = true];
+  // No role is a member. The owner is never invited.
+  WorkspaceRole role = 2 [(buf.validate.field).enum = {
+    in: [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  }];
+}
+message CreateInvitationResponse {
+  Invitation invitation = 1;
+  string link = 2; // Set only when the server sends no mail.
+}
+
+message ListInvitationsRequest {}
+message ListInvitationsResponse {
+  repeated Invitation invitations = 1;
+}
+
+message DeleteInvitationRequest {
+  string email = 1 [(buf.validate.field).string.email = true];
+}
+message DeleteInvitationResponse {}

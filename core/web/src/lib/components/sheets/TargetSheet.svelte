@@ -59,7 +59,9 @@
 	const remove = targetApi.delete();
 	const connect = useConnect();
 
-	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
+	const autoSave = useAutoSave(() =>
+		draft.save((changes) => update.mutateAsync({ ...changes, id: model?.id }))
+	);
 	const save = () => autoSave.save();
 
 	const isManual = $derived(!entity?.daemonId);
@@ -107,8 +109,9 @@
 		if (!entity) return;
 		void confirm({
 			title: `Delete ${entity.name}?`,
-			description:
-				'Everyone loses access to this target. Its login accounts and grants are removed.',
+			description: entity.daemonId
+				? 'Everyone loses access to this target. Its login accounts, grants and daemon are removed.'
+				: 'Everyone loses access to this target. Its login accounts and grants are removed.',
 			typeToConfirm: entity.name,
 			onConfirm: async () => {
 				await remove.mutateAsync({ id: entity.id });
@@ -247,8 +250,8 @@
 						<CopyText value={syncCommand} mono class="text-sm" />
 					</div>
 					<p class="text-xs text-muted-foreground">
-						Run it on your own machine. It connects to the host as root, installs the CA key and the
-						principals files under /etc/ssh/nokku_principals, checks sshd and reloads it.
+						Run it on your own machine. It connects to the host as root, installs the CA key and an
+						sshd rule for this server, checks sshd and reloads it. Access changes need no new sync.
 					</p>
 				</Section>
 			{/if}

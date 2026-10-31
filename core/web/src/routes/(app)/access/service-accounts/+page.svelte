@@ -35,7 +35,7 @@
 
 	const sheet = useSheet();
 	const can = user.can();
-	const create = useCreate();
+	const create = useCreate({ fresh: true });
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 

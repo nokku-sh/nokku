@@ -41,17 +41,11 @@ SELECT
         ssh_cas ca
       WHERE
         ca.workspace_id = $1
-    ) + (
-      SELECT
-        COUNT(*)
-      FROM
-        daemons d
-      WHERE
-        d.workspace_id = $1
     )
   )::bigint AS resource_count
 `
 
+// A server counts once, its daemon is part of its target.
 func (q *Queries) CountWorkspaceResources(ctx context.Context, workspaceID string) (int64, error) {
 	row := q.db.QueryRow(ctx, countWorkspaceResources, workspaceID)
 	var resource_count int64

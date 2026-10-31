@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
 // Pinned, a new upstream release must not fail the tests on its own. compose.dev.yml runs the same versions.
@@ -50,7 +52,8 @@ func run(
 	}
 }
 
-// Postgres starts an empty server and points the PG* environment at it. Call it from TestMain, run stop after.
+// Postgres starts a server, points the PG* environment at it and migrates it the way the server does on start.
+// Call it from TestMain, run stop after.
 func Postgres() (stop func()) {
 	ctx := context.Background()
 	c, err := run(ctx, postgresImage,
@@ -72,6 +75,9 @@ func Postgres() (stop func()) {
 	stop = func() { _ = testcontainers.TerminateContainer(c) }
 	if err == nil {
 		err = pointEnvAt(ctx, c)
+	}
+	if err == nil {
+		err = db.Migrate(ctx)
 	}
 	if err != nil {
 		stop()
@@ -101,6 +107,32 @@ func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 		"PGSSLMODE":  "disable",
 	} {
 		_ = os.Setenv(key, value)
+	}
+	// Nor change what the tests boot, or wrap a test keyset in a KMS.
+	for _, key := range []string{
+		"GOOGLE_CLIENT_ID",
+		"GOOGLE_CLIENT_SECRET",
+		"KMS_URI",
+		"MICROSOFT_CLIENT_ID",
+		"MICROSOFT_CLIENT_SECRET",
+		"MICROSOFT_TENANT_ID",
+		"NOKKU_ADMIN_EMAIL",
+		"NOKKU_ADMIN_NAME",
+		"NOKKU_BASE_URL",
+		"NOKKU_LICENSE_KEY",
+		"NOKKU_SAAS",
+		"NOKKU_SECRET",
+		"NOKKU_SMTP_HOST",
+		"NOKKU_STORAGE_URL",
+		"NOKKU_TRUSTED_PROXIES",
+		"NOKKU_WORKSPACE_NAME",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+		"STRIPE_PRO_MONTHLY_PRICE_ID",
+		"STRIPE_PRO_YEARLY_PRICE_ID",
+		"STRIPE_SECRET_KEY",
+		"STRIPE_WEBHOOK_SECRET",
+	} {
+		_ = os.Unsetenv(key)
 	}
 	return nil
 }

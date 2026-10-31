@@ -104,19 +104,11 @@ WHERE
 RETURNING
   *;
 
--- name: DeleteWorkspace :execrows
--- Names the workspace, the purge of unclaimed signups runs as nokku_system. A legal hold keeps it, 0 rows says so.
-DELETE FROM workspaces w
+-- name: DeleteWorkspace :exec
+-- Names the workspace, the purge of unclaimed signups runs as nokku_system.
+DELETE FROM workspaces
 WHERE
-  w.id = @workspace_id
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      legal_holds h
-    WHERE
-      h.workspace_id = @workspace_id
-  );
+  id = @workspace_id;
 
 -- name: GetWorkspaceStateVersion :one
 SELECT

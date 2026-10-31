@@ -114,16 +114,13 @@ var (
 
 // AccessRequestServiceClient is a client for the nokku.v1.AccessRequestService service.
 type AccessRequestServiceClient interface {
-	// ListRequestableAccounts names the targets a member may ask for, the ones carrying a requestable tag.
 	ListRequestableAccounts(context.Context, *v1.ListRequestableAccountsRequest) (*v1.ListRequestableAccountsResponse, error)
 	CreateAccessRequest(context.Context, *v1.CreateAccessRequestRequest) (*v1.CreateAccessRequestResponse, error)
-	// GetAccessRequest and ListAccessRequests show a member only their own requests, admins see all.
 	GetAccessRequest(context.Context, *v1.GetAccessRequestRequest) (*v1.GetAccessRequestResponse, error)
 	ListAccessRequests(context.Context, *v1.ListAccessRequestsRequest) (*v1.ListAccessRequestsResponse, error)
 	ApproveAccessRequest(context.Context, *v1.ApproveAccessRequestRequest) (*v1.ApproveAccessRequestResponse, error)
 	DenyAccessRequest(context.Context, *v1.DenyAccessRequestRequest) (*v1.DenyAccessRequestResponse, error)
 	CancelAccessRequest(context.Context, *v1.CancelAccessRequestRequest) (*v1.CancelAccessRequestResponse, error)
-	// SetRequestableTags replaces the tags whose targets members may ask for. None turns requests off.
 	SetRequestableTags(context.Context, *v1.SetRequestableTagsRequest) (*v1.SetRequestableTagsResponse, error)
 }
 
@@ -135,16 +132,13 @@ func NewAccessRequestServiceClient(client *connect.Client) AccessRequestServiceC
 
 // AccessRequestServiceHandler is an implementation of the nokku.v1.AccessRequestService service.
 type AccessRequestServiceHandler interface {
-	// ListRequestableAccounts names the targets a member may ask for, the ones carrying a requestable tag.
 	ListRequestableAccounts(context.Context, *v1.ListRequestableAccountsRequest) (*v1.ListRequestableAccountsResponse, error)
 	CreateAccessRequest(context.Context, *v1.CreateAccessRequestRequest) (*v1.CreateAccessRequestResponse, error)
-	// GetAccessRequest and ListAccessRequests show a member only their own requests, admins see all.
 	GetAccessRequest(context.Context, *v1.GetAccessRequestRequest) (*v1.GetAccessRequestResponse, error)
 	ListAccessRequests(context.Context, *v1.ListAccessRequestsRequest) (*v1.ListAccessRequestsResponse, error)
 	ApproveAccessRequest(context.Context, *v1.ApproveAccessRequestRequest) (*v1.ApproveAccessRequestResponse, error)
 	DenyAccessRequest(context.Context, *v1.DenyAccessRequestRequest) (*v1.DenyAccessRequestResponse, error)
 	CancelAccessRequest(context.Context, *v1.CancelAccessRequestRequest) (*v1.CancelAccessRequestResponse, error)
-	// SetRequestableTags replaces the tags whose targets members may ask for. None turns requests off.
 	SetRequestableTags(context.Context, *v1.SetRequestableTagsRequest) (*v1.SetRequestableTagsResponse, error)
 }
 

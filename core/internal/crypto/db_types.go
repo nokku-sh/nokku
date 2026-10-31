@@ -7,68 +7,6 @@ import (
 	"fmt"
 )
 
-// EncryptedBytes encrypts at rest. String and MarshalJSON render "" so secrets never leak.
-//
-//nolint:recvcheck // Scan requires pointer receiver for sql.Scanner
-type EncryptedBytes []byte
-
-func (e EncryptedBytes) Bytes() []byte {
-	out := make([]byte, len(e))
-	copy(out, e)
-	return out
-}
-
-func (e EncryptedBytes) Value() (driver.Value, error) {
-	enc, err := Encryptor()
-	if err != nil {
-		return nil, err
-	}
-	if len(e) == 0 {
-		return nil, nil
-	}
-	return enc.Encrypt(e)
-}
-
-func (e *EncryptedBytes) Scan(value any) error {
-	if value == nil {
-		*e = nil
-		return nil
-	}
-	enc, err := Encryptor()
-	if err != nil {
-		return err
-	}
-
-	var encrypted []byte
-	switch v := value.(type) {
-	case []byte:
-		encrypted = v
-	case string:
-		encrypted = []byte(v)
-	default:
-		return fmt.Errorf("cannot scan %T into EncryptedBytes", value)
-	}
-	if len(encrypted) == 0 {
-		*e = nil
-		return nil
-	}
-
-	decrypted, err := enc.Decrypt(encrypted)
-	if err != nil {
-		return err
-	}
-	*e = decrypted
-	return nil
-}
-
-func (e EncryptedBytes) String() string {
-	return ""
-}
-
-func (e EncryptedBytes) MarshalJSON() ([]byte, error) {
-	return []byte(`""`), nil
-}
-
 // HashedToken renders "" from String and MarshalJSON so hashes never leak.
 //
 //nolint:recvcheck // Scan requires pointer receiver for sql.Scanner

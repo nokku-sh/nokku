@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto"
-	nokku "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
 const addJoinTokenGrant = `-- name: AddJoinTokenGrant :exec
@@ -54,15 +53,12 @@ func (q *Queries) AddJoinTokenGrant(ctx context.Context, arg *AddJoinTokenGrantP
 const createJoinToken = `-- name: CreateJoinToken :one
 INSERT INTO
   join_tokens (
-    id,
-    kind,
     label,
     token_hash,
     expires_at,
     max_uses,
     auto_approve,
     ca_id,
-    role,
     tags,
     retire_after
   )
@@ -74,41 +70,32 @@ VALUES
     $4,
     $5,
     $6,
-    $7,
-    $8,
-    $9,
-    COALESCE($10::TEXT[], '{}'),
-    $11
+    COALESCE($7::TEXT[], '{}'),
+    $8
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
+  id, workspace_id, ca_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
 `
 
 type CreateJoinTokenParams struct {
-	ID          string               `json:"id"`
-	Kind        nokku.JoinTokenKind  `json:"kind"`
-	Label       string               `json:"label"`
-	TokenHash   crypto.HashedToken   `json:"tokenHash"`
-	ExpiresAt   *time.Time           `json:"expiresAt"`
-	MaxUses     *int32               `json:"maxUses"`
-	AutoApprove bool                 `json:"autoApprove"`
-	CaID        *string              `json:"caId"`
-	Role        *nokku.WorkspaceRole `json:"role"`
-	Tags        []string             `json:"tags"`
-	RetireAfter *time.Duration       `json:"retireAfter"`
+	Label       string             `json:"label"`
+	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	ExpiresAt   *time.Time         `json:"expiresAt"`
+	MaxUses     *int32             `json:"maxUses"`
+	AutoApprove bool               `json:"autoApprove"`
+	CaID        *string            `json:"caId"`
+	Tags        []string           `json:"tags"`
+	RetireAfter *time.Duration     `json:"retireAfter"`
 }
 
 func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParams) (*JoinToken, error) {
 	row := q.db.QueryRow(ctx, createJoinToken,
-		arg.ID,
-		arg.Kind,
 		arg.Label,
 		arg.TokenHash,
 		arg.ExpiresAt,
 		arg.MaxUses,
 		arg.AutoApprove,
 		arg.CaID,
-		arg.Role,
 		arg.Tags,
 		arg.RetireAfter,
 	)
@@ -116,19 +103,17 @@ func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParam
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.Kind,
-		&i.Label,
+		&i.CaID,
 		&i.TokenHash,
-		&i.ExpiresAt,
+		&i.Label,
+		&i.Tags,
+		&i.AutoApprove,
+		&i.RetireAfter,
 		&i.MaxUses,
 		&i.Uses,
-		&i.AutoApprove,
-		&i.CaID,
-		&i.Role,
-		&i.Tags,
-		&i.RetireAfter,
-		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.LastUsedAt,
+		&i.CreatedAt,
 	)
 	return &i, err
 }
@@ -146,45 +131,35 @@ func (q *Queries) DeleteJoinToken(ctx context.Context, id string) error {
 
 const getLiveJoinToken = `-- name: GetLiveJoinToken :one
 SELECT
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
+  id, workspace_id, ca_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
 FROM
   join_tokens
 WHERE
-  id = $1
-  AND kind = $2
-  AND token_hash = $3
+  token_hash = $1
   AND (
     expires_at IS NULL
     OR expires_at > NOW()
   )
 `
 
-type GetLiveJoinTokenParams struct {
-	ID        string              `json:"id"`
-	Kind      nokku.JoinTokenKind `json:"kind"`
-	TokenHash crypto.HashedToken  `json:"tokenHash"`
-}
-
 // Ignores the use limit, so a used-up token still identifies a daemon it enrolled. RedeemJoinToken enforces it.
-func (q *Queries) GetLiveJoinToken(ctx context.Context, arg *GetLiveJoinTokenParams) (*JoinToken, error) {
-	row := q.db.QueryRow(ctx, getLiveJoinToken, arg.ID, arg.Kind, arg.TokenHash)
+func (q *Queries) GetLiveJoinToken(ctx context.Context, tokenHash crypto.HashedToken) (*JoinToken, error) {
+	row := q.db.QueryRow(ctx, getLiveJoinToken, tokenHash)
 	var i JoinToken
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.Kind,
-		&i.Label,
+		&i.CaID,
 		&i.TokenHash,
-		&i.ExpiresAt,
+		&i.Label,
+		&i.Tags,
+		&i.AutoApprove,
+		&i.RetireAfter,
 		&i.MaxUses,
 		&i.Uses,
-		&i.AutoApprove,
-		&i.CaID,
-		&i.Role,
-		&i.Tags,
-		&i.RetireAfter,
-		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.LastUsedAt,
+		&i.CreatedAt,
 	)
 	return &i, err
 }
@@ -238,20 +213,15 @@ func (q *Queries) ListJoinTokenGrants(ctx context.Context) ([]*ListJoinTokenGran
 
 const listJoinTokens = `-- name: ListJoinTokens :many
 SELECT
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
+  id, workspace_id, ca_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
 FROM
   join_tokens
-WHERE
-  (
-    kind = $1
-    OR $1 = 0
-  )
 ORDER BY
   created_at DESC
 `
 
-func (q *Queries) ListJoinTokens(ctx context.Context, kind nokku.JoinTokenKind) ([]*JoinToken, error) {
-	rows, err := q.db.Query(ctx, listJoinTokens, kind)
+func (q *Queries) ListJoinTokens(ctx context.Context) ([]*JoinToken, error) {
+	rows, err := q.db.Query(ctx, listJoinTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -262,19 +232,17 @@ func (q *Queries) ListJoinTokens(ctx context.Context, kind nokku.JoinTokenKind) 
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
-			&i.Kind,
-			&i.Label,
+			&i.CaID,
 			&i.TokenHash,
-			&i.ExpiresAt,
+			&i.Label,
+			&i.Tags,
+			&i.AutoApprove,
+			&i.RetireAfter,
 			&i.MaxUses,
 			&i.Uses,
-			&i.AutoApprove,
-			&i.CaID,
-			&i.Role,
-			&i.Tags,
-			&i.RetireAfter,
-			&i.CreatedAt,
+			&i.ExpiresAt,
 			&i.LastUsedAt,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -292,9 +260,7 @@ SET
   uses = uses + 1,
   last_used_at = NOW()
 WHERE
-  id = $1
-  AND kind = $2
-  AND token_hash = $3
+  token_hash = $1
   AND (
     expires_at IS NULL
     OR expires_at > NOW()
@@ -304,84 +270,27 @@ WHERE
     OR uses < max_uses
   )
 RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
+  id, workspace_id, ca_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
 `
-
-type RedeemJoinTokenParams struct {
-	ID        string              `json:"id"`
-	Kind      nokku.JoinTokenKind `json:"kind"`
-	TokenHash crypto.HashedToken  `json:"tokenHash"`
-}
 
 // One statement, so two redemptions can never both take the last use.
-func (q *Queries) RedeemJoinToken(ctx context.Context, arg *RedeemJoinTokenParams) (*JoinToken, error) {
-	row := q.db.QueryRow(ctx, redeemJoinToken, arg.ID, arg.Kind, arg.TokenHash)
+func (q *Queries) RedeemJoinToken(ctx context.Context, tokenHash crypto.HashedToken) (*JoinToken, error) {
+	row := q.db.QueryRow(ctx, redeemJoinToken, tokenHash)
 	var i JoinToken
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.Kind,
-		&i.Label,
+		&i.CaID,
 		&i.TokenHash,
-		&i.ExpiresAt,
+		&i.Label,
+		&i.Tags,
+		&i.AutoApprove,
+		&i.RetireAfter,
 		&i.MaxUses,
 		&i.Uses,
-		&i.AutoApprove,
-		&i.CaID,
-		&i.Role,
-		&i.Tags,
-		&i.RetireAfter,
-		&i.CreatedAt,
-		&i.LastUsedAt,
-	)
-	return &i, err
-}
-
-const redeemJoinTokenByID = `-- name: RedeemJoinTokenByID :one
-UPDATE join_tokens
-SET
-  uses = uses + 1,
-  last_used_at = NOW()
-WHERE
-  id = $1
-  AND kind = $2
-  AND (
-    expires_at IS NULL
-    OR expires_at > NOW()
-  )
-  AND (
-    max_uses IS NULL
-    OR uses < max_uses
-  )
-RETURNING
-  id, workspace_id, kind, label, token_hash, expires_at, max_uses, uses, auto_approve, ca_id, role, tags, retire_after, created_at, last_used_at
-`
-
-type RedeemJoinTokenByIDParams struct {
-	ID   string              `json:"id"`
-	Kind nokku.JoinTokenKind `json:"kind"`
-}
-
-// For a signup whose invite was checked earlier. The mailed link is the proof by then.
-func (q *Queries) RedeemJoinTokenByID(ctx context.Context, arg *RedeemJoinTokenByIDParams) (*JoinToken, error) {
-	row := q.db.QueryRow(ctx, redeemJoinTokenByID, arg.ID, arg.Kind)
-	var i JoinToken
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Kind,
-		&i.Label,
-		&i.TokenHash,
 		&i.ExpiresAt,
-		&i.MaxUses,
-		&i.Uses,
-		&i.AutoApprove,
-		&i.CaID,
-		&i.Role,
-		&i.Tags,
-		&i.RetireAfter,
-		&i.CreatedAt,
 		&i.LastUsedAt,
+		&i.CreatedAt,
 	)
 	return &i, err
 }

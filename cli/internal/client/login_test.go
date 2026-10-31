@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -14,10 +13,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 
 	"github.com/nokku-sh/nokku/internal/dpop"
 	"github.com/nokku-sh/nokku/internal/dpopclient"
@@ -25,15 +26,16 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
+const testAPI = "https://nokku.example.com"
+
 // fakeDeviceFlow mirrors iam.DeviceFlow closely enough for the poll loop, DPoP checks and replay store included.
 type fakeDeviceFlow struct {
-	// interval stands in for the server's one second, so a test polls in milliseconds.
-	interval   time.Duration
 	mu         sync.Mutex
 	grants     map[string]*fakeGrant // by device code
 	replay     map[string]bool
 	nonce      string
 	baseURL    string
+	expiresIn  int
 	violations map[string]int
 	lastPoll   map[string]time.Time
 }
@@ -45,13 +47,13 @@ type fakeGrant struct {
 	userAgent  string
 }
 
-func newFakeDeviceFlow(t *testing.T) (*fakeDeviceFlow, *httptest.Server) {
-	t.Helper()
+func newFakeDeviceFlow() (*fakeDeviceFlow, http.Handler) {
 	f := &fakeDeviceFlow{
-		interval:   20 * time.Millisecond,
 		grants:     map[string]*fakeGrant{},
 		replay:     map[string]bool{},
 		nonce:      "test-nonce",
+		baseURL:    testAPI,
+		expiresIn:  900,
 		lastPoll:   map[string]time.Time{},
 		violations: map[string]int{},
 	}
@@ -59,10 +61,7 @@ func newFakeDeviceFlow(t *testing.T) (*fakeDeviceFlow, *httptest.Server) {
 	mux.HandleFunc("POST /auth/device", f.begin)
 	mux.HandleFunc("POST /auth/device/token", f.poll)
 	mux.HandleFunc("GET /auth/device/nonce", f.nonceEndpoint)
-	srv := httptest.NewServer(mux)
-	f.baseURL = srv.URL
-	t.Cleanup(srv.Close)
-	return f, srv
+	return f, mux
 }
 
 func (f *fakeDeviceFlow) begin(w http.ResponseWriter, r *http.Request) {
@@ -75,11 +74,12 @@ func (f *fakeDeviceFlow) begin(w http.ResponseWriter, r *http.Request) {
 		userAgent:  r.Header.Get("User-Agent"),
 	}
 	f.grants[g.deviceCode] = g
-	writeJSON(w, map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"device_code":               g.deviceCode,
 		"user_code":                 g.userCode,
 		"verification_uri":          f.baseURL + "/device",
 		"verification_uri_complete": f.baseURL + "/device?user_code=" + g.userCode,
+		"expires_in":                f.expiresIn,
 		"interval":                  1,
 	})
 }
@@ -95,8 +95,8 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 	}
 	switch g.status {
 	case "pending":
-		// pollTrack: the required interval grows by 5s per too-fast poll. Half of it, so ticker jitter never counts.
-		required := f.interval/2 + time.Duration(f.violations[code])*5*time.Second
+		// tooFast: the required interval grows by 5s with each poll that came too soon.
+		required := time.Second + time.Duration(f.violations[code])*5*time.Second
 		now := time.Now()
 		if last := f.lastPoll[code]; !last.IsZero() && now.Sub(last) < required {
 			f.violations[code]++
@@ -118,9 +118,10 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		delete(f.grants, code)
-		writeJSON(w, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"access_token": "tok-for-" + jkt,
 			"token_type":   "DPoP",
+			"expires_in":   60,
 		})
 	}
 }
@@ -137,11 +138,9 @@ func (f *fakeDeviceFlow) nonceEndpoint(w http.ResponseWriter, _ *http.Request) {
 func (f *fakeDeviceFlow) verifyProof(r *http.Request) (string, string) {
 	proof := r.Header.Get("DPoP")
 	if proof == "" {
-		return "", "" // unbound session, still succeeds
+		return "", "use_dpop_nonce"
 	}
-	payload, err := base64.RawURLEncoding.DecodeString(
-		strings.Split(proof, ".")[1],
-	)
+	payload, err := base64.RawURLEncoding.DecodeString(strings.Split(proof, ".")[1])
 	if err != nil {
 		return "", "invalid_dpop_proof"
 	}
@@ -155,8 +154,7 @@ func (f *fakeDeviceFlow) verifyProof(r *http.Request) (string, string) {
 	if err = json.Unmarshal(payload, &claims); err != nil {
 		return "", "invalid_dpop_proof"
 	}
-	if claims.HTM != http.MethodPost ||
-		!strings.EqualFold(claims.HTU, f.baseURL+"/auth/device/token") {
+	if claims.HTM != http.MethodPost || !strings.EqualFold(claims.HTU, f.baseURL+"/auth/device/token") {
 		return "", "invalid_dpop_proof"
 	}
 	if claims.IAT == 0 || time.Since(time.Unix(claims.IAT, 0)) > time.Minute {
@@ -179,12 +177,22 @@ func (f *fakeDeviceFlow) approve(deviceCode string) {
 }
 
 func writeOAuthErr(w http.ResponseWriter, code string) {
-	writeJSON(w, map[string]string{"error": code})
+	writeJSON(w, http.StatusBadRequest, map[string]string{"error": code})
 }
 
-func writeJSON(w http.ResponseWriter, v any) {
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// inMemory serves requests without a socket, so the fake clock of a synctest bubble runs the poll interval at once.
+type inMemory struct{ h http.Handler }
+
+func (m inMemory) RoundTrip(r *http.Request) (*http.Response, error) {
+	rec := httptest.NewRecorder()
+	m.h.ServeHTTP(rec, r)
+	return rec.Result(), nil
 }
 
 func newTestProofer(t *testing.T) *dpop.Proofer {
@@ -196,65 +204,154 @@ func newTestProofer(t *testing.T) *dpop.Proofer {
 	return p
 }
 
-// runDeviceLogin drives deviceLogin's path and approves shortly after, like a user clicking accept.
+// testClient talks to h at testAPI, signing like nk does.
+func testClient(t *testing.T, h http.Handler) *Client {
+	t.Helper()
+	c := &Client{State: &state.State{APIURL: testAPI}, httpc: &http.Client{Transport: inMemory{h}}}
+	c.dpop = dpopclient.New(newTestProofer(t), c.httpc, func() string { return c.State.SessionToken },
+		dpopclient.Options{BaseURL: testAPI})
+	return c
+}
+
+// runDeviceLogin runs deviceLogin without the browser and approves after a few polls, like a user clicking accept.
 func runDeviceLogin(t *testing.T, c *Client, f *fakeDeviceFlow) (string, error) {
 	t.Helper()
-	d, err := c.beginDeviceAuth(context.Background())
+	ctx, cfg, err := c.deviceFlow(t.Context())
+	require.NoError(t, err)
+	d, err := beginDeviceAuth(ctx, cfg)
 	require.NoError(t, err)
 
 	go func() {
-		time.Sleep(3 * f.interval / 2)
+		time.Sleep(3 * time.Second)
 		f.approve(d.DeviceCode)
 	}()
-
-	token, _, err := c.pollDeviceToken(context.Background(), d.DeviceCode, f.interval)
-	return token, err
+	tok, err := pollDeviceToken(ctx, cfg, d)
+	if err != nil {
+		return "", err
+	}
+	return tok.AccessToken, nil
 }
 
 func TestDeviceFlowTwoConsecutiveLogins(t *testing.T) {
-	f, srv := newFakeDeviceFlow(t)
+	synctest.Test(t, func(t *testing.T) {
+		f, h := newFakeDeviceFlow()
+		c := testClient(t, h)
 
-	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
-	c.dpop = dpopclient.New(
-		newTestProofer(t),
-		srv.Client(),
-		func() string { return c.State.SessionToken },
-		dpopclient.Options{BaseURL: c.State.APIURL},
-	)
+		for i := range 2 {
+			token, err := runDeviceLogin(t, c, f)
+			require.NoError(t, err, "login %d", i+1)
+			assert.Equal(t, "tok-for-jkt", token, "login %d", i+1)
+		}
 
-	for i := range 2 {
-		token, err := runDeviceLogin(t, c, f)
-		require.NoError(t, err, "login %d", i+1)
-		assert.NotEmpty(t, token, "login %d: empty token", i+1)
-	}
+		// The approval page shows who asked, so the request has to say it is nk.
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		for _, g := range f.grants {
+			assert.True(t, strings.HasPrefix(g.userAgent, "nk/"), "device request user agent = %q", g.userAgent)
+		}
+	})
+}
 
-	// The approval page shows who asked, so the request has to say it is nk.
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for _, g := range f.grants {
-		assert.True(t, strings.HasPrefix(g.userAgent, "nk/"), "device request user agent = %q", g.userAgent)
-	}
+// RFC 8628 section 3.5: each slow_down adds 5 seconds to this and every later poll.
+func TestDeviceFlowSlowsDown(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var polls []time.Time
+		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/auth/device/token" {
+				writeJSON(w, http.StatusOK, map[string]any{
+					"device_code": "d", "user_code": "AB-CD", "verification_uri": testAPI + "/device", "interval": 1,
+				})
+				return
+			}
+			polls = append(polls, time.Now())
+			switch len(polls) {
+			case 1:
+				writeOAuthErr(w, "slow_down")
+			case 2:
+				writeOAuthErr(w, "authorization_pending")
+			default:
+				writeJSON(w, http.StatusOK, map[string]any{"access_token": "tok"})
+			}
+		})
+		c := &Client{State: &state.State{APIURL: testAPI}, httpc: &http.Client{Transport: inMemory{h}}}
+		ctx, cfg, err := c.deviceFlow(t.Context())
+		require.NoError(t, err)
+		d, err := beginDeviceAuth(ctx, cfg)
+		require.NoError(t, err)
+		start := time.Now()
+
+		tok, err := pollDeviceToken(ctx, cfg, d)
+		require.NoError(t, err)
+		assert.Equal(t, "tok", tok.AccessToken)
+		require.Len(t, polls, 3)
+		assert.Equal(t, time.Second, polls[0].Sub(start))
+		assert.Equal(t, 6*time.Second, polls[1].Sub(polls[0]), "slow_down did not add 5 seconds")
+		assert.Equal(t, 6*time.Second, polls[2].Sub(polls[1]), "the slower pace did not stick")
+	})
+}
+
+// The code runs out after expires_in, so the poll ends then even if the server never says so.
+func TestDeviceFlowExpires(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f, h := newFakeDeviceFlow()
+		f.expiresIn = 30
+		c := testClient(t, h)
+		ctx, cfg, err := c.deviceFlow(t.Context())
+		require.NoError(t, err)
+		d, err := beginDeviceAuth(ctx, cfg)
+		require.NoError(t, err)
+		start := time.Now()
+
+		_, err = pollDeviceToken(ctx, cfg, d)
+		require.EqualError(t, err, "sign-in code expired, run nk login again")
+		assert.Equal(t, 30*time.Second, time.Since(start))
+	})
 }
 
 // The OS opener also launches files and custom schemes, so a core may only send a web page.
 func TestDeviceFlowRejectsNonWebLink(t *testing.T) {
-	f, srv := newFakeDeviceFlow(t)
+	f, h := newFakeDeviceFlow()
 	f.baseURL = "file:///etc/passwd"
-	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
-	c.dpop = dpopclient.New(
-		newTestProofer(t),
-		srv.Client(),
-		func() string { return c.State.SessionToken },
-		dpopclient.Options{BaseURL: c.State.APIURL},
-	)
+	c := testClient(t, h)
+	// The fake names the file URL as its own, so only the link check can stop it.
+	c.dpop = nil
 
-	_, err := c.beginDeviceAuth(t.Context())
-	require.Error(t, err, "a file link was accepted")
+	ctx, cfg, err := c.deviceFlow(t.Context())
+	require.NoError(t, err)
+	_, err = beginDeviceAuth(ctx, cfg)
+	require.ErrorContains(t, err, "not a web address")
 }
 
-// Waiting cannot fix any of these answers, so the poll loop ends on them.
+// pollAnswers runs the poll against a token endpoint that gives the answers in turn, the last one for good.
+func pollAnswers(t *testing.T, answers ...func(w http.ResponseWriter)) (int32, error) {
+	t.Helper()
+	var polls atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /auth/device/nonce", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("DPoP-Nonce", "n")
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /auth/device/token", func(w http.ResponseWriter, _ *http.Request) {
+		n := int(polls.Add(1))
+		answers[min(n, len(answers))-1](w)
+	})
+	c := testClient(t, mux)
+	ctx, cfg, err := c.deviceFlow(t.Context())
+	require.NoError(t, err)
+	_, err = pollDeviceToken(ctx, cfg, &oauth2.DeviceAuthResponse{DeviceCode: "dev", Interval: 1})
+	return polls.Load(), err
+}
+
+func answer(status int, body string) func(w http.ResponseWriter) {
+	return func(w http.ResponseWriter) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}
+}
+
+// Waiting cannot fix any of these answers, so the poll ends on them.
 func TestPollDeviceTokenStopsOnFinalAnswers(t *testing.T) {
-	t.Parallel()
 	for name, tc := range map[string]struct {
 		status int
 		body   string
@@ -265,8 +362,9 @@ func TestPollDeviceTokenStopsOnFinalAnswers(t *testing.T) {
 		"unknown code":       {http.StatusBadRequest, `{"error":"server_error"}`, "device authorization failed: server_error"},
 		"oauth error on 200": {http.StatusOK, `{"error":"access_denied"}`, "sign-in was denied in the browser"},
 		"http error":         {http.StatusForbidden, "forbidden", "device authorization: HTTP 403: forbidden"},
-		"empty answer":       {http.StatusOK, `{}`, "device authorization: unexpected response"},
-		"not json":           {http.StatusOK, "<html>", "device authorization: unexpected response"},
+		"empty answer": {
+			http.StatusOK, `{}`, "device authorization: oauth2: server response missing access_token",
+		},
 		"proof rejected": {
 			http.StatusBadRequest, `{"error":"invalid_dpop_proof"}`,
 			"sign-in failed, Nokku rejected this machine's proof. Check that the clock is right and run nk login again",
@@ -277,143 +375,99 @@ func TestPollDeviceTokenStopsOnFinalAnswers(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(tc.status)
-				_, _ = w.Write([]byte(tc.body))
-			}))
-			t.Cleanup(srv.Close)
-			c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
-
-			_, _, err := c.pollDeviceToken(t.Context(), "dev", time.Millisecond)
-			require.EqualError(t, err, tc.want)
+			synctest.Test(t, func(t *testing.T) {
+				_, err := pollAnswers(t, answer(tc.status, tc.body))
+				require.EqualError(t, err, tc.want)
+			})
 		})
 	}
 }
 
 func TestPollDeviceTokenOutlastsABlip(t *testing.T) {
-	t.Parallel()
-	var polls atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		if polls.Add(1) == 1 {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		writeJSON(w, map[string]any{"access_token": "tok"})
-	}))
-	t.Cleanup(srv.Close)
-	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
-
-	token, _, err := c.pollDeviceToken(t.Context(), "dev", time.Millisecond)
-	require.NoError(t, err, "one 503 ended the sign-in")
-	assert.Equal(t, "tok", token)
+	synctest.Test(t, func(t *testing.T) {
+		polls, err := pollAnswers(t,
+			answer(http.StatusServiceUnavailable, ""),
+			answer(http.StatusOK, `{"access_token":"tok"}`),
+		)
+		require.NoError(t, err, "one 503 ended the sign-in")
+		assert.EqualValues(t, 2, polls)
+	})
 }
 
 func TestPollDeviceTokenGivesUpOnAServerThatStaysDown(t *testing.T) {
-	t.Parallel()
-	var polls atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		polls.Add(1)
-		w.WriteHeader(http.StatusBadGateway)
-		_, _ = w.Write([]byte("bad gateway"))
-	}))
-	t.Cleanup(srv.Close)
-	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
-
-	_, _, err := c.pollDeviceToken(t.Context(), "dev", time.Millisecond)
-	require.EqualError(t, err, "device authorization: HTTP 502: bad gateway")
-	assert.EqualValues(t, pollRetries+1, polls.Load())
+	synctest.Test(t, func(t *testing.T) {
+		polls, err := pollAnswers(t, answer(http.StatusBadGateway, "bad gateway"))
+		require.EqualError(t, err, "device authorization: HTTP 502: bad gateway")
+		assert.EqualValues(t, pollRetries+1, polls)
+	})
 }
 
 // A stale nonce is retried at once, the fresh one came with the rejection.
 func TestPollDeviceTokenRetriesNonceWithoutWaiting(t *testing.T) {
-	t.Parallel()
-	var polls atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		if polls.Add(1) == 1 {
-			w.WriteHeader(http.StatusBadRequest)
-			writeOAuthErr(w, "use_dpop_nonce")
-			return
-		}
-		writeJSON(w, map[string]any{"access_token": "tok", "expires_in": 60})
-	}))
-	t.Cleanup(srv.Close)
-	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
-
-	start := time.Now()
-	token, expiresIn, err := c.pollDeviceToken(t.Context(), "dev", 30*time.Second)
-	require.NoError(t, err)
-	assert.Equal(t, "tok", token)
-	assert.Equal(t, 60, expiresIn)
-	assert.EqualValues(t, 2, polls.Load())
-	assert.Less(t, time.Since(start), 5*time.Second, "the retry waited for the poll interval")
+	synctest.Test(t, func(t *testing.T) {
+		start := time.Now()
+		polls, err := pollAnswers(t,
+			answer(http.StatusBadRequest, `{"error":"use_dpop_nonce"}`),
+			answer(http.StatusOK, `{"access_token":"tok","expires_in":60}`),
+		)
+		require.NoError(t, err)
+		assert.EqualValues(t, 2, polls)
+		assert.Equal(t, time.Second, time.Since(start), "the retry waited for the poll interval")
+	})
 }
 
 // A refused proof, like one from a wrong clock, ends the login. No other URL is tried.
 func TestPollDeviceTokenGivesUpOnARejectedProof(t *testing.T) {
-	t.Parallel()
-	var polls atomic.Int32
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /auth/device/nonce", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("DPoP-Nonce", "n")
-		w.WriteHeader(http.StatusNoContent)
+	synctest.Test(t, func(t *testing.T) {
+		polls, err := pollAnswers(t, answer(http.StatusBadRequest, `{"error":"invalid_dpop_proof"}`))
+		require.ErrorContains(t, err, "Check that the clock is right")
+		assert.EqualValues(t, 1, polls, "a rejected proof is final")
 	})
-	mux.HandleFunc("POST /auth/device/token", func(w http.ResponseWriter, _ *http.Request) {
-		polls.Add(1)
-		w.WriteHeader(http.StatusBadRequest)
-		writeOAuthErr(w, "invalid_dpop_proof")
-	})
-	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
-	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
-	c.dpop = dpopclient.New(newTestProofer(t), srv.Client(), func() string { return "" },
-		dpopclient.Options{BaseURL: srv.URL})
-
-	_, _, err := c.pollDeviceToken(t.Context(), "dev", 30*time.Second)
-	require.ErrorContains(t, err, "Check that the clock is right")
-	assert.EqualValues(t, 1, polls.Load(), "a rejected proof is final")
 }
 
 // A proof only verifies for the URL the server knows itself by, so a login through another URL stops at once.
 func TestDeviceLoginRefusesAServerAtAnotherURL(t *testing.T) {
-	f, srv := newFakeDeviceFlow(t)
-	f.baseURL = "https://nokku.example.com"
-	c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
-	c.dpop = dpopclient.New(newTestProofer(t), srv.Client(), func() string { return "" },
-		dpopclient.Options{BaseURL: srv.URL})
+	f, h := newFakeDeviceFlow()
+	f.baseURL = "https://other.example.com"
+	c := testClient(t, h)
 
 	err := c.deviceLogin(t.Context())
 	require.ErrorIs(t, err, dpopclient.ErrAPIURLMismatch)
-	require.ErrorContains(t, err, "https://nokku.example.com", "the error names the URL to use")
+	require.ErrorContains(t, err, "https://other.example.com", "the error names the URL to use")
 	assert.Empty(t, f.grants, "no device flow was started")
 }
 
 // The code and the link are printed, and the answer is read into memory.
 func TestDeviceAuthRejectsHostileAnswers(t *testing.T) {
 	t.Parallel()
-	const valid = `{"device_code":"d","user_code":"AB-CD","verification_uri":"https://a.example/device"}`
 	for name, tc := range map[string]struct {
 		body string
 		ok   bool
 	}{
-		"a plain answer": {valid, true},
+		"a plain answer": {`{"device_code":"d","user_code":"AB-CD","verification_uri":"https://a.example/device"}`, true},
 		"escape sequence in the code": {
 			`{"device_code":"d","user_code":"AB\u001b[2JCD","verification_uri":"https://a.example/device"}`, false,
 		},
 		"escape sequence in the link": {
 			`{"device_code":"d","user_code":"AB-CD","verification_uri":"https://a.example/\u009b2J"}`, false,
 		},
-		"answer past the size cap": {strings.Repeat(" ", maxDeviceResponse) + valid, false},
+		"no code": {`{"device_code":"d","verification_uri":"https://a.example/device"}`, false},
+		"answer past the size cap": {
+			strings.Repeat(" ", maxDeviceResponse) +
+				`{"device_code":"d","user_code":"AB-CD","verification_uri":"https://a.example/device"}`,
+			false,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write([]byte(tc.body))
-			}))
-			t.Cleanup(srv.Close)
-			c := &Client{State: &state.State{APIURL: srv.URL}, httpc: srv.Client()}
+			h := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				answer(http.StatusOK, tc.body)(w)
+			})
+			c := &Client{State: &state.State{APIURL: testAPI}, httpc: &http.Client{Transport: inMemory{h}}}
+			ctx, cfg, err := c.deviceFlow(t.Context())
+			require.NoError(t, err)
 
-			_, err := c.beginDeviceAuth(t.Context())
+			_, err = beginDeviceAuth(ctx, cfg)
 			if tc.ok {
 				require.NoError(t, err)
 				return

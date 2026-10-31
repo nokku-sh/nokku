@@ -9,7 +9,10 @@ import "nokku/v1/access.proto";
 
 service JoinTokenService {
   rpc CreateJoinToken(CreateJoinTokenRequest) returns (CreateJoinTokenResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      fresh: true
+    };
   }
   rpc ListJoinTokens(ListJoinTokensRequest) returns (ListJoinTokensResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
@@ -20,28 +23,20 @@ service JoinTokenService {
   }
 }
 
-enum JoinTokenKind {
-  JOIN_TOKEN_KIND_UNSPECIFIED = 0;
-  JOIN_TOKEN_KIND_ENROLL = 1;
-  JOIN_TOKEN_KIND_INVITE = 2;
-}
-
 message JoinToken {
   string id = 1;
-  JoinTokenKind kind = 2;
-  string label = 3;
-  google.protobuf.Timestamp expires_at = 4;
-  int32 max_uses = 5;
-  int32 uses = 6;
-  bool auto_approve = 7;
-  string ca_id = 8;
-  WorkspaceRole role = 9;
-  google.protobuf.Timestamp created_at = 10;
-  google.protobuf.Timestamp last_used_at = 11;
-  repeated string tags = 12;
-  repeated JoinTokenGrant grants = 13;
-  bool ephemeral = 14;
-  google.protobuf.Duration retire_after = 15;
+  string label = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  int32 max_uses = 4;
+  int32 uses = 5;
+  bool auto_approve = 6;
+  string ca_id = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp last_used_at = 9;
+  repeated string tags = 10;
+  repeated JoinTokenGrant grants = 11;
+  bool ephemeral = 12;
+  google.protobuf.Duration retire_after = 13;
 }
 
 message JoinTokenGrant {
@@ -71,25 +66,20 @@ message JoinTokenGrant {
 }
 
 message CreateJoinTokenRequest {
-  JoinTokenKind kind = 1 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  string label = 2 [(buf.validate.field).string.max_len = 100];
-  google.protobuf.Duration ttl = 3 [(buf.validate.field).duration.gt = {seconds: 0}];
-  int32 max_uses = 4 [(buf.validate.field).int32.gt = 0];
-  bool auto_approve = 5;
-  string ca_id = 6 [(buf.validate.field).string.uuid = true];
-  WorkspaceRole role = 7 [(buf.validate.field).enum.defined_only = true];
-  repeated string tags = 8 [(buf.validate.field).repeated = {
+  string label = 1 [(buf.validate.field).string.max_len = 100];
+  google.protobuf.Duration ttl = 2 [(buf.validate.field).duration.gt = {seconds: 0}];
+  int32 max_uses = 3 [(buf.validate.field).int32.gt = 0];
+  bool auto_approve = 4;
+  string ca_id = 5 [(buf.validate.field).string.uuid = true];
+  repeated string tags = 6 [(buf.validate.field).repeated = {
     max_items: 32
     items: {
       string: {max_len: 64}
     }
   }];
-  repeated JoinTokenGrant grants = 9 [(buf.validate.field).repeated.max_items = 32];
-  bool ephemeral = 10;
-  google.protobuf.Duration retire_after = 11 [(buf.validate.field).duration = {
+  repeated JoinTokenGrant grants = 7 [(buf.validate.field).repeated.max_items = 32];
+  bool ephemeral = 8;
+  google.protobuf.Duration retire_after = 9 [(buf.validate.field).duration = {
     gte: {seconds: 60}
     lte: {seconds: 604800}
   }];
@@ -99,9 +89,7 @@ message CreateJoinTokenResponse {
   string secret = 2;
 }
 
-message ListJoinTokensRequest {
-  JoinTokenKind kind = 1 [(buf.validate.field).enum.defined_only = true];
-}
+message ListJoinTokensRequest {}
 message ListJoinTokensResponse {
   repeated JoinToken tokens = 1;
 }

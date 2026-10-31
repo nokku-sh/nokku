@@ -22,16 +22,23 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
+// accessTokens are the kinds of every access token, for a test that takes whichever it got.
+var accessTokens = []crypto.TokenKind{
+	crypto.TokenSession, crypto.TokenCLI, crypto.TokenDaemon, crypto.TokenServiceAccount, crypto.TokenSCIM,
+}
+
 const (
 	testBaseURL = "http://nokku.test"
 	// What a browser holds and a mailed link carries.
 	sessionCookieName = "nokku_session"
 	loginVerifyURL    = "/login/verify?token="
+	inviteURL         = "/invite?token="
 )
 
 type testEnv struct {
 	svc  *iam.Service
 	conn *db.Connection
+	keys *kms.Keyset
 }
 
 func newTestEnv(t *testing.T) *testEnv {
@@ -39,7 +46,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	return newTestEnvWith(t, iam.Deps{})
 }
 
-// newTestEnvWith takes the mail functions and the seat cap. Conn and Secret are filled in.
+// newTestEnvWith takes the mail functions and the seat cap. Conn, Secret and Keyset are filled in.
 func newTestEnvWith(t *testing.T, deps iam.Deps) *testEnv {
 	t.Helper()
 	// The mock IdPs listen on loopback.
@@ -48,19 +55,17 @@ func newTestEnvWith(t *testing.T, deps iam.Deps) *testEnv {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	cipher, err := kms.New(t.Context(), conn, "test-secret-0123456789-0123456789")
+	t.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
+	keys, err := kms.New(t.Context(), conn, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := crypto.SetEncryptor(cipher); err != nil {
-		t.Fatal(err)
-	}
-	deps.Conn, deps.Secret = conn, []byte("test-secret")
+	deps.Conn, deps.Keyset = conn, keys
 	svc, err := iam.New(t.Context(), deps)
 	if err != nil {
 		t.Fatalf("build iam service: %v", err)
 	}
-	return &testEnv{svc: svc, conn: conn}
+	return &testEnv{svc: svc, conn: conn, keys: keys}
 }
 
 // normalizeEmail is the form the schema takes an address in.
@@ -77,7 +82,7 @@ func testDomain() string {
 func (e *testEnv) workspace(t *testing.T) actor.Workspace {
 	t.Helper()
 	slug := "w" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[:12]
-	ws, err := tenant.Create(t.Context(), e.conn, slug, "Test")
+	ws, err := tenant.Create(t.Context(), e.conn, e.keys, slug, "Test")
 	if err != nil {
 		t.Fatalf("create workspace: %v", err)
 	}
@@ -115,29 +120,6 @@ func (e *testEnv) user(t *testing.T, ws actor.Workspace, email string, role nokk
 		t.Fatalf("create user %s: %v", email, err)
 	}
 	return u
-}
-
-// invite makes an invite link for ws. maxUses zero is unlimited.
-func (e *testEnv) invite(t *testing.T, ws actor.Workspace, role nokkuv1.WorkspaceRole, maxUses int32) string {
-	t.Helper()
-	id := uuid.NewV7().String()
-	tok := crypto.NewToken(id)
-	params := &db.CreateJoinTokenParams{
-		ID:        id,
-		Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE,
-		TokenHash: tok.Hash,
-		Role:      &role,
-	}
-	if maxUses > 0 {
-		params.MaxUses = &maxUses
-	}
-	if err := e.in(t, ws, func(q *db.Queries) error {
-		_, err := q.CreateJoinToken(t.Context(), params)
-		return err
-	}); err != nil {
-		t.Fatalf("create invite: %v", err)
-	}
-	return tok.Plaintext
 }
 
 func (e *testEnv) provider(t *testing.T, ws actor.Workspace, p iam.SSOProvider) {

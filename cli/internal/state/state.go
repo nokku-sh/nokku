@@ -29,20 +29,10 @@ type CA struct {
 	PublicKey     string `json:"public_key"`
 	HostPublicKey string `json:"host_public_key,omitempty"`
 	Default       bool   `json:"default,omitzero"`
-	// RotatedAt is when the current keys were issued.
-	RotatedAt time.Time `json:"rotated_at,omitzero"`
 	// The keys before the last rollover. Their certificates stay trusted until PreviousTrustedUntil.
 	PreviousPublicKey     string    `json:"previous_public_key,omitempty"`
 	PreviousHostPublicKey string    `json:"previous_host_public_key,omitempty"`
 	PreviousTrustedUntil  time.Time `json:"previous_trusted_until,omitzero"`
-}
-
-// KeysChangedAt is when TrustedKeys last changed, at a rotation or at the end of its grace period.
-func (ca CA) KeysChangedAt() time.Time {
-	if time.Now().After(ca.PreviousTrustedUntil) && ca.PreviousTrustedUntil.After(ca.RotatedAt) {
-		return ca.PreviousTrustedUntil
-	}
-	return ca.RotatedAt
 }
 
 // TrustedKeys returns the current user key and, while it is still trusted, the one it replaced.
@@ -74,31 +64,17 @@ type Target struct {
 	// Until holds the usernames whose grant ends, the others are for good.
 	Until map[string]time.Time `json:"until,omitempty"`
 	// HostPublicKey pins the host key of a manual target.
-	HostPublicKey string            `json:"host_public_key,omitempty"`
-	Metadata      map[string]string `json:"metadata,omitempty"`
+	HostPublicKey string `json:"host_public_key,omitempty"`
 }
 
 // Manual reports whether the target has no daemon and is synced by hand.
 func (t Target) Manual() bool { return t.DaemonID == "" }
 
-// NeedsSync means the server of a manual target lacks ca's current key, or still trusts the one it replaced.
-func (t Target) NeedsSync(ca *CA) bool {
-	return t.Manual() && ca != nil && ca.KeysChangedAt().After(t.LastManualSync())
-}
-
-// LastManualSync is when an operator last ran nk sync, zero when never.
-func (t Target) LastManualSync() time.Time {
-	ts, _ := time.Parse(time.RFC3339, t.Metadata["last_manual_sync"])
-	return ts
-}
-
 // Config lives in config.json. A session belongs to the API that issued it, so both are kept together.
 type Config struct {
 	APIURL string `json:"api_url,omitempty"`
 	// PEM of the private CA the API is trusted through, empty when the system roots know its certificate.
-	APICA string `json:"api_ca,omitempty"`
-	// Set once nk put that CA into the system trust store, so the sign-out knows to offer taking it out.
-	APICAInstalled   bool      `json:"api_ca_installed,omitzero"`
+	APICA            string    `json:"api_ca,omitempty"`
 	SessionToken     string    `json:"session_token,omitempty"`
 	SessionExpiresAt time.Time `json:"session_expires_at,omitzero"`
 	// TTL is kept from --ttl, ssh runs nk proxy and nk prepare without flags.
@@ -126,8 +102,6 @@ type State struct {
 	// Read from NK_TOKEN only, never argv, so it stays out of shell history and the process list.
 	Token      string
 	RequireTPM bool
-	// Pin names the private CA of the API, see internal/trust.
-	Pin string
 }
 
 // Load reads config and cache. A missing or corrupt file starts empty.

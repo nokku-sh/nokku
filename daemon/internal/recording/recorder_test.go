@@ -13,25 +13,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
-func newRecordsDir(t *testing.T) string {
-	t.Helper()
-	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	dir := paths.RecordsDir()
-	must := require.New(t)
-	must.NoError(os.MkdirAll(dir, 0o700))
-	return dir
-}
+const testID = "0199aaaa-0000-7000-8000-0000000000a1"
 
 func TestRecorderCorrelatesSessionID(t *testing.T) {
 	recordsDir := newRecordsDir(t)
 	is := assert.New(t)
 	must := require.New(t)
 
-	sessionID := "0123456789abcdef0123456789abcdef"
+	sessionID := "0199aaaa-0000-7000-8000-0000000000c1"
 	rec, err := New(Options{Width: 80, Height: 24, Title: "t", SessionID: sessionID})
 	must.NoError(err, "new recorder")
 	rec.RecordOutput([]byte("hello"))
@@ -40,7 +31,7 @@ func TestRecorderCorrelatesSessionID(t *testing.T) {
 	entries, err := os.ReadDir(recordsDir)
 	must.NoError(err)
 	must.Len(entries, 1)
-	is.Contains(entries[0].Name(), sessionID)
+	is.Equal(sessionID+castSuffix, entries[0].Name(), "a whole recording is named by its id")
 
 	f, err := os.Open(filepath.Join(recordsDir, entries[0].Name()))
 	must.NoError(err)
@@ -59,7 +50,7 @@ func TestRecorderV3Schema(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 
-	rec, err := New(Options{Width: 100, Height: 40, Title: "t", SessionID: "sess-1"})
+	rec, err := New(Options{Width: 100, Height: 40, Title: "t", SessionID: testID})
 	must.NoError(err, "new recorder")
 	rec.RecordOutput([]byte("hi"))
 	rec.RecordExit(7)
@@ -144,7 +135,7 @@ func recRecordAndReadEvents(
 
 func TestRecorderKeepsSplitCharacters(t *testing.T) {
 	recordsDir := newRecordsDir(t)
-	rec, err := New(Options{Width: 80, Height: 24, SessionID: "s1"})
+	rec, err := New(Options{Width: 80, Height: 24, SessionID: testID})
 	require.NoError(t, err, "new recorder")
 
 	euro := []byte("€")
@@ -168,7 +159,7 @@ func TestRecorderNoHTMLEscape(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 
-	rec, err := New(Options{Width: 80, Height: 24, SessionID: "s1"})
+	rec, err := New(Options{Width: 80, Height: 24, SessionID: testID})
 	must.NoError(err, "new recorder")
 	rec.RecordOutput([]byte("a < b & c > d\n"))
 	rec.Close()
@@ -197,7 +188,7 @@ func TestRecorderEscapedUnicodeRoundTrips(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 
-	rec, err := New(Options{Width: 80, Height: 24, SessionID: "s1"})
+	rec, err := New(Options{Width: 80, Height: 24, SessionID: testID})
 	must.NoError(err, "new recorder")
 	input := `echo '\u003c \u003e \u0026'`
 	rec.RecordOutput([]byte(input))
@@ -224,7 +215,7 @@ func TestRecorderFlushesWithoutClose(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 
-	rec, err := New(Options{Width: 80, Height: 24, Title: "t"})
+	rec, err := New(Options{Width: 80, Height: 24, Title: "t", SessionID: testID})
 	must.NoError(err, "new recorder")
 	defer rec.Close()
 
@@ -270,48 +261,21 @@ func TestNilRecorderIsNoOp(t *testing.T) {
 	iface.RecordResize(80, 24)
 }
 
-// slowSink blocks in Close until released, like an upload stream waiting on the core.
-type slowSink struct {
-	release chan struct{}
-	done    chan struct{}
-}
+// A second session under the same id never touches the first one's recording, open or waiting for its upload.
+func TestRecorderRefusesAnIDInUse(t *testing.T) {
+	newRecordsDir(t)
+	first, err := New(Options{Width: 80, Height: 24, SessionID: testID})
+	require.NoError(t, err)
+	_, err = New(Options{Width: 80, Height: 24, SessionID: testID})
+	require.Error(t, err, "a second recorder opened the first one's file")
+	first.RecordOutput([]byte("first session"))
+	first.Close()
 
-func (s *slowSink) Write(p []byte) (int, error) { return len(p), nil }
-
-func (s *slowSink) Close() error {
-	<-s.release
-	close(s.done)
-	return nil
-}
-
-func TestRecorderCloseDoesNotBlockOnSink(t *testing.T) {
-	recordsDir := newRecordsDir(t)
-	is := assert.New(t)
-	must := require.New(t)
-
-	sink := &slowSink{release: make(chan struct{}), done: make(chan struct{})}
-	rec, err := New(Options{Width: 80, Height: 24, Title: "t", Sink: sink})
-	must.NoError(err, "new recorder")
-	rec.RecordOutput([]byte("hello"))
-
-	start := time.Now()
-	rec.Close()
-	is.Less(time.Since(start), time.Second, "Close blocked on the sink")
-
-	// The local file is complete and readable while the sink is still open.
-	entries, err := os.ReadDir(recordsDir)
-	must.NoError(err)
-	must.Len(entries, 1)
-	f, err := os.Open(filepath.Join(recordsDir, entries[0].Name()))
-	must.NoError(err)
-	defer f.Close()
-	gz, err := gzip.NewReader(f)
-	must.NoError(err)
-	defer gz.Close()
-	data, err := io.ReadAll(gz)
-	must.NoError(err, "local recording must be complete after Close")
-	is.Contains(string(data), "hello")
-
-	close(sink.release)
-	<-sink.done
+	_, err = New(Options{Width: 80, Height: 24, SessionID: testID})
+	require.Error(t, err, "a second recorder would replace the whole recording at its close")
+	data, err := os.ReadFile(first.path)
+	require.NoError(t, err)
+	text, err := unzipCast(data)
+	require.NoError(t, err)
+	assert.Contains(t, text, "first session")
 }

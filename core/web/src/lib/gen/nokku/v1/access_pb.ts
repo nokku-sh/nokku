@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/access.proto.
  */
 export const file_nokku_v1_access: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxInIKBkFjY2VzcxIOCgZwdWJsaWMYASABKAgSDAoEc2VsZhgCIAEoCBIlCgRyb2xlGAMgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZRIOCgZkYWVtb24YBCABKAgSEwoLcGVvcGxlX29ubHkYBSABKAgqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzQowBCgxjb20ubm9ra3UudjFCC0FjY2Vzc1Byb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_google_protobuf_descriptor]);
+  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIsABCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEgwKBHNlbGYYAiABKAgSJQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGUSDgoGZGFlbW9uGAQgASgIEhMKC3Blb3BsZV9vbmx5GAUgASgIEg0KBWZyZXNoGAYgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEg0KBXNpZ25zGAkgASgIEg0KBXF1aWV0GAogASgIKrQBCg1Xb3Jrc3BhY2VSb2xlEh4KGldPUktTUEFDRV9ST0xFX1VOU1BFQ0lGSUVEEAASGQoVV09SS1NQQUNFX1JPTEVfTUVNQkVSEAESGQoVV09SS1NQQUNFX1JPTEVfVklFV0VSEAISGQoVV09SS1NQQUNFX1JPTEVfRURJVE9SEAMSGAoUV09SS1NQQUNFX1JPTEVfQURNSU4QBBIYChRXT1JLU1BBQ0VfUk9MRV9PV05FUhAFOkoKBmFjY2VzcxIeLmdvb2dsZS5wcm90b2J1Zi5NZXRob2RPcHRpb25zGLiOAyABKAsyEC5ub2trdS52MS5BY2Nlc3NSBmFjY2Vzc0KMAQoMY29tLm5va2t1LnYxQgtBY2Nlc3NQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_descriptor]);
 
 /**
  * @generated from message nokku.v1.Access
@@ -44,6 +44,41 @@ export type Access = Message<"nokku.v1.Access"> & {
    * @generated from field: bool people_only = 5;
    */
   peopleOnly: boolean;
+
+  /**
+   * fresh needs a browser session from the last 10 minutes and refuses nk, a stolen session cannot add a way in.
+   *
+   * @generated from field: bool fresh = 6;
+   */
+  fresh: boolean;
+
+  /**
+   * feature is the plan feature the call needs.
+   *
+   * @generated from field: string feature = 7;
+   */
+  feature: string;
+
+  /**
+   * capped counts the create against the plan's resource cap.
+   *
+   * @generated from field: bool capped = 8;
+   */
+  capped: boolean;
+
+  /**
+   * signs issues a user certificate, an inactive workspace gets none.
+   *
+   * @generated from field: bool signs = 9;
+   */
+  signs: boolean;
+
+  /**
+   * quiet changes something, but the handler records what matters, so the audit log skips the call.
+   *
+   * @generated from field: bool quiet = 10;
+   */
+  quiet: boolean;
 };
 
 /**

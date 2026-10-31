@@ -29,7 +29,7 @@ That is the whole workflow. No new SSH client and no `authorized_keys` to clean 
 
 - **Plain OpenSSH.** `ssh`, `scp`, `rsync` and your editor's remote mode work as before. Nokku only keeps your certificate fresh.
 - **No passwords anywhere.** People sign in with a passkey, Google, Microsoft or any OIDC provider.
-- **Access you can read.** This person or team, on this server, as this account. A revoke applies at once.
+- **Access you can read.** This person or team, on this server, as this account. A revoke applies at once, and within an hour on a server set up with `nk sync`.
 - **Access that runs out.** On the paid plans, grant a server for an hour or a week, or let people ask and an admin approve. It ends by itself.
 - **Keys that stay in hardware.** On Linux and Windows your SSH key lives in a TPM 2.0 when the machine has one and never leaves the chip. On macOS the Secure Enclave is experimental, so a Mac uses a software key unless you turn it on.
 - **No bastion in the path.** Every server serves its own SSH connections, and keeps doing so when the core is down.
@@ -48,7 +48,7 @@ Each one has its own README. Pick where you want to start.
 | **[Daemon](./daemon)** `nokkud` | Runs on a server next to your `sshd` and keeps its access in sync                    | [Add a server](./daemon#quick-start)     |
 | **[CLI](./cli)** `nk`           | Signs you in on your machine, then plain `ssh` works                                 | [Sign in and connect](./cli#quick-start) |
 
-Don't want a daemon on a server? [`nk sync`](./cli#servers-without-the-daemon) sets up its `sshd` over plain SSH.
+Don't want a daemon on a server? [`nk sync`](./cli#servers-without-the-daemon) sets up its `sshd` over plain SSH. Certificates for such a server last an hour at most, so a revoke lands there within the hour.
 
 The guides are at [nokku.sh/docs](https://nokku.sh/docs).
 

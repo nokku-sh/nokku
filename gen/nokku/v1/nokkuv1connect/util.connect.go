@@ -118,7 +118,6 @@ type UtilServiceClient interface {
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
-	// ExportAccessReport is who can log in where and when they last got a certificate there, for an access review.
 	ExportAccessReport(context.Context, *v1.ExportAccessReportRequest) (*v1.ExportAccessReportResponse, error)
 	ListMyActivity(context.Context, *v1.ListMyActivityRequest) (*v1.ListMyActivityResponse, error)
 }
@@ -137,7 +136,6 @@ type UtilServiceHandler interface {
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
-	// ExportAccessReport is who can log in where and when they last got a certificate there, for an access review.
 	ExportAccessReport(context.Context, *v1.ExportAccessReportRequest) (*v1.ExportAccessReportResponse, error)
 	ListMyActivity(context.Context, *v1.ListMyActivityRequest) (*v1.ListMyActivityResponse, error)
 }

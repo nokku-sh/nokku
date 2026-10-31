@@ -15,7 +15,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
+	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
@@ -134,7 +136,7 @@ func (s *Service) sendNew(ctx context.Context, st *db.AuditStream) error {
 // TestStream sends one made up event, so an admin sees at once whether the destination takes it.
 func (s *Service) TestStream(ctx context.Context, st *db.AuditStream) error {
 	return s.send(ctx, st, []*Event{{
-		ID:          "00000000-0000-0000-0000-000000000000",
+		ID:          uuid.Nil().String(),
 		Timestamp:   time.Now().UTC(),
 		WorkspaceID: st.WorkspaceID,
 		Action:      "StreamTest",
@@ -151,9 +153,13 @@ func (s *Service) send(ctx context.Context, st *db.AuditStream, events []*Event)
 	if err != nil {
 		return err
 	}
+	plain, err := s.keys.Open(SecretAAD(st.WorkspaceID, st.ID), st.Secret)
+	if err != nil {
+		return err
+	}
+	secret := string(plain)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "nokku-audit-stream")
-	secret := string(st.Secret)
 	switch st.Kind {
 	case StreamWebhook:
 		stamp := strconv.FormatInt(time.Now().Unix(), 10)
@@ -175,6 +181,12 @@ func (s *Service) send(ctx context.Context, st *db.AuditStream, events []*Event)
 		return fmt.Errorf("the destination answered %s: %s", res.Status, bytes.TrimSpace(detail))
 	}
 	return nil
+}
+
+// SecretAAD is where the secret of a stream is sealed. It opens only for the stream it was stored with, so a
+// ciphertext copied to another stream, whose URL someone else may pick, does not.
+func SecretAAD(workspaceID, streamID string) crypto.AAD {
+	return crypto.AAD{Table: "audit_streams", Column: "secret", Workspace: workspaceID, Row: streamID}
 }
 
 // refuseRedirect keeps the API key or the signature from going to a host nobody chose.

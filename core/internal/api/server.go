@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -19,8 +20,6 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
-	"github.com/nokku-sh/nokku/core/internal/entitlement"
-	"github.com/nokku-sh/nokku/core/internal/webpki"
 	"github.com/nokku-sh/nokku/core/web"
 )
 
@@ -57,7 +56,6 @@ func (s *Server) Start(ctx context.Context) error {
 		Addr:              "0.0.0.0:" + s.cfg.Port,
 		Handler:           s.Handler(ctx),
 		Protocols:         proto,
-		ErrorLog:          slog.NewLogLogger(quietHandshakes{slog.Default().Handler()}, slog.LevelInfo),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
 		MaxHeaderBytes:    1 << 14, // 16 KiB
@@ -71,12 +69,11 @@ func (s *Server) Start(ctx context.Context) error {
 	serverErr := make(chan error, 1)
 	go func() {
 		slog.Info("server listening", "bind_address", server.Addr, "public_url", s.cfg.FullURL())
-		if s.cfg.BootstrapLink != "" {
-			slog.Warn("the owner has no passkey yet, sign in with this link, it works for 24 hours",
-				"url", s.cfg.BootstrapLink)
+		if s.cfg.OwnerNeedsLink {
+			slog.Warn("the owner has no passkey yet, run nokku admin-link for a sign-in link")
+			s.printOwnerLink(ctx)
 		}
-		// One port: TLS for a client that connects by itself, plain HTTP for a proxy.
-		err := server.Serve(s.cfg.WebPKI.Listener(listener))
+		err := server.Serve(listener)
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
@@ -107,7 +104,6 @@ func (s *Server) serverInterceptors(ctx context.Context) []connect.ServerInterce
 		s.recoverRPC,          // Inside audit, so a call that panicked is recorded with its code.
 		errorInterceptor,
 		(&authorizationInterceptor{cfg: s.cfg}).intercept,
-		entitlement.NewGuardInterceptor(s.cfg.Entitlements),
 		validate.NewServerInterceptor(),
 	}
 	// Outermost, so it sees the mapped code and the calls turned down before the handler.
@@ -162,10 +158,23 @@ func (s *Server) handler() http.Handler {
 	)(s.mux.ServeHTTP)
 }
 
+// printOwnerLink writes the owner's sign-in link to a terminal only. A log line can end up at a telemetry backend.
+func (s *Server) printOwnerLink(ctx context.Context) {
+	if fi, err := os.Stderr.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
+		return
+	}
+	owner, link, err := s.cfg.IAM.AdminLink(ctx, s.cfg.Tenant.Single())
+	if err != nil {
+		slog.Error("failed to issue the owner's sign-in link", "error", err)
+		return
+	}
+	_, _ = fmt.Fprintf(os.Stderr, "\nSign in as %s within 24 hours:\n\n  %s\n\n", owner.Email, link)
+}
+
 // withRequestMeta is the one place that sets the address and headers session rows and audit events read.
 func (s *Server) withRequestMeta(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		meta := actor.RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr, TLS: r.TLS != nil}
+		meta := actor.RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr}
 		ctx := actor.ContextWithRequestMeta(r.Context(), meta)
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -204,7 +213,6 @@ func (s *Server) registerServices(ctx context.Context) {
 	nokkuv1connect.RegisterSCIMServiceHandler(server, &scimService{cfg: s.cfg})
 	nokkuv1connect.RegisterDaemonControlServiceHandler(server, newDaemonControlService(s.cfg))
 	nokkuv1connect.RegisterRecordingServiceHandler(server, &recordingService{cfg: s.cfg})
-	nokkuv1connect.RegisterLegalHoldServiceHandler(server, &legalHoldService{cfg: s.cfg})
 	nokkuv1connect.RegisterAccessRequestServiceHandler(server, &accessRequestService{cfg: s.cfg})
 	nokkuv1connect.RegisterAuditStreamServiceHandler(server, &auditStreamService{cfg: s.cfg})
 	connecthttp.Mount(s.mux, server,
@@ -223,8 +231,6 @@ func (s *Server) registerServices(ctx context.Context) {
 	})
 
 	registerAuthRoutes(s.mux, s.cfg)
-	// Public, a client reads it before it trusts the certificate.
-	s.mux.Handle("GET "+webpki.Path, s.cfg.WebPKI)
 
 	protec := chain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
 	s.mux.Handle("GET /avatars/{id}", protec(serveAvatar(s.cfg)))

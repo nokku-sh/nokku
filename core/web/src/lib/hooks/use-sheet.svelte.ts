@@ -1,5 +1,6 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
+import { whenFresh } from '#lib/api/auth.svelte.js';
 
 /** Query params owned by sheets and create forms, tables don't treat them as filters. */
 export const SHEET_PARAMS = ['id', 'tab', 'new'];
@@ -66,8 +67,9 @@ export function useSheet() {
 	};
 }
 
-// useCreate keeps "the create form is open" in `?new`, so the command palette can open it from any page.
-export function useCreate() {
+// useCreate keeps "the create form is open" in `?new`, so the command palette can open it from any page. A fresh
+// form hands out a credential and opens only after a recent sign-in.
+export function useCreate({ fresh = false } = {}) {
 	const open = $derived(page.url.searchParams.has('new'));
 
 	return {
@@ -76,7 +78,10 @@ export function useCreate() {
 		},
 		set open(value: boolean) {
 			if (value === open) return;
-			void goto(urlWith({ new: value ? '1' : undefined }), { replace: true, reset: false });
+			const url = urlWith({ new: value ? '1' : undefined });
+			const go = () => void goto(url, { replace: true, reset: false });
+			if (value && fresh) void whenFresh(go, url.pathname + url.search);
+			else go();
 		}
 	};
 }

@@ -4,6 +4,7 @@ package nokku.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
@@ -13,7 +14,10 @@ service CertificateService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateCertificateAuthority(CreateCertificateAuthorityRequest) returns (CreateCertificateAuthorityResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      capped: true
+    };
   }
   rpc UpdateCertificateAuthority(UpdateCertificateAuthorityRequest) returns (UpdateCertificateAuthorityResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
@@ -29,67 +33,58 @@ service CertificateService {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc SignSSHCertificate(SignSSHCertificateRequest) returns (SignSSHCertificateResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      signs: true
+    };
   }
 }
 
-// A CA holds two Ed25519 keys that never expire. The user key signs login certificates, the host key the
-// certificates daemons present. Both change only by rollover.
 message CertificateAuthority {
-  reserved 6, 9, 10, 11, 12;
+  reserved 11;
 
   string id = 1;
   string name = 2;
   string description = 3;
-  // The user key, what sshd's TrustedUserCAKeys holds.
   string public_key = 4;
-  // The host key, what @cert-authority in known_hosts holds.
-  string host_public_key = 23;
-  // When the keys were made, at creation or the last rollover.
-  google.protobuf.Timestamp rotated_at = 5;
-  bool is_active = 7;
-  bool is_default = 8;
-  google.protobuf.Duration user_default_ttl = 13;
-  google.protobuf.Duration user_max_ttl = 14;
-  google.protobuf.Duration host_default_ttl = 15;
-  google.protobuf.Duration host_max_ttl = 16;
-  google.protobuf.Timestamp created_at = 17;
-  google.protobuf.Timestamp updated_at = 18;
-  string previous_public_key = 19;
-  string previous_host_public_key = 24;
-  // The previous keys are trusted until then.
-  google.protobuf.Timestamp previous_trusted_until = 20;
-  string force_command = 21;
-  string source_address = 22;
+  string host_public_key = 5;
+  google.protobuf.Timestamp rotated_at = 6;
+  bool is_default = 7;
+  google.protobuf.Duration user_default_ttl = 8;
+  google.protobuf.Duration user_max_ttl = 9;
+  google.protobuf.Duration host_ttl = 10;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  string previous_public_key = 14;
+  string previous_host_public_key = 15;
+  google.protobuf.Timestamp previous_trusted_until = 16;
+  string force_command = 17;
+  string source_address = 18;
 }
 
 message CreateCertificateAuthorityRequest {
-  reserved 3, 4, 6, 7;
+  reserved 7;
 
   string name = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 256
   }];
   string description = 2 [(buf.validate.field).string.max_len = 1000];
-  bool is_default = 5;
-  google.protobuf.Duration user_default_ttl = 8 [(buf.validate.field).duration = {
+  bool is_default = 3;
+  google.protobuf.Duration user_default_ttl = 4 [(buf.validate.field).duration = {
     gte: {seconds: 60} /* Min 1 minute */
     lte: {seconds: 31536000} /* Max 1 year */
   }];
-  google.protobuf.Duration user_max_ttl = 9 [(buf.validate.field).duration = {
+  google.protobuf.Duration user_max_ttl = 5 [(buf.validate.field).duration = {
     gte: {seconds: 60}
     lte: {seconds: 31536000}
   }];
-  google.protobuf.Duration host_default_ttl = 10 [(buf.validate.field).duration = {
+  google.protobuf.Duration host_ttl = 6 [(buf.validate.field).duration = {
     gte: {seconds: 60}
     lte: {seconds: 31536000}
   }];
-  google.protobuf.Duration host_max_ttl = 11 [(buf.validate.field).duration = {
-    gte: {seconds: 60}
-    lte: {seconds: 31536000}
-  }];
-  string force_command = 12 [(buf.validate.field).string.max_len = 1024];
-  string source_address = 13 [(buf.validate.field).string.max_len = 1024];
+  string force_command = 8 [(buf.validate.field).string.max_len = 1024];
+  string source_address = 9 [(buf.validate.field).string.max_len = 1024];
 }
 message CreateCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;
@@ -108,7 +103,7 @@ message ListCertificateAuthoritiesResponse {
 }
 
 message UpdateCertificateAuthorityRequest {
-  reserved 6, 7;
+  reserved 8;
 
   string id = 1 [(buf.validate.field).string.uuid = true];
   string name = 2 [(buf.validate.field).string = {
@@ -116,26 +111,36 @@ message UpdateCertificateAuthorityRequest {
     max_len: 256
   }];
   string description = 3 [(buf.validate.field).string.max_len = 1000];
-  bool is_active = 4;
-  bool is_default = 5;
-  google.protobuf.Duration user_default_ttl = 8 [(buf.validate.field).duration = {
+  bool is_default = 4;
+  google.protobuf.Duration user_default_ttl = 5 [(buf.validate.field).duration = {
     gte: {seconds: 60}
     lte: {seconds: 31536000}
   }];
-  google.protobuf.Duration user_max_ttl = 9 [(buf.validate.field).duration = {
+  google.protobuf.Duration user_max_ttl = 6 [(buf.validate.field).duration = {
     gte: {seconds: 60}
     lte: {seconds: 31536000}
   }];
-  google.protobuf.Duration host_default_ttl = 10 [(buf.validate.field).duration = {
+  google.protobuf.Duration host_ttl = 7 [(buf.validate.field).duration = {
     gte: {seconds: 60}
     lte: {seconds: 31536000}
   }];
-  google.protobuf.Duration host_max_ttl = 11 [(buf.validate.field).duration = {
-    gte: {seconds: 60}
-    lte: {seconds: 31536000}
-  }];
-  string force_command = 12 [(buf.validate.field).string.max_len = 1024];
-  string source_address = 13 [(buf.validate.field).string.max_len = 1024];
+  string force_command = 9 [(buf.validate.field).string.max_len = 1024];
+  string source_address = 10 [(buf.validate.field).string.max_len = 1024];
+  google.protobuf.FieldMask update_mask = 11 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).field_mask = {
+      in: [
+        "name",
+        "description",
+        "is_default",
+        "user_default_ttl",
+        "user_max_ttl",
+        "host_ttl",
+        "force_command",
+        "source_address"
+      ]
+    }
+  ];
 }
 message UpdateCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;
@@ -147,11 +152,9 @@ message DeleteCertificateAuthorityRequest {
 message DeleteCertificateAuthorityResponse {}
 
 message RolloverCertificateAuthorityRequest {
-  reserved 2, 3;
-
   string id = 1 [(buf.validate.field).string.uuid = true];
   // Distrusts the previous keys at once, for a key that leaked. Otherwise they stay trusted for user_max_ttl.
-  bool revoke_previous = 4;
+  bool revoke_previous = 2;
 }
 message RolloverCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;

@@ -22,7 +22,18 @@ INSERT INTO
   )
 VALUES
   (
-    $1,
+    COALESCE(
+      $1::UUID,
+      (
+        SELECT
+          id
+        FROM
+          ssh_cas
+        WHERE
+          workspace_id = current_workspace_id ()
+          AND is_default
+      )
+    ),
     $2,
     $3,
     $4,
@@ -44,6 +55,7 @@ type CreateTargetParams struct {
 	HostPublicKey *string  `json:"hostPublicKey"`
 }
 
+// No CA means the workspace default.
 func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error) {
 	row := q.db.QueryRow(ctx, createTarget,
 		arg.CaID,
@@ -141,26 +153,24 @@ WHERE
   t.daemon_id = $1::UUID
   OR t.id IN (
     SELECT
+      e.target_id
+    FROM
+      effective_access e
+    WHERE
+      e.subject_id = $1::UUID
+  )
+  OR t.id IN (
+    SELECT
       p.target_id
     FROM
       live_grants g
       JOIN target_accounts p ON p.id = g.account_id
     WHERE
-      -- One array of ids, an OR over the teams would keep the lookup off the subject index.
-      g.subject_id = ANY (
-        ARRAY[$1::UUID] || ARRAY(
-          SELECT
-            tm.team_id
-          FROM
-            team_members tm
-          WHERE
-            tm.user_id = $1::UUID
-        )
-      )
+      g.team_id = $1::UUID
   )
 `
 
-// For a user, grants to their teams count too. Subject UUIDs are unique across kinds.
+// The targets a person or service account holds an account on, a team's own for a team, a daemon's for a daemon.
 func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]*Target, error) {
 	rows, err := q.db.Query(ctx, getTargetsBySubject, subjectID)
 	if err != nil {
@@ -434,56 +444,6 @@ func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*T
 		arg.HostPublicKey,
 		arg.TargetID,
 	)
-	var i Target
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.CaID,
-		&i.DaemonID,
-		&i.Name,
-		&i.Description,
-		&i.Endpoints,
-		&i.HostPublicKey,
-		&i.Tags,
-		&i.Metadata,
-		&i.LastSyncAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const updateTargetCA = `-- name: UpdateTargetCA :one
-UPDATE targets
-SET
-  ca_id = COALESCE(
-    $1,
-    (
-      SELECT
-        id
-      FROM
-        ssh_cas
-      WHERE
-        workspace_id = targets.workspace_id
-        AND is_default = TRUE
-      LIMIT
-        1
-    )
-  )
-WHERE
-  targets.daemon_id = $2
-RETURNING
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
-`
-
-type UpdateTargetCAParams struct {
-	CaID     *string `json:"caId"`
-	DaemonID *string `json:"daemonId"`
-}
-
-// No id means the workspace default.
-func (q *Queries) UpdateTargetCA(ctx context.Context, arg *UpdateTargetCAParams) (*Target, error) {
-	row := q.db.QueryRow(ctx, updateTargetCA, arg.CaID, arg.DaemonID)
 	var i Target
 	err := row.Scan(
 		&i.ID,

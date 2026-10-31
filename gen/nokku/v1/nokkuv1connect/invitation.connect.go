@@ -30,6 +30,15 @@ const (
 	// InvitationServiceAcceptInvitationProcedure is the procedure name of the InvitationService's
 	// AcceptInvitation RPC.
 	InvitationServiceAcceptInvitationProcedure = "/nokku.v1.InvitationService/AcceptInvitation"
+	// InvitationServiceCreateInvitationProcedure is the procedure name of the InvitationService's
+	// CreateInvitation RPC.
+	InvitationServiceCreateInvitationProcedure = "/nokku.v1.InvitationService/CreateInvitation"
+	// InvitationServiceListInvitationsProcedure is the procedure name of the InvitationService's
+	// ListInvitations RPC.
+	InvitationServiceListInvitationsProcedure = "/nokku.v1.InvitationService/ListInvitations"
+	// InvitationServiceDeleteInvitationProcedure is the procedure name of the InvitationService's
+	// DeleteInvitation RPC.
+	InvitationServiceDeleteInvitationProcedure = "/nokku.v1.InvitationService/DeleteInvitation"
 )
 
 var (
@@ -48,12 +57,37 @@ var (
 			Procedure:  InvitationServiceAcceptInvitationProcedure,
 		}
 	})
+	invitationServiceCreateInvitationSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods().ByName("CreateInvitation"),
+			Procedure:  InvitationServiceCreateInvitationProcedure,
+		}
+	})
+	invitationServiceListInvitationsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods().ByName("ListInvitations"),
+			Procedure:        InvitationServiceListInvitationsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	invitationServiceDeleteInvitationSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_invitation_proto.Services().ByName("InvitationService").Methods().ByName("DeleteInvitation"),
+			Procedure:  InvitationServiceDeleteInvitationProcedure,
+		}
+	})
 )
 
 // InvitationServiceClient is a client for the nokku.v1.InvitationService service.
 type InvitationServiceClient interface {
 	GetInvitation(context.Context, *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error)
 	AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error)
+	CreateInvitation(context.Context, *v1.CreateInvitationRequest) (*v1.CreateInvitationResponse, error)
+	ListInvitations(context.Context, *v1.ListInvitationsRequest) (*v1.ListInvitationsResponse, error)
+	DeleteInvitation(context.Context, *v1.DeleteInvitationRequest) (*v1.DeleteInvitationResponse, error)
 }
 
 // NewInvitationServiceClient constructs a client for the nokku.v1.InvitationService service.
@@ -66,6 +100,9 @@ func NewInvitationServiceClient(client *connect.Client) InvitationServiceClient 
 type InvitationServiceHandler interface {
 	GetInvitation(context.Context, *v1.GetInvitationRequest) (*v1.GetInvitationResponse, error)
 	AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error)
+	CreateInvitation(context.Context, *v1.CreateInvitationRequest) (*v1.CreateInvitationResponse, error)
+	ListInvitations(context.Context, *v1.ListInvitationsRequest) (*v1.ListInvitationsResponse, error)
+	DeleteInvitation(context.Context, *v1.DeleteInvitationRequest) (*v1.DeleteInvitationResponse, error)
 }
 
 // RegisterInvitationServiceHandler registers svc as the nokku.v1.InvitationService implementation
@@ -75,6 +112,9 @@ func RegisterInvitationServiceHandler(server *connect.Server, svc InvitationServ
 	server.Register(
 		connect.Method{Spec: invitationServiceGetInvitationSpec(), Handler: adapter.getInvitation},
 		connect.Method{Spec: invitationServiceAcceptInvitationSpec(), Handler: adapter.acceptInvitation},
+		connect.Method{Spec: invitationServiceCreateInvitationSpec(), Handler: adapter.createInvitation},
+		connect.Method{Spec: invitationServiceListInvitationsSpec(), Handler: adapter.listInvitations},
+		connect.Method{Spec: invitationServiceDeleteInvitationSpec(), Handler: adapter.deleteInvitation},
 	)
 }
 
@@ -87,6 +127,18 @@ func (UnimplementedInvitationServiceHandler) GetInvitation(context.Context, *v1.
 
 func (UnimplementedInvitationServiceHandler) AcceptInvitation(context.Context, *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.InvitationService.AcceptInvitation is not implemented")
+}
+
+func (UnimplementedInvitationServiceHandler) CreateInvitation(context.Context, *v1.CreateInvitationRequest) (*v1.CreateInvitationResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.InvitationService.CreateInvitation is not implemented")
+}
+
+func (UnimplementedInvitationServiceHandler) ListInvitations(context.Context, *v1.ListInvitationsRequest) (*v1.ListInvitationsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.InvitationService.ListInvitations is not implemented")
+}
+
+func (UnimplementedInvitationServiceHandler) DeleteInvitation(context.Context, *v1.DeleteInvitationRequest) (*v1.DeleteInvitationResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.InvitationService.DeleteInvitation is not implemented")
 }
 
 type invitationServiceClient struct {
@@ -104,6 +156,30 @@ func (c *invitationServiceClient) GetInvitation(ctx context.Context, req *v1.Get
 func (c *invitationServiceClient) AcceptInvitation(ctx context.Context, req *v1.AcceptInvitationRequest) (*v1.AcceptInvitationResponse, error) {
 	var res v1.AcceptInvitationResponse
 	if err := c.client.CallUnary(ctx, invitationServiceAcceptInvitationSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *invitationServiceClient) CreateInvitation(ctx context.Context, req *v1.CreateInvitationRequest) (*v1.CreateInvitationResponse, error) {
+	var res v1.CreateInvitationResponse
+	if err := c.client.CallUnary(ctx, invitationServiceCreateInvitationSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *invitationServiceClient) ListInvitations(ctx context.Context, req *v1.ListInvitationsRequest) (*v1.ListInvitationsResponse, error) {
+	var res v1.ListInvitationsResponse
+	if err := c.client.CallUnary(ctx, invitationServiceListInvitationsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *invitationServiceClient) DeleteInvitation(ctx context.Context, req *v1.DeleteInvitationRequest) (*v1.DeleteInvitationResponse, error) {
+	var res v1.DeleteInvitationResponse
+	if err := c.client.CallUnary(ctx, invitationServiceDeleteInvitationSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -129,6 +205,42 @@ func (h invitationServiceHandler) acceptInvitation(ctx context.Context, _ connec
 		return err
 	}
 	res, err := h.svc.AcceptInvitation(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h invitationServiceHandler) createInvitation(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CreateInvitationRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CreateInvitation(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h invitationServiceHandler) listInvitations(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListInvitationsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListInvitations(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h invitationServiceHandler) deleteInvitation(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeleteInvitationRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.DeleteInvitation(ctx, &req)
 	if err != nil {
 		return err
 	}

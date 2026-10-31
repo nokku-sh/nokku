@@ -74,21 +74,3 @@ func TestLoadCacheLeavesOutAnotherServer(t *testing.T) {
 	require.NoError(t, old.LoadCache())
 	assert.True(t, old.HasCachedData(), "a snapshot from before the field existed keeps ssh working offline")
 }
-
-func TestNeedsSyncAfterRollover(t *testing.T) {
-	t.Parallel()
-	now := time.Now()
-	ca := &CA{RotatedAt: now.Add(-10 * 24 * time.Hour), PreviousTrustedUntil: now.Add(-3 * 24 * time.Hour)}
-	synced := func(at time.Time) Target {
-		return Target{Metadata: map[string]string{"last_manual_sync": at.Format(time.RFC3339)}}
-	}
-
-	assert.True(t, synced(now.Add(-20*24*time.Hour)).NeedsSync(ca), "synced before the rotation")
-	during := synced(now.Add(-5 * 24 * time.Hour))
-	assert.True(t, during.NeedsSync(ca), "synced in the grace period, the retired key is still on the host")
-	assert.False(t, synced(now.Add(-time.Hour)).NeedsSync(ca), "synced after the grace period")
-
-	open := &CA{RotatedAt: ca.RotatedAt, PreviousTrustedUntil: now.Add(time.Hour)}
-	assert.False(t, during.NeedsSync(open), "the grace period is not over yet")
-	assert.False(t, Target{DaemonID: "d"}.NeedsSync(ca), "the daemon keeps its own host up to date")
-}

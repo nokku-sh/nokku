@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -16,23 +17,17 @@ import (
 	"unicode"
 
 	"github.com/mizuchilabs/kata/buildinfo"
+	"golang.org/x/oauth2"
+
+	"github.com/nokku-sh/nokku/internal/dpopclient"
 )
 
 const (
 	// A real device flow answer is a few hundred bytes.
 	maxDeviceResponse = 64 << 10
-	// Polls in a row that may fail on the network or the server before the sign-in gives up.
+	// Failed polls on the network or the server before the sign-in gives up.
 	pollRetries = 3
 )
-
-// RFC 8628 device authorization response.
-type deviceAuth struct {
-	DeviceCode              string `json:"device_code"`
-	UserCode                string `json:"user_code"`
-	VerificationURI         string `json:"verification_uri"`
-	VerificationURIComplete string `json:"verification_uri_complete"`
-	Interval                int    `json:"interval"`
-}
 
 // The stored expiry is trusted locally. A rejection shows up later as CodeUnauthenticated and Sync logs in again.
 func (c *Client) ensureSession(ctx context.Context, interactive bool) error {
@@ -48,206 +43,187 @@ func (c *Client) ensureSession(ctx context.Context, interactive bool) error {
 	return c.deviceLogin(ctx)
 }
 
+// deviceLogin is the RFC 8628 device flow. The library polls and handles slow_down and the expiry of the code.
 func (c *Client) deviceLogin(ctx context.Context) error {
 	slog.Debug("starting device flow", "api", c.State.APIURL)
-
-	d, err := c.beginDeviceAuth(ctx)
+	ctx, cfg, err := c.deviceFlow(ctx)
 	if err != nil {
 		return err
 	}
 
+	d, err := beginDeviceAuth(ctx, cfg)
+	if err != nil {
+		return err
+	}
 	// The link already carries the code, the code is shown to compare. Stderr keeps it out of --json.
 	fmt.Fprintf(os.Stderr, "\nSign in to Nokku in your browser. If it does not open, visit:\n  %s\n", d.VerificationURI)
 	fmt.Fprintf(os.Stderr, "Confirm the code %s there. Waiting...\n", d.UserCode)
 	_ = openBrowser(d.VerificationURI)
 
-	token, expiresIn, err := c.pollDeviceToken(ctx, d.DeviceCode, time.Duration(d.Interval)*time.Second)
+	tok, err := pollDeviceToken(ctx, cfg, d)
 	if err != nil {
 		return err
 	}
-
-	c.State.SessionToken = token
-	if expiresIn > 0 {
-		c.State.SessionExpiresAt = time.Now().Add(time.Duration(expiresIn) * time.Second)
+	c.State.SessionToken = tok.AccessToken
+	if !tok.Expiry.IsZero() {
+		c.State.SessionExpiresAt = tok.Expiry
 	}
-	if err = c.State.Save(); err != nil {
-		return err
-	}
-
 	// Identity comes from the access sync that runs after login.
-	return nil
+	return c.State.Save()
 }
 
-func (c *Client) beginDeviceAuth(ctx context.Context) (deviceAuth, error) {
-	var d deviceAuth
-	resp, err := c.postForm(ctx, "/auth/device", url.Values{})
+// deviceFlow hands the library a client that signs every request, so a core at another URL stops the login
+// before a code exists.
+func (c *Client) deviceFlow(ctx context.Context) (context.Context, *oauth2.Config, error) {
+	base := strings.TrimRight(c.State.APIURL, "/")
+	u, err := url.Parse(base)
 	if err != nil {
-		return d, err
+		return ctx, nil, fmt.Errorf("the API URL %q: %w", c.State.APIURL, err)
 	}
-	if err = json.Unmarshal(resp, &d); err != nil {
-		return d, fmt.Errorf("device authorization: %w", err)
+	httpc := &http.Client{
+		Transport:     &deviceTransport{dpop: c.dpop, prefix: u.Path, next: c.httpc.Transport},
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	cfg := &oauth2.Config{Endpoint: oauth2.Endpoint{
+		DeviceAuthURL: base + "/auth/device",
+		TokenURL:      base + "/auth/device/token",
+		// Unknown would send every poll twice, once per way to pass the client id.
+		AuthStyle: oauth2.AuthStyleInParams,
+	}}
+	return context.WithValue(ctx, oauth2.HTTPClient, httpc), cfg, nil
+}
+
+func beginDeviceAuth(ctx context.Context, cfg *oauth2.Config) (*oauth2.DeviceAuthResponse, error) {
+	d, err := cfg.DeviceAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("device authorization: %w", err)
 	}
 	d.VerificationURI = cmp.Or(d.VerificationURIComplete, d.VerificationURI)
 	if d.DeviceCode == "" || d.UserCode == "" || d.VerificationURI == "" {
-		return d, errors.New("device authorization: incomplete response")
+		return nil, errors.New("device authorization: incomplete response")
 	}
 	// Both are printed, and a control character there starts an escape sequence.
 	if strings.ContainsFunc(d.UserCode+d.VerificationURI, unicode.IsControl) {
-		return d, errors.New("device authorization: the response has control characters")
+		return nil, errors.New("device authorization: the response has control characters")
 	}
 	// The link goes to the OS opener, which also launches files and custom schemes.
 	u, err := url.Parse(d.VerificationURI)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
-		return d, errors.New("device authorization: the sign-in link is not a web address")
+		return nil, errors.New("device authorization: the sign-in link is not a web address")
 	}
 	return d, nil
 }
 
-func (c *Client) pollDeviceToken(
-	ctx context.Context,
-	deviceCode string,
-	wait time.Duration,
-) (token string, expiresIn int, err error) {
-	// Cap the total wait at the grant TTL.
-	timeout := time.NewTimer(15 * time.Minute)
-	defer timeout.Stop()
-
-	if wait <= 0 {
-		wait = 5 * time.Second
-	}
-	ticker := time.NewTicker(wait)
-	defer ticker.Stop()
-
-	nonceRetried := false
-	failures := 0
-
-	for {
-		body, doErr := c.postForm(ctx, "/auth/device/token", url.Values{"device_code": {deviceCode}})
-
-		var out struct {
-			AccessToken string `json:"access_token"`
-			ExpiresIn   int    `json:"expires_in"`
-			Error       string `json:"error"`
+// pollDeviceToken starts the library's poll over after a blip, one in a wait of minutes is no reason to give up.
+func pollDeviceToken(ctx context.Context, cfg *oauth2.Config, d *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
+	for failures := 0; ; failures++ {
+		tok, err := cfg.DeviceAccessToken(ctx, d)
+		if err == nil {
+			return tok, nil
 		}
-		decodeErr := json.Unmarshal(body, &out)
-
-		if doErr == nil && decodeErr == nil && out.AccessToken != "" {
-			return out.AccessToken, out.ExpiresIn, nil
-		}
-		retry := ctx.Err() == nil && transient(doErr) && failures < pollRetries
-		if retry {
-			failures++
-		} else {
-			failures = 0
-		}
-		slog.Debug("device flow poll", "api", c.State.APIURL, "response", out.Error, "err", doErr)
+		slog.Debug("device flow poll", "api", cfg.Endpoint.TokenURL, "err", err)
 		switch {
-		case retry:
-			// One blip in a wait of minutes is no reason to start over.
-		case decodeErr != nil || out.Error == "":
-			// An HTTP error without an RFC 8628 code won't fix itself on retry.
-			if doErr != nil {
-				return "", 0, doErr
-			}
-			// Never echo the body, a malformed response can still carry a token.
-			return "", 0, errors.New("device authorization: unexpected response")
-		case out.Error == "authorization_pending":
-		case out.Error == "use_dpop_nonce" && !nonceRetried:
-			// postForm learned the fresh nonce, so retry at once.
-			nonceRetried = true
+		case ctx.Err() != nil:
+			return nil, ctx.Err()
+		case !d.Expiry.IsZero() && !time.Now().Before(d.Expiry):
+			return nil, errors.New("sign-in code expired, run nk login again")
+		case failures < pollRetries && transient(err):
 			continue
-		case out.Error == "use_dpop_nonce":
-			return "", 0, errors.New("sign-in failed, Nokku rejected the retry with a fresh nonce, run nk login again")
-		case out.Error == "invalid_dpop_proof":
-			return "", 0, errors.New(
-				"sign-in failed, Nokku rejected this machine's proof. " +
-					"Check that the clock is right and run nk login again",
-			)
-		case out.Error == "slow_down":
-			// RFC 8628 section 3.5. The server counts violations per grant and its interval keeps growing.
-			wait += 5 * time.Second
-			ticker.Reset(wait)
-		case out.Error == "access_denied":
-			return "", 0, errors.New("sign-in was denied in the browser")
-		case out.Error == "expired_token":
-			return "", 0, errors.New("sign-in code expired, run nk login again")
-		default:
-			return "", 0, errors.New("device authorization failed: " + out.Error)
 		}
-
-		select {
-		case <-ctx.Done():
-			return "", 0, ctx.Err()
-		case <-ticker.C:
-			nonceRetried = false
-		case <-timeout.C:
-			return "", 0, errors.New("sign-in timed out, run nk login again")
-		}
+		return nil, deviceError(err)
 	}
 }
 
 // transient is a failure of the network or the server, not an answer about the grant.
 func transient(err error) bool {
-	if err == nil {
-		return false
+	if re, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
+		return re.Response.StatusCode >= http.StatusInternalServerError
 	}
-	if se, ok := errors.AsType[*statusError](err); ok {
-		return se.code >= http.StatusInternalServerError
+	_, network := errors.AsType[*url.Error](err)
+	return network && !errors.Is(err, dpopclient.ErrAPIURLMismatch)
+}
+
+func deviceError(err error) error {
+	re, ok := errors.AsType[*oauth2.RetrieveError](err)
+	switch {
+	case !ok:
+		return fmt.Errorf("device authorization: %w", err)
+	case re.ErrorCode == "":
+		return fmt.Errorf("device authorization: HTTP %d: %s", re.Response.StatusCode, bytes.TrimSpace(re.Body))
+	case re.ErrorCode == "access_denied":
+		return errors.New("sign-in was denied in the browser")
+	case re.ErrorCode == "expired_token":
+		return errors.New("sign-in code expired, run nk login again")
+	case re.ErrorCode == "use_dpop_nonce":
+		return errors.New("sign-in failed, Nokku rejected the retry with a fresh nonce, run nk login again")
+	case re.ErrorCode == "invalid_dpop_proof":
+		return errors.New(
+			"sign-in failed, Nokku rejected this machine's proof. Check that the clock is right and run nk login again",
+		)
 	}
-	return true
+	return errors.New("device authorization failed: " + re.ErrorCode)
 }
 
-type statusError struct {
-	code int
-	body string
+// deviceTransport signs each request with a proof for its URL and learns the nonce every answer carries. A stale
+// nonce is retried at once, the rejection came with a fresh one (RFC 9449 section 8).
+type deviceTransport struct {
+	dpop *dpopclient.Client
+	// prefix is the path of the API URL, a proof names what follows it.
+	prefix string
+	next   http.RoundTripper
 }
 
-func (e *statusError) Error() string {
-	return fmt.Sprintf("device authorization: HTTP %d: %s", e.code, e.body)
-}
-
-func (c *Client) postForm(
-	ctx context.Context,
-	path string,
-	form url.Values,
-) (body []byte, err error) {
-	ctx, cancel := context.WithTimeout(ctx, syncTimeout)
-	defer cancel()
-	encoded := form.Encode()
-	u := strings.TrimRight(c.State.APIURL, "/") + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(encoded))
+func (t *deviceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, data, err := t.send(req, req.Body)
+	if err != nil || req.GetBody == nil || !staleNonce(resp.StatusCode, data) {
+		return resp, err
+	}
+	body, err := req.GetBody()
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, _, err = t.send(req, body)
+	return resp, err
+}
+
+// send reads the whole answer within the timeout. The library has no context on its first request and leaves that
+// body open.
+func (t *deviceTransport) send(req *http.Request, body io.ReadCloser) (*http.Response, []byte, error) {
+	ctx, cancel := context.WithTimeout(req.Context(), syncTimeout)
+	defer cancel()
+	req = req.Clone(ctx)
+	req.Body = body
 	// The approval page shows it, so the user recognizes their own terminal.
 	req.Header.Set("User-Agent", buildinfo.UserAgent("nk"))
-
-	if c.dpop != nil {
-		proof, perr := c.dpop.Proof(ctx, http.MethodPost, path)
-		if perr != nil {
-			return nil, perr
+	if t.dpop != nil {
+		proof, err := t.dpop.Proof(ctx, req.Method, strings.TrimPrefix(req.URL.Path, t.prefix))
+		if err != nil {
+			if body != nil {
+				_ = body.Close()
+			}
+			return nil, nil, err
 		}
 		req.Header.Set("DPoP", proof)
 	}
-
-	resp, err := c.httpc.Do(req)
+	resp, err := t.next.RoundTrip(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-
-	// Learn before the status check, the rejection carries the nonce the retry needs.
-	if c.dpop != nil {
-		c.dpop.Learn(resp.Header.Get("DPoP-Nonce"))
+	if t.dpop != nil {
+		t.dpop.Learn(resp.Header.Get("DPoP-Nonce"))
 	}
-
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxDeviceResponse))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if resp.StatusCode >= 400 {
-		return data, &statusError{code: resp.StatusCode, body: strings.TrimSpace(string(data))}
+	resp.Body = io.NopCloser(bytes.NewReader(data))
+	return resp, data, nil
+}
+
+func staleNonce(status int, body []byte) bool {
+	var answer struct {
+		Error string `json:"error"`
 	}
-	return data, nil
+	return status == http.StatusBadRequest && json.Unmarshal(body, &answer) == nil && answer.Error == "use_dpop_nonce"
 }

@@ -102,10 +102,10 @@ RETURNING
 `
 
 type UpsertSSOProviderParams struct {
-	ProviderID string                `json:"providerId"`
-	Name       string                `json:"name"`
-	Enabled    bool                  `json:"enabled"`
-	Config     crypto.EncryptedBytes `json:"config"`
+	ProviderID string        `json:"providerId"`
+	Name       string        `json:"name"`
+	Enabled    bool          `json:"enabled"`
+	Config     crypto.Sealed `json:"config"`
 }
 
 func (q *Queries) UpsertSSOProvider(ctx context.Context, arg *UpsertSSOProviderParams) (*SsoProvider, error) {

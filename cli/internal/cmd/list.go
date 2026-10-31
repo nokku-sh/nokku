@@ -41,8 +41,12 @@ func listCMD() *cli.Command {
 				if len(t.Usernames) > 0 {
 					users = strings.Join(withUntil(t), ", ")
 				}
+				note := ""
+				if t.Manual() {
+					note = "(manual)"
+				}
 				name := cmp.Or(aliases[t.ID], t.Name)
-				fmt.Printf("  %-24s %s %s\n", name, users, ui.Dim(manualNote(t, s.CAByID(t.CAID))))
+				fmt.Printf("  %-24s %s %s\n", name, users, ui.Dim(note))
 			}
 			fmt.Println("\nConnect with: ssh <server> or ssh <user>@<server>")
 			return nil
@@ -71,46 +75,25 @@ func untilLabel(end time.Time) string {
 	return end.Format("Jan 2 15:04")
 }
 
-func manualNote(t state.Target, ca *state.CA) string {
-	if !t.Manual() {
-		return ""
-	}
-	last := t.LastManualSync()
-	if last.IsZero() {
-		return "(manual, never synced)"
-	}
-	if t.NeedsSync(ca) && ca.RotatedAt.After(last) {
-		return "(manual, needs nk sync, its certificate authority was rotated)"
-	}
-	if t.NeedsSync(ca) {
-		return "(manual, needs nk sync, it still trusts a retired certificate authority key)"
-	}
-	return "(manual, synced " + ui.HumanizeDuration(time.Since(last)) + " ago)"
-}
-
 func listJSON(s *state.State, aliases map[string]string) any {
 	type listedTarget struct {
 		Name string `json:"name"`
 		// Host is what ssh knows the target by, empty when it stays out of ssh_config.
-		Host       string               `json:"host,omitempty"`
-		Users      []string             `json:"users"`
-		Until      map[string]time.Time `json:"until,omitempty"`
-		Manual     bool                 `json:"manual"`
-		LastSynced string               `json:"last_synced,omitempty"`
-		NeedsSync  bool                 `json:"needs_sync,omitzero"`
+		Host   string               `json:"host,omitempty"`
+		Users  []string             `json:"users"`
+		Until  map[string]time.Time `json:"until,omitempty"`
+		Manual bool                 `json:"manual"`
 	}
 	out := struct {
 		Targets []listedTarget `json:"targets"`
 	}{Targets: make([]listedTarget, 0, len(s.Targets))}
 	for _, t := range s.Targets {
 		out.Targets = append(out.Targets, listedTarget{
-			Name:       t.Name,
-			Host:       aliases[t.ID],
-			Users:      append([]string{}, t.Usernames...),
-			Until:      t.Until,
-			Manual:     t.Manual(),
-			LastSynced: t.Metadata["last_manual_sync"],
-			NeedsSync:  t.NeedsSync(s.CAByID(t.CAID)),
+			Name:   t.Name,
+			Host:   aliases[t.ID],
+			Users:  append([]string{}, t.Usernames...),
+			Until:  t.Until,
+			Manual: t.Manual(),
 		})
 	}
 	return out

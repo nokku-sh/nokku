@@ -16,6 +16,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
+	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -53,7 +54,7 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 		writeScimError(w, scimerrors.ScimError{Status: http.StatusUnauthorized, Detail: "authentication required"})
 		return
 	}
-	p, tok, err := f.svc.AuthenticateToken(r.Context(), raw)
+	p, tok, err := f.svc.AuthenticateToken(r.Context(), raw, crypto.TokenSCIM)
 	// A provider reads 401 as a broken token. A lookup that failed is ours to answer for, and it retries a 500.
 	if err != nil && !IsCredentialError(err) {
 		writeScimError(w, scimerrors.ScimErrorInternal)
@@ -111,7 +112,7 @@ func (s *Service) scimProvisionUser(
 		u, err = q.GetUserByEmail(ctx, email)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{Email: email, Name: name}, "")
+			u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{Email: email, Name: name})
 			if err != nil {
 				return err
 			}

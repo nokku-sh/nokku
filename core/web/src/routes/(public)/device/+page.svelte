@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { user } from '#lib/api/user.svelte.js';
+	import { leave } from '#lib/api/client.js';
 	import { pendingDeviceCode } from '#lib/store.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Alert from '#lib/components/ext/alert/index.js';
@@ -76,6 +77,12 @@
 			body: new URLSearchParams({ user_code: code })
 		})
 			.then(async (response) => {
+				// An old session must sign in again to approve, the code waits for it.
+				if (response.status === 401 && !denied) {
+					pendingDeviceCode.current = code;
+					leave();
+					return;
+				}
 				const body = (await response.json()) as DeviceVerifyResponse;
 				if (response.ok) {
 					pendingDeviceCode.current = null;

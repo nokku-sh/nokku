@@ -20,8 +20,9 @@ import (
 
 // Tenant queries carry no workspace filter. These tests are what that rests on.
 
-// unscoped has a workspace_id but no policy, on purpose. It holds a counter the app role cannot write.
-var unscoped = []string{"workspace_state"}
+// unscoped has a workspace_id but no policy, on purpose. Only definer triggers write these, the app role cannot:
+// the sync counter, and the objects of deleted recordings.
+var unscoped = []string{"workspace_state", "recording_deletes"}
 
 const tenantPolicy = "(workspace_id = current_workspace_id())"
 
@@ -55,21 +56,25 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		VALUES ($1, $2, 'cookie', NOW() + INTERVAL '1 day');
 		INSERT INTO one_time_tokens (token_hash, workspace_id, user_id, purpose, expires_at)
 		VALUES ($2 || '-ott', $1, $2, 'login', NOW() + INTERVAL '1 hour');
+		INSERT INTO one_time_tokens (token_hash, workspace_id, purpose, email, role, expires_at)
+		VALUES ($2 || '-inv', $1, 'invite', $2 || '@invite.test', 1, NOW() + INTERVAL '1 hour');
 		INSERT INTO device_grants (device_code_hash, workspace_id, user_code, expires_at)
 		VALUES ($2 || '-dg', $1, 'BCDF-GHJK', NOW() + INTERVAL '1 hour');
-		INSERT INTO sso_providers (workspace_id, provider_id) VALUES ($1, 'idp');
+		INSERT INTO sso_providers (workspace_id, provider_id, config) VALUES ($1, 'idp', 'sealed');
 		INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci');
-		INSERT INTO ssh_cas (workspace_id, name, private_key, public_key, host_private_key, host_public_key,
-			user_default_ttl, user_max_ttl, host_default_ttl, host_max_ttl)
-		VALUES ($1, 'ca', 'key', 'pub', 'host-key', 'host-pub', '1 hour', '1 hour', '1 hour', '1 hour');
+		WITH ca AS (
+			INSERT INTO ssh_cas (workspace_id, name, public_key, host_public_key,
+				user_default_ttl, user_max_ttl, host_ttl)
+			VALUES ($1, 'ca', 'pub', 'host-pub', '1 hour', '1 hour', '1 hour') RETURNING id
+		)
+		INSERT INTO ssh_ca_keys (ca_id, workspace_id, kind, private_key) SELECT id, $1, 'user', 'sealed' FROM ca;
 		WITH t AS (
-			INSERT INTO join_tokens (id, workspace_id, kind, token_hash) VALUES (uuidv7(), $1, 1, 'hash') RETURNING id
+			INSERT INTO join_tokens (workspace_id, token_hash) VALUES ($1, $2 || '-jt') RETURNING id
 		)
 		INSERT INTO join_token_grants (workspace_id, token_id, username, user_id) SELECT $1, id, 'dev', $2 FROM t;
 		INSERT INTO recordings (workspace_id, daemon_name, username, key) VALUES ($1, 'd', 'deploy', 'key');
 		INSERT INTO workspace_subscriptions (workspace_id) VALUES ($1);
 		INSERT INTO access_usage (workspace_id, target_id, subject_id) VALUES ($1, $3, $2);
-		INSERT INTO legal_holds (workspace_id, reason, starts_at) VALUES ($1, 'incident', NOW());
 		INSERT INTO access_requests (workspace_id, requester_id, account_id, duration, reason)
 		VALUES ($1, $2, $4, '1 hour', 'fix');
 		INSERT INTO audit_streams (workspace_id, kind, url, secret) VALUES ($1, 'webhook', 'https://siem.test', 'key');
@@ -479,7 +484,7 @@ func TestSystemRoleSeesEveryWorkspace(t *testing.T) {
 func TestAuditLogIsAppendOnly(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	if err := c.Sys().InsertAuditLog(t.Context(), &db.InsertAuditLogParams{
+	if err := c.Tenant().InsertAuditLog(pinned(t, f.ws), &db.InsertAuditLogParams{
 		WorkspaceID: f.ws, Action: "Test", Ok: true, Details: []byte("{}"),
 	}); err != nil {
 		t.Fatalf("insert: %v", err)
@@ -494,20 +499,24 @@ func TestAuditLogIsAppendOnly(t *testing.T) {
 	}
 }
 
-func TestAppRoleCannotWriteAudit(t *testing.T) {
+// Events are written by the app role into the pinned workspace, and only there. No path writes them past RLS.
+func TestAuditWritesStayInTheirWorkspace(t *testing.T) {
 	c := testConnection(t)
-	f := newStateFixture(t, c)
-
-	err := c.TenantTx(pinned(t, f.ws), func(q *db.Queries) error {
-		return q.InsertAuditLog(t.Context(), &db.InsertAuditLogParams{
-			WorkspaceID: f.ws,
-			Action:      "forged",
-			ActorKind:   "user",
-			Details:     []byte("{}"),
+	a, b := newStateFixture(t, c), newStateFixture(t, c)
+	write := func(ctx context.Context, q *db.Queries, ws string) error {
+		return q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
+			WorkspaceID: ws, Action: "Test", ActorKind: "user", Details: []byte("{}"),
 		})
-	})
-	if err == nil {
-		t.Fatal("app role wrote an audit row")
+	}
+
+	if err := write(pinned(t, a.ws), c.Tenant(), a.ws); err != nil {
+		t.Fatalf("the app role could not write its own workspace's event: %v", err)
+	}
+	if err := write(pinned(t, a.ws), c.Tenant(), b.ws); pgCode(err) != pgerrcode.InsufficientPrivilege {
+		t.Errorf("an event for another workspace: err = %v, want a row security violation", err)
+	}
+	if err := write(t.Context(), c.Sys(), a.ws); pgCode(err) != pgerrcode.InsufficientPrivilege {
+		t.Errorf("the system role wrote an event: err = %v, want insufficient privilege", err)
 	}
 }
 
@@ -515,7 +524,7 @@ func TestAuditLogScopes(t *testing.T) {
 	c := testConnection(t)
 	a, b := newStateFixture(t, c), newStateFixture(t, c)
 	for _, row := range []struct{ ws, actor string }{{a.ws, a.u}, {b.ws, b.u}, {b.ws, b.owner}} {
-		if err := c.Sys().InsertAuditLog(t.Context(), &db.InsertAuditLogParams{
+		if err := c.Tenant().InsertAuditLog(pinned(t, row.ws), &db.InsertAuditLogParams{
 			WorkspaceID: row.ws, ActorID: row.actor, Action: "Test", Ok: true, Details: []byte("{}"),
 		}); err != nil {
 			t.Fatalf("insert: %v", err)

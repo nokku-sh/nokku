@@ -40,7 +40,7 @@ func (s *dashboardService) GetDashboard(
 ) (*nokkuv1.GetDashboardResponse, error) {
 	wsID := actor.WorkspaceIDFromContext(ctx)
 	now := time.Now()
-	seenAfter := now.Add(-db.DaemonOnlineWindow)
+	connected := s.cfg.Pool.ConnectedIn(wsID)
 	since := now.Truncate(time.Hour).Add(-23 * time.Hour)
 
 	var (
@@ -53,13 +53,13 @@ func (s *dashboardService) GetDashboard(
 		usedBytes  int64
 	)
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if counts, err = q.DashboardCounts(ctx, seenAfter); err != nil {
+		if counts, err = q.DashboardCounts(ctx, connected); err != nil {
 			return err
 		}
 		if pending, err = q.ListPendingDaemons(ctx); err != nil {
 			return err
 		}
-		if offline, err = q.ListOfflineDaemons(ctx, seenAfter); err != nil {
+		if offline, err = q.ListOfflineDaemons(ctx, connected); err != nil {
 			return err
 		}
 		// The pool holds the terminals of every workspace, the query keeps the daemons of this one.
@@ -68,7 +68,7 @@ func (s *dashboardService) GetDashboard(
 				return err
 			}
 		}
-		if recordings, err = q.ListOpenRecordings(ctx, seenAfter); err != nil {
+		if recordings, err = q.ListOpenRecordings(ctx, connected); err != nil {
 			return err
 		}
 		if hours, err = q.AuditActivityByHour(ctx, since); err != nil {
@@ -93,10 +93,10 @@ func (s *dashboardService) GetDashboard(
 		Failures:            make([]int32, 24),
 	}
 	for _, d := range pending {
-		res.PendingDaemons = append(res.PendingDaemons, d.ToProto())
+		res.PendingDaemons = append(res.PendingDaemons, d.ToProto(s.cfg.Pool.IsConnected(d.ID)))
 	}
 	for _, d := range offline {
-		res.OfflineDaemons = append(res.OfflineDaemons, d.ToProto())
+		res.OfflineDaemons = append(res.OfflineDaemons, d.ToProto(false))
 	}
 
 	for _, h := range hours {

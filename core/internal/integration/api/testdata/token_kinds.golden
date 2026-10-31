@@ -1,0 +1,53 @@
+# kind | fact | value
+# tampered is a copy with one character in the middle of its random part changed.
+# <base> is the workspace URL.
+magic sign-in link | shape | <base>/login/verify?token=nk_login_<base32:26><crc32 hex:8> (43 chars)
+magic sign-in link | tampered | ConsumeMagicLink unauthenticated: this link is invalid or expired
+magic sign-in link | verifies | ConsumeMagicLink ok
+browser session cookie | name | nokku_session
+browser session cookie | shape | nk_sess_<base32:26><crc32 hex:8> (42 chars)
+browser session cookie | attributes | Path=/ SameSite=Lax HttpOnly lives 168h0m0s
+browser session cookie | tampered | Whoami unauthenticated: iam: invalid credentials
+browser session cookie | verifies | Whoami as user
+remembered device cookie | name | nokku_device_<user id>
+remembered device cookie | shape | <base64url:43> (43 chars)
+remembered device cookie | attributes | Path=/ SameSite=Lax HttpOnly lives 4320h0m0s
+remembered device cookie | as a session | Whoami unauthenticated: iam: invalid credentials
+device code | shape | nk_device_<base32:26><crc32 hex:8> (44 chars)
+user code | shape | <BCDFGHJKLMNPQRSTVWXZ23456789:4>-<BCDFGHJKLMNPQRSTVWXZ23456789:4> (9 chars)
+user code | tampered | GET /auth/device/info 404 invalid or expired code
+user code | tampered | POST /auth/device/verify 400 invalid or expired code
+user code | verifies | GET /auth/device/info 200
+user code | verifies | POST /auth/device/verify 200
+device code | tampered | POST /auth/device/token 400 expired_token
+device code | verifies | POST /auth/device/token 200 token_type DPoP
+cli session | shape | nk_cli_<base32:26><crc32 hex:8> (41 chars)
+cli session | tampered | Whoami unauthenticated: iam: invalid credentials
+cli session | without its proof | Whoami unauthenticated: iam: dpop proof required
+cli session | verifies | Whoami as cli
+enroll token | shape | nk_enroll_<base32:26><crc32 hex:8> (44 chars)
+enroll token | tampered | EnrollDaemon failed_precondition: invalid or expired enrollment token
+enroll token | verifies | EnrollDaemon ok
+daemon session | shape | nk_daemon_<base32:26><crc32 hex:8> (44 chars)
+daemon session | tampered | SyncDaemon unauthenticated: iam: invalid credentials
+daemon session | without its proof | SyncDaemon unauthenticated: iam: dpop proof required
+daemon session | verifies | SyncDaemon ok
+service account key | shape | nk_sa_<base32:26><crc32 hex:8> (40 chars)
+service account key | tampered | Whoami unauthenticated: iam: invalid credentials
+service account key | on the SCIM API | GET /scim/v2/ServiceProviderConfig 401 invalid token
+service account key | verifies | Whoami as service_account
+SCIM key | shape | nk_scim_<base32:26><crc32 hex:8> (42 chars)
+SCIM key | tampered | GET /scim/v2/ServiceProviderConfig 401 invalid token
+SCIM key | on the RPC API | Whoami unauthenticated: iam: invalid credentials
+SCIM key | verifies | GET /scim/v2/ServiceProviderConfig 200
+invite link | shape | <base>/invite?token=nk_invite_<base32:26><crc32 hex:8> (44 chars)
+invite link | tampered | GetInvitation failed_precondition: invalid or expired invitation
+invite link | verifies | GetInvitation ok
+invite link | tampered | AcceptInvitation failed_precondition: invalid or expired invitation
+invite link | verifies | AcceptInvitation ok
+email change confirm token | shape | nk_email_<base32:26><crc32 hex:8> (43 chars)
+email change confirm token | tampered | ConfirmEmailChange invalid_argument: this confirmation link is invalid or expired
+email change confirm token | verifies | ConfirmEmailChange ok
+email change cancel token | shape | nk_revert_<base32:26><crc32 hex:8> (44 chars)
+email change cancel token | tampered | CancelEmailChange invalid_argument: this link is invalid or expired
+email change cancel token | verifies | CancelEmailChange ok

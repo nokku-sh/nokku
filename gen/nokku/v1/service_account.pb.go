@@ -10,6 +10,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -406,6 +407,7 @@ type UpdateServiceAccountRequest struct {
 	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
 	Role          *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
 	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,6,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -471,6 +473,13 @@ func (x *UpdateServiceAccountRequest) GetRole() WorkspaceRole {
 func (x *UpdateServiceAccountRequest) GetTags() []string {
 	if x != nil {
 		return x.Tags
+	}
+	return nil
+}
+
+func (x *UpdateServiceAccountRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
+	if x != nil {
+		return x.UpdateMask
 	}
 	return nil
 }
@@ -1019,7 +1028,7 @@ var File_nokku_v1_service_account_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\n" +
-	"\x1enokku/v1/service_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xcb\x02\n" +
+	"\x1enokku/v1/service_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xcb\x02\n" +
 	"\x0eServiceAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1051,13 +1060,15 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\x04role\x18\x03 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleB\x0e\xbaH\v\x82\x01\b\x18\x00\x18\x01\x18\x02\x18\x03R\x04role\x12\x12\n" +
 	"\x04tags\x18\x04 \x03(\tR\x04tags\"a\n" +
 	"\x1cCreateServiceAccountResponse\x12A\n" +
-	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xf1\x01\n" +
+	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xd8\x02\n" +
 	"\x1bUpdateServiceAccountRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12;\n" +
 	"\x04name\x18\x02 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12;\n" +
 	"\x04role\x18\x04 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleB\x0e\xbaH\v\x82\x01\b\x18\x00\x18\x01\x18\x02\x18\x03R\x04role\x12\x12\n" +
-	"\x04tags\x18\x05 \x03(\tR\x04tags\"a\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x12e\n" +
+	"\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskB(\xbaH%\xc8\x01\x01\xe2\x01\x1f\x12\x04name\x12\vdescription\x12\x04role\x12\x04tagsR\n" +
+	"updateMask\"a\n" +
 	"\x1cUpdateServiceAccountResponse\x12A\n" +
 	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"7\n" +
 	"\x1bDeleteServiceAccountRequest\x12\x18\n" +
@@ -1087,14 +1098,16 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	" RevokeServiceAccountTokenRequest\x126\n" +
 	"\x12service_account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x10serviceAccountId\x12\x18\n" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"#\n" +
-	"!RevokeServiceAccountTokenResponse2\xba\a\n" +
+	"!RevokeServiceAccountTokenResponse2\xbf\a\n" +
 	"\x15ServiceAccountService\x12g\n" +
 	"\x11GetServiceAccount\x12\".nokku.v1.GetServiceAccountRequest\x1a#.nokku.v1.GetServiceAccountResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12m\n" +
-	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12o\n" +
-	"\x14CreateServiceAccount\x12%.nokku.v1.CreateServiceAccountRequest\x1a&.nokku.v1.CreateServiceAccountResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12m\n" +
+	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12q\n" +
+	"\x14CreateServiceAccount\x12%.nokku.v1.CreateServiceAccountRequest\x1a&.nokku.v1.CreateServiceAccountResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x03(\x01@\x01\x12m\n" +
 	"\x14UpdateServiceAccount\x12%.nokku.v1.UpdateServiceAccountRequest\x1a&.nokku.v1.UpdateServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12m\n" +
-	"\x14DeleteServiceAccount\x12%.nokku.v1.DeleteServiceAccountRequest\x1a&.nokku.v1.DeleteServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12~\n" +
-	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12|\n" +
+	"\x14DeleteServiceAccount\x12%.nokku.v1.DeleteServiceAccountRequest\x1a&.nokku.v1.DeleteServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12\x80\x01\n" +
+	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x03(\x010\x01\x12|\n" +
 	"\x18ListServiceAccountTokens\x12).nokku.v1.ListServiceAccountTokensRequest\x1a*.nokku.v1.ListServiceAccountTokensResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12|\n" +
 	"\x19RevokeServiceAccountToken\x12*.nokku.v1.RevokeServiceAccountTokenRequest\x1a+.nokku.v1.RevokeServiceAccountTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x03B\x94\x01\n" +
 	"\fcom.nokku.v1B\x13ServiceAccountProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -1133,6 +1146,7 @@ var file_nokku_v1_service_account_proto_goTypes = []any{
 	(*RevokeServiceAccountTokenResponse)(nil), // 17: nokku.v1.RevokeServiceAccountTokenResponse
 	(WorkspaceRole)(0),                        // 18: nokku.v1.WorkspaceRole
 	(*timestamppb.Timestamp)(nil),             // 19: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),             // 20: google.protobuf.FieldMask
 }
 var file_nokku_v1_service_account_proto_depIdxs = []int32{
 	18, // 0: nokku.v1.ServiceAccount.role:type_name -> nokku.v1.WorkspaceRole
@@ -1146,33 +1160,34 @@ var file_nokku_v1_service_account_proto_depIdxs = []int32{
 	18, // 8: nokku.v1.CreateServiceAccountRequest.role:type_name -> nokku.v1.WorkspaceRole
 	0,  // 9: nokku.v1.CreateServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
 	18, // 10: nokku.v1.UpdateServiceAccountRequest.role:type_name -> nokku.v1.WorkspaceRole
-	0,  // 11: nokku.v1.UpdateServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
-	18, // 12: nokku.v1.ListServiceAccountsRequest.role:type_name -> nokku.v1.WorkspaceRole
-	0,  // 13: nokku.v1.ListServiceAccountsResponse.service_accounts:type_name -> nokku.v1.ServiceAccount
-	19, // 14: nokku.v1.CreateServiceAccountTokenRequest.expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 15: nokku.v1.CreateServiceAccountTokenResponse.token:type_name -> nokku.v1.ServiceAccountToken
-	1,  // 16: nokku.v1.ListServiceAccountTokensResponse.tokens:type_name -> nokku.v1.ServiceAccountToken
-	2,  // 17: nokku.v1.ServiceAccountService.GetServiceAccount:input_type -> nokku.v1.GetServiceAccountRequest
-	10, // 18: nokku.v1.ServiceAccountService.ListServiceAccounts:input_type -> nokku.v1.ListServiceAccountsRequest
-	4,  // 19: nokku.v1.ServiceAccountService.CreateServiceAccount:input_type -> nokku.v1.CreateServiceAccountRequest
-	6,  // 20: nokku.v1.ServiceAccountService.UpdateServiceAccount:input_type -> nokku.v1.UpdateServiceAccountRequest
-	8,  // 21: nokku.v1.ServiceAccountService.DeleteServiceAccount:input_type -> nokku.v1.DeleteServiceAccountRequest
-	12, // 22: nokku.v1.ServiceAccountService.CreateServiceAccountToken:input_type -> nokku.v1.CreateServiceAccountTokenRequest
-	14, // 23: nokku.v1.ServiceAccountService.ListServiceAccountTokens:input_type -> nokku.v1.ListServiceAccountTokensRequest
-	16, // 24: nokku.v1.ServiceAccountService.RevokeServiceAccountToken:input_type -> nokku.v1.RevokeServiceAccountTokenRequest
-	3,  // 25: nokku.v1.ServiceAccountService.GetServiceAccount:output_type -> nokku.v1.GetServiceAccountResponse
-	11, // 26: nokku.v1.ServiceAccountService.ListServiceAccounts:output_type -> nokku.v1.ListServiceAccountsResponse
-	5,  // 27: nokku.v1.ServiceAccountService.CreateServiceAccount:output_type -> nokku.v1.CreateServiceAccountResponse
-	7,  // 28: nokku.v1.ServiceAccountService.UpdateServiceAccount:output_type -> nokku.v1.UpdateServiceAccountResponse
-	9,  // 29: nokku.v1.ServiceAccountService.DeleteServiceAccount:output_type -> nokku.v1.DeleteServiceAccountResponse
-	13, // 30: nokku.v1.ServiceAccountService.CreateServiceAccountToken:output_type -> nokku.v1.CreateServiceAccountTokenResponse
-	15, // 31: nokku.v1.ServiceAccountService.ListServiceAccountTokens:output_type -> nokku.v1.ListServiceAccountTokensResponse
-	17, // 32: nokku.v1.ServiceAccountService.RevokeServiceAccountToken:output_type -> nokku.v1.RevokeServiceAccountTokenResponse
-	25, // [25:33] is the sub-list for method output_type
-	17, // [17:25] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	20, // 11: nokku.v1.UpdateServiceAccountRequest.update_mask:type_name -> google.protobuf.FieldMask
+	0,  // 12: nokku.v1.UpdateServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
+	18, // 13: nokku.v1.ListServiceAccountsRequest.role:type_name -> nokku.v1.WorkspaceRole
+	0,  // 14: nokku.v1.ListServiceAccountsResponse.service_accounts:type_name -> nokku.v1.ServiceAccount
+	19, // 15: nokku.v1.CreateServiceAccountTokenRequest.expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 16: nokku.v1.CreateServiceAccountTokenResponse.token:type_name -> nokku.v1.ServiceAccountToken
+	1,  // 17: nokku.v1.ListServiceAccountTokensResponse.tokens:type_name -> nokku.v1.ServiceAccountToken
+	2,  // 18: nokku.v1.ServiceAccountService.GetServiceAccount:input_type -> nokku.v1.GetServiceAccountRequest
+	10, // 19: nokku.v1.ServiceAccountService.ListServiceAccounts:input_type -> nokku.v1.ListServiceAccountsRequest
+	4,  // 20: nokku.v1.ServiceAccountService.CreateServiceAccount:input_type -> nokku.v1.CreateServiceAccountRequest
+	6,  // 21: nokku.v1.ServiceAccountService.UpdateServiceAccount:input_type -> nokku.v1.UpdateServiceAccountRequest
+	8,  // 22: nokku.v1.ServiceAccountService.DeleteServiceAccount:input_type -> nokku.v1.DeleteServiceAccountRequest
+	12, // 23: nokku.v1.ServiceAccountService.CreateServiceAccountToken:input_type -> nokku.v1.CreateServiceAccountTokenRequest
+	14, // 24: nokku.v1.ServiceAccountService.ListServiceAccountTokens:input_type -> nokku.v1.ListServiceAccountTokensRequest
+	16, // 25: nokku.v1.ServiceAccountService.RevokeServiceAccountToken:input_type -> nokku.v1.RevokeServiceAccountTokenRequest
+	3,  // 26: nokku.v1.ServiceAccountService.GetServiceAccount:output_type -> nokku.v1.GetServiceAccountResponse
+	11, // 27: nokku.v1.ServiceAccountService.ListServiceAccounts:output_type -> nokku.v1.ListServiceAccountsResponse
+	5,  // 28: nokku.v1.ServiceAccountService.CreateServiceAccount:output_type -> nokku.v1.CreateServiceAccountResponse
+	7,  // 29: nokku.v1.ServiceAccountService.UpdateServiceAccount:output_type -> nokku.v1.UpdateServiceAccountResponse
+	9,  // 30: nokku.v1.ServiceAccountService.DeleteServiceAccount:output_type -> nokku.v1.DeleteServiceAccountResponse
+	13, // 31: nokku.v1.ServiceAccountService.CreateServiceAccountToken:output_type -> nokku.v1.CreateServiceAccountTokenResponse
+	15, // 32: nokku.v1.ServiceAccountService.ListServiceAccountTokens:output_type -> nokku.v1.ListServiceAccountTokensResponse
+	17, // 33: nokku.v1.ServiceAccountService.RevokeServiceAccountToken:output_type -> nokku.v1.RevokeServiceAccountTokenResponse
+	26, // [26:34] is the sub-list for method output_type
+	18, // [18:26] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_service_account_proto_init() }

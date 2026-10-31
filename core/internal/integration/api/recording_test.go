@@ -110,7 +110,6 @@ func TestUploadRecordingEndsAtTheLimit(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualValues(t, maxUploadBytes, rec.SizeBytes)
 	assert.False(t, rec.Complete, "a cut recording is not a complete one")
-	assert.NotNil(t, rec.EndedAt)
 	assert.EqualValues(t, maxUploadBytes, storedBytes(t, cfg, id), "what arrived before the limit is kept")
 }
 
@@ -121,12 +120,12 @@ func TestUploadRecordingKeepsWhatADeadDaemonSent(t *testing.T) {
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	id := uuid.NewV7().String()
 
+	// The live stream had sent the start of the file when the daemon died.
+	whole := randomBytes(4 * pendingChunk)
+	const sent = 3 * pendingChunk
 	ctx, die := context.WithCancel(t.Context())
 	stream := openUpload(ctx, t, cfg, srv, key, enrolled.GetAccessToken(), id)
-	const sent = 3 * (32 << 10)
-	for range 3 {
-		require.NoError(t, sendChunk(stream, make([]byte, 32<<10)))
-	}
+	sendLive(t, stream, whole[:sent])
 	// The row shows up once the first chunk went through the handler.
 	require.Eventually(t, func() bool {
 		_, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
@@ -135,34 +134,18 @@ func TestUploadRecordingKeepsWhatADeadDaemonSent(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	die()
 
-	require.Eventually(t, func() bool {
-		rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
-		return err == nil && rec.EndedAt != nil
-	}, 5*time.Second, 20*time.Millisecond, "the recording was never closed")
-	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
-	require.NoError(t, err)
-	assert.EqualValues(t, sent, rec.SizeBytes)
+	rec := waitStored(t, cfg, id, sent)
 	assert.False(t, rec.Complete)
+	assert.Nil(t, rec.EndedAt, "only the daemon can say its session ended")
 	assert.EqualValues(t, sent, storedBytes(t, cfg, id))
 
 	// Back up, the daemon sends its whole file and that replaces the part.
-	var whole bytes.Buffer
-	zw := gzip.NewWriter(&whole)
-	_, err = zw.Write([]byte(`{"version":3,"term":{"cols":80,"rows":24}}` + "\n" + `[0.1,"o","done\r\n"]` + "\n"))
-	require.NoError(t, err)
-	require.NoError(t, zw.Close())
-	stream = openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
-	require.NoError(t, sendChunk(stream, whole.Bytes()))
-	require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{
-		Msg: &nokkuv1.UploadRecordingRequest_Final{Final: &nokkuv1.RecordingFinal{}},
-	}))
-	_, err = stream.CloseAndReceive()
-	require.NoError(t, err)
-	rec, err = cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, uploadFile(t, cfg, srv, key, enrolled.GetAccessToken(), id, whole, ""))
+	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
 	assert.True(t, rec.Complete)
-	assert.EqualValues(t, whole.Len(), rec.SizeBytes)
-	assert.EqualValues(t, whole.Len(), storedBytes(t, cfg, id))
+	assert.EqualValues(t, len(whole), rec.SizeBytes)
+	assert.EqualValues(t, len(whole), storedBytes(t, cfg, id))
 }
 
 // The part a dead daemon left is kept, it may be all there ever is. The whole file replaces it later.
@@ -222,9 +205,7 @@ func TestCutRecordingIsKept(t *testing.T) {
 	require.NoError(t, zw.Close())
 	stream = openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
 	require.NoError(t, sendChunk(stream, whole.Bytes()))
-	require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{
-		Msg: &nokkuv1.UploadRecordingRequest_Final{Final: &nokkuv1.RecordingFinal{}},
-	}))
+	require.NoError(t, stream.Send(finalOf(whole.Len(), "")))
 	_, err = stream.CloseAndReceive()
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
@@ -276,8 +257,55 @@ func TestLateUploadKeepsItsStartTime(t *testing.T) {
 		"a start from a clock at zero")
 }
 
-// The same when storage cannot even open the object. The row exists by then, and it used to stay open.
-func TestUploadRecordingIsClosedWhenStorageCannotOpen(t *testing.T) {
+// A late upload keeps when its session ended, not when the file arrived. An end from a wrong clock counts as now.
+func TestLateUploadKeepsItsEndTime(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	defer func() { _ = owner.Close(t.Context()) }()
+	_, err = owner.Exec(t.Context(),
+		"UPDATE daemons SET created_at = NOW() - INTERVAL '2 days' WHERE id = $1", enrolled.GetId())
+	require.NoError(t, err)
+
+	began := time.Now().Add(-3 * time.Hour).Truncate(time.Second)
+	endOf := func(named *timestamppb.Timestamp) time.Time {
+		id := uuid.NewV7().String()
+		ctx, call := connect.NewClientContext(t.Context())
+		call.RequestHeader().Set("Authorization", "DPoP "+enrolled.GetAccessToken())
+		call.RequestHeader().Set("DPoP", dpopProof(
+			t, cfg, key, nokkuv1connect.DaemonControlServiceUploadRecordingProcedure, enrolled.GetAccessToken(),
+		))
+		stream, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+			UploadRecording(ctx)
+		require.NoError(t, err)
+		require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
+			Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root"), StartedAt: timestamppb.New(began)},
+		}}))
+		require.NoError(t, sendChunk(stream, []byte("x")))
+		require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Final{
+			Final: &nokkuv1.RecordingFinal{SizeBytes: new(int64(1)), EndedAt: named},
+		}}))
+		_, err = stream.CloseAndReceive()
+		require.NoError(t, err)
+		rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+		require.NoError(t, err)
+		require.NotNil(t, rec.EndedAt, "the last message of a session left it open")
+		return *rec.EndedAt
+	}
+
+	ended := began.Add(time.Hour)
+	assert.WithinDuration(t, ended, endOf(timestamppb.New(ended)), time.Second, "a late upload lost its end")
+	assert.WithinDuration(t, time.Now(), endOf(nil), time.Minute, "an upload that names no end")
+	assert.WithinDuration(t, time.Now(), endOf(timestamppb.New(time.Now().Add(time.Hour))), time.Minute,
+		"an end in the future")
+	assert.WithinDuration(t, time.Now(), endOf(timestamppb.New(began.Add(-time.Hour))), time.Minute,
+		"an end before the start")
+}
+
+// The row waits for the daemon's next try when storage cannot even open the object.
+func TestStorageThatCannotOpenLeavesTheRowToTheNextTry(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
@@ -295,13 +323,13 @@ func TestUploadRecordingIsClosedWhenStorageCannotOpen(t *testing.T) {
 	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err), "an upload storage could not open, got %v", err)
 	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
-	assert.NotNil(t, rec.EndedAt, "the recording stayed open")
+	assert.Nil(t, rec.EndedAt, "a failed try says nothing about the session")
 	assert.False(t, rec.Complete)
 	assert.Zero(t, rec.SizeBytes, "nothing was stored")
 }
 
-// When storage fails the recording is closed with nothing stored. Left open it would count as a live session.
-func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
+// A commit that fails stores nothing and tells the daemon to try again.
+func TestFailedCommitLeavesTheRowToTheNextTry(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
@@ -325,7 +353,8 @@ func TestUploadRecordingIsClosedWhenStorageFails(t *testing.T) {
 	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err), "an upload storage could not keep, got %v", err)
 	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
-	assert.NotNil(t, rec.EndedAt, "the recording stayed open")
+	assert.Nil(t, rec.EndedAt, "a failed try says nothing about the session")
+	assert.Nil(t, rec.ObjectID, "the row names an object that was never stored")
 	assert.False(t, rec.Complete)
 	assert.Zero(t, rec.SizeBytes, "nothing was stored")
 }
@@ -347,8 +376,17 @@ func capStorage(t *testing.T, cfg *config.Config) {
 	_, err = owner.Exec(t.Context(), "DELETE FROM recordings")
 	require.NoError(t, err)
 	require.NoError(t, owner.Close(t.Context()))
+	store, err := storage.New(t.Context())
+	require.NoError(t, err)
 	uncapped := cfg.Record
-	cfg.Record = recording.New(t.Context(), cfg.Conn, cfg.Storage, cappedStorage{cfg.Entitlements}, cfg.Audit)
+	cfg.Record = recording.New(
+		t.Context(),
+		cfg.Conn,
+		cfg.Keyset,
+		store,
+		cappedStorage{cfg.Entitlements},
+		cfg.Audit,
+	)
 	t.Cleanup(func() { cfg.Record = uncapped })
 }
 
@@ -363,7 +401,7 @@ func backdate(t *testing.T, id string, days int) {
 	require.NoError(t, err)
 }
 
-// Over the cap an upload evicts old recordings, never one from the last day. A full workspace cuts and refuses.
+// An upload that starts over the cap evicts old recordings, never one from the last day. A full workspace refuses it.
 func TestRecordingStorageCap(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	capStorage(t, cfg)
@@ -375,18 +413,13 @@ func TestRecordingStorageCap(t *testing.T) {
 	stored := func(id string) (*db.Recording, error) {
 		return cfg.Conn.Sys().GetRecording(t.Context(), id)
 	}
-	old, recent, cut, refused := uuid.NewV7().
-		String(),
-		uuid.NewV7().
-			String(),
-		uuid.NewV7().
-			String(),
-		uuid.NewV7().
-			String()
+	old, recent, next, last, refused := uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String(),
+		uuid.NewV7().String(), uuid.NewV7().String()
 
 	require.NoError(t, upload(old, 6))
 	backdate(t, old, 2)
-	require.NoError(t, upload(recent, 6), "an old recording is in the way, not a reason to refuse")
+	require.NoError(t, upload(recent, 6), "the cap is asked when an upload starts, this one started under it")
+	require.NoError(t, upload(next, 1), "an old recording is in the way, not a reason to refuse")
 	_, err := stored(old)
 	require.ErrorIs(t, err, pgx.ErrNoRows, "the old recording makes room")
 	var events []*db.ListAuditLogsRow
@@ -401,34 +434,27 @@ func TestRecordingStorageCap(t *testing.T) {
 	})
 	require.Len(t, events, 1, "every eviction is audited")
 	assert.Equal(t, old, events[0].Target)
-	assert.Contains(t, string(events[0].Details), recent, "the event names the upload that needed the room")
+	assert.Contains(t, string(events[0].Details), next, "the event names the upload that needed the room")
 
-	// Nothing left to evict: the next upload fills the cap and ends there.
-	err = upload(cut, 6)
-	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "an upload past the cap, got %v", err)
-	rec, err := stored(cut)
-	require.NoError(t, err)
-	assert.False(t, rec.Complete)
-	assert.EqualValues(t, 5<<20, rec.SizeBytes, "the upload ends where the cap is reached")
-	assert.EqualValues(t, 5<<20, storedBytes(t, cfg, cut), "and what arrived is kept")
-	_, err = stored(recent)
-	require.NoError(t, err, "a recording from today stays")
-
+	// Past the cap with nothing left to evict, the workspace takes no new upload.
+	require.NoError(t, upload(last, 6))
 	err = upload(refused, 1)
 	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "an upload into a full workspace, got %v", err)
 	_, err = stored(refused)
 	require.ErrorIs(t, err, pgx.ErrNoRows, "a refused upload leaves no recording behind")
+	_, err = stored(recent)
+	require.NoError(t, err, "a recording from today stays")
 
 	// A day later there is room again, and the daemon's next try gets through.
 	backdate(t, recent, 2)
-	require.NoError(t, upload(cut, 6))
-	rec, err = stored(cut)
+	require.NoError(t, upload(refused, 1))
+	rec, err := stored(refused)
 	require.NoError(t, err)
-	assert.EqualValues(t, 6<<20, rec.SizeBytes)
-	assert.EqualValues(t, 6<<20, storedBytes(t, cfg, cut), "the whole file replaced the part")
+	assert.EqualValues(t, 1<<20, rec.SizeBytes)
+	assert.EqualValues(t, 1<<20, storedBytes(t, cfg, refused))
 }
 
-// Eviction takes the oldest recordings and stops as soon as the upload fits.
+// Eviction takes the oldest recordings and stops as soon as the workspace is back under the cap.
 func TestRecordingEvictionTakesNoMoreThanNeeded(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	capStorage(t, cfg)
@@ -444,7 +470,9 @@ func TestRecordingEvictionTakesNoMoreThanNeeded(t *testing.T) {
 	backdate(t, oldest, 4)
 	backdate(t, older, 3)
 	backdate(t, old, 2)
+	evicted := objectOf(t, cfg, oldest)
 	upload(3)
+	upload(1)
 
 	_, err := cfg.Conn.Sys().GetRecording(t.Context(), oldest)
 	require.ErrorIs(t, err, pgx.ErrNoRows, "the oldest recording makes room")
@@ -452,36 +480,207 @@ func TestRecordingEvictionTakesNoMoreThanNeeded(t *testing.T) {
 		_, err = cfg.Conn.Sys().GetRecording(t.Context(), id)
 		require.NoError(t, err, "one recording was enough, a second one went too")
 	}
+	// capStorage's sweeper may have emptied the queue already, so only the end state is certain.
+	require.NoError(t, cfg.Record.DeleteQueued(t.Context()))
+	assert.False(t, objectExists(workspaceID, evicted), "the delete queue left the evicted object")
 }
 
-// Uploads side by side fill the cap together, or a daemon could store the cap once per stream.
-func TestRecordingUploadsShareTheCap(t *testing.T) {
+// objectPath is where the test server's storage keeps an object.
+func objectPath(workspaceID, objectID string) string {
+	return filepath.Join(storageDir, filepath.FromSlash(storage.RecordingPath(workspaceID, objectID)))
+}
+
+func objectExists(workspaceID, objectID string) bool {
+	_, err := os.Stat(objectPath(workspaceID, objectID))
+	return err == nil
+}
+
+// storedObjects names what is committed in a workspace, whichever row names it.
+func storedObjects(t *testing.T, workspaceID string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Dir(objectPath(workspaceID, "any")))
+	require.NoError(t, err)
+	var names []string
+	for _, entry := range entries {
+		if name, ok := strings.CutSuffix(entry.Name(), ".cast.gz"); ok {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// objectOf is the object of recording id.
+func objectOf(t *testing.T, cfg *config.Config, id string) string {
+	t.Helper()
+	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.NoError(t, err)
+	require.NotNil(t, rec.ObjectID, "nothing of the recording is stored")
+	return *rec.ObjectID
+}
+
+func deleteRecording(t *testing.T, cfg *config.Config, srv *httptest.Server, workspaceID, id string) {
+	t.Helper()
+	editor := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)))
+	_, err := nokkuv1connect.NewRecordingServiceClient(editor).
+		DeleteRecording(t.Context(), &nokkuv1.DeleteRecordingRequest{RecordingId: &id})
+	require.NoError(t, err)
+}
+
+// A deleted recording is gone with its key at once, its object when the delete queue runs.
+func TestDeletedRecordingObjectGoesThroughTheQueue(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	capStorage(t, cfg)
 	workspaceID := seedWorkspace(t, cfg)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
-	first, second := uuid.NewV7().String(), uuid.NewV7().String()
+	id := uuid.NewV7().String()
+	require.NoError(t, uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, 1))
+	object := objectOf(t, cfg, id)
+	require.True(t, objectExists(workspaceID, object), "the upload stored nothing")
 
-	// The first upload stays open with most of the cap taken.
-	open := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), first)
-	for range 7 {
-		require.NoError(t, sendChunk(open, make([]byte, 1<<20)))
-	}
+	deleteRecording(t, cfg, srv, workspaceID, id)
+	_, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+	require.ErrorIs(t, err, pgx.ErrNoRows, "the row outlived the delete")
+	require.True(t, objectExists(workspaceID, object), "the object went before the delete queue ran")
+
+	require.NoError(t, cfg.Record.DeleteQueued(t.Context()))
+	assert.False(t, objectExists(workspaceID, object), "the delete queue left the object")
+}
+
+// A daemon can upload an id again after its recording was deleted. The queue deletes the old object, not the new one.
+func TestRecordingMadeAgainKeepsItsNewObject(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+	require.NoError(t, uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, 1))
+	first := objectOf(t, cfg, id)
+
+	deleteRecording(t, cfg, srv, workspaceID, id)
+	require.NoError(t, uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, 1))
+	second := objectOf(t, cfg, id)
+	require.NotEqual(t, first, second, "the recording came back on the object that is queued for deletion")
+
+	require.NoError(t, cfg.Record.DeleteQueued(t.Context()))
+	assert.False(t, objectExists(workspaceID, first), "the delete queue left the old object")
+	assert.True(t, objectExists(workspaceID, second), "the delete queue took the new object")
+	assert.EqualValues(t, 1<<20, storedBytes(t, cfg, id))
+}
+
+// An upload still running while its recording is deleted and made again can't be read under the new key. Its object
+// goes to the delete queue, nothing else would ever take it out of the bucket.
+func TestUploadOfARecordingMadeAgainLeavesNoObject(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+
+	running := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	require.NoError(t, sendChunk(running, make([]byte, 32<<10)))
 	require.Eventually(t, func() bool {
-		rec, err := cfg.Conn.Sys().GetRecording(t.Context(), first)
-		return err == nil && rec.SizeBytes >= 6<<20
-	}, 5*time.Second, 20*time.Millisecond, "an upload in progress is not counted")
+		_, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+		return err == nil
+	}, 5*time.Second, 20*time.Millisecond, "the upload made no row")
 
-	err := uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), second, 8)
-	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "a second stream past the cap, got %v", err)
-	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), second)
-	require.NoError(t, err)
-	// Each stream is checked once per interval, so it can be that much over.
-	assert.LessOrEqual(t, rec.SizeBytes, int64(testStorageCap-6<<20+quotaCheckInterval),
-		"the second stream took more than what was left")
+	deleteRecording(t, cfg, srv, workspaceID, id)
+	require.NoError(t, uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, 1))
+	second := objectOf(t, cfg, id)
+	// Drained first, so only the running upload can add to what is stored.
+	require.NoError(t, cfg.Record.DeleteQueued(t.Context()))
+	before := storedObjects(t, workspaceID)
 
-	_, err = open.CloseAndReceive()
+	_, err := running.CloseAndReceive()
+	require.Error(t, err, "an upload of a row that went was stored")
+	require.NoError(t, cfg.Record.DeleteQueued(t.Context()))
+	assert.ElementsMatch(t, before, storedObjects(t, workspaceID), "the old upload left an object nothing tracks")
+	assert.True(t, objectExists(workspaceID, second), "the old upload took the new object")
+	assert.Equal(t, second, objectOf(t, cfg, id), "the old upload moved the row onto an object its key can't read")
+	assert.EqualValues(t, 1<<20, storedBytes(t, cfg, id))
+	entries, err := os.ReadDir(filepath.Dir(objectPath(workspaceID, second)))
 	require.NoError(t, err)
+	for _, entry := range entries {
+		assert.False(t, strings.HasSuffix(entry.Name(), ".tmp"), "the old upload left %s behind", entry.Name())
+	}
+}
+
+// An object storage refuses to delete waits with its error on its row, the ones after it still go.
+func TestFailedRecordingDeleteHoldsUpNothing(t *testing.T) {
+	cfg, _ := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	stuck, next := uuid.NewV7().String(), uuid.NewV7().String()
+	// A directory with something in it where the object belongs, which no delete takes.
+	stuckPath := objectPath(workspaceID, stuck)
+	require.NoError(t, os.MkdirAll(filepath.Join(stuckPath, "x"), 0o700))
+	require.NoError(t, os.WriteFile(objectPath(workspaceID, next), []byte("x"), 0o600))
+
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ctx := context.WithoutCancel(t.Context())
+		_, _ = owner.Exec(ctx, "DELETE FROM recording_deletes WHERE object_id = $1", stuck)
+		_ = owner.Close(ctx)
+		_ = os.RemoveAll(stuckPath)
+	})
+	_, err = owner.Exec(t.Context(), `
+		INSERT INTO recording_deletes (object_id, workspace_id, next_try_at)
+		VALUES ($1, $3, NOW() - INTERVAL '2 minutes'), ($2, $3, NOW() - INTERVAL '1 minute')`,
+		stuck, next, workspaceID)
+	require.NoError(t, err)
+
+	require.NoError(t, cfg.Record.DeleteQueued(t.Context()), "one failed delete ended the pass")
+	assert.False(t, objectExists(workspaceID, next), "the object queued after a failing one stayed")
+
+	var attempts int
+	var lastError *string
+	var due time.Time
+	require.NoError(t, owner.QueryRow(t.Context(),
+		"SELECT attempts, last_error, next_try_at FROM recording_deletes WHERE object_id = $1", stuck,
+	).Scan(&attempts, &lastError, &due))
+	assert.Equal(t, 1, attempts)
+	assert.NotEmpty(t, lastError, "the failure left no error on its row")
+	assert.True(t, due.After(time.Now()), "the failed delete is due again at once")
+}
+
+// A daemon holds no more uploads open than the limit. Over it the daemon hears to try again soon, the workspace is not
+// full and a slot frees up as soon as a session ends.
+func TestOpenUploadsOfADaemonAreLimited(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	token := enrolled.GetAccessToken()
+
+	ids := make([]string, maxOpenUploads)
+	open := make([]uploadStream, maxOpenUploads)
+	for i := range open {
+		ids[i] = uuid.NewV7().String()
+		open[i] = openUpload(t.Context(), t, cfg, srv, key, token, ids[i])
+	}
+	t.Cleanup(func() {
+		for _, stream := range open {
+			_, _ = stream.CloseAndReceive()
+		}
+	})
+	require.Eventually(t, func() bool {
+		for _, id := range ids {
+			if _, err := cfg.Conn.Sys().GetRecording(t.Context(), id); err != nil {
+				return false
+			}
+		}
+		return true
+	}, 30*time.Second, 50*time.Millisecond, "the open uploads never reached the handler")
+
+	over := uuid.NewV7().String()
+	_, err := openUpload(t.Context(), t, cfg, srv, key, token, over).CloseAndReceive()
+	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err), "an upload over the limit, got %v", err)
+
+	other, otherDaemon := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	_, err = openUpload(t.Context(), t, cfg, srv, other, otherDaemon.GetAccessToken(), uuid.NewV7().String()).
+		CloseAndReceive()
+	require.NoError(t, err, "the limit of one daemon held up another")
+
+	_, err = open[0].CloseAndReceive()
+	require.NoError(t, err)
+	_, err = openUpload(t.Context(), t, cfg, srv, key, token, over).CloseAndReceive()
+	require.NoError(t, err, "an upload that ended gave its slot back")
 }
 
 // A recording belongs to the daemon that started it. The answer tells another daemon to drop its file, a retry
@@ -505,25 +704,16 @@ func TestShorterRetryKeepsTheLongerUpload(t *testing.T) {
 	workspaceID := seedWorkspace(t, cfg)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	id := uuid.NewV7().String()
-	// cut sends chunks and dies, then waits until the handler closed the recording again.
+	// cut ends the stream without its last message, the way a broken one ends.
 	cut := func(chunks int) *db.Recording {
-		var before time.Time
-		if rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id); err == nil && rec.EndedAt != nil {
-			before = *rec.EndedAt
-		}
-		ctx, die := context.WithCancel(t.Context())
-		stream := openUpload(ctx, t, cfg, srv, key, enrolled.GetAccessToken(), id)
+		stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
 		for range chunks {
 			require.NoError(t, sendChunk(stream, make([]byte, 32<<10)))
 		}
-		time.Sleep(300 * time.Millisecond)
-		die()
-		var rec *db.Recording
-		require.Eventually(t, func() bool {
-			var err error
-			rec, err = cfg.Conn.Sys().GetRecording(t.Context(), id)
-			return err == nil && rec.EndedAt != nil && rec.EndedAt.After(before)
-		}, 5*time.Second, 20*time.Millisecond, "the recording was never closed")
+		_, err := stream.CloseAndReceive()
+		require.NoError(t, err)
+		rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
+		require.NoError(t, err)
 		return rec
 	}
 

@@ -5,8 +5,8 @@
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
-import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Duration, FieldMask, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_duration, file_google_protobuf_field_mask, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import { file_nokku_v1_access } from "./access_pb";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -14,12 +14,9 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/certificates.proto.
  */
 export const file_nokku_v1_certificates: GenFile = /*@__PURE__*/
-  fileDesc("Chtub2trdS92MS9jZXJ0aWZpY2F0ZXMucHJvdG8SCG5va2t1LnYxIr0FChRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEhIKCnB1YmxpY19rZXkYBCABKAkSFwoPaG9zdF9wdWJsaWNfa2V5GBcgASgJEi4KCnJvdGF0ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhEKCWlzX2FjdGl2ZRgHIAEoCBISCgppc19kZWZhdWx0GAggASgIEjMKEHVzZXJfZGVmYXVsdF90dGwYDSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLwoMdXNlcl9tYXhfdHRsGA4gASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEjMKEGhvc3RfZGVmYXVsdF90dGwYDyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLwoMaG9zdF9tYXhfdHRsGBAgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi4KCmNyZWF0ZWRfYXQYESABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYEiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhsKE3ByZXZpb3VzX3B1YmxpY19rZXkYEyABKAkSIAoYcHJldmlvdXNfaG9zdF9wdWJsaWNfa2V5GBggASgJEjoKFnByZXZpb3VzX3RydXN0ZWRfdW50aWwYFCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDWZvcmNlX2NvbW1hbmQYFSABKAkSFgoOc291cmNlX2FkZHJlc3MYFiABKAlKBAgGEAdKBAgJEApKBAgKEAtKBAgLEAxKBAgMEA0i4wMKIUNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxISCgppc19kZWZhdWx0GAUgASgIEkYKEHVzZXJfZGVmYXVsdF90dGwYCCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkIKDHVzZXJfbWF4X3R0bBgJIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSRgoQaG9zdF9kZWZhdWx0X3R0bBgKIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSQgoMaG9zdF9tYXhfdHRsGAsgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBIfCg1mb3JjZV9jb21tYW5kGAwgASgJQgi6SAVyAxiACBIgCg5zb3VyY2VfYWRkcmVzcxgNIAEoCUIIukgFcgMYgAhKBAgDEARKBAgEEAVKBAgGEAdKBAgHEAgiYwoiQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZRI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYASABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSI2Ch5HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBImAKH0dldENlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiIwohTGlzdENlcnRpZmljYXRlQXV0aG9yaXRpZXNSZXF1ZXN0ImUKIkxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVzcG9uc2USPwoXY2VydGlmaWNhdGVfYXV0aG9yaXRpZXMYASADKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSKABAohVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIYCgRuYW1lGAIgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxIRCglpc19hY3RpdmUYBCABKAgSEgoKaXNfZGVmYXVsdBgFIAEoCBJGChB1c2VyX2RlZmF1bHRfdHRsGAggASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJCCgx1c2VyX21heF90dGwYCSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkYKEGhvc3RfZGVmYXVsdF90dGwYCiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8EkIKDGhvc3RfbWF4X3R0bBgLIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSHwoNZm9yY2VfY29tbWFuZBgMIAEoCUIIukgFcgMYgAgSIAoOc291cmNlX2FkZHJlc3MYDSABKAlCCLpIBXIDGIAISgQIBhAHSgQIBxAIImMKIlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiOQohRGVsZXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIkCiJEZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlImAKI1JvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIXCg9yZXZva2VfcHJldmlvdXMYBCABKAhKBAgCEANKBAgDEAQiZQokUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IpYBChlTaWduU1NIQ2VydGlmaWNhdGVSZXF1ZXN0Eh4KCnB1YmxpY19rZXkYASABKAlCCrpIB3IFEAEYkE4SOQoDdHRsGAIgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBIeCgl0YXJnZXRfaWQYAyABKAlCC7pICMgBAXIDsAEBIp8BChpTaWduU1NIQ2VydGlmaWNhdGVSZXNwb25zZRINCgVjYV9pZBgBIAEoCRIPCgdjYV9uYW1lGAIgASgJEhUKDWNhX3B1YmxpY19rZXkYAyABKAkSGgoSc2lnbmVkX2NlcnRpZmljYXRlGAQgASgJEi4KCmV4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMogHChJDZXJ0aWZpY2F0ZVNlcnZpY2USeQoXR2V0Q2VydGlmaWNhdGVBdXRob3JpdHkSKC5ub2trdS52MS5HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaKS5ub2trdS52MS5HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIgmQAgHC8xgCGAESfwoaQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHkSKy5ub2trdS52MS5DcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLC5ub2trdS52MS5DcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIgbC8xgCGAMSfwoaVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHkSKy5ub2trdS52MS5VcGRhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLC5ub2trdS52MS5VcGRhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIgbC8xgCGAMSggEKGkxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzEisubm9ra3UudjEuTGlzdENlcnRpZmljYXRlQXV0aG9yaXRpZXNSZXF1ZXN0Giwubm9ra3UudjEuTGlzdENlcnRpZmljYXRlQXV0aG9yaXRpZXNSZXNwb25zZSIJkAIBwvMYAhgBEn8KGkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5Eisubm9ra3UudjEuRGVsZXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0Giwubm9ra3UudjEuRGVsZXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZSIGwvMYAhgDEoUBChxSb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5Ei0ubm9ra3UudjEuUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLi5ub2trdS52MS5Sb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiBsLzGAIYAxJnChJTaWduU1NIQ2VydGlmaWNhdGUSIy5ub2trdS52MS5TaWduU1NIQ2VydGlmaWNhdGVSZXF1ZXN0GiQubm9ra3UudjEuU2lnblNTSENlcnRpZmljYXRlUmVzcG9uc2UiBsLzGAIQAUKSAQoMY29tLm5va2t1LnYxQhFDZXJ0aWZpY2F0ZXNQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chtub2trdS92MS9jZXJ0aWZpY2F0ZXMucHJvdG8SCG5va2t1LnYxItkEChRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEhIKCnB1YmxpY19rZXkYBCABKAkSFwoPaG9zdF9wdWJsaWNfa2V5GAUgASgJEi4KCnJvdGF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmlzX2RlZmF1bHQYByABKAgSMwoQdXNlcl9kZWZhdWx0X3R0bBgIIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbhIvCgx1c2VyX21heF90dGwYCSABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SKwoIaG9zdF90dGwYCiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLgoKY3JlYXRlZF9hdBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGwoTcHJldmlvdXNfcHVibGljX2tleRgOIAEoCRIgChhwcmV2aW91c19ob3N0X3B1YmxpY19rZXkYDyABKAkSOgoWcHJldmlvdXNfdHJ1c3RlZF91bnRpbBgQIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFQoNZm9yY2VfY29tbWFuZBgRIAEoCRIWCg5zb3VyY2VfYWRkcmVzcxgSIAEoCUoECAsQDCKFAwohQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhgKBG5hbWUYASABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YAiABKAlCCLpIBXIDGOgHEhIKCmlzX2RlZmF1bHQYAyABKAgSRgoQdXNlcl9kZWZhdWx0X3R0bBgEIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSQgoMdXNlcl9tYXhfdHRsGAUgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBI+Cghob3N0X3R0bBgGIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgUIgOeEDzICCDwSHwoNZm9yY2VfY29tbWFuZBgIIAEoCUIIukgFcgMYgAgSIAoOc291cmNlX2FkZHJlc3MYCSABKAlCCLpIBXIDGIAISgQIBxAIImMKIkNyZWF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiNgoeR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASJgCh9HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgBIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5IiMKIUxpc3RDZXJ0aWZpY2F0ZUF1dGhvcml0aWVzUmVxdWVzdCJlCiJMaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1Jlc3BvbnNlEj8KF2NlcnRpZmljYXRlX2F1dGhvcml0aWVzGAEgAygLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiwAQKIVVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESGAoEbmFtZRgCIAEoCUIKukgHcgUQARiAAhIdCgtkZXNjcmlwdGlvbhgDIAEoCUIIukgFcgMY6AcSEgoKaXNfZGVmYXVsdBgEIAEoCBJGChB1c2VyX2RlZmF1bHRfdHRsGAUgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBJCCgx1c2VyX21heF90dGwYBiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8Ej4KCGhvc3RfdHRsGAcgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhG6SA6qAQsiBQiA54QPMgIIPBIfCg1mb3JjZV9jb21tYW5kGAkgASgJQgi6SAVyAxiACBIgCg5zb3VyY2VfYWRkcmVzcxgKIAEoCUIIukgFcgMYgAgSogEKC3VwZGF0ZV9tYXNrGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0JxukhuyAEB4gFoEgRuYW1lEgtkZXNjcmlwdGlvbhIKaXNfZGVmYXVsdBIQdXNlcl9kZWZhdWx0X3R0bBIMdXNlcl9tYXhfdHRsEghob3N0X3R0bBINZm9yY2VfY29tbWFuZBIOc291cmNlX2FkZHJlc3NKBAgIEAkiYwoiVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZRI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYASABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSI5CiFEZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIiQKIkRlbGV0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiVAojUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBEhcKD3Jldm9rZV9wcmV2aW91cxgCIAEoCCJlCiRSb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkilgEKGVNpZ25TU0hDZXJ0aWZpY2F0ZVJlcXVlc3QSHgoKcHVibGljX2tleRgBIAEoCUIKukgHcgUQARiQThI5CgN0dGwYAiABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CEbpIDqoBCyIFCIDnhA8yAgg8Eh4KCXRhcmdldF9pZBgDIAEoCUILukgIyAEBcgOwAQEinwEKGlNpZ25TU0hDZXJ0aWZpY2F0ZVJlc3BvbnNlEg0KBWNhX2lkGAEgASgJEg8KB2NhX25hbWUYAiABKAkSFQoNY2FfcHVibGljX2tleRgDIAEoCRIaChJzaWduZWRfY2VydGlmaWNhdGUYBCABKAkSLgoKZXhwaXJlc19hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAyjQcKEkNlcnRpZmljYXRlU2VydmljZRJ5ChdHZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIoLm5va2t1LnYxLkdldENlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBopLm5va2t1LnYxLkdldENlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiCZACAcLzGAIYARKBAQoaQ3JlYXRlQ2VydGlmaWNhdGVBdXRob3JpdHkSKy5ub2trdS52MS5DcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLC5ub2trdS52MS5DcmVhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIgjC8xgEGANAARJ/ChpVcGRhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiBsLzGAIYAxKCAQoaTGlzdENlcnRpZmljYXRlQXV0aG9yaXRpZXMSKy5ub2trdS52MS5MaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1JlcXVlc3QaLC5ub2trdS52MS5MaXN0Q2VydGlmaWNhdGVBdXRob3JpdGllc1Jlc3BvbnNlIgmQAgHC8xgCGAESfwoaRGVsZXRlQ2VydGlmaWNhdGVBdXRob3JpdHkSKy5ub2trdS52MS5EZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLC5ub2trdS52MS5EZWxldGVDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIgbC8xgCGAMShQEKHFJvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHkSLS5ub2trdS52MS5Sb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBouLm5va2t1LnYxLlJvbGxvdmVyQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZSIGwvMYAhgDEmkKElNpZ25TU0hDZXJ0aWZpY2F0ZRIjLm5va2t1LnYxLlNpZ25TU0hDZXJ0aWZpY2F0ZVJlcXVlc3QaJC5ub2trdS52MS5TaWduU1NIQ2VydGlmaWNhdGVSZXNwb25zZSIIwvMYBBABSAFCkgEKDGNvbS5ub2trdS52MUIRQ2VydGlmaWNhdGVzUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
- * A CA holds two Ed25519 keys that never expire. The user key signs login certificates, the host key the
- * certificates daemons present. Both change only by rollover.
- *
  * @generated from message nokku.v1.CertificateAuthority
  */
 export type CertificateAuthority = Message<"nokku.v1.CertificateAuthority"> & {
@@ -39,90 +36,72 @@ export type CertificateAuthority = Message<"nokku.v1.CertificateAuthority"> & {
   description: string;
 
   /**
-   * The user key, what sshd's TrustedUserCAKeys holds.
-   *
    * @generated from field: string public_key = 4;
    */
   publicKey: string;
 
   /**
-   * The host key, what @cert-authority in known_hosts holds.
-   *
-   * @generated from field: string host_public_key = 23;
+   * @generated from field: string host_public_key = 5;
    */
   hostPublicKey: string;
 
   /**
-   * When the keys were made, at creation or the last rollover.
-   *
-   * @generated from field: google.protobuf.Timestamp rotated_at = 5;
+   * @generated from field: google.protobuf.Timestamp rotated_at = 6;
    */
   rotatedAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: bool is_active = 7;
-   */
-  isActive: boolean;
-
-  /**
-   * @generated from field: bool is_default = 8;
+   * @generated from field: bool is_default = 7;
    */
   isDefault: boolean;
 
   /**
-   * @generated from field: google.protobuf.Duration user_default_ttl = 13;
+   * @generated from field: google.protobuf.Duration user_default_ttl = 8;
    */
   userDefaultTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration user_max_ttl = 14;
+   * @generated from field: google.protobuf.Duration user_max_ttl = 9;
    */
   userMaxTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration host_default_ttl = 15;
+   * @generated from field: google.protobuf.Duration host_ttl = 10;
    */
-  hostDefaultTtl?: Duration | undefined;
+  hostTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration host_max_ttl = 16;
-   */
-  hostMaxTtl?: Duration | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 17;
+   * @generated from field: google.protobuf.Timestamp created_at = 12;
    */
   createdAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 18;
+   * @generated from field: google.protobuf.Timestamp updated_at = 13;
    */
   updatedAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: string previous_public_key = 19;
+   * @generated from field: string previous_public_key = 14;
    */
   previousPublicKey: string;
 
   /**
-   * @generated from field: string previous_host_public_key = 24;
+   * @generated from field: string previous_host_public_key = 15;
    */
   previousHostPublicKey: string;
 
   /**
-   * The previous keys are trusted until then.
-   *
-   * @generated from field: google.protobuf.Timestamp previous_trusted_until = 20;
+   * @generated from field: google.protobuf.Timestamp previous_trusted_until = 16;
    */
   previousTrustedUntil?: Timestamp | undefined;
 
   /**
-   * @generated from field: string force_command = 21;
+   * @generated from field: string force_command = 17;
    */
   forceCommand: string;
 
   /**
-   * @generated from field: string source_address = 22;
+   * @generated from field: string source_address = 18;
    */
   sourceAddress: string;
 };
@@ -149,37 +128,32 @@ export type CreateCertificateAuthorityRequest = Message<"nokku.v1.CreateCertific
   description: string;
 
   /**
-   * @generated from field: bool is_default = 5;
+   * @generated from field: bool is_default = 3;
    */
   isDefault: boolean;
 
   /**
-   * @generated from field: google.protobuf.Duration user_default_ttl = 8;
+   * @generated from field: google.protobuf.Duration user_default_ttl = 4;
    */
   userDefaultTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration user_max_ttl = 9;
+   * @generated from field: google.protobuf.Duration user_max_ttl = 5;
    */
   userMaxTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration host_default_ttl = 10;
+   * @generated from field: google.protobuf.Duration host_ttl = 6;
    */
-  hostDefaultTtl?: Duration | undefined;
+  hostTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration host_max_ttl = 11;
-   */
-  hostMaxTtl?: Duration | undefined;
-
-  /**
-   * @generated from field: string force_command = 12;
+   * @generated from field: string force_command = 8;
    */
   forceCommand: string;
 
   /**
-   * @generated from field: string source_address = 13;
+   * @generated from field: string source_address = 9;
    */
   sourceAddress: string;
 };
@@ -292,44 +266,39 @@ export type UpdateCertificateAuthorityRequest = Message<"nokku.v1.UpdateCertific
   description: string;
 
   /**
-   * @generated from field: bool is_active = 4;
-   */
-  isActive: boolean;
-
-  /**
-   * @generated from field: bool is_default = 5;
+   * @generated from field: bool is_default = 4;
    */
   isDefault: boolean;
 
   /**
-   * @generated from field: google.protobuf.Duration user_default_ttl = 8;
+   * @generated from field: google.protobuf.Duration user_default_ttl = 5;
    */
   userDefaultTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration user_max_ttl = 9;
+   * @generated from field: google.protobuf.Duration user_max_ttl = 6;
    */
   userMaxTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration host_default_ttl = 10;
+   * @generated from field: google.protobuf.Duration host_ttl = 7;
    */
-  hostDefaultTtl?: Duration | undefined;
+  hostTtl?: Duration | undefined;
 
   /**
-   * @generated from field: google.protobuf.Duration host_max_ttl = 11;
-   */
-  hostMaxTtl?: Duration | undefined;
-
-  /**
-   * @generated from field: string force_command = 12;
+   * @generated from field: string force_command = 9;
    */
   forceCommand: string;
 
   /**
-   * @generated from field: string source_address = 13;
+   * @generated from field: string source_address = 10;
    */
   sourceAddress: string;
+
+  /**
+   * @generated from field: google.protobuf.FieldMask update_mask = 11;
+   */
+  updateMask?: FieldMask | undefined;
 };
 
 /**
@@ -398,7 +367,7 @@ export type RolloverCertificateAuthorityRequest = Message<"nokku.v1.RolloverCert
   /**
    * Distrusts the previous keys at once, for a key that leaked. Otherwise they stay trusted for user_max_ttl.
    *
-   * @generated from field: bool revoke_previous = 4;
+   * @generated from field: bool revoke_previous = 2;
    */
   revokePrevious: boolean;
 };

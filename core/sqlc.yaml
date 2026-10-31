@@ -18,7 +18,7 @@ sql:
         emit_params_struct_pointers: true # More efficient parameter passing
         rename:
           ssh_ca: "SSHCA"
-          web_ca: "WebCA"
+          ssh_ca_key: "SSHCAKey"
         overrides:
           # UUID overrides
           - db_type: "uuid"
@@ -59,10 +59,6 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
               type: "DaemonStatus"
-          - column: "join_tokens.kind"
-            go_type:
-              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
-              type: "JoinTokenKind"
           - column: "users.role"
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -71,7 +67,7 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
               type: "WorkspaceRole"
-          - column: "join_tokens.role"
+          - column: "one_time_tokens.role"
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
               type: "WorkspaceRole"
@@ -107,28 +103,20 @@ sql:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "HashedToken"
 
-          # Encrypt (reversible) overrides
-          - column: "ssh_cas.private_key"
+          # Sealed overrides. Plain bytes, only Keyset.Open reads the secret. db/reencrypt.go lists the same columns.
+          - column: "ssh_ca_keys.private_key"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "EncryptedBytes"
-          - column: "ssh_cas.host_private_key"
-            go_type:
-              import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "EncryptedBytes"
+              type: "Sealed"
           - column: "sso_providers.config"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "EncryptedBytes"
+              type: "Sealed"
           - column: "recordings.key"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "EncryptedBytes"
-          - column: "web_ca.private_key"
-            go_type:
-              import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "EncryptedBytes"
+              type: "Sealed"
           - column: "audit_streams.secret"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "EncryptedBytes"
+              type: "Sealed"

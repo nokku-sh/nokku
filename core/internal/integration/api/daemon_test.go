@@ -19,18 +19,18 @@ import (
 	"github.com/coder/websocket"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/cryptosigner"
-	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/ssh"
+	gossh "golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/proto"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+	"github.com/nokku-sh/nokku/internal/dpop"
 
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/iam"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
 
@@ -45,7 +45,7 @@ func dpopProof(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey, procedur
 		"nonce": cfg.IAM.DPoP.CurrentNonce(),
 	}
 	if token != "" {
-		claims["ath"] = iam.DPoPATH(token)
+		claims["ath"] = dpop.ATH(token)
 	}
 	payload, err := json.Marshal(claims)
 	require.NoError(t, err)
@@ -69,7 +69,6 @@ func TestEnrollDaemon(t *testing.T) {
 
 	created, err := nokkuv1connect.NewJoinTokenServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			MaxUses:     new(int32(1)),
 			AutoApprove: new(true),
 		})
@@ -110,10 +109,10 @@ func TestEnrollDaemon(t *testing.T) {
 		"the API reads the same config back, got %v", got.GetDaemon().GetConfig())
 
 	// One switch off keeps the others where they were.
-	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+	_, err = daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
 		Id:     new(res.GetId()),
 		Config: &nokkuv1.DaemonConfig{RecordSessions: new(false)},
-	})
+	}))
 	require.NoError(t, err)
 	got, err = daemons.GetDaemon(
 		t.Context(),
@@ -128,10 +127,10 @@ func TestEnrollDaemon(t *testing.T) {
 		"a config change leaves the status alone")
 
 	// A status alone leaves the config where it was.
-	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+	_, err = daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
 		Id:     new(res.GetId()),
 		Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
-	})
+	}))
 	require.NoError(t, err)
 	got, err = daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(res.GetId())})
 	require.NoError(t, err)
@@ -176,7 +175,6 @@ func TestCreateSession(t *testing.T) {
 	require.NoError(t, err)
 	created, err := nokkuv1connect.NewJoinTokenServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			AutoApprove: new(true),
 		})
 	require.NoError(t, err)
@@ -215,7 +213,7 @@ func TestCreateSession(t *testing.T) {
 	_, err = machine.CreateSession(t.Context(), req)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "service account, got %v", err)
 
-	memberPrincipal, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken)
+	memberPrincipal, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken, accessTokens...)
 	require.NoError(t, err)
 
 	// Membership alone opens nothing. A web shell and a relay need a grant on the target, like sshd asks for.
@@ -258,27 +256,25 @@ func TestCreateSession(t *testing.T) {
 	})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "another account on the host, got %v", err)
 
-	// The target trusts the sshtest CA, which admits the member's cert.
-	sshd := sshtest.NewServerFor(t, enrolled.GetTargetId(), memberPrincipal.ID)
-	ca := sshd.CA(t)
+	// The target's CA signs the sshtest server's host certificate and admits the member's cert.
+	var user, host gossh.Signer
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
-		row, err := q.CreateCA(t.Context(), &db.CreateCAParams{
-			Name:           "sshtest",
-			PrivateKey:     ca.PrivateKey,
-			PublicKey:      ca.PublicKey,
-			HostPrivateKey: ca.HostPrivateKey,
-			HostPublicKey:  ca.HostPublicKey,
-			UserDefaultTtl: ca.UserDefaultTtl,
-			UserMaxTtl:     ca.UserMaxTtl,
-			HostDefaultTtl: ca.HostDefaultTtl,
-			HostMaxTtl:     ca.HostMaxTtl,
-		})
+		params := ssh.NewCA()
+		params.Name = "sshtest"
+		row, err := ssh.CreateCA(t.Context(), q, cfg.Keyset, params)
 		if err != nil {
 			return err
 		}
-		_, err = q.UpdateTargetCA(t.Context(), &db.UpdateTargetCAParams{DaemonID: new(enrolled.GetId()), CaID: &row.ID})
+		if user, err = ssh.CASigner(t.Context(), q, cfg.Keyset, row.ID, gossh.UserCert); err != nil {
+			return err
+		}
+		if host, err = ssh.CASigner(t.Context(), q, cfg.Keyset, row.ID, gossh.HostCert); err != nil {
+			return err
+		}
+		_, err = q.UpdateTarget(t.Context(), &db.UpdateTargetParams{TargetID: enrolled.GetTargetId(), CaID: &row.ID})
 		return err
 	})
+	sshd := sshtest.NewServerSignedBy(t, enrolled.GetTargetId(), memberPrincipal.ID, user, host)
 
 	// openShell trades a fresh ticket for the terminal websocket.
 	openShell := func() (string, *websocket.Conn) {
@@ -452,7 +448,6 @@ func enrollTestDaemon(
 	)
 	created, err := nokkuv1connect.NewJoinTokenServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-			Kind:        nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL.Enum(),
 			AutoApprove: &autoApprove,
 		})
 	require.NoError(t, err)
@@ -533,7 +528,7 @@ func seedDefaultCA(
 	return created.GetCertificateAuthority()
 }
 
-// An enrollment that names no CA falls back to the workspace default, and gets none while there is no default.
+// An enrollment that names no CA gets the workspace default, wherever the default is at the time.
 func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
@@ -541,12 +536,6 @@ func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	// The workspace is shared and came with a default CA. Only the owner role deletes past RLS.
-	owner, err := pgx.Connect(t.Context(), "")
-	require.NoError(t, err)
-	_, err = owner.Exec(t.Context(), "DELETE FROM ssh_cas WHERE workspace_id = $1", workspaceID)
-	require.NoError(t, err)
-	require.NoError(t, owner.Close(t.Context()))
 	certs := nokkuv1connect.NewCertificateServiceClient(
 		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
 	)
@@ -558,7 +547,7 @@ func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 		require.NoError(t, err)
 		return res.GetCertificateAuthority().GetId()
 	}
-	enrolledCA := func() *string {
+	enrolledCA := func() string {
 		_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 		target, err := cfg.Conn.Sys().GetTarget(t.Context(), enrolled.GetTargetId())
 		require.NoError(t, err)
@@ -566,18 +555,12 @@ func TestEnrollFallsBackToDefaultCA(t *testing.T) {
 	}
 
 	create("plain", false)
-	assert.Nil(t, enrolledCA(), "with no default the server gets none")
-
 	first := create("first", true)
-	got := enrolledCA()
-	require.NotNil(t, got)
-	assert.Equal(t, first, *got, "the default")
+	assert.Equal(t, first, enrolledCA(), "the default, not the newest")
 
 	// Making another CA the default moves it. The partial unique index refuses two defaults.
 	second := create("second", true)
-	got = enrolledCA()
-	require.NotNil(t, got)
-	assert.Equal(t, second, *got, "the new default")
+	assert.Equal(t, second, enrolledCA(), "the new default")
 	listed, err := certs.ListCertificateAuthorities(t.Context(), &nokkuv1.ListCertificateAuthoritiesRequest{})
 	require.NoError(t, err)
 	var defaults []string
@@ -647,7 +630,7 @@ func TestSignHostCertificate(t *testing.T) {
 
 	hostKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	hostPub, err := ssh.NewPublicKey(&hostKey.PublicKey)
+	hostPub, err := gossh.NewPublicKey(&hostKey.PublicKey)
 	require.NoError(t, err)
 
 	res, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(
@@ -655,17 +638,17 @@ func TestSignHostCertificate(t *testing.T) {
 		nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure,
 	))).
 		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{
-			PublicKey: new(string(ssh.MarshalAuthorizedKey(hostPub))),
+			PublicKey: new(string(gossh.MarshalAuthorizedKey(hostPub))),
 		})
 	require.NoError(t, err)
 
-	parsed, _, _, _, err := ssh.ParseAuthorizedKey([]byte(res.GetSignedCertificate()))
+	parsed, _, _, _, err := gossh.ParseAuthorizedKey([]byte(res.GetSignedCertificate()))
 	require.NoError(t, err)
-	cert, ok := parsed.(*ssh.Certificate)
+	cert, ok := parsed.(*gossh.Certificate)
 	require.True(t, ok, "not a certificate")
-	assert.Equal(t, uint32(ssh.HostCert), cert.CertType)
+	assert.Equal(t, uint32(gossh.HostCert), cert.CertType)
 	assert.Equal(t, []string{enrolled.GetTargetId()}, cert.ValidPrincipals, "a daemon only signs for its own target")
-	ca, _, _, _, err := ssh.ParseAuthorizedKey([]byte(caKey))
+	ca, _, _, _, err := gossh.ParseAuthorizedKey([]byte(caKey))
 	require.NoError(t, err)
 	assert.Equal(t, ca.Marshal(), cert.SignatureKey.Marshal(), "signed by the host key of the target's CA")
 }

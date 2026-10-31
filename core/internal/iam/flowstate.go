@@ -15,7 +15,6 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 )
 
@@ -36,26 +35,11 @@ const (
 	providerCacheEntries = 10_000
 )
 
-var (
-	errFlowState   = errors.New("iam: invalid or expired flow state")
-	errLinkRefused = errors.New("iam: linking needs a session and a same-origin request")
-)
+var errFlowState = errors.New("iam: invalid or expired flow state")
 
 // providerContext is how oauth2 and go-oidc pick up the guarded client.
 func (s *Service) providerContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, s.idp)
-}
-
-// linkUserIDFor only links for the profile page's own request. The Lax session cookie rides on any navigation.
-func linkUserIDFor(ctx context.Context, r *http.Request) (string, error) {
-	if r.URL.Query().Get("link") != "true" {
-		return "", nil
-	}
-	userID := actor.SubjectFromContext(ctx)
-	if userID == "" || r.Header.Get("Sec-Fetch-Site") != "same-origin" {
-		return "", errLinkRefused
-	}
-	return userID, nil
 }
 
 // sealed keeps the state of a browser flow in an encrypted cookie, so starting a flow stores nothing on the server.

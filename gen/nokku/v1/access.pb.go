@@ -87,7 +87,17 @@ type Access struct {
 	Role   *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
 	Daemon *bool                  `protobuf:"varint,4,opt,name=daemon" json:"daemon,omitempty"`
 	// people_only refuses service accounts, so a leaked token cannot mint more credentials for itself.
-	PeopleOnly    *bool `protobuf:"varint,5,opt,name=people_only,json=peopleOnly" json:"people_only,omitempty"`
+	PeopleOnly *bool `protobuf:"varint,5,opt,name=people_only,json=peopleOnly" json:"people_only,omitempty"`
+	// fresh needs a browser session from the last 10 minutes and refuses nk, a stolen session cannot add a way in.
+	Fresh *bool `protobuf:"varint,6,opt,name=fresh" json:"fresh,omitempty"`
+	// feature is the plan feature the call needs.
+	Feature *string `protobuf:"bytes,7,opt,name=feature" json:"feature,omitempty"`
+	// capped counts the create against the plan's resource cap.
+	Capped *bool `protobuf:"varint,8,opt,name=capped" json:"capped,omitempty"`
+	// signs issues a user certificate, an inactive workspace gets none.
+	Signs *bool `protobuf:"varint,9,opt,name=signs" json:"signs,omitempty"`
+	// quiet changes something, but the handler records what matters, so the audit log skips the call.
+	Quiet         *bool `protobuf:"varint,10,opt,name=quiet" json:"quiet,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -157,6 +167,41 @@ func (x *Access) GetPeopleOnly() bool {
 	return false
 }
 
+func (x *Access) GetFresh() bool {
+	if x != nil && x.Fresh != nil {
+		return *x.Fresh
+	}
+	return false
+}
+
+func (x *Access) GetFeature() string {
+	if x != nil && x.Feature != nil {
+		return *x.Feature
+	}
+	return ""
+}
+
+func (x *Access) GetCapped() bool {
+	if x != nil && x.Capped != nil {
+		return *x.Capped
+	}
+	return false
+}
+
+func (x *Access) GetSigns() bool {
+	if x != nil && x.Signs != nil {
+		return *x.Signs
+	}
+	return false
+}
+
+func (x *Access) GetQuiet() bool {
+	if x != nil && x.Quiet != nil {
+		return *x.Quiet
+	}
+	return false
+}
+
 var file_nokku_v1_access_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
@@ -178,14 +223,20 @@ var File_nokku_v1_access_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_access_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\x9a\x01\n" +
+	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\x8e\x02\n" +
 	"\x06Access\x12\x16\n" +
 	"\x06public\x18\x01 \x01(\bR\x06public\x12\x12\n" +
 	"\x04self\x18\x02 \x01(\bR\x04self\x12+\n" +
 	"\x04role\x18\x03 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x12\x16\n" +
 	"\x06daemon\x18\x04 \x01(\bR\x06daemon\x12\x1f\n" +
 	"\vpeople_only\x18\x05 \x01(\bR\n" +
-	"peopleOnly*\xb4\x01\n" +
+	"peopleOnly\x12\x14\n" +
+	"\x05fresh\x18\x06 \x01(\bR\x05fresh\x12\x18\n" +
+	"\afeature\x18\a \x01(\tR\afeature\x12\x16\n" +
+	"\x06capped\x18\b \x01(\bR\x06capped\x12\x14\n" +
+	"\x05signs\x18\t \x01(\bR\x05signs\x12\x14\n" +
+	"\x05quiet\x18\n" +
+	" \x01(\bR\x05quiet*\xb4\x01\n" +
 	"\rWorkspaceRole\x12\x1e\n" +
 	"\x1aWORKSPACE_ROLE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15WORKSPACE_ROLE_MEMBER\x10\x01\x12\x19\n" +

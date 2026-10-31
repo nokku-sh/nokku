@@ -2,7 +2,6 @@
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import ExportMenu from '#lib/components/blocks/ExportMenu.svelte';
 	import AuditStreams from '#lib/components/audit/AuditStreams.svelte';
-	import LegalHolds from '#lib/components/audit/LegalHolds.svelte';
 	import { page } from '$app/state';
 	import { util } from '#lib/api/workspaces.svelte.js';
 	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
@@ -119,7 +118,6 @@
 		</Badge>
 	{/if}
 	<AuditStreams />
-	<LegalHolds />
 	<ExportMenu
 		hint="Exactly what is on screen, up to 90 days"
 		feature="audit_export"

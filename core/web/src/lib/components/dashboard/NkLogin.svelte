@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { util } from '#lib/api/workspaces.svelte.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import { DocsURL } from '#lib/config.js';
 	import { nkLoginCommand } from '#lib/utils.js';
 
-	const info = util.instanceInfo();
-	const login = $derived(nkLoginCommand(info.data?.caPin));
+	const login = nkLoginCommand();
 </script>
 
 <p class="text-sm text-muted-foreground">

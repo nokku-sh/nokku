@@ -69,6 +69,33 @@ func TestAuditDeniedCall(t *testing.T) {
 	assert.Empty(t, rows(long[:256]), "a stranger's call reached the log")
 }
 
+// The log is for forensics, so it keeps the client's exact address, not the /64 that rate limits count by.
+func TestAuditKeepsTheExactAddress(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	viewer := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	// The test server is on loopback, which may name the client by default.
+	targets := nokkuv1connect.NewTargetServiceClient(
+		connect.NewClient(
+			connecthttp.NewTransport(srv.Client(), srv.URL),
+			header("Authorization", "Bearer "+viewer),
+			header("X-Forwarded-For", "2001:db8:abcd:1234::7"),
+		),
+	)
+	target := uuid.NewV7().String()
+	_, err := targets.DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &target})
+	require.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+
+	var rows []*db.ListAuditLogsRow
+	require.Eventually(t, func() bool {
+		_ = cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{Target: &target, Limit: 1})
+			return err
+		})
+		return len(rows) == 1
+	}, 5*time.Second, 20*time.Millisecond, "no audit row for the denied call")
+	assert.Equal(t, "2001:db8:abcd:1234::7", rows[0].Ip)
+}
+
 // The log keeps the name of a service account, the account may be long gone when somebody reads the row.
 func TestAuditNamesServiceAccount(t *testing.T) {
 	cfg, srv := newTestAPI(t)

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { credentials } from '#lib/api/credential.svelte.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import DangerZone from '#lib/components/sheets/DangerZone.svelte';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
@@ -144,7 +145,9 @@
 						<InputGroup.Input id="profile-email" value={model.email} readonly />
 						{#if !managed}
 							<InputGroup.Addon align="inline-end">
-								<InputGroup.Button onclick={() => (emailOpen = true)}>Change</InputGroup.Button>
+								<InputGroup.Button onclick={() => whenFresh(() => (emailOpen = true))}
+									>Change</InputGroup.Button
+								>
 							</InputGroup.Addon>
 						{/if}
 					</InputGroup.Root>

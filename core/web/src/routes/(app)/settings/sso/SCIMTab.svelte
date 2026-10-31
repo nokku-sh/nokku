@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { scim } from '#lib/api/scim.svelte.js';
 	import FormModal from '#lib/components/blocks/FormModal.svelte';
 	import LoadError from '#lib/components/blocks/LoadError.svelte';
@@ -181,7 +182,7 @@
 				</Card.Description>
 				{#if !readonly && available}
 					<Card.Action>
-						<Button size="sm" onclick={() => (createOpen = true)}>
+						<Button size="sm" onclick={() => whenFresh(() => (createOpen = true))}>
 							<Plus data-icon="inline-start" />
 							Create token
 						</Button>

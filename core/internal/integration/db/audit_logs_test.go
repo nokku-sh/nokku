@@ -25,7 +25,7 @@ func TestListAuditLogsFilters(t *testing.T) {
 		{"CreateTarget", false, `{"code":"invalid_argument"}`},
 		{"LoginDenied", false, `{}`},
 	} {
-		if err := c.Sys().InsertAuditLog(t.Context(), &db.InsertAuditLogParams{
+		if err := c.Tenant().InsertAuditLog(pinned(t, f.ws), &db.InsertAuditLogParams{
 			WorkspaceID: f.ws,
 			ActorID:     f.owner,
 			ActorKind:   "user",

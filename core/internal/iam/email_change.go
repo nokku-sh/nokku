@@ -24,13 +24,18 @@ const (
 
 var ErrSameEmail = errors.New("iam: email unchanged")
 
+var emailTokenKinds = map[string]crypto.TokenKind{
+	tokenEmailChange: crypto.TokenEmailChange,
+	tokenEmailRevert: crypto.TokenEmailRevert,
+}
+
 // RequestEmailChange replaces any pending change. The account keeps its address until confirm is used.
 func (s *Service) RequestEmailChange(
 	ctx context.Context,
 	u *db.User,
 	newEmail string,
 ) (confirm, cancel string, err error) {
-	newEmail = normalizeEmail(newEmail)
+	newEmail = NormalizeEmail(newEmail)
 	if newEmail == u.Email {
 		return "", "", ErrSameEmail
 	}
@@ -79,7 +84,7 @@ func (s *Service) putEmailToken(
 	userID, purpose, email string,
 	ttl time.Duration,
 ) (string, error) {
-	raw, hash := crypto.NewSecret()
+	raw, hash := crypto.NewToken(emailTokenKinds[purpose])
 	return raw, q.PutToken(ctx, &db.PutTokenParams{
 		TokenHash: hash,
 		UserID:    &userID,
@@ -176,7 +181,10 @@ func consumeEmailToken(
 	q *db.Queries,
 	raw, purpose string,
 ) (*db.ConsumeEmailTokenRow, error) {
-	hash := crypto.HashToken(raw)
+	hash, ok := crypto.TokenHash(raw, emailTokenKinds[purpose])
+	if !ok {
+		return nil, ErrInvalidToken
+	}
 	row, err := q.ConsumeEmailToken(
 		ctx,
 		&db.ConsumeEmailTokenParams{TokenHash: hash, Purpose: purpose},

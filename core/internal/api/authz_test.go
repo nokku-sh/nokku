@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
@@ -167,11 +168,11 @@ func TestAuthorizeDaemon(t *testing.T) {
 		switch {
 		case procedureAccess[procedure].GetPublic():
 		case !procedureAccess[procedure].GetDaemon():
-			if err := a.authorize(ctx, procedure); !errors.Is(err, db.ErrPermissionDenied) {
+			if err := a.authorize(ctx, procedure, nil); !errors.Is(err, db.ErrPermissionDenied) {
 				t.Errorf("daemon allowed %s, want permission denied", procedure)
 			}
 		case slices.Contains(anyState, procedure):
-			if err := a.authorize(ctx, procedure); err != nil {
+			if err := a.authorize(ctx, procedure, nil); err != nil {
 				t.Errorf("daemon denied %s: %v", procedure, err)
 			}
 		}
@@ -201,7 +202,7 @@ func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 		if !daemonOnly(access) {
 			continue
 		}
-		if err := a.authorize(ctx, procedure); !errors.Is(err, db.ErrPermissionDenied) {
+		if err := a.authorize(ctx, procedure, nil); !errors.Is(err, db.ErrPermissionDenied) {
 			t.Errorf("user allowed %s, want permission denied", procedure)
 		}
 	}
@@ -224,12 +225,12 @@ func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, nokkuv1connect.TargetServiceDeleteTargetProcedure, false},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN, nokkuv1connect.SSOServicePutSSOProviderProcedure, false},
-		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, nokkuv1connect.SSOServicePutSSOProviderProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, nokkuv1connect.SSOServiceDeleteSSOProviderProcedure, true},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.TargetServiceListTargetsProcedure, false},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.AccountServiceGetAccountProcedure, true},
 	}
 	for _, tt := range tests {
-		err := a.authorize(as(tt.role), tt.procedure)
+		err := a.authorize(as(tt.role), tt.procedure, nil)
 		if (err == nil) != tt.allowed {
 			t.Errorf("%s on %s: err = %v, want allowed=%v", tt.role, tt.procedure, err, tt.allowed)
 		}
@@ -239,9 +240,10 @@ func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 // A service account token must not mint credentials that outlive revoking it.
 func TestAuthorizePeopleOnly(t *testing.T) {
 	a := &authorizationInterceptor{}
-	editor := nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR
+	// Even the top role, so only people_only can refuse.
+	owner := nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER
 	as := func(kind actor.Kind) context.Context {
-		return actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "p1", Kind: kind, Role: editor})
+		return actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "p1", Kind: kind, Role: owner})
 	}
 	tests := []struct {
 		kind      actor.Kind
@@ -250,13 +252,19 @@ func TestAuthorizePeopleOnly(t *testing.T) {
 	}{
 		{actor.KindServiceAccount, nokkuv1connect.ServiceAccountServiceCreateServiceAccountTokenProcedure, false},
 		{actor.KindServiceAccount, nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, false},
+		{actor.KindServiceAccount, nokkuv1connect.AccessRequestServiceCreateAccessRequestProcedure, false},
+		{actor.KindServiceAccount, nokkuv1connect.AccessRequestServiceApproveAccessRequestProcedure, false},
+		{actor.KindServiceAccount, nokkuv1connect.AccessRequestServiceDenyAccessRequestProcedure, false},
+		{actor.KindServiceAccount, nokkuv1connect.AccessRequestServiceCancelAccessRequestProcedure, false},
+		{actor.KindServiceAccount, nokkuv1connect.DaemonServiceCreateSessionProcedure, false},
+		{actor.KindUser, nokkuv1connect.AccessRequestServiceApproveAccessRequestProcedure, true},
 		{actor.KindServiceAccount, nokkuv1connect.ServiceAccountServiceListServiceAccountsProcedure, true},
 		{actor.KindServiceAccount, nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
-		{actor.KindUser, nokkuv1connect.ServiceAccountServiceCreateServiceAccountTokenProcedure, true},
+		{actor.KindUser, nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, true},
 		{actor.KindCLI, nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, true},
 	}
 	for _, tt := range tests {
-		err := a.authorize(as(tt.kind), tt.procedure)
+		err := a.authorize(as(tt.kind), tt.procedure, nil)
 		if (err == nil) != tt.allowed {
 			t.Errorf("%s on %s: err = %v, want allowed=%v", tt.kind, tt.procedure, err, tt.allowed)
 		}
@@ -269,7 +277,29 @@ func TestAuthorizeUnknownProcedure(t *testing.T) {
 		t.Context(),
 		actor.Principal{ID: "u1", Kind: actor.KindUser, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 	)
-	if err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown"); !errors.Is(err, db.ErrPermissionDenied) {
+	if err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown", nil); !errors.Is(err, db.ErrPermissionDenied) {
 		t.Fatalf("unknown procedure: err = %v, want permission denied", err)
+	}
+}
+
+// nk must not add a way in, a stolen state file would otherwise mint credentials for good.
+func TestAuthorizeFreshRefusesNk(t *testing.T) {
+	a := &authorizationInterceptor{}
+	ctx := actor.ContextWithPrincipal(
+		t.Context(),
+		actor.Principal{ID: "u1", Kind: actor.KindCLI, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+	)
+	fresh := 0
+	for _, procedure := range allProcedures(t) {
+		if !procedureAccess[procedure].GetFresh() {
+			continue
+		}
+		fresh++
+		if err := a.authorize(ctx, procedure, nil); connect.CodeOf(err) != connect.CodePermissionDenied {
+			t.Errorf("nk on %s: err = %v, want permission denied", procedure, err)
+		}
+	}
+	if fresh == 0 {
+		t.Fatal("no procedure asks for a fresh sign-in")
 	}
 }

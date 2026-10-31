@@ -1,6 +1,7 @@
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { AccessRequestService } from '#lib/gen/nokku/v1/access_request_pb.js';
+import { LIVE } from './client';
 
 export const accessRequests = {
 	requestable: (when: () => boolean) =>
@@ -9,7 +10,12 @@ export const accessRequests = {
 			select: (res) => res.targets
 		})),
 	// The newest hundred, every status. Members get only their own.
-	list: () => useQuery(AccessRequestService.method.listAccessRequests, { limit: 100 }),
+	list: () =>
+		useQuery(
+			AccessRequestService.method.listAccessRequests,
+			{ limit: 100 },
+			{ refetchInterval: LIVE }
+		),
 
 	create: () =>
 		useMutation(AccessRequestService.method.createAccessRequest, {

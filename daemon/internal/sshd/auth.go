@@ -10,50 +10,54 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
 var errNoCertificates = errors.New("sshd: only certificate authentication is supported")
 
-func (s *Server) trustedCA(key ssh.PublicKey) bool {
-	return s.trustedCAWire(string(key.Marshal()))
+// access is one sync, parsed for logins. A sync swaps it whole, so a login never sees half of one.
+type access struct {
+	principals map[string][]string
+	policy     Policy
+	// The CA keys are in wire form. An empty active key trusts none.
+	ca      string
+	retired map[string]time.Time
 }
 
-func (s *Server) trustedCAWire(wire string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if _, ok := s.trustedCAs[wire]; ok {
+func (a *access) trusts(wire string) bool {
+	if a.ca != "" && wire == a.ca {
 		return true
 	}
-	until, ok := s.retiredCAs[wire]
+	until, ok := a.retired[wire]
 	return ok && time.Now().Before(until)
 }
 
-// SetTrust with an empty active key trusts no CA. An emergency rollover sends no retired key.
-func (s *Server) SetTrust(active string, retiredKeys []*nokkuv1.RetiredCAKey) {
-	trusted := map[string]struct{}{}
-	if active != "" {
-		pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(active))
+// SetAccess applies a sync to new logins, DropRevoked to open connections. An active CA key that does not parse
+// trusts no CA at all, retired ones included. An emergency rollover sends no retired key.
+func (s *Server) SetAccess(sa *state.Access) {
+	a := &access{
+		principals: sa.Principals,
+		policy:     policyFrom(sa.DaemonConfig),
+		retired:    make(map[string]time.Time, len(sa.RetiredCAs)),
+	}
+	if sa.CA != "" {
+		pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sa.CA))
 		if err != nil {
-			// Keep the last good set, a garbled key must not lock everyone out.
-			slog.Warn("unreadable CA public key, keeping the previous trust", "error", err)
+			slog.Warn("unreadable CA public key, trusting no CA", "error", err)
+			s.access.Store(a)
 			return
 		}
-		trusted[string(pub.Marshal())] = struct{}{}
+		a.ca = string(pub.Marshal())
 	}
-	retired := make(map[string]time.Time, len(retiredKeys))
-	for _, k := range retiredKeys {
+	for _, k := range sa.RetiredCAs {
 		pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(k.GetPublicKey()))
 		if err != nil {
 			slog.Warn("skipping unreadable retired CA", "error", err)
 			continue
 		}
-		retired[string(pub.Marshal())] = k.GetTrustedUntil().AsTime()
+		a.retired[string(pub.Marshal())] = k.GetTrustedUntil().AsTime()
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.trustedCAs = trusted
-	s.retiredCAs = retired
+	s.access.Store(a)
 }
 
 // One certificate principal has to match the list synced for the requested account as a whole string.
@@ -72,11 +76,14 @@ func (s *Server) publicKeyCallback(
 		return nil, s.deny(conn, fmt.Errorf("sshd: certificate has type %d, want user certificate", cert.CertType))
 	}
 
-	if !s.trustedCA(cert.SignatureKey) {
+	// One sync answers every question of this login.
+	a := s.access.Load()
+	trusted := func(key ssh.PublicKey) bool { return a.trusts(string(key.Marshal())) }
+	if !trusted(cert.SignatureKey) {
 		return nil, s.deny(conn, errors.New("sshd: certificate signed by unrecognized authority"))
 	}
 
-	allowed := s.principals(conn.User())
+	allowed := a.principals[conn.User()]
 	if len(allowed) == 0 {
 		return nil, s.deny(conn, fmt.Errorf("sshd: no access rules for user %q", conn.User()))
 	}
@@ -97,7 +104,7 @@ func (s *Server) publicKeyCallback(
 
 	// Built per auth so a new trust applies at once. CheckCert enforces critical options, validity and signature.
 	checker := ssh.CertChecker{
-		IsUserAuthority:          s.trustedCA,
+		IsUserAuthority:          trusted,
 		SupportedCriticalOptions: []string{"force-command", "source-address"},
 	}
 	if err := checker.CheckCert(matched, cert); err != nil {

@@ -12,15 +12,12 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
-
-	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
 func TestSignCertificate_UnspecifiedTypeIsUser(t *testing.T) {
 	ca := newTestCA(t)
 
-	cert, err := SignCertificate(ca, newTestKey(t), []string{"alice"}, "k", time.Hour,
-		0)
+	cert, err := SignCertificate(ca.row, ca.user, newTestKey(t), []string{"alice"}, "k", time.Hour, 0)
 	if err != nil {
 		t.Fatalf("SignCertificate() error: %v", err)
 	}
@@ -31,9 +28,6 @@ func TestSignCertificate_UnspecifiedTypeIsUser(t *testing.T) {
 
 func TestSignCertificate_Errors(t *testing.T) {
 	ca := newTestCA(t)
-	clientKey := newTestKey(t)
-
-	badCA := &db.SSHCA{PrivateKey: []byte("garbage")}
 
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 3072)
 	if err != nil {
@@ -46,18 +40,15 @@ func TestSignCertificate_Errors(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		ca      *db.SSHCA
 		pub     string
 		wantErr string
 	}{
-		{"invalid CA key", badCA, clientKey, "CA signer"},
-		{"invalid public key", ca, "not-a-key", "public key"},
-		{"RSA key", ca, rsaPub, "not accepted"},
+		{"invalid public key", "not-a-key", "public key"},
+		{"RSA key", rsaPub, "not accepted"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := SignCertificate(tt.ca, tt.pub, []string{"alice"}, "k", time.Hour,
-				ssh.UserCert)
+			_, err := SignCertificate(ca.row, ca.user, tt.pub, []string{"alice"}, "k", time.Hour, ssh.UserCert)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("error = %v, want containing %q", err, tt.wantErr)
 			}
@@ -118,7 +109,7 @@ func TestAcceptedKey(t *testing.T) {
 }
 
 func TestUserPermissions_Restrictions(t *testing.T) {
-	ca := newTestCA(t)
+	ca := newTestCA(t).row
 	if got := userPermissions(ca).CriticalOptions; len(got) != 0 {
 		t.Errorf("a CA without restrictions wrote %v", got)
 	}
@@ -154,7 +145,8 @@ func TestSignUserCertificate(t *testing.T) {
 	ca := newTestCA(t)
 
 	cert, err := SignCertificate(
-		ca,
+		ca.row,
+		ca.user,
 		newTestKey(t),
 		[]string{"user-123"},
 		"nokku:login:user:alice:user-123",
@@ -179,7 +171,7 @@ func TestSignUserCertificate(t *testing.T) {
 	if v := validity(cert); v < 24*time.Hour || v > 24*time.Hour+2*time.Minute {
 		t.Errorf("expected ~24h validity, got %v", v)
 	}
-	if err := checkCert(t, ca, cert, "user-123"); err != nil {
+	if err := checkCert(t, ca.row, cert, "user-123"); err != nil {
 		t.Fatalf("certificate failed verification: %v", err)
 	}
 }
@@ -188,7 +180,8 @@ func TestSignHostCertificate(t *testing.T) {
 	ca := newTestCA(t)
 
 	cert, err := SignCertificate(
-		ca,
+		ca.row,
+		ca.host,
 		newTestKey(t),
 		[]string{"target-123"},
 		"nokku:provision:daemon:d:d",
@@ -205,11 +198,11 @@ func TestSignHostCertificate(t *testing.T) {
 	if len(cert.Permissions.Extensions) != 0 {
 		t.Errorf("host certs must not carry user extensions: %v", cert.Permissions.Extensions)
 	}
-	// Host default TTL is 2160h (90 days)
+	// The host TTL is 2160h (90 days)
 	if v := validity(cert); v < 2160*time.Hour || v > 2160*time.Hour+2*time.Minute {
 		t.Errorf("expected ~2160h validity, got %v", v)
 	}
-	if err := checkCert(t, ca, cert, "target-123"); err != nil {
+	if err := checkCert(t, ca.row, cert, "target-123"); err != nil {
 		t.Fatalf("certificate failed verification: %v", err)
 	}
 }
@@ -218,7 +211,7 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 	ca := newTestCA(t)
 
 	// Negative TTL falls back to the default instead of expiring instantly
-	cert, err := SignCertificate(ca, newTestKey(t), []string{"u"}, "k", -time.Hour, 0)
+	cert, err := SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", -time.Hour, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +220,7 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 	}
 
 	// Over-max TTL falls back to the default
-	cert, err = SignCertificate(ca, newTestKey(t), []string{"u"}, "k", 1000*time.Hour, 0)
+	cert, err = SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 1000*time.Hour, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +229,7 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 	}
 
 	// In-bounds TTL is honored
-	cert, err = SignCertificate(ca, newTestKey(t), []string{"u"}, "k", 2*time.Hour, 0)
+	cert, err = SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 2*time.Hour, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,58 +238,14 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 	}
 }
 
-// A user certificate never vouches for a host, a host certificate never logs anyone in.
-func TestSignCertificateKeepsTheKeysApart(t *testing.T) {
-	ca := newTestCA(t)
-	swapped := *ca
-	swapped.PublicKey, swapped.HostPublicKey = ca.HostPublicKey, ca.PublicKey
-
-	user, err := SignCertificate(ca, newTestKey(t), []string{"u"}, "k", 0, ssh.UserCert)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if checkCert(t, &swapped, user, "u") == nil {
-		t.Error("a user certificate verified against the host key")
-	}
-	host, err := SignCertificate(ca, newTestKey(t), []string{"target-1"}, "k", 0, ssh.HostCert)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if checkCert(t, &swapped, host, "target-1") == nil {
-		t.Error("a host certificate verified against the user key")
-	}
-}
-
 // A certificate without principals is valid for every account, and OpenSSH reads at most 256.
 func TestSignCertificatePrincipalCount(t *testing.T) {
 	ca := newTestCA(t)
-	if _, err := SignCertificate(ca, newTestKey(t), nil, "k", 0, ssh.UserCert); err == nil {
+	if _, err := SignCertificate(ca.row, ca.user, newTestKey(t), nil, "k", 0, ssh.UserCert); err == nil {
 		t.Error("signed a certificate without principals")
 	}
-	if _, err := SignCertificate(ca, newTestKey(t), make([]string, maxPrincipals+1), "k", 0, ssh.UserCert); err == nil {
+	many := make([]string, maxPrincipals+1)
+	if _, err := SignCertificate(ca.row, ca.user, newTestKey(t), many, "k", 0, ssh.UserCert); err == nil {
 		t.Error("signed a certificate with more principals than OpenSSH reads")
-	}
-}
-
-func TestLoginPrincipal(t *testing.T) {
-	if got := LoginPrincipal("subject", "target", "root"); got != "subject@target:root" {
-		t.Errorf("LoginPrincipal = %q", got)
-	}
-}
-
-func TestParseLoginPrincipal(t *testing.T) {
-	subject := "0192d6a0-7c1e-7c3a-8f3b-6f2a9f0b1c2d"
-	target := "0192d6a0-7c1e-7c3a-8f3b-6f2a9f0b1c2e"
-	got, ok := ParseLoginPrincipal(LoginPrincipal(subject, target, "deploy"))
-	if !ok || got != (Principal{SubjectID: subject, TargetID: target, Username: "deploy"}) {
-		t.Errorf("ParseLoginPrincipal = %+v, %v", got, ok)
-	}
-	for _, bad := range []string{
-		"", "deploy", subject + "@" + target, subject + "@" + target + ":",
-		"root@" + target + ":deploy", subject + "@host:deploy",
-	} {
-		if _, ok := ParseLoginPrincipal(bad); ok {
-			t.Errorf("ParseLoginPrincipal(%q) accepted", bad)
-		}
 	}
 }

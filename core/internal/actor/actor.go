@@ -1,12 +1,19 @@
-// Package actor carries the request identity through contexts. It imports no sibling, so db can use it.
+// Package actor carries the request identity through contexts. Its one sibling import, realip, imports none, so
+// db can use it.
 package actor
 
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
+	"github.com/nokku-sh/nokku/core/internal/realip"
 )
+
+// maxUserAgent keeps a hostile header from bloating the rows that store it.
+const maxUserAgent = 512
 
 type Kind string
 
@@ -78,8 +85,20 @@ func SubjectFromContext(ctx context.Context) string {
 type RequestMeta struct {
 	Header     http.Header
 	RemoteAddr string
-	// TLS is about the connection to this server. A proxy in front reports its own in X-Forwarded-Proto.
-	TLS bool
+}
+
+// ClientIP is the client's address as stored, see [realip.Client].
+func (m RequestMeta) ClientIP() string {
+	return strings.ToValidUTF8(realip.Client(m.Header, m.RemoteAddr), "")
+}
+
+// UserAgent is the header as stored, valid UTF-8 and cut to 512 bytes.
+func (m RequestMeta) UserAgent() string {
+	ua := strings.ToValidUTF8(m.Header.Get("User-Agent"), "")
+	if len(ua) <= maxUserAgent {
+		return ua
+	}
+	return strings.ToValidUTF8(ua[:maxUserAgent], "")
 }
 
 type requestMetaKey struct{}

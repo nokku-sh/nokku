@@ -9,13 +9,47 @@ import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { WorkspaceRole } from "./access_pb";
 import { file_nokku_v1_access } from "./access_pb";
+import type { User } from "./account_pb";
+import { file_nokku_v1_account } from "./account_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/invitation.proto.
  */
 export const file_nokku_v1_invitation: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASKGAQoVR2V0SW52aXRhdGlvblJlc3BvbnNlEhYKDndvcmtzcGFjZV9uYW1lGAEgASgJEiUKBHJvbGUYAiABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wImEKF0FjY2VwdEludml0YXRpb25SZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABEhYKBG5hbWUYAiABKAlCCLpIBXIDGIACEhYKBWVtYWlsGAMgASgJQge6SARyAmABIhoKGEFjY2VwdEludml0YXRpb25SZXNwb25zZTLTAQoRSW52aXRhdGlvblNlcnZpY2USWwoNR2V0SW52aXRhdGlvbhIeLm5va2t1LnYxLkdldEludml0YXRpb25SZXF1ZXN0Gh8ubm9ra3UudjEuR2V0SW52aXRhdGlvblJlc3BvbnNlIgmQAgHC8xgCCAESYQoQQWNjZXB0SW52aXRhdGlvbhIhLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXF1ZXN0GiIubm9ra3UudjEuQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlIgbC8xgCCAFCkAEKDGNvbS5ub2trdS52MUIPSW52aXRhdGlvblByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9pbnZpdGF0aW9uLnByb3RvEghub2trdS52MSKiAQoKSW52aXRhdGlvbhINCgVlbWFpbBgBIAEoCRIlCgRyb2xlGAIgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIuChRHZXRJbnZpdGF0aW9uUmVxdWVzdBIWCgV0b2tlbhgBIAEoCUIHukgEcgIQASKVAQoVR2V0SW52aXRhdGlvblJlc3BvbnNlEhYKDndvcmtzcGFjZV9uYW1lGAEgASgJEiUKBHJvbGUYAiABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWVtYWlsGAQgASgJIksKF0FjY2VwdEludml0YXRpb25SZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAIiOAoYQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5ub2trdS52MS5Vc2VyImoKF0NyZWF0ZUludml0YXRpb25SZXF1ZXN0EhYKBWVtYWlsGAEgASgJQge6SARyAmABEjcKBHJvbGUYAiABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQhC6SA2CAQoYABgBGAIYAxgEIlIKGENyZWF0ZUludml0YXRpb25SZXNwb25zZRIoCgppbnZpdGF0aW9uGAEgASgLMhQubm9ra3UudjEuSW52aXRhdGlvbhIMCgRsaW5rGAIgASgJIhgKFkxpc3RJbnZpdGF0aW9uc1JlcXVlc3QiRAoXTGlzdEludml0YXRpb25zUmVzcG9uc2USKQoLaW52aXRhdGlvbnMYASADKAsyFC5ub2trdS52MS5JbnZpdGF0aW9uIjEKF0RlbGV0ZUludml0YXRpb25SZXF1ZXN0EhYKBWVtYWlsGAEgASgJQge6SARyAmABIhoKGERlbGV0ZUludml0YXRpb25SZXNwb25zZTL+AwoRSW52aXRhdGlvblNlcnZpY2USWwoNR2V0SW52aXRhdGlvbhIeLm5va2t1LnYxLkdldEludml0YXRpb25SZXF1ZXN0Gh8ubm9ra3UudjEuR2V0SW52aXRhdGlvblJlc3BvbnNlIgmQAgHC8xgCCAESYQoQQWNjZXB0SW52aXRhdGlvbhIhLm5va2t1LnYxLkFjY2VwdEludml0YXRpb25SZXF1ZXN0GiIubm9ra3UudjEuQWNjZXB0SW52aXRhdGlvblJlc3BvbnNlIgbC8xgCCAESYwoQQ3JlYXRlSW52aXRhdGlvbhIhLm5va2t1LnYxLkNyZWF0ZUludml0YXRpb25SZXF1ZXN0GiIubm9ra3UudjEuQ3JlYXRlSW52aXRhdGlvblJlc3BvbnNlIgjC8xgEGAQwARJhCg9MaXN0SW52aXRhdGlvbnMSIC5ub2trdS52MS5MaXN0SW52aXRhdGlvbnNSZXF1ZXN0GiEubm9ra3UudjEuTGlzdEludml0YXRpb25zUmVzcG9uc2UiCZACAcLzGAIYBBJhChBEZWxldGVJbnZpdGF0aW9uEiEubm9ra3UudjEuRGVsZXRlSW52aXRhdGlvblJlcXVlc3QaIi5ub2trdS52MS5EZWxldGVJbnZpdGF0aW9uUmVzcG9uc2UiBsLzGAIYBEKQAQoMY29tLm5va2t1LnYxQg9JbnZpdGF0aW9uUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account]);
+
+/**
+ * @generated from message nokku.v1.Invitation
+ */
+export type Invitation = Message<"nokku.v1.Invitation"> & {
+  /**
+   * @generated from field: string email = 1;
+   */
+  email: string;
+
+  /**
+   * @generated from field: nokku.v1.WorkspaceRole role = 2;
+   */
+  role: WorkspaceRole;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 3;
+   */
+  expiresAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 4;
+   */
+  createdAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.Invitation.
+ * Use `create(InvitationSchema)` to create a new message.
+ */
+export const InvitationSchema: GenMessage<Invitation> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 0);
 
 /**
  * @generated from message nokku.v1.GetInvitationRequest
@@ -32,7 +66,7 @@ export type GetInvitationRequest = Message<"nokku.v1.GetInvitationRequest"> & {
  * Use `create(GetInvitationRequestSchema)` to create a new message.
  */
 export const GetInvitationRequestSchema: GenMessage<GetInvitationRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_invitation, 0);
+  messageDesc(file_nokku_v1_invitation, 1);
 
 /**
  * @generated from message nokku.v1.GetInvitationResponse
@@ -52,6 +86,11 @@ export type GetInvitationResponse = Message<"nokku.v1.GetInvitationResponse"> & 
    * @generated from field: google.protobuf.Timestamp expires_at = 3;
    */
   expiresAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string email = 4;
+   */
+  email: string;
 };
 
 /**
@@ -59,7 +98,7 @@ export type GetInvitationResponse = Message<"nokku.v1.GetInvitationResponse"> & 
  * Use `create(GetInvitationResponseSchema)` to create a new message.
  */
 export const GetInvitationResponseSchema: GenMessage<GetInvitationResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_invitation, 1);
+  messageDesc(file_nokku_v1_invitation, 2);
 
 /**
  * @generated from message nokku.v1.AcceptInvitationRequest
@@ -74,11 +113,6 @@ export type AcceptInvitationRequest = Message<"nokku.v1.AcceptInvitationRequest"
    * @generated from field: string name = 2;
    */
   name: string;
-
-  /**
-   * @generated from field: string email = 3;
-   */
-  email: string;
 };
 
 /**
@@ -86,12 +120,16 @@ export type AcceptInvitationRequest = Message<"nokku.v1.AcceptInvitationRequest"
  * Use `create(AcceptInvitationRequestSchema)` to create a new message.
  */
 export const AcceptInvitationRequestSchema: GenMessage<AcceptInvitationRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_invitation, 2);
+  messageDesc(file_nokku_v1_invitation, 3);
 
 /**
  * @generated from message nokku.v1.AcceptInvitationResponse
  */
 export type AcceptInvitationResponse = Message<"nokku.v1.AcceptInvitationResponse"> & {
+  /**
+   * @generated from field: nokku.v1.User user = 1;
+   */
+  user?: User | undefined;
 };
 
 /**
@@ -99,9 +137,119 @@ export type AcceptInvitationResponse = Message<"nokku.v1.AcceptInvitationRespons
  * Use `create(AcceptInvitationResponseSchema)` to create a new message.
  */
 export const AcceptInvitationResponseSchema: GenMessage<AcceptInvitationResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_invitation, 3);
+  messageDesc(file_nokku_v1_invitation, 4);
 
 /**
+ * @generated from message nokku.v1.CreateInvitationRequest
+ */
+export type CreateInvitationRequest = Message<"nokku.v1.CreateInvitationRequest"> & {
+  /**
+   * @generated from field: string email = 1;
+   */
+  email: string;
+
+  /**
+   * No role is a member. The owner is never invited.
+   *
+   * @generated from field: nokku.v1.WorkspaceRole role = 2;
+   */
+  role: WorkspaceRole;
+};
+
+/**
+ * Describes the message nokku.v1.CreateInvitationRequest.
+ * Use `create(CreateInvitationRequestSchema)` to create a new message.
+ */
+export const CreateInvitationRequestSchema: GenMessage<CreateInvitationRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 5);
+
+/**
+ * @generated from message nokku.v1.CreateInvitationResponse
+ */
+export type CreateInvitationResponse = Message<"nokku.v1.CreateInvitationResponse"> & {
+  /**
+   * @generated from field: nokku.v1.Invitation invitation = 1;
+   */
+  invitation?: Invitation | undefined;
+
+  /**
+   * Set only when the server sends no mail.
+   *
+   * @generated from field: string link = 2;
+   */
+  link: string;
+};
+
+/**
+ * Describes the message nokku.v1.CreateInvitationResponse.
+ * Use `create(CreateInvitationResponseSchema)` to create a new message.
+ */
+export const CreateInvitationResponseSchema: GenMessage<CreateInvitationResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 6);
+
+/**
+ * @generated from message nokku.v1.ListInvitationsRequest
+ */
+export type ListInvitationsRequest = Message<"nokku.v1.ListInvitationsRequest"> & {
+};
+
+/**
+ * Describes the message nokku.v1.ListInvitationsRequest.
+ * Use `create(ListInvitationsRequestSchema)` to create a new message.
+ */
+export const ListInvitationsRequestSchema: GenMessage<ListInvitationsRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 7);
+
+/**
+ * @generated from message nokku.v1.ListInvitationsResponse
+ */
+export type ListInvitationsResponse = Message<"nokku.v1.ListInvitationsResponse"> & {
+  /**
+   * @generated from field: repeated nokku.v1.Invitation invitations = 1;
+   */
+  invitations: Invitation[];
+};
+
+/**
+ * Describes the message nokku.v1.ListInvitationsResponse.
+ * Use `create(ListInvitationsResponseSchema)` to create a new message.
+ */
+export const ListInvitationsResponseSchema: GenMessage<ListInvitationsResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 8);
+
+/**
+ * @generated from message nokku.v1.DeleteInvitationRequest
+ */
+export type DeleteInvitationRequest = Message<"nokku.v1.DeleteInvitationRequest"> & {
+  /**
+   * @generated from field: string email = 1;
+   */
+  email: string;
+};
+
+/**
+ * Describes the message nokku.v1.DeleteInvitationRequest.
+ * Use `create(DeleteInvitationRequestSchema)` to create a new message.
+ */
+export const DeleteInvitationRequestSchema: GenMessage<DeleteInvitationRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 9);
+
+/**
+ * @generated from message nokku.v1.DeleteInvitationResponse
+ */
+export type DeleteInvitationResponse = Message<"nokku.v1.DeleteInvitationResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.DeleteInvitationResponse.
+ * Use `create(DeleteInvitationResponseSchema)` to create a new message.
+ */
+export const DeleteInvitationResponseSchema: GenMessage<DeleteInvitationResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_invitation, 10);
+
+/**
+ * An invite names one address and one role, and works once. Only Join spends it, opening the link does not.
+ *
  * @generated from service nokku.v1.InvitationService
  */
 export const InvitationService: GenService<{
@@ -120,6 +268,30 @@ export const InvitationService: GenService<{
     methodKind: "unary";
     input: typeof AcceptInvitationRequestSchema;
     output: typeof AcceptInvitationResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.InvitationService.CreateInvitation
+   */
+  createInvitation: {
+    methodKind: "unary";
+    input: typeof CreateInvitationRequestSchema;
+    output: typeof CreateInvitationResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.InvitationService.ListInvitations
+   */
+  listInvitations: {
+    methodKind: "unary";
+    input: typeof ListInvitationsRequestSchema;
+    output: typeof ListInvitationsResponseSchema;
+  },
+  /**
+   * @generated from rpc nokku.v1.InvitationService.DeleteInvitation
+   */
+  deleteInvitation: {
+    methodKind: "unary";
+    input: typeof DeleteInvitationRequestSchema;
+    output: typeof DeleteInvitationResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_invitation, 0);

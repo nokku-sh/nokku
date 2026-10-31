@@ -22,7 +22,7 @@ func agentForwardedSession(t *testing.T, ca testCA) *ssh.Session {
 	addr, closeFn := startTestServerOpts(
 		t,
 		ca,
-		Options{Policy: Policy{AllowAgentForwarding: true}},
+		withPolicy(Policy{AllowAgentForwarding: true}),
 	)
 	t.Cleanup(closeFn)
 
@@ -144,7 +144,7 @@ func TestServerAgentForwardingInterop(t *testing.T) {
 	addr, closeFn := startTestServerOpts(
 		t,
 		ca,
-		Options{Policy: Policy{AllowAgentForwarding: true}},
+		withPolicy(Policy{AllowAgentForwarding: true}),
 	)
 	defer closeFn()
 	host, port := hostPort(t, addr)

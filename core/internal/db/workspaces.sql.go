@@ -51,27 +51,16 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParam
 	return &i, err
 }
 
-const deleteWorkspace = `-- name: DeleteWorkspace :execrows
-DELETE FROM workspaces w
+const deleteWorkspace = `-- name: DeleteWorkspace :exec
+DELETE FROM workspaces
 WHERE
-  w.id = $1
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      legal_holds h
-    WHERE
-      h.workspace_id = $1
-  )
+  id = $1
 `
 
-// Names the workspace, the purge of unclaimed signups runs as nokku_system. A legal hold keeps it, 0 rows says so.
-func (q *Queries) DeleteWorkspace(ctx context.Context, workspaceID string) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteWorkspace, workspaceID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// Names the workspace, the purge of unclaimed signups runs as nokku_system.
+func (q *Queries) DeleteWorkspace(ctx context.Context, workspaceID string) error {
+	_, err := q.db.Exec(ctx, deleteWorkspace, workspaceID)
+	return err
 }
 
 const getFirstWorkspace = `-- name: GetFirstWorkspace :one

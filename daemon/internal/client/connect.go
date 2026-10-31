@@ -48,7 +48,7 @@ func (c *Client) sendHeartbeats(ctx context.Context, stream nokkuv1connect.Daemo
 	t := time.NewTicker(heartbeatInterval)
 	defer t.Stop()
 	for {
-		version := c.cache.GetStateVersion()
+		version := c.state.SavedVersion()
 		err := stream.Send(&nokkuv1.ConnectRequest{
 			Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{StateVersion: &version}},
 		})

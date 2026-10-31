@@ -56,12 +56,7 @@
 
 		const chunks: Uint8Array[] = [];
 		try {
-			await recordings.stream(
-				recording.id,
-				() => {},
-				(chunk) => chunks.push(chunk),
-				abortCtrl.signal
-			);
+			await recordings.stream(recording.id, (chunk) => chunks.push(chunk), abortCtrl.signal);
 		} catch (err) {
 			if (abortCtrl.signal.aborted) return;
 			playState = 'error';

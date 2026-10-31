@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/egress"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
@@ -18,6 +19,7 @@ const (
 
 type Service struct {
 	conn         *db.Connection
+	keys         *kms.Keyset
 	entitlements *entitlement.Service
 	// egress reaches the stream destinations a workspace chose.
 	egress *http.Client
@@ -25,13 +27,18 @@ type Service struct {
 	sending sync.Map
 }
 
-func New(ctx context.Context, conn *db.Connection, entitlements *entitlement.Service) (*Service, error) {
+func New(
+	ctx context.Context,
+	conn *db.Connection,
+	keys *kms.Keyset,
+	entitlements *entitlement.Service,
+) (*Service, error) {
 	client, err := egress.NewClient(streamTimeout)
 	if err != nil {
 		return nil, err
 	}
 	client.CheckRedirect = refuseRedirect
-	s := &Service{conn: conn, entitlements: entitlements, egress: client}
+	s := &Service{conn: conn, keys: keys, entitlements: entitlements, egress: client}
 	go s.runBackgroundJobs(ctx)
 	go s.streamLoop(ctx)
 	return s, nil

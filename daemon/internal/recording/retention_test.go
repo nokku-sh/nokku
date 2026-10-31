@@ -3,6 +3,7 @@ package recording
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -25,14 +26,17 @@ func TestEnforceRetention(t *testing.T) {
 		must.NoError(os.Chtimes(path, mod, mod))
 	}
 	write("expired.cast.gz", 1, maxAge+time.Hour)
+	write("expired.part", 1, maxAge+time.Hour)
 	write("oldest.cast.gz", maxTotalSpace/2+1, 3*time.Hour)
 	write("older.cast.gz", maxTotalSpace/2+1, 2*time.Hour)
-	write("newest.cast.gz", 1, time.Hour)
+	write("newest.part", 1, time.Hour)
 	write("notes.txt", 1, maxAge+time.Hour)
-	write("active.cast.gz", 1, maxAge+time.Hour)
-	activePath := filepath.Join(dir, "active.cast.gz")
-	active.Store(activePath, struct{}{})
-	t.Cleanup(func() { active.Delete(activePath) })
+	write("written.part", 1, maxAge+time.Hour)
+	// The lock a recorder holds while it writes.
+	f, err := os.Open(filepath.Join(dir, "written.part"))
+	must.NoError(err)
+	defer f.Close()
+	must.NoError(syscall.Flock(int(f.Fd()), syscall.LOCK_EX))
 
 	must.NoError(enforceRetention())
 
@@ -42,5 +46,5 @@ func TestEnforceRetention(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	is.Equal([]string{"active.cast.gz", "newest.cast.gz", "notes.txt", "older.cast.gz"}, names)
+	is.Equal([]string{"newest.part", "notes.txt", "older.cast.gz", "written.part"}, names)
 }

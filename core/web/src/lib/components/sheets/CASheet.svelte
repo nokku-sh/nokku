@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { ca as caApi } from '#lib/api/certificates.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import SignModal from '#lib/components/modals/SignModal.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
-	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
@@ -24,10 +22,8 @@
 		History,
 		Info,
 		KeyRound,
-		PenLine,
 		Server,
-		Settings2,
-		ShieldOff
+		Settings2
 	} from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
@@ -45,39 +41,18 @@
 	const remove = caApi.delete();
 	const rollover = caApi.rollover();
 
-	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
+	const autoSave = useAutoSave(() =>
+		draft.save((changes) => update.mutateAsync({ ...changes, id: model?.id }))
+	);
 	const save = () => autoSave.save();
 
-	// Turning a CA off stops new logins it signs, so that direction asks first.
-	function setActive(on: boolean) {
-		if (!model) return;
-		if (on) {
-			model.isActive = true;
-			save();
-			return;
-		}
-		void confirm({
-			title: `Turn off ${model.name}?`,
-			description: 'It signs no new certificates until you turn it back on.',
-			confirmText: 'Turn off',
-			onConfirm: () => {
-				if (!model) return;
-				model.isActive = false;
-				save();
-			}
-		});
-	}
-
-	let signOpen = $state(false);
-
 	const lifetimes: {
-		key: 'userDefaultTtl' | 'userMaxTtl' | 'hostDefaultTtl' | 'hostMaxTtl';
+		key: 'userDefaultTtl' | 'userMaxTtl' | 'hostTtl';
 		label: string;
 	}[] = [
 		{ key: 'userDefaultTtl', label: 'Default' },
 		{ key: 'userMaxTtl', label: 'Longest allowed' },
-		{ key: 'hostDefaultTtl', label: 'Default' },
-		{ key: 'hostMaxTtl', label: 'Longest allowed' }
+		{ key: 'hostTtl', label: 'Valid for' }
 	];
 
 	function setLifetime(key: (typeof lifetimes)[number]['key'], value: Duration) {
@@ -86,13 +61,14 @@
 		save();
 	}
 
-	// A planned rotation keeps the old keys trusted for as long as a user certificate can live, so nobody is cut off.
+	// A planned rotation keeps the old keys trusted for as long as a user certificate can live. Only daemons learn the
+	// new keys on their own.
 	function askRotate() {
 		if (!entity) return;
 		void confirm({
 			title: `Rotate the keys of ${entity.name}?`,
 			description:
-				'New keys replace both. The old ones stay trusted until the certificates they signed run out, so nobody is cut off. Run nk sync on servers without the daemon before then.',
+				'New keys replace both. Servers with the daemon take them at once, and certificates already signed keep working until they run out. A server set up with nk sync refuses new certificates until you run nk sync on it again.',
 			confirmText: 'Rotate',
 			onConfirm: () => rollover.mutateAsync({ id: entity.id, revokePrevious: false })
 		});
@@ -123,10 +99,6 @@
 		});
 	}
 </script>
-
-{#if entity}
-	<SignModal bind:open={signOpen} ca={entity} />
-{/if}
 
 <EntitySheet
 	open={sheet.open}
@@ -162,16 +134,6 @@
 		{#if model?.isDefault}
 			<Badge variant="muted">Default</Badge>
 		{/if}
-		{#if model && !model.isActive}
-			<Badge variant="muted"><ShieldOff data-icon="inline-start" />Inactive</Badge>
-		{/if}
-	{/snippet}
-
-	{#snippet actions()}
-		<Button size="sm" onclick={() => (signOpen = true)}>
-			<PenLine data-icon="inline-start" />
-			Sign a certificate
-		</Button>
 	{/snippet}
 
 	{#if model && entity}
@@ -245,17 +207,6 @@
 								model.isDefault = v;
 								save();
 							}}
-						/>
-					</Field.Field>
-					<Field.Field orientation="horizontal">
-						<Field.Content>
-							<Field.Label for="ca-active">Active</Field.Label>
-							<Field.Description>An inactive CA signs no new certificates.</Field.Description>
-						</Field.Content>
-						<Switch
-							id="ca-active"
-							bind:checked={() => model.isActive, setActive}
-							disabled={!can.edit}
 						/>
 					</Field.Field>
 				</Field.Group>
@@ -338,7 +289,7 @@
 							{
 								title: 'Rotate keys',
 								description:
-									'Replace both keys. The old ones stay trusted for a while, nobody is cut off.',
+									'Replace both keys. Daemons take the new ones at once, run nk sync on the other servers.',
 								label: 'Rotate',
 								onClick: askRotate
 							},

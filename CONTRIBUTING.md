@@ -50,8 +50,16 @@ migration. A key that no longer loads means every machine re-enrolls.
 
 ## The core
 
-Set `NOKKU_SECRET` to any 32 characters or more. The database defaults already
-match the dev PostgreSQL. Then, in `core/`:
+In `core/`, set `NOKKU_SECRET` to any 32 characters or more, or use the dev
+Vault's transit key, which `task dev` creates:
+
+```bash
+export KMS_URI="hcvault://localhost:8200/transit/keys/nokku"
+export VAULT_CACERT="$PWD/data/vault/vault-ca.pem"
+export VAULT_TOKEN="root"
+```
+
+The database defaults already match the dev PostgreSQL. Then run:
 
 ```bash
 task dev
@@ -60,7 +68,8 @@ task dev
 This starts the containers of `compose.dev.yml`, then the backend
 (`go run ./cmd/nokku`) and the `web` frontend via Vite, and seeds the users to
 sign in as (see below). Every container keeps its data in memory,
-`task dev:reset` wipes them all and runs `task dev` again.
+`task dev:reset` wipes them all and runs `task dev` again. Do that too if Vault
+restarts on its own, its new key can't open the keyset in PostgreSQL.
 
 Open `http://localhost:3000`, the backend's address. The backend takes
 the UI from Vite (the `backend` task sets `NOKKU_DEV_UI` for it), so edits
@@ -69,12 +78,6 @@ install has. Leave `NOKKU_BASE_URL` unset.
 
 Without `NOKKU_DEV_UI`, as in a plain `go run ./cmd/nokku`, the backend serves
 the UI that was built into the binary.
-
-To work on the built-in TLS, give this machine a name, like a line
-`127.0.0.1 nokku.test` in `/etc/hosts`, and set `NOKKU_BASE_URL=nokku.test:3000`.
-The app is then on `https://nokku.test:3000`. Run
-`nk --api https://nokku.test:3000 --pin ... login` once with the pin from the
-start log, it installs the CA for your browser.
 
 ### Users to sign in as
 
@@ -141,6 +144,14 @@ that need PostgreSQL, Keycloak or Vault live in `core/internal/integration`
 behind the `integration` build tag and start their own containers, so nothing
 has to run on your machine first. The TPM tests in `internal/tpm` run against
 the go-tpm simulator and skip when it cannot start. CI runs all of them.
+
+`task smoke` is the end-to-end check, and it needs Docker. It builds the real
+`nokku`, `nk` and `nokkud`, the daemon into a local `nokkud:smoke` image, and
+starts its own Postgres and Mailpit on random ports. Then it walks one owner
+through it all: the admin link, a daemon that enrolls, `nk login`, ssh direct
+and through the relay, the web terminal, the recordings, a revoke that ends a
+live session, and the audit log. nk and ssh run in a HOME of their own, so
+your `~/.ssh`, `~/.config/nk` and ssh agent stay untouched.
 
 Please add tests for new behavior and keep the existing suite green.
 Database-backed changes should include the relevant migration and regenerate

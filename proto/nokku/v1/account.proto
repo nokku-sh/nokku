@@ -3,6 +3,8 @@ edition = "2023";
 package nokku.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
@@ -14,12 +16,14 @@ service AccountService {
   rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
     option (access) = {self: true};
   }
-  // SetAvatar stores a picture of one's own. An empty image removes it.
   rpc SetAvatar(SetAvatarRequest) returns (SetAvatarResponse) {
     option (access) = {self: true};
   }
   rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      fresh: true
+    };
   }
   rpc ListCredentials(ListCredentialsRequest) returns (ListCredentialsResponse) {
     option (access) = {self: true};
@@ -76,6 +80,8 @@ message AccountSession {
   bool current = 7;
   google.protobuf.Timestamp expires_at = 8;
   google.protobuf.Timestamp last_seen_at = 9;
+  // How long this session can still make calls marked fresh, zero once it can't.
+  google.protobuf.Duration fresh_for = 10;
 }
 
 message GetAccountRequest {}
@@ -84,16 +90,19 @@ message GetAccountResponse {
 }
 
 message UpdateAccountRequest {
-  reserved 2;
-
   string name = 1 [(buf.validate.field).string.max_len = 256];
+  google.protobuf.FieldMask update_mask = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).field_mask = {
+      in: ["name"]
+    }
+  ];
 }
 message UpdateAccountResponse {
   User user = 1;
 }
 
 message SetAvatarRequest {
-  // A JPEG, PNG or GIF. The server crops it to a square and keeps 128px.
   bytes image = 1 [(buf.validate.field).bytes.max_len = 2097152];
 }
 message SetAvatarResponse {

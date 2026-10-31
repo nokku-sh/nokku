@@ -10,20 +10,16 @@ import (
 	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
+
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
-// skipPrefixes are reads, polling syncs, and long-lived streams.
-var skipPrefixes = []string{
-	"Get", "List", "Whoami", "Subscribe", "Sync", "Connect", "Relay", "DaemonRelay",
-}
-
-// Both are stored before the request is validated.
 const (
-	maxTarget    = 256
-	maxUserAgent = 512
+	// maxTarget is stored before the request is validated.
+	maxTarget = 256
 	// auditWriteTimeout bounds what a slow database adds to a request.
 	auditWriteTimeout = 10 * time.Second
 )
@@ -47,10 +43,11 @@ func Set(ctx context.Context, key string, value any) {
 // Intercept records every call that changes something. It sits outside authorization so denied calls are recorded too.
 func (s *Service) Intercept(next connect.ServerFunc) connect.ServerFunc {
 	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
-		e := newEvent(spec.Procedure)
-		if e == nil {
+		if !Records(spec.Schema) {
 			return next(ctx, spec, stream)
 		}
+		_, method, _ := strings.Cut(strings.TrimPrefix(spec.Procedure, "/"), "/")
+		e := &Event{Action: method, Details: map[string]any{}}
 		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
 		// A stream may still receive after the handler returned, only a unary request names the target.
 		if spec.StreamType == connect.StreamTypeUnary {
@@ -79,14 +76,18 @@ func (t *targetStream) Receive(msg any) error {
 	return nil
 }
 
-func newEvent(procedure string) *Event {
-	_, method, _ := strings.Cut(strings.TrimPrefix(procedure, "/"), "/")
-	for _, prefix := range skipPrefixes {
-		if strings.HasPrefix(method, prefix) {
-			return nil
-		}
+// Records says whether the log keeps a call: all but the ones its proto marks read-only or quiet. A call without a
+// schema is kept.
+func Records(schema any) bool {
+	md, ok := schema.(protoreflect.MethodDescriptor)
+	if !ok {
+		return true
 	}
-	return &Event{Action: method, Details: map[string]any{}}
+	if opts, _ := md.Options().(*descriptorpb.MethodOptions); opts.GetIdempotencyLevel() == descriptorpb.MethodOptions_NO_SIDE_EFFECTS {
+		return false
+	}
+	access, _ := proto.GetExtension(md.Options(), nokkuv1.E_Access).(*nokkuv1.Access)
+	return !access.GetQuiet()
 }
 
 // Log is for work the interceptor cannot see, like a relay opening.
@@ -105,8 +106,8 @@ func (s *Service) Record(ctx context.Context, e *Event) {
 	}
 	e.Timestamp = time.Now().UTC()
 	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
-		e.IP = strings.ToValidUTF8(realip.Bucket(meta.Header, meta.RemoteAddr), "")
-		e.UserAgent = cut(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
+		e.IP = meta.ClientIP()
+		e.UserAgent = meta.UserAgent()
 	}
 
 	s.write(ctx, e)
@@ -121,8 +122,8 @@ func (s *Service) finish(ctx context.Context, e *Event, err error) {
 	e.Timestamp = time.Now().UTC()
 	e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), cmp.Or(p.Email, p.Name)
 	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
-		e.IP = strings.ToValidUTF8(realip.Bucket(meta.Header, meta.RemoteAddr), "")
-		e.UserAgent = cut(strings.ToValidUTF8(meta.Header.Get("User-Agent"), ""), maxUserAgent)
+		e.IP = meta.ClientIP()
+		e.UserAgent = meta.UserAgent()
 	}
 	e.OK = err == nil
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/coder/websocket"
+	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
@@ -19,6 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/realip"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 const (
@@ -82,10 +84,14 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		return
 	}
 	var ca *db.SSHCA
+	var signer gossh.Signer
 	var targetID string
 	if err := t.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		ca, err = q.GetCAByDaemonID(ctx, &ticket.DaemonID)
 		if err != nil {
+			return err
+		}
+		if signer, err = ssh.CASigner(ctx, q, t.cfg.Keyset, ca.ID, gossh.UserCert); err != nil {
 			return err
 		}
 		target, err := q.GetTargetByDaemon(ctx, &ticket.DaemonID)
@@ -120,17 +126,15 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		Username:      ticket.Username,
 		UserID:        ticket.UserID,
 		CA:            ca,
+		CASigner:      signer,
 		HostPrincipal: targetID,
 		ClientAddr:    realip.Client(r.Header, r.RemoteAddr),
 	})
 	if err != nil {
 		logger.Warn("web session failed to start", "error", err)
 		reason := "could not reach the server"
-		switch {
-		case errors.Is(err, daemon.ErrRelayLimit):
+		if errors.Is(err, daemon.ErrRelayLimit) {
 			reason = "too many concurrent sessions"
-		case errors.Is(err, daemon.ErrCAInactive):
-			reason = "certificate authority is not active"
 		}
 		_ = conn.Close(websocket.StatusInternalError, reason)
 		return

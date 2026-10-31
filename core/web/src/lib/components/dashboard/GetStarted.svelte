@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { auth } from '#lib/api/auth.svelte.js';
+	import { auth, whenFresh } from '#lib/api/auth.svelte.js';
 	import { session } from '#lib/api/session.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
@@ -78,7 +78,7 @@
 			</ol>
 			<CodeSnippet code="sudo nokkud enroll" language="bash" />
 			{#if can.admin}
-				<Button class="self-start" onclick={() => (enrollOpen = true)}>
+				<Button class="self-start" onclick={() => whenFresh(() => (enrollOpen = true))}>
 					<Rocket data-icon="inline-start" />
 					Create enrollment token
 				</Button>
@@ -103,8 +103,12 @@
 	<p class="text-sm text-muted-foreground">
 		Grant access per server account, to people or whole teams.
 	</p>
-	{#if can.admin && options.data?.magicLink}
-		<Button variant="outline" class="self-start" onclick={() => (inviteOpen = true)}>
+	{#if can.admin && options.data?.passkey}
+		<Button
+			variant="outline"
+			class="self-start"
+			onclick={() => whenFresh(() => (inviteOpen = true))}
+		>
 			<UserPlus data-icon="inline-start" />
 			Invite people
 		</Button>

@@ -19,7 +19,6 @@ const (
 var (
 	ErrRelayLimit       = errors.New("relay limit reached")
 	errRelayUnavailable = errors.New("relay unavailable")
-	ErrCAInactive       = errors.New("certificate authority is not active")
 )
 
 // Relay bridges the daemon's DaemonRelay stream and the user's Relay stream.

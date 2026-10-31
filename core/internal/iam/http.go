@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -60,7 +61,7 @@ func (s *Service) cookieValue(h http.Header, name string) string {
 // Middleware attaches a cookie session's principal and continues either way. Header tokens belong to connect.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, tok, err := s.AuthenticateToken(r.Context(), s.cookieValue(r.Header, sessionCookieName))
+		p, tok, err := s.AuthenticateToken(r.Context(), s.cookieValue(r.Header, sessionCookieName), crypto.TokenSession)
 		if err != nil || p.Kind != actor.KindUser {
 			next.ServeHTTP(w, r)
 			return
@@ -80,6 +81,28 @@ func (s *Service) RequireLogin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := actor.PrincipalFromContext(r.Context()); !ok {
 			writeError(w, http.StatusUnauthorized, "sign in to continue")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireFresh guards a route that adds a way in, so a stolen cookie cannot become a lasting one. A GET is taken
+// only from the app itself, the Lax cookie rides on any navigation and an old session ends here.
+func (s *Service) RequireFresh(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (r.Method == http.MethodGet || r.Method == http.MethodHead) &&
+			r.Header.Get("Sec-Fetch-Site") != "same-origin" {
+			writeError(w, http.StatusForbidden, "open this from the app")
+			return
+		}
+		if err := s.RequireRecentSignIn(r.Context()); err != nil {
+			http.SetCookie(w, s.ClearSessionCookie())
+			if r.Method == http.MethodGet {
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+			writeError(w, http.StatusUnauthorized, "sign in again to continue")
 			return
 		}
 		next.ServeHTTP(w, r)

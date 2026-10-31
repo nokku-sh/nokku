@@ -7,6 +7,9 @@ import { returnTo } from '#lib/store.svelte.js';
 import { connection } from './connection.svelte';
 import { formatConnectError } from './error-formatter';
 
+// LIVE is how often a view that shows live state, like who is online or waiting, asks again on the tab in front.
+export const LIVE = 15_000;
+
 // The id keeps a failing poll from stacking the same toast.
 function toastError(error: ConnectError) {
 	const { title, description } = formatConnectError(error);
@@ -22,8 +25,9 @@ export const queryClient = new QueryClient({
 			refetchOnReconnect: true,
 			refetchOnWindowFocus: true,
 			refetchIntervalInBackground: false,
-			// What other people change shows up within this, on the tab in front.
-			refetchInterval: 15_000
+			// Only the views that show live state poll, see LIVE. During an outage every query retries, so the page
+			// comes back by itself.
+			refetchInterval: () => (connection.down ? LIVE : false)
 		},
 		mutations: {
 			retry: false
@@ -40,8 +44,10 @@ export const queryClient = new QueryClient({
 			// ConnectionBanner says it once, a poll would say it every 15 seconds.
 			if (connection.failed(error)) return;
 
-			// The account layer bounces to /login itself.
-			if (error.code === Code.Unauthenticated) return;
+			if (error.code === Code.Unauthenticated) {
+				handleSessionExpired();
+				return;
+			}
 
 			// Views render missing entities themselves (deleted subjects, stale links).
 			if (error.code === Code.NotFound) return;
@@ -63,7 +69,11 @@ export const queryClient = new QueryClient({
 		},
 		onError: (error) => {
 			if (!(error instanceof ConnectError)) return;
-			if (error.code === Code.Unauthenticated) return;
+			// A step-up call ends an old session, sign in again lands back on this page.
+			if (error.code === Code.Unauthenticated) {
+				handleSessionExpired();
+				return;
+			}
 			if (connection.failed(error)) {
 				toast.error("Can't reach Nokku", {
 					description: 'The change may not have gone through. Check once it is back.',
@@ -87,10 +97,11 @@ export function leave(path = '/login') {
 	window.location.assign(path);
 }
 
-export function handleSessionExpired() {
+// back is where signing in again lands, this page by default.
+export function handleSessionExpired(back?: string) {
 	if (!browser || publicPaths.some((p) => window.location.pathname.startsWith(p))) return;
 
-	const path = window.location.pathname + window.location.search;
+	const path = back ?? window.location.pathname + window.location.search;
 	returnTo.current = path === '/' ? null : { path, at: Date.now() };
 	leave();
 }

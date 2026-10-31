@@ -135,8 +135,6 @@ export const areas: Area[] = [
 			'DeleteSSOProvider',
 			'CreateSCIMToken',
 			'DeleteSCIMToken',
-			'CreateLegalHold',
-			'DeleteLegalHold',
 			'CreateAuditStream',
 			'UpdateAuditStream',
 			'DeleteAuditStream',
@@ -203,9 +201,7 @@ const labels: Record<string, string> = {
 	CancelAccessRequest: 'Cancelled a request',
 	AccessRequestExpired: 'Request expired',
 	SetRequestableTags: 'Changed requestable servers',
-	ExportAccessReport: 'Exported the access report',
-	CreateLegalHold: 'Placed a legal hold',
-	DeleteLegalHold: 'Released a legal hold'
+	ExportAccessReport: 'Exported the access report'
 };
 
 /** "DeleteTarget" reads as "Delete target". */

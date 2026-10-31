@@ -1,125 +1,47 @@
 package crypto
 
 import (
-	"errors"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestNewToken_NoID(t *testing.T) {
-	tok := NewToken("")
-	if tok.ID != "" {
-		t.Errorf("ID = %q, want empty", tok.ID)
-	}
-
-	// A bare token is a bare secret: Parse returns it as the Secret.
-	parsed, err := Parse(tok.Plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if parsed.Secret != tok.Plaintext || parsed.ID != "" {
-		t.Errorf("Parse() = %+v, want bare secret", parsed)
-	}
-	if tok.Hash != HashToken(tok.Plaintext) {
-		t.Error("hash does not match the plaintext")
-	}
+var allKinds = []TokenKind{
+	TokenSession, TokenCLI, TokenDaemon, TokenServiceAccount, TokenSCIM, TokenLogin,
+	TokenEmailChange, TokenEmailRevert, TokenInvite, TokenEnroll, TokenDeviceCode,
 }
 
-func TestNewToken_WithID(t *testing.T) {
-	id := "123e4567-e89b-12d3-a456-426614174000" // UUID-form ID round-trips through Parse
-	tok := NewToken(id)
-	if tok.ID != id {
-		t.Errorf("ID = %q, want %q", tok.ID, id)
+func TestNewTokenRoundTrips(t *testing.T) {
+	for _, kind := range allKinds {
+		raw, hash := NewToken(kind)
+		prefix := "nk_" + string(kind) + "_"
+		require.True(t, strings.HasPrefix(raw, prefix), "%q does not start with %q", raw, prefix)
+		assert.Equal(t, HashToken(raw), hash, "the hash is not of the plaintext")
+		assert.True(t, CheckToken(raw, kind), "%s does not pass its own check", kind)
+		assert.True(t, CheckToken(raw, TokenLogin, kind), "%s is refused among other kinds", kind)
 	}
-	if !strings.HasPrefix(tok.Plaintext, id+"_") {
-		t.Errorf("plaintext %q missing id prefix", tok.Plaintext)
-	}
-
-	parsed, err := Parse(tok.Plaintext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if parsed.ID != id {
-		t.Errorf("Parse().ID = %q, want %q", parsed.ID, id)
-	}
+	first, _ := NewToken(TokenSession)
+	second, _ := NewToken(TokenSession)
+	assert.NotEqual(t, first, second)
 }
 
-func TestParse(t *testing.T) {
-	tests := []struct {
-		name string
-		in   string
-		want ParsedToken
-	}{
-		{"bare secret", "supersecret", ParsedToken{Secret: "supersecret"}},
-		{
-			"uuid + secret", "123e4567-e89b-12d3-a456-426614174000_mys3cr3t",
-			ParsedToken{ID: "123e4567-e89b-12d3-a456-426614174000", Secret: "mys3cr3t"},
-		},
-		{
-			"non-uuid first segment treated as bare secret",
-			"notauuid_part",
-			ParsedToken{Secret: "notauuid_part"},
-		},
-		{
-			"uuid + secret with underscores in secret",
-			"123e4567-e89b-12d3-a456-426614174000_a_b",
-			ParsedToken{ID: "123e4567-e89b-12d3-a456-426614174000", Secret: "a_b"},
-		},
-		{"bare secret containing underscores", "a_b_c", ParsedToken{Secret: "a_b_c"}},
-		{"bare secret containing many underscores", "a_b_c_d_e", ParsedToken{Secret: "a_b_c_d_e"}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := Parse(tt.in)
-			if err != nil {
-				t.Fatalf("Parse(%q) error: %v", tt.in, err)
-			}
-			if *got != tt.want {
-				t.Errorf("Parse(%q) = %+v, want %+v", tt.in, *got, tt.want)
-			}
-		})
-	}
+// The format itself is tested in internal/nktoken, this is the choice among kinds.
+func TestCheckTokenRefuses(t *testing.T) {
+	raw, _ := NewToken(TokenServiceAccount)
+	assert.False(t, CheckToken(raw), "no kind takes nothing")
+	assert.False(t, CheckToken(raw, TokenSCIM, TokenSession), "a service account key passes as another kind")
+	assert.False(t, CheckToken(RandomString(32), TokenServiceAccount), "an old session passes")
 }
 
-func TestParse_Empty(t *testing.T) {
-	if _, err := Parse(""); !errors.Is(err, errInvalidToken) {
-		t.Errorf("Parse(\"\") error = %v, want errInvalidToken", err)
-	}
-}
+func TestTokenHash(t *testing.T) {
+	raw, want := NewToken(TokenInvite)
+	hash, ok := TokenHash(raw, TokenLogin, TokenInvite)
+	assert.True(t, ok, "a token of a listed kind is refused")
+	assert.Equal(t, want, hash, "the hash is not of the plaintext")
 
-func TestNewKey(t *testing.T) {
-	for _, prefix := range []string{KeyPrefixServiceAccount, KeyPrefixSCIM} {
-		raw, hash := NewKey(prefix)
-		if !strings.HasPrefix(raw, prefix) {
-			t.Errorf("%q does not start with %q", raw, prefix)
-		}
-		if len(raw) != len(prefix)+32+keyCheckLen {
-			t.Errorf("len(%q) = %d", raw, len(raw))
-		}
-		if hash != HashToken(raw) {
-			t.Error("hash does not match the plaintext")
-		}
-		if !CheckKey(raw) {
-			t.Errorf("CheckKey(%q) = false", raw)
-		}
-	}
-}
-
-func TestCheckKey_Rejects(t *testing.T) {
-	raw, _ := NewKey(KeyPrefixServiceAccount)
-	flipped := []byte(raw)
-	flipped[len(KeyPrefixServiceAccount)] ^= 1
-	for name, bad := range map[string]string{
-		"empty":        "",
-		"short":        "nk_sa_",
-		"no prefix":    strings.TrimPrefix(raw, "nk_"),
-		"truncated":    raw[:len(raw)-1],
-		"flipped char": string(flipped),
-		"bare secret":  RandomString(32),
-	} {
-		if CheckKey(bad) {
-			t.Errorf("%s: CheckKey(%q) = true", name, bad)
-		}
-	}
+	hash, ok = TokenHash(raw, TokenLogin)
+	assert.False(t, ok, "a token of another kind passes")
+	assert.True(t, hash.IsZero(), "a refused token still gets a hash")
 }

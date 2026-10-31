@@ -3,12 +3,14 @@
 package api_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
@@ -41,19 +43,21 @@ func TestAuditStreamSecretStaysWithItsURL(t *testing.T) {
 	require.NoError(t, err)
 	id := created.GetStream().GetId()
 	t.Cleanup(func() {
-		_, _ = streams.DeleteAuditStream(t.Context(), &nokkuv1.DeleteAuditStreamRequest{Id: &id})
+		_, _ = streams.DeleteAuditStream(context.WithoutCancel(t.Context()), &nokkuv1.DeleteAuditStreamRequest{Id: &id})
 	})
 
-	moved := &nokkuv1.UpdateAuditStreamRequest{Id: &id, Url: new("https://attacker.example.com/collector")}
-	_, err = streams.UpdateAuditStream(t.Context(), moved)
+	url := new("https://attacker.example.com/collector")
+	_, err = streams.UpdateAuditStream(t.Context(), masked(&nokkuv1.UpdateAuditStreamRequest{Id: &id, Url: url}))
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a new URL without the secret: %v", err)
-	moved.Secret = new("hec-token-2")
-	_, err = streams.UpdateAuditStream(t.Context(), moved)
+	_, err = streams.UpdateAuditStream(t.Context(),
+		masked(&nokkuv1.UpdateAuditStreamRequest{Id: &id, Url: url, Secret: new("hec-token-2")}))
 	require.NoError(t, err, "a new URL with its secret")
-	moved.Secret = nil
-	_, err = streams.UpdateAuditStream(t.Context(), moved)
+	_, err = streams.UpdateAuditStream(t.Context(), masked(&nokkuv1.UpdateAuditStreamRequest{Id: &id, Url: url}))
 	require.NoError(t, err, "the same URL keeps the stored secret")
-	_, err = streams.UpdateAuditStream(t.Context(), &nokkuv1.UpdateAuditStreamRequest{Id: &id, Enabled: new(false)})
+	_, err = streams.UpdateAuditStream(
+		t.Context(),
+		masked(&nokkuv1.UpdateAuditStreamRequest{Id: &id, Enabled: new(false)}),
+	)
 	require.NoError(t, err, "a toggle needs no secret")
 }
 
@@ -98,15 +102,20 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	var ids []string
 	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
 		for _, url := range []string{slow.URL, fast.URL} {
-			st, err := q.CreateAuditStream(t.Context(), &db.CreateAuditStreamParams{
-				Kind:   audit.StreamWebhook,
-				URL:    url,
-				Secret: []byte("stream-secret"),
-			})
+			id := uuid.NewV7().String()
+			secret, err := cfg.Keyset.Seal(audit.SecretAAD(ws, id), []byte("stream-secret"))
 			if err != nil {
 				return err
 			}
-			ids = append(ids, st.ID)
+			if _, err := q.CreateAuditStream(t.Context(), &db.CreateAuditStreamParams{
+				ID:     id,
+				Kind:   audit.StreamWebhook,
+				URL:    url,
+				Secret: secret,
+			}); err != nil {
+				return err
+			}
+			ids = append(ids, id)
 		}
 		return nil
 	})
@@ -114,8 +123,9 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_, _ = owner.Exec(t.Context(), "DELETE FROM audit_streams WHERE id = ANY($1)", ids)
-		_ = owner.Close(t.Context())
+		ctx := context.WithoutCancel(t.Context())
+		_, _ = owner.Exec(ctx, "DELETE FROM audit_streams WHERE id = ANY($1)", ids)
+		_ = owner.Close(ctx)
 	})
 	// An event old enough to pass the stream's settle window, and cursors from before it.
 	_, err = owner.Exec(t.Context(), `
@@ -125,7 +135,7 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	`, pgx.QueryExecModeSimpleProtocol, ids, ws)
 	require.NoError(t, err)
 
-	_, err = audit.New(t.Context(), cfg.Conn, cfg.Entitlements)
+	_, err = audit.New(t.Context(), cfg.Conn, cfg.Keyset, cfg.Entitlements)
 	require.NoError(t, err)
 
 	select {
@@ -134,4 +144,68 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	case <-time.After(25 * time.Second):
 		t.Fatal("the fast stream got nothing")
 	}
+}
+
+// A stream whose secret does not open fails on its own. The streams of every other workspace keep sending.
+func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
+	cfg, _ := enterprise(t)
+	broken, good := seedOtherWorkspace(t, cfg), seedWorkspace(t, cfg)
+
+	got := make(chan struct{}, 1)
+	siem := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		select {
+		case got <- struct{}{}:
+		default:
+		}
+	}))
+	t.Cleanup(siem.Close)
+
+	// The broken stream is made first, so it comes first in every list of streams.
+	var ids []string
+	for _, ws := range []string{broken, good} {
+		id := uuid.NewV7().String()
+		sealedFor := id
+		if ws == broken {
+			sealedFor = uuid.NewV7().String()
+		}
+		secret, err := cfg.Keyset.Seal(audit.SecretAAD(ws, sealedFor), []byte("stream-secret"))
+		require.NoError(t, err)
+		inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+			_, err := q.CreateAuditStream(t.Context(), &db.CreateAuditStreamParams{
+				ID: id, Kind: audit.StreamWebhook, URL: siem.URL, Secret: secret,
+			})
+			return err
+		})
+		ids = append(ids, id)
+	}
+
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		// t.Context is already canceled when cleanups run.
+		ctx := context.WithoutCancel(t.Context())
+		_, _ = owner.Exec(ctx, "DELETE FROM audit_streams WHERE id = ANY($1)", ids)
+		_ = owner.Close(ctx)
+	})
+	_, err = owner.Exec(t.Context(), `
+		UPDATE audit_streams SET cursor_ts = NOW() - INTERVAL '1 minute' WHERE id = ANY($1);
+		INSERT INTO audit.audit_logs (workspace_id, action, ok, timestamp)
+		VALUES ($2, 'StreamProbe', TRUE, NOW() - INTERVAL '30 seconds'), ($3, 'StreamProbe', TRUE, NOW() - INTERVAL '30 seconds');
+	`, pgx.QueryExecModeSimpleProtocol, ids, broken, good)
+	require.NoError(t, err)
+
+	_, err = audit.New(t.Context(), cfg.Conn, cfg.Keyset, cfg.Entitlements)
+	require.NoError(t, err)
+
+	select {
+	case <-got:
+	case <-time.After(25 * time.Second):
+		t.Fatal("the readable stream sent nothing")
+	}
+	assert.Eventually(t, func() bool {
+		var lastError string
+		err := owner.QueryRow(t.Context(), "SELECT last_error FROM audit_streams WHERE id = $1", ids[0]).
+			Scan(&lastError)
+		return err == nil && lastError != ""
+	}, 10*time.Second, 100*time.Millisecond, "the broken stream is not marked as failing")
 }

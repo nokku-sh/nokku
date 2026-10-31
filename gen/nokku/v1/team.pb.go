@@ -10,6 +10,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -29,9 +30,9 @@ type Team struct {
 	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
 	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	MemberCount   *int32                 `protobuf:"varint,7,opt,name=member_count,json=memberCount" json:"member_count,omitempty"`
+	MemberCount   *int32                 `protobuf:"varint,5,opt,name=member_count,json=memberCount" json:"member_count,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -94,6 +95,13 @@ func (x *Team) GetTags() []string {
 	return nil
 }
 
+func (x *Team) GetMemberCount() int32 {
+	if x != nil && x.MemberCount != nil {
+		return *x.MemberCount
+	}
+	return 0
+}
+
 func (x *Team) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
@@ -106,13 +114,6 @@ func (x *Team) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
-}
-
-func (x *Team) GetMemberCount() int32 {
-	if x != nil && x.MemberCount != nil {
-		return *x.MemberCount
-	}
-	return 0
 }
 
 type GetTeamRequest struct {
@@ -313,6 +314,7 @@ type UpdateTeamRequest struct {
 	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
 	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,5,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -371,6 +373,13 @@ func (x *UpdateTeamRequest) GetDescription() string {
 func (x *UpdateTeamRequest) GetTags() []string {
 	if x != nil {
 		return x.Tags
+	}
+	return nil
+}
+
+func (x *UpdateTeamRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
+	if x != nil {
+		return x.UpdateMask
 	}
 	return nil
 }
@@ -975,17 +984,17 @@ var File_nokku_v1_team_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_team_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/team.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"\xf9\x01\n" +
+	"\x13nokku/v1/team.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"\xf9\x01\n" +
 	"\x04Team\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\x129\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\x12!\n" +
+	"\fmember_count\x18\x05 \x01(\x05R\vmemberCount\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12!\n" +
-	"\fmember_count\x18\a \x01(\x05R\vmemberCount\"*\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"*\n" +
 	"\x0eGetTeamRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"5\n" +
 	"\x0fGetTeamResponse\x12\"\n" +
@@ -996,13 +1005,15 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x03 \x03(\tR\x04tags\"8\n" +
 	"\x12CreateTeamResponse\x12\"\n" +
-	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\x8d\x01\n" +
+	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\xee\x01\n" +
 	"\x11UpdateTeamRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04name\x12*\n" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\"8\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\x12_\n" +
+	"\vupdate_mask\x18\x05 \x01(\v2\x1a.google.protobuf.FieldMaskB\"\xbaH\x1f\xc8\x01\x01\xe2\x01\x19\x12\x04name\x12\vdescription\x12\x04tagsR\n" +
+	"updateMask\"8\n" +
 	"\x12UpdateTeamResponse\x12\"\n" +
 	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"-\n" +
 	"\x11DeleteTeamRequest\x12\x18\n" +
@@ -1031,12 +1042,12 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\x17ListTeamsForUserRequest\x12!\n" +
 	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"@\n" +
 	"\x18ListTeamsForUserResponse\x12$\n" +
-	"\x05teams\x18\x01 \x03(\v2\x0e.nokku.v1.TeamR\x05teams2\xa2\x06\n" +
+	"\x05teams\x18\x01 \x03(\v2\x0e.nokku.v1.TeamR\x05teams2\xa4\x06\n" +
 	"\vTeamService\x12I\n" +
 	"\aGetTeam\x12\x18.nokku.v1.GetTeamRequest\x1a\x19.nokku.v1.GetTeamResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12O\n" +
-	"\tListTeams\x12\x1a.nokku.v1.ListTeamsRequest\x1a\x1b.nokku.v1.ListTeamsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12O\n" +
+	"\tListTeams\x12\x1a.nokku.v1.ListTeamsRequest\x1a\x1b.nokku.v1.ListTeamsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12Q\n" +
 	"\n" +
-	"CreateTeam\x12\x1b.nokku.v1.CreateTeamRequest\x1a\x1c.nokku.v1.CreateTeamResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12O\n" +
+	"CreateTeam\x12\x1b.nokku.v1.CreateTeamRequest\x1a\x1c.nokku.v1.CreateTeamResponse\"\b\xc2\xf3\x18\x04\x18\x03@\x01\x12O\n" +
 	"\n" +
 	"UpdateTeam\x12\x1b.nokku.v1.UpdateTeamRequest\x1a\x1c.nokku.v1.UpdateTeamResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12O\n" +
 	"\n" +
@@ -1081,40 +1092,42 @@ var file_nokku_v1_team_proto_goTypes = []any{
 	(*ListTeamsForUserRequest)(nil),  // 17: nokku.v1.ListTeamsForUserRequest
 	(*ListTeamsForUserResponse)(nil), // 18: nokku.v1.ListTeamsForUserResponse
 	(*timestamppb.Timestamp)(nil),    // 19: google.protobuf.Timestamp
-	(*User)(nil),                     // 20: nokku.v1.User
+	(*fieldmaskpb.FieldMask)(nil),    // 20: google.protobuf.FieldMask
+	(*User)(nil),                     // 21: nokku.v1.User
 }
 var file_nokku_v1_team_proto_depIdxs = []int32{
 	19, // 0: nokku.v1.Team.created_at:type_name -> google.protobuf.Timestamp
 	19, // 1: nokku.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: nokku.v1.GetTeamResponse.team:type_name -> nokku.v1.Team
 	0,  // 3: nokku.v1.CreateTeamResponse.team:type_name -> nokku.v1.Team
-	0,  // 4: nokku.v1.UpdateTeamResponse.team:type_name -> nokku.v1.Team
-	0,  // 5: nokku.v1.ListTeamsResponse.teams:type_name -> nokku.v1.Team
-	20, // 6: nokku.v1.ListTeamMembersResponse.members:type_name -> nokku.v1.User
-	0,  // 7: nokku.v1.ListTeamsForUserResponse.teams:type_name -> nokku.v1.Team
-	1,  // 8: nokku.v1.TeamService.GetTeam:input_type -> nokku.v1.GetTeamRequest
-	9,  // 9: nokku.v1.TeamService.ListTeams:input_type -> nokku.v1.ListTeamsRequest
-	3,  // 10: nokku.v1.TeamService.CreateTeam:input_type -> nokku.v1.CreateTeamRequest
-	5,  // 11: nokku.v1.TeamService.UpdateTeam:input_type -> nokku.v1.UpdateTeamRequest
-	7,  // 12: nokku.v1.TeamService.DeleteTeam:input_type -> nokku.v1.DeleteTeamRequest
-	11, // 13: nokku.v1.TeamService.AddTeamMember:input_type -> nokku.v1.AddTeamMemberRequest
-	13, // 14: nokku.v1.TeamService.RemoveTeamMember:input_type -> nokku.v1.RemoveTeamMemberRequest
-	15, // 15: nokku.v1.TeamService.ListTeamMembers:input_type -> nokku.v1.ListTeamMembersRequest
-	17, // 16: nokku.v1.TeamService.ListTeamsForUser:input_type -> nokku.v1.ListTeamsForUserRequest
-	2,  // 17: nokku.v1.TeamService.GetTeam:output_type -> nokku.v1.GetTeamResponse
-	10, // 18: nokku.v1.TeamService.ListTeams:output_type -> nokku.v1.ListTeamsResponse
-	4,  // 19: nokku.v1.TeamService.CreateTeam:output_type -> nokku.v1.CreateTeamResponse
-	6,  // 20: nokku.v1.TeamService.UpdateTeam:output_type -> nokku.v1.UpdateTeamResponse
-	8,  // 21: nokku.v1.TeamService.DeleteTeam:output_type -> nokku.v1.DeleteTeamResponse
-	12, // 22: nokku.v1.TeamService.AddTeamMember:output_type -> nokku.v1.AddTeamMemberResponse
-	14, // 23: nokku.v1.TeamService.RemoveTeamMember:output_type -> nokku.v1.RemoveTeamMemberResponse
-	16, // 24: nokku.v1.TeamService.ListTeamMembers:output_type -> nokku.v1.ListTeamMembersResponse
-	18, // 25: nokku.v1.TeamService.ListTeamsForUser:output_type -> nokku.v1.ListTeamsForUserResponse
-	17, // [17:26] is the sub-list for method output_type
-	8,  // [8:17] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	20, // 4: nokku.v1.UpdateTeamRequest.update_mask:type_name -> google.protobuf.FieldMask
+	0,  // 5: nokku.v1.UpdateTeamResponse.team:type_name -> nokku.v1.Team
+	0,  // 6: nokku.v1.ListTeamsResponse.teams:type_name -> nokku.v1.Team
+	21, // 7: nokku.v1.ListTeamMembersResponse.members:type_name -> nokku.v1.User
+	0,  // 8: nokku.v1.ListTeamsForUserResponse.teams:type_name -> nokku.v1.Team
+	1,  // 9: nokku.v1.TeamService.GetTeam:input_type -> nokku.v1.GetTeamRequest
+	9,  // 10: nokku.v1.TeamService.ListTeams:input_type -> nokku.v1.ListTeamsRequest
+	3,  // 11: nokku.v1.TeamService.CreateTeam:input_type -> nokku.v1.CreateTeamRequest
+	5,  // 12: nokku.v1.TeamService.UpdateTeam:input_type -> nokku.v1.UpdateTeamRequest
+	7,  // 13: nokku.v1.TeamService.DeleteTeam:input_type -> nokku.v1.DeleteTeamRequest
+	11, // 14: nokku.v1.TeamService.AddTeamMember:input_type -> nokku.v1.AddTeamMemberRequest
+	13, // 15: nokku.v1.TeamService.RemoveTeamMember:input_type -> nokku.v1.RemoveTeamMemberRequest
+	15, // 16: nokku.v1.TeamService.ListTeamMembers:input_type -> nokku.v1.ListTeamMembersRequest
+	17, // 17: nokku.v1.TeamService.ListTeamsForUser:input_type -> nokku.v1.ListTeamsForUserRequest
+	2,  // 18: nokku.v1.TeamService.GetTeam:output_type -> nokku.v1.GetTeamResponse
+	10, // 19: nokku.v1.TeamService.ListTeams:output_type -> nokku.v1.ListTeamsResponse
+	4,  // 20: nokku.v1.TeamService.CreateTeam:output_type -> nokku.v1.CreateTeamResponse
+	6,  // 21: nokku.v1.TeamService.UpdateTeam:output_type -> nokku.v1.UpdateTeamResponse
+	8,  // 22: nokku.v1.TeamService.DeleteTeam:output_type -> nokku.v1.DeleteTeamResponse
+	12, // 23: nokku.v1.TeamService.AddTeamMember:output_type -> nokku.v1.AddTeamMemberResponse
+	14, // 24: nokku.v1.TeamService.RemoveTeamMember:output_type -> nokku.v1.RemoveTeamMemberResponse
+	16, // 25: nokku.v1.TeamService.ListTeamMembers:output_type -> nokku.v1.ListTeamMembersResponse
+	18, // 26: nokku.v1.TeamService.ListTeamsForUser:output_type -> nokku.v1.ListTeamsForUserResponse
+	18, // [18:27] is the sub-list for method output_type
+	9,  // [9:18] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_team_proto_init() }

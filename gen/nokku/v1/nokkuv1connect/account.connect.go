@@ -134,7 +134,6 @@ var (
 type AccountServiceClient interface {
 	GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error)
 	UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error)
-	// SetAvatar stores a picture of one's own. An empty image removes it.
 	SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error)
 	RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error)
 	ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error)
@@ -155,7 +154,6 @@ func NewAccountServiceClient(client *connect.Client) AccountServiceClient {
 type AccountServiceHandler interface {
 	GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error)
 	UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error)
-	// SetAvatar stores a picture of one's own. An empty image removes it.
 	SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error)
 	RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error)
 	ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error)

@@ -16,6 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
 
 // procedureAccess holds the (access) option of every RPC. RPCs without one are denied.
@@ -42,19 +43,20 @@ func isPublicEndpoint(procedure string) bool {
 	return procedureAccess[procedure].GetPublic()
 }
 
-// authorizationInterceptor checks the role the session carries, so no lookup happens here.
+// authorizationInterceptor applies the (access) option of the call, in this order: role, self or daemon, people
+// only, a fresh sign-in, the plan feature, signing, the resource cap.
 type authorizationInterceptor struct {
 	cfg *config.Config
 }
 
-// A unary call is checked once its request is decoded, so the audit row of a denied call still names the target.
-// Generated handlers receive before they run, a stream is checked up front.
+// A unary call is checked once its request is decoded, so the plan gates can read it and the audit row of a denied
+// call still names the target. Generated handlers receive before they run, a stream is checked up front.
 func (a *authorizationInterceptor) intercept(next connect.ServerFunc) connect.ServerFunc {
 	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
 		if spec.StreamType == connect.StreamTypeUnary {
 			return next(ctx, spec, &authorizedStream{ServerStream: stream, ctx: ctx, procedure: spec.Procedure, a: a})
 		}
-		if err := a.authorize(ctx, spec.Procedure); err != nil {
+		if err := a.authorize(ctx, spec.Procedure, nil); err != nil {
 			return err
 		}
 		return next(ctx, spec, stream)
@@ -73,10 +75,11 @@ func (s *authorizedStream) Receive(msg any) error {
 	if err := s.ServerStream.Receive(msg); err != nil {
 		return err
 	}
-	return s.a.authorize(s.ctx, s.procedure)
+	return s.a.authorize(s.ctx, s.procedure, msg)
 }
 
-func (a *authorizationInterceptor) authorize(ctx context.Context, procedure string) error {
+// authorize gets the decoded request of a unary call, a stream passes nil and no plan gate applies to it.
+func (a *authorizationInterceptor) authorize(ctx context.Context, procedure string, msg any) error {
 	access := procedureAccess[procedure]
 	if access == nil {
 		return db.ErrPermissionDenied
@@ -91,16 +94,61 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 		}
 		return a.daemonAccepted(ctx, caller.ID, procedure)
 	}
-	if access.GetPeopleOnly() && caller.Kind == actor.KindServiceAccount {
-		return db.ErrPermissionDenied
-	}
-	if access.GetSelf() {
-		return nil
-	}
 	// An RPC that names no role stays denied.
 	required := access.GetRole()
-	if required == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || caller.Role < required {
+	if !access.GetSelf() && (required == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || caller.Role < required) {
 		return db.ErrPermissionDenied
+	}
+	if access.GetPeopleOnly() && caller.Kind == actor.KindServiceAccount {
+		return newError(connect.CodePermissionDenied, "only people can do this, not a service account")
+	}
+	if access.GetFresh() {
+		if err := a.fresh(ctx, caller); err != nil {
+			return err
+		}
+	}
+	if msg == nil {
+		return nil
+	}
+	// The handler prunes too, but a plan gate must not read a field the mask leaves out.
+	if req, ok := msg.(maskedRequest); ok {
+		if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
+			return err
+		}
+	}
+	ent := a.cfg.Entitlements
+	features := entitlement.RequestedFeatures(msg)
+	if f := access.GetFeature(); f != "" {
+		features = append(features, f)
+	}
+	if err := ent.CheckFeatures(ctx, features); err != nil {
+		return err
+	}
+	if access.GetSigns() {
+		if err := ent.CheckSigning(ctx); err != nil {
+			return err
+		}
+	}
+	if ws := actor.WorkspaceIDFromContext(ctx); access.GetCapped() && ws != "" {
+		return ent.CheckResources(ctx, ws)
+	}
+	return nil
+}
+
+// fresh refuses nk outright and a browser session older than 10 minutes, which ends here. The web app reads
+// Unauthenticated as a session to sign in again. A service account follows people_only.
+func (a *authorizationInterceptor) fresh(ctx context.Context, caller actor.Principal) error {
+	switch caller.Kind {
+	case actor.KindCLI:
+		return newError(connect.CodePermissionDenied, "do this in the web app")
+	case actor.KindUser:
+		if err := a.cfg.IAM.RequireRecentSignIn(ctx); err != nil {
+			if ci, ok := connect.CallInfoForServerContext(ctx); ok {
+				setCookie(ci, a.cfg.IAM.ClearSessionCookie())
+			}
+			return newError(connect.CodeUnauthenticated, "sign in again to continue")
+		}
+	case actor.KindServiceAccount, actor.KindDaemon, actor.KindSCIM:
 	}
 	return nil
 }

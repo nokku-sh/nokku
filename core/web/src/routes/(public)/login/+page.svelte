@@ -11,6 +11,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { returnTo } from '#lib/store.svelte.js';
 	import { KeyRound, Mail, MailCheck } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -20,6 +21,8 @@
 	let email = $state('');
 	let passkeyBusy = $state(false);
 	let ownerRecovery = $state(false);
+	// Set when a session ended in the middle of something, or a change needed a recent sign-in.
+	const returning = !!returnTo.current;
 
 	// The provider is the only way in once SSO is required, so the rest is left out rather than greyed out.
 	// Only the owner keeps the passkey and the email link, to get in when the provider is broken.
@@ -83,7 +86,9 @@
 {:else}
 	<AuthCard
 		title={`Sign in to ${options.data?.workspaceName || 'Nokku'}`}
-		description="Welcome back, pick up where you left off"
+		description={returning
+			? 'Sign in again to go back to where you were'
+			: 'Welcome back, pick up where you left off'}
 	>
 		{#if showMagicLink}
 			<form class="flex flex-col gap-4" onsubmit={submit}>

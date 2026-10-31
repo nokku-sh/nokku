@@ -5,26 +5,39 @@ import (
 	"cmp"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unicode/utf8"
+
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
 const (
-	// Recording stops at this compressed size and calls OnLimit.
+	// Recording stops at this compressed size and calls OnCut.
 	maxSize     = 50 << 20
 	maxIdleTime = 2 * time.Second
-	// A crash loses at most this much of the tail of a recording.
-	maxFlushInterval = 100 * time.Millisecond
+	// A crash loses at most this much of the tail of a recording. Every flush ends a gzip block, so a shorter one costs
+	// a shell recording twice the size and a progress bar eight times.
+	maxFlushInterval = time.Second
+
+	// A recording is written to <id>.part. Only one that closed whole is renamed to <id>.cast.gz.
+	partSuffix = ".part"
+	castSuffix = ".cast.gz"
 )
+
+// ErrSizeLimit is why a recording that reached its size limit stopped.
+var ErrSizeLimit = errors.New("size limit reached")
 
 type header struct {
 	Version   int    `json:"version"`
@@ -43,28 +56,30 @@ type term struct {
 }
 
 type Options struct {
-	Width     int
-	Height    int
-	Title     string
+	Width  int
+	Height int
+	Title  string
+	// SessionID names the file and the recording in the core. It has to be a canonical UUID.
 	SessionID string
-	User      string // the local account, labels the file and is needed to upload it later
+	User      string // the local account
 	Principal string // the certificate principal auth matched, names who was logged in
 	Term      string
-	// A nil error from Sink's Close confirms the upload.
-	Sink    io.WriteCloser
-	OnLimit func()
+	// OnCut runs once when the recording stops before its session, with ErrSizeLimit or the write error.
+	OnCut func(error)
 	// MaxSize defaults to 50 MB. Tests shrink it.
 	MaxSize int64
+	// Uploads sends the recording to the core while it is written. Nil leaves it on disk.
+	Uploads *Uploads
 }
 
 type Recorder struct {
 	mu        sync.Mutex
 	path      string
-	onLimit   func()
+	header    header
+	onCut     func(error)
 	maxSize   int64
 	cw        *countingWriter
 	gw        *gzip.Writer
-	sink      io.WriteCloser
 	lastEvent time.Time
 	// msCarry carries the rounding error to the next interval, so the written intervals sum to the real time.
 	msCarry float64
@@ -73,19 +88,22 @@ type Recorder struct {
 	// exitCode is written last, so the x event stays the final event.
 	exitCode *int
 	dirty    bool
-	done     chan struct{}
-	closed   bool
+	// broken is set by a failed write, the gzip stream is cut there.
+	broken bool
+	closed bool
+	// cut is why the recording stopped early, nil for a whole one. Final once done is closed.
+	cut error
+	// ended is when it stopped. Final once done is closed.
+	ended time.Time
+
+	// flushed wakes the upload when more of the file is on disk. done closes once the file is final.
+	flushed chan struct{}
+	done    chan struct{}
 }
 
 type countingWriter struct {
 	w       *os.File
 	written int64
-}
-
-// A sink failure is logged once and the sink is dropped, the file is never affected.
-type sinkTee struct {
-	w    io.Writer
-	sink io.WriteCloser
 }
 
 func (cw *countingWriter) Write(p []byte) (int, error) {
@@ -94,84 +112,72 @@ func (cw *countingWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func (t *sinkTee) Write(p []byte) (int, error) {
-	if t.sink != nil {
-		if _, err := t.sink.Write(p); err != nil {
-			slog.Warn("recording sink failed, keeping local copy", "error", err)
-			_ = t.sink.Close()
-			t.sink = nil
-		}
-	}
-	return t.w.Write(p)
-}
-
 // New may return a nil Recorder, which is a valid no-op, so callers can keep going after an error.
 func New(opts Options) (*Recorder, error) {
+	if !login.ValidID(opts.SessionID) {
+		return nil, fmt.Errorf("recording id %q is no canonical UUID", opts.SessionID)
+	}
 	if err := checkDiskSpace(paths.RecordsDir()); err != nil {
 		return nil, err
 	}
-
-	// CreateTemp adds a random part, so sessions started in the same second never collide. The file is 0600.
-	pattern := recordingPattern(time.Now(), toSnakeCase(opts.User), opts.SessionID)
-	f, err := os.CreateTemp(paths.RecordsDir(), pattern)
-	if err != nil {
-		return nil, fmt.Errorf("create recording file: %w", err)
-	}
-	path := f.Name()
-
-	if err = enforceRetention(); err != nil {
-		_ = f.Close()
-		_ = os.Remove(path)
+	if err := enforceRetention(); err != nil {
 		return nil, err
 	}
 
-	cw := &countingWriter{w: f}
-	var w io.Writer = cw
-	if opts.Sink != nil {
-		w = &sinkTee{w: cw, sink: opts.Sink}
+	// A second session under the same id must not write into the first one's file, nor replace it at the rename.
+	path := filepath.Join(paths.RecordsDir(), opts.SessionID+partSuffix)
+	if _, err := os.Lstat(strings.TrimSuffix(path, partSuffix) + castSuffix); err == nil {
+		return nil, fmt.Errorf("a recording %s waits for its upload already", opts.SessionID)
 	}
-	gw := gzip.NewWriter(w)
-	enc := json.NewEncoder(gw)
-	enc.SetEscapeHTML(false)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) // #nosec G304 - the id is a UUID
+	if err != nil {
+		return nil, fmt.Errorf("create recording file: %w", err)
+	}
+	// The lock tells retention a session still writes the file. It ends with the descriptor, in a crash too.
+	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return nil, fmt.Errorf("lock recording file: %w", err)
+	}
 
-	if err = enc.Encode(header{
-		Version: 3,
-		Term: term{
-			Cols: opts.Width,
-			Rows: opts.Height,
-			Type: cmp.Or(opts.Term, "xterm-256color"),
-		},
-		Timestamp: time.Now().Unix(),
+	now := time.Now()
+	hdr := header{
+		Version:   3,
+		Term:      term{Cols: opts.Width, Rows: opts.Height, Type: cmp.Or(opts.Term, "xterm-256color")},
+		Timestamp: now.Unix(),
 		Title:     opts.Title,
 		SessionID: opts.SessionID,
 		User:      opts.User,
 		Principal: opts.Principal,
-	}); err != nil {
-		_ = gw.Close()
+	}
+	cw := &countingWriter{w: f}
+	gw := gzip.NewWriter(cw)
+	enc := json.NewEncoder(gw)
+	enc.SetEscapeHTML(false)
+	if err = enc.Encode(hdr); err == nil {
+		err = gw.Flush()
+	}
+	if err != nil {
 		_ = f.Close()
 		_ = os.Remove(path)
 		return nil, fmt.Errorf("write header: %w", err)
 	}
 
-	if err = gw.Flush(); err != nil {
-		_ = gw.Close()
-		_ = f.Close()
-		_ = os.Remove(path)
-		return nil, fmt.Errorf("flush header: %w", err)
-	}
-
 	rec := &Recorder{
 		path:      path,
-		onLimit:   opts.OnLimit,
+		header:    hdr,
+		onCut:     opts.OnCut,
 		maxSize:   cmp.Or(opts.MaxSize, maxSize),
 		cw:        cw,
 		gw:        gw,
-		sink:      opts.Sink,
-		lastEvent: time.Now(),
+		lastEvent: now,
 		partial:   map[string][]byte{},
+		flushed:   make(chan struct{}, 1),
 		done:      make(chan struct{}),
 	}
-	active.Store(path, struct{}{})
+	if opts.Uploads != nil {
+		opts.Uploads.follow(rec)
+	}
 	go rec.flushLoop()
 	return rec, nil
 }
@@ -182,19 +188,26 @@ func (r *Recorder) flushLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			r.mu.Lock()
-			if r.closed {
-				r.mu.Unlock()
-				return
-			}
-			if r.dirty {
-				_ = r.gw.Flush()
-				r.dirty = false
-			}
-			r.mu.Unlock()
 		case <-r.done:
 			return
 		}
+		r.mu.Lock()
+		var cut error
+		if !r.closed && r.dirty {
+			r.dirty = false
+			if err := r.gw.Flush(); err != nil {
+				r.broken = true
+				cut = fmt.Errorf("write failed: %w", err)
+				r.closeLocked(cut)
+			} else {
+				select {
+				case r.flushed <- struct{}{}:
+				default:
+				}
+			}
+		}
+		r.mu.Unlock()
+		r.report(cut)
 	}
 }
 
@@ -208,28 +221,36 @@ func (r *Recorder) event(eventType string, data []byte) {
 		r.mu.Unlock()
 		return
 	}
+	cut := ErrSizeLimit
 	if r.cw.written < r.maxSize {
 		// A read can end inside a multi-byte character. Its head waits for the next event of its type.
 		if head := r.partial[eventType]; len(head) > 0 {
 			data = append(head, data...)
 		}
-		cut := len(data) - incompleteTail(data)
-		r.partial[eventType] = bytes.Clone(data[cut:])
-		r.emit(eventType, data[:cut])
-		r.mu.Unlock()
+		end := len(data) - incompleteTail(data)
+		r.partial[eventType] = bytes.Clone(data[end:])
+		cut = r.emit(eventType, data[:end])
+	}
+	if cut != nil {
+		r.closeLocked(cut)
+	}
+	r.mu.Unlock()
+	r.report(cut)
+}
+
+// report runs OnCut outside the lock, it may end the session and so close the recorder.
+func (r *Recorder) report(cut error) {
+	if cut == nil {
 		return
 	}
-	r.closeLocked()
-	r.mu.Unlock()
-
-	slog.Warn("recording size limit reached, stopping", "size", r.maxSize)
-	if r.onLimit != nil {
-		r.onLimit()
+	slog.Warn("recording stopped early", "path", filepath.Base(r.path), "reason", cut)
+	if r.onCut != nil {
+		r.onCut(cut)
 	}
 }
 
-// Caller holds r.mu and has checked not closed.
-func (r *Recorder) emit(eventType string, data []byte) {
+// Caller holds r.mu and has checked not closed. A failed write cuts the gzip stream, so it ends the recording.
+func (r *Recorder) emit(eventType string, data []byte) error {
 	// asciicast v3 timestamps are intervals. Gaps over maxIdleTime are clamped so playback skips idle time.
 	now := time.Now()
 	gap := min(now.Sub(r.lastEvent), maxIdleTime)
@@ -239,10 +260,12 @@ func (r *Recorder) emit(eventType string, data []byte) {
 
 	line := fmt.Sprintf("[%s, %q, %s]\n", r.roundInterval(gap), eventType, encodedData)
 
-	if _, err := r.gw.Write([]byte(line)); err != nil {
-		slog.Error("write recording event", "error", err)
-	}
 	r.dirty = true
+	if _, err := r.gw.Write([]byte(line)); err != nil {
+		r.broken = true
+		return fmt.Errorf("write failed: %w", err)
+	}
+	return nil
 }
 
 // Length of the multi-byte character p ends in the middle of, 0 on a character boundary.
@@ -300,43 +323,44 @@ func (r *Recorder) RecordExit(status int) {
 	r.exitCode = new(status)
 }
 
-func (r *Recorder) closeLocked() {
+// closeLocked makes the file final. Only a recording nothing cut is synced and renamed to its whole name, so a
+// .part file is always a cut one once its writer is gone.
+func (r *Recorder) closeLocked(cut error) {
 	if r.closed {
 		return
 	}
 	r.closed = true
+
+	// After a failed write the gzip stream is cut there, nothing more goes in.
+	if !r.broken {
+		// A character the stream never completed is recorded as it stands.
+		for _, eventType := range []string{"o", "i"} {
+			if tail := r.partial[eventType]; len(tail) > 0 {
+				cut = cmp.Or(cut, r.emit(eventType, tail))
+			}
+		}
+		if cut == nil && r.exitCode != nil {
+			cut = r.emit("x", []byte(strconv.Itoa(*r.exitCode)))
+		}
+	}
+	// gw.Close writes the gzip footer. A whole recording is synced before its name says so.
+	err := r.gw.Close()
+	if err == nil && cut == nil {
+		err = r.cw.w.Sync()
+	}
+	if err = errors.Join(err, r.cw.w.Close()); err != nil {
+		cut = cmp.Or(cut, fmt.Errorf("write failed: %w", err))
+	}
+	if cut == nil {
+		whole := strings.TrimSuffix(r.path, partSuffix) + castSuffix
+		if err = os.Rename(r.path, whole); err != nil {
+			cut = fmt.Errorf("write failed: %w", err)
+		} else {
+			r.path = whole
+		}
+	}
+	r.cut, r.ended = cut, time.Now()
 	close(r.done)
-
-	// A character the stream never completed is recorded as it stands.
-	for _, eventType := range []string{"o", "i"} {
-		if tail := r.partial[eventType]; len(tail) > 0 {
-			r.emit(eventType, tail)
-		}
-	}
-	if r.exitCode != nil {
-		r.emit("x", []byte(strconv.Itoa(*r.exitCode)))
-	}
-
-	// gw.Close writes the gzip footer, so the file is complete. The sink gets the tail through the tee.
-	if err := r.gw.Close(); err != nil {
-		slog.Error("close gzip writer", "error", err)
-	}
-	if err := r.cw.w.Close(); err != nil {
-		slog.Error("close recording file", "error", err)
-	}
-	if r.sink == nil {
-		active.Delete(r.path)
-		return
-	}
-	// The sink's Close waits for the core, so it runs off the session path and never holds the client.
-	go func() {
-		defer active.Delete(r.path)
-		if err := r.sink.Close(); err != nil {
-			slog.Warn("recording upload incomplete, retrying later", "error", err)
-			return
-		}
-		removeUploaded(r.path)
-	}()
 }
 
 func (r *Recorder) Close() {
@@ -344,6 +368,11 @@ func (r *Recorder) Close() {
 		return
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.closeLocked()
+	wasOpen := !r.closed
+	r.closeLocked(nil)
+	cut := r.cut
+	r.mu.Unlock()
+	if wasOpen {
+		r.report(cut)
+	}
 }

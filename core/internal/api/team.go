@@ -43,12 +43,15 @@ func (s *teamService) UpdateTeam(
 	ctx context.Context,
 	req *nokkuv1.UpdateTeamRequest,
 ) (*nokkuv1.UpdateTeamResponse, error) {
+	named, err := applyMask(req, req.GetUpdateMask())
+	if err != nil {
+		return nil, err
+	}
 	team, err := s.cfg.Conn.Tenant().UpdateTeam(ctx, &db.UpdateTeamParams{
 		TeamID:      req.GetId(),
 		Name:        req.Name,
 		Description: req.Description,
-		// An update replaces the tags. The query keeps the old ones for nil.
-		Tags: append([]string{}, req.GetTags()...),
+		Tags:        maskedList(named("tags"), req.GetTags()),
 	})
 	if err != nil {
 		return nil, err

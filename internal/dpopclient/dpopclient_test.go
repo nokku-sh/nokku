@@ -274,26 +274,6 @@ func TestProofBindsToTheConfiguredURL(t *testing.T) {
 	assert.Equal(t, "n", got["nonce"], "a proof asked for by hand skipped the nonce fetch")
 }
 
-func TestSameURL(t *testing.T) {
-	for name, tc := range map[string]struct {
-		advertised string
-		same       bool
-	}{
-		"equal":          {"https://api.example.com", true},
-		"host case":      {"https://API.example.com", true},
-		"default port":   {"https://api.example.com:443", true},
-		"trailing slash": {"https://api.example.com/", true},
-		"other host":     {"https://other.example.com", false},
-		"other port":     {"https://api.example.com:8443", false},
-		"other scheme":   {"http://api.example.com", false},
-		"path prefix":    {"https://api.example.com/nokku", false},
-	} {
-		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.same, sameURL(tc.advertised, testBase))
-		})
-	}
-}
-
 func TestFetchNonceRefusesAServerAtAnotherURL(t *testing.T) {
 	tr := &countingTransport{nonce: "n", base: "https://other.example.com"}
 

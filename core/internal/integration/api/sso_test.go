@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -197,10 +198,33 @@ func TestEnforceSSOIsGated(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
 	_, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner)).
-		UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
+		UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
-		})
+		}))
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "got %v", err)
+}
+
+// A field the mask leaves out is not changed, so it cannot trip a plan gate either. A client may send back the whole
+// workspace it read and name only what it changes.
+func TestPlanGateReadsOnlyMaskedFields(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	owner := header(
+		"Authorization",
+		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+	)
+	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner),
+	)
+	got, err := workspaces.GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
+	require.NoError(t, err)
+
+	updated, err := workspaces.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
+		Description: new(got.GetWorkspace().GetDescription()),
+		Settings:    &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
+		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"description"}},
+	})
+	require.NoError(t, err, "a gated field outside the mask refused the call")
+	assert.False(t, updated.GetWorkspace().GetSettings().GetEnforceSso(), "a field outside the mask was stored")
 }
 
 // Requiring single sign-on signs out everyone a passkey or a mailed link let in, in the browser and in nk. The owner
@@ -228,20 +252,20 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
 		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
 	)
-	_, err := workspaces.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
+	_, err := workspaces.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
 		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
-	})
+	}))
 	require.NoError(t, err)
 	// The workspace is shared, and a mailed link fails in every test that runs after this one.
 	t.Cleanup(func() {
-		_, err := workspaces.UpdateWorkspace(context.WithoutCancel(t.Context()), &nokkuv1.UpdateWorkspaceRequest{
+		_, err := workspaces.UpdateWorkspace(context.WithoutCancel(t.Context()), masked(&nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)},
-		})
+		}))
 		assert.NoError(t, err, "turning single sign-on back off")
 	})
 
 	for token, stays := range sessions {
-		_, tok, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), token)
+		_, tok, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), token, accessTokens...)
 		if stays {
 			assert.NoError(t, err, "a %s session of kind %s was ended", tok.Method, tok.Kind)
 		} else {

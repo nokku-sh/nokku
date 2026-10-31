@@ -7,6 +7,9 @@
 	# unencrypted HTTP/2 (h2c), so advertise both to the upstream.
 	# WebSockets (/terminal/ws) are proxied transparently.
 	reverse_proxy nokku:3000 {
+		# Holds requests during a restart instead of a 502. A POST that reached the core never runs twice.
+		lb_try_duration 10s
+		lb_try_interval 100ms
 		transport http {
 			versions h2c 1.1
 		}

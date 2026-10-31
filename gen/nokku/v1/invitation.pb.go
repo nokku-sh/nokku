@@ -23,6 +23,74 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Invitation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         *string                `protobuf:"bytes,1,opt,name=email" json:"email,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,2,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Invitation) Reset() {
+	*x = Invitation{}
+	mi := &file_nokku_v1_invitation_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Invitation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Invitation) ProtoMessage() {}
+
+func (x *Invitation) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_invitation_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Invitation.ProtoReflect.Descriptor instead.
+func (*Invitation) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Invitation) GetEmail() string {
+	if x != nil && x.Email != nil {
+		return *x.Email
+	}
+	return ""
+}
+
+func (x *Invitation) GetRole() WorkspaceRole {
+	if x != nil && x.Role != nil {
+		return *x.Role
+	}
+	return WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
+}
+
+func (x *Invitation) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *Invitation) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 type GetInvitationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
@@ -32,7 +100,7 @@ type GetInvitationRequest struct {
 
 func (x *GetInvitationRequest) Reset() {
 	*x = GetInvitationRequest{}
-	mi := &file_nokku_v1_invitation_proto_msgTypes[0]
+	mi := &file_nokku_v1_invitation_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +112,7 @@ func (x *GetInvitationRequest) String() string {
 func (*GetInvitationRequest) ProtoMessage() {}
 
 func (x *GetInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_invitation_proto_msgTypes[0]
+	mi := &file_nokku_v1_invitation_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +125,7 @@ func (x *GetInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInvitationRequest.ProtoReflect.Descriptor instead.
 func (*GetInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{0}
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetInvitationRequest) GetToken() string {
@@ -72,13 +140,14 @@ type GetInvitationResponse struct {
 	WorkspaceName *string                `protobuf:"bytes,1,opt,name=workspace_name,json=workspaceName" json:"workspace_name,omitempty"`
 	Role          *WorkspaceRole         `protobuf:"varint,2,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
 	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	Email         *string                `protobuf:"bytes,4,opt,name=email" json:"email,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetInvitationResponse) Reset() {
 	*x = GetInvitationResponse{}
-	mi := &file_nokku_v1_invitation_proto_msgTypes[1]
+	mi := &file_nokku_v1_invitation_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -90,7 +159,7 @@ func (x *GetInvitationResponse) String() string {
 func (*GetInvitationResponse) ProtoMessage() {}
 
 func (x *GetInvitationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_invitation_proto_msgTypes[1]
+	mi := &file_nokku_v1_invitation_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -103,7 +172,7 @@ func (x *GetInvitationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInvitationResponse.ProtoReflect.Descriptor instead.
 func (*GetInvitationResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{1}
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetInvitationResponse) GetWorkspaceName() string {
@@ -127,18 +196,24 @@ func (x *GetInvitationResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *GetInvitationResponse) GetEmail() string {
+	if x != nil && x.Email != nil {
+		return *x.Email
+	}
+	return ""
+}
+
 type AcceptInvitationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
 	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Email         *string                `protobuf:"bytes,3,opt,name=email" json:"email,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AcceptInvitationRequest) Reset() {
 	*x = AcceptInvitationRequest{}
-	mi := &file_nokku_v1_invitation_proto_msgTypes[2]
+	mi := &file_nokku_v1_invitation_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -150,7 +225,7 @@ func (x *AcceptInvitationRequest) String() string {
 func (*AcceptInvitationRequest) ProtoMessage() {}
 
 func (x *AcceptInvitationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_invitation_proto_msgTypes[2]
+	mi := &file_nokku_v1_invitation_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -163,7 +238,7 @@ func (x *AcceptInvitationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptInvitationRequest.ProtoReflect.Descriptor instead.
 func (*AcceptInvitationRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{2}
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AcceptInvitationRequest) GetToken() string {
@@ -180,22 +255,16 @@ func (x *AcceptInvitationRequest) GetName() string {
 	return ""
 }
 
-func (x *AcceptInvitationRequest) GetEmail() string {
-	if x != nil && x.Email != nil {
-		return *x.Email
-	}
-	return ""
-}
-
 type AcceptInvitationResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AcceptInvitationResponse) Reset() {
 	*x = AcceptInvitationResponse{}
-	mi := &file_nokku_v1_invitation_proto_msgTypes[3]
+	mi := &file_nokku_v1_invitation_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -207,7 +276,7 @@ func (x *AcceptInvitationResponse) String() string {
 func (*AcceptInvitationResponse) ProtoMessage() {}
 
 func (x *AcceptInvitationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_invitation_proto_msgTypes[3]
+	mi := &file_nokku_v1_invitation_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -220,29 +289,329 @@ func (x *AcceptInvitationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptInvitationResponse.ProtoReflect.Descriptor instead.
 func (*AcceptInvitationResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{3}
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AcceptInvitationResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+type CreateInvitationRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Email *string                `protobuf:"bytes,1,opt,name=email" json:"email,omitempty"`
+	// No role is a member. The owner is never invited.
+	Role          *WorkspaceRole `protobuf:"varint,2,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateInvitationRequest) Reset() {
+	*x = CreateInvitationRequest{}
+	mi := &file_nokku_v1_invitation_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateInvitationRequest) ProtoMessage() {}
+
+func (x *CreateInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_invitation_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateInvitationRequest.ProtoReflect.Descriptor instead.
+func (*CreateInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CreateInvitationRequest) GetEmail() string {
+	if x != nil && x.Email != nil {
+		return *x.Email
+	}
+	return ""
+}
+
+func (x *CreateInvitationRequest) GetRole() WorkspaceRole {
+	if x != nil && x.Role != nil {
+		return *x.Role
+	}
+	return WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
+}
+
+type CreateInvitationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Invitation    *Invitation            `protobuf:"bytes,1,opt,name=invitation" json:"invitation,omitempty"`
+	Link          *string                `protobuf:"bytes,2,opt,name=link" json:"link,omitempty"` // Set only when the server sends no mail.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateInvitationResponse) Reset() {
+	*x = CreateInvitationResponse{}
+	mi := &file_nokku_v1_invitation_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateInvitationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateInvitationResponse) ProtoMessage() {}
+
+func (x *CreateInvitationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_invitation_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateInvitationResponse.ProtoReflect.Descriptor instead.
+func (*CreateInvitationResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CreateInvitationResponse) GetInvitation() *Invitation {
+	if x != nil {
+		return x.Invitation
+	}
+	return nil
+}
+
+func (x *CreateInvitationResponse) GetLink() string {
+	if x != nil && x.Link != nil {
+		return *x.Link
+	}
+	return ""
+}
+
+type ListInvitationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInvitationsRequest) Reset() {
+	*x = ListInvitationsRequest{}
+	mi := &file_nokku_v1_invitation_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInvitationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInvitationsRequest) ProtoMessage() {}
+
+func (x *ListInvitationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_invitation_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInvitationsRequest.ProtoReflect.Descriptor instead.
+func (*ListInvitationsRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{7}
+}
+
+type ListInvitationsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Invitations   []*Invitation          `protobuf:"bytes,1,rep,name=invitations" json:"invitations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInvitationsResponse) Reset() {
+	*x = ListInvitationsResponse{}
+	mi := &file_nokku_v1_invitation_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInvitationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInvitationsResponse) ProtoMessage() {}
+
+func (x *ListInvitationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_invitation_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInvitationsResponse.ProtoReflect.Descriptor instead.
+func (*ListInvitationsResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListInvitationsResponse) GetInvitations() []*Invitation {
+	if x != nil {
+		return x.Invitations
+	}
+	return nil
+}
+
+type DeleteInvitationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         *string                `protobuf:"bytes,1,opt,name=email" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteInvitationRequest) Reset() {
+	*x = DeleteInvitationRequest{}
+	mi := &file_nokku_v1_invitation_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteInvitationRequest) ProtoMessage() {}
+
+func (x *DeleteInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_invitation_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteInvitationRequest.ProtoReflect.Descriptor instead.
+func (*DeleteInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DeleteInvitationRequest) GetEmail() string {
+	if x != nil && x.Email != nil {
+		return *x.Email
+	}
+	return ""
+}
+
+type DeleteInvitationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteInvitationResponse) Reset() {
+	*x = DeleteInvitationResponse{}
+	mi := &file_nokku_v1_invitation_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteInvitationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteInvitationResponse) ProtoMessage() {}
+
+func (x *DeleteInvitationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_invitation_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteInvitationResponse.ProtoReflect.Descriptor instead.
+func (*DeleteInvitationResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_invitation_proto_rawDescGZIP(), []int{10}
 }
 
 var File_nokku_v1_invitation_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_invitation_proto_rawDesc = "" +
 	"\n" +
-	"\x19nokku/v1/invitation.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"5\n" +
+	"\x19nokku/v1/invitation.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"\xc5\x01\n" +
+	"\n" +
+	"Invitation\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\x12+\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x129\n" +
+	"\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"5\n" +
 	"\x14GetInvitationRequest\x12\x1d\n" +
-	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\"\xa6\x01\n" +
+	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\"\xbc\x01\n" +
 	"\x15GetInvitationResponse\x12%\n" +
 	"\x0eworkspace_name\x18\x01 \x01(\tR\rworkspaceName\x12+\n" +
 	"\x04role\x18\x02 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"u\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\"X\n" +
 	"\x17AcceptInvitationRequest\x12\x1d\n" +
-	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\x12\x1c\n" +
-	"\x04name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x04name\x12\x1d\n" +
-	"\x05email\x18\x03 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"\x1a\n" +
-	"\x18AcceptInvitationResponse2\xd3\x01\n" +
+	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\x12\x1e\n" +
+	"\x04name\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04name\">\n" +
+	"\x18AcceptInvitationResponse\x12\"\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\"w\n" +
+	"\x17CreateInvitationRequest\x12\x1d\n" +
+	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12=\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleB\x10\xbaH\r\x82\x01\n" +
+	"\x18\x00\x18\x01\x18\x02\x18\x03\x18\x04R\x04role\"d\n" +
+	"\x18CreateInvitationResponse\x124\n" +
+	"\n" +
+	"invitation\x18\x01 \x01(\v2\x14.nokku.v1.InvitationR\n" +
+	"invitation\x12\x12\n" +
+	"\x04link\x18\x02 \x01(\tR\x04link\"\x18\n" +
+	"\x16ListInvitationsRequest\"Q\n" +
+	"\x17ListInvitationsResponse\x126\n" +
+	"\vinvitations\x18\x01 \x03(\v2\x14.nokku.v1.InvitationR\vinvitations\"8\n" +
+	"\x17DeleteInvitationRequest\x12\x1d\n" +
+	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"\x1a\n" +
+	"\x18DeleteInvitationResponse2\xfe\x03\n" +
 	"\x11InvitationService\x12[\n" +
 	"\rGetInvitation\x12\x1e.nokku.v1.GetInvitationRequest\x1a\x1f.nokku.v1.GetInvitationResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12a\n" +
-	"\x10AcceptInvitation\x12!.nokku.v1.AcceptInvitationRequest\x1a\".nokku.v1.AcceptInvitationResponse\"\x06\xc2\xf3\x18\x02\b\x01B\x90\x01\n" +
+	"\x10AcceptInvitation\x12!.nokku.v1.AcceptInvitationRequest\x1a\".nokku.v1.AcceptInvitationResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12c\n" +
+	"\x10CreateInvitation\x12!.nokku.v1.CreateInvitationRequest\x1a\".nokku.v1.CreateInvitationResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12a\n" +
+	"\x0fListInvitations\x12 .nokku.v1.ListInvitationsRequest\x1a!.nokku.v1.ListInvitationsResponse\"\t\xc2\xf3\x18\x02\x18\x04\x90\x02\x01\x12a\n" +
+	"\x10DeleteInvitation\x12!.nokku.v1.DeleteInvitationRequest\x1a\".nokku.v1.DeleteInvitationResponse\"\x06\xc2\xf3\x18\x02\x18\x04B\x90\x01\n" +
 	"\fcom.nokku.v1B\x0fInvitationProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -257,27 +626,48 @@ func file_nokku_v1_invitation_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_invitation_proto_rawDescData
 }
 
-var file_nokku_v1_invitation_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_nokku_v1_invitation_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_nokku_v1_invitation_proto_goTypes = []any{
-	(*GetInvitationRequest)(nil),     // 0: nokku.v1.GetInvitationRequest
-	(*GetInvitationResponse)(nil),    // 1: nokku.v1.GetInvitationResponse
-	(*AcceptInvitationRequest)(nil),  // 2: nokku.v1.AcceptInvitationRequest
-	(*AcceptInvitationResponse)(nil), // 3: nokku.v1.AcceptInvitationResponse
-	(WorkspaceRole)(0),               // 4: nokku.v1.WorkspaceRole
-	(*timestamppb.Timestamp)(nil),    // 5: google.protobuf.Timestamp
+	(*Invitation)(nil),               // 0: nokku.v1.Invitation
+	(*GetInvitationRequest)(nil),     // 1: nokku.v1.GetInvitationRequest
+	(*GetInvitationResponse)(nil),    // 2: nokku.v1.GetInvitationResponse
+	(*AcceptInvitationRequest)(nil),  // 3: nokku.v1.AcceptInvitationRequest
+	(*AcceptInvitationResponse)(nil), // 4: nokku.v1.AcceptInvitationResponse
+	(*CreateInvitationRequest)(nil),  // 5: nokku.v1.CreateInvitationRequest
+	(*CreateInvitationResponse)(nil), // 6: nokku.v1.CreateInvitationResponse
+	(*ListInvitationsRequest)(nil),   // 7: nokku.v1.ListInvitationsRequest
+	(*ListInvitationsResponse)(nil),  // 8: nokku.v1.ListInvitationsResponse
+	(*DeleteInvitationRequest)(nil),  // 9: nokku.v1.DeleteInvitationRequest
+	(*DeleteInvitationResponse)(nil), // 10: nokku.v1.DeleteInvitationResponse
+	(WorkspaceRole)(0),               // 11: nokku.v1.WorkspaceRole
+	(*timestamppb.Timestamp)(nil),    // 12: google.protobuf.Timestamp
+	(*User)(nil),                     // 13: nokku.v1.User
 }
 var file_nokku_v1_invitation_proto_depIdxs = []int32{
-	4, // 0: nokku.v1.GetInvitationResponse.role:type_name -> nokku.v1.WorkspaceRole
-	5, // 1: nokku.v1.GetInvitationResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 2: nokku.v1.InvitationService.GetInvitation:input_type -> nokku.v1.GetInvitationRequest
-	2, // 3: nokku.v1.InvitationService.AcceptInvitation:input_type -> nokku.v1.AcceptInvitationRequest
-	1, // 4: nokku.v1.InvitationService.GetInvitation:output_type -> nokku.v1.GetInvitationResponse
-	3, // 5: nokku.v1.InvitationService.AcceptInvitation:output_type -> nokku.v1.AcceptInvitationResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	11, // 0: nokku.v1.Invitation.role:type_name -> nokku.v1.WorkspaceRole
+	12, // 1: nokku.v1.Invitation.expires_at:type_name -> google.protobuf.Timestamp
+	12, // 2: nokku.v1.Invitation.created_at:type_name -> google.protobuf.Timestamp
+	11, // 3: nokku.v1.GetInvitationResponse.role:type_name -> nokku.v1.WorkspaceRole
+	12, // 4: nokku.v1.GetInvitationResponse.expires_at:type_name -> google.protobuf.Timestamp
+	13, // 5: nokku.v1.AcceptInvitationResponse.user:type_name -> nokku.v1.User
+	11, // 6: nokku.v1.CreateInvitationRequest.role:type_name -> nokku.v1.WorkspaceRole
+	0,  // 7: nokku.v1.CreateInvitationResponse.invitation:type_name -> nokku.v1.Invitation
+	0,  // 8: nokku.v1.ListInvitationsResponse.invitations:type_name -> nokku.v1.Invitation
+	1,  // 9: nokku.v1.InvitationService.GetInvitation:input_type -> nokku.v1.GetInvitationRequest
+	3,  // 10: nokku.v1.InvitationService.AcceptInvitation:input_type -> nokku.v1.AcceptInvitationRequest
+	5,  // 11: nokku.v1.InvitationService.CreateInvitation:input_type -> nokku.v1.CreateInvitationRequest
+	7,  // 12: nokku.v1.InvitationService.ListInvitations:input_type -> nokku.v1.ListInvitationsRequest
+	9,  // 13: nokku.v1.InvitationService.DeleteInvitation:input_type -> nokku.v1.DeleteInvitationRequest
+	2,  // 14: nokku.v1.InvitationService.GetInvitation:output_type -> nokku.v1.GetInvitationResponse
+	4,  // 15: nokku.v1.InvitationService.AcceptInvitation:output_type -> nokku.v1.AcceptInvitationResponse
+	6,  // 16: nokku.v1.InvitationService.CreateInvitation:output_type -> nokku.v1.CreateInvitationResponse
+	8,  // 17: nokku.v1.InvitationService.ListInvitations:output_type -> nokku.v1.ListInvitationsResponse
+	10, // 18: nokku.v1.InvitationService.DeleteInvitation:output_type -> nokku.v1.DeleteInvitationResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_invitation_proto_init() }
@@ -286,13 +676,14 @@ func file_nokku_v1_invitation_proto_init() {
 		return
 	}
 	file_nokku_v1_access_proto_init()
+	file_nokku_v1_account_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_invitation_proto_rawDesc), len(file_nokku_v1_invitation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

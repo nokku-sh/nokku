@@ -7,11 +7,11 @@ type linkTemplateData struct {
 	Expiration string
 }
 
-type signupTemplateData struct {
+type inviteTemplateData struct {
 	Operator Operator
 
-	UserName   string
 	Workspace  string
+	Role       string
 	LinkURL    string
 	Expiration string
 }
@@ -30,6 +30,15 @@ type newLoginTemplateData struct {
 	ProfileURL string
 	DeviceID   string
 	DeviceName string
+	IPAddress  string
+	EventTime  string
+}
+
+type newWayInTemplateData struct {
+	Operator Operator
+
+	ProfileURL string
+	What       string
 	IPAddress  string
 	EventTime  string
 }

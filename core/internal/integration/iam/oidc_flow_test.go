@@ -128,7 +128,11 @@ func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *iam.Service) *oidcFlow
 func (h *oidcIDPHarness) startOIDCFlowFrom(t *testing.T, svc *iam.Service, login *http.Request) *oidcFlowRun {
 	t.Helper()
 	loginRec := httptest.NewRecorder()
-	svc.OIDC.Login(loginRec, login)
+	start := svc.OIDC.Login
+	if login.URL.Path == "/oidc/link" {
+		start = svc.OIDC.Link
+	}
+	start(loginRec, login)
 
 	authorizeURL := loginRec.Header().Get("Location")
 	if authorizeURL == "" {
@@ -184,7 +188,12 @@ func (h *oidcIDPHarness) setup(t *testing.T, jit bool) (*testEnv, *iam.Service) 
 
 func (h *oidcIDPHarness) setupProvider(t *testing.T, p iam.OIDCProvider) (*testEnv, *iam.Service) {
 	t.Helper()
-	e := newTestEnv(t)
+	return h.setupWith(t, p, iam.Deps{})
+}
+
+func (h *oidcIDPHarness) setupWith(t *testing.T, p iam.OIDCProvider, deps iam.Deps) (*testEnv, *iam.Service) {
+	t.Helper()
+	e := newTestEnvWith(t, deps)
 	h.org = e.org(t)
 	h.email = "alice@" + testDomain()
 	p.IssuerURL, p.ClientID, p.ClientSecret = h.issuer, h.m.ClientID, h.m.ClientSecret
@@ -343,16 +352,30 @@ func TestOIDCFlowUnverifiedEmail(t *testing.T) {
 	}
 }
 
-// Entra sends no email_verified at all.
+// Entra sends no email_verified at all. A new account takes such an address only when the owner trusts the provider,
+// or whoever picks the address there could create the account a later invite or SCIM adopts.
 func TestOIDCFlowMissingEmailVerified(t *testing.T) {
-	h := newOIDCIdP(t)
-	h.user()
-	h.mintBadToken(t, map[string]any{"email_verified": nil})
-	e, svc := h.setup(t, true)
+	for name, trust := range map[string]bool{"refused": false, "trusted": true} {
+		t.Run(name, func(t *testing.T) {
+			h := newOIDCIdP(t)
+			h.user()
+			h.mintBadToken(t, map[string]any{"email_verified": nil})
+			e, svc := h.setupProvider(t, iam.OIDCProvider{JITProvisioning: true, TrustUnverifiedEmail: trust})
 
-	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
-	if e.userByEmail(t, h.org.ws, h.email) == nil {
-		t.Error("a provider without the claim could not sign in")
+			rec := h.runOIDCFlow(t, svc, "")
+			created := e.userByEmail(t, h.org.ws, h.email) != nil
+			if !trust {
+				wantSSOFailure(t, rec)
+				if created {
+					t.Error("an address nobody vouched for got an account")
+				}
+				return
+			}
+			wantSSOSuccess(t, rec)
+			if !created {
+				t.Error("a trusted provider without the claim could not sign in")
+			}
+		})
 	}
 }
 
@@ -477,7 +500,7 @@ func signIDToken(t *testing.T, key *rsa.PrivateKey, kid string, claims map[strin
 
 // linkRequest is what the profile page's link button sends.
 func linkRequest(ctx context.Context) *http.Request {
-	r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/oidc/login?provider="+testProviderID+"&link=true", nil)
+	r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/oidc/link?provider="+testProviderID, nil)
 	r.Header.Set("Sec-Fetch-Site", "same-origin")
 	return r
 }
@@ -490,7 +513,13 @@ func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
 	h.user()
 
 	f := h.startOIDCFlowFrom(t, svc, linkRequest(as(t.Context(), h.org.ws, existing)))
-	wantSSOSuccess(t, f.callback(t, svc, ""))
+	rec := f.callback(t, svc, "")
+	wantSSOSuccess(t, rec)
+	for _, c := range rec.Result().Cookies() {
+		if strings.HasSuffix(c.Name, "nokku_session") && c.Value != "" {
+			t.Errorf("the link started a second session %s, it must keep the one that asked", c.Name)
+		}
+	}
 
 	if c := e.oidcCredential(
 		t,
@@ -552,7 +581,7 @@ func TestOIDCFlowRefusedLinkStops(t *testing.T) {
 	_, svc := h.setup(t, true)
 
 	rec := httptest.NewRecorder()
-	svc.OIDC.Login(rec, linkRequest(anon(t.Context(), h.org.ws)))
+	svc.OIDC.Link(rec, linkRequest(anon(t.Context(), h.org.ws)))
 	wantSSOFailure(t, rec)
 	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "link+refused") {
 		t.Errorf("redirect = %q, want the link refused message", loc)

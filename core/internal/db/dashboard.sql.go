@@ -70,7 +70,7 @@ SELECT
       JOIN daemons d ON d.workspace_id = t.workspace_id
       AND d.id = t.daemon_id
     WHERE
-      d.last_seen_at > $1::TIMESTAMPTZ
+      COALESCE(d.id = ANY ($1::UUID[]), FALSE)
   )::INTEGER AS targets_online,
   (
     SELECT
@@ -97,7 +97,7 @@ FROM
       (COUNT(*) FILTER (
         WHERE
           status <> 1 -- pending
-          AND last_seen_at > $1::TIMESTAMPTZ
+          AND COALESCE(id = ANY ($1::UUID[]), FALSE)
       ))::INTEGER AS online
     FROM
       daemons
@@ -113,8 +113,8 @@ type DashboardCountsRow struct {
 	DaemonsOnline int32 `json:"daemonsOnline"`
 }
 
-func (q *Queries) DashboardCounts(ctx context.Context, seenAfter time.Time) (*DashboardCountsRow, error) {
-	row := q.db.QueryRow(ctx, dashboardCounts, seenAfter)
+func (q *Queries) DashboardCounts(ctx context.Context, connected []string) (*DashboardCountsRow, error) {
+	row := q.db.QueryRow(ctx, dashboardCounts, connected)
 	var i DashboardCountsRow
 	err := row.Scan(
 		&i.Targets,
@@ -129,20 +129,20 @@ func (q *Queries) DashboardCounts(ctx context.Context, seenAfter time.Time) (*Da
 
 const listOfflineDaemons = `-- name: ListOfflineDaemons :many
 SELECT
-  id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, join_token_id, retire_after, updated_at, created_at
+  id, workspace_id, join_token_id, name, key_thumbprint, version, status, config, retire_after, last_seen_at, created_at, updated_at
 FROM
   daemons
 WHERE
   status = 2 -- accepted
-  AND COALESCE(last_seen_at <= $1::TIMESTAMPTZ, TRUE)
+  AND NOT COALESCE(id = ANY ($1::UUID[]), FALSE)
 ORDER BY
   id ASC
 LIMIT
   5
 `
 
-func (q *Queries) ListOfflineDaemons(ctx context.Context, seenAfter time.Time) ([]*Daemon, error) {
-	rows, err := q.db.Query(ctx, listOfflineDaemons, seenAfter)
+func (q *Queries) ListOfflineDaemons(ctx context.Context, connected []string) ([]*Daemon, error) {
+	rows, err := q.db.Query(ctx, listOfflineDaemons, connected)
 	if err != nil {
 		return nil, err
 	}
@@ -153,16 +153,16 @@ func (q *Queries) ListOfflineDaemons(ctx context.Context, seenAfter time.Time) (
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
-			&i.Name,
-			&i.Status,
-			&i.LastSeenAt,
-			&i.KeyThumbprint,
-			&i.Config,
-			&i.Metadata,
 			&i.JoinTokenID,
+			&i.Name,
+			&i.KeyThumbprint,
+			&i.Version,
+			&i.Status,
+			&i.Config,
 			&i.RetireAfter,
-			&i.UpdatedAt,
+			&i.LastSeenAt,
 			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ FROM
 WHERE
   r.ended_at IS NULL
   AND r.started_at > NOW() - INTERVAL '24 hours'
-  AND d.last_seen_at > $1::TIMESTAMPTZ
+  AND COALESCE(d.id = ANY ($1::UUID[]), FALSE)
 ORDER BY
   r.started_at DESC
 LIMIT
@@ -203,8 +203,8 @@ type ListOpenRecordingsRow struct {
 }
 
 // A crashed daemon never closes its recordings, so only trust open ones behind a connected daemon.
-func (q *Queries) ListOpenRecordings(ctx context.Context, seenAfter time.Time) ([]*ListOpenRecordingsRow, error) {
-	rows, err := q.db.Query(ctx, listOpenRecordings, seenAfter)
+func (q *Queries) ListOpenRecordings(ctx context.Context, connected []string) ([]*ListOpenRecordingsRow, error) {
+	rows, err := q.db.Query(ctx, listOpenRecordings, connected)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (q *Queries) ListOpenRecordings(ctx context.Context, seenAfter time.Time) (
 
 const listPendingDaemons = `-- name: ListPendingDaemons :many
 SELECT
-  id, workspace_id, name, status, last_seen_at, key_thumbprint, config, metadata, join_token_id, retire_after, updated_at, created_at
+  id, workspace_id, join_token_id, name, key_thumbprint, version, status, config, retire_after, last_seen_at, created_at, updated_at
 FROM
   daemons
 WHERE
@@ -255,16 +255,16 @@ func (q *Queries) ListPendingDaemons(ctx context.Context) ([]*Daemon, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
-			&i.Name,
-			&i.Status,
-			&i.LastSeenAt,
-			&i.KeyThumbprint,
-			&i.Config,
-			&i.Metadata,
 			&i.JoinTokenID,
+			&i.Name,
+			&i.KeyThumbprint,
+			&i.Version,
+			&i.Status,
+			&i.Config,
 			&i.RetireAfter,
-			&i.UpdatedAt,
+			&i.LastSeenAt,
 			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

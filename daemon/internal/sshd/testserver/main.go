@@ -11,6 +11,8 @@ import (
 	"os/user"
 	"syscall"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 	"github.com/nokku-sh/nokku/daemon/internal/sshd"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
@@ -21,7 +23,7 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:0", "listen address")
 	configDir := flag.String(
 		"config-dir", "",
-		"state directory holding cache.json and the host key",
+		"state directory holding daemon.json and the host key",
 	)
 	allowNonRoot := flag.Bool("allow-nonroot", false, "run as non-root, sessions restricted to this account")
 	flag.Parse()
@@ -49,33 +51,26 @@ func main() {
 		fail(err.Error())
 	}
 
-	cache := state.NewCache()
-	if err := cache.Load(); err != nil {
+	st, err := state.Load()
+	if err != nil {
 		fail(err.Error())
 	}
-
-	policy := sshd.DefaultPolicy
-	policy.Record = false
-	opts := sshd.Options{Principals: cache.CertPrincipals, Policy: policy}
+	access := *st.Access()
+	access.DaemonConfig = &nokkuv1.DaemonConfig{RecordSessions: new(false)}
 	if *allowNonRoot {
 		// Without privilege dropping every session runs as this account, so only this account may log in.
 		self, userErr := user.Current()
 		if userErr != nil {
 			fail(userErr.Error())
 		}
-		opts.Principals = func(username string) []string {
-			if username != self.Username {
-				return nil
-			}
-			return cache.CertPrincipals(username)
-		}
+		access.Principals = map[string][]string{self.Username: access.Principals[self.Username]}
 	}
 
-	srv, err := sshd.New(opts)
+	srv, err := sshd.New(nil)
 	if err != nil {
 		fail(err.Error())
 	}
-	srv.SetTrust(cache.CAs())
+	srv.SetAccess(&access)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

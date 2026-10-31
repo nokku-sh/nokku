@@ -85,19 +85,19 @@ type AuditAuditLog struct {
 }
 
 type AuditStream struct {
-	ID           string                `json:"id"`
-	WorkspaceID  string                `json:"workspaceId"`
-	Kind         string                `json:"kind"`
-	URL          string                `json:"url"`
-	Secret       crypto.EncryptedBytes `json:"secret"`
-	Enabled      bool                  `json:"enabled"`
-	CursorTs     time.Time             `json:"cursorTs"`
-	CursorID     string                `json:"cursorId"`
-	LastSentAt   *time.Time            `json:"lastSentAt"`
-	LastError    string                `json:"lastError"`
-	FailingSince *time.Time            `json:"failingSince"`
-	RetryAt      *time.Time            `json:"retryAt"`
-	CreatedAt    time.Time             `json:"createdAt"`
+	ID           string        `json:"id"`
+	WorkspaceID  string        `json:"workspaceId"`
+	Kind         string        `json:"kind"`
+	URL          string        `json:"url"`
+	Secret       crypto.Sealed `json:"secret"`
+	Enabled      bool          `json:"enabled"`
+	CursorTs     time.Time     `json:"cursorTs"`
+	CursorID     string        `json:"cursorId"`
+	LastSentAt   *time.Time    `json:"lastSentAt"`
+	LastError    string        `json:"lastError"`
+	FailingSince *time.Time    `json:"failingSince"`
+	RetryAt      *time.Time    `json:"retryAt"`
+	CreatedAt    time.Time     `json:"createdAt"`
 }
 
 type Credential struct {
@@ -117,16 +117,16 @@ type Credential struct {
 type Daemon struct {
 	ID            string              `json:"id"`
 	WorkspaceID   string              `json:"workspaceId"`
-	Name          string              `json:"name"`
-	Status        nokku.DaemonStatus  `json:"status"`
-	LastSeenAt    *time.Time          `json:"lastSeenAt"`
-	KeyThumbprint *string             `json:"keyThumbprint"`
-	Config        *nokku.DaemonConfig `json:"config"`
-	Metadata      []byte              `json:"metadata"`
 	JoinTokenID   *string             `json:"joinTokenId"`
+	Name          string              `json:"name"`
+	KeyThumbprint *string             `json:"keyThumbprint"`
+	Version       string              `json:"version"`
+	Status        nokku.DaemonStatus  `json:"status"`
+	Config        *nokku.DaemonConfig `json:"config"`
 	RetireAfter   *time.Duration      `json:"retireAfter"`
-	UpdatedAt     time.Time           `json:"updatedAt"`
+	LastSeenAt    *time.Time          `json:"lastSeenAt"`
 	CreatedAt     time.Time           `json:"createdAt"`
+	UpdatedAt     time.Time           `json:"updatedAt"`
 }
 
 type DeviceGrant struct {
@@ -142,6 +142,19 @@ type DeviceGrant struct {
 	Violations     int32              `json:"violations"`
 	ExpiresAt      time.Time          `json:"expiresAt"`
 	CreatedAt      time.Time          `json:"createdAt"`
+}
+
+type EffectiveAccess struct {
+	WorkspaceID string      `json:"workspaceId"`
+	TargetID    string      `json:"targetId"`
+	Username    string      `json:"username"`
+	SubjectKind *string     `json:"subjectKind"`
+	SubjectID   string      `json:"subjectId"`
+	TeamID      *string     `json:"teamId"`
+	GrantedAt   time.Time   `json:"grantedAt"`
+	ExpiresAt   *time.Time  `json:"expiresAt"`
+	UserOk      bool        `json:"userOk"`
+	DaemonOk    interface{} `json:"daemonOk"`
 }
 
 type Grant struct {
@@ -163,21 +176,19 @@ type InstanceLicense struct {
 }
 
 type JoinToken struct {
-	ID          string               `json:"id"`
-	WorkspaceID string               `json:"workspaceId"`
-	Kind        nokku.JoinTokenKind  `json:"kind"`
-	Label       string               `json:"label"`
-	TokenHash   crypto.HashedToken   `json:"tokenHash"`
-	ExpiresAt   *time.Time           `json:"expiresAt"`
-	MaxUses     *int32               `json:"maxUses"`
-	Uses        int32                `json:"uses"`
-	AutoApprove bool                 `json:"autoApprove"`
-	CaID        *string              `json:"caId"`
-	Role        *nokku.WorkspaceRole `json:"role"`
-	Tags        []string             `json:"tags"`
-	RetireAfter *time.Duration       `json:"retireAfter"`
-	CreatedAt   time.Time            `json:"createdAt"`
-	LastUsedAt  *time.Time           `json:"lastUsedAt"`
+	ID          string             `json:"id"`
+	WorkspaceID string             `json:"workspaceId"`
+	CaID        *string            `json:"caId"`
+	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	Label       string             `json:"label"`
+	Tags        []string           `json:"tags"`
+	AutoApprove bool               `json:"autoApprove"`
+	RetireAfter *time.Duration     `json:"retireAfter"`
+	MaxUses     *int32             `json:"maxUses"`
+	Uses        int32              `json:"uses"`
+	ExpiresAt   *time.Time         `json:"expiresAt"`
+	LastUsedAt  *time.Time         `json:"lastUsedAt"`
+	CreatedAt   time.Time          `json:"createdAt"`
 }
 
 type JoinTokenGrant struct {
@@ -211,16 +222,6 @@ type KnownDevice struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-type LegalHold struct {
-	ID          string     `json:"id"`
-	WorkspaceID string     `json:"workspaceId"`
-	Reason      string     `json:"reason"`
-	StartsAt    time.Time  `json:"startsAt"`
-	EndsAt      *time.Time `json:"endsAt"`
-	CreatedBy   *string    `json:"createdBy"`
-	CreatedAt   time.Time  `json:"createdAt"`
-}
-
 type LiveGrant struct {
 	AccountID        string     `json:"accountId"`
 	WorkspaceID      string     `json:"workspaceId"`
@@ -234,56 +235,68 @@ type LiveGrant struct {
 }
 
 type OneTimeToken struct {
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	WorkspaceID string             `json:"workspaceId"`
-	UserID      *string            `json:"userId"`
-	Purpose     string             `json:"purpose"`
-	Email       *string            `json:"email"`
-	Data        []byte             `json:"data"`
-	ExpiresAt   time.Time          `json:"expiresAt"`
-	CreatedAt   time.Time          `json:"createdAt"`
+	TokenHash   crypto.HashedToken   `json:"tokenHash"`
+	WorkspaceID string               `json:"workspaceId"`
+	UserID      *string              `json:"userId"`
+	Purpose     string               `json:"purpose"`
+	Email       *string              `json:"email"`
+	Role        *nokku.WorkspaceRole `json:"role"`
+	ExpiresAt   time.Time            `json:"expiresAt"`
+	CreatedAt   time.Time            `json:"createdAt"`
 }
 
 type Recording struct {
-	ID          string                `json:"id"`
-	WorkspaceID string                `json:"workspaceId"`
-	DaemonID    *string               `json:"daemonId"`
-	DaemonName  string                `json:"daemonName"`
-	Username    string                `json:"username"`
-	SubjectID   *string               `json:"subjectId"`
-	SubjectName string                `json:"subjectName"`
-	Principal   string                `json:"principal"`
-	Key         crypto.EncryptedBytes `json:"key"`
-	StartedAt   time.Time             `json:"startedAt"`
-	EndedAt     *time.Time            `json:"endedAt"`
-	SizeBytes   int64                 `json:"sizeBytes"`
-	Complete    bool                  `json:"complete"`
-	CreatedAt   time.Time             `json:"createdAt"`
+	ID          string        `json:"id"`
+	WorkspaceID string        `json:"workspaceId"`
+	DaemonID    *string       `json:"daemonId"`
+	DaemonName  string        `json:"daemonName"`
+	Username    string        `json:"username"`
+	SubjectID   *string       `json:"subjectId"`
+	SubjectName string        `json:"subjectName"`
+	Principal   string        `json:"principal"`
+	Key         crypto.Sealed `json:"key"`
+	ObjectID    *string       `json:"objectId"`
+	StartedAt   time.Time     `json:"startedAt"`
+	EndedAt     *time.Time    `json:"endedAt"`
+	SizeBytes   int64         `json:"sizeBytes"`
+	Complete    bool          `json:"complete"`
+}
+
+type RecordingDelete struct {
+	ObjectID    string    `json:"objectId"`
+	WorkspaceID string    `json:"workspaceId"`
+	Attempts    int32     `json:"attempts"`
+	LastError   *string   `json:"lastError"`
+	NextTryAt   time.Time `json:"nextTryAt"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 type SSHCA struct {
-	ID                    string                `json:"id"`
-	WorkspaceID           string                `json:"workspaceId"`
-	Name                  string                `json:"name"`
-	Description           *string               `json:"description"`
-	PrivateKey            crypto.EncryptedBytes `json:"privateKey"`
-	PublicKey             string                `json:"publicKey"`
-	HostPrivateKey        crypto.EncryptedBytes `json:"hostPrivateKey"`
-	HostPublicKey         string                `json:"hostPublicKey"`
-	PreviousPublicKey     *string               `json:"previousPublicKey"`
-	PreviousHostPublicKey *string               `json:"previousHostPublicKey"`
-	PreviousTrustedUntil  *time.Time            `json:"previousTrustedUntil"`
-	RotatedAt             time.Time             `json:"rotatedAt"`
-	IsActive              bool                  `json:"isActive"`
-	IsDefault             bool                  `json:"isDefault"`
-	UserDefaultTtl        time.Duration         `json:"userDefaultTtl"`
-	UserMaxTtl            time.Duration         `json:"userMaxTtl"`
-	ForceCommand          string                `json:"forceCommand"`
-	SourceAddress         string                `json:"sourceAddress"`
-	HostDefaultTtl        time.Duration         `json:"hostDefaultTtl"`
-	HostMaxTtl            time.Duration         `json:"hostMaxTtl"`
-	CreatedAt             time.Time             `json:"createdAt"`
-	UpdatedAt             time.Time             `json:"updatedAt"`
+	ID                    string        `json:"id"`
+	WorkspaceID           string        `json:"workspaceId"`
+	Name                  string        `json:"name"`
+	Description           *string       `json:"description"`
+	IsDefault             bool          `json:"isDefault"`
+	PublicKey             string        `json:"publicKey"`
+	HostPublicKey         string        `json:"hostPublicKey"`
+	PreviousPublicKey     *string       `json:"previousPublicKey"`
+	PreviousHostPublicKey *string       `json:"previousHostPublicKey"`
+	PreviousTrustedUntil  *time.Time    `json:"previousTrustedUntil"`
+	RotatedAt             time.Time     `json:"rotatedAt"`
+	UserDefaultTtl        time.Duration `json:"userDefaultTtl"`
+	UserMaxTtl            time.Duration `json:"userMaxTtl"`
+	HostTtl               time.Duration `json:"hostTtl"`
+	ForceCommand          string        `json:"forceCommand"`
+	SourceAddress         string        `json:"sourceAddress"`
+	CreatedAt             time.Time     `json:"createdAt"`
+	UpdatedAt             time.Time     `json:"updatedAt"`
+}
+
+type SSHCAKey struct {
+	CaID        string        `json:"caId"`
+	WorkspaceID string        `json:"workspaceId"`
+	Kind        string        `json:"kind"`
+	PrivateKey  crypto.Sealed `json:"privateKey"`
 }
 
 type ServiceAccount struct {
@@ -292,26 +305,26 @@ type ServiceAccount struct {
 	Name        string              `json:"name"`
 	Description *string             `json:"description"`
 	Role        nokku.WorkspaceRole `json:"role"`
-	LastUsedAt  *time.Time          `json:"lastUsedAt"`
 	Tags        []string            `json:"tags"`
+	LastUsedAt  *time.Time          `json:"lastUsedAt"`
 	CreatedAt   time.Time           `json:"createdAt"`
 	UpdatedAt   time.Time           `json:"updatedAt"`
 }
 
 type SsoProvider struct {
-	WorkspaceID string                `json:"workspaceId"`
-	ProviderID  string                `json:"providerId"`
-	Name        string                `json:"name"`
-	Enabled     bool                  `json:"enabled"`
-	Config      crypto.EncryptedBytes `json:"config"`
-	CreatedAt   time.Time             `json:"createdAt"`
-	UpdatedAt   time.Time             `json:"updatedAt"`
+	WorkspaceID string        `json:"workspaceId"`
+	ProviderID  string        `json:"providerId"`
+	Name        string        `json:"name"`
+	Enabled     bool          `json:"enabled"`
+	Config      crypto.Sealed `json:"config"`
+	CreatedAt   time.Time     `json:"createdAt"`
+	UpdatedAt   time.Time     `json:"updatedAt"`
 }
 
 type Target struct {
 	ID            string     `json:"id"`
 	WorkspaceID   string     `json:"workspaceId"`
-	CaID          *string    `json:"caId"`
+	CaID          string     `json:"caId"`
 	DaemonID      *string    `json:"daemonId"`
 	Name          string     `json:"name"`
 	Description   *string    `json:"description"`
@@ -372,13 +385,6 @@ type UserAvatar struct {
 	Image       []byte    `json:"image"`
 	Etag        string    `json:"etag"`
 	UpdatedAt   time.Time `json:"updatedAt"`
-}
-
-type WebCA struct {
-	ID          int32                 `json:"id"`
-	PrivateKey  crypto.EncryptedBytes `json:"privateKey"`
-	Certificate []byte                `json:"certificate"`
-	UpdatedAt   time.Time             `json:"updatedAt"`
 }
 
 type Workspace struct {

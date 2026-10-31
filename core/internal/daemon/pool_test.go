@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,9 +30,39 @@ func (stubConn) TenantTx(context.Context, func(*db.Queries) error) error {
 	return nil
 }
 
+// versionConn answers the state version query with what the test stored.
+type versionConn struct {
+	stubConn
+
+	version atomic.Int64
+}
+
+func (c *versionConn) SysTx(_ context.Context, fn func(*db.Queries) error) error {
+	return fn(db.New(c))
+}
+
+func (c *versionConn) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, errors.New("not in this test")
+}
+
+func (c *versionConn) Query(context.Context, string, ...any) (pgx.Rows, error) {
+	return nil, errors.New("not in this test")
+}
+
+func (c *versionConn) QueryRow(context.Context, string, ...any) pgx.Row {
+	return versionRow(c.version.Load())
+}
+
+type versionRow int64
+
+func (r versionRow) Scan(dest ...any) error {
+	*dest[0].(*int64) = int64(r)
+	return nil
+}
+
 func newTestPool(t *testing.T) *Pool {
 	t.Helper()
-	return New(t.Context(), stubConn{})
+	return New(stubConn{})
 }
 
 // waitRelayPending waits for the pending entry, so registerRelay cannot win a race the test isn't about.
@@ -85,6 +117,17 @@ func TestPool_ReconnectStorm(t *testing.T) {
 			t.Errorf("workspace %s still lists %d daemons", wksp, len(daemons))
 		}
 	}
+}
+
+func TestPool_ConnectedIn(t *testing.T) {
+	p := newTestPool(t)
+	p.registerDaemon(t.Context(), "d1", "w1")
+	p.registerDaemon(t.Context(), "d2", "w2")
+	p.registerDaemon(t.Context(), "d3", "w1")
+
+	assert.ElementsMatch(t, []string{"d1", "d3"}, p.ConnectedIn("w1"))
+	assert.Empty(t, p.ConnectedIn("w3"), "a workspace without daemons lists some")
+	assert.ElementsMatch(t, []string{"d1", "d2", "d3"}, p.Connected())
 }
 
 func TestPool_PokeStorm(t *testing.T) {
@@ -401,23 +444,19 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	}
 }
 
-// A beat stamps only newly connected daemons, a full beat every connected one.
-func TestPool_HeartbeatBatch(t *testing.T) {
-	p := newTestPool(t)
-	for range 3 {
-		c := p.registerDaemon(t.Context(), "d1", "w1")
-		p.unregisterDaemon("d1", c)
-	}
-	c := p.registerDaemon(t.Context(), "d2", "w1")
-	defer p.unregisterDaemon("d2", c)
+// The listener may stay connected and still lose a notification. The heartbeat check reads the version on its own,
+// so the daemon hears of the change at its next heartbeat.
+func TestPool_StateVersionNeedsNoListener(t *testing.T) {
+	conn := &versionConn{}
+	conn.version.Store(1)
+	p := New(conn)
 
-	if got := p.heartbeatBatch(false); !slices.Equal(got, []string{"d2"}) {
-		t.Fatalf("beat = %v, want [d2]", got)
-	}
-	if got := p.heartbeatBatch(false); len(got) != 0 {
-		t.Fatalf("second beat = %v, want nothing new", got)
-	}
-	if got := p.heartbeatBatch(true); !slices.Equal(got, []string{"d2"}) {
-		t.Fatalf("full beat = %v, want [d2]", got)
-	}
+	v, err := p.stateVersion(t.Context(), "w1")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), v)
+
+	conn.version.Store(2)
+	v, err = p.stateVersion(t.Context(), "w1")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), v, "the change never reached the heartbeat check")
 }

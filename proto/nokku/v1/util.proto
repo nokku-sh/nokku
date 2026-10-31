@@ -32,11 +32,16 @@ service UtilService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ExportAuditLogs(ExportAuditLogsRequest) returns (ExportAuditLogsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      feature: "audit_export"
+    };
   }
-  // ExportAccessReport is who can log in where and when they last got a certificate there, for an access review.
   rpc ExportAccessReport(ExportAccessReportRequest) returns (ExportAccessReportResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      feature: "access_review"
+    };
   }
   rpc ListMyActivity(ListMyActivityRequest) returns (ListMyActivityResponse) {
     option (access) = {self: true};
@@ -52,6 +57,8 @@ message GetVersionResponse {
 message GetInstanceInfoRequest {}
 
 message GetInstanceInfoResponse {
+  reserved 9;
+
   string operator_name = 1;
   string support_email = 2;
   string website_url = 3;
@@ -60,7 +67,6 @@ message GetInstanceInfoResponse {
   string imprint_url = 6;
   string mode = 7;
   bool signup = 8;
-  string ca_pin = 9;
 }
 
 message WhoamiRequest {}

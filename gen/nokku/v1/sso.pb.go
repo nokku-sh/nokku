@@ -176,10 +176,9 @@ func (*ListSSOProvidersRequest) Descriptor() ([]byte, []int) {
 }
 
 type ListSSOProvidersResponse struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Providers []*SSOProvider         `protobuf:"bytes,1,rep,name=providers" json:"providers,omitempty"`
-	// What the owner registers with every provider.
-	RedirectUri   *string `protobuf:"bytes,2,opt,name=redirect_uri,json=redirectUri" json:"redirect_uri,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Providers     []*SSOProvider         `protobuf:"bytes,1,rep,name=providers" json:"providers,omitempty"`
+	RedirectUri   *string                `protobuf:"bytes,2,opt,name=redirect_uri,json=redirectUri" json:"redirect_uri,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -229,18 +228,16 @@ func (x *ListSSOProvidersResponse) GetRedirectUri() string {
 }
 
 type PutSSOProviderRequest struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	ProviderId *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
-	Name       *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Enabled    *bool                  `protobuf:"varint,3,opt,name=enabled" json:"enabled,omitempty"`
-	IssuerUrl  *string                `protobuf:"bytes,4,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
-	ClientId   *string                `protobuf:"bytes,5,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
-	// Empty keeps the stored secret.
-	ClientSecret    *string  `protobuf:"bytes,6,opt,name=client_secret,json=clientSecret" json:"client_secret,omitempty"`
-	Scopes          []string `protobuf:"bytes,7,rep,name=scopes" json:"scopes,omitempty"`
-	JitProvisioning *bool    `protobuf:"varint,8,opt,name=jit_provisioning,json=jitProvisioning" json:"jit_provisioning,omitempty"`
-	// Links an existing account by an address the provider sends without email_verified, as Entra does.
-	TrustUnverifiedEmail *bool `protobuf:"varint,9,opt,name=trust_unverified_email,json=trustUnverifiedEmail" json:"trust_unverified_email,omitempty"`
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	ProviderId           *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
+	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Enabled              *bool                  `protobuf:"varint,3,opt,name=enabled" json:"enabled,omitempty"`
+	IssuerUrl            *string                `protobuf:"bytes,4,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
+	ClientId             *string                `protobuf:"bytes,5,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
+	ClientSecret         *string                `protobuf:"bytes,6,opt,name=client_secret,json=clientSecret" json:"client_secret,omitempty"`
+	Scopes               []string               `protobuf:"bytes,7,rep,name=scopes" json:"scopes,omitempty"`
+	JitProvisioning      *bool                  `protobuf:"varint,8,opt,name=jit_provisioning,json=jitProvisioning" json:"jit_provisioning,omitempty"`
+	TrustUnverifiedEmail *bool                  `protobuf:"varint,9,opt,name=trust_unverified_email,json=trustUnverifiedEmail" json:"trust_unverified_email,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -506,11 +503,11 @@ const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\x18DeleteSSOProviderRequest\x12(\n" +
 	"\vprovider_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +
 	"providerId\"\x1b\n" +
-	"\x19DeleteSSOProviderResponse2\xb5\x02\n" +
+	"\x19DeleteSSOProviderResponse2\xb7\x02\n" +
 	"\n" +
 	"SSOService\x12d\n" +
-	"\x10ListSSOProviders\x12!.nokku.v1.ListSSOProvidersRequest\x1a\".nokku.v1.ListSSOProvidersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12[\n" +
-	"\x0ePutSSOProvider\x12\x1f.nokku.v1.PutSSOProviderRequest\x1a .nokku.v1.PutSSOProviderResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12d\n" +
+	"\x10ListSSOProviders\x12!.nokku.v1.ListSSOProvidersRequest\x1a\".nokku.v1.ListSSOProvidersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12]\n" +
+	"\x0ePutSSOProvider\x12\x1f.nokku.v1.PutSSOProviderRequest\x1a .nokku.v1.PutSSOProviderResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12d\n" +
 	"\x11DeleteSSOProvider\x12\".nokku.v1.DeleteSSOProviderRequest\x1a#.nokku.v1.DeleteSSOProviderResponse\"\x06\xc2\xf3\x18\x02\x18\x05B\x89\x01\n" +
 	"\fcom.nokku.v1B\bSsoProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

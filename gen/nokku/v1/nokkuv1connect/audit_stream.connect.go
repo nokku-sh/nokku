@@ -86,7 +86,6 @@ type AuditStreamServiceClient interface {
 	CreateAuditStream(context.Context, *v1.CreateAuditStreamRequest) (*v1.CreateAuditStreamResponse, error)
 	UpdateAuditStream(context.Context, *v1.UpdateAuditStreamRequest) (*v1.UpdateAuditStreamResponse, error)
 	DeleteAuditStream(context.Context, *v1.DeleteAuditStreamRequest) (*v1.DeleteAuditStreamResponse, error)
-	// TestAuditStream sends one made up event and answers with what the destination said.
 	TestAuditStream(context.Context, *v1.TestAuditStreamRequest) (*v1.TestAuditStreamResponse, error)
 }
 
@@ -102,7 +101,6 @@ type AuditStreamServiceHandler interface {
 	CreateAuditStream(context.Context, *v1.CreateAuditStreamRequest) (*v1.CreateAuditStreamResponse, error)
 	UpdateAuditStream(context.Context, *v1.UpdateAuditStreamRequest) (*v1.UpdateAuditStreamResponse, error)
 	DeleteAuditStream(context.Context, *v1.DeleteAuditStreamRequest) (*v1.DeleteAuditStreamResponse, error)
-	// TestAuditStream sends one made up event and answers with what the destination said.
 	TestAuditStream(context.Context, *v1.TestAuditStreamRequest) (*v1.TestAuditStreamResponse, error)
 }
 

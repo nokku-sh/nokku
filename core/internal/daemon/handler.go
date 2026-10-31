@@ -29,9 +29,8 @@ func (p *Pool) Connect(
 		)
 	}
 
-	// System tx since the workspace is unknown until the daemon is looked up.
 	var daemon *db.Daemon
-	if err := p.conn.SysTx(ctx, func(q *db.Queries) (err error) {
+	if err := p.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, daemonID)
 		return err
 	}); err != nil {
@@ -42,6 +41,8 @@ func (p *Pool) Connect(
 	}
 
 	conn := p.registerDaemon(ctx, daemonID, daemon.WorkspaceID)
+	p.markSeen(ctx, daemonID)
+	defer p.markSeen(context.WithoutCancel(ctx), daemonID)
 	defer p.unregisterDaemon(daemonID, conn)
 
 	// The handler must join outDone, a Send after ServeHTTP returns panics and kills the process.

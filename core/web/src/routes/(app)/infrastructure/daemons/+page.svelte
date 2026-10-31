@@ -39,21 +39,24 @@
 
 	const sheet = useSheet();
 	const can = user.can();
-	const create = useCreate();
+	const create = useCreate({ fresh: true });
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const pager = usePagination();
-	const daemons = daemon.list(() => ({
-		...pager.args,
-		query: debounced.current,
-		status: page.url.searchParams.get('status')
-			? Number(page.url.searchParams.get('status'))
-			: undefined,
-		online: page.url.searchParams.has('online')
-			? page.url.searchParams.get('online') === 'true'
-			: undefined
-	}));
+	const daemons = daemon.list(
+		() => ({
+			...pager.args,
+			query: debounced.current,
+			status: page.url.searchParams.get('status')
+				? Number(page.url.searchParams.get('status'))
+				: undefined,
+			online: page.url.searchParams.has('online')
+				? page.url.searchParams.get('online') === 'true'
+				: undefined
+		}),
+		{ live: true }
+	);
 
 	const deleteDaemon = daemon.delete();
 	const deleteDaemons = daemon.deleteMany();
@@ -66,7 +69,7 @@
 			cell: ({ row }) =>
 				renderComponent(IdentityCell, {
 					name: row.original.name,
-					detail: row.original.metadata?.hostname,
+					detail: row.original.version,
 					mono: true
 				})
 		}),

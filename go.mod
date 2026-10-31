@@ -32,7 +32,6 @@ require (
 	github.com/scaleway/scaleway-sdk-go v1.39.0
 	github.com/scaleway/tink-go-scwkms v0.1.2
 	github.com/scim2/filter-parser/v2 v2.3.1
-	github.com/smallstep/truststore v0.13.0
 	github.com/stretchr/testify v1.12.1
 	github.com/stripe/stripe-go/v87 v87.0.0
 	github.com/testcontainers/testcontainers-go v0.44.0
@@ -202,7 +201,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
 	google.golang.org/grpc v1.84.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	howett.net/plist v1.0.1 // indirect
 )
 
 tool connectrpc.com/connect/v2/cmd/protoc-gen-connect-go

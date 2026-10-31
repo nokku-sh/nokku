@@ -1,10 +1,10 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
-	"time"
 	"uuid"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
@@ -38,7 +38,7 @@ func (s *daemonService) GetDaemon(
 	}
 
 	return &nokkuv1.GetDaemonResponse{
-		Daemon: result.ToProto(),
+		Daemon: result.ToProto(s.cfg.Pool.IsConnected(result.ID)),
 	}, nil
 }
 
@@ -46,17 +46,26 @@ func (s *daemonService) UpdateDaemon(
 	ctx context.Context,
 	req *nokkuv1.UpdateDaemonRequest,
 ) (*nokkuv1.UpdateDaemonResponse, error) {
-	// A config replaces the stored one wholesale, proto.Merge cannot turn a scalar off. Unset keeps it.
-	config := req.GetConfig()
-	if config != nil {
-		// Ephemeral is the token's call, the row carries it. See Daemon.EffectiveConfig.
-		config.Ephemeral = nil
+	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
+		return nil, err
 	}
-	// One statement and no read, so two updates in a row cannot write each other's old values back.
-	if _, err := s.cfg.Conn.Tenant().UpdateDaemon(ctx, &db.UpdateDaemonParams{
-		DaemonID: req.GetId(),
-		Status:   req.GetStatus(),
-		Config:   config,
+	// The row lock keeps two updates from writing each other's old config back.
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		var config *nokkuv1.DaemonConfig
+		if req.GetConfig() != nil {
+			stored, err := q.GetDaemonConfigForUpdate(ctx, req.GetId())
+			if err != nil {
+				return err
+			}
+			config = cmp.Or(stored, &nokkuv1.DaemonConfig{})
+			mergeSet(config.ProtoReflect(), req.GetConfig().ProtoReflect())
+		}
+		_, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
+			DaemonID: req.GetId(),
+			Status:   req.GetStatus(),
+			Config:   config,
+		})
+		return err
 	}); err != nil {
 		return nil, err
 	}
@@ -72,7 +81,7 @@ func (s *daemonService) ListDaemons(
 		Query:     req.Query,
 		Status:    req.GetStatus(),
 		Online:    req.Online,
-		SeenAfter: time.Now().Add(-db.DaemonOnlineWindow),
+		Connected: s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
 		Limit:     req.Limit,
 		Offset:    req.Offset,
 	})
@@ -85,7 +94,7 @@ func (s *daemonService) ListDaemons(
 	}
 
 	return &nokkuv1.ListDaemonsResponse{
-		Daemons: db.DaemonsToProto(result),
+		Daemons: db.DaemonsToProto(result, s.cfg.Pool.IsConnected),
 		Total:   &count,
 	}, nil
 }
@@ -106,25 +115,14 @@ func (s *daemonService) CreateSession(
 	ctx context.Context,
 	req *nokkuv1.CreateSessionRequest,
 ) (*nokkuv1.CreateSessionResponse, error) {
-	// The cert principal is the actor id, sshd would refuse any non-user.
+	// The cert principal is the person's id. The call is people only, so there is one.
 	userID := actor.UserIDFromContext(ctx)
-	if userID == "" {
-		return nil, newError(connect.CodePermissionDenied, "web sessions require a user principal")
-	}
 
 	var daemon *db.Daemon
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
 		if err != nil {
 			return err
-		}
-		// sshd only trusts the CA synced to it.
-		ca, err := q.GetCAByDaemonID(ctx, &daemon.ID)
-		if err != nil {
-			return err
-		}
-		if !ca.IsActive {
-			return newError(connect.CodeFailedPrecondition, "certificate authority is not active")
 		}
 		// The same grant sshd will ask for, so nobody gets a shell ticket for an account they cannot use.
 		accounts, err := grantedAccounts(ctx, q, daemon.ID, userID)
@@ -160,7 +158,7 @@ func (s *daemonService) CreateSession(
 	}, nil
 }
 
-// grantedAccounts lists the accounts on the daemon's host that subject may log in to, directly or through a team.
+// grantedAccounts lists the accounts on the daemon's host that subject may log in to today, the ones sshd would let in.
 func grantedAccounts(ctx context.Context, q *db.Queries, daemonID, subject string) ([]string, error) {
 	target, err := q.GetTargetByDaemon(ctx, &daemonID)
 	if err != nil {
@@ -175,7 +173,9 @@ func grantedAccounts(ctx context.Context, q *db.Queries, daemonID, subject strin
 	}
 	accounts := make([]string, 0, len(rows))
 	for _, r := range rows {
-		accounts = append(accounts, r.Username)
+		if r.UserOk && r.DaemonOk {
+			accounts = append(accounts, r.Username)
+		}
 	}
 	return accounts, nil
 }

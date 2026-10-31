@@ -17,13 +17,13 @@ const fuzzMaxEvent = 64 << 10
 
 // Invalid UTF-8 becomes U+FFFD in the format itself, so byte equality only holds for valid UTF-8.
 func FuzzRecordEvents(f *testing.F) {
-	f.Add([]byte("hello\n"), "session-1")
-	f.Add([]byte{}, "s")
-	f.Add([]byte("\x00\x01\x02\xff\n\x1b[31mred\x1b[0m"), "a/b")
-	f.Add([]byte("{\"json\": true}"), "")
-	f.Add(bytes.Repeat([]byte("x"), 4096), "0123456789abcdef")
+	f.Add([]byte("hello\n"))
+	f.Add([]byte{})
+	f.Add([]byte("\x00\x01\x02\xff\n\x1b[31mred\x1b[0m"))
+	f.Add([]byte("{\"json\": true}"))
+	f.Add(bytes.Repeat([]byte("x"), 4096))
 
-	f.Fuzz(func(t *testing.T, data []byte, sessionID string) {
+	f.Fuzz(func(t *testing.T, data []byte) {
 		if len(data) > fuzzMaxEvent {
 			data = data[:fuzzMaxEvent]
 		}
@@ -38,7 +38,7 @@ func FuzzRecordEvents(f *testing.F) {
 			Width:     80,
 			Height:    24,
 			Title:     "fuzz-session",
-			SessionID: sessionID,
+			SessionID: testID,
 		})
 		if err != nil {
 			t.Fatalf("New: %v", err)

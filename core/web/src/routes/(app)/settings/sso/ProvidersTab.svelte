@@ -30,7 +30,7 @@
 	const providers = sso.list();
 	const ws = workspace.get();
 	const update = workspace.update();
-	const create = useCreate();
+	const create = useCreate({ fresh: true });
 	const sheet = useSheet();
 
 	const enforced = $derived(ws.data?.settings?.enforceSso ?? false);

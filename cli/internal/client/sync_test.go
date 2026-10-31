@@ -24,21 +24,21 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// fakeCore serves GetMyAccess and SignSSHCertificate, the two calls the CLI syncs against.
+// fakeCore serves GetSubjectAccess and SignSSHCertificate, the two calls the CLI syncs against.
 type fakeCore struct {
 	nokkuv1connect.UnimplementedTargetServiceHandler
 	nokkuv1connect.UnimplementedCertificateServiceHandler
 
-	access    *nokkuv1.GetMyAccessResponse
+	access    *nokkuv1.GetSubjectAccessResponse
 	accessErr error
 	test      *testing.T
 	sign      func(t *testing.T, req *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error)
 }
 
-func (f *fakeCore) GetMyAccess(
+func (f *fakeCore) GetSubjectAccess(
 	context.Context,
-	*nokkuv1.GetMyAccessRequest,
-) (*nokkuv1.GetMyAccessResponse, error) {
+	*nokkuv1.GetSubjectAccessRequest,
+) (*nokkuv1.GetSubjectAccessResponse, error) {
 	return f.access, f.accessErr
 }
 
@@ -126,9 +126,9 @@ func newSyncTestClient(t *testing.T, core *fakeCore) *Client {
 	return c
 }
 
-func accessResponse(caPubKey string) *nokkuv1.GetMyAccessResponse {
-	return &nokkuv1.GetMyAccessResponse{
-		Subject: &nokkuv1.GetMyAccessResponse_User{
+func accessResponse(caPubKey string) *nokkuv1.GetSubjectAccessResponse {
+	return &nokkuv1.GetSubjectAccessResponse{
+		Subject: &nokkuv1.GetSubjectAccessResponse_User{
 			User: &nokkuv1.User{Id: new("user-1"), Name: new("alice")},
 		},
 		Targets: []*nokkuv1.Target{{
@@ -337,4 +337,21 @@ func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, aging, string(renewed), "the aging certificate was not renewed")
 	assert.True(t, ssh.CertFresh(target, authority))
+}
+
+// A private CA reaches nk through --ca-file only, so nothing is asked and the error names the flag.
+func TestSyncUntrustedServerNamesCAFile(t *testing.T) {
+	setTestDirs(t)
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	c := &Client{State: &state.State{APIURL: srv.URL, Token: "nk_sa_test"}}
+	require.NoError(t, c.dial())
+
+	err := c.Sync(t.Context(), true)
+	require.ErrorContains(t, err, "--ca-file")
+	assert.Empty(t, c.State.APICA, "no CA is kept without the file")
 }

@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { legalHolds } from '#lib/api/legal-holds.svelte.js';
 	import { recordings } from '#lib/api/recordings.svelte.js';
-	import { useFeatures } from '#lib/api/workspaces.svelte.js';
 	import RecordingPlayer from './RecordingPlayer.svelte';
 	import WhoCell from './WhoCell.svelte';
 	import {
@@ -24,11 +22,10 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import StorageQuotaPill from './StorageQuotaPill.svelte';
-	import { createModalState, usePagination } from '#lib/hooks/index.js';
+	import { usePagination } from '#lib/hooks/index.js';
 	import { formatBytes } from '#lib/utils.js';
 	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
-	import { timestampFromMs, timestampMs } from '@bufbuild/protobuf/wkt';
-	import { Bot, Lock, Video } from '@lucide/svelte';
+	import { Bot, Video } from '@lucide/svelte';
 
 	const pager = usePagination();
 	const can = user.can();
@@ -46,21 +43,9 @@
 	const deleteRecording = recordings.delete();
 	const deleteRecordings = recordings.deleteMany();
 
-	const has = useFeatures();
-	const hold = legalHolds.create();
-
-	// A hold of one second around the start keeps this recording and nothing much else.
-	function keep(r: Recording) {
-		if (!r.startedAt) return;
-		const start = timestampMs(r.startedAt);
-		void hold.mutateAsync({
-			reason: `Recording of ${r.username} on ${daemonName.get(r.daemonId) ?? r.daemonName}`,
-			startsAt: timestampFromMs(start),
-			endsAt: timestampFromMs(start + 1000)
-		});
-	}
-
-	const player = createModalState<Recording>({} as Recording);
+	// selected stays set after close, so the player can animate out.
+	let selected = $state<Recording>();
+	let playerOpen = $state(false);
 
 	const bulkActions: BulkAction<Recording>[] = [
 		bulkDelete<Recording>({
@@ -105,7 +90,8 @@
 			header: 'Status',
 			cell: ({ row }) =>
 				renderComponent(StateCell, {
-					label: row.original.held ? 'Held' : row.original.complete ? 'Complete' : 'Truncated'
+					// Complete only when nothing cut it and the core got every byte. Live is a session still running.
+					label: row.original.complete ? 'Complete' : row.original.live ? 'Recording' : 'Incomplete'
 				})
 		}),
 		columnHelper.display({
@@ -115,24 +101,13 @@
 				renderComponent(ActionCell, {
 					label: `recording of ${row.original.username}`,
 					id: row.original.id,
-					menuActions:
-						can.admin && has('legal_hold') && !row.original.held
-							? [
-									{
-										label: 'Keep under a legal hold',
-										icon: Lock,
-										onClick: () => keep(row.original)
-									}
-								]
-							: [],
-					deleteConfig:
-						can.edit && !row.original.held
-							? {
-									itemName: `recording of ${row.original.username}`,
-									description: 'This permanently deletes the recording.',
-									onDelete: () => deleteRecording.mutateAsync({ recordingId: row.original.id })
-								}
-							: undefined
+					deleteConfig: can.edit
+						? {
+								itemName: `recording of ${row.original.username}`,
+								description: 'This permanently deletes the recording.',
+								onDelete: () => deleteRecording.mutateAsync({ recordingId: row.original.id })
+							}
+						: undefined
 				})
 		})
 	]);
@@ -151,7 +126,10 @@
 	rowLabel={(r) => `recording of ${r.username || 'a session'}`}
 	{columns}
 	bulkActions={can.edit ? bulkActions : []}
-	onRowClick={(r) => player.openWith({ ...r })}
+	onRowClick={(r) => {
+		selected = { ...r };
+		playerOpen = true;
+	}}
 	emptyState={{
 		icon: Video,
 		title: 'No recordings yet',
@@ -168,13 +146,6 @@
 	{/snippet}
 </DataTable>
 
-{#if player.selected.id}
-	<RecordingPlayer
-		recording={player.selected}
-		open={player.open}
-		onOpenChange={(o) => {
-			player.open = o;
-			if (!o) player.close();
-		}}
-	/>
+{#if selected?.id}
+	<RecordingPlayer recording={selected} open={playerOpen} onOpenChange={(o) => (playerOpen = o)} />
 {/if}

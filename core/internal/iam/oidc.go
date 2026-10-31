@@ -1,6 +1,7 @@
 package iam
 
 import (
+	"cmp"
 	"context"
 	"crypto/subtle"
 	"errors"
@@ -65,18 +66,26 @@ func newOIDCFlow(svc *Service) *oidcFlow {
 	}
 }
 
-// Login signs in, or with link=true links the identity to the signed-in user.
+// Login signs in. It never links, whatever session the browser holds.
 func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
+	h.begin(w, r, "")
+}
+
+// Link adds the identity to the signed-in user. Its route takes only a fresh session from the app itself.
+func (h *oidcFlow) Link(w http.ResponseWriter, r *http.Request) {
+	userID := actor.UserIDFromContext(r.Context())
+	if userID == "" {
+		fail(w, r, "link refused")
+		return
+	}
+	h.begin(w, r, userID)
+}
+
+func (h *oidcFlow) begin(w http.ResponseWriter, r *http.Request, linkUserID string) {
 	ctx := r.Context()
 	cfg, err := h.svc.loginProvider(ctx, r.URL.Query().Get("provider"))
 	if err != nil {
 		fail(w, r, "provider not configured")
-		return
-	}
-	// A refused link must not go on as a sign-in, that could make a second account.
-	linkUserID, err := linkUserIDFor(ctx, r)
-	if err != nil {
-		fail(w, r, "link refused")
 		return
 	}
 	provider, err := h.discover(ctx, cfg.OIDC.IssuerURL)
@@ -146,7 +155,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 
 	id := identityFrom(cfg, idToken, claims)
 	id.LinkUserID = st.LinkUserID
-	u, err := h.resolve(r.Context(), id)
+	u, linked, err := h.resolve(r.Context(), id)
 	if err != nil {
 		h.svc.record(r.Context(), event{
 			Action: actionLoginDenied, Method: MethodOIDC, UserID: id.LinkUserID, Email: id.Email, Detail: err.Error(),
@@ -162,17 +171,23 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	cookie, err := h.svc.completeLogin(r.Context(), u, MethodOIDC)
-	if err != nil {
-		fail(w, r, "login refused")
-		return
+	// A link keeps the session that asked for it. A second session would pass the fresh sign-in checks.
+	if st.LinkUserID == "" {
+		cookie, err := h.svc.completeLogin(r.Context(), u, MethodOIDC)
+		if err != nil {
+			fail(w, r, "login refused")
+			return
+		}
+		http.SetCookie(w, cookie)
+		if c := h.svc.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
+			http.SetCookie(w, c)
+		}
+	} else if linked {
+		h.svc.credentialAdded(r.Context(), r, u, MethodOIDC, cfg.ProviderID+":"+id.Subject,
+			"Your "+cmp.Or(cfg.Name, cfg.ProviderID)+" account")
 	}
 	h.svc.spendFlow(flowID)
 	http.SetCookie(w, h.svc.newCookie(flowCookieName, "", time.Unix(0, 0)))
-	http.SetCookie(w, cookie)
-	if c := h.svc.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
-		http.SetCookie(w, c)
-	}
 	// Re-sanitize, the value round-tripped through the cookie.
 	returnTo := safeReturnTo(st.ReturnTo)
 	if returnTo == "" {
@@ -245,41 +260,43 @@ func identityFrom(cfg *SSOProvider, idToken *oidc.IDToken, claims map[string]any
 
 // resolve trusts a matching email and may create the account, the workspace owner configured the provider.
 // The owner is never matched by email. A provider user who can pick their address would take the workspace.
-func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, error) {
+// resolve reports whether it linked an identity the account did not have before.
+func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool, error) {
 	var u *db.User
-	created := false
+	var created, linked bool
 	err := h.svc.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		u, created, err = h.resolveIn(ctx, q, id)
+		u, created, linked, err = h.resolveIn(ctx, q, id)
 		return err
 	})
 	if err != nil {
-		return nil, mapNotFound(err)
+		return nil, false, mapNotFound(err)
 	}
 	if created {
 		h.svc.record(ctx, event{
 			Action: actionUserCreated, Kind: actor.KindUser, Method: MethodOIDC, UserID: u.ID, Email: u.Email,
 		})
 	}
-	return u, nil
+	return u, linked, nil
 }
 
-// resolveIn finds or creates the user in the caller's tx and links the identity to it.
-func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity) (*db.User, bool, error) {
+// resolveIn finds or creates the user in the caller's tx and links the identity to it. It reports whether it created
+// the user and whether it linked the identity.
+func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity) (*db.User, bool, bool, error) {
 	cred, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
 		Type: string(MethodOIDC), Provider: id.ProviderID, Subject: id.Subject,
 	})
 	switch {
 	case err == nil:
 		if id.LinkUserID != "" && cred.UserID != id.LinkUserID {
-			return nil, false, errIdentityLinked
+			return nil, false, false, errIdentityLinked
 		}
 		u, err := q.GetUser(ctx, cred.UserID)
 		if err != nil {
-			return nil, false, err
+			return nil, false, false, err
 		}
-		return u, false, q.TouchCredential(ctx, cred.ID)
+		return u, false, false, q.TouchCredential(ctx, cred.ID)
 	case !errors.Is(err, pgx.ErrNoRows):
-		return nil, false, err
+		return nil, false, false, err
 	}
 
 	var u *db.User
@@ -288,35 +305,39 @@ func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity
 	case id.LinkUserID != "":
 		u, err = q.GetUser(ctx, id.LinkUserID)
 	case id.Email == "":
-		return nil, false, errIdentityRejected
+		return nil, false, false, errIdentityRejected
 	case id.EmailUnverified:
-		return nil, false, errEmailUnverified
+		return nil, false, false, errEmailUnverified
 	default:
-		email := normalizeEmail(id.Email)
+		email := NormalizeEmail(id.Email)
 		u, err = q.GetUserByEmail(ctx, email)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			if !id.JITProvisioning {
-				return nil, false, errIdentityRejected
+				return nil, false, false, errIdentityRejected
+			}
+			// A new account takes an address only on the provider's word, the same rule as linking one.
+			if !id.EmailVerified && !id.TrustUnverifiedEmail {
+				return nil, false, false, errEmailUnverified
 			}
 			u, err = h.svc.createUser(ctx, q, db.CreateUserWithIDParams{
 				Email: email, Name: id.Name, Picture: nonEmpty(id.Picture),
-			}, "")
+			})
 			created = err == nil
 		case err == nil && u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER:
-			return nil, false, errOwnerLink
+			return nil, false, false, errOwnerLink
 		// Whoever sets this address at the provider would get the account, unless the provider vouches for it.
 		case err == nil && !id.EmailVerified && !id.TrustUnverifiedEmail:
-			return nil, false, errEmailUnverified
+			return nil, false, false, errEmailUnverified
 		case err == nil && id.Name != "" && u.Name != id.Name:
 			// The provider owns the name.
 			u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Name: &id.Name})
 		}
 	}
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
-	return u, created, link(ctx, q, id, u.ID)
+	return u, created, true, link(ctx, q, id, u.ID)
 }
 
 func link(ctx context.Context, q *db.Queries, id oidcIdentity, userID string) error {

@@ -3,6 +3,7 @@ edition = "2023";
 package nokku.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 import "nokku/v1/account.proto";
@@ -22,7 +23,10 @@ service TargetService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateTarget(CreateTargetRequest) returns (CreateTargetResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      capped: true
+    };
   }
   rpc UpdateTarget(UpdateTargetRequest) returns (UpdateTargetResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
@@ -31,18 +35,10 @@ service TargetService {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc GetSubjectAccess(GetSubjectAccessRequest) returns (GetSubjectAccessResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc GetMyAccess(GetMyAccessRequest) returns (GetMyAccessResponse) {
     option (access) = {self: true};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetTargetFilters(GetTargetFiltersRequest) returns (GetTargetFiltersResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc GetTargetPrincipals(GetTargetPrincipalsRequest) returns (GetTargetPrincipalsResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -57,14 +53,6 @@ service TargetService {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-}
-
-message GetTargetPrincipalsRequest {
-  string target_id = 1 [(buf.validate.field).string.uuid = true];
-}
-
-message GetTargetPrincipalsResponse {
-  repeated AccountPrincipals principals = 1;
 }
 
 message SyncTargetUsersRequest {
@@ -103,6 +91,17 @@ message Target {
   google.protobuf.Timestamp last_sync_at = 14;
   // username_expires_at holds the usernames the subject asked about may only use until then. The others are for good.
   map<string, google.protobuf.Timestamp> username_expires_at = 15;
+  // blocked says why the subject's grants here let nobody in today. Unset when they work.
+  AccessBlock blocked = 16;
+}
+
+// AccessBlock is why grants that stand let nobody in today.
+enum AccessBlock {
+  ACCESS_BLOCK_UNSPECIFIED = 0;
+  // The person is deactivated.
+  ACCESS_BLOCK_USER_INACTIVE = 1;
+  // The daemon of the server is pending or rejected.
+  ACCESS_BLOCK_DAEMON_NOT_APPROVED = 2;
 }
 
 message GetTargetRequest {
@@ -140,6 +139,20 @@ message UpdateTargetRequest {
   string host_public_key = 5;
   repeated string endpoints = 6;
   repeated string tags = 7;
+  // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
+  google.protobuf.FieldMask update_mask = 8 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).field_mask = {
+      in: [
+        "ca_id",
+        "name",
+        "description",
+        "host_public_key",
+        "endpoints",
+        "tags"
+      ]
+    }
+  ];
 }
 message UpdateTargetResponse {
   Target target = 1;
@@ -174,17 +187,10 @@ message GetSubjectAccessResponse {
   repeated Target targets = 1;
   repeated Daemon daemons = 2;
   repeated CertificateAuthority certificate_authorities = 3;
-}
-
-message GetMyAccessRequest {}
-
-message GetMyAccessResponse {
   oneof subject {
-    User user = 1;
-    ServiceAccount service_account = 2;
+    User user = 4;
+    ServiceAccount service_account = 5;
   }
-  repeated Target targets = 3;
-  repeated CertificateAuthority certificate_authorities = 4;
 }
 
 message GetTargetFiltersRequest {}
@@ -257,7 +263,6 @@ message ListAccessGraphTargetsRequest {
   int32 offset = 4 [(buf.validate.field).int32.gte = 0];
 }
 
-// Matched targets come first.
 message ListAccessGraphTargetsResponse {
   repeated AccessGraphTarget targets = 1;
   int32 total = 2;

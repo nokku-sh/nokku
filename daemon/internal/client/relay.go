@@ -46,7 +46,7 @@ func (c *Client) runRelay(ctx context.Context, req *nokkuv1.RelayOpen) {
 		return
 	}
 	slog.Info("relay connected", "relay", req.GetRelayId())
-	c.srv.ServeConn(&relayConn{
+	c.srv.ServeConn(ctx, &relayConn{
 		stream: stream,
 		cancel: cancel,
 		remote: clientAddr(req.GetClientAddr()),

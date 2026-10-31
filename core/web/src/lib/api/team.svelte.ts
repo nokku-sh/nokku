@@ -4,6 +4,7 @@ import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
+import { usePatch } from './mask';
 
 export const team = {
 	get: (id: MaybeGetter<string | undefined>) =>
@@ -45,7 +46,7 @@ export const team = {
 		useMutation(TeamService.method.createTeam, {
 			onSuccess: () => toast.success('Team created')
 		}),
-	update: () => useMutation(TeamService.method.updateTeam),
+	update: () => usePatch(TeamService.method.updateTeam),
 	delete: () =>
 		useMutation(TeamService.method.deleteTeam, {
 			onSuccess: () => toast.success('Team deleted')

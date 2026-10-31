@@ -34,12 +34,16 @@ This is optional but appreciated.
 
 The following are in scope for security reports:
 
-- `dpop`: DPoP proof signing, claims, and the embedded JWK.
+- `dpop`: DPoP proof signing, claims, and the embedded JWK, and the
+  verifier the core runs: nonces, the htu compare, the token hash and the
+  replay check.
+- `login`: the principal formats a certificate carries, the sshd rule
+  `nk sync` writes, the account name rule and the passwd parser.
 - `dpopclient`: the DPoP interceptors, nonce learning, the binding of proofs
   to the configured API URL, the retry on a stale nonce, and the TLS 1.3
   HTTP/2 transport.
-- `trust`: fetching the CA a server advertises, the pin check, and the
-  verification that follows.
+- `trust`: loading a private CA from a file, and the verification that
+  follows.
 - `id`: the machine fingerprint and how it hides the raw machine ID.
 - `tpm`: TPM-backed and software-fallback signing identities, key wrapping,
   the persisted state format, and identity change detection.

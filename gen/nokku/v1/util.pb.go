@@ -251,7 +251,6 @@ type GetInstanceInfoResponse struct {
 	ImprintUrl    *string                `protobuf:"bytes,6,opt,name=imprint_url,json=imprintUrl" json:"imprint_url,omitempty"`
 	Mode          *string                `protobuf:"bytes,7,opt,name=mode" json:"mode,omitempty"`
 	Signup        *bool                  `protobuf:"varint,8,opt,name=signup" json:"signup,omitempty"`
-	CaPin         *string                `protobuf:"bytes,9,opt,name=ca_pin,json=caPin" json:"ca_pin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -340,13 +339,6 @@ func (x *GetInstanceInfoResponse) GetSignup() bool {
 		return *x.Signup
 	}
 	return false
-}
-
-func (x *GetInstanceInfoResponse) GetCaPin() string {
-	if x != nil && x.CaPin != nil {
-		return *x.CaPin
-	}
-	return ""
 }
 
 type WhoamiRequest struct {
@@ -1265,7 +1257,7 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x11GetVersionRequest\".\n" +
 	"\x12GetVersionResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\"\x18\n" +
-	"\x16GetInstanceInfoRequest\"\xa6\x02\n" +
+	"\x16GetInstanceInfoRequest\"\x95\x02\n" +
 	"\x17GetInstanceInfoResponse\x12#\n" +
 	"\roperator_name\x18\x01 \x01(\tR\foperatorName\x12#\n" +
 	"\rsupport_email\x18\x02 \x01(\tR\fsupportEmail\x12\x1f\n" +
@@ -1277,8 +1269,8 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\vimprint_url\x18\x06 \x01(\tR\n" +
 	"imprintUrl\x12\x12\n" +
 	"\x04mode\x18\a \x01(\tR\x04mode\x12\x16\n" +
-	"\x06signup\x18\b \x01(\bR\x06signup\x12\x15\n" +
-	"\x06ca_pin\x18\t \x01(\tR\x05caPin\"\x0f\n" +
+	"\x06signup\x18\b \x01(\bR\x06signupJ\x04\b\t\x10\n" +
+	"\"\x0f\n" +
 	"\rWhoamiRequest\"\xd4\x01\n" +
 	"\x0eWhoamiResponse\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x1d\n" +
@@ -1358,16 +1350,16 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x19AUDIT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17AUDIT_OUTCOME_SUCCEEDED\x10\x01\x12\x18\n" +
 	"\x14AUDIT_OUTCOME_FAILED\x10\x02\x12\x18\n" +
-	"\x14AUDIT_OUTCOME_DENIED\x10\x032\xe3\x05\n" +
+	"\x14AUDIT_OUTCOME_DENIED\x10\x032\x80\x06\n" +
 	"\vUtilService\x12R\n" +
 	"\n" +
 	"GetVersion\x12\x1b.nokku.v1.GetVersionRequest\x1a\x1c.nokku.v1.GetVersionResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12a\n" +
 	"\x0fGetInstanceInfo\x12 .nokku.v1.GetInstanceInfoRequest\x1a!.nokku.v1.GetInstanceInfoResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12F\n" +
 	"\x06Whoami\x12\x17.nokku.v1.WhoamiRequest\x1a\x18.nokku.v1.WhoamiResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12O\n" +
 	"\tListRoles\x12\x1a.nokku.v1.ListRolesRequest\x1a\x1b.nokku.v1.ListRolesResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12[\n" +
-	"\rListAuditLogs\x12\x1e.nokku.v1.ListAuditLogsRequest\x1a\x1f.nokku.v1.ListAuditLogsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12^\n" +
-	"\x0fExportAuditLogs\x12 .nokku.v1.ExportAuditLogsRequest\x1a!.nokku.v1.ExportAuditLogsResponse\"\x06\xc2\xf3\x18\x02\x18\x02\x12g\n" +
-	"\x12ExportAccessReport\x12#.nokku.v1.ExportAccessReportRequest\x1a$.nokku.v1.ExportAccessReportResponse\"\x06\xc2\xf3\x18\x02\x18\x02\x12^\n" +
+	"\rListAuditLogs\x12\x1e.nokku.v1.ListAuditLogsRequest\x1a\x1f.nokku.v1.ListAuditLogsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12l\n" +
+	"\x0fExportAuditLogs\x12 .nokku.v1.ExportAuditLogsRequest\x1a!.nokku.v1.ExportAuditLogsResponse\"\x14\xc2\xf3\x18\x10\x18\x02:\faudit_export\x12v\n" +
+	"\x12ExportAccessReport\x12#.nokku.v1.ExportAccessReportRequest\x1a$.nokku.v1.ExportAccessReportResponse\"\x15\xc2\xf3\x18\x11\x18\x02:\raccess_review\x12^\n" +
 	"\x0eListMyActivity\x12\x1f.nokku.v1.ListMyActivityRequest\x1a .nokku.v1.ListMyActivityResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01B\x8a\x01\n" +
 	"\fcom.nokku.v1B\tUtilProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

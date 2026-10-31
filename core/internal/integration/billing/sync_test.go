@@ -20,10 +20,8 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -484,54 +482,21 @@ func TestLookup_WhenTheDatabaseDoesNotAnswer(t *testing.T) {
 	assert.NoError(t, ent.CheckResources(down, fake.workspaceID), "a count that fails must not block a create")
 }
 
-// signingCore signs nothing, the guard in front of it decides.
-type signingCore struct {
-	nokkuv1connect.UnimplementedCertificateServiceHandler
-}
-
-func (signingCore) SignSSHCertificate(
-	context.Context,
-	*nokkuv1.SignSSHCertificateRequest,
-) (*nokkuv1.SignSSHCertificateResponse, error) {
-	return &nokkuv1.SignSSHCertificateResponse{}, nil
-}
-
-// signViaGuard calls SignSSHCertificate through the guard, as the API serves it for the workspace.
-func signViaGuard(t *testing.T, ent *entitlement.Service, workspaceID string) error {
-	t.Helper()
-	pin := func(next connect.ServerFunc) connect.ServerFunc {
-		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
-			return next(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), spec, stream)
-		}
-	}
-	server := connect.NewServer(pin, entitlement.NewGuardInterceptor(ent))
-	nokkuv1connect.RegisterCertificateServiceHandler(server, signingCore{})
-	mux := http.NewServeMux()
-	connecthttp.Mount(mux, server)
-	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
-
-	client := nokkuv1connect.NewCertificateServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
-	)
-	_, err := client.SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{})
-	return err
-}
-
-func TestGuard_EndedTrialSignsNothing(t *testing.T) {
+func TestCheckSigning_EndedTrialSignsNothing(t *testing.T) {
 	fake := newSync(t)
 	ent := fake.plans(t)
-	require.NoError(t, signViaGuard(t, ent, fake.workspaceID), "a trial signs")
+	pinned := actor.WithWorkspace(t.Context(), actor.Workspace{ID: fake.workspaceID})
+	require.NoError(t, ent.CheckSigning(pinned), "a trial signs")
 
 	fake.endTrial(t, time.Hour)
-	err := signViaGuard(t, ent, fake.workspaceID)
+	err := ent.CheckSigning(pinned)
 	require.Error(t, err)
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
 	require.ErrorContains(t, err, "no active plan")
 
 	fake.subs["sub_a"] = remoteSub{status: "active", seats: 5}
 	require.Equal(t, http.StatusOK, fake.event(t, "sub_a"))
-	assert.NoError(t, signViaGuard(t, ent, fake.workspaceID), "subscribing signs again at once")
+	assert.NoError(t, ent.CheckSigning(pinned), "subscribing signs again at once")
 }
 
 func TestTrial_RemindersAndExpiry(t *testing.T) {

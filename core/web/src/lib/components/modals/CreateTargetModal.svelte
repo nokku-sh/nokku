@@ -19,11 +19,11 @@
 	const tagFilters = targetApi.filters();
 	const createTarget = targetApi.create();
 
+	// No CA picked leaves caId unset, the server then takes the workspace default.
 	let model = $state(newDraft(TargetSchema));
-	const caId = $derived(model.caId || caList.find((c) => c.isDefault)?.id || '');
 
 	async function onSubmit() {
-		const res = await createTarget.mutateAsync({ ...model, caId });
+		const res = await createTarget.mutateAsync({ ...model });
 		model = newDraft(TargetSchema);
 		if (res.target) await sheet.show(res.target.id, 'access');
 	}
@@ -45,9 +45,9 @@
 
 	<Field.Field>
 		<Field.Label for="new-target-ca">Certificate authority</Field.Label>
-		<Select.Root type="single" value={caId} onValueChange={(v) => (model.caId = v)}>
+		<Select.Root type="single" value={model.caId} onValueChange={(v) => (model.caId = v)}>
 			<Select.Trigger id="new-target-ca" class="w-full">
-				{caList.find((c) => c.id === caId)?.name ?? 'Choose a CA'}
+				{caList.find((c) => c.id === model.caId)?.name ?? 'Default CA'}
 			</Select.Trigger>
 			<Select.Content>
 				<Select.Group>

@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/scim.proto.
  */
 export const file_nokku_v1_scim: GenFile = /*@__PURE__*/
-  fileDesc("ChNub2trdS92MS9zY2ltLnByb3RvEghub2trdS52MSKIAQoJU0NJTVRva2VuEgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEi4KCmNyZWF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMwoWQ3JlYXRlU0NJTVRva2VuUmVxdWVzdBIZCgVsYWJlbBgBIAEoCUIKukgHcgUQARiAAiJeChdDcmVhdGVTQ0lNVG9rZW5SZXNwb25zZRINCgV0b2tlbhgBIAEoCRIiCgVlbnRyeRgCIAEoCzITLm5va2t1LnYxLlNDSU1Ub2tlbhIQCghiYXNlX3VybBgDIAEoCSIXChVMaXN0U0NJTVRva2Vuc1JlcXVlc3QiTwoWTGlzdFNDSU1Ub2tlbnNSZXNwb25zZRIjCgZ0b2tlbnMYASADKAsyEy5ub2trdS52MS5TQ0lNVG9rZW4SEAoIYmFzZV91cmwYAiABKAkiLgoWRGVsZXRlU0NJTVRva2VuUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlU0NJTVRva2VuUmVzcG9uc2UyrQIKC1NDSU1TZXJ2aWNlEl4KD0NyZWF0ZVNDSU1Ub2tlbhIgLm5va2t1LnYxLkNyZWF0ZVNDSU1Ub2tlblJlcXVlc3QaIS5ub2trdS52MS5DcmVhdGVTQ0lNVG9rZW5SZXNwb25zZSIGwvMYAhgFEl4KDkxpc3RTQ0lNVG9rZW5zEh8ubm9ra3UudjEuTGlzdFNDSU1Ub2tlbnNSZXF1ZXN0GiAubm9ra3UudjEuTGlzdFNDSU1Ub2tlbnNSZXNwb25zZSIJkAIBwvMYAhgCEl4KD0RlbGV0ZVNDSU1Ub2tlbhIgLm5va2t1LnYxLkRlbGV0ZVNDSU1Ub2tlblJlcXVlc3QaIS5ub2trdS52MS5EZWxldGVTQ0lNVG9rZW5SZXNwb25zZSIGwvMYAhgFQooBCgxjb20ubm9ra3UudjFCCVNjaW1Qcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChNub2trdS92MS9zY2ltLnByb3RvEghub2trdS52MSKIAQoJU0NJTVRva2VuEgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEi4KCmNyZWF0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMwoWQ3JlYXRlU0NJTVRva2VuUmVxdWVzdBIZCgVsYWJlbBgBIAEoCUIKukgHcgUQARiAAiJeChdDcmVhdGVTQ0lNVG9rZW5SZXNwb25zZRINCgV0b2tlbhgBIAEoCRIQCghiYXNlX3VybBgCIAEoCRIiCgVlbnRyeRgDIAEoCzITLm5va2t1LnYxLlNDSU1Ub2tlbiIXChVMaXN0U0NJTVRva2Vuc1JlcXVlc3QiTwoWTGlzdFNDSU1Ub2tlbnNSZXNwb25zZRIjCgZ0b2tlbnMYASADKAsyEy5ub2trdS52MS5TQ0lNVG9rZW4SEAoIYmFzZV91cmwYAiABKAkiLgoWRGVsZXRlU0NJTVRva2VuUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlU0NJTVRva2VuUmVzcG9uc2UytQIKC1NDSU1TZXJ2aWNlEmYKD0NyZWF0ZVNDSU1Ub2tlbhIgLm5va2t1LnYxLkNyZWF0ZVNDSU1Ub2tlblJlcXVlc3QaIS5ub2trdS52MS5DcmVhdGVTQ0lNVG9rZW5SZXNwb25zZSIOwvMYChgFMAE6BHNjaW0SXgoOTGlzdFNDSU1Ub2tlbnMSHy5ub2trdS52MS5MaXN0U0NJTVRva2Vuc1JlcXVlc3QaIC5ub2trdS52MS5MaXN0U0NJTVRva2Vuc1Jlc3BvbnNlIgmQAgHC8xgCGAISXgoPRGVsZXRlU0NJTVRva2VuEiAubm9ra3UudjEuRGVsZXRlU0NJTVRva2VuUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZVNDSU1Ub2tlblJlc3BvbnNlIgbC8xgCGAVCigEKDGNvbS5ub2trdS52MUIJU2NpbVByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.SCIMToken
@@ -75,14 +75,14 @@ export type CreateSCIMTokenResponse = Message<"nokku.v1.CreateSCIMTokenResponse"
   token: string;
 
   /**
-   * @generated from field: nokku.v1.SCIMToken entry = 2;
-   */
-  entry?: SCIMToken | undefined;
-
-  /**
-   * @generated from field: string base_url = 3;
+   * @generated from field: string base_url = 2;
    */
   baseUrl: string;
+
+  /**
+   * @generated from field: nokku.v1.SCIMToken entry = 3;
+   */
+  entry?: SCIMToken | undefined;
 };
 
 /**
@@ -115,8 +115,6 @@ export type ListSCIMTokensResponse = Message<"nokku.v1.ListSCIMTokensResponse"> 
   tokens: SCIMToken[];
 
   /**
-   * Where the identity provider sends users and groups.
-   *
    * @generated from field: string base_url = 2;
    */
   baseUrl: string;

@@ -42,7 +42,7 @@ func TestServerDirectTCPIP(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}})
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
 	defer closeFn()
 
 	echo := testEchoServer(t)
@@ -69,7 +69,7 @@ func TestServerDirectTCPIP(t *testing.T) {
 func TestServerMaxChannelsHeldForRelay(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}},
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}),
 		func(s *Server) { s.maxChannels = 1 })
 	defer closeFn()
 
@@ -120,7 +120,7 @@ func TestServerRemoteForward(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}})
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -161,7 +161,7 @@ func TestServerRemoteForwardPortZero(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}})
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -186,7 +186,7 @@ func TestServerRemoteForwardCancelAfterPolicyChange(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	var srv *Server
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}},
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}),
 		func(s *Server) { srv = s })
 	defer closeFn()
 
@@ -196,7 +196,7 @@ func TestServerRemoteForwardCancelAfterPolicyChange(t *testing.T) {
 
 	ln, err := client.Listen("tcp", "0.0.0.0:0")
 	must.NoError(err, "forward")
-	srv.SetPolicy(Policy{AllowForwarding: true, GatewayPorts: true})
+	withPolicy(Policy{AllowForwarding: true, GatewayPorts: true})(srv)
 	must.NoError(ln.Close(), "cancel the forward")
 
 	_, port, err := net.SplitHostPort(ln.Addr().String())
@@ -208,7 +208,7 @@ func TestServerRemoteForwardCancelAfterPolicyChange(t *testing.T) {
 func TestServerRemoteForwardListenersCapped(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}},
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}),
 		func(s *Server) { s.maxChannels = 2 })
 	defer closeFn()
 
@@ -241,7 +241,7 @@ func TestServerRemoteForwardLocalhost(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}})
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -290,7 +290,7 @@ func TestServerRemoteForwardInterop(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}})
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
 	defer closeFn()
 	host, port := hostPort(t, addr)
 
@@ -379,7 +379,7 @@ func TestForwardAddr(t *testing.T) {
 func TestServerForwardingLargeTransfer(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, Options{Policy: Policy{AllowForwarding: true}})
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
 	defer closeFn()
 
 	payload := bytes.Repeat([]byte("0123456789abcdef"), 512*1024) // 8 MiB
@@ -418,9 +418,9 @@ func TestServerForwardingLargeTransfer(t *testing.T) {
 // A forward request racing connection teardown must not leak a listener.
 func TestTCPIPForwardAfterClose(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(Options{Principals: func(string) []string { return nil }, Policy: Policy{AllowForwarding: true}})
+	srv, err := New(nil)
 	require.NoError(t, err)
-	defer srv.hostKeyDev.Close()
+	withPolicy(Policy{AllowForwarding: true})(srv)
 
 	conn := &ssh.ServerConn{Permissions: &ssh.Permissions{
 		Extensions: map[string]string{"permit-port-forwarding": ""},

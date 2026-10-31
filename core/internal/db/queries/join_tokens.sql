@@ -1,29 +1,23 @@
 -- name: CreateJoinToken :one
 INSERT INTO
   join_tokens (
-    id,
-    kind,
     label,
     token_hash,
     expires_at,
     max_uses,
     auto_approve,
     ca_id,
-    role,
     tags,
     retire_after
   )
 VALUES
   (
-    @id,
-    @kind,
     @label,
     @token_hash,
     sqlc.narg('expires_at'),
     sqlc.narg('max_uses'),
     @auto_approve,
     sqlc.narg('ca_id'),
-    sqlc.narg('role'),
     COALESCE(sqlc.narg('tags')::TEXT[], '{}'),
     sqlc.narg('retire_after')
   )
@@ -69,11 +63,6 @@ SELECT
   *
 FROM
   join_tokens
-WHERE
-  (
-    kind = @kind
-    OR @kind = 0
-  )
 ORDER BY
   created_at DESC;
 
@@ -89,9 +78,7 @@ SELECT
 FROM
   join_tokens
 WHERE
-  id = @id
-  AND kind = @kind
-  AND token_hash = @token_hash
+  token_hash = @token_hash
   AND (
     expires_at IS NULL
     OR expires_at > NOW()
@@ -104,29 +91,7 @@ SET
   uses = uses + 1,
   last_used_at = NOW()
 WHERE
-  id = @id
-  AND kind = @kind
-  AND token_hash = @token_hash
-  AND (
-    expires_at IS NULL
-    OR expires_at > NOW()
-  )
-  AND (
-    max_uses IS NULL
-    OR uses < max_uses
-  )
-RETURNING
-  *;
-
--- name: RedeemJoinTokenByID :one
--- For a signup whose invite was checked earlier. The mailed link is the proof by then.
-UPDATE join_tokens
-SET
-  uses = uses + 1,
-  last_used_at = NOW()
-WHERE
-  id = @id
-  AND kind = @kind
+  token_hash = @token_hash
   AND (
     expires_at IS NULL
     OR expires_at > NOW()

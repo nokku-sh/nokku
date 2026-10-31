@@ -26,7 +26,7 @@
 	const canView = $derived(atLeast(role, WorkspaceRole.VIEWER));
 	const canEdit = $derived(atLeast(role, WorkspaceRole.EDITOR));
 
-	const data = dashboard.get(() => canView);
+	const data = dashboard.get(() => canView, true);
 	const issues = $derived(data.data ? issuesOf(data.data) : []);
 	// Until something is enrolled, setup is the whole dashboard.
 	const fresh = $derived(isFresh(data.data));

@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 	nokkussh "github.com/nokku-sh/nokku/core/internal/ssh"
@@ -30,6 +31,8 @@ type SessionConfig struct {
 	Username  string
 	UserID    string
 	CA        *db.SSHCA
+	// CASigner is the user key of CA, from ssh.CASigner.
+	CASigner ssh.Signer
 	// HostPrincipal is the daemon's target id.
 	HostPrincipal string
 	// ClientAddr is the browser's address, reported to the daemon's sshd.
@@ -69,11 +72,8 @@ func (s *Session) Close() { s.close() }
 
 // StartSession lives until ctx ends, the shell ends, the daemon drops, Close, or the TTL.
 func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
-	if cfg.CA == nil || !cfg.CA.IsActive {
-		return nil, ErrCAInactive
-	}
-	principal := nokkussh.LoginPrincipal(cfg.UserID, cfg.HostPrincipal, cfg.Username)
-	signer, err := mintSessionCert(cfg.CA, principal, cfg.SessionID)
+	principal := login.Principal(cfg.UserID, cfg.HostPrincipal, cfg.Username)
+	signer, err := mintSessionCert(cfg.CA, cfg.CASigner, principal, cfg.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("mint session certificate: %w", err)
 	}
@@ -151,10 +151,7 @@ func hostCAKeys(ca *db.SSHCA) ([]ssh.PublicKey, error) {
 	return keys, nil
 }
 
-func mintSessionCert(
-	ca *db.SSHCA,
-	principal, sessionID string,
-) (ssh.Signer, error) {
+func mintSessionCert(ca *db.SSHCA, caSigner ssh.Signer, principal, sessionID string) (ssh.Signer, error) {
 	_, key, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("generate session key: %w", err)
@@ -165,9 +162,10 @@ func mintSessionCert(
 	}
 	cert, err := nokkussh.SignCertificate(
 		ca,
+		caSigner,
 		nokkussh.MarshalKey(pub),
 		[]string{principal},
-		"nokku:web:session:"+sessionID,
+		login.WebSessionKeyIDPrefix+sessionID,
 		sessionCertTTL,
 		ssh.UserCert,
 	)

@@ -20,6 +20,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
+	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
@@ -80,7 +81,7 @@ type Resolver struct {
 }
 
 // New in self-host mode makes sure the one workspace exists.
-func New(ctx context.Context, conn *db.Connection, baseURL string, saas bool) (*Resolver, error) {
+func New(ctx context.Context, conn *db.Connection, keys *kms.Keyset, baseURL string, saas bool) (*Resolver, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil || u.Host == "" {
 		return nil, errors.New("tenant: base url needs a scheme and host")
@@ -98,7 +99,7 @@ func New(ctx context.Context, conn *db.Connection, baseURL string, saas bool) (*
 	}
 	ws, err := conn.Sys().GetFirstWorkspace(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
-		ws, err = Create(ctx, conn, "default", cfg.WorkspaceName)
+		ws, err = Create(ctx, conn, keys, "default", cfg.WorkspaceName)
 	}
 	if err != nil {
 		return nil, err
@@ -218,8 +219,7 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 			return err
 		}
 		for _, ws := range rows {
-			// Nobody signed in, so no legal hold can keep it.
-			if _, err := q.DeleteWorkspace(ctx, ws.ID); err != nil {
+			if err := q.DeleteWorkspace(ctx, ws.ID); err != nil {
 				return err
 			}
 			r.Forget(ws.Slug)
@@ -229,16 +229,12 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 }
 
 // Create pins the transaction to the id the workspace is about to get, so it runs under RLS with no system role.
-func Create(ctx context.Context, conn *db.Connection, slug, name string) (*db.Workspace, error) {
-	ca, err := ssh.NewCA()
-	if err != nil {
-		return nil, err
-	}
+func Create(ctx context.Context, conn *db.Connection, keys *kms.Keyset, slug, name string) (*db.Workspace, error) {
 	id := uuid.NewV7().String()
 	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: id})
 
 	var ws *db.Workspace
-	err = conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+	err := conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		ws, err = q.CreateWorkspace(ctx, &db.CreateWorkspaceParams{
 			ID:       id,
 			Slug:     slug,
@@ -254,8 +250,9 @@ func Create(ctx context.Context, conn *db.Connection, slug, name string) (*db.Wo
 		}); err != nil {
 			return err
 		}
+		ca := ssh.NewCA()
 		ca.Name, ca.Description = "Default CA", new("Default CA for "+ws.Name)
-		row, err := q.CreateCA(ctx, ca)
+		row, err := ssh.CreateCA(ctx, q, keys, ca)
 		if err != nil {
 			return err
 		}

@@ -32,8 +32,8 @@ message Recording {
   string subject_id = 9;
   string principal = 10;
   string subject_name = 11;
-  // held is true while a legal hold keeps it, it can't be deleted then.
-  bool held = 12;
+  // live is a session still running as far as the core can tell, ended_at unset behind a connected daemon.
+  bool live = 12;
 }
 
 message UploadRecordingRequest {
@@ -47,11 +47,16 @@ message UploadRecordingRequest {
 message RecordingMeta {
   string recording_id = 1 [(buf.validate.field).string.uuid = true];
   string username = 2 [(buf.validate.field).string.max_len = 32];
-  google.protobuf.Timestamp started_at = 3;
-  string principal = 4 [(buf.validate.field).string.max_len = 160];
+  string principal = 3 [(buf.validate.field).string.max_len = 160];
+  google.protobuf.Timestamp started_at = 4;
 }
 
-message RecordingFinal {}
+message RecordingFinal {
+  int64 size_bytes = 1 [(buf.validate.field).int64.gte = 0];
+  string cut_reason = 2 [(buf.validate.field).string.max_len = 200];
+  // ended_at is when the session ended, which a late upload can be long after.
+  google.protobuf.Timestamp ended_at = 3;
+}
 
 message UploadRecordingResponse {
   string recording_id = 1;

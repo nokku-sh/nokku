@@ -9,7 +9,6 @@ import (
 	"net"
 	"strings"
 	"time"
-	"uuid"
 
 	"golang.org/x/crypto/ssh"
 
@@ -19,40 +18,16 @@ import (
 // maxPrincipals is how many principals OpenSSH reads from one certificate.
 const maxPrincipals = 256
 
-// LoginPrincipal lets one subject log in as one account on one server. Hosts compare it as a whole string.
-func LoginPrincipal(subjectID, targetID, username string) string {
-	return subjectID + "@" + targetID + ":" + username
-}
+// RefusedError is a certificate the request can't have, its reason is for the caller. Any other error is the server's.
+type RefusedError struct{ Reason string }
 
-// Principal is a LoginPrincipal taken apart.
-type Principal struct {
-	SubjectID string
-	TargetID  string
-	Username  string
-}
+func (e *RefusedError) Error() string { return e.Reason }
 
-// ParseLoginPrincipal is for the core only. The ids are UUIDs, so "@" or ":" in a username cannot shift the split.
-func ParseLoginPrincipal(s string) (Principal, bool) {
-	subject, rest, ok := strings.Cut(s, "@")
-	if !ok {
-		return Principal{}, false
-	}
-	target, username, ok := strings.Cut(rest, ":")
-	if !ok || username == "" {
-		return Principal{}, false
-	}
-	if _, err := uuid.Parse(subject); err != nil {
-		return Principal{}, false
-	}
-	if _, err := uuid.Parse(target); err != nil {
-		return Principal{}, false
-	}
-	return Principal{SubjectID: subject, TargetID: target, Username: username}, true
-}
-
-// SignCertificate refuses an empty principal list, such a certificate is valid for anyone.
+// SignCertificate refuses an empty principal list, such a certificate is valid for anyone. signer is the key
+// CASigner returns for the same certType, the host key never signs a login and the user key never vouches for a server.
 func SignCertificate(
 	ca *db.SSHCA,
+	signer ssh.Signer,
 	pubKey string,
 	principals []string,
 	keyID string,
@@ -60,24 +35,16 @@ func SignCertificate(
 	certType uint32,
 ) (*ssh.Certificate, error) {
 	if len(principals) == 0 || len(principals) > maxPrincipals {
-		return nil, fmt.Errorf("a certificate takes 1 to %d principals, got %d", maxPrincipals, len(principals))
-	}
-	// The host key never signs a login, the user key never vouches for a server.
-	private := ca.PrivateKey
-	if certType == ssh.HostCert {
-		private = ca.HostPrivateKey
-	}
-	signer, err := getSigner(private.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create CA signer: %w", err)
+		return nil, &RefusedError{fmt.Sprintf("a certificate takes 1 to %d principals, got %d",
+			maxPrincipals, len(principals))}
 	}
 
 	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubKey))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse public key: %w", err)
+		return nil, &RefusedError{"failed to parse public key: " + err.Error()}
 	}
 	if err := acceptedKey(key); err != nil {
-		return nil, err
+		return nil, &RefusedError{err.Error()}
 	}
 
 	var serial uint64
@@ -96,7 +63,7 @@ func SignCertificate(
 
 	if certType == ssh.HostCert {
 		cert.CertType = ssh.HostCert
-		ttl = boundTTL(ttl, ca.HostDefaultTtl, ca.HostMaxTtl)
+		ttl = ca.HostTtl
 	} else {
 		cert.CertType = ssh.UserCert
 		ttl = UserTTL(ca, ttl)

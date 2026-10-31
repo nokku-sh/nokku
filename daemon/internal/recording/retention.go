@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
@@ -33,11 +34,11 @@ func enforceRetention() error {
 	var kept []os.FileInfo
 	var total int64
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), castSuffix) {
+		if e.IsDir() || !isRecording(e.Name()) {
 			continue
 		}
-		// Unlinking an open file frees no space, it would only lose the recording.
-		if _, busy := active.Load(filepath.Join(recordsDir, e.Name())); busy {
+		// Unlinking a file a session still writes frees no space, it would only lose the recording.
+		if beingWritten(filepath.Join(recordsDir, e.Name())) {
 			continue
 		}
 		var info os.FileInfo
@@ -64,18 +65,23 @@ func enforceRetention() error {
 	return nil
 }
 
+func isRecording(name string) bool {
+	return strings.HasSuffix(name, partSuffix) || strings.HasSuffix(name, castSuffix)
+}
+
+// The recorder holds an exclusive lock on its file until it closes it.
+func beingWritten(path string) bool {
+	f, err := os.Open(path) // #nosec G304 - a file from the recordings dir
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	return errors.Is(syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB), syscall.EWOULDBLOCK)
+}
+
 func dropPending(dir, name, reason string) {
 	slog.Warn("dropping a recording that was never uploaded", "path", name, "reason", reason)
 	if err := os.Remove(filepath.Join(dir, name)); err != nil {
 		slog.Debug("remove recording", "path", name, "error", err)
 	}
-}
-
-// The session ID is sanitized like the label, so it can never smuggle a path separator in.
-func recordingPattern(now time.Time, safeLabel, sessionID string) string {
-	parts := []string{now.Format("20060102T150405Z"), safeLabel}
-	if sessionID != "" {
-		parts = append(parts, toSnakeCase(sessionID))
-	}
-	return strings.Join(parts, "-") + "-*" + castSuffix
 }

@@ -2,7 +2,8 @@ package iam
 
 import (
 	"errors"
-	"fmt"
+
+	"github.com/nokku-sh/nokku/internal/dpop"
 )
 
 var (
@@ -28,18 +29,14 @@ var (
 	errEmailUnverified    = errors.New("iam: the provider has not verified the email")
 	errOwnerLink          = errors.New("iam: the owner links an identity while signed in")
 	// ErrDPoPRequired is advertised with a DPoP-Nonce header so the client signs and retries (RFC 9449 section 8).
-	ErrDPoPRequired    = errors.New("iam: dpop proof required")
-	errInvalidProof    = errors.New("iam: invalid dpop proof")
-	ErrDPoPNonce       = errors.New("iam: dpop nonce required")
-	errReplay          = fmt.Errorf("%w: replayed proof", errInvalidProof)
-	errBindingMismatch = fmt.Errorf("%w: jkt mismatch", errInvalidProof)
+	ErrDPoPRequired = errors.New("iam: dpop proof required")
 )
 
 // IsCredentialError tells a refused credential from a failure to check one. Only the first may end a session.
 func IsCredentialError(err error) bool {
 	for _, target := range []error{
 		errNoSession, errSessionExpired, errInvalidCredentials, ErrInactive, ErrNotFound,
-		ErrDPoPRequired, ErrDPoPNonce, errInvalidProof,
+		ErrDPoPRequired, dpop.ErrNonce, dpop.ErrInvalidProof,
 	} {
 		if errors.Is(err, target) {
 			return true

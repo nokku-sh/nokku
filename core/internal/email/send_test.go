@@ -9,6 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
 )
 
@@ -39,16 +43,16 @@ func TestSendTemplate_CallsSender(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
 
-	err := svc.SendSignupLinkEmail(
+	err := svc.SendInviteEmail(
 		t.Context(),
 		"ada@example.com",
-		"Ada",
 		"Acme",
-		"https://acme.nokku.sh/invite/verify?token=secret",
-		15*time.Minute,
+		"editor",
+		"https://acme.nokku.sh/invite?token=secret",
+		7*24*time.Hour,
 	)
 	if err != nil {
-		t.Fatalf("SendSignupLinkEmail: %v", err)
+		t.Fatalf("SendInviteEmail: %v", err)
 	}
 
 	if len(sender.sent) != 1 {
@@ -64,8 +68,8 @@ func TestSendTemplate_CallsSender(t *testing.T) {
 	if msg.Subject != "Join Acme on Nokku" {
 		t.Errorf("Subject = %q", msg.Subject)
 	}
-	if !strings.Contains(msg.HTML, "Ada") {
-		t.Error("HTML body missing rendered username")
+	if !strings.Contains(msg.HTML, "editor") {
+		t.Error("HTML body missing rendered role")
 	}
 }
 
@@ -93,18 +97,18 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 	ctx := t.Context()
 
 	// Different templates for the same user must not share a cooldown key.
-	if err := svc.SendSignupLinkEmail(ctx, "a@b.io", "Ada", "Acme", "u", 10*time.Minute); err != nil {
+	if err := svc.SendInviteEmail(ctx, "a@b.io", "Acme", "member", "u", 10*time.Minute); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.SendNewLoginEmail(ctx, "user-1", "a@b.io", "d1", "Chrome", "Vienna"); err != nil {
 		t.Fatalf("different template blocked by cooldown: %v", err)
 	}
 	// Same template again is still blocked.
-	if err := svc.SendSignupLinkEmail(
+	if err := svc.SendInviteEmail(
 		ctx,
 		"a@b.io",
-		"Ada",
 		"Acme",
+		"member",
 		"u",
 		10*time.Minute,
 	); !errors.Is(
@@ -115,6 +119,26 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 	}
 	if len(sender.sent) != 2 {
 		t.Errorf("sender called %d times, want 2", len(sender.sent))
+	}
+}
+
+// Another workspace inviting the same address is not held back, and learns nothing of the first invite.
+func TestSendInviteEmail_CooldownPerWorkspace(t *testing.T) {
+	sender := &mockSender{}
+	svc := newTestService(sender)
+	in := func(ws string) context.Context {
+		return actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws})
+	}
+
+	if err := svc.SendInviteEmail(in("w1"), "a@b.io", "Acme", "member", "u", 10*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.SendInviteEmail(in("w2"), "a@b.io", "Other", "member", "u", 10*time.Minute); err != nil {
+		t.Fatalf("another workspace was held back: %v", err)
+	}
+	err := svc.SendInviteEmail(in("w1"), "a@b.io", "Acme", "member", "u", 10*time.Minute)
+	if !errors.Is(err, ErrCooldown) {
+		t.Errorf("same workspace again = %v, want ErrCooldown", err)
 	}
 }
 
@@ -335,4 +359,21 @@ func TestLifetime(t *testing.T) {
 			t.Errorf("lifetime(%s) = %q, want %q", tt.d, got, tt.want)
 		}
 	}
+}
+
+// A security mail never hides another: each new device and each new way in gets its own, a repeat waits.
+func TestSecurityMailsCoolDownPerDeviceAndCredential(t *testing.T) {
+	sender := &mockSender{}
+	svc := newTestService(sender)
+	ctx := t.Context()
+
+	require.NoError(t, svc.SendNewLoginEmail(ctx, "user-1", "a@b.io", "browser", "Firefox", "ip"))
+	require.NoError(t, svc.SendNewLoginEmail(ctx, "user-1", "a@b.io", "nk", "nk on laptop", "ip"))
+	require.ErrorIs(t, svc.SendNewLoginEmail(ctx, "user-1", "a@b.io", "nk", "nk on laptop", "ip"), ErrCooldown)
+
+	require.NoError(t, svc.SendNewWayInEmail(ctx, "user-1", "a@b.io", "passkey-1", "A passkey", "ip"))
+	require.NoError(t, svc.SendNewWayInEmail(ctx, "user-1", "a@b.io", "google:sub", "Google", "ip"))
+	require.ErrorIs(t, svc.SendNewWayInEmail(ctx, "user-1", "a@b.io", "passkey-1", "A passkey", "ip"), ErrCooldown)
+
+	assert.Len(t, sender.sent, 4)
 }

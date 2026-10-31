@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,4 +97,29 @@ func TestNew_UnreachableRelayStillStarts(t *testing.T) {
 	svc, err := New(t.Context(), "http://localhost")
 	require.NoError(t, err, "a relay that does not answer stopped the start")
 	assert.True(t, svc.HasSMTP())
+}
+
+// A relay that takes the connection and then says nothing must not hold up the start either.
+func TestNew_HungRelayDoesNotHoldUpTheStart(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			t.Cleanup(func() { _ = conn.Close() })
+		}
+	}()
+	setRelayEnv(t, ln.Addr().(*net.TCPAddr).Port)
+	relayCheckTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { relayCheckTimeout = 3 * time.Second })
+
+	start := time.Now()
+	svc, err := New(t.Context(), "http://localhost")
+	require.NoError(t, err, "a relay that hangs stopped the start")
+	assert.True(t, svc.HasSMTP())
+	assert.Less(t, time.Since(start), 2*time.Second, "the check waited out the relay")
 }

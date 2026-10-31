@@ -58,12 +58,15 @@
 			toast.success('Passkey added');
 			await all.refetch();
 		} catch (error) {
-			const cancelled = error instanceof DOMException && error.name === 'NotAllowedError';
-			const exists = error instanceof DOMException && error.name === 'InvalidStateError';
-			toast.error(
-				cancelled ? 'Cancelled' : exists ? 'This key is already added' : 'Adding failed',
-				{ description: cancelled ? 'The passkey prompt was closed or timed out.' : undefined }
-			);
+			if (error instanceof DOMException && error.name === 'NotAllowedError') {
+				toast.error('Cancelled', { description: 'The passkey prompt was closed or timed out.' });
+			} else if (error instanceof DOMException && error.name === 'InvalidStateError') {
+				toast.error('This key is already added');
+			} else {
+				toast.error('Adding failed', {
+					description: error instanceof Error ? error.message : undefined
+				});
+			}
 		} finally {
 			adding = false;
 		}
@@ -165,7 +168,7 @@
 						<Button
 							size="sm"
 							variant="ghost"
-							href={`/oidc/login?provider=${encodeURIComponent(p.providerId)}&link=true`}
+							href={`/oidc/link?provider=${encodeURIComponent(p.providerId)}&return_to=/profile/security`}
 							data-sveltekit-reload
 						>
 							<OIDCIcon data-icon="inline-start" />

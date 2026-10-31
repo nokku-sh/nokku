@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -166,12 +167,8 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	if err := f.svc.RequireRecentSignIn(ctx); err != nil {
-		http.SetCookie(w, f.svc.ClearSessionCookie())
-		writeError(w, http.StatusUnauthorized, "sign in again to add a passkey")
-		return
-	}
-	creation, session, err := wa.BeginRegistration(wu)
+	creation, session, err := wa.BeginRegistration(wu,
+		webauthn.WithExclusions(webauthn.Credentials(wu.creds).CredentialDescriptors()))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "registration failed")
 		return
@@ -214,13 +211,8 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	f.svc.spendFlow(flowID)
-	f.svc.record(ctx, event{
-		Action: actionCredentialAdded,
-		Kind:   actor.KindUser,
-		Method: MethodPasskey,
-		UserID: wu.user.ID,
-		Email:  wu.user.Email,
-	})
+	f.svc.credentialAdded(ctx, r, wu.user, MethodPasskey,
+		base64.RawURLEncoding.EncodeToString(cred.ID), fmt.Sprintf("The passkey %q", name))
 	http.SetCookie(w, f.clearedCeremonyCookie())
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "name": name})
 }

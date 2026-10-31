@@ -3,6 +3,7 @@ edition = "2023";
 package nokku.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 import "nokku/v1/account.proto";
@@ -17,7 +18,10 @@ service TeamService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      capped: true
+    };
   }
   rpc UpdateTeam(UpdateTeamRequest) returns (UpdateTeamResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
@@ -46,9 +50,9 @@ message Team {
   string name = 2;
   string description = 3;
   repeated string tags = 4;
-  google.protobuf.Timestamp created_at = 5;
-  google.protobuf.Timestamp updated_at = 6;
-  int32 member_count = 7;
+  int32 member_count = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
 }
 
 message GetTeamRequest {
@@ -78,6 +82,16 @@ message UpdateTeamRequest {
   }];
   string description = 3 [(buf.validate.field).string.max_len = 1000];
   repeated string tags = 4;
+  google.protobuf.FieldMask update_mask = 5 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).field_mask = {
+      in: [
+        "name",
+        "description",
+        "tags"
+      ]
+    }
+  ];
 }
 message UpdateTeamResponse {
   Team team = 1;

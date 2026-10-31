@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"strings"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
@@ -79,5 +80,30 @@ func TestMarshalPubKey_RoundTrip(t *testing.T) {
 	}
 	if string(pub.Marshal()) != string(want.Marshal()) {
 		t.Error("round-tripped key does not match original")
+	}
+}
+
+func keyLine(t *testing.T, comment string) string {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	pub, err := ssh.NewPublicKey(priv.Public())
+	if err != nil {
+		t.Fatalf("new public key: %v", err)
+	}
+	line := strings.TrimRight(string(ssh.MarshalAuthorizedKey(pub)), "\n")
+	return line + " " + comment
+}
+
+func TestParsePublicKey(t *testing.T) {
+	line := keyLine(t, "x")
+
+	if _, err := ParsePublicKey(line); err != nil {
+		t.Fatalf("parse valid key: %v", err)
+	}
+	if _, err := ParsePublicKey("garbage"); err == nil {
+		t.Fatal("parse garbage should fail")
 	}
 }

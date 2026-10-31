@@ -1,9 +1,10 @@
 -- name: CreateAuditStream :one
--- A new stream starts with the events from now on. Never the secret back, it is not shown again.
+-- A new stream starts with the events from now on. Never the secret back, it is not shown again. The id comes from
+-- the caller, the secret is sealed to it.
 INSERT INTO
-  audit_streams (kind, url, secret)
+  audit_streams (id, kind, url, secret)
 VALUES
-  (@kind, @url, @secret)
+  (@id, @kind, @url, @secret)
 RETURNING
   id,
   kind,

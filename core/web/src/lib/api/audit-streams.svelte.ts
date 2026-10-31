@@ -1,6 +1,7 @@
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { AuditStreamService } from '#lib/gen/nokku/v1/audit_stream_pb.js';
+import { usePatch } from './mask';
 
 export const auditStreams = {
 	list: () =>
@@ -10,7 +11,7 @@ export const auditStreams = {
 		useMutation(AuditStreamService.method.createAuditStream, {
 			onSuccess: () => toast.success('Stream added, new events go out within seconds')
 		}),
-	update: () => useMutation(AuditStreamService.method.updateAuditStream),
+	update: () => usePatch(AuditStreamService.method.updateAuditStream),
 	remove: () =>
 		useMutation(AuditStreamService.method.deleteAuditStream, {
 			onSuccess: () => toast.success('Stream removed')

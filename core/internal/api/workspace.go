@@ -1,13 +1,12 @@
 package api
 
 import (
+	"cmp"
 	"context"
-	"errors"
 	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect/v2"
-	"google.golang.org/protobuf/reflect/protoreflect"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -55,19 +54,20 @@ func (s *workspaceService) UpdateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceRequest,
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
+	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
+		return nil, err
+	}
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		base, err := q.GetWorkspace(ctx)
+		// Locked, so two tabs saving different settings at once keep both.
+		base, err := q.GetWorkspaceForUpdate(ctx)
 		if err != nil {
 			return err
 		}
 		wasEnforced := base.Settings.GetEnforceSso()
-		// Each field the request sets replaces the stored one whole. Merge would keep a stored timeout under a zero one.
-		if settings := req.GetSettings(); settings != nil {
-			settings.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
-				base.Settings.ProtoReflect().Set(fd, v)
-				return true
-			})
+		if req.GetSettings() != nil {
+			base.Settings = cmp.Or(base.Settings, &nokkuv1.WorkspaceSettings{})
+			mergeSet(base.Settings.ProtoReflect(), req.GetSettings().ProtoReflect())
 		}
 		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
 			Name:        req.Name,
@@ -96,16 +96,8 @@ func (s *workspaceService) DeleteWorkspace(
 		return nil, errSingleWorkspace
 	}
 	ws, _ := actor.WorkspaceFromContext(ctx)
-	// Asked before billing, a held workspace must not lose its subscription and then stay.
-	holds, err := s.cfg.Conn.Tenant().CountLegalHolds(ctx)
-	if err != nil {
-		return nil, errInternal
-	}
-	if holds > 0 {
-		return nil, errLegalHold
-	}
 	if err := s.cfg.Billing.Cancel(ctx, ws.ID, true, ""); err != nil {
-		return nil, errInternal
+		return nil, err
 	}
 	if err := deleteWorkspace(ctx, s.cfg, ws); err != nil {
 		return nil, err
@@ -113,18 +105,13 @@ func (s *workspaceService) DeleteWorkspace(
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
-// deleteWorkspace removes ws with its recordings. The database refuses while a legal hold exists.
+// deleteWorkspace removes ws. Its recording objects go through the delete queue.
 func deleteWorkspace(ctx context.Context, cfg *config.Config, ws actor.Workspace) error {
 	ctx = actor.WithWorkspace(ctx, ws)
-	deleted, err := cfg.Conn.Tenant().DeleteWorkspace(ctx, ws.ID)
-	if err != nil {
+	if err := cfg.Conn.Tenant().DeleteWorkspace(ctx, ws.ID); err != nil {
 		return err
 	}
-	if deleted == 0 {
-		return errLegalHold
-	}
 	cfg.Tenant.Forget(ws.Slug)
-	cfg.Record.PurgeWorkspace(ctx, ws.ID)
 	return nil
 }
 
@@ -140,7 +127,7 @@ func (s *workspaceService) CreateWorkspace(
 		return nil, newError(connect.CodeInvalidArgument, "this name is not available")
 	}
 	// Asked before anything exists. A workspace whose owner gets no mail would sit there until the purge.
-	addr := strings.ToLower(strings.TrimSpace(req.GetOwnerEmail()))
+	addr := iam.NormalizeEmail(req.GetOwnerEmail())
 	if s.cfg.Email.OwnerLinkOnCooldown(addr) {
 		return nil, newError(
 			connect.CodeResourceExhausted,
@@ -150,7 +137,7 @@ func (s *workspaceService) CreateWorkspace(
 	if err := email.Verify(ctx, addr, true); err != nil {
 		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
 	}
-	ws, err := tenant.Create(ctx, s.cfg.Conn, req.GetSlug(), strings.TrimSpace(req.GetName()))
+	ws, err := tenant.Create(ctx, s.cfg.Conn, s.cfg.Keyset, req.GetSlug(), strings.TrimSpace(req.GetName()))
 	if db.IsUniqueViolation(err) {
 		return nil, newError(connect.CodeAlreadyExists, "this name is taken")
 	}
@@ -252,9 +239,6 @@ func (s *workspaceService) SetUserActive(
 		_, err := s.cfg.IAM.SetUserActive(ctx, q, req.GetUserId(), req.GetActive())
 		return err
 	}); err != nil {
-		if errors.Is(err, iam.ErrSeatLimit) {
-			return nil, errSeatLimit
-		}
 		return nil, err
 	}
 	if !req.GetActive() {

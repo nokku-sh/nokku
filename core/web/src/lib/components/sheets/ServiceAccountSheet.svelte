@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
 	import { roleLabel, SERVICE_ACCOUNT_MAX_ROLE } from '#lib/roles.js';
@@ -52,7 +53,9 @@
 	const tokenList = $derived(tokens.data ?? []);
 	const revokeToken = saApi.tokens.revoke();
 
-	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
+	const autoSave = useAutoSave(() =>
+		draft.save((changes) => update.mutateAsync({ ...changes, id: model?.id }))
+	);
 	const save = () => autoSave.save();
 
 	let tokenOpen = $state(false);
@@ -185,7 +188,11 @@
 					</Empty.Header>
 					{#if can.edit}
 						<Empty.Content>
-							<Button size="sm" variant="outline" onclick={() => (tokenOpen = true)}>
+							<Button
+								size="sm"
+								variant="outline"
+								onclick={() => whenFresh(() => (tokenOpen = true))}
+							>
 								<Plus data-icon="inline-start" />
 								Create token
 							</Button>
@@ -195,7 +202,7 @@
 			{:else}
 				{#if can.edit}
 					<div class="flex justify-end">
-						<Button size="sm" variant="outline" onclick={() => (tokenOpen = true)}>
+						<Button size="sm" variant="outline" onclick={() => whenFresh(() => (tokenOpen = true))}>
 							<Plus data-icon="inline-start" />
 							New token
 						</Button>

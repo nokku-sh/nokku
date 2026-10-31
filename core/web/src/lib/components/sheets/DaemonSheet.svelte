@@ -20,9 +20,8 @@
 	} from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Ban, Clock, Cpu, Info, Server, Settings2, ShieldCheck } from '@lucide/svelte';
+	import { Ban, Clock, Info, Server, Settings2, ShieldCheck } from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
-	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
 	import Chip from '#lib/components/blocks/Chip.svelte';
@@ -43,7 +42,7 @@
 	const pending = $derived(entity?.status === DaemonStatus.PENDING);
 
 	const autoSave = useAutoSave(() =>
-		update.mutateAsync({ id: sheet.id, config: create(DaemonConfigSchema, cfg ?? {}) })
+		draft.save((changes) => update.mutateAsync({ ...changes, id: sheet.id }))
 	);
 
 	// The idle timeout is the workspace's, set under Settings.
@@ -122,7 +121,7 @@
 	saveState={accepted ? autoSave.saveState : undefined}
 	saveHint={sheet.tab === 'settings'}
 	readonly={!can.edit}
-	detail={entity?.metadata?.hostname}
+	detail={entity?.version}
 	detailMono
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
@@ -192,28 +191,6 @@
 						{/if}
 					</Alert.Root>
 				</div>
-			{/if}
-
-			{#if Object.keys(entity.metadata ?? {}).length}
-				<Section title="Host" icon={Cpu}>
-					<DetailList
-						items={Object.entries(entity.metadata).map(([key, value]) => ({
-							label: key.replace(/[-_]/g, ' '),
-							value,
-							mono: true,
-							copy: key === 'host'
-						}))}
-					/>
-				</Section>
-			{:else}
-				<Section title="Host" icon={Cpu}>
-					<Empty.Root class="border border-dashed p-6">
-						<Empty.Header>
-							<Empty.Media variant="icon"><Cpu /></Empty.Media>
-							<Empty.Description>Host details show up once the daemon connects.</Empty.Description>
-						</Empty.Header>
-					</Empty.Root>
-				</Section>
 			{/if}
 
 			{#if accepted}

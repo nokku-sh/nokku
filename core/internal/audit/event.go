@@ -13,6 +13,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -40,7 +41,8 @@ type Event struct {
 	Details     map[string]any `json:"details,omitempty"`
 }
 
-// Append writes the event as nokku_system, tenant transactions cannot write audit rows.
+// Append writes the event into its workspace. A job outside a request pins the event's, a request may only write
+// into its own, which the row policy checks.
 func (s *Service) Append(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil
@@ -56,7 +58,10 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 	if string(details) == "null" {
 		details = []byte("{}")
 	}
-	return s.conn.Sys().InsertAuditLog(ctx, &db.InsertAuditLogParams{
+	if actor.WorkspaceIDFromContext(ctx) == "" {
+		ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: event.WorkspaceID})
+	}
+	return s.conn.Tenant().InsertAuditLog(ctx, &db.InsertAuditLogParams{
 		WorkspaceID: event.WorkspaceID,
 		ActorID:     event.ActorID,
 		ActorKind:   event.ActorKind,

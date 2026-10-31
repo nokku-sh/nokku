@@ -10,7 +10,7 @@
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { auth } from '#lib/api/auth.svelte.js';
+	import { auth, whenFresh } from '#lib/api/auth.svelte.js';
 	import { useConnect, useServers } from '#lib/api/connect.svelte.js';
 	import { daemon } from '#lib/api/daemons.svelte.js';
 	import { serviceAccount } from '#lib/api/service_account.svelte.js';
@@ -88,6 +88,7 @@
 				title: 'Enroll a daemon',
 				icon: Rocket,
 				url: '/infrastructure/daemons?new=1',
+				fresh: true,
 				show: can.admin,
 				keywords: 'nokkud token install'
 			},
@@ -95,7 +96,8 @@
 				title: 'Invite people',
 				icon: UserPlus,
 				url: '/access/users?new=1',
-				show: can.admin && !!options.data?.magicLink,
+				fresh: true,
+				show: can.admin && !!options.data?.passkey,
 				keywords: 'user member add'
 			},
 			{ title: 'Create team', icon: Users, url: '/access/teams?new=1', show: can.edit },
@@ -103,6 +105,7 @@
 				title: 'Create service account',
 				icon: Waypoints,
 				url: '/access/service-accounts?new=1',
+				fresh: true,
 				show: can.edit,
 				keywords: 'api ci automation'
 			},
@@ -130,7 +133,7 @@
 	const foundTargets = target.list(find, () => finding);
 	const foundUsers = users.list(find, () => finding);
 	const foundTeams = team.list(find, () => finding);
-	const foundDaemons = daemon.list(find, () => finding);
+	const foundDaemons = daemon.list(find, { when: () => finding });
 	const foundAccounts = serviceAccount.list(find, () => finding);
 
 	const found = $derived(
@@ -309,7 +312,8 @@
 					<Command.Item
 						value={`action:${action.title}`}
 						onSelect={() => {
-							if (action.url) return go(action.url);
+							const url = action.url;
+							if (url) return 'fresh' in action ? whenFresh(() => go(url), url) : go(url);
 							open = false;
 							action.run?.();
 						}}

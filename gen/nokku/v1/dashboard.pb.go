@@ -22,6 +22,106 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type LiveSession struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	DaemonName    *string                `protobuf:"bytes,3,opt,name=daemon_name,json=daemonName" json:"daemon_name,omitempty"`
+	Username      *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
+	UserId        *string                `protobuf:"bytes,5,opt,name=user_id,json=userId" json:"user_id,omitempty"`
+	Recording     *bool                  `protobuf:"varint,6,opt,name=recording" json:"recording,omitempty"`
+	Web           *bool                  `protobuf:"varint,7,opt,name=web" json:"web,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LiveSession) Reset() {
+	*x = LiveSession{}
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LiveSession) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LiveSession) ProtoMessage() {}
+
+func (x *LiveSession) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LiveSession.ProtoReflect.Descriptor instead.
+func (*LiveSession) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *LiveSession) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return ""
+}
+
+func (x *LiveSession) GetDaemonId() string {
+	if x != nil && x.DaemonId != nil {
+		return *x.DaemonId
+	}
+	return ""
+}
+
+func (x *LiveSession) GetDaemonName() string {
+	if x != nil && x.DaemonName != nil {
+		return *x.DaemonName
+	}
+	return ""
+}
+
+func (x *LiveSession) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+func (x *LiveSession) GetUserId() string {
+	if x != nil && x.UserId != nil {
+		return *x.UserId
+	}
+	return ""
+}
+
+func (x *LiveSession) GetRecording() bool {
+	if x != nil && x.Recording != nil {
+		return *x.Recording
+	}
+	return false
+}
+
+func (x *LiveSession) GetWeb() bool {
+	if x != nil && x.Web != nil {
+		return *x.Web
+	}
+	return false
+}
+
+func (x *LiveSession) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
 type GetDashboardRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -30,7 +130,7 @@ type GetDashboardRequest struct {
 
 func (x *GetDashboardRequest) Reset() {
 	*x = GetDashboardRequest{}
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[0]
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +142,7 @@ func (x *GetDashboardRequest) String() string {
 func (*GetDashboardRequest) ProtoMessage() {}
 
 func (x *GetDashboardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[0]
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +155,7 @@ func (x *GetDashboardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDashboardRequest.ProtoReflect.Descriptor instead.
 func (*GetDashboardRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{0}
+	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{1}
 }
 
 type GetDashboardResponse struct {
@@ -68,19 +168,19 @@ type GetDashboardResponse struct {
 	PendingDaemons      []*Daemon              `protobuf:"bytes,6,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
 	OfflineDaemons      []*Daemon              `protobuf:"bytes,7,rep,name=offline_daemons,json=offlineDaemons" json:"offline_daemons,omitempty"`
 	Users               *int32                 `protobuf:"varint,8,opt,name=users" json:"users,omitempty"`
-	RecordingBytes      *int64                 `protobuf:"varint,10,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
-	RecordingQuotaBytes *int64                 `protobuf:"varint,11,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
-	LiveSessions        []*LiveSession         `protobuf:"bytes,12,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
-	Activity            []int32                `protobuf:"varint,13,rep,packed,name=activity" json:"activity,omitempty"`
-	Failures            []int32                `protobuf:"varint,14,rep,packed,name=failures" json:"failures,omitempty"`
-	RecentChanges       []*EventLog            `protobuf:"bytes,15,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
+	RecordingBytes      *int64                 `protobuf:"varint,9,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
+	RecordingQuotaBytes *int64                 `protobuf:"varint,10,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
+	LiveSessions        []*LiveSession         `protobuf:"bytes,11,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
+	Activity            []int32                `protobuf:"varint,12,rep,packed,name=activity" json:"activity,omitempty"`
+	Failures            []int32                `protobuf:"varint,13,rep,packed,name=failures" json:"failures,omitempty"`
+	RecentChanges       []*EventLog            `protobuf:"bytes,14,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
 func (x *GetDashboardResponse) Reset() {
 	*x = GetDashboardResponse{}
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[1]
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -92,7 +192,7 @@ func (x *GetDashboardResponse) String() string {
 func (*GetDashboardResponse) ProtoMessage() {}
 
 func (x *GetDashboardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[1]
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -105,7 +205,7 @@ func (x *GetDashboardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDashboardResponse.ProtoReflect.Descriptor instead.
 func (*GetDashboardResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{1}
+	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetDashboardResponse) GetTargets() int32 {
@@ -206,112 +306,23 @@ func (x *GetDashboardResponse) GetRecentChanges() []*EventLog {
 	return nil
 }
 
-type LiveSession struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	DaemonName    *string                `protobuf:"bytes,3,opt,name=daemon_name,json=daemonName" json:"daemon_name,omitempty"`
-	Username      *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
-	UserId        *string                `protobuf:"bytes,5,opt,name=user_id,json=userId" json:"user_id,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt" json:"started_at,omitempty"`
-	Recording     *bool                  `protobuf:"varint,7,opt,name=recording" json:"recording,omitempty"`
-	Web           *bool                  `protobuf:"varint,8,opt,name=web" json:"web,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LiveSession) Reset() {
-	*x = LiveSession{}
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LiveSession) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LiveSession) ProtoMessage() {}
-
-func (x *LiveSession) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LiveSession.ProtoReflect.Descriptor instead.
-func (*LiveSession) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *LiveSession) GetId() string {
-	if x != nil && x.Id != nil {
-		return *x.Id
-	}
-	return ""
-}
-
-func (x *LiveSession) GetDaemonId() string {
-	if x != nil && x.DaemonId != nil {
-		return *x.DaemonId
-	}
-	return ""
-}
-
-func (x *LiveSession) GetDaemonName() string {
-	if x != nil && x.DaemonName != nil {
-		return *x.DaemonName
-	}
-	return ""
-}
-
-func (x *LiveSession) GetUsername() string {
-	if x != nil && x.Username != nil {
-		return *x.Username
-	}
-	return ""
-}
-
-func (x *LiveSession) GetUserId() string {
-	if x != nil && x.UserId != nil {
-		return *x.UserId
-	}
-	return ""
-}
-
-func (x *LiveSession) GetStartedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.StartedAt
-	}
-	return nil
-}
-
-func (x *LiveSession) GetRecording() bool {
-	if x != nil && x.Recording != nil {
-		return *x.Recording
-	}
-	return false
-}
-
-func (x *LiveSession) GetWeb() bool {
-	if x != nil && x.Web != nil {
-		return *x.Web
-	}
-	return false
-}
-
 var File_nokku_v1_dashboard_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\n" +
-	"\x18nokku/v1/dashboard.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x15nokku/v1/daemon.proto\x1a\x13nokku/v1/util.proto\"\x15\n" +
-	"\x13GetDashboardRequest\"\xdd\x04\n" +
+	"\x18nokku/v1/dashboard.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x15nokku/v1/daemon.proto\x1a\x13nokku/v1/util.proto\"\xfb\x01\n" +
+	"\vLiveSession\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tdaemon_id\x18\x02 \x01(\tR\bdaemonId\x12\x1f\n" +
+	"\vdaemon_name\x18\x03 \x01(\tR\n" +
+	"daemonName\x12\x1a\n" +
+	"\busername\x18\x04 \x01(\tR\busername\x12\x17\n" +
+	"\auser_id\x18\x05 \x01(\tR\x06userId\x12\x1c\n" +
+	"\trecording\x18\x06 \x01(\bR\trecording\x12\x10\n" +
+	"\x03web\x18\a \x01(\bR\x03web\x129\n" +
+	"\n" +
+	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\"\x15\n" +
+	"\x13GetDashboardRequest\"\xd7\x04\n" +
 	"\x14GetDashboardResponse\x12\x18\n" +
 	"\atargets\x18\x01 \x01(\x05R\atargets\x12%\n" +
 	"\x0etargets_online\x18\x02 \x01(\x05R\rtargetsOnline\x12%\n" +
@@ -321,25 +332,13 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\x0fpending_daemons\x18\x06 \x03(\v2\x10.nokku.v1.DaemonR\x0ependingDaemons\x129\n" +
 	"\x0foffline_daemons\x18\a \x03(\v2\x10.nokku.v1.DaemonR\x0eofflineDaemons\x12\x14\n" +
 	"\x05users\x18\b \x01(\x05R\x05users\x12'\n" +
-	"\x0frecording_bytes\x18\n" +
-	" \x01(\x03R\x0erecordingBytes\x122\n" +
-	"\x15recording_quota_bytes\x18\v \x01(\x03R\x13recordingQuotaBytes\x12:\n" +
-	"\rlive_sessions\x18\f \x03(\v2\x15.nokku.v1.LiveSessionR\fliveSessions\x12\x1a\n" +
-	"\bactivity\x18\r \x03(\x05R\bactivity\x12\x1a\n" +
-	"\bfailures\x18\x0e \x03(\x05R\bfailures\x129\n" +
-	"\x0erecent_changes\x18\x0f \x03(\v2\x12.nokku.v1.EventLogR\rrecentChangesJ\x04\b\t\x10\n" +
-	"\"\xfb\x01\n" +
-	"\vLiveSession\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
-	"\tdaemon_id\x18\x02 \x01(\tR\bdaemonId\x12\x1f\n" +
-	"\vdaemon_name\x18\x03 \x01(\tR\n" +
-	"daemonName\x12\x1a\n" +
-	"\busername\x18\x04 \x01(\tR\busername\x12\x17\n" +
-	"\auser_id\x18\x05 \x01(\tR\x06userId\x129\n" +
-	"\n" +
-	"started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12\x1c\n" +
-	"\trecording\x18\a \x01(\bR\trecording\x12\x10\n" +
-	"\x03web\x18\b \x01(\bR\x03web2l\n" +
+	"\x0frecording_bytes\x18\t \x01(\x03R\x0erecordingBytes\x122\n" +
+	"\x15recording_quota_bytes\x18\n" +
+	" \x01(\x03R\x13recordingQuotaBytes\x12:\n" +
+	"\rlive_sessions\x18\v \x03(\v2\x15.nokku.v1.LiveSessionR\fliveSessions\x12\x1a\n" +
+	"\bactivity\x18\f \x03(\x05R\bactivity\x12\x1a\n" +
+	"\bfailures\x18\r \x03(\x05R\bfailures\x129\n" +
+	"\x0erecent_changes\x18\x0e \x03(\v2\x12.nokku.v1.EventLogR\rrecentChanges2l\n" +
 	"\x10DashboardService\x12X\n" +
 	"\fGetDashboard\x12\x1d.nokku.v1.GetDashboardRequest\x1a\x1e.nokku.v1.GetDashboardResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eDashboardProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -358,21 +357,21 @@ func file_nokku_v1_dashboard_proto_rawDescGZIP() []byte {
 
 var file_nokku_v1_dashboard_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_nokku_v1_dashboard_proto_goTypes = []any{
-	(*GetDashboardRequest)(nil),   // 0: nokku.v1.GetDashboardRequest
-	(*GetDashboardResponse)(nil),  // 1: nokku.v1.GetDashboardResponse
-	(*LiveSession)(nil),           // 2: nokku.v1.LiveSession
-	(*Daemon)(nil),                // 3: nokku.v1.Daemon
-	(*EventLog)(nil),              // 4: nokku.v1.EventLog
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*LiveSession)(nil),           // 0: nokku.v1.LiveSession
+	(*GetDashboardRequest)(nil),   // 1: nokku.v1.GetDashboardRequest
+	(*GetDashboardResponse)(nil),  // 2: nokku.v1.GetDashboardResponse
+	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
+	(*Daemon)(nil),                // 4: nokku.v1.Daemon
+	(*EventLog)(nil),              // 5: nokku.v1.EventLog
 }
 var file_nokku_v1_dashboard_proto_depIdxs = []int32{
-	3, // 0: nokku.v1.GetDashboardResponse.pending_daemons:type_name -> nokku.v1.Daemon
-	3, // 1: nokku.v1.GetDashboardResponse.offline_daemons:type_name -> nokku.v1.Daemon
-	2, // 2: nokku.v1.GetDashboardResponse.live_sessions:type_name -> nokku.v1.LiveSession
-	4, // 3: nokku.v1.GetDashboardResponse.recent_changes:type_name -> nokku.v1.EventLog
-	5, // 4: nokku.v1.LiveSession.started_at:type_name -> google.protobuf.Timestamp
-	0, // 5: nokku.v1.DashboardService.GetDashboard:input_type -> nokku.v1.GetDashboardRequest
-	1, // 6: nokku.v1.DashboardService.GetDashboard:output_type -> nokku.v1.GetDashboardResponse
+	3, // 0: nokku.v1.LiveSession.started_at:type_name -> google.protobuf.Timestamp
+	4, // 1: nokku.v1.GetDashboardResponse.pending_daemons:type_name -> nokku.v1.Daemon
+	4, // 2: nokku.v1.GetDashboardResponse.offline_daemons:type_name -> nokku.v1.Daemon
+	0, // 3: nokku.v1.GetDashboardResponse.live_sessions:type_name -> nokku.v1.LiveSession
+	5, // 4: nokku.v1.GetDashboardResponse.recent_changes:type_name -> nokku.v1.EventLog
+	1, // 5: nokku.v1.DashboardService.GetDashboard:input_type -> nokku.v1.GetDashboardRequest
+	2, // 6: nokku.v1.DashboardService.GetDashboard:output_type -> nokku.v1.GetDashboardResponse
 	6, // [6:7] is the sub-list for method output_type
 	5, // [5:6] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name

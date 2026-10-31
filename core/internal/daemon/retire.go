@@ -12,10 +12,16 @@ import (
 
 const retireTick = time.Minute
 
-// RetireLoop deletes the daemons of ephemeral tokens that have been away longer than their retire_after.
-// Each one is written to the audit log through record. The session stays, like after an admin's delete, so
-// a host that does come back is told it is rejected and drops its cached principals.
-func RetireLoop(ctx context.Context, conn connection, record func(context.Context, *audit.Event)) {
+// RetireLoop deletes the daemons of ephemeral tokens that have been away longer than their retire_after. A daemon
+// in connected is never away. Each one is written to the audit log through record. The session stays, like after an
+// admin's delete, so a host that does come back is told it is rejected and drops its cached principals.
+func RetireLoop(
+	ctx context.Context,
+	conn connection,
+	connected func() []string,
+	record func(context.Context, *audit.Event),
+) {
+	started := time.Now()
 	ticker := time.NewTicker(retireTick)
 	defer ticker.Stop()
 	for {
@@ -24,21 +30,30 @@ func RetireLoop(ctx context.Context, conn connection, record func(context.Contex
 			return
 		case <-ticker.C:
 		}
-		if err := Retire(ctx, conn, record); err != nil {
+		if err := Retire(ctx, conn, connected(), started, record); err != nil {
 			slog.Error("retire ephemeral daemons", "error", err)
 		}
 	}
 }
 
-// Retire is one pass of RetireLoop, on its own for tests.
-func Retire(ctx context.Context, conn connection, record func(context.Context, *audit.Event)) error {
+// Retire is one pass of RetireLoop, on its own for tests. Nothing counts as away before started.
+func Retire(
+	ctx context.Context,
+	conn connection,
+	connected []string,
+	started time.Time,
+	record func(context.Context, *audit.Event),
+) error {
 	var retired []*db.DeleteRetiredDaemonsRow
 	err := conn.SysTx(ctx, func(q *db.Queries) error {
 		locked, err := q.TryAdvisoryXactLock(ctx, "daemon-retire")
 		if err != nil || !locked {
 			return err
 		}
-		retired, err = q.DeleteRetiredDaemons(ctx)
+		retired, err = q.DeleteRetiredDaemons(ctx, &db.DeleteRetiredDaemonsParams{
+			StartedAt: started,
+			Connected: connected,
+		})
 		return err
 	})
 	if err != nil {

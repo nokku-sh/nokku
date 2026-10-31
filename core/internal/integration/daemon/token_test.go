@@ -28,7 +28,7 @@ func seedTeamGrant(t *testing.T, f fixture, username string) string {
 			return err
 		}
 		teamID = team.ID
-		tokens, err := q.ListJoinTokens(f.ctx, 0)
+		tokens, err := q.ListJoinTokens(f.ctx)
 		if err != nil {
 			return err
 		}
@@ -138,10 +138,12 @@ func TestEnrollEphemeralReplacesOffline(t *testing.T) {
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
 		_, err := q.GetDaemon(f.ctx, first.DaemonID)
 		assert.Error(t, err, "the offline daemon of that name is gone")
-		return q.TouchDaemons(f.ctx, []string{second.DaemonID})
+		return nil
 	}))
 
-	third, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	third, err := enroll(t, f, daemon.EnrollInput{
+		Token: token, ReqMetadata: hostname("alice"), Connected: []string{second.DaemonID},
+	})
 	require.NoError(t, err)
 	assert.Regexp(t, generatedName, third.Name, "an online daemon keeps its name")
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
@@ -159,11 +161,11 @@ func TestRetireSweep(t *testing.T) {
 	var events []*audit.Event
 	record := func(_ context.Context, e *audit.Event) { events = append(events, e) }
 
-	require.NoError(t, daemon.Retire(f.ctx, f.conn, record))
+	require.NoError(t, daemon.Retire(f.ctx, f.conn, nil, time.Time{}, record))
 	assert.Empty(t, events, "retired a daemon that was just made")
 
 	time.Sleep(1100 * time.Millisecond)
-	require.NoError(t, daemon.Retire(f.ctx, f.conn, record))
+	require.NoError(t, daemon.Retire(f.ctx, f.conn, nil, time.Time{}, record))
 	require.Len(t, events, 1)
 	assert.Equal(t, "RetireDaemon", events[0].Action)
 	assert.Equal(t, out.DaemonID, events[0].Target)
@@ -171,4 +173,47 @@ func TestRetireSweep(t *testing.T) {
 		_, err := q.GetDaemon(f.ctx, out.DaemonID)
 		return err
 	}), "the daemon is still there")
+}
+
+// A daemon that stays connected is never away, however long ago it connected.
+func TestRetireSweepKeepsAConnectedDaemon(t *testing.T) {
+	f, token := ephemeralToken(t, time.Second)
+	out, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	require.NoError(t, err)
+	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
+		return q.MarkDaemonSeen(f.ctx, out.DaemonID)
+	}))
+
+	time.Sleep(1100 * time.Millisecond)
+	var events []*audit.Event
+	record := func(_ context.Context, e *audit.Event) { events = append(events, e) }
+	require.NoError(t, daemon.Retire(f.ctx, f.conn, []string{out.DaemonID}, time.Time{}, record))
+	assert.Empty(t, events, "retired a daemon that is connected")
+	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
+		_, err := q.GetDaemon(f.ctx, out.DaemonID)
+		return err
+	}), "the connected daemon is gone")
+}
+
+// A crash stamps no daemon as gone, so one that was connected looks away since it connected. The sweep counts from
+// the restart instead, and a daemon still reconnecting gets its whole retire_after.
+func TestRetireSweepCountsFromTheRestart(t *testing.T) {
+	f, token := ephemeralToken(t, time.Second)
+	out, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	require.NoError(t, err)
+	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
+		return q.MarkDaemonSeen(f.ctx, out.DaemonID)
+	}))
+
+	time.Sleep(1100 * time.Millisecond)
+	restarted := time.Now()
+	// The sweep spans workspaces and takes what earlier tests left too, only this daemon counts.
+	var retired []string
+	record := func(_ context.Context, e *audit.Event) { retired = append(retired, e.Target) }
+	require.NoError(t, daemon.Retire(f.ctx, f.conn, nil, restarted, record))
+	assert.NotContains(t, retired, out.DaemonID, "retired a daemon right after the restart")
+
+	time.Sleep(1100 * time.Millisecond)
+	require.NoError(t, daemon.Retire(f.ctx, f.conn, nil, restarted, record))
+	assert.Contains(t, retired, out.DaemonID, "a daemon that never came back stays")
 }

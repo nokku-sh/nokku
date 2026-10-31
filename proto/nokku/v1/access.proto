@@ -11,6 +11,16 @@ message Access {
   bool daemon = 4;
   // people_only refuses service accounts, so a leaked token cannot mint more credentials for itself.
   bool people_only = 5;
+  // fresh needs a browser session from the last 10 minutes and refuses nk, a stolen session cannot add a way in.
+  bool fresh = 6;
+  // feature is the plan feature the call needs.
+  string feature = 7;
+  // capped counts the create against the plan's resource cap.
+  bool capped = 8;
+  // signs issues a user certificate, an inactive workspace gets none.
+  bool signs = 9;
+  // quiet changes something, but the handler records what matters, so the audit log skips the call.
+  bool quiet = 10;
 }
 
 enum WorkspaceRole {

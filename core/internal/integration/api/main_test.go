@@ -22,6 +22,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/api"
 	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
@@ -30,12 +31,17 @@ import (
 
 // What a client sees of the limits and codes of the server.
 const (
-	maxMessageBytes    = 4 << 20
-	maxUploadBytes     = 64 << 20
-	quotaCheckInterval = 1 << 20
+	maxMessageBytes = 4 << 20
+	maxUploadBytes  = 64 << 20
+	maxOpenUploads  = 64
 
 	wsShellExited websocket.StatusCode = 4000
 )
+
+// accessTokens are the kinds of every access token, for a test that takes whichever it got.
+var accessTokens = []crypto.TokenKind{
+	crypto.TokenSession, crypto.TokenCLI, crypto.TokenDaemon, crypto.TokenServiceAccount, crypto.TokenSCIM,
+}
 
 // One server for the package, the tests share its workspace.
 var (
@@ -47,28 +53,6 @@ var (
 
 // TestMain keeps a developer's shell env from pointing the test server at real Stripe, KMS, S3, SMTP or providers.
 func TestMain(m *testing.M) {
-	for _, key := range []string{
-		"NOKKU_BASE_URL",
-		"NOKKU_TLS_CA",
-		"NOKKU_TRUSTED_PROXIES",
-		"NOKKU_LICENSE_KEY",
-		"NOKKU_STORAGE_URL",
-		"NOKKU_SMTP_HOST",
-		"NOKKU_ADMIN_EMAIL",
-		"NOKKU_ADMIN_NAME",
-		"NOKKU_WORKSPACE_NAME",
-		"KMS_URI",
-		"NOKKU_SAAS",
-		"STRIPE_SECRET_KEY",
-		"STRIPE_WEBHOOK_SECRET",
-		"STRIPE_PRO_MONTHLY_PRICE_ID",
-		"STRIPE_PRO_YEARLY_PRICE_ID",
-		"GOOGLE_CLIENT_ID",
-		"MICROSOFT_CLIENT_ID",
-		"OTEL_EXPORTER_OTLP_ENDPOINT",
-	} {
-		os.Unsetenv(key)
-	}
 	stop := testenv.Postgres()
 	storageDir, _ = os.MkdirTemp("", "nokku-api-test")
 	os.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
@@ -122,7 +106,7 @@ func seedWorkspace(t *testing.T, cfg *config.Config) string {
 // seedOtherWorkspace makes a workspace no request can reach. What lives in it must never show up through the API.
 func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 	t.Helper()
-	ws, err := tenant.Create(t.Context(), cfg.Conn, uuid.NewV7().String(), "other")
+	ws, err := tenant.Create(t.Context(), cfg.Conn, cfg.Keyset, uuid.NewV7().String(), "other")
 	require.NoError(t, err)
 	return ws.ID
 }
@@ -174,6 +158,18 @@ func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	_, token, err := cfg.IAM.IssueToken(wsCtx(t, cfg), iam.TokenParams{
 		SubjectID: u.ID,
 		Kind:      actor.KindUser,
+		Method:    iam.MethodPasskey,
+	})
+	require.NoError(t, err)
+	return token
+}
+
+// cliSessionFor is an nk session for u, unbound. nk binds it to its key, the server skips the proof without one.
+func cliSessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
+	t.Helper()
+	_, token, err := cfg.IAM.IssueToken(wsCtx(t, cfg), iam.TokenParams{
+		SubjectID: u.ID,
+		Kind:      actor.KindCLI,
 		Method:    iam.MethodPasskey,
 	})
 	require.NoError(t, err)

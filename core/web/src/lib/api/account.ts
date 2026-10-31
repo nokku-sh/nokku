@@ -24,7 +24,9 @@ export const account = {
 	user: (): Promise<User> => guard(client.getAccount({})).then((r) => r.user as User),
 
 	update: (patch: { name?: string }) =>
-		guard(client.updateAccount({ name: patch.name })).then((r) => r.user as User),
+		guard(client.updateAccount({ name: patch.name, updateMask: { paths: ['name'] } })).then(
+			(r) => r.user as User
+		),
 
 	/** An empty image removes the avatar. */
 	setAvatar: (image: Uint8Array): Promise<User> =>

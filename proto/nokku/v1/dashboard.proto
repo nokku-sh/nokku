@@ -14,11 +14,19 @@ service DashboardService {
   }
 }
 
+message LiveSession {
+  string id = 1;
+  string daemon_id = 2;
+  string daemon_name = 3;
+  string username = 4;
+  string user_id = 5;
+  bool recording = 6;
+  bool web = 7;
+  google.protobuf.Timestamp started_at = 8;
+}
+
 message GetDashboardRequest {}
-
 message GetDashboardResponse {
-  reserved 9;
-
   int32 targets = 1;
   int32 targets_online = 2;
   int32 targets_manual = 3;
@@ -27,21 +35,10 @@ message GetDashboardResponse {
   repeated Daemon pending_daemons = 6;
   repeated Daemon offline_daemons = 7;
   int32 users = 8;
-  int64 recording_bytes = 10;
-  int64 recording_quota_bytes = 11;
-  repeated LiveSession live_sessions = 12;
-  repeated int32 activity = 13;
-  repeated int32 failures = 14;
-  repeated EventLog recent_changes = 15;
-}
-
-message LiveSession {
-  string id = 1;
-  string daemon_id = 2;
-  string daemon_name = 3;
-  string username = 4;
-  string user_id = 5;
-  google.protobuf.Timestamp started_at = 6;
-  bool recording = 7;
-  bool web = 8;
+  int64 recording_bytes = 9;
+  int64 recording_quota_bytes = 10;
+  repeated LiveSession live_sessions = 11;
+  repeated int32 activity = 12;
+  repeated int32 failures = 13;
+  repeated EventLog recent_changes = 14;
 }

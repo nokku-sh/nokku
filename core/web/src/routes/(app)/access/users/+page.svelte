@@ -32,16 +32,17 @@
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
-	const create = useCreate();
+	const create = useCreate({ fresh: true });
 
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const me = user.self();
 	const canManage = $derived(atLeast(me.data?.role, WorkspaceRole.ADMIN));
 	const can = user.can();
-	// An invitation ends in a mailed link, which takes mail and a workspace that lets people in by one.
+	// An invited account signs in without a provider, so a workspace that requires SSO takes none.
+	// Passkeys are off exactly then.
 	const options = auth.options();
-	const canInvite = $derived(canManage && !!options.data?.magicLink);
+	const canInvite = $derived(canManage && !!options.data?.passkey);
 
 	const pager = usePagination();
 	const list = users.list(() => ({

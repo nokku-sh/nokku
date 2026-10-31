@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
@@ -28,20 +27,20 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func testConnection(t *testing.T) *db.Connection {
+func testConnection(t *testing.T) (*db.Connection, *kms.Keyset) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	t.Cleanup(cancel)
 	c, err := db.NewConnection(ctx)
 	require.NoError(t, err)
-	cipher, err := kms.New(ctx, c, "test-secret-0123456789-0123456789")
+	t.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
+	keys, err := kms.New(ctx, c, false)
 	require.NoError(t, err)
-	require.NoError(t, crypto.SetEncryptor(cipher))
-	return c
+	return c, keys
 }
 
 func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
-	c := testConnection(t)
+	c, keys := testConnection(t)
 	t.Setenv("NOKKU_WORKSPACE_NAME", "Lab")
 	// A self-hosted database is empty before its first boot, so workspaces of other tests go first.
 	owner, err := pgx.Connect(t.Context(), "")
@@ -50,12 +49,12 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, owner.Close(t.Context()))
 
-	first, err := tenant.New(t.Context(), c, "http://localhost:3000", false)
+	first, err := tenant.New(t.Context(), c, keys, "http://localhost:3000", false)
 	require.NoError(t, err)
 	ws := first.Single()
 	assert.Equal(t, "http://localhost:3000", ws.BaseURL)
 
-	second, err := tenant.New(t.Context(), c, "http://localhost:3000", false)
+	second, err := tenant.New(t.Context(), c, keys, "http://localhost:3000", false)
 	require.NoError(t, err)
 	assert.Equal(t, ws.ID, second.Single().ID, "a second boot reuses the workspace")
 
@@ -83,12 +82,12 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 }
 
 func TestSaaSResolvesBySlug(t *testing.T) {
-	c := testConnection(t)
-	r, err := tenant.New(t.Context(), c, "https://nokku.test", true)
+	c, keys := testConnection(t)
+	r, err := tenant.New(t.Context(), c, keys, "https://nokku.test", true)
 	require.NoError(t, err)
 
 	slug := "w" + uuid.New().String()[:8]
-	created, err := tenant.Create(t.Context(), c, slug, "Acme")
+	created, err := tenant.Create(t.Context(), c, keys, slug, "Acme")
 	require.NoError(t, err)
 
 	ws, err := r.FromHost(t.Context(), slug+".nokku.test")
@@ -102,12 +101,12 @@ func TestSaaSResolvesBySlug(t *testing.T) {
 
 // A signup nobody ever signed in to frees its slug after a day.
 func TestPurgeUnclaimed(t *testing.T) {
-	c := testConnection(t)
-	r, err := tenant.New(t.Context(), c, "https://nokku.test", true)
+	c, keys := testConnection(t)
+	r, err := tenant.New(t.Context(), c, keys, "https://nokku.test", true)
 	require.NoError(t, err)
 
 	slug := "w" + uuid.New().String()[:8]
-	_, err = tenant.Create(t.Context(), c, slug, "Squat")
+	_, err = tenant.Create(t.Context(), c, keys, slug, "Squat")
 	require.NoError(t, err)
 	_, err = r.FromHost(t.Context(), slug+".nokku.test")
 	require.NoError(t, err, "the fresh signup resolves")

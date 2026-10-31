@@ -68,7 +68,6 @@ type GetBillingResponse struct {
 	UserCount     *int64                 `protobuf:"varint,5,opt,name=user_count,json=userCount" json:"user_count,omitempty"`
 	ResourceCount *int64                 `protobuf:"varint,6,opt,name=resource_count,json=resourceCount" json:"resource_count,omitempty"`
 	Subscription  *Subscription          `protobuf:"bytes,7,opt,name=subscription" json:"subscription,omitempty"`
-	// held_quotas are the data limits of a plan that ended and still hold until held_until. Unset without a hold.
 	HeldQuotas    *Quotas                `protobuf:"bytes,8,opt,name=held_quotas,json=heldQuotas" json:"held_quotas,omitempty"`
 	HeldUntil     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=held_until,json=heldUntil" json:"held_until,omitempty"`
 	unknownFields protoimpl.UnknownFields

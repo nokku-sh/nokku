@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -38,10 +39,10 @@ func TestUpdateServiceAccount(t *testing.T) {
 	require.NoError(t, err)
 	id := created.GetServiceAccount().GetId()
 
-	updated, err := client.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{
+	updated, err := client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
 		Id:   &id,
 		Tags: []string{"ci", "prod"},
-	})
+	}))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ci", "prod"}, updated.GetServiceAccount().GetTags(), "tags must be saved")
 	assert.Equal(
@@ -51,11 +52,19 @@ func TestUpdateServiceAccount(t *testing.T) {
 		"unset fields stay as they are",
 	)
 
+	kept, err := client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+		Id:   &id,
+		Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER.Enum(),
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"ci", "prod"}, kept.GetServiceAccount().GetTags(), "a role change wiped the tags")
+
 	cleared, err := client.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{
-		Id: &id,
+		Id:         &id,
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}},
 	})
 	require.NoError(t, err)
-	assert.Empty(t, cleared.GetServiceAccount().GetTags(), "an update replaces the tags, the last one can go")
+	assert.Empty(t, cleared.GetServiceAccount().GetTags(), "naming the tags with none clears them")
 }
 
 func TestServiceAccountRole(t *testing.T) {
@@ -77,7 +86,10 @@ func TestServiceAccountRole(t *testing.T) {
 		"no role is the member")
 
 	update := func(role *nokkuv1.WorkspaceRole) (nokkuv1.WorkspaceRole, error) {
-		res, err := client.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{Id: &id, Role: role})
+		res, err := client.UpdateServiceAccount(
+			t.Context(),
+			masked(&nokkuv1.UpdateServiceAccountRequest{Id: &id, Role: role}),
+		)
 		return res.GetServiceAccount().GetRole(), err
 	}
 	got, err := update(new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR))

@@ -3,12 +3,14 @@ package api
 import (
 	"cmp"
 	"context"
+	"errors"
 	"maps"
 	"slices"
 	"strconv"
 	"strings"
 
 	"connectrpc.com/connect/v2"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -173,19 +175,23 @@ func (s *targetService) UpdateTarget(
 	ctx context.Context,
 	req *nokkuv1.UpdateTargetRequest,
 ) (*nokkuv1.UpdateTargetResponse, error) {
+	named, err := applyMask(req, req.GetUpdateMask())
+	if err != nil {
+		return nil, err
+	}
 	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
 		return nil, err
 	}
-	result, err := s.cfg.Conn.Tenant().UpdateTarget(ctx, &db.UpdateTargetParams{
-		TargetID:    req.GetId(),
-		Name:        req.Name,
-		Description: req.Description,
-		// An update replaces both lists. The query keeps the old one for nil.
-		Endpoints:     append([]string{}, req.GetEndpoints()...),
+	params := &db.UpdateTargetParams{
+		TargetID:      req.GetId(),
+		Name:          req.Name,
+		Description:   req.Description,
 		CaID:          req.CaId,
-		Tags:          append([]string{}, req.GetTags()...),
 		HostPublicKey: trimmed(req.HostPublicKey),
-	})
+		Endpoints:     maskedList(named("endpoints"), req.GetEndpoints()),
+		Tags:          maskedList(named("tags"), req.GetTags()),
+	}
+	result, err := s.cfg.Conn.Tenant().UpdateTarget(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +205,19 @@ func (s *targetService) DeleteTarget(
 	ctx context.Context,
 	req *nokkuv1.DeleteTargetRequest,
 ) (*nokkuv1.DeleteTargetResponse, error) {
-	if _, err := s.cfg.Conn.Tenant().DeleteTarget(ctx, req.GetId()); err != nil {
+	// A server that runs nokkud goes with its daemon, deleting the daemon cascades to it.
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		target, err := q.GetTarget(ctx, req.GetId())
+		if err != nil {
+			return err
+		}
+		if target.DaemonID != nil {
+			_, err = q.DeleteDaemon(ctx, *target.DaemonID)
+			return err
+		}
+		_, err = q.DeleteTarget(ctx, target.ID)
+		return err
+	}); err != nil {
 		return nil, err
 	}
 	return &nokkuv1.DeleteTargetResponse{}, nil
@@ -251,31 +269,6 @@ func (s *targetService) ListTargets(
 	}, nil
 }
 
-// GetTargetPrincipals feeds AuthorizedPrincipalsFile on daemonless hosts.
-func (s *targetService) GetTargetPrincipals(
-	ctx context.Context,
-	req *nokkuv1.GetTargetPrincipalsRequest,
-) (*nokkuv1.GetTargetPrincipalsResponse, error) {
-	rows, err := s.cfg.Conn.Tenant().ListAccountSubjectsForTarget(ctx, req.GetTargetId())
-	if err != nil {
-		return nil, err
-	}
-
-	// sshd compares these as they are, see ssh.LoginPrincipal.
-	principals := make([]*nokkuv1.AccountPrincipals, 0, len(rows))
-	for _, r := range rows {
-		certPrincipals := make([]string, 0, len(r.Ids))
-		for _, id := range r.Ids {
-			certPrincipals = append(certPrincipals, ssh.LoginPrincipal(id, req.GetTargetId(), r.Username))
-		}
-		principals = append(principals, &nokkuv1.AccountPrincipals{
-			Username:       &r.Username,
-			CertPrincipals: certPrincipals,
-		})
-	}
-	return &nokkuv1.GetTargetPrincipalsResponse{Principals: principals}, nil
-}
-
 // SyncTargetUsers is the daemonless report. It never deletes accounts, so a failed report cannot lock anyone out.
 func (s *targetService) SyncTargetUsers(
 	ctx context.Context,
@@ -313,13 +306,15 @@ func (s *targetService) GetSubjectAccess(
 	ctx context.Context,
 	req *nokkuv1.GetSubjectAccessRequest,
 ) (*nokkuv1.GetSubjectAccessResponse, error) {
-	// A member reads its own access. Who else holds an account is for viewers.
+	// Anyone reads their own access. Who else holds an account is for viewers.
 	caller, _ := actor.PrincipalFromContext(ctx)
+	subjectID := cmp.Or(req.GetSubjectId(), caller.ID)
 	canView := callerRole(ctx) >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER
-	if !canView && req.GetSubjectId() != caller.ID {
+	if !canView && subjectID != caller.ID {
 		return nil, db.ErrPermissionDenied
 	}
 
+	res := &nokkuv1.GetSubjectAccessResponse{}
 	var targets []*nokkuv1.Target
 	var daemons []*nokkuv1.Daemon
 	var cas []*nokkuv1.CertificateAuthority
@@ -328,7 +323,10 @@ func (s *targetService) GetSubjectAccess(
 	uniqueCAIDs := make(map[string]struct{})
 
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		rows, err := q.GetTargetsBySubject(ctx, req.GetSubjectId())
+		if err := setSubject(ctx, q, res, subjectID); err != nil {
+			return err
+		}
+		rows, err := q.GetTargetsBySubject(ctx, subjectID)
 		if err != nil {
 			return err
 		}
@@ -343,14 +341,12 @@ func (s *targetService) GetSubjectAccess(
 			if r.DaemonID != nil {
 				uniqueDaemonIDs[*r.DaemonID] = struct{}{}
 			}
-			if r.CaID != nil {
-				uniqueCAIDs[*r.CaID] = struct{}{}
-			}
+			uniqueCAIDs[r.CaID] = struct{}{}
 		}
 
 		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 			TargetIds: targetIDs,
-			SubjectID: req.GetSubjectId(),
+			SubjectID: subjectID,
 		})
 		if err != nil {
 			return err
@@ -369,6 +365,7 @@ func (s *targetService) GetSubjectAccess(
 			targets = append(targets, target)
 		}
 		setUsernames(targets, uRows)
+		slices.SortFunc(targets, func(a, b *nokkuv1.Target) int { return strings.Compare(a.GetName(), b.GetName()) })
 
 		if len(uniqueDaemonIDs) > 0 {
 			daemonRows, err := q.GetDaemonsByIDs(ctx, slices.Collect(maps.Keys(uniqueDaemonIDs)))
@@ -379,7 +376,7 @@ func (s *targetService) GetSubjectAccess(
 				daemons = append(daemons, &nokkuv1.Daemon{
 					Id:     &d.ID,
 					Name:   &d.Name,
-					Online: new(db.SeenRecently(d.LastSeenAt)),
+					Online: new(s.cfg.Pool.IsConnected(d.ID)),
 				})
 			}
 		}
@@ -398,14 +395,37 @@ func (s *targetService) GetSubjectAccess(
 		return nil, err
 	}
 
-	return &nokkuv1.GetSubjectAccessResponse{
-		Targets:                targets,
-		CertificateAuthorities: cas,
-		Daemons:                daemons,
-	}, nil
+	res.Targets, res.CertificateAuthorities, res.Daemons = targets, cas, daemons
+	return res, nil
 }
 
-// setUsernames fills in the accounts the subject holds on each target, and when the ones that end do.
+// setSubject names the person or service account asked about. Nothing else is one, a team is left out.
+func setSubject(ctx context.Context, q *db.Queries, res *nokkuv1.GetSubjectAccessResponse, subjectID string) error {
+	// A service account asking about itself is no user, so it skips that lookup.
+	caller, _ := actor.PrincipalFromContext(ctx)
+	if caller.ID != subjectID || caller.Kind != actor.KindServiceAccount {
+		u, err := q.GetUser(ctx, subjectID)
+		if err == nil {
+			res.Subject = &nokkuv1.GetSubjectAccessResponse_User{User: u.ToProto()}
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+	}
+	sa, err := q.GetServiceAccount(ctx, subjectID)
+	if err == nil {
+		res.Subject = &nokkuv1.GetSubjectAccessResponse_ServiceAccount{ServiceAccount: sa.ToProto()}
+		return nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
+}
+
+// setUsernames fills in the accounts the subject holds on each target, when the ones that end do, and why they let
+// nobody in today when they don't.
 func setUsernames(targets []*nokkuv1.Target, rows []*db.ListSubjectUsernamesForTargetsRow) {
 	byID := make(map[string]*nokkuv1.Target, len(targets))
 	for _, t := range targets {
@@ -417,6 +437,12 @@ func setUsernames(targets []*nokkuv1.Target, rows []*db.ListSubjectUsernamesForT
 			continue
 		}
 		target.Usernames = append(target.Usernames, r.Username)
+		switch {
+		case !r.UserOk:
+			target.Blocked = nokkuv1.AccessBlock_ACCESS_BLOCK_USER_INACTIVE.Enum()
+		case !r.DaemonOk:
+			target.Blocked = nokkuv1.AccessBlock_ACCESS_BLOCK_DAEMON_NOT_APPROVED.Enum()
+		}
 		if until := r.Until(); until != nil {
 			if target.UsernameExpiresAt == nil {
 				target.UsernameExpiresAt = make(map[string]*timestamppb.Timestamp)
@@ -424,88 +450,6 @@ func setUsernames(targets []*nokkuv1.Target, rows []*db.ListSubjectUsernamesForT
 			target.UsernameExpiresAt[r.Username] = timestamppb.New(*until)
 		}
 	}
-}
-
-func (s *targetService) GetMyAccess(
-	ctx context.Context,
-	_ *nokkuv1.GetMyAccessRequest,
-) (*nokkuv1.GetMyAccessResponse, error) {
-	p, ok := actor.PrincipalFromContext(ctx)
-	if !ok || p.ID == "" {
-		return nil, newError(connect.CodeUnauthenticated, "not authenticated")
-	}
-	//nolint:exhaustive // daemons sync through SyncDaemon
-	switch p.Kind {
-	case actor.KindUser, actor.KindCLI, actor.KindServiceAccount:
-	default:
-		return nil, newError(
-			connect.CodePermissionDenied,
-			"unsupported principal kind. Daemons sync through SyncDaemon.",
-		)
-	}
-
-	resp := &nokkuv1.GetMyAccessResponse{}
-	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		//nolint:exhaustive // other kinds were rejected above
-		switch p.Kind {
-		case actor.KindUser, actor.KindCLI:
-			u, err := q.GetUser(ctx, p.ID)
-			if err != nil {
-				return err
-			}
-			resp.Subject = &nokkuv1.GetMyAccessResponse_User{User: u.ToProto()}
-		case actor.KindServiceAccount:
-			sa, err := q.GetServiceAccount(ctx, p.ID)
-			if err != nil {
-				return err
-			}
-			resp.Subject = &nokkuv1.GetMyAccessResponse_ServiceAccount{ServiceAccount: sa.ToProto()}
-		}
-
-		rows, err := q.GetTargetsBySubject(ctx, p.ID)
-		if err != nil || len(rows) == 0 {
-			return err
-		}
-
-		targetIDs := make([]string, 0, len(rows))
-		caIDs := make(map[string]struct{})
-		for _, r := range rows {
-			targetIDs = append(targetIDs, r.ID)
-			if r.CaID != nil {
-				caIDs[*r.CaID] = struct{}{}
-			}
-			resp.Targets = append(resp.Targets, r.ToProto())
-		}
-
-		// The CLI needs the accounts this subject may use, not the whole graph.
-		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
-			TargetIds: targetIDs,
-			SubjectID: p.ID,
-		})
-		if err != nil {
-			return err
-		}
-		setUsernames(resp.GetTargets(), uRows)
-		slices.SortFunc(resp.GetTargets(), func(a, b *nokkuv1.Target) int {
-			return strings.Compare(a.GetName(), b.GetName())
-		})
-
-		if len(caIDs) == 0 {
-			return nil
-		}
-		caRows, err := q.GetCAsByIDs(ctx, slices.Collect(maps.Keys(caIDs)))
-		if err != nil {
-			return err
-		}
-		for _, ca := range caRows {
-			resp.CertificateAuthorities = append(resp.CertificateAuthorities, ca.ToProto())
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
 }
 
 func (s *targetService) GetTargetFilters(

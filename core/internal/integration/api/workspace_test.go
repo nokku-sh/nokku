@@ -172,7 +172,7 @@ func TestManageUsers(t *testing.T) {
 		&nokkuv1.SetUserActiveRequest{UserId: &viewer.ID, Active: new(false)},
 	)
 	require.NoError(t, err)
-	_, _, err = cfg.IAM.AuthenticateToken(wsCtx(t, cfg), viewerToken)
+	_, _, err = cfg.IAM.AuthenticateToken(wsCtx(t, cfg), viewerToken, accessTokens...)
 	require.Error(t, err, "a deactivated user kept their session")
 
 	users, err := workspaces.ListUsers(

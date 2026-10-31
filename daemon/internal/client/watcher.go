@@ -33,7 +33,7 @@ func (c *Client) watchCertificates(ctx context.Context) {
 			}
 			failing = false
 			b.Reset()
-			delay = max(time.Until(hostcerts.NextRenewal(c.config.TargetID, c.cache.HostCA())), minRenewDelay)
+			delay = max(time.Until(hostcerts.NextRenewal(c.state.TargetID, c.state.Access().HostCA)), minRenewDelay)
 		}
 		select {
 		case <-ctx.Done():

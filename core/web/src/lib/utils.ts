@@ -125,13 +125,9 @@ export function formatHours(hours: number): string {
 	return hours >= 24 && hours % 24 === 0 ? plural(hours / 24, 'day') : plural(hours, 'hour');
 }
 
-/** nk goes to app.nokku.sh unless told otherwise, and the pin lets it trust a server behind a private CA. */
-export function nkLoginCommand(caPin?: string): string {
-	return [
-		'nk login',
-		location.origin !== 'https://app.nokku.sh' && `--api ${location.origin}`,
-		caPin && `--pin ${caPin}`
-	]
-		.filter(Boolean)
-		.join(' ');
+/** nk goes to app.nokku.sh unless told otherwise. */
+export function nkLoginCommand(): string {
+	return location.origin === 'https://app.nokku.sh'
+		? 'nk login'
+		: `nk login --api ${location.origin}`;
 }

@@ -282,46 +282,18 @@ func (q *Queries) InsertTargetAccounts(ctx context.Context, arg *InsertTargetAcc
 
 const listAccountSubjectsForTarget = `-- name: ListAccountSubjectsForTarget :many
 SELECT
-  p.username,
-  array_agg(DISTINCT ids)::TEXT[] AS ids
+  e.username,
+  array_agg(DISTINCT e.subject_id)::TEXT[] AS ids
 FROM
-  target_accounts p
-  CROSS JOIN LATERAL (
-    SELECT
-      g.subject_id AS ids
-    FROM
-      live_grants g
-    WHERE
-      g.account_id = p.id
-      AND g.subject_kind = 'service_account'
-    UNION
-    SELECT
-      u.id
-    FROM
-      live_grants g
-      JOIN users u ON u.id = g.subject_id
-      AND u.active
-    WHERE
-      g.account_id = p.id
-      AND g.subject_kind = 'user'
-    UNION
-    SELECT
-      u.id
-    FROM
-      live_grants g
-      JOIN team_members tm ON tm.team_id = g.subject_id
-      JOIN users u ON u.id = tm.user_id
-      AND u.active
-    WHERE
-      g.account_id = p.id
-      AND g.subject_kind = 'team'
-  ) AS combined (ids)
+  effective_access e
 WHERE
-  p.target_id = $1
+  e.target_id = $1
+  AND e.user_ok
+  AND e.daemon_ok
 GROUP BY
-  p.username
+  e.username
 ORDER BY
-  p.username
+  e.username
 `
 
 type ListAccountSubjectsForTargetRow struct {
@@ -329,7 +301,7 @@ type ListAccountSubjectsForTargetRow struct {
 	Ids      []string `json:"ids"`
 }
 
-// Teams are expanded so the host needs no team knowledge. Users are joined, so an inactive account drops out.
+// Who a server lets in as which account, as the subjects its certificates name.
 func (q *Queries) ListAccountSubjectsForTarget(ctx context.Context, targetID string) ([]*ListAccountSubjectsForTargetRow, error) {
 	rows, err := q.db.Query(ctx, listAccountSubjectsForTarget, targetID)
 	if err != nil {
@@ -352,41 +324,51 @@ func (q *Queries) ListAccountSubjectsForTarget(ctx context.Context, targetID str
 
 const listSubjectUsernamesForTargets = `-- name: ListSubjectUsernamesForTargets :many
 SELECT
-  p.target_id,
-  p.username,
-  bool_or(g.expires_at IS NULL)::BOOLEAN AS for_good,
+  a.target_id,
+  a.username,
+  bool_or(a.expires_at IS NULL)::BOOLEAN AS for_good,
   -- Only read when not for good, then no grant has a NULL. The epoch keeps the column scannable.
-  COALESCE(max(g.expires_at), 'epoch')::TIMESTAMPTZ AS expires_at
+  COALESCE(max(a.expires_at), 'epoch')::TIMESTAMPTZ AS expires_at,
+  bool_and(a.user_ok)::BOOLEAN AS user_ok,
+  bool_and(a.daemon_ok)::BOOLEAN AS daemon_ok
 FROM
-  target_accounts p
-  JOIN live_grants g ON g.account_id = p.id
+  (
+    SELECT
+      e.target_id,
+      e.username,
+      e.expires_at,
+      e.user_ok,
+      e.daemon_ok
+    FROM
+      effective_access e
+    WHERE
+      e.subject_id = $1
+    UNION ALL
+    SELECT
+      p.target_id,
+      p.username,
+      g.expires_at,
+      TRUE,
+      TRUE
+    FROM
+      live_grants g
+      JOIN target_accounts p ON p.id = g.account_id
+    WHERE
+      g.team_id = $1
+  ) a
 WHERE
-  p.target_id = ANY ($1::UUID[])
-  AND (
-    g.subject_id = $2
-    OR (
-      g.subject_kind = 'team'
-      AND g.subject_id IN (
-        SELECT
-          tm.team_id
-        FROM
-          team_members tm
-        WHERE
-          tm.user_id = $2
-      )
-    )
-  )
+  a.target_id = ANY ($2::UUID[])
 GROUP BY
-  p.target_id,
-  p.username
+  a.target_id,
+  a.username
 ORDER BY
-  p.target_id,
-  p.username
+  a.target_id,
+  a.username
 `
 
 type ListSubjectUsernamesForTargetsParams struct {
-	TargetIds []string `json:"targetIds"`
 	SubjectID string   `json:"subjectId"`
+	TargetIds []string `json:"targetIds"`
 }
 
 type ListSubjectUsernamesForTargetsRow struct {
@@ -394,12 +376,15 @@ type ListSubjectUsernamesForTargetsRow struct {
 	Username  string    `json:"username"`
 	ForGood   bool      `json:"forGood"`
 	ExpiresAt time.Time `json:"expiresAt"`
+	UserOk    bool      `json:"userOk"`
+	DaemonOk  bool      `json:"daemonOk"`
 }
 
-// A team grant counts for its members. Subject UUIDs are unique across kinds. The access lasts until the latest
-// grant that applies ends, or for good when one of them is.
+// What a person or a service account holds on each target, a team's own grants for a team. The access lasts until
+// the latest grant that applies ends, or for good when one of them is. user_ok and daemon_ok say whether it lets
+// anyone in today, see effective_access. A team's rows are its grants as given, they carry no mark.
 func (q *Queries) ListSubjectUsernamesForTargets(ctx context.Context, arg *ListSubjectUsernamesForTargetsParams) ([]*ListSubjectUsernamesForTargetsRow, error) {
-	rows, err := q.db.Query(ctx, listSubjectUsernamesForTargets, arg.TargetIds, arg.SubjectID)
+	rows, err := q.db.Query(ctx, listSubjectUsernamesForTargets, arg.SubjectID, arg.TargetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -412,6 +397,8 @@ func (q *Queries) ListSubjectUsernamesForTargets(ctx context.Context, arg *ListS
 			&i.Username,
 			&i.ForGood,
 			&i.ExpiresAt,
+			&i.UserOk,
+			&i.DaemonOk,
 		); err != nil {
 			return nil, err
 		}

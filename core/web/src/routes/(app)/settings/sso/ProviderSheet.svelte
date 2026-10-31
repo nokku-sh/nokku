@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { sso } from '#lib/api/sso.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { OIDCIcon } from '#lib/assets/index.js';
@@ -113,8 +114,11 @@
 
 	function editConnection() {
 		if (!model) return;
-		connection = { issuerUrl: model.issuerUrl, clientId: model.clientId, clientSecret: '' };
-		connectionOpen = true;
+		const { issuerUrl, clientId } = model;
+		void whenFresh(() => {
+			connection = { issuerUrl, clientId, clientSecret: '' };
+			connectionOpen = true;
+		});
 	}
 
 	async function saveConnection() {

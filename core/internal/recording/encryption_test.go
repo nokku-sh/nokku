@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/storage"
 )
@@ -19,17 +20,23 @@ func newTestService(t *testing.T) *Service {
 	t.Setenv("NOKKU_STORAGE_URL", "file://"+t.TempDir())
 	st, err := storage.New(t.Context())
 	require.NoError(t, err)
-	return &Service{store: st}
+	keys, err := kms.Ephemeral()
+	require.NoError(t, err)
+	return &Service{store: st, keys: keys}
 }
 
-func testRecording() *db.Recording {
-	return &db.Recording{ID: "rec1", WorkspaceID: "ws1", Key: NewKey(), Complete: true}
+// newRecording seals key for the recording id, the way an upload stores it.
+func newRecording(t *testing.T, s *Service, id string, key []byte) *db.Recording {
+	t.Helper()
+	sealed, err := s.keys.Seal(KeyAAD("ws1", id), key)
+	require.NoError(t, err)
+	return &db.Recording{ID: id, ObjectID: new(id), WorkspaceID: "ws1", Key: sealed, Complete: true}
 }
 
 // writeRecording stores plaintext in small chunks, the way a daemon streams it.
 func writeRecording(t *testing.T, s *Service, rec *db.Recording, plaintext []byte) {
 	t.Helper()
-	w, err := s.NewWriter(t.Context(), rec)
+	w, err := s.NewWriter(t.Context(), rec, *rec.ObjectID)
 	require.NoError(t, err)
 	for chunk := range slices.Chunk(plaintext, 1000) {
 		require.NoError(t, w.WriteChunk(chunk))
@@ -39,7 +46,7 @@ func writeRecording(t *testing.T, s *Service, rec *db.Recording, plaintext []byt
 
 func storedObject(t *testing.T, s *Service, rec *db.Recording) []byte {
 	t.Helper()
-	rc, err := s.store.Reader(t.Context(), storage.RecordingPath(rec.WorkspaceID, rec.ID))
+	rc, err := s.store.Reader(t.Context(), storage.RecordingPath(rec.WorkspaceID, *rec.ObjectID))
 	require.NoError(t, err)
 	defer func() { _ = rc.Close() }()
 	raw, err := io.ReadAll(rc)
@@ -50,7 +57,7 @@ func storedObject(t *testing.T, s *Service, rec *db.Recording) []byte {
 // storeObject overwrites rec's object, the way someone with write access to the bucket could.
 func storeObject(t *testing.T, s *Service, rec *db.Recording, raw []byte) {
 	t.Helper()
-	w, err := s.store.CreateWriter(t.Context(), storage.RecordingPath(rec.WorkspaceID, rec.ID))
+	w, err := s.store.CreateWriter(t.Context(), storage.RecordingPath(rec.WorkspaceID, *rec.ObjectID))
 	require.NoError(t, err)
 	_, err = w.Write(raw)
 	require.NoError(t, err)
@@ -69,7 +76,7 @@ func readAll(t *testing.T, s *Service, rec *db.Recording) ([]byte, error) {
 
 func TestRecordingRoundTrip(t *testing.T) {
 	s := newTestService(t)
-	rec := testRecording()
+	rec := newRecording(t, s, "rec1", NewKey())
 	want := []byte(strings.Repeat("a line of a terminal\n", 2000))
 	writeRecording(t, s, rec, want)
 
@@ -82,7 +89,8 @@ func TestRecordingRoundTrip(t *testing.T) {
 // Someone with write access to the bucket must not change what a recording shows without the reader noticing.
 func TestRecordingIsBoundToItsObject(t *testing.T) {
 	s := newTestService(t)
-	rec := testRecording()
+	key := NewKey()
+	rec := newRecording(t, s, "rec1", key)
 	writeRecording(t, s, rec, []byte(strings.Repeat("x", 5*segmentSize)))
 	raw := storedObject(t, s, rec)
 	require.Greater(t, len(raw), 4*segmentSize)
@@ -108,7 +116,7 @@ func TestRecordingIsBoundToItsObject(t *testing.T) {
 	}
 
 	t.Run("the object of another recording with the same key", func(t *testing.T) {
-		other := &db.Recording{ID: "rec2", WorkspaceID: rec.WorkspaceID, Key: rec.Key}
+		other := newRecording(t, s, "rec2", key)
 		storeObject(t, s, other, raw)
 		_, err := readAll(t, s, other)
 		require.Error(t, err)
@@ -116,7 +124,24 @@ func TestRecordingIsBoundToItsObject(t *testing.T) {
 
 	t.Run("another recording's key", func(t *testing.T) {
 		storeObject(t, s, rec, raw)
-		_, err := readAll(t, s, &db.Recording{ID: rec.ID, WorkspaceID: rec.WorkspaceID, Key: NewKey()})
+		_, err := readAll(t, s, newRecording(t, s, rec.ID, NewKey()))
 		require.Error(t, err)
 	})
+
+	t.Run("an older upload of the same recording", func(t *testing.T) {
+		older := *rec
+		older.ObjectID = new("older")
+		writeRecording(t, s, &older, []byte("the start of the session"))
+		storeObject(t, s, rec, storedObject(t, s, &older))
+		_, err := readAll(t, s, rec)
+		require.Error(t, err)
+	})
+}
+
+func TestRecordingWithoutAnObjectIsNotStored(t *testing.T) {
+	s := newTestService(t)
+	rec := newRecording(t, s, "rec1", NewKey())
+	rec.ObjectID = nil
+	_, err := s.OpenReader(t.Context(), rec)
+	require.ErrorIs(t, err, ErrNotStored)
 }

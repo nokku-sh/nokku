@@ -40,6 +40,7 @@ linters:
     - exhaustive
     - exptostd
     - fatcontext
+    - forbidigo
     - funcorder
     - funlen
     - gocheckcompilerdirectives
@@ -127,6 +128,14 @@ linters:
       check:
         - switch
         - mapliteral
+
+    # A secret is sealed by kms.Keyset.Seal and nothing else, so its ciphertext is always tied to its row.
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^crypto\.Sealed$
+          pkg: ^github\.com/nokku-sh/nokku/core/internal/crypto$
+          msg: seal secrets with kms.Keyset.Seal, only core/internal/crypto names crypto.Sealed
 
     funcorder:
       struct-method: false
@@ -235,3 +244,5 @@ linters:
         linters: [govet]
       - path: '^core/internal/recording/term\.go'
         linters: [cyclop]
+      - path: '^core/internal/crypto/'
+        linters: [forbidigo]

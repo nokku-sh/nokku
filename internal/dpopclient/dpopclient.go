@@ -15,8 +15,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/url"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -132,7 +130,7 @@ func FetchNonce(ctx context.Context, httpc *http.Client, baseURL string) (string
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if advertised := resp.Header.Get(apiURLHeader); advertised != "" && !sameURL(advertised, baseURL) {
+	if advertised := resp.Header.Get(apiURLHeader); advertised != "" && !dpop.SameURL(advertised, baseURL) {
 		return "", fmt.Errorf("%w: %s says it is at %q, use that URL", ErrAPIURLMismatch, baseURL, advertised)
 	}
 	return resp.Header.Get("DPoP-Nonce"), nil
@@ -327,30 +325,4 @@ func (c *Client) currentNonce() string {
 func within(t time.Time, d time.Duration) bool {
 	age := time.Since(t.Round(0))
 	return age >= 0 && age <= d
-}
-
-// sameURL compares like the core compares an htu: host case, a default port and a trailing slash do not count.
-func sameURL(a, b string) bool {
-	ua, errA := url.Parse(a)
-	ub, errB := url.Parse(b)
-	if errA != nil || errB != nil {
-		return false
-	}
-	return ua.Scheme == ub.Scheme &&
-		strings.EqualFold(ua.Hostname(), ub.Hostname()) &&
-		effectivePort(ua) == effectivePort(ub) &&
-		path.Clean("/"+ua.EscapedPath()) == path.Clean("/"+ub.EscapedPath())
-}
-
-func effectivePort(u *url.URL) string {
-	if port := u.Port(); port != "" {
-		return port
-	}
-	switch u.Scheme {
-	case "https":
-		return "443"
-	case "http":
-		return "80"
-	}
-	return ""
 }

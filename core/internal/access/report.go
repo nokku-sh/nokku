@@ -26,7 +26,9 @@ type reportRow struct {
 	GrantedAt         time.Time  `json:"granted_at"`
 	ExpiresAt         *time.Time `json:"expires_at,omitzero"`
 	LastCertificateAt *time.Time `json:"last_certificate_at,omitzero"`
-	Stale             bool       `json:"stale"`
+	// Enforced is false for a grant that lets nobody in today, like one on a server waiting for approval.
+	Enforced bool `json:"enforced"`
+	Stale    bool `json:"stale"`
 }
 
 // Report renders who can log in where for an access review, in JSON or CSV.
@@ -45,6 +47,7 @@ func Report(rows []*db.ListAccessReportRow, format nokkuv1.ExportAuditLogsReques
 			GrantedAt:         r.GrantedAt,
 			ExpiresAt:         r.ExpiresAt,
 			LastCertificateAt: r.LastCertAt,
+			Enforced:          r.Enforced,
 			Stale:             r.Stale,
 		}
 	}
@@ -64,13 +67,13 @@ func reportCSV(rows []reportRow) ([]byte, error) {
 	w := csv.NewWriter(&buf)
 	_ = w.Write([]string{
 		"kind", "subject_id", "name", "email", "active", "via",
-		"target", "account", "granted_at", "expires_at", "last_certificate_at", "stale",
+		"target", "account", "granted_at", "expires_at", "last_certificate_at", "enforced", "stale",
 	})
 	for _, r := range rows {
 		_ = w.Write([]string{
 			r.Kind, r.SubjectID, r.Name, r.Email, strconv.FormatBool(r.Active), r.Via,
 			r.Target, r.Account, stamp(&r.GrantedAt), stamp(r.ExpiresAt), stamp(r.LastCertificateAt),
-			strconv.FormatBool(r.Stale),
+			strconv.FormatBool(r.Enforced), strconv.FormatBool(r.Stale),
 		})
 	}
 	w.Flush()

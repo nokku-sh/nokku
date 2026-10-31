@@ -5,10 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"slices"
-	"strings"
 	"time"
-	"unicode"
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
@@ -105,15 +102,10 @@ func (c *Client) dial() error {
 
 // Sync without interactive takes a missing or rejected session as an error instead of a browser login.
 func (c *Client) Sync(ctx context.Context, interactive bool) error {
-	if err := c.pinServer(ctx); err != nil {
-		return err
-	}
 	err := c.sync(ctx, interactive)
 	if trust.Untrusted(err) {
-		if err = c.confirmServer(ctx, interactive, err); err != nil {
-			return err
-		}
-		err = c.sync(ctx, interactive)
+		return fmt.Errorf("this machine does not trust the certificate of %s. "+
+			"If it comes from a private CA, pass that CA with --ca-file: %w", c.State.APIURL, err)
 	}
 	if err == nil || !interactive || connect.CodeOf(err) != connect.CodeUnauthenticated {
 		return err
@@ -144,7 +136,7 @@ func (c *Client) sync(ctx context.Context, interactive bool) error {
 	if err := c.ensureSession(ctx, interactive); err != nil {
 		return err
 	}
-	res, err := c.targets.GetMyAccess(ctx, &nokkuv1.GetMyAccessRequest{})
+	res, err := c.targets.GetSubjectAccess(ctx, &nokkuv1.GetSubjectAccessRequest{})
 	if err != nil {
 		return err
 	}
@@ -206,34 +198,6 @@ func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.C
 		return fmt.Errorf("core returned an unusable certificate: %w", err)
 	}
 	return fsutil.WriteFile(paths.SSHCertificate(target.ID), signed, 0o600)
-}
-
-// TargetPrincipals come from the core as they are, sshd compares them as whole strings.
-func (c *Client) TargetPrincipals(ctx context.Context, t *state.Target) (map[string][]string, error) {
-	res, err := c.targets.GetTargetPrincipals(ctx, &nokkuv1.GetTargetPrincipalsRequest{
-		TargetId: new(t.ID),
-	})
-	if err != nil {
-		return nil, err
-	}
-	grants := make(map[string][]string, len(res.GetPrincipals()))
-	for _, p := range res.GetPrincipals() {
-		if i := slices.IndexFunc(p.GetCertPrincipals(), unsafePrincipal); i >= 0 {
-			return nil, fmt.Errorf(
-				"the core sent an unusable principal %q, nothing was written",
-				p.GetCertPrincipals()[i],
-			)
-		}
-		grants[p.GetUsername()] = p.GetCertPrincipals()
-	}
-	return grants, nil
-}
-
-// unsafePrincipal would not stay one name on one line. sshd reads what follows a space as options, like command=.
-func unsafePrincipal(p string) bool {
-	return p == "" || strings.ContainsFunc(p, func(r rune) bool {
-		return unicode.IsSpace(r) || unicode.IsControl(r) || r == '"' || r == '\''
-	})
 }
 
 // ReportTarget also stamps the target's last sync.
@@ -309,8 +273,5 @@ func (c *Client) ListSSHCAs(ctx context.Context) ([]state.CA, error) {
 	if err != nil {
 		return nil, err
 	}
-	active := slices.DeleteFunc(res.GetCertificateAuthorities(), func(ca *nokkuv1.CertificateAuthority) bool {
-		return !ca.GetIsActive()
-	})
-	return state.SSHCAs(active), nil
+	return state.SSHCAs(res.GetCertificateAuthorities()), nil
 }

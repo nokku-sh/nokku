@@ -10,6 +10,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -363,12 +364,12 @@ func (x *CreateAuditStreamResponse) GetStream() *AuditStream {
 }
 
 type UpdateAuditStreamRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Url   *string                `protobuf:"bytes,2,opt,name=url" json:"url,omitempty"`
-	// secret unset keeps the one stored.
-	Secret        *string `protobuf:"bytes,3,opt,name=secret" json:"secret,omitempty"`
-	Enabled       *bool   `protobuf:"varint,4,opt,name=enabled" json:"enabled,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Url           *string                `protobuf:"bytes,2,opt,name=url" json:"url,omitempty"`
+	Secret        *string                `protobuf:"bytes,3,opt,name=secret" json:"secret,omitempty"`
+	Enabled       *bool                  `protobuf:"varint,4,opt,name=enabled" json:"enabled,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,5,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -429,6 +430,13 @@ func (x *UpdateAuditStreamRequest) GetEnabled() bool {
 		return *x.Enabled
 	}
 	return false
+}
+
+func (x *UpdateAuditStreamRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
+	if x != nil {
+		return x.UpdateMask
+	}
+	return nil
 }
 
 type UpdateAuditStreamResponse struct {
@@ -639,7 +647,7 @@ var File_nokku_v1_audit_stream_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_audit_stream_proto_rawDesc = "" +
 	"\n" +
-	"\x1bnokku/v1/audit_stream.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xd1\x02\n" +
+	"\x1bnokku/v1/audit_stream.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xd1\x02\n" +
 	"\vAuditStream\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x19.nokku.v1.AuditStreamKindR\x04kind\x12\x10\n" +
@@ -662,13 +670,15 @@ const file_nokku_v1_audit_stream_proto_rawDesc = "" +
 	"\x06secret\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\b\x18\x80\bR\x06secret\"J\n" +
 	"\x19CreateAuditStreamResponse\x12-\n" +
-	"\x06stream\x18\x01 \x01(\v2\x15.nokku.v1.AuditStreamR\x06stream\"\x9b\x01\n" +
+	"\x06stream\x18\x01 \x01(\v2\x15.nokku.v1.AuditStreamR\x06stream\"\xf9\x01\n" +
 	"\x18UpdateAuditStreamRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12'\n" +
 	"\x03url\x18\x02 \x01(\tB\x15\xbaH\x12r\x10\x18\x80\x10:\bhttps://\x88\x01\x01R\x03url\x12\"\n" +
 	"\x06secret\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\b\x18\x80\bR\x06secret\x12\x18\n" +
-	"\aenabled\x18\x04 \x01(\bR\aenabled\"J\n" +
+	"\aenabled\x18\x04 \x01(\bR\aenabled\x12\\\n" +
+	"\vupdate_mask\x18\x05 \x01(\v2\x1a.google.protobuf.FieldMaskB\x1f\xbaH\x1c\xc8\x01\x01\xe2\x01\x16\x12\x03url\x12\x06secret\x12\aenabledR\n" +
+	"updateMask\"J\n" +
 	"\x19UpdateAuditStreamResponse\x12-\n" +
 	"\x06stream\x18\x01 \x01(\v2\x15.nokku.v1.AuditStreamR\x06stream\"4\n" +
 	"\x18DeleteAuditStreamRequest\x12\x18\n" +
@@ -681,13 +691,13 @@ const file_nokku_v1_audit_stream_proto_rawDesc = "" +
 	"\x1dAUDIT_STREAM_KIND_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19AUDIT_STREAM_KIND_WEBHOOK\x10\x01\x12\x1c\n" +
 	"\x18AUDIT_STREAM_KIND_SPLUNK\x10\x02\x12\x1d\n" +
-	"\x19AUDIT_STREAM_KIND_DATADOG\x10\x032\x8c\x04\n" +
+	"\x19AUDIT_STREAM_KIND_DATADOG\x10\x032\xae\x04\n" +
 	"\x12AuditStreamService\x12d\n" +
-	"\x10ListAuditStreams\x12!.nokku.v1.ListAuditStreamsRequest\x1a\".nokku.v1.ListAuditStreamsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12d\n" +
-	"\x11CreateAuditStream\x12\".nokku.v1.CreateAuditStreamRequest\x1a#.nokku.v1.CreateAuditStreamResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12d\n" +
+	"\x10ListAuditStreams\x12!.nokku.v1.ListAuditStreamsRequest\x1a\".nokku.v1.ListAuditStreamsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12u\n" +
+	"\x11CreateAuditStream\x12\".nokku.v1.CreateAuditStreamRequest\x1a#.nokku.v1.CreateAuditStreamResponse\"\x17\xc2\xf3\x18\x13\x18\x05:\x0faudit_streaming\x12d\n" +
 	"\x11UpdateAuditStream\x12\".nokku.v1.UpdateAuditStreamRequest\x1a#.nokku.v1.UpdateAuditStreamResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12d\n" +
-	"\x11DeleteAuditStream\x12\".nokku.v1.DeleteAuditStreamRequest\x1a#.nokku.v1.DeleteAuditStreamResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12^\n" +
-	"\x0fTestAuditStream\x12 .nokku.v1.TestAuditStreamRequest\x1a!.nokku.v1.TestAuditStreamResponse\"\x06\xc2\xf3\x18\x02\x18\x05B\x91\x01\n" +
+	"\x11DeleteAuditStream\x12\".nokku.v1.DeleteAuditStreamRequest\x1a#.nokku.v1.DeleteAuditStreamResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12o\n" +
+	"\x0fTestAuditStream\x12 .nokku.v1.TestAuditStreamRequest\x1a!.nokku.v1.TestAuditStreamResponse\"\x17\xc2\xf3\x18\x13\x18\x05:\x0faudit_streamingB\x91\x01\n" +
 	"\fcom.nokku.v1B\x10AuditStreamProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -718,6 +728,7 @@ var file_nokku_v1_audit_stream_proto_goTypes = []any{
 	(*TestAuditStreamRequest)(nil),    // 10: nokku.v1.TestAuditStreamRequest
 	(*TestAuditStreamResponse)(nil),   // 11: nokku.v1.TestAuditStreamResponse
 	(*timestamppb.Timestamp)(nil),     // 12: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),     // 13: google.protobuf.FieldMask
 }
 var file_nokku_v1_audit_stream_proto_depIdxs = []int32{
 	0,  // 0: nokku.v1.AuditStream.kind:type_name -> nokku.v1.AuditStreamKind
@@ -727,22 +738,23 @@ var file_nokku_v1_audit_stream_proto_depIdxs = []int32{
 	1,  // 4: nokku.v1.ListAuditStreamsResponse.streams:type_name -> nokku.v1.AuditStream
 	0,  // 5: nokku.v1.CreateAuditStreamRequest.kind:type_name -> nokku.v1.AuditStreamKind
 	1,  // 6: nokku.v1.CreateAuditStreamResponse.stream:type_name -> nokku.v1.AuditStream
-	1,  // 7: nokku.v1.UpdateAuditStreamResponse.stream:type_name -> nokku.v1.AuditStream
-	2,  // 8: nokku.v1.AuditStreamService.ListAuditStreams:input_type -> nokku.v1.ListAuditStreamsRequest
-	4,  // 9: nokku.v1.AuditStreamService.CreateAuditStream:input_type -> nokku.v1.CreateAuditStreamRequest
-	6,  // 10: nokku.v1.AuditStreamService.UpdateAuditStream:input_type -> nokku.v1.UpdateAuditStreamRequest
-	8,  // 11: nokku.v1.AuditStreamService.DeleteAuditStream:input_type -> nokku.v1.DeleteAuditStreamRequest
-	10, // 12: nokku.v1.AuditStreamService.TestAuditStream:input_type -> nokku.v1.TestAuditStreamRequest
-	3,  // 13: nokku.v1.AuditStreamService.ListAuditStreams:output_type -> nokku.v1.ListAuditStreamsResponse
-	5,  // 14: nokku.v1.AuditStreamService.CreateAuditStream:output_type -> nokku.v1.CreateAuditStreamResponse
-	7,  // 15: nokku.v1.AuditStreamService.UpdateAuditStream:output_type -> nokku.v1.UpdateAuditStreamResponse
-	9,  // 16: nokku.v1.AuditStreamService.DeleteAuditStream:output_type -> nokku.v1.DeleteAuditStreamResponse
-	11, // 17: nokku.v1.AuditStreamService.TestAuditStream:output_type -> nokku.v1.TestAuditStreamResponse
-	13, // [13:18] is the sub-list for method output_type
-	8,  // [8:13] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	13, // 7: nokku.v1.UpdateAuditStreamRequest.update_mask:type_name -> google.protobuf.FieldMask
+	1,  // 8: nokku.v1.UpdateAuditStreamResponse.stream:type_name -> nokku.v1.AuditStream
+	2,  // 9: nokku.v1.AuditStreamService.ListAuditStreams:input_type -> nokku.v1.ListAuditStreamsRequest
+	4,  // 10: nokku.v1.AuditStreamService.CreateAuditStream:input_type -> nokku.v1.CreateAuditStreamRequest
+	6,  // 11: nokku.v1.AuditStreamService.UpdateAuditStream:input_type -> nokku.v1.UpdateAuditStreamRequest
+	8,  // 12: nokku.v1.AuditStreamService.DeleteAuditStream:input_type -> nokku.v1.DeleteAuditStreamRequest
+	10, // 13: nokku.v1.AuditStreamService.TestAuditStream:input_type -> nokku.v1.TestAuditStreamRequest
+	3,  // 14: nokku.v1.AuditStreamService.ListAuditStreams:output_type -> nokku.v1.ListAuditStreamsResponse
+	5,  // 15: nokku.v1.AuditStreamService.CreateAuditStream:output_type -> nokku.v1.CreateAuditStreamResponse
+	7,  // 16: nokku.v1.AuditStreamService.UpdateAuditStream:output_type -> nokku.v1.UpdateAuditStreamResponse
+	9,  // 17: nokku.v1.AuditStreamService.DeleteAuditStream:output_type -> nokku.v1.DeleteAuditStreamResponse
+	11, // 18: nokku.v1.AuditStreamService.TestAuditStream:output_type -> nokku.v1.TestAuditStreamResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_audit_stream_proto_init() }

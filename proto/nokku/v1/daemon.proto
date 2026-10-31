@@ -4,6 +4,7 @@ package nokku.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 import "nokku/v1/recordings.proto";
@@ -28,13 +29,20 @@ service DaemonService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      people_only: true
+      signs: true
+    };
   }
   rpc CloseSession(CloseSessionRequest) returns (CloseSessionResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc Relay(stream RelayRequest) returns (stream RelayResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      quiet: true
+    };
   }
 }
 
@@ -43,13 +51,22 @@ service DaemonControlService {
     option (access) = {public: true};
   }
   rpc SyncDaemon(SyncDaemonRequest) returns (SyncDaemonResponse) {
-    option (access) = {daemon: true};
+    option (access) = {
+      daemon: true
+      quiet: true
+    };
   }
   rpc Connect(stream ConnectRequest) returns (stream ConnectResponse) {
-    option (access) = {daemon: true};
+    option (access) = {
+      daemon: true
+      quiet: true
+    };
   }
   rpc DaemonRelay(stream DaemonRelayRequest) returns (stream DaemonRelayResponse) {
-    option (access) = {daemon: true};
+    option (access) = {
+      daemon: true
+      quiet: true
+    };
   }
   rpc SignHostCertificate(SignHostCertificateRequest) returns (SignHostCertificateResponse) {
     option (access) = {daemon: true};
@@ -70,15 +87,18 @@ enum DaemonStatus {
 }
 
 message Daemon {
+  reserved 6;
+
   string id = 1;
   string name = 2;
   bool online = 3;
   DaemonStatus status = 4;
   DaemonConfig config = 5;
-  map<string, string> metadata = 6;
   google.protobuf.Timestamp updated_at = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp last_seen_at = 9;
+  // version is nokkud's, as its last enroll or sync reported it.
+  string version = 10;
 }
 
 message DaemonConfig {
@@ -106,6 +126,19 @@ message UpdateDaemonRequest {
     not_in: [0] /* Prevent UNSPECIFIED */
   }];
   DaemonConfig config = 3;
+  // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
+  google.protobuf.FieldMask update_mask = 4 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).field_mask = {
+      in: [
+        "status",
+        "config.record_sessions",
+        "config.allow_forwarding",
+        "config.allow_agent_forwarding",
+        "config.gateway_ports"
+      ]
+    }
+  ];
 }
 
 message UpdateDaemonResponse {}

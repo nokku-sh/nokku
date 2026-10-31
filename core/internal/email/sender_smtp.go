@@ -13,8 +13,8 @@ type smtpSender struct {
 }
 
 // Port 465 uses implicit TLS, 587 requires STARTTLS, anything else upgrades when the server offers it.
-func newSMTPSender(host string, port int, username, password string) (*smtpSender, error) {
-	opts := []mail.Option{mail.WithPort(port), mail.WithTimeout(10 * time.Second)}
+func newSMTPSender(host string, port int, username, password string, timeout time.Duration) (*smtpSender, error) {
+	opts := []mail.Option{mail.WithPort(port), mail.WithTimeout(timeout)}
 	if username != "" {
 		opts = append(opts,
 			mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover),

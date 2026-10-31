@@ -138,8 +138,8 @@ func (x *CreateSCIMTokenRequest) GetLabel() string {
 type CreateSCIMTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         *string                `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
-	Entry         *SCIMToken             `protobuf:"bytes,2,opt,name=entry" json:"entry,omitempty"`
-	BaseUrl       *string                `protobuf:"bytes,3,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
+	BaseUrl       *string                `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
+	Entry         *SCIMToken             `protobuf:"bytes,3,opt,name=entry" json:"entry,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -181,18 +181,18 @@ func (x *CreateSCIMTokenResponse) GetToken() string {
 	return ""
 }
 
-func (x *CreateSCIMTokenResponse) GetEntry() *SCIMToken {
-	if x != nil {
-		return x.Entry
-	}
-	return nil
-}
-
 func (x *CreateSCIMTokenResponse) GetBaseUrl() string {
 	if x != nil && x.BaseUrl != nil {
 		return *x.BaseUrl
 	}
 	return ""
+}
+
+func (x *CreateSCIMTokenResponse) GetEntry() *SCIMToken {
+	if x != nil {
+		return x.Entry
+	}
+	return nil
 }
 
 type ListSCIMTokensRequest struct {
@@ -232,10 +232,9 @@ func (*ListSCIMTokensRequest) Descriptor() ([]byte, []int) {
 }
 
 type ListSCIMTokensResponse struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Tokens []*SCIMToken           `protobuf:"bytes,1,rep,name=tokens" json:"tokens,omitempty"`
-	// Where the identity provider sends users and groups.
-	BaseUrl       *string `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tokens        []*SCIMToken           `protobuf:"bytes,1,rep,name=tokens" json:"tokens,omitempty"`
+	BaseUrl       *string                `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -380,18 +379,19 @@ const file_nokku_v1_scim_proto_rawDesc = "" +
 	"\x05label\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x05label\"u\n" +
 	"\x17CreateSCIMTokenResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\x12)\n" +
-	"\x05entry\x18\x02 \x01(\v2\x13.nokku.v1.SCIMTokenR\x05entry\x12\x19\n" +
-	"\bbase_url\x18\x03 \x01(\tR\abaseUrl\"\x17\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x19\n" +
+	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\x12)\n" +
+	"\x05entry\x18\x03 \x01(\v2\x13.nokku.v1.SCIMTokenR\x05entry\"\x17\n" +
 	"\x15ListSCIMTokensRequest\"`\n" +
 	"\x16ListSCIMTokensResponse\x12+\n" +
 	"\x06tokens\x18\x01 \x03(\v2\x13.nokku.v1.SCIMTokenR\x06tokens\x12\x19\n" +
 	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\"2\n" +
 	"\x16DeleteSCIMTokenRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x19\n" +
-	"\x17DeleteSCIMTokenResponse2\xad\x02\n" +
-	"\vSCIMService\x12^\n" +
-	"\x0fCreateSCIMToken\x12 .nokku.v1.CreateSCIMTokenRequest\x1a!.nokku.v1.CreateSCIMTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12^\n" +
+	"\x17DeleteSCIMTokenResponse2\xb5\x02\n" +
+	"\vSCIMService\x12f\n" +
+	"\x0fCreateSCIMToken\x12 .nokku.v1.CreateSCIMTokenRequest\x1a!.nokku.v1.CreateSCIMTokenResponse\"\x0e\xc2\xf3\x18\n" +
+	"\x18\x050\x01:\x04scim\x12^\n" +
 	"\x0eListSCIMTokens\x12\x1f.nokku.v1.ListSCIMTokensRequest\x1a .nokku.v1.ListSCIMTokensResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12^\n" +
 	"\x0fDeleteSCIMToken\x12 .nokku.v1.DeleteSCIMTokenRequest\x1a!.nokku.v1.DeleteSCIMTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x05B\x8a\x01\n" +
 	"\fcom.nokku.v1B\tScimProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"

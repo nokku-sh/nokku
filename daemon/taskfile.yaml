@@ -19,6 +19,11 @@ tasks:
       - go test -race -count=1 -cover ./...
       - golangci-lint run --fix
 
+  test:root:
+    desc: Check as root, in a throwaway container, that every session feature runs as the user. Needs Docker
+    cmds:
+      - go test -tags integration -count=1 -v -run '^TestSessionsRunAsTheUserInAContainer$' ./internal/sshd
+
   fuzz:
     desc: Fuzz every fuzz target for FUZZTIME (default 30s)
     vars:

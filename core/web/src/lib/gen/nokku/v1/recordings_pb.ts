@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/recordings.proto.
  */
 export const file_nokku_v1_recordings: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSKgAgoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIQCgh1c2VybmFtZRgDIAEoCRISCgpzaXplX2J5dGVzGAQgASgDEhAKCGNvbXBsZXRlGAUgASgIEi4KCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgtkYWVtb25fbmFtZRgIIAEoCRISCgpzdWJqZWN0X2lkGAkgASgJEhEKCXByaW5jaXBhbBgKIAEoCRIUCgxzdWJqZWN0X25hbWUYCyABKAkSDAoEaGVsZBgMIAEoCCKEAQoWVXBsb2FkUmVjb3JkaW5nUmVxdWVzdBInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSAASKQoFZmluYWwYAyABKAsyGC5ub2trdS52MS5SZWNvcmRpbmdGaW5hbEgAQgUKA21zZyKXAQoNUmVjb3JkaW5nTWV0YRIeCgxyZWNvcmRpbmdfaWQYASABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAIgASgJQge6SARyAhggEi4KCnN0YXJ0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhsKCXByaW5jaXBhbBgEIAEoCUIIukgFcgMYoAEiEAoOUmVjb3JkaW5nRmluYWwiQwoXVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2USFAoMcmVjb3JkaW5nX2lkGAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMilwEKFUxpc3RSZWNvcmRpbmdzUmVxdWVzdBIbCglkYWVtb25faWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEhAKCHVzZXJuYW1lGAQgASgJEhwKCnN1YmplY3RfaWQYBSABKAlCCLpIBXIDsAEBImUKFkxpc3RSZWNvcmRpbmdzUmVzcG9uc2USJwoKcmVjb3JkaW5ncxgBIAMoCzITLm5va2t1LnYxLlJlY29yZGluZxINCgV0b3RhbBgCIAEoBRITCgt0b3RhbF9ieXRlcxgDIAEoAyI1ChNHZXRSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQEiVwoUR2V0UmVjb3JkaW5nUmVzcG9uc2USJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAQgUKA21zZyI4ChZEZWxldGVSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UyrgIKEFJlY29yZGluZ1NlcnZpY2USWgoMR2V0UmVjb3JkaW5nEh0ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVxdWVzdBoeLm5va2t1LnYxLkdldFJlY29yZGluZ1Jlc3BvbnNlIgmQAgHC8xgCGAIwARJeCg5MaXN0UmVjb3JkaW5ncxIfLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVzcG9uc2UiCZACAcLzGAIYAhJeCg9EZWxldGVSZWNvcmRpbmcSIC5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXF1ZXN0GiEubm9ra3UudjEuRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UiBsLzGAIYA0KQAQoMY29tLm5va2t1LnYxQg9SZWNvcmRpbmdzUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSKgAgoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIQCgh1c2VybmFtZRgDIAEoCRISCgpzaXplX2J5dGVzGAQgASgDEhAKCGNvbXBsZXRlGAUgASgIEi4KCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgtkYWVtb25fbmFtZRgIIAEoCRISCgpzdWJqZWN0X2lkGAkgASgJEhEKCXByaW5jaXBhbBgKIAEoCRIUCgxzdWJqZWN0X25hbWUYCyABKAkSDAoEbGl2ZRgMIAEoCCKEAQoWVXBsb2FkUmVjb3JkaW5nUmVxdWVzdBInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSAASKQoFZmluYWwYAyABKAsyGC5ub2trdS52MS5SZWNvcmRpbmdGaW5hbEgAQgUKA21zZyKXAQoNUmVjb3JkaW5nTWV0YRIeCgxyZWNvcmRpbmdfaWQYASABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAIgASgJQge6SARyAhggEhsKCXByaW5jaXBhbBgDIAEoCUIIukgFcgMYoAESLgoKc3RhcnRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAieQoOUmVjb3JkaW5nRmluYWwSGwoKc2l6ZV9ieXRlcxgBIAEoA0IHukgEIgIoABIcCgpjdXRfcmVhc29uGAIgASgJQgi6SAVyAxjIARIsCghlbmRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiQwoXVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2USFAoMcmVjb3JkaW5nX2lkGAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMilwEKFUxpc3RSZWNvcmRpbmdzUmVxdWVzdBIbCglkYWVtb25faWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEhAKCHVzZXJuYW1lGAQgASgJEhwKCnN1YmplY3RfaWQYBSABKAlCCLpIBXIDsAEBImUKFkxpc3RSZWNvcmRpbmdzUmVzcG9uc2USJwoKcmVjb3JkaW5ncxgBIAMoCzITLm5va2t1LnYxLlJlY29yZGluZxINCgV0b3RhbBgCIAEoBRITCgt0b3RhbF9ieXRlcxgDIAEoAyI1ChNHZXRSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQEiVwoUR2V0UmVjb3JkaW5nUmVzcG9uc2USJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAQgUKA21zZyI4ChZEZWxldGVSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UyrgIKEFJlY29yZGluZ1NlcnZpY2USWgoMR2V0UmVjb3JkaW5nEh0ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVxdWVzdBoeLm5va2t1LnYxLkdldFJlY29yZGluZ1Jlc3BvbnNlIgmQAgHC8xgCGAIwARJeCg5MaXN0UmVjb3JkaW5ncxIfLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVxdWVzdBogLm5va2t1LnYxLkxpc3RSZWNvcmRpbmdzUmVzcG9uc2UiCZACAcLzGAIYAhJeCg9EZWxldGVSZWNvcmRpbmcSIC5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXF1ZXN0GiEubm9ra3UudjEuRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UiBsLzGAIYA0KQAQoMY29tLm5va2t1LnYxQg9SZWNvcmRpbmdzUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.Recording
@@ -76,11 +76,11 @@ export type Recording = Message<"nokku.v1.Recording"> & {
   subjectName: string;
 
   /**
-   * held is true while a legal hold keeps it, it can't be deleted then.
+   * live is a session still running as far as the core can tell, ended_at unset behind a connected daemon.
    *
-   * @generated from field: bool held = 12;
+   * @generated from field: bool live = 12;
    */
-  held: boolean;
+  live: boolean;
 };
 
 /**
@@ -140,14 +140,14 @@ export type RecordingMeta = Message<"nokku.v1.RecordingMeta"> & {
   username: string;
 
   /**
-   * @generated from field: google.protobuf.Timestamp started_at = 3;
-   */
-  startedAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: string principal = 4;
+   * @generated from field: string principal = 3;
    */
   principal: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 4;
+   */
+  startedAt?: Timestamp | undefined;
 };
 
 /**
@@ -161,6 +161,22 @@ export const RecordingMetaSchema: GenMessage<RecordingMeta> = /*@__PURE__*/
  * @generated from message nokku.v1.RecordingFinal
  */
 export type RecordingFinal = Message<"nokku.v1.RecordingFinal"> & {
+  /**
+   * @generated from field: int64 size_bytes = 1;
+   */
+  sizeBytes: bigint;
+
+  /**
+   * @generated from field: string cut_reason = 2;
+   */
+  cutReason: string;
+
+  /**
+   * ended_at is when the session ended, which a late upload can be long after.
+   *
+   * @generated from field: google.protobuf.Timestamp ended_at = 3;
+   */
+  endedAt?: Timestamp | undefined;
 };
 
 /**

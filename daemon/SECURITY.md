@@ -30,9 +30,9 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 
 - The `nokkud` binary: enrollment token handling, generating and renewing SSH host certificates, the SSH server's certificate authentication and session handling, and the authenticated outbound control stream to the core
 - The local state it writes, all under `/var/lib/nokkud/`:
-  - `config.json`, `cache.json` and `state.json`. The trusted CA keys are part of `cache.json`
-  - `ssh_host_signer.json`, the host identity
-  - The SSH host public key and host certificate
+  - `daemon.json`, the enrollment and the synced access. The trusted CA keys are part of it
+  - `state.json`, the daemon's signing identity toward the core
+  - `ssh_host_ecdsa_key`, the SSH host key, with its public key and host certificate
   - `recordings/`
 
 ### Out of scope
@@ -54,6 +54,12 @@ Every signing identity is ECDSA P-256. The daemon authenticates to the core with
 - **Keep `/var/lib/nokkud` to root.** The key has no auth value or PCR policy, so a process that can read the state files and open `/dev/tpmrm0` can use the identity. Access to the TPM alone is not enough.
 - **Without a TPM**, the daemon uses a software key wrapped with a key derived from the machine fingerprint (`/etc/machine-id` and friends). That only stops someone from copying the state file to another machine. It is not encryption against anyone who can read the file, because the fingerprint is public. The key is only as strong as the file permissions.
 - **Run with `--require-tpm` on servers that have a TPM.** The daemon then refuses to fall back to the software key.
+
+### The SSH host key
+
+- **The host key is a file under `/var/lib/nokkud`, readable by root only**, like sshd's `/etc/ssh/ssh_host_*`. It is an OpenSSH key file, `ssh_host_ecdsa_key`, mode 0600, made at every enrollment. The daemon refuses a host key that others can read.
+- **The TPM holds only the daemon's identity toward the core.** Every handshake signs with the host key before the client logs in, and a TPM signs far slower than the CPU. In the TPM, a flood of connections that never log in would queue up in front of real logins and of the daemon's own calls to the core.
+- **A copied host key works elsewhere.** Someone who copies `/var/lib/nokkud` to another machine can pose as this server until its host certificate expires. They need root on this server for that.
 
 ### The connection to the core
 
@@ -105,7 +111,7 @@ Sessions never go through PAM. A granted user runs with their own OS privileges 
 
 ### What a session may do
 
-- **Sessions run as the target OS user.** The daemon has to run as root so it can drop privileges. It refuses to serve SSH unprivileged, so it never runs a session as the wrong user.
+- **Sessions run as the target OS user.** The daemon has to run as root so it can drop privileges. It refuses to serve SSH unprivileged, so it never runs a session as the wrong user. A test that runs as root in a container checks that the shell, exec, file transfer, both kinds of port forward, the agent socket and signals all reach the OS as the user.
 - **The client environment is an allowlist.** Sessions accept only locale and terminal variables from clients (`TERM`, `LANG`, `LC_*`, `TZ` and the like). They never accept variables that affect the shell or the loader (`PATH`, `LD_*`, `BASH_ENV`, `ENV`), or connection metadata (`SSH_*`). A certificate with a `force-command` critical option refuses all client-supplied environment. The command the client asked for is passed to the forced one as `SSH_ORIGINAL_COMMAND`, like sshd does, so restricted wrappers such as `git-shell` work.
 - **Only modern algorithms are offered.** Key exchange, MACs and client key signatures are limited to the set OpenSSH ships by default. SHA-1 key exchange, `hmac-sha1-96`, `ssh-rsa` signatures and DSA keys are refused.
 - **Remote forwards are loopback-only by default**, like OpenSSH's `GatewayPorts=no`. An authorized user cannot expose services on the server's external interfaces. Direct forwards (outbound `-L`) are written to the audit log with their destination.
@@ -122,7 +128,18 @@ Sessions never go through PAM. A granted user runs with their own OS privileges 
 - **A web terminal session is recorded under the core's session id.** The core puts it in the key id of the certificate it mints for the session, which the CA signs. Nothing a client sends can label a recording, so a direct login cannot claim another session's id.
 - **Non-interactive `exec` sessions** are captured as `command` audit events (command line, user, exit code) and as recordings of their output. They have no echo signal, so only output is captured.
 - **SFTP**, and so modern `scp`, is audited as a `subsystem` event. File contents are not recorded.
-- **Recordings stream to the core live.** Any that the core did not fully receive (offline, upload error, crash) are uploaded again every few minutes. Once the core confirms a recording, the local file is deleted. The core then holds the only copy and its retention applies.
+- **Recordings go to the core from their file, while the session runs.** The recorder writes `recordings/<id>.part`, and only a recording that closed whole is synced and renamed to `<id>.cast.gz`. One upload per recording reads the file as it grows. After a break (core offline, a deploy, an upload error) it starts again from the first byte, during the session and after it, until the core holds all of the file. Then the local file is deleted. The core then holds the only copy and its retention applies.
+- **A stop or a crash keeps what was recorded.** Stopping the daemon ends its sessions like a hangup and waits a few seconds for their uploads. What a crash or a stop leaves on disk goes to the core at the next start. A crash of the daemon loses at most the last second of output.
+- **The core marks a recording complete only when it is whole.** The last upload message carries the size of the file, when the session ended and, for a cut recording, why it stops early. A crash, a write error and the size cap all leave a recording the console shows as incomplete, with the reason in the core's audit log. Every try goes to an object of its own, and of two copies of one recording the core keeps the larger one.
 - **A recording that waits too long is dropped**, with a warning in the log: after 30 days, or oldest first once the waiting ones pass 1 GiB.
-- **Recording fails open, except for interactive sessions at the size cap.** A session that cannot be recorded (under 512 MiB free, a file error) still runs, so a full disk never locks admins out. Every gap raises a `recording_degraded` audit event with the reason.
-- **At the 50 MB cap an interactive session ends** with a notice, so flooding output cannot switch recording off for what is typed next. **An `exec` session runs on** with the rest of its output unrecorded, so `git clone`, `rsync` or `pg_dump` over ssh finish. Its command line is in the audit log either way. Such a recording closes at the cap, so the console stops listing the session as live and the recording has no exit code.
+- **Recording fails open, except for interactive sessions at the size cap.** A session that cannot be recorded (under 512 MiB free, a file error) still runs, so a full disk never locks admins out. A disk that fills in the middle of a session stops the recording there and the session runs on. Every gap raises a `recording_degraded` audit event with the reason.
+- **At the 50 MB cap an interactive session ends** with a notice, so flooding output cannot switch recording off for what is typed next. **An `exec` session is capped at 5 MB and runs on** with the rest of its output unrecorded, so `git clone`, `rsync` or `pg_dump` over ssh finish and their binary output does not fill the workspace's recording storage. Its command line is in the audit log either way. Such a recording closes at the cap, so the console stops listing the session as live and the recording has no exit code.
+
+### What sshd does that nokkud does not
+
+`nokkud` is its own SSH server and never goes through PAM or the login machinery of the OS. Tools that rely on it see no session.
+
+- **No login records.** Sessions are not written to utmp, wtmp or lastlog, so `who`, `w`, `last` and `lastlog` do not show them. The daemon's `audit` lines are the record of who logged in.
+- **No loginuid.** `pam_loginuid` never runs, so `/proc/<pid>/loginuid` stays unset in a session. The kernel audit subsystem and `auditd` rules cannot tie what a session does to its login, only to the daemon.
+- **No logind session.** systemd-logind does not know the session. `loginctl` does not list it, it gets no session scope and no `XDG_RUNTIME_DIR`, and `systemctl --user` does not work in it. Its processes stay in the daemon's own service cgroup.
+- **No other PAM modules either**, see [Account limits](#account-limits): no `pam_limits`, `pam_access`, `pam_env` or `pam_systemd`. The daemon checks `/etc/nologin` and the account expiry itself.

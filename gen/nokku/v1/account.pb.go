@@ -10,6 +10,8 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
+	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -232,16 +234,18 @@ func (x *AccountCredential) GetLastUsedAt() *timestamppb.Timestamp {
 }
 
 type AccountSession struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Kind          *string                `protobuf:"bytes,2,opt,name=kind" json:"kind,omitempty"`
-	Method        *string                `protobuf:"bytes,3,opt,name=method" json:"method,omitempty"`
-	Binding       *string                `protobuf:"bytes,4,opt,name=binding" json:"binding,omitempty"`
-	UserAgent     *string                `protobuf:"bytes,5,opt,name=user_agent,json=userAgent" json:"user_agent,omitempty"`
-	Ip            *string                `protobuf:"bytes,6,opt,name=ip" json:"ip,omitempty"`
-	Current       *bool                  `protobuf:"varint,7,opt,name=current" json:"current,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	LastSeenAt    *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_seen_at,json=lastSeenAt" json:"last_seen_at,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Kind       *string                `protobuf:"bytes,2,opt,name=kind" json:"kind,omitempty"`
+	Method     *string                `protobuf:"bytes,3,opt,name=method" json:"method,omitempty"`
+	Binding    *string                `protobuf:"bytes,4,opt,name=binding" json:"binding,omitempty"`
+	UserAgent  *string                `protobuf:"bytes,5,opt,name=user_agent,json=userAgent" json:"user_agent,omitempty"`
+	Ip         *string                `protobuf:"bytes,6,opt,name=ip" json:"ip,omitempty"`
+	Current    *bool                  `protobuf:"varint,7,opt,name=current" json:"current,omitempty"`
+	ExpiresAt  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	LastSeenAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_seen_at,json=lastSeenAt" json:"last_seen_at,omitempty"`
+	// How long this session can still make calls marked fresh, zero once it can't.
+	FreshFor      *durationpb.Duration `protobuf:"bytes,10,opt,name=fresh_for,json=freshFor" json:"fresh_for,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -339,6 +343,13 @@ func (x *AccountSession) GetLastSeenAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *AccountSession) GetFreshFor() *durationpb.Duration {
+	if x != nil {
+		return x.FreshFor
+	}
+	return nil
+}
+
 type GetAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -422,6 +433,7 @@ func (x *GetAccountResponse) GetUser() *User {
 type UpdateAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -461,6 +473,13 @@ func (x *UpdateAccountRequest) GetName() string {
 		return *x.Name
 	}
 	return ""
+}
+
+func (x *UpdateAccountRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
+	if x != nil {
+		return x.UpdateMask
+	}
+	return nil
 }
 
 type UpdateAccountResponse struct {
@@ -508,9 +527,8 @@ func (x *UpdateAccountResponse) GetUser() *User {
 }
 
 type SetAvatarRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// A JPEG, PNG or GIF. The server crops it to a square and keeps 128px.
-	Image         []byte `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Image         []byte                 `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1160,7 +1178,7 @@ var File_nokku_v1_account_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_account_proto_rawDesc = "" +
 	"\n" +
-	"\x16nokku/v1/account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xdd\x02\n" +
+	"\x16nokku/v1/account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xdd\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -1184,7 +1202,7 @@ const file_nokku_v1_account_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\flast_used_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastUsedAt\"\xa8\x02\n" +
+	"lastUsedAt\"\xe0\x02\n" +
 	"\x0eAccountSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
@@ -1197,12 +1215,16 @@ const file_nokku_v1_account_proto_rawDesc = "" +
 	"\n" +
 	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12<\n" +
 	"\flast_seen_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastSeenAt\"\x13\n" +
+	"lastSeenAt\x126\n" +
+	"\tfresh_for\x18\n" +
+	" \x01(\v2\x19.google.protobuf.DurationR\bfreshFor\"\x13\n" +
 	"\x11GetAccountRequest\"8\n" +
 	"\x12GetAccountResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\":\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\"\x82\x01\n" +
 	"\x14UpdateAccountRequest\x12\x1c\n" +
-	"\x04name\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x04nameJ\x04\b\x02\x10\x03\";\n" +
+	"\x04name\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x04name\x12L\n" +
+	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x0f\xbaH\f\xc8\x01\x01\xe2\x01\x06\x12\x04nameR\n" +
+	"updateMask\";\n" +
 	"\x15UpdateAccountResponse\x12\"\n" +
 	"\x04user\x18\x01 \x01(\v2\x0e.nokku.v1.UserR\x04user\"4\n" +
 	"\x10SetAvatarRequest\x12 \n" +
@@ -1231,13 +1253,13 @@ const file_nokku_v1_account_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x17\n" +
 	"\x15RemoveSessionResponse\"\x16\n" +
 	"\x14DeleteAccountRequest\"\x17\n" +
-	"\x15DeleteAccountResponse2\xc1\a\n" +
+	"\x15DeleteAccountResponse2\xc3\a\n" +
 	"\x0eAccountService\x12R\n" +
 	"\n" +
 	"GetAccount\x12\x1b.nokku.v1.GetAccountRequest\x1a\x1c.nokku.v1.GetAccountResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12X\n" +
 	"\rUpdateAccount\x12\x1e.nokku.v1.UpdateAccountRequest\x1a\x1f.nokku.v1.UpdateAccountResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12L\n" +
-	"\tSetAvatar\x12\x1a.nokku.v1.SetAvatarRequest\x1a\x1b.nokku.v1.SetAvatarResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12g\n" +
-	"\x12RequestEmailChange\x12#.nokku.v1.RequestEmailChangeRequest\x1a$.nokku.v1.RequestEmailChangeResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12a\n" +
+	"\tSetAvatar\x12\x1a.nokku.v1.SetAvatarRequest\x1a\x1b.nokku.v1.SetAvatarResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12i\n" +
+	"\x12RequestEmailChange\x12#.nokku.v1.RequestEmailChangeRequest\x1a$.nokku.v1.RequestEmailChangeResponse\"\b\xc2\xf3\x18\x04\x10\x010\x01\x12a\n" +
 	"\x0fListCredentials\x12 .nokku.v1.ListCredentialsRequest\x1a!.nokku.v1.ListCredentialsResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12a\n" +
 	"\x10RenameCredential\x12!.nokku.v1.RenameCredentialRequest\x1a\".nokku.v1.RenameCredentialResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12a\n" +
 	"\x10RemoveCredential\x12!.nokku.v1.RemoveCredentialRequest\x1a\".nokku.v1.RemoveCredentialResponse\"\x06\xc2\xf3\x18\x02\x10\x01\x12m\n" +
@@ -1285,6 +1307,8 @@ var file_nokku_v1_account_proto_goTypes = []any{
 	(*DeleteAccountResponse)(nil),       // 22: nokku.v1.DeleteAccountResponse
 	(WorkspaceRole)(0),                  // 23: nokku.v1.WorkspaceRole
 	(*timestamppb.Timestamp)(nil),       // 24: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),         // 25: google.protobuf.Duration
+	(*fieldmaskpb.FieldMask)(nil),       // 26: google.protobuf.FieldMask
 }
 var file_nokku_v1_account_proto_depIdxs = []int32{
 	23, // 0: nokku.v1.User.role:type_name -> nokku.v1.WorkspaceRole
@@ -1294,36 +1318,38 @@ var file_nokku_v1_account_proto_depIdxs = []int32{
 	24, // 4: nokku.v1.AccountCredential.last_used_at:type_name -> google.protobuf.Timestamp
 	24, // 5: nokku.v1.AccountSession.expires_at:type_name -> google.protobuf.Timestamp
 	24, // 6: nokku.v1.AccountSession.last_seen_at:type_name -> google.protobuf.Timestamp
-	0,  // 7: nokku.v1.GetAccountResponse.user:type_name -> nokku.v1.User
-	0,  // 8: nokku.v1.UpdateAccountResponse.user:type_name -> nokku.v1.User
-	0,  // 9: nokku.v1.SetAvatarResponse.user:type_name -> nokku.v1.User
-	1,  // 10: nokku.v1.ListCredentialsResponse.credentials:type_name -> nokku.v1.AccountCredential
-	2,  // 11: nokku.v1.ListAccountSessionsResponse.sessions:type_name -> nokku.v1.AccountSession
-	3,  // 12: nokku.v1.AccountService.GetAccount:input_type -> nokku.v1.GetAccountRequest
-	5,  // 13: nokku.v1.AccountService.UpdateAccount:input_type -> nokku.v1.UpdateAccountRequest
-	7,  // 14: nokku.v1.AccountService.SetAvatar:input_type -> nokku.v1.SetAvatarRequest
-	9,  // 15: nokku.v1.AccountService.RequestEmailChange:input_type -> nokku.v1.RequestEmailChangeRequest
-	11, // 16: nokku.v1.AccountService.ListCredentials:input_type -> nokku.v1.ListCredentialsRequest
-	13, // 17: nokku.v1.AccountService.RenameCredential:input_type -> nokku.v1.RenameCredentialRequest
-	15, // 18: nokku.v1.AccountService.RemoveCredential:input_type -> nokku.v1.RemoveCredentialRequest
-	17, // 19: nokku.v1.AccountService.ListAccountSessions:input_type -> nokku.v1.ListAccountSessionsRequest
-	19, // 20: nokku.v1.AccountService.RemoveSession:input_type -> nokku.v1.RemoveSessionRequest
-	21, // 21: nokku.v1.AccountService.DeleteAccount:input_type -> nokku.v1.DeleteAccountRequest
-	4,  // 22: nokku.v1.AccountService.GetAccount:output_type -> nokku.v1.GetAccountResponse
-	6,  // 23: nokku.v1.AccountService.UpdateAccount:output_type -> nokku.v1.UpdateAccountResponse
-	8,  // 24: nokku.v1.AccountService.SetAvatar:output_type -> nokku.v1.SetAvatarResponse
-	10, // 25: nokku.v1.AccountService.RequestEmailChange:output_type -> nokku.v1.RequestEmailChangeResponse
-	12, // 26: nokku.v1.AccountService.ListCredentials:output_type -> nokku.v1.ListCredentialsResponse
-	14, // 27: nokku.v1.AccountService.RenameCredential:output_type -> nokku.v1.RenameCredentialResponse
-	16, // 28: nokku.v1.AccountService.RemoveCredential:output_type -> nokku.v1.RemoveCredentialResponse
-	18, // 29: nokku.v1.AccountService.ListAccountSessions:output_type -> nokku.v1.ListAccountSessionsResponse
-	20, // 30: nokku.v1.AccountService.RemoveSession:output_type -> nokku.v1.RemoveSessionResponse
-	22, // 31: nokku.v1.AccountService.DeleteAccount:output_type -> nokku.v1.DeleteAccountResponse
-	22, // [22:32] is the sub-list for method output_type
-	12, // [12:22] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	25, // 7: nokku.v1.AccountSession.fresh_for:type_name -> google.protobuf.Duration
+	0,  // 8: nokku.v1.GetAccountResponse.user:type_name -> nokku.v1.User
+	26, // 9: nokku.v1.UpdateAccountRequest.update_mask:type_name -> google.protobuf.FieldMask
+	0,  // 10: nokku.v1.UpdateAccountResponse.user:type_name -> nokku.v1.User
+	0,  // 11: nokku.v1.SetAvatarResponse.user:type_name -> nokku.v1.User
+	1,  // 12: nokku.v1.ListCredentialsResponse.credentials:type_name -> nokku.v1.AccountCredential
+	2,  // 13: nokku.v1.ListAccountSessionsResponse.sessions:type_name -> nokku.v1.AccountSession
+	3,  // 14: nokku.v1.AccountService.GetAccount:input_type -> nokku.v1.GetAccountRequest
+	5,  // 15: nokku.v1.AccountService.UpdateAccount:input_type -> nokku.v1.UpdateAccountRequest
+	7,  // 16: nokku.v1.AccountService.SetAvatar:input_type -> nokku.v1.SetAvatarRequest
+	9,  // 17: nokku.v1.AccountService.RequestEmailChange:input_type -> nokku.v1.RequestEmailChangeRequest
+	11, // 18: nokku.v1.AccountService.ListCredentials:input_type -> nokku.v1.ListCredentialsRequest
+	13, // 19: nokku.v1.AccountService.RenameCredential:input_type -> nokku.v1.RenameCredentialRequest
+	15, // 20: nokku.v1.AccountService.RemoveCredential:input_type -> nokku.v1.RemoveCredentialRequest
+	17, // 21: nokku.v1.AccountService.ListAccountSessions:input_type -> nokku.v1.ListAccountSessionsRequest
+	19, // 22: nokku.v1.AccountService.RemoveSession:input_type -> nokku.v1.RemoveSessionRequest
+	21, // 23: nokku.v1.AccountService.DeleteAccount:input_type -> nokku.v1.DeleteAccountRequest
+	4,  // 24: nokku.v1.AccountService.GetAccount:output_type -> nokku.v1.GetAccountResponse
+	6,  // 25: nokku.v1.AccountService.UpdateAccount:output_type -> nokku.v1.UpdateAccountResponse
+	8,  // 26: nokku.v1.AccountService.SetAvatar:output_type -> nokku.v1.SetAvatarResponse
+	10, // 27: nokku.v1.AccountService.RequestEmailChange:output_type -> nokku.v1.RequestEmailChangeResponse
+	12, // 28: nokku.v1.AccountService.ListCredentials:output_type -> nokku.v1.ListCredentialsResponse
+	14, // 29: nokku.v1.AccountService.RenameCredential:output_type -> nokku.v1.RenameCredentialResponse
+	16, // 30: nokku.v1.AccountService.RemoveCredential:output_type -> nokku.v1.RemoveCredentialResponse
+	18, // 31: nokku.v1.AccountService.ListAccountSessions:output_type -> nokku.v1.ListAccountSessionsResponse
+	20, // 32: nokku.v1.AccountService.RemoveSession:output_type -> nokku.v1.RemoveSessionResponse
+	22, // 33: nokku.v1.AccountService.DeleteAccount:output_type -> nokku.v1.DeleteAccountResponse
+	24, // [24:34] is the sub-list for method output_type
+	14, // [14:24] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_account_proto_init() }

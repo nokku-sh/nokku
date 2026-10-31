@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -96,10 +97,9 @@ func TestSendSetsEachDestinationsAuth(t *testing.T) {
 				got, want = r.Header.Get(tt.header), tt.want(r, body)
 			}))
 			t.Cleanup(srv.Close)
-			sut := &Service{egress: srv.Client()}
+			sut := &Service{egress: srv.Client(), keys: testKeys(t)}
 
-			err := sut.send(t.Context(), &db.AuditStream{Kind: tt.kind, URL: srv.URL, Secret: []byte("s3cret-key")},
-				testEvents())
+			err := sut.send(t.Context(), testStream(t, sut, tt.kind, srv.URL, "s3cret-key"), testEvents())
 
 			require.NoError(t, err)
 			assert.Equal(t, want, got)
@@ -114,13 +114,26 @@ func TestSendRefusesARedirect(t *testing.T) {
 	t.Cleanup(srv.Close)
 	client := srv.Client()
 	client.CheckRedirect = refuseRedirect
-	sut := &Service{egress: client}
+	sut := &Service{egress: client, keys: testKeys(t)}
 
-	err := sut.send(
-		t.Context(),
-		&db.AuditStream{Kind: StreamDatadog, URL: srv.URL, Secret: []byte("key")},
-		testEvents(),
-	)
+	err := sut.send(t.Context(), testStream(t, sut, StreamDatadog, srv.URL, "key"), testEvents())
 
 	require.ErrorContains(t, err, "302", "a redirect must fail the delivery, not follow it with the key")
+}
+
+func testKeys(t *testing.T) *kms.Keyset {
+	t.Helper()
+	keys, err := kms.Ephemeral()
+	require.NoError(t, err)
+	return keys
+}
+
+// testStream seals secret the way CreateAuditStream stores it.
+func testStream(t *testing.T, s *Service, kind, url, secret string) *db.AuditStream {
+	t.Helper()
+	st := &db.AuditStream{ID: "s1", WorkspaceID: "w1", Kind: kind, URL: url}
+	sealed, err := s.keys.Seal(SecretAAD(st.WorkspaceID, st.ID), []byte(secret))
+	require.NoError(t, err)
+	st.Secret = sealed
+	return st
 }

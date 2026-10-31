@@ -24,72 +24,21 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type JoinTokenKind int32
-
-const (
-	JoinTokenKind_JOIN_TOKEN_KIND_UNSPECIFIED JoinTokenKind = 0
-	JoinTokenKind_JOIN_TOKEN_KIND_ENROLL      JoinTokenKind = 1
-	JoinTokenKind_JOIN_TOKEN_KIND_INVITE      JoinTokenKind = 2
-)
-
-// Enum value maps for JoinTokenKind.
-var (
-	JoinTokenKind_name = map[int32]string{
-		0: "JOIN_TOKEN_KIND_UNSPECIFIED",
-		1: "JOIN_TOKEN_KIND_ENROLL",
-		2: "JOIN_TOKEN_KIND_INVITE",
-	}
-	JoinTokenKind_value = map[string]int32{
-		"JOIN_TOKEN_KIND_UNSPECIFIED": 0,
-		"JOIN_TOKEN_KIND_ENROLL":      1,
-		"JOIN_TOKEN_KIND_INVITE":      2,
-	}
-)
-
-func (x JoinTokenKind) Enum() *JoinTokenKind {
-	p := new(JoinTokenKind)
-	*p = x
-	return p
-}
-
-func (x JoinTokenKind) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (JoinTokenKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_nokku_v1_join_token_proto_enumTypes[0].Descriptor()
-}
-
-func (JoinTokenKind) Type() protoreflect.EnumType {
-	return &file_nokku_v1_join_token_proto_enumTypes[0]
-}
-
-func (x JoinTokenKind) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use JoinTokenKind.Descriptor instead.
-func (JoinTokenKind) EnumDescriptor() ([]byte, []int) {
-	return file_nokku_v1_join_token_proto_rawDescGZIP(), []int{0}
-}
-
 type JoinToken struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Kind          *JoinTokenKind         `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.JoinTokenKind" json:"kind,omitempty"`
-	Label         *string                `protobuf:"bytes,3,opt,name=label" json:"label,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	MaxUses       *int32                 `protobuf:"varint,5,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
-	Uses          *int32                 `protobuf:"varint,6,opt,name=uses" json:"uses,omitempty"`
-	AutoApprove   *bool                  `protobuf:"varint,7,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
-	CaId          *string                `protobuf:"bytes,8,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	Role          *WorkspaceRole         `protobuf:"varint,9,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
-	Tags          []string               `protobuf:"bytes,12,rep,name=tags" json:"tags,omitempty"`
-	Grants        []*JoinTokenGrant      `protobuf:"bytes,13,rep,name=grants" json:"grants,omitempty"`
-	Ephemeral     *bool                  `protobuf:"varint,14,opt,name=ephemeral" json:"ephemeral,omitempty"`
-	RetireAfter   *durationpb.Duration   `protobuf:"bytes,15,opt,name=retire_after,json=retireAfter" json:"retire_after,omitempty"`
+	Label         *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	MaxUses       *int32                 `protobuf:"varint,4,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
+	Uses          *int32                 `protobuf:"varint,5,opt,name=uses" json:"uses,omitempty"`
+	AutoApprove   *bool                  `protobuf:"varint,6,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
+	CaId          *string                `protobuf:"bytes,7,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
+	Tags          []string               `protobuf:"bytes,10,rep,name=tags" json:"tags,omitempty"`
+	Grants        []*JoinTokenGrant      `protobuf:"bytes,11,rep,name=grants" json:"grants,omitempty"`
+	Ephemeral     *bool                  `protobuf:"varint,12,opt,name=ephemeral" json:"ephemeral,omitempty"`
+	RetireAfter   *durationpb.Duration   `protobuf:"bytes,13,opt,name=retire_after,json=retireAfter" json:"retire_after,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -129,13 +78,6 @@ func (x *JoinToken) GetId() string {
 		return *x.Id
 	}
 	return ""
-}
-
-func (x *JoinToken) GetKind() JoinTokenKind {
-	if x != nil && x.Kind != nil {
-		return *x.Kind
-	}
-	return JoinTokenKind_JOIN_TOKEN_KIND_UNSPECIFIED
 }
 
 func (x *JoinToken) GetLabel() string {
@@ -178,13 +120,6 @@ func (x *JoinToken) GetCaId() string {
 		return *x.CaId
 	}
 	return ""
-}
-
-func (x *JoinToken) GetRole() WorkspaceRole {
-	if x != nil && x.Role != nil {
-		return *x.Role
-	}
-	return WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
 }
 
 func (x *JoinToken) GetCreatedAt() *timestamppb.Timestamp {
@@ -299,17 +234,15 @@ func (x *JoinTokenGrant) GetServiceAccountIds() []string {
 
 type CreateJoinTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Kind          *JoinTokenKind         `protobuf:"varint,1,opt,name=kind,enum=nokku.v1.JoinTokenKind" json:"kind,omitempty"`
-	Label         *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
-	Ttl           *durationpb.Duration   `protobuf:"bytes,3,opt,name=ttl" json:"ttl,omitempty"`
-	MaxUses       *int32                 `protobuf:"varint,4,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
-	AutoApprove   *bool                  `protobuf:"varint,5,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
-	CaId          *string                `protobuf:"bytes,6,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
-	Role          *WorkspaceRole         `protobuf:"varint,7,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	Tags          []string               `protobuf:"bytes,8,rep,name=tags" json:"tags,omitempty"`
-	Grants        []*JoinTokenGrant      `protobuf:"bytes,9,rep,name=grants" json:"grants,omitempty"`
-	Ephemeral     *bool                  `protobuf:"varint,10,opt,name=ephemeral" json:"ephemeral,omitempty"`
-	RetireAfter   *durationpb.Duration   `protobuf:"bytes,11,opt,name=retire_after,json=retireAfter" json:"retire_after,omitempty"`
+	Label         *string                `protobuf:"bytes,1,opt,name=label" json:"label,omitempty"`
+	Ttl           *durationpb.Duration   `protobuf:"bytes,2,opt,name=ttl" json:"ttl,omitempty"`
+	MaxUses       *int32                 `protobuf:"varint,3,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
+	AutoApprove   *bool                  `protobuf:"varint,4,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
+	CaId          *string                `protobuf:"bytes,5,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
+	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
+	Grants        []*JoinTokenGrant      `protobuf:"bytes,7,rep,name=grants" json:"grants,omitempty"`
+	Ephemeral     *bool                  `protobuf:"varint,8,opt,name=ephemeral" json:"ephemeral,omitempty"`
+	RetireAfter   *durationpb.Duration   `protobuf:"bytes,9,opt,name=retire_after,json=retireAfter" json:"retire_after,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -342,13 +275,6 @@ func (x *CreateJoinTokenRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateJoinTokenRequest.ProtoReflect.Descriptor instead.
 func (*CreateJoinTokenRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_join_token_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *CreateJoinTokenRequest) GetKind() JoinTokenKind {
-	if x != nil && x.Kind != nil {
-		return *x.Kind
-	}
-	return JoinTokenKind_JOIN_TOKEN_KIND_UNSPECIFIED
 }
 
 func (x *CreateJoinTokenRequest) GetLabel() string {
@@ -384,13 +310,6 @@ func (x *CreateJoinTokenRequest) GetCaId() string {
 		return *x.CaId
 	}
 	return ""
-}
-
-func (x *CreateJoinTokenRequest) GetRole() WorkspaceRole {
-	if x != nil && x.Role != nil {
-		return *x.Role
-	}
-	return WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
 }
 
 func (x *CreateJoinTokenRequest) GetTags() []string {
@@ -475,7 +394,6 @@ func (x *CreateJoinTokenResponse) GetSecret() string {
 
 type ListJoinTokensRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Kind          *JoinTokenKind         `protobuf:"varint,1,opt,name=kind,enum=nokku.v1.JoinTokenKind" json:"kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -508,13 +426,6 @@ func (x *ListJoinTokensRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListJoinTokensRequest.ProtoReflect.Descriptor instead.
 func (*ListJoinTokensRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_join_token_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ListJoinTokensRequest) GetKind() JoinTokenKind {
-	if x != nil && x.Kind != nil {
-		return *x.Kind
-	}
-	return JoinTokenKind_JOIN_TOKEN_KIND_UNSPECIFIED
 }
 
 type ListJoinTokensResponse struct {
@@ -645,63 +556,52 @@ var File_nokku_v1_join_token_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_join_token_proto_rawDesc = "" +
 	"\n" +
-	"\x19nokku/v1/join_token.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xc8\x04\n" +
+	"\x19nokku/v1/join_token.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xee\x03\n" +
 	"\tJoinToken\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
-	"\x04kind\x18\x02 \x01(\x0e2\x17.nokku.v1.JoinTokenKindR\x04kind\x12\x14\n" +
-	"\x05label\x18\x03 \x01(\tR\x05label\x129\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x129\n" +
 	"\n" +
-	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x19\n" +
-	"\bmax_uses\x18\x05 \x01(\x05R\amaxUses\x12\x12\n" +
-	"\x04uses\x18\x06 \x01(\x05R\x04uses\x12!\n" +
-	"\fauto_approve\x18\a \x01(\bR\vautoApprove\x12\x13\n" +
-	"\x05ca_id\x18\b \x01(\tR\x04caId\x12+\n" +
-	"\x04role\x18\t \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x129\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x19\n" +
+	"\bmax_uses\x18\x04 \x01(\x05R\amaxUses\x12\x12\n" +
+	"\x04uses\x18\x05 \x01(\x05R\x04uses\x12!\n" +
+	"\fauto_approve\x18\x06 \x01(\bR\vautoApprove\x12\x13\n" +
+	"\x05ca_id\x18\a \x01(\tR\x04caId\x129\n" +
 	"\n" +
-	"created_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
-	"\flast_used_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
+	"\flast_used_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastUsedAt\x12\x12\n" +
-	"\x04tags\x18\f \x03(\tR\x04tags\x120\n" +
-	"\x06grants\x18\r \x03(\v2\x18.nokku.v1.JoinTokenGrantR\x06grants\x12\x1c\n" +
-	"\tephemeral\x18\x0e \x01(\bR\tephemeral\x12<\n" +
-	"\fretire_after\x18\x0f \x01(\v2\x19.google.protobuf.DurationR\vretireAfter\"\xef\x01\n" +
+	"\x04tags\x18\n" +
+	" \x03(\tR\x04tags\x120\n" +
+	"\x06grants\x18\v \x03(\v2\x18.nokku.v1.JoinTokenGrantR\x06grants\x12\x1c\n" +
+	"\tephemeral\x18\f \x01(\bR\tephemeral\x12<\n" +
+	"\fretire_after\x18\r \x01(\v2\x19.google.protobuf.DurationR\vretireAfter\"\xef\x01\n" +
 	"\x0eJoinTokenGrant\x12D\n" +
 	"\busername\x18\x01 \x01(\tB(\xbaH%r#\x10\x01\x18 2\x1d^[A-Za-z_][A-Za-z0-9._-]*\\$?$R\busername\x12*\n" +
 	"\buser_ids\x18\x02 \x03(\tB\x0f\xbaH\f\x92\x01\t\x102\"\x05r\x03\xb0\x01\x01R\auserIds\x12*\n" +
 	"\bteam_ids\x18\x03 \x03(\tB\x0f\xbaH\f\x92\x01\t\x102\"\x05r\x03\xb0\x01\x01R\ateamIds\x12?\n" +
-	"\x13service_account_ids\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\x102\"\x05r\x03\xb0\x01\x01R\x11serviceAccountIds\"\x92\x04\n" +
-	"\x16CreateJoinTokenRequest\x127\n" +
-	"\x04kind\x18\x01 \x01(\x0e2\x17.nokku.v1.JoinTokenKindB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\x12\x1d\n" +
-	"\x05label\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\x05label\x125\n" +
-	"\x03ttl\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\b\xbaH\x05\xaa\x01\x02*\x00R\x03ttl\x12\"\n" +
-	"\bmax_uses\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02 \x00R\amaxUses\x12!\n" +
-	"\fauto_approve\x18\x05 \x01(\bR\vautoApprove\x12\x1d\n" +
-	"\x05ca_id\x18\x06 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x04caId\x125\n" +
-	"\x04role\x18\a \x01(\x0e2\x17.nokku.v1.WorkspaceRoleB\b\xbaH\x05\x82\x01\x02\x10\x01R\x04role\x12\"\n" +
-	"\x04tags\x18\b \x03(\tB\x0e\xbaH\v\x92\x01\b\x10 \"\x04r\x02\x18@R\x04tags\x12:\n" +
-	"\x06grants\x18\t \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grants\x12\x1c\n" +
-	"\tephemeral\x18\n" +
-	" \x01(\bR\tephemeral\x12N\n" +
-	"\fretire_after\x18\v \x01(\v2\x19.google.protobuf.DurationB\x10\xbaH\r\xaa\x01\n" +
+	"\x13service_account_ids\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\x102\"\x05r\x03\xb0\x01\x01R\x11serviceAccountIds\"\xa2\x03\n" +
+	"\x16CreateJoinTokenRequest\x12\x1d\n" +
+	"\x05label\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x05label\x125\n" +
+	"\x03ttl\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\b\xbaH\x05\xaa\x01\x02*\x00R\x03ttl\x12\"\n" +
+	"\bmax_uses\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02 \x00R\amaxUses\x12!\n" +
+	"\fauto_approve\x18\x04 \x01(\bR\vautoApprove\x12\x1d\n" +
+	"\x05ca_id\x18\x05 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x04caId\x12\"\n" +
+	"\x04tags\x18\x06 \x03(\tB\x0e\xbaH\v\x92\x01\b\x10 \"\x04r\x02\x18@R\x04tags\x12:\n" +
+	"\x06grants\x18\a \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grants\x12\x1c\n" +
+	"\tephemeral\x18\b \x01(\bR\tephemeral\x12N\n" +
+	"\fretire_after\x18\t \x01(\v2\x19.google.protobuf.DurationB\x10\xbaH\r\xaa\x01\n" +
 	"\"\x04\b\x80\xf5$2\x02\b<R\vretireAfter\"\\\n" +
 	"\x17CreateJoinTokenResponse\x12)\n" +
 	"\x05token\x18\x01 \x01(\v2\x13.nokku.v1.JoinTokenR\x05token\x12\x16\n" +
-	"\x06secret\x18\x02 \x01(\tR\x06secret\"N\n" +
-	"\x15ListJoinTokensRequest\x125\n" +
-	"\x04kind\x18\x01 \x01(\x0e2\x17.nokku.v1.JoinTokenKindB\b\xbaH\x05\x82\x01\x02\x10\x01R\x04kind\"E\n" +
+	"\x06secret\x18\x02 \x01(\tR\x06secret\"\x17\n" +
+	"\x15ListJoinTokensRequest\"E\n" +
 	"\x16ListJoinTokensResponse\x12+\n" +
 	"\x06tokens\x18\x01 \x03(\v2\x13.nokku.v1.JoinTokenR\x06tokens\"2\n" +
 	"\x16DeleteJoinTokenRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x19\n" +
-	"\x17DeleteJoinTokenResponse*h\n" +
-	"\rJoinTokenKind\x12\x1f\n" +
-	"\x1bJOIN_TOKEN_KIND_UNSPECIFIED\x10\x00\x12\x1a\n" +
-	"\x16JOIN_TOKEN_KIND_ENROLL\x10\x01\x12\x1a\n" +
-	"\x16JOIN_TOKEN_KIND_INVITE\x10\x022\xb2\x02\n" +
-	"\x10JoinTokenService\x12^\n" +
-	"\x0fCreateJoinToken\x12 .nokku.v1.CreateJoinTokenRequest\x1a!.nokku.v1.CreateJoinTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12^\n" +
+	"\x17DeleteJoinTokenResponse2\xb4\x02\n" +
+	"\x10JoinTokenService\x12`\n" +
+	"\x0fCreateJoinToken\x12 .nokku.v1.CreateJoinTokenRequest\x1a!.nokku.v1.CreateJoinTokenResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12^\n" +
 	"\x0eListJoinTokens\x12\x1f.nokku.v1.ListJoinTokensRequest\x1a .nokku.v1.ListJoinTokensResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12^\n" +
 	"\x0fDeleteJoinToken\x12 .nokku.v1.DeleteJoinTokenRequest\x1a!.nokku.v1.DeleteJoinTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x04B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eJoinTokenProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -718,49 +618,41 @@ func file_nokku_v1_join_token_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_join_token_proto_rawDescData
 }
 
-var file_nokku_v1_join_token_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_nokku_v1_join_token_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_nokku_v1_join_token_proto_goTypes = []any{
-	(JoinTokenKind)(0),              // 0: nokku.v1.JoinTokenKind
-	(*JoinToken)(nil),               // 1: nokku.v1.JoinToken
-	(*JoinTokenGrant)(nil),          // 2: nokku.v1.JoinTokenGrant
-	(*CreateJoinTokenRequest)(nil),  // 3: nokku.v1.CreateJoinTokenRequest
-	(*CreateJoinTokenResponse)(nil), // 4: nokku.v1.CreateJoinTokenResponse
-	(*ListJoinTokensRequest)(nil),   // 5: nokku.v1.ListJoinTokensRequest
-	(*ListJoinTokensResponse)(nil),  // 6: nokku.v1.ListJoinTokensResponse
-	(*DeleteJoinTokenRequest)(nil),  // 7: nokku.v1.DeleteJoinTokenRequest
-	(*DeleteJoinTokenResponse)(nil), // 8: nokku.v1.DeleteJoinTokenResponse
-	(*timestamppb.Timestamp)(nil),   // 9: google.protobuf.Timestamp
-	(WorkspaceRole)(0),              // 10: nokku.v1.WorkspaceRole
-	(*durationpb.Duration)(nil),     // 11: google.protobuf.Duration
+	(*JoinToken)(nil),               // 0: nokku.v1.JoinToken
+	(*JoinTokenGrant)(nil),          // 1: nokku.v1.JoinTokenGrant
+	(*CreateJoinTokenRequest)(nil),  // 2: nokku.v1.CreateJoinTokenRequest
+	(*CreateJoinTokenResponse)(nil), // 3: nokku.v1.CreateJoinTokenResponse
+	(*ListJoinTokensRequest)(nil),   // 4: nokku.v1.ListJoinTokensRequest
+	(*ListJoinTokensResponse)(nil),  // 5: nokku.v1.ListJoinTokensResponse
+	(*DeleteJoinTokenRequest)(nil),  // 6: nokku.v1.DeleteJoinTokenRequest
+	(*DeleteJoinTokenResponse)(nil), // 7: nokku.v1.DeleteJoinTokenResponse
+	(*timestamppb.Timestamp)(nil),   // 8: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),     // 9: google.protobuf.Duration
 }
 var file_nokku_v1_join_token_proto_depIdxs = []int32{
-	0,  // 0: nokku.v1.JoinToken.kind:type_name -> nokku.v1.JoinTokenKind
-	9,  // 1: nokku.v1.JoinToken.expires_at:type_name -> google.protobuf.Timestamp
-	10, // 2: nokku.v1.JoinToken.role:type_name -> nokku.v1.WorkspaceRole
-	9,  // 3: nokku.v1.JoinToken.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 4: nokku.v1.JoinToken.last_used_at:type_name -> google.protobuf.Timestamp
-	2,  // 5: nokku.v1.JoinToken.grants:type_name -> nokku.v1.JoinTokenGrant
-	11, // 6: nokku.v1.JoinToken.retire_after:type_name -> google.protobuf.Duration
-	0,  // 7: nokku.v1.CreateJoinTokenRequest.kind:type_name -> nokku.v1.JoinTokenKind
-	11, // 8: nokku.v1.CreateJoinTokenRequest.ttl:type_name -> google.protobuf.Duration
-	10, // 9: nokku.v1.CreateJoinTokenRequest.role:type_name -> nokku.v1.WorkspaceRole
-	2,  // 10: nokku.v1.CreateJoinTokenRequest.grants:type_name -> nokku.v1.JoinTokenGrant
-	11, // 11: nokku.v1.CreateJoinTokenRequest.retire_after:type_name -> google.protobuf.Duration
-	1,  // 12: nokku.v1.CreateJoinTokenResponse.token:type_name -> nokku.v1.JoinToken
-	0,  // 13: nokku.v1.ListJoinTokensRequest.kind:type_name -> nokku.v1.JoinTokenKind
-	1,  // 14: nokku.v1.ListJoinTokensResponse.tokens:type_name -> nokku.v1.JoinToken
-	3,  // 15: nokku.v1.JoinTokenService.CreateJoinToken:input_type -> nokku.v1.CreateJoinTokenRequest
-	5,  // 16: nokku.v1.JoinTokenService.ListJoinTokens:input_type -> nokku.v1.ListJoinTokensRequest
-	7,  // 17: nokku.v1.JoinTokenService.DeleteJoinToken:input_type -> nokku.v1.DeleteJoinTokenRequest
-	4,  // 18: nokku.v1.JoinTokenService.CreateJoinToken:output_type -> nokku.v1.CreateJoinTokenResponse
-	6,  // 19: nokku.v1.JoinTokenService.ListJoinTokens:output_type -> nokku.v1.ListJoinTokensResponse
-	8,  // 20: nokku.v1.JoinTokenService.DeleteJoinToken:output_type -> nokku.v1.DeleteJoinTokenResponse
-	18, // [18:21] is the sub-list for method output_type
-	15, // [15:18] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	8,  // 0: nokku.v1.JoinToken.expires_at:type_name -> google.protobuf.Timestamp
+	8,  // 1: nokku.v1.JoinToken.created_at:type_name -> google.protobuf.Timestamp
+	8,  // 2: nokku.v1.JoinToken.last_used_at:type_name -> google.protobuf.Timestamp
+	1,  // 3: nokku.v1.JoinToken.grants:type_name -> nokku.v1.JoinTokenGrant
+	9,  // 4: nokku.v1.JoinToken.retire_after:type_name -> google.protobuf.Duration
+	9,  // 5: nokku.v1.CreateJoinTokenRequest.ttl:type_name -> google.protobuf.Duration
+	1,  // 6: nokku.v1.CreateJoinTokenRequest.grants:type_name -> nokku.v1.JoinTokenGrant
+	9,  // 7: nokku.v1.CreateJoinTokenRequest.retire_after:type_name -> google.protobuf.Duration
+	0,  // 8: nokku.v1.CreateJoinTokenResponse.token:type_name -> nokku.v1.JoinToken
+	0,  // 9: nokku.v1.ListJoinTokensResponse.tokens:type_name -> nokku.v1.JoinToken
+	2,  // 10: nokku.v1.JoinTokenService.CreateJoinToken:input_type -> nokku.v1.CreateJoinTokenRequest
+	4,  // 11: nokku.v1.JoinTokenService.ListJoinTokens:input_type -> nokku.v1.ListJoinTokensRequest
+	6,  // 12: nokku.v1.JoinTokenService.DeleteJoinToken:input_type -> nokku.v1.DeleteJoinTokenRequest
+	3,  // 13: nokku.v1.JoinTokenService.CreateJoinToken:output_type -> nokku.v1.CreateJoinTokenResponse
+	5,  // 14: nokku.v1.JoinTokenService.ListJoinTokens:output_type -> nokku.v1.ListJoinTokensResponse
+	7,  // 15: nokku.v1.JoinTokenService.DeleteJoinToken:output_type -> nokku.v1.DeleteJoinTokenResponse
+	13, // [13:16] is the sub-list for method output_type
+	10, // [10:13] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_join_token_proto_init() }
@@ -774,14 +666,13 @@ func file_nokku_v1_join_token_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_join_token_proto_rawDesc), len(file_nokku_v1_join_token_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      0,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_nokku_v1_join_token_proto_goTypes,
 		DependencyIndexes: file_nokku_v1_join_token_proto_depIdxs,
-		EnumInfos:         file_nokku_v1_join_token_proto_enumTypes,
 		MessageInfos:      file_nokku_v1_join_token_proto_msgTypes,
 	}.Build()
 	File_nokku_v1_join_token_proto = out.File

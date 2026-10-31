@@ -9,6 +9,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+	"github.com/nokku-sh/nokku/internal/dpop"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
@@ -43,7 +44,8 @@ func (s *authService) GetLoginOptions(
 		return nil, err
 	}
 	enforced := ws.Settings.GetEnforceSso()
-	providers, err := s.cfg.IAM.ListSSOProviders(ctx)
+	// The rows alone. Anyone may load this page, it opens no provider's config.
+	providers, err := s.cfg.Conn.Tenant().ListSSOProviders(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -112,11 +114,11 @@ func (s *authService) Logout(
 	setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	meta, _ := actor.RequestMetaFromContext(ctx)
 	if err := s.cfg.IAM.Logout(ctx, meta.Header, nokkuv1connect.AuthServiceLogoutProcedure); err != nil {
-		if errors.Is(err, iam.ErrDPoPNonce) || errors.Is(err, iam.ErrDPoPRequired) {
+		if errors.Is(err, dpop.ErrNonce) || errors.Is(err, iam.ErrDPoPRequired) {
 			s.cfg.IAM.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
 			return nil, connect.NewError(connect.CodeUnauthenticated, err.Error()).WithCause(err)
 		}
-		return nil, errInternal
+		return nil, err
 	}
 	return &nokkuv1.LogoutResponse{}, nil
 }

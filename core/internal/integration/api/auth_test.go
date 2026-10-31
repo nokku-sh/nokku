@@ -32,7 +32,7 @@ func TestLoginPageFollowsARename(t *testing.T) {
 	)
 	rename := func(name string) {
 		t.Helper()
-		_, err := workspaces.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{Name: &name})
+		_, err := workspaces.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{Name: &name}))
 		require.NoError(t, err)
 	}
 	// Other tests share the workspace.

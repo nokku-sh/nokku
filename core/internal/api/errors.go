@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
@@ -46,14 +46,20 @@ var (
 		connect.CodeInvalidArgument,
 		"please check your input and try again",
 	)
+	errInvalidValue = connect.NewError(
+		connect.CodeInvalidArgument,
+		"a value is missing, too long or not valid",
+	)
 	errSingleWorkspace = connect.NewError(
 		connect.CodeFailedPrecondition,
 		"a self-hosted server keeps its workspace",
 	)
-	errLegalHold = connect.NewError(
-		connect.CodeFailedPrecondition,
-		"this workspace has legal holds, remove them first",
-	)
+)
+
+// errTooManyUploads is not ResourceExhausted, a daemon waits an hour on that and this frees up in seconds.
+var errTooManyUploads = connect.NewError(
+	connect.CodeUnavailable,
+	"this daemon has too many recording uploads open, try again",
 )
 
 // errRecordingStorageFull is not InvalidArgument, a daemon gives up on that.
@@ -122,17 +128,34 @@ func newError(code connect.Code, msg string) error {
 // errorInterceptor maps every handler error onto a connect error. It sits inside audit so that sees the final code.
 func errorInterceptor(next connect.ServerFunc) connect.ServerFunc {
 	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
-		return toConnectError(next(ctx, spec, stream))
+		return toConnectError(ctx, next(ctx, spec, stream))
 	}
 }
 
-// toConnectError passes connect errors through, so handlers can return domain failures from a tx closure.
-func toConnectError(err error) error {
+// toConnectError sorts an error into six groups a client can act on. Anything else is internal, and logged here
+// once with what the client never sees. Connect errors pass through, so handlers can return domain failures.
+func toConnectError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
+	// Before the pass-through, a seat refusal carries the plan's own connect error.
+	switch {
+	case errors.Is(err, iam.ErrSeatLimit):
+		return errSeatLimit
+	case errors.Is(err, iam.ErrSSORequired):
+		return errSSORequired
+	case errors.Is(err, iam.ErrInviteSpent):
+		return errInviteInvalid
+	}
+	if refused, ok := errors.AsType[*ssh.RefusedError](err); ok {
+		return newError(connect.CodeInvalidArgument, refused.Reason)
+	}
 	if _, ok := errors.AsType[*connect.Error](err); ok {
 		return err
+	}
+	var code string
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+		code = pgErr.Code
 	}
 
 	switch {
@@ -142,79 +165,26 @@ func toConnectError(err error) error {
 		return errNoWorkspace
 	case errors.Is(err, pgx.ErrNoRows):
 		return errNotFound
-	case errors.Is(err, context.Canceled):
+	case code == pgerrcode.UniqueViolation, code == pgerrcode.ExclusionViolation:
+		return newError(connect.CodeAlreadyExists, "a record with this value already exists")
+	case code == pgerrcode.ForeignKeyViolation, code == pgerrcode.RestrictViolation:
+		return newError(connect.CodeFailedPrecondition, "a related record is missing or still in use")
+	case code == pgerrcode.NotNullViolation, code == pgerrcode.CheckViolation, pgerrcode.IsDataException(code):
+		return errInvalidValue
+	case code == pgerrcode.SerializationFailure, code == pgerrcode.DeadlockDetected:
+		return newError(connect.CodeAborted, "the operation conflicted with another, please retry")
+	case errors.Is(err, context.Canceled), code == pgerrcode.QueryCanceled:
 		return newError(connect.CodeCanceled, "the request was canceled")
 	case errors.Is(err, context.DeadlineExceeded):
 		return errTimeout
 	}
 
-	pgConnErr, ok := errors.AsType[*pgconn.PgError](err)
-	if !ok {
-		slog.Warn("unmapped database error", "error", err, "error_type", fmt.Sprintf("%T", err))
-		return errInternal
+	var procedure string
+	if ci, ok := connect.CallInfoForServerContext(ctx); ok {
+		procedure = ci.Spec.Procedure
 	}
-
-	switch pgConnErr.Code {
-	case pgerrcode.UniqueViolation, pgerrcode.ExclusionViolation:
-		return newError(connect.CodeAlreadyExists, "a record with this value already exists")
-	case pgerrcode.ForeignKeyViolation, pgerrcode.RestrictViolation:
-		return newError(
-			connect.CodeFailedPrecondition,
-			"a related record is missing or still in use",
-		)
-	case pgerrcode.NotNullViolation, pgerrcode.CheckViolation:
-		return newError(
-			connect.CodeInvalidArgument,
-			"a required field is missing or contains invalid data",
-		)
-	case pgerrcode.StringDataRightTruncationDataException:
-		return newError(connect.CodeInvalidArgument, "a provided value is too long")
-	case pgerrcode.InvalidTextRepresentation,
-		pgerrcode.NumericValueOutOfRange,
-		pgerrcode.InvalidParameterValue:
-		return newError(connect.CodeInvalidArgument, "a provided identifier or value is not valid")
-	case pgerrcode.SerializationFailure,
-		pgerrcode.DeadlockDetected,
-		pgerrcode.InvalidTransactionState,
-		pgerrcode.InFailedSQLTransaction,
-		pgerrcode.ActiveSQLTransaction:
-		return newError(connect.CodeAborted, "the operation conflicted with another, please retry")
-	case pgerrcode.QueryCanceled:
-		return newError(connect.CodeCanceled, "the request was canceled")
-	case pgerrcode.LockNotAvailable,
-		pgerrcode.ObjectInUse,
-		pgerrcode.ObjectNotInPrerequisiteState,
-		pgerrcode.CantChangeRuntimeParam:
-		return newError(
-			connect.CodeFailedPrecondition,
-			"the resource is not available in its current state",
-		)
-	case pgerrcode.TooManyConnections:
-		return newError(
-			connect.CodeResourceExhausted,
-			"the database is busy, please try again later",
-		)
-	case pgerrcode.InsufficientResources,
-		pgerrcode.DiskFull,
-		pgerrcode.OutOfMemory,
-		pgerrcode.ProgramLimitExceeded:
-		return newError(
-			connect.CodeResourceExhausted,
-			"the database ran out of resources, please try again later",
-		)
-	case pgerrcode.ConnectionException,
-		pgerrcode.ConnectionDoesNotExist,
-		pgerrcode.ConnectionFailure,
-		pgerrcode.AdminShutdown,
-		pgerrcode.CrashShutdown,
-		pgerrcode.CannotConnectNow:
-		return newError(
-			connect.CodeUnavailable,
-			"the service is temporarily unavailable, please try again",
-		)
-	default:
-		return errInternal
-	}
+	slog.ErrorContext(ctx, "internal error", "procedure", procedure, "pg_code", code, "error", err)
+	return errInternal
 }
 
 func writeJSONError(w http.ResponseWriter, status int, message string) {

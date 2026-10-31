@@ -1,10 +1,8 @@
 package api
 
 import (
-	"cmp"
 	"context"
 	"time"
-	"uuid"
 
 	"github.com/nokku-sh/nokku/core/internal/audit"
 
@@ -24,70 +22,35 @@ type joinTokenService struct {
 // defaultRetireAfter is how long an ephemeral daemon may be away before the sweep deletes it.
 const defaultRetireAfter = 15 * time.Minute
 
-// CreateJoinToken returns the "<id>_<secret>" plaintext once, only its hash is stored.
+// CreateJoinToken returns the plaintext once, only its hash is stored.
 func (s *joinTokenService) CreateJoinToken(
 	ctx context.Context,
 	req *nokkuv1.CreateJoinTokenRequest,
 ) (*nokkuv1.CreateJoinTokenResponse, error) {
+	if req.GetRetireAfter() != nil && !req.GetEphemeral() {
+		return nil, newError(connect.CodeInvalidArgument, "retire_after needs an ephemeral token")
+	}
 	params := &db.CreateJoinTokenParams{
-		ID:      uuid.NewV7().String(),
-		Kind:    req.GetKind(),
-		Label:   req.GetLabel(),
-		MaxUses: req.MaxUses,
+		Label:       req.GetLabel(),
+		MaxUses:     req.MaxUses,
+		AutoApprove: req.GetAutoApprove(),
+		CaID:        req.CaId,
+		Tags:        req.GetTags(),
 	}
 	if req.GetTtl() != nil {
 		params.ExpiresAt = new(time.Now().Add(req.GetTtl().AsDuration()))
 	}
-	switch req.GetKind() {
-	case nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL:
-		if req.GetRole() != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
-			return nil, newError(connect.CodeInvalidArgument, "enroll tokens take no role")
+	if req.GetEphemeral() {
+		// A pending box would retire before anyone approves it.
+		params.AutoApprove = true
+		retire := defaultRetireAfter
+		if req.GetRetireAfter() != nil {
+			retire = req.GetRetireAfter().AsDuration()
 		}
-		if req.GetRetireAfter() != nil && !req.GetEphemeral() {
-			return nil, newError(connect.CodeInvalidArgument, "retire_after needs an ephemeral token")
-		}
-		params.AutoApprove = req.GetAutoApprove()
-		params.CaID = req.CaId
-		params.Tags = req.GetTags()
-		if req.GetEphemeral() {
-			// A pending box would retire before anyone approves it.
-			params.AutoApprove = true
-			retire := defaultRetireAfter
-			if req.GetRetireAfter() != nil {
-				retire = req.GetRetireAfter().AsDuration()
-			}
-			params.RetireAfter = &retire
-		}
-	case nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_INVITE:
-		if req.GetAutoApprove() || req.GetCaId() != "" || req.GetEphemeral() ||
-			len(req.GetTags()) > 0 || len(req.GetGrants()) > 0 {
-			return nil, newError(connect.CodeInvalidArgument, "invite tokens take only a role")
-		}
-		// An invite ends in a mailed link. Without mail or under required SSO it would be a dead one.
-		if !s.cfg.Email.HasSMTP() {
-			return nil, newError(connect.CodeFailedPrecondition, "invitations need email, set NOKKU_SMTP_HOST first")
-		}
-		ws, err := s.cfg.Conn.Tenant().GetWorkspace(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if ws.Settings.GetEnforceSso() {
-			return nil, errSSORequired
-		}
-		role := cmp.Or(req.GetRole(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-		if !db.CanAssign(callerRole(ctx), role) {
-			return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
-		}
-		params.Role = &role
-		audit.Set(ctx, "role", db.RoleLabel(role))
-	case nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_UNSPECIFIED:
-		return nil, errInvalidInput
-	default:
-		return nil, errInvalidInput
+		params.RetireAfter = &retire
 	}
-
-	token := crypto.NewToken(params.ID)
-	params.TokenHash = token.Hash
+	secret, hash := crypto.NewToken(crypto.TokenEnroll)
+	params.TokenHash = hash
 
 	var created *db.JoinToken
 	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -110,7 +73,7 @@ func (s *joinTokenService) CreateJoinToken(
 	out.Grants = req.GetGrants()
 	return &nokkuv1.CreateJoinTokenResponse{
 		Token:  out,
-		Secret: &token.Plaintext,
+		Secret: &secret,
 	}, nil
 }
 
@@ -140,14 +103,14 @@ func addJoinTokenGrants(ctx context.Context, q *db.Queries, tokenID string, gran
 
 func (s *joinTokenService) ListJoinTokens(
 	ctx context.Context,
-	req *nokkuv1.ListJoinTokensRequest,
+	_ *nokkuv1.ListJoinTokensRequest,
 ) (*nokkuv1.ListJoinTokensResponse, error) {
 	var (
 		tokens []*db.JoinToken
 		grants []*db.ListJoinTokenGrantsRow
 	)
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if tokens, err = q.ListJoinTokens(ctx, req.GetKind()); err != nil {
+		if tokens, err = q.ListJoinTokens(ctx); err != nil {
 			return err
 		}
 		grants, err = q.ListJoinTokenGrants(ctx)
@@ -158,7 +121,7 @@ func (s *joinTokenService) ListJoinTokens(
 	return &nokkuv1.ListJoinTokensResponse{Tokens: db.JoinTokensToProto(tokens, grants)}, nil
 }
 
-// DeleteJoinToken keeps the daemons and members the token already brought in.
+// DeleteJoinToken keeps the daemons the token already brought in.
 func (s *joinTokenService) DeleteJoinToken(
 	ctx context.Context,
 	req *nokkuv1.DeleteJoinTokenRequest,

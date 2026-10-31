@@ -45,7 +45,7 @@ On a self-hosted core, point the daemon at it:
 sudo nokkud --api https://nokku.example.com enroll
 ```
 
-A core with a certificate from a private CA also needs `NOKKUD_API_PIN`. The enroll commands in the web app carry it. `nokkud` checks the core's CA against the pin once and keeps it with the enrollment.
+A core with a certificate from a private CA also needs that CA. Point `NOKKUD_CA_FILE` at it for the enroll, and `nokkud` keeps it with the enrollment.
 
 The server shows up in the web app. Unless the token approves it automatically, someone has to approve it there before it serves logins.
 
@@ -72,8 +72,9 @@ On a cloud server, also allow TCP 4022 in the provider's firewall or security gr
 - **Before enrollment** the service exits with a clear error, and systemd does not restart it.
 - **Enrolling again** is safe. With a token from another workspace it moves the server there and drops everything the old one trusted.
 - **A token can carry grants and tags.** Every server it enrolls starts with them. They are copied once, so changes made later in the web app stay.
+- **Every enrollment makes a new SSH host key.** It is an OpenSSH key file, `/var/lib/nokkud/ssh_host_ecdsa_key`, readable by root only like sshd's own `/etc/ssh/ssh_host_*`. The core signs a host certificate for it. The TPM, when there is one, holds only the daemon's identity toward the core.
 
-Everything `nokkud` owns lives under `/var/lib/nokkud/`.
+Everything `nokkud` owns lives under `/var/lib/nokkud/`. The enrollment and the synced access share one file, `daemon.json`. A host that still has the older `config.json` and `cache.json` is not enrolled anymore, so enroll it again.
 
 ## Container
 
@@ -119,14 +120,13 @@ On OpenRC or another init system, use [packaging/openrc/nokkud.openrc](packaging
 
 ## Configuration
 
-| Flag            | Environment          | Purpose                                             |
-| --------------- | -------------------- | --------------------------------------------------- |
-| `--api`         | `NOKKUD_API_URL`     | Address of the core, `https` only                   |
-| `--api-pin`     | `NOKKUD_API_PIN`     | Pin of the core's private CA, read at enroll        |
-| `--ca-file`     | `NOKKUD_CA_FILE`     | PEM file with the core's private CA                 |
-| `--ssh-addr`    | `NOKKUD_SSH_ADDR`    | Where the SSH server listens. Default `:4022`       |
-| `--require-tpm` | `NOKKUD_REQUIRE_TPM` | Require a TPM 2.0 and refuse the software key       |
-| `--debug`       | `NOKKUD_DEBUG`       | Debug logging                                       |
+| Flag            | Environment          | Purpose                                       |
+| --------------- | -------------------- | --------------------------------------------- |
+| `--api`         | `NOKKUD_API_URL`     | Address of the core, `https` only             |
+| `--ca-file`     | `NOKKUD_CA_FILE`     | PEM file with the core's private CA           |
+| `--ssh-addr`    | `NOKKUD_SSH_ADDR`    | Where the SSH server listens. Default `:4022` |
+| `--require-tpm` | `NOKKUD_REQUIRE_TPM` | Require a TPM 2.0 and refuse the software key |
+| `--debug`       | `NOKKUD_DEBUG`       | Debug logging                                 |
 
 Session rules like recording and port forwarding are set in the web app, per daemon or as a workspace default.
 
@@ -139,7 +139,7 @@ sudo journalctl -u nokkud -f
 
 When the core is unreachable, logins keep working from the last synced access list. Access changes and certificate renewals resume once the daemon reconnects.
 
-A restart or a package upgrade ends the sessions that are open on the daemon.
+A restart or a package upgrade ends the sessions that are open on the daemon, like a hangup. Their recordings still go to the core, the ones it could not send in time at the next start.
 
 ## Uninstall
 

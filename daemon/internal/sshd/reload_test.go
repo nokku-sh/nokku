@@ -1,13 +1,10 @@
 package sshd
 
 import (
-	"crypto"
 	"crypto/rand"
 	"errors"
-	"io"
 	"net"
 	"os"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,33 +13,54 @@ import (
 	"golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/nokku-sh/nokku/daemon/internal/paths"
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
-	"github.com/nokku-sh/nokku/internal/tpm"
+
+	"github.com/nokku-sh/nokku/daemon/internal/paths"
+	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
-func TestSetTrust(t *testing.T) {
+func trustsCA(srv *Server, ca testCA) bool {
+	return srv.access.Load().trusts(string(ca.pub.Marshal()))
+}
+
+func TestSetAccessTrust(t *testing.T) {
 	is := assert.New(t)
 	first, second := newTestCA(t), newTestCA(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 
-	srv, err := New(Options{Principals: func(string) []string { return nil }})
+	srv, err := New(nil)
 	require.NoError(t, err, "new server without a CA")
-	defer srv.hostKeyDev.Close()
-	is.False(srv.trustedCA(first.pub), "a server that never synced trusts no CA")
+	is.False(trustsCA(srv, first), "a server that never synced trusts no CA")
 
-	srv.SetTrust(string(ssh.MarshalAuthorizedKey(first.pub)), nil)
-	is.True(srv.trustedCA(first.pub), "the synced CA is not trusted")
+	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(first.pub))})
+	is.True(trustsCA(srv, first), "the synced CA is not trusted")
 
-	srv.SetTrust("garbage", nil)
-	is.True(srv.trustedCA(first.pub), "an unreadable CA dropped the previous trust")
+	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(second.pub))})
+	is.True(trustsCA(srv, second), "the new CA is not trusted")
+	is.False(trustsCA(srv, first), "the replaced CA is still trusted")
 
-	srv.SetTrust(string(ssh.MarshalAuthorizedKey(second.pub)), nil)
-	is.True(srv.trustedCA(second.pub), "the new CA is not trusted")
-	is.False(srv.trustedCA(first.pub), "the replaced CA is still trusted")
+	srv.SetAccess(&state.Access{})
+	is.False(trustsCA(srv, second), "a target without a CA still trusts one")
+}
 
-	srv.SetTrust("", nil)
-	is.False(srv.trustedCA(second.pub), "a target without a CA still trusts one")
+// A restart trusts no CA when the active key on disk does not parse, so a sync that brings one must not either.
+func TestUnreadableActiveCATrustsNone(t *testing.T) {
+	is := assert.New(t)
+	active, retired := newTestCA(t), newTestCA(t)
+	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
+	srv, err := New(nil)
+	require.NoError(t, err)
+
+	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(active.pub))})
+	srv.SetAccess(&state.Access{
+		CA: "garbage",
+		RetiredCAs: []*nokkuv1.RetiredCAKey{{
+			PublicKey:    new(string(ssh.MarshalAuthorizedKey(retired.pub))),
+			TrustedUntil: timestamppb.New(time.Now().Add(time.Hour)),
+		}},
+	})
+	is.False(trustsCA(srv, active), "an unreadable CA kept the previous trust")
+	is.False(trustsCA(srv, retired), "an unreadable CA still trusts the retired ones")
 }
 
 // An empty retired list, as sent after an emergency rollover, drops the old CA at once.
@@ -52,32 +70,31 @@ func TestRetiredCATrustedUntilDeadline(t *testing.T) {
 	retired := newTestCA(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 
-	srv, err := New(Options{Principals: func(string) []string { return nil }})
+	srv, err := New(nil)
 	require.NoError(t, err)
-	defer srv.hostKeyDev.Close()
 
 	activeKey := string(ssh.MarshalAuthorizedKey(active.pub))
-	retiredKey := func(until time.Time) []*nokkuv1.RetiredCAKey {
-		return []*nokkuv1.RetiredCAKey{
+	withRetired := func(until time.Time) *state.Access {
+		return &state.Access{CA: activeKey, RetiredCAs: []*nokkuv1.RetiredCAKey{
 			{PublicKey: new(string(ssh.MarshalAuthorizedKey(retired.pub))), TrustedUntil: timestamppb.New(until)},
 			{PublicKey: new("garbage"), TrustedUntil: timestamppb.New(until)},
-		}
+		}}
 	}
 
-	srv.SetTrust(activeKey, nil)
-	is.False(srv.trustedCA(retired.pub), "no retired CA synced yet")
+	srv.SetAccess(&state.Access{CA: activeKey})
+	is.False(trustsCA(srv, retired), "no retired CA synced yet")
 
-	srv.SetTrust(activeKey, retiredKey(time.Now().Add(time.Hour)))
-	is.True(srv.trustedCA(retired.pub), "retired CA must be trusted before its deadline")
-	is.True(srv.trustedCA(active.pub), "active CA must stay trusted")
+	srv.SetAccess(withRetired(time.Now().Add(time.Hour)))
+	is.True(trustsCA(srv, retired), "retired CA must be trusted before its deadline")
+	is.True(trustsCA(srv, active), "active CA must stay trusted")
 
-	srv.SetTrust(activeKey, retiredKey(time.Now().Add(-time.Minute)))
-	is.False(srv.trustedCA(retired.pub), "retired CA must not be trusted past its deadline")
+	srv.SetAccess(withRetired(time.Now().Add(-time.Minute)))
+	is.False(trustsCA(srv, retired), "retired CA must not be trusted past its deadline")
 
-	srv.SetTrust(activeKey, retiredKey(time.Now().Add(time.Hour)))
-	srv.SetTrust(activeKey, nil)
-	is.False(srv.trustedCA(retired.pub), "an empty list must drop the retired CA at once")
-	is.True(srv.trustedCA(active.pub), "active CA must stay trusted")
+	srv.SetAccess(withRetired(time.Now().Add(time.Hour)))
+	srv.SetAccess(&state.Access{CA: activeKey})
+	is.False(trustsCA(srv, retired), "an empty list must drop the retired CA at once")
+	is.True(trustsCA(srv, active), "active CA must stay trusted")
 }
 
 func TestServerReloadRefreshesHostCerts(t *testing.T) {
@@ -87,17 +104,9 @@ func TestServerReloadRefreshesHostCerts(t *testing.T) {
 	configDir := t.TempDir()
 	t.Setenv("NOKKUD_DATA_DIR", configDir)
 
-	srv, err := New(Options{
-		Principals: func(username string) []string {
-			if username == currentUser(t) {
-				return []string{testPrincipal}
-			}
-			return nil
-		},
-	})
+	srv, err := New(nil)
 	must.NoError(err, "new server")
-	srv.SetTrust(string(ssh.MarshalAuthorizedKey(ca.pub)), nil)
-	defer srv.hostKeyDev.Close()
+	srv.SetAccess(testAccess(t, ca))
 
 	// Sign the host key New generated and write the cert next to it, as RenewHostCerts would.
 	pubData, err := os.ReadFile(paths.HostKeyPub())
@@ -153,41 +162,12 @@ func hostPublicKey(t *testing.T, cfg *ssh.ServerConfig) ssh.PublicKey {
 	return got
 }
 
-// closingSigner cannot sign once closed, like a key held in a TPM.
-type closingSigner struct {
-	tpm.Signer
-
-	closed atomic.Bool
-}
-
-func (c *closingSigner) Close() error {
-	c.closed.Store(true)
-	return c.Signer.Close()
-}
-
-func (c *closingSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
-	if c.closed.Load() {
-		return nil, errors.New("host key is closed")
-	}
-	return c.Signer.Sign(rand, digest, opts)
-}
-
-// Every key exchange signs with the host key again, so a rekey after a reload needs it open.
-func TestReloadKeepsHostKeyOpen(t *testing.T) {
+// Every key exchange signs with the host key again, so a rekey after a reload still needs it.
+func TestRekeyAfterReload(t *testing.T) {
 	must := require.New(t)
-	open := newHostSigner
-	newHostSigner = func(opts tpm.SignerOptions) (tpm.Signer, error) {
-		signer, err := open(opts)
-		if err != nil {
-			return nil, err
-		}
-		return &closingSigner{Signer: signer}, nil
-	}
-	t.Cleanup(func() { newHostSigner = open })
-
 	ca := newTestCA(t)
 	var srv *Server
-	addr, closeFn := startTestServerOpts(t, ca, Options{}, func(s *Server) { srv = s })
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { srv = s })
 	defer closeFn()
 
 	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{

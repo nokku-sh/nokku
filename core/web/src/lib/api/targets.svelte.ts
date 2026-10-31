@@ -5,6 +5,7 @@ import { toast } from 'svelte-sonner';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { plural, useBulkMutation } from './bulk';
+import { usePatch } from './mask';
 
 export type AccessGraphFilter = MessageInitShape<typeof AccessGraphFilterSchema>;
 
@@ -70,7 +71,7 @@ export const target = {
 		useMutation(TargetService.method.createTarget, {
 			onSuccess: () => toast.success('Target created')
 		}),
-	update: () => useMutation(TargetService.method.updateTarget),
+	update: () => usePatch(TargetService.method.updateTarget),
 	delete: () =>
 		useMutation(TargetService.method.deleteTarget, {
 			onSuccess: () => toast.success('Target deleted')

@@ -5,6 +5,7 @@ import { extract, type MaybeGetter } from 'runed';
 import { useQuery, useMutation } from '#lib/query/index.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
+import { usePatch } from './mask';
 
 export const serviceAccount = {
 	get: (id: MaybeGetter<string | undefined>) =>
@@ -34,7 +35,7 @@ export const serviceAccount = {
 		useMutation(ServiceAccountService.method.createServiceAccount, {
 			onSuccess: () => toast.success('Service account created')
 		}),
-	update: () => useMutation(ServiceAccountService.method.updateServiceAccount),
+	update: () => usePatch(ServiceAccountService.method.updateServiceAccount),
 	delete: () => useMutation(ServiceAccountService.method.deleteServiceAccount),
 	deleteMany: () =>
 		useBulkMutation(

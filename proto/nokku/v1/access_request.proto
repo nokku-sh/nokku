@@ -7,18 +7,21 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
-// AccessRequestService lets a member ask for an account for a while. An admin other than them decides, and an
-// approval grants the account until it runs out.
 service AccessRequestService {
-  // ListRequestableAccounts names the targets a member may ask for, the ones carrying a requestable tag.
   rpc ListRequestableAccounts(ListRequestableAccountsRequest) returns (ListRequestableAccountsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      feature: "access_requests"
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateAccessRequest(CreateAccessRequestRequest) returns (CreateAccessRequestResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      feature: "access_requests"
+      people_only: true
+    };
   }
-  // GetAccessRequest and ListAccessRequests show a member only their own requests, admins see all.
   rpc GetAccessRequest(GetAccessRequestRequest) returns (GetAccessRequestResponse) {
     option (access) = {role: WORKSPACE_ROLE_MEMBER};
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -28,15 +31,24 @@ service AccessRequestService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ApproveAccessRequest(ApproveAccessRequestRequest) returns (ApproveAccessRequestResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      feature: "access_requests"
+      people_only: true
+    };
   }
   rpc DenyAccessRequest(DenyAccessRequestRequest) returns (DenyAccessRequestResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      people_only: true
+    };
   }
   rpc CancelAccessRequest(CancelAccessRequestRequest) returns (CancelAccessRequestResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      people_only: true
+    };
   }
-  // SetRequestableTags replaces the tags whose targets members may ask for. None turns requests off.
   rpc SetRequestableTags(SetRequestableTagsRequest) returns (SetRequestableTagsResponse) {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
   }
@@ -66,7 +78,6 @@ message AccessRequest {
   string decider_name = 12;
   google.protobuf.Timestamp decided_at = 13;
   google.protobuf.Timestamp created_at = 14;
-  // granted_until is when the grant of an approved request ends.
   google.protobuf.Timestamp granted_until = 15;
 }
 

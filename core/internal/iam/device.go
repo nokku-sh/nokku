@@ -13,10 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nokku-sh/nokku/internal/dpop"
+
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
 const (
@@ -50,7 +51,8 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deviceCode := crypto.RandomString(32)
+	deviceCode, deviceHash := crypto.NewToken(crypto.TokenDeviceCode)
+	meta := actor.RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr}
 	var userCode string
 	var err error
 	// Two grants of one workspace may draw the same user code, rarely.
@@ -59,10 +61,10 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		err = h.svc.conn.Tenant().CreateDeviceGrant(ctx, &db.CreateDeviceGrantParams{
-			DeviceCodeHash: crypto.HashToken(deviceCode),
+			DeviceCodeHash: deviceHash,
 			UserCode:       userCode,
-			Ip:             strings.ToValidUTF8(realip.Client(r.Header, r.RemoteAddr), ""),
-			UserAgent:      truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxUserAgent),
+			Ip:             meta.ClientIP(),
+			UserAgent:      meta.UserAgent(),
 			ExpiresAt:      h.svc.now().Add(grantTTL),
 		})
 		if !db.IsUniqueViolation(err) {
@@ -143,8 +145,13 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		writeOAuthError(w, "invalid_request")
 		return
 	}
+	// A code that is no device code answers like one that ran out.
+	hash, ok := crypto.TokenHash(deviceCode, crypto.TokenDeviceCode)
+	if !ok {
+		writeOAuthError(w, "expired_token")
+		return
+	}
 
-	hash := crypto.HashToken(deviceCode)
 	g, err := h.svc.conn.Tenant().GetDeviceGrant(ctx, hash)
 	if err != nil {
 		writeOAuthError(w, "expired_token")
@@ -191,7 +198,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		if derr != nil {
 			// Retryable, the grant stays usable. The advertised URL also fixes clients that signed the wrong htu.
 			h.svc.AdvertiseDPoPNonce(ctx, w.Header())
-			if errors.Is(derr, ErrDPoPNonce) {
+			if errors.Is(derr, dpop.ErrNonce) {
 				writeOAuthError(w, "use_dpop_nonce")
 			} else {
 				writeOAuthError(w, "invalid_dpop_proof")
@@ -250,12 +257,12 @@ func (h *DeviceFlow) Nonce(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string, error) {
-	proof, err := DPoPProof(r.Header)
+	proof, err := dpop.ProofFrom(r.Header)
 	if err != nil {
 		return "", err
 	}
 	if proof == "" {
-		return "", ErrDPoPNonce
+		return "", dpop.ErrNonce
 	}
 	return h.svc.DPoP.Verify(proof, "", r.Method, baseURL(ctx)+r.URL.Path, "")
 }

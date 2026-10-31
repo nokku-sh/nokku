@@ -24,8 +24,8 @@ func TestBinaryInterop(t *testing.T) {
 
 	ca := newTestCA(t)
 	configDir := t.TempDir()
-	// Written in the daemon's on-disk format, not via Cache.Save, so the harness stays independent of state wiring.
-	must.NoError(writeCacheFile(configDir, ca.pub, currentUser(t), []string{testPrincipal}), "seed cache")
+	// Written in the daemon's on-disk format, not via State.Save, so the harness stays independent of state wiring.
+	must.NoError(writeStateFile(configDir, ca.pub, currentUser(t), []string{testPrincipal}), "seed state")
 
 	cmd := exec.Command(
 		bin,
@@ -213,15 +213,15 @@ func TestBinaryInterop(t *testing.T) {
 	is.Contains(stderr.String(), "type=command")
 }
 
-func writeCacheFile(configDir string, ca ssh.PublicKey, username string, uuids []string) error {
-	data, err := json.MarshalIndent(map[string]any{
+func writeStateFile(configDir string, ca ssh.PublicKey, username string, uuids []string) error {
+	data, err := json.MarshalIndent(map[string]any{"access": map[string]any{
 		"principals": map[string][]string{username: uuids},
 		"ca":         string(ssh.MarshalAuthorizedKey(ca)),
-	}, "", "  ")
+	}}, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(configDir, "cache.json"), data, 0o600)
+	return os.WriteFile(filepath.Join(configDir, "daemon.json"), data, 0o600)
 }
 
 func buildTestServer(t *testing.T) string {

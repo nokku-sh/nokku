@@ -9,12 +9,13 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
 
-func TestUpdateTeamReplacesTags(t *testing.T) {
+func TestUpdateTeamTagsChangeOnlyWhenNamed(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	editor := nokkuv1connect.NewTeamServiceClient(
@@ -34,8 +35,15 @@ func TestUpdateTeamReplacesTags(t *testing.T) {
 	require.NoError(t, err)
 	id, name := created.GetTeam().GetId(), created.GetTeam().GetName()
 
-	updated, err := editor.UpdateTeam(t.Context(), &nokkuv1.UpdateTeamRequest{Id: &id})
+	updated, err := editor.UpdateTeam(t.Context(), masked(&nokkuv1.UpdateTeamRequest{Id: &id, Description: new("x")}))
 	require.NoError(t, err)
-	assert.Empty(t, updated.GetTeam().GetTags(), "an update replaces the tags, the last one can go")
+	assert.Equal(t, []string{"prod"}, updated.GetTeam().GetTags(), "tags the update leaves out stay")
 	assert.Equal(t, name, updated.GetTeam().GetName(), "unset fields stay as they are")
+
+	updated, err = editor.UpdateTeam(t.Context(), &nokkuv1.UpdateTeamRequest{
+		Id:         &id,
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, updated.GetTeam().GetTags(), "naming the tags with none clears them")
 }

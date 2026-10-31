@@ -78,6 +78,7 @@ SET
   updated_at = NOW();
 
 -- name: CountWorkspaceResources :one
+-- A server counts once, its daemon is part of its target.
 SELECT
   (
     (
@@ -108,13 +109,6 @@ SELECT
         ssh_cas ca
       WHERE
         ca.workspace_id = $1
-    ) + (
-      SELECT
-        COUNT(*)
-      FROM
-        daemons d
-      WHERE
-        d.workspace_id = $1
     )
   )::bigint AS resource_count;
 

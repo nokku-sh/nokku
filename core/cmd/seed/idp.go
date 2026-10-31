@@ -21,6 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
+	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
@@ -107,14 +108,14 @@ func runIDP(ctx context.Context, _ *cli.Command) error {
 	if err := waitForServer(ctx, ec.Port); err != nil {
 		return err
 	}
-	ctx, conn, ws, err := open(ctx, ec)
+	ctx, conn, keys, ws, err := open(ctx, ec)
 	if err != nil {
 		return err
 	}
 	var scimToken string
 	var owner *db.User
 	err = conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		scimToken, owner, err = seedIDP(ctx, q, ws.ID)
+		scimToken, owner, err = seedIDP(ctx, q, keys, ws.ID)
 		return err
 	})
 	if err != nil {
@@ -148,7 +149,7 @@ func waitForServer(ctx context.Context, port string) error {
 }
 
 // seedIDP may run again, what is there stays as it is. It returns a new SCIM token for Pocket ID and the owner.
-func seedIDP(ctx context.Context, q *db.Queries, workspaceID string) (string, *db.User, error) {
+func seedIDP(ctx context.Context, q *db.Queries, keys *kms.Keyset, workspaceID string) (string, *db.User, error) {
 	// SCIM brings everyone, so the provider has no JIT. Settings changed in nokku stay.
 	_, err := q.GetSSOProvider(ctx, providerID)
 	switch {
@@ -157,11 +158,15 @@ func seedIDP(ctx context.Context, q *db.Queries, workspaceID string) (string, *d
 		if err != nil {
 			return "", nil, err
 		}
+		sealed, err := keys.Seal(iam.SSOConfigAAD(workspaceID, providerID), cfg)
+		if err != nil {
+			return "", nil, err
+		}
 		if _, err := q.UpsertSSOProvider(ctx, &db.UpsertSSOProviderParams{
 			ProviderID: providerID,
 			Name:       "Pocket ID",
 			Enabled:    true,
-			Config:     crypto.EncryptedBytes(cfg),
+			Config:     sealed,
 		}); err != nil {
 			return "", nil, fmt.Errorf("provider: %w", err)
 		}
@@ -233,7 +238,7 @@ func seedIDP(ctx context.Context, q *db.Queries, workspaceID string) (string, *d
 			return "", nil, err
 		}
 	}
-	token, hash := crypto.NewKey(crypto.KeyPrefixSCIM)
+	token, hash := crypto.NewToken(crypto.TokenSCIM)
 	if _, err := q.CreateAccessToken(ctx, &db.CreateAccessTokenParams{
 		TokenHash: hash,
 		Kind:      string(actor.KindSCIM),

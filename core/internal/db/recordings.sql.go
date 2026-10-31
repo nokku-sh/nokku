@@ -38,17 +38,17 @@ FROM
 WHERE
   d.id = $7
 RETURNING
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, object_id, started_at, ended_at, size_bytes, complete
 `
 
 type CreateRecordingParams struct {
-	ID        string                `json:"id"`
-	Username  string                `json:"username"`
-	SubjectID *string               `json:"subjectId"`
-	Principal string                `json:"principal"`
-	Key       crypto.EncryptedBytes `json:"key"`
-	StartedAt *time.Time            `json:"startedAt"`
-	DaemonID  string                `json:"daemonId"`
+	ID        string        `json:"id"`
+	Username  string        `json:"username"`
+	SubjectID *string       `json:"subjectId"`
+	Principal string        `json:"principal"`
+	Key       crypto.Sealed `json:"key"`
+	StartedAt *time.Time    `json:"startedAt"`
+	DaemonID  string        `json:"daemonId"`
 }
 
 // A start before the daemon enrolled or in the future is a wrong clock and counts as now, or retention would take it.
@@ -73,23 +73,42 @@ func (q *Queries) CreateRecording(ctx context.Context, arg *CreateRecordingParam
 		&i.SubjectName,
 		&i.Principal,
 		&i.Key,
+		&i.ObjectID,
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.SizeBytes,
 		&i.Complete,
-		&i.CreatedAt,
 	)
 	return &i, err
 }
 
-const deleteRecording = `-- name: DeleteRecording :execrows
-DELETE FROM recordings r
+const deferRecordingDelete = `-- name: DeferRecordingDelete :exec
+UPDATE recording_deletes
+SET
+  attempts = attempts + 1,
+  last_error = $1,
+  next_try_at = NOW() + LEAST(INTERVAL '1 day', INTERVAL '10 minutes' * POWER(2, LEAST(attempts, 10)))
 WHERE
-  r.id = $1
-  AND NOT legal_hold_covers (r.workspace_id, r.started_at)
+  object_id = $2
 `
 
-// Nothing is deleted when a legal hold covers it.
+type DeferRecordingDeleteParams struct {
+	LastError *string `json:"lastError"`
+	ObjectID  string  `json:"objectId"`
+}
+
+// Waits 10 minutes after the first failure, doubling up to a day.
+func (q *Queries) DeferRecordingDelete(ctx context.Context, arg *DeferRecordingDeleteParams) error {
+	_, err := q.db.Exec(ctx, deferRecordingDelete, arg.LastError, arg.ObjectID)
+	return err
+}
+
+const deleteRecording = `-- name: DeleteRecording :execrows
+DELETE FROM recordings
+WHERE
+  id = $1
+`
+
 func (q *Queries) DeleteRecording(ctx context.Context, id string) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteRecording, id)
 	if err != nil {
@@ -98,15 +117,11 @@ func (q *Queries) DeleteRecording(ctx context.Context, id string) (int64, error)
 	return result.RowsAffected(), nil
 }
 
-const deleteRecordingsBefore = `-- name: DeleteRecordingsBefore :many
-DELETE FROM recordings r
+const deleteRecordingsBefore = `-- name: DeleteRecordingsBefore :exec
+DELETE FROM recordings
 WHERE
-  r.workspace_id = $1
-  AND r.started_at < $2
-  AND NOT legal_hold_covers (r.workspace_id, r.started_at)
-RETURNING
-  id,
-  size_bytes
+  workspace_id = $1
+  AND started_at < $2
 `
 
 type DeleteRecordingsBeforeParams struct {
@@ -114,35 +129,80 @@ type DeleteRecordingsBeforeParams struct {
 	Cutoff      time.Time `json:"cutoff"`
 }
 
-type DeleteRecordingsBeforeRow struct {
-	ID        string `json:"id"`
-	SizeBytes int64  `json:"sizeBytes"`
+func (q *Queries) DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) error {
+	_, err := q.db.Exec(ctx, deleteRecordingsBefore, arg.WorkspaceID, arg.Cutoff)
+	return err
 }
 
-// A legal hold keeps its range.
-func (q *Queries) DeleteRecordingsBefore(ctx context.Context, arg *DeleteRecordingsBeforeParams) ([]*DeleteRecordingsBeforeRow, error) {
-	rows, err := q.db.Query(ctx, deleteRecordingsBefore, arg.WorkspaceID, arg.Cutoff)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*DeleteRecordingsBeforeRow
-	for rows.Next() {
-		var i DeleteRecordingsBeforeRow
-		if err := rows.Scan(&i.ID, &i.SizeBytes); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+const finishRecordingDelete = `-- name: FinishRecordingDelete :exec
+DELETE FROM recording_deletes
+WHERE
+  object_id = $1
+`
+
+func (q *Queries) FinishRecordingDelete(ctx context.Context, objectID string) error {
+	_, err := q.db.Exec(ctx, finishRecordingDelete, objectID)
+	return err
+}
+
+const finishRecordingUpload = `-- name: FinishRecordingUpload :one
+UPDATE recordings
+SET
+  object_id = COALESCE($1::UUID, object_id),
+  size_bytes = $2,
+  complete = $3,
+  ended_at = CASE
+    WHEN $4::TIMESTAMPTZ IS NULL THEN ended_at
+    WHEN $4::TIMESTAMPTZ BETWEEN started_at AND NOW() THEN $4::TIMESTAMPTZ
+    ELSE NOW()
+  END
+WHERE
+  id = $5
+RETURNING
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, object_id, started_at, ended_at, size_bytes, complete
+`
+
+type FinishRecordingUploadParams struct {
+	ObjectID  *string    `json:"objectId"`
+	SizeBytes int64      `json:"sizeBytes"`
+	Complete  bool       `json:"complete"`
+	EndedAt   *time.Time `json:"endedAt"`
+	ID        string     `json:"id"`
+}
+
+// A NULL object leaves the stored copy in place, a NULL end leaves a session running. An end from a wrong clock counts
+// as now.
+func (q *Queries) FinishRecordingUpload(ctx context.Context, arg *FinishRecordingUploadParams) (*Recording, error) {
+	row := q.db.QueryRow(ctx, finishRecordingUpload,
+		arg.ObjectID,
+		arg.SizeBytes,
+		arg.Complete,
+		arg.EndedAt,
+		arg.ID,
+	)
+	var i Recording
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.DaemonID,
+		&i.DaemonName,
+		&i.Username,
+		&i.SubjectID,
+		&i.SubjectName,
+		&i.Principal,
+		&i.Key,
+		&i.ObjectID,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.SizeBytes,
+		&i.Complete,
+	)
+	return &i, err
 }
 
 const getRecording = `-- name: GetRecording :one
 SELECT
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at, ended_at, size_bytes, complete, created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, object_id, started_at, ended_at, size_bytes, complete
 FROM
   recordings
 WHERE
@@ -162,11 +222,11 @@ func (q *Queries) GetRecording(ctx context.Context, id string) (*Recording, erro
 		&i.SubjectName,
 		&i.Principal,
 		&i.Key,
+		&i.ObjectID,
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.SizeBytes,
 		&i.Complete,
-		&i.CreatedAt,
 	)
 	return &i, err
 }
@@ -242,16 +302,16 @@ WITH
       recordings f
     WHERE
       (
-        $1::UUID IS NULL
-        OR f.daemon_id = $1
+        $2::UUID IS NULL
+        OR f.daemon_id = $2
       )
       AND (
-        $2::TEXT IS NULL
-        OR f.username = $2
+        $3::TEXT IS NULL
+        OR f.username = $3
       )
       AND (
-        $3::UUID IS NULL
-        OR f.subject_id = $3
+        $4::UUID IS NULL
+        OR f.subject_id = $4
       )
   ),
   paginated AS (
@@ -262,19 +322,24 @@ WITH
     ORDER BY
       started_at DESC
     LIMIT
-      $5
+      $6
     OFFSET
-      $4
+      $5
   )
 SELECT
-  r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.subject_name, r.principal, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at,
-  legal_hold_covers (r.workspace_id, r.started_at)::BOOLEAN AS held,
+  r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.subject_name, r.principal, r.key, r.object_id, r.started_at, r.ended_at, r.size_bytes, r.complete,
   (
     SELECT
       COUNT(*)
     FROM
       filtered
-  )::INTEGER AS total_count
+  )::INTEGER AS total_count,
+  -- The same rule as ListOpenRecordings.
+  (
+    r.ended_at IS NULL
+    AND r.started_at > NOW() - INTERVAL '24 hours'
+    AND COALESCE(r.daemon_id = ANY ($1::UUID[]), FALSE)
+  )::BOOLEAN AS live
 FROM
   recordings r
   JOIN paginated pp ON pp.id = r.id
@@ -283,22 +348,24 @@ ORDER BY
 `
 
 type ListRecordingsParams struct {
-	DaemonID  *string `json:"daemonId"`
-	Username  *string `json:"username"`
-	SubjectID *string `json:"subjectId"`
-	Offset    *int32  `json:"offset"`
-	Limit     *int32  `json:"limit"`
+	Connected []string `json:"connected"`
+	DaemonID  *string  `json:"daemonId"`
+	Username  *string  `json:"username"`
+	SubjectID *string  `json:"subjectId"`
+	Offset    *int32   `json:"offset"`
+	Limit     *int32   `json:"limit"`
 }
 
 type ListRecordingsRow struct {
 	Recording  Recording `json:"recording"`
-	Held       bool      `json:"held"`
 	TotalCount int32     `json:"totalCount"`
+	Live       bool      `json:"live"`
 }
 
 // The total is counted on its own. A window count reads every matching row in full to return one page.
 func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams) ([]*ListRecordingsRow, error) {
 	rows, err := q.db.Query(ctx, listRecordings,
+		arg.Connected,
 		arg.DaemonID,
 		arg.Username,
 		arg.SubjectID,
@@ -322,13 +389,13 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 			&i.Recording.SubjectName,
 			&i.Recording.Principal,
 			&i.Recording.Key,
+			&i.Recording.ObjectID,
 			&i.Recording.StartedAt,
 			&i.Recording.EndedAt,
 			&i.Recording.SizeBytes,
 			&i.Recording.Complete,
-			&i.Recording.CreatedAt,
-			&i.Held,
 			&i.TotalCount,
+			&i.Live,
 		); err != nil {
 			return nil, err
 		}
@@ -340,20 +407,76 @@ func (q *Queries) ListRecordings(ctx context.Context, arg *ListRecordingsParams)
 	return items, nil
 }
 
+const lockRecording = `-- name: LockRecording :one
+SELECT
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, object_id, started_at, ended_at, size_bytes, complete
+FROM
+  recordings
+WHERE
+  id = $1
+FOR UPDATE
+`
+
+// Uploads of one recording end one at a time, so each sees what the one before it stored.
+func (q *Queries) LockRecording(ctx context.Context, id string) (*Recording, error) {
+	row := q.db.QueryRow(ctx, lockRecording, id)
+	var i Recording
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.DaemonID,
+		&i.DaemonName,
+		&i.Username,
+		&i.SubjectID,
+		&i.SubjectName,
+		&i.Principal,
+		&i.Key,
+		&i.ObjectID,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.SizeBytes,
+		&i.Complete,
+	)
+	return &i, err
+}
+
+const nextRecordingDelete = `-- name: NextRecordingDelete :one
+SELECT
+  workspace_id,
+  object_id
+FROM
+  recording_deletes
+WHERE
+  next_try_at <= NOW()
+ORDER BY
+  next_try_at
+LIMIT
+  1
+`
+
+type NextRecordingDeleteRow struct {
+	WorkspaceID string `json:"workspaceId"`
+	ObjectID    string `json:"objectId"`
+}
+
+func (q *Queries) NextRecordingDelete(ctx context.Context) (*NextRecordingDeleteRow, error) {
+	row := q.db.QueryRow(ctx, nextRecordingDelete)
+	var i NextRecordingDeleteRow
+	err := row.Scan(&i.WorkspaceID, &i.ObjectID)
+	return &i, err
+}
+
 const oldestRecordings = `-- name: OldestRecordings :many
 SELECT
-  r.id, r.workspace_id, r.daemon_id, r.daemon_name, r.username, r.subject_id, r.subject_name, r.principal, r.key, r.started_at, r.ended_at, r.size_bytes, r.complete, r.created_at
+  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, object_id, started_at, ended_at, size_bytes, complete
 FROM
-  recordings r
-WHERE
-  NOT legal_hold_covers (r.workspace_id, r.started_at)
+  recordings
 ORDER BY
-  r.started_at ASC
+  started_at ASC
 LIMIT
   $1
 `
 
-// Held recordings are never evicted, so they are never offered.
 func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Recording, error) {
 	rows, err := q.db.Query(ctx, oldestRecordings, limit)
 	if err != nil {
@@ -373,11 +496,11 @@ func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Record
 			&i.SubjectName,
 			&i.Principal,
 			&i.Key,
+			&i.ObjectID,
 			&i.StartedAt,
 			&i.EndedAt,
 			&i.SizeBytes,
 			&i.Complete,
-			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -389,82 +512,13 @@ func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Record
 	return items, nil
 }
 
-const recordingHeld = `-- name: RecordingHeld :one
+const queueLostRecordingObject = `-- name: QueueLostRecordingObject :exec
 SELECT
-  EXISTS (
-    SELECT
-      1
-    FROM
-      recordings r
-    WHERE
-      r.id = $1
-      AND legal_hold_covers (r.workspace_id, r.started_at)
-  )::BOOLEAN
+  queue_lost_recording_object ($1)
 `
 
-func (q *Queries) RecordingHeld(ctx context.Context, id string) (bool, error) {
-	row := q.db.QueryRow(ctx, recordingHeld, id)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const setRecordingComplete = `-- name: SetRecordingComplete :one
-UPDATE recordings
-SET
-  size_bytes = $1,
-  ended_at = NOW(),
-  complete = $2
-WHERE
-  id = $3
-RETURNING
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at, ended_at, size_bytes, complete, created_at
-`
-
-type SetRecordingCompleteParams struct {
-	SizeBytes int64  `json:"sizeBytes"`
-	Complete  bool   `json:"complete"`
-	ID        string `json:"id"`
-}
-
-func (q *Queries) SetRecordingComplete(ctx context.Context, arg *SetRecordingCompleteParams) (*Recording, error) {
-	row := q.db.QueryRow(ctx, setRecordingComplete, arg.SizeBytes, arg.Complete, arg.ID)
-	var i Recording
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.DaemonID,
-		&i.DaemonName,
-		&i.Username,
-		&i.SubjectID,
-		&i.SubjectName,
-		&i.Principal,
-		&i.Key,
-		&i.StartedAt,
-		&i.EndedAt,
-		&i.SizeBytes,
-		&i.Complete,
-		&i.CreatedAt,
-	)
-	return &i, err
-}
-
-const setRecordingSize = `-- name: SetRecordingSize :exec
-UPDATE recordings
-SET
-  size_bytes = $1
-WHERE
-  id = $2
-`
-
-type SetRecordingSizeParams struct {
-	SizeBytes int64  `json:"sizeBytes"`
-	ID        string `json:"id"`
-}
-
-// An upload in progress counts toward the storage cap by its row.
-func (q *Queries) SetRecordingSize(ctx context.Context, arg *SetRecordingSizeParams) error {
-	_, err := q.db.Exec(ctx, setRecordingSize, arg.SizeBytes, arg.ID)
+func (q *Queries) QueueLostRecordingObject(ctx context.Context, objectID string) error {
+	_, err := q.db.Exec(ctx, queueLostRecordingObject, objectID)
 	return err
 }
 

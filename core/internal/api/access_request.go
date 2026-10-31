@@ -46,9 +46,6 @@ func (s *accessRequestService) CreateAccessRequest(
 	req *nokkuv1.CreateAccessRequestRequest,
 ) (*nokkuv1.CreateAccessRequestResponse, error) {
 	userID := actor.UserIDFromContext(ctx)
-	if userID == "" {
-		return nil, newError(connect.CodePermissionDenied, "only people can ask for access")
-	}
 
 	var id string
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
@@ -180,9 +177,6 @@ func (s *accessRequestService) decide(
 	status nokkuv1.AccessRequestStatus,
 ) (*db.AccessRequestDetail, error) {
 	caller := actor.UserIDFromContext(ctx)
-	if caller == "" {
-		return nil, newError(connect.CodePermissionDenied, "only people can answer requests")
-	}
 
 	var row *db.AccessRequestDetail
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
@@ -239,9 +233,6 @@ func (s *accessRequestService) CancelAccessRequest(
 	req *nokkuv1.CancelAccessRequestRequest,
 ) (*nokkuv1.CancelAccessRequestResponse, error) {
 	userID := actor.UserIDFromContext(ctx)
-	if userID == "" {
-		return nil, newError(connect.CodePermissionDenied, "only people ask for access, and only they cancel")
-	}
 	cancelled, err := s.cfg.Conn.Tenant().CancelAccessRequest(ctx, &db.CancelAccessRequestParams{
 		ID:          req.GetId(),
 		RequesterID: userID,

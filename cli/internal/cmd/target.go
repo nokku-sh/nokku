@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -31,8 +30,8 @@ func syncCMD() *cli.Command {
 	return &cli.Command{
 		Name:  "sync",
 		Usage: "Add a server to Nokku without the daemon, or refresh one you added",
-		Description: "Connects as root with your own ssh, then writes the Nokku CA, an sshd drop-in, " +
-			"and one principals file per account. Run it again whenever access changes.",
+		Description: "Connects as root with your own ssh, then writes the Nokku CA and an sshd drop-in. " +
+			"Access changes need no rerun, a rotated CA does.",
 		ArgsUsage: "<host | root@host | target-name>",
 		// A --grant lists its subjects with commas.
 		DisableSliceFlagSeparator: true,
@@ -115,7 +114,6 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	grants := map[string][]string{}
 	created := false
 	if target.ID == "" && !dryRun {
 		target.HostPublicKey = h.HostKey
@@ -125,12 +123,10 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 		created = true
 		fmt.Fprintf(progress, "Added target %s\n", ui.Bold(target.Name))
 	}
-	if target.ID != "" {
-		if grants, err = c.TargetPrincipals(ctx, target); err != nil {
-			return err
-		}
+	plan, err := manual.NewPlan(strings.Join(ca.TrustedKeys(), "\n"), target.ID)
+	if err != nil {
+		return err
 	}
-	plan := manual.NewPlan(strings.Join(ca.TrustedKeys(), "\n"), grants, h)
 
 	if !dryRun {
 		if err = applyPlan(ctx, c, target, created, dest, h, plan, progress); err != nil {
@@ -192,38 +188,33 @@ func checkHostKey(pinned, seen, host string, accept bool) error {
 	return nil
 }
 
-// A new target has no principals yet, so a file a grant will fill names its subjects as typed.
+// The grants of a new target are shown as typed, they become ids only when the target is created.
 func printPlan(plan manual.Plan, seeds []client.Grant) {
 	fmt.Println("Dry run, nothing was written. This sync would write:")
 	for _, f := range plan.Files {
-		empty := ui.Dim("(empty, nobody may log in)\n")
-		for _, g := range seeds {
-			if g.Account == path.Base(f.Path) {
-				empty = ui.Dim("(the principals of " + strings.Join(g.Subjects, ", ") + ")\n")
-			}
-		}
-		fmt.Printf("\n%s\n%s", ui.Bold(f.Path), cmp.Or(f.Content, empty))
+		fmt.Printf("\n%s\n%s", ui.Bold(f.Path), f.Content)
 	}
-	for _, path := range plan.Stale {
-		fmt.Printf("\n%s %s\n", ui.Bold("remove"), path)
+	if len(seeds) > 0 {
+		fmt.Println("\nThe new target starts with these grants:")
+	}
+	for _, g := range seeds {
+		fmt.Printf("  %s: %s\n", g.Account, strings.Join(g.Subjects, ", "))
 	}
 }
 
 type syncResult struct {
-	Target  string        `json:"target"`
-	DryRun  bool          `json:"dry_run"`
-	Files   []manual.File `json:"files"`
-	Removed []string      `json:"removed"`
+	Target string        `json:"target"`
+	DryRun bool          `json:"dry_run"`
+	Files  []manual.File `json:"files"`
 	// Grants are the subjects a new target starts with, as they were typed.
 	Grants map[string][]string `json:"grants,omitempty"`
 }
 
 func newSyncResult(target *state.Target, plan manual.Plan, seeds []client.Grant, dryRun bool) syncResult {
 	res := syncResult{
-		Target:  target.Name,
-		DryRun:  dryRun,
-		Files:   plan.Files,
-		Removed: append([]string{}, plan.Stale...),
+		Target: target.Name,
+		DryRun: dryRun,
+		Files:  plan.Files,
 	}
 	for _, g := range seeds {
 		if res.Grants == nil {
@@ -287,8 +278,8 @@ func rmCMD() *cli.Command {
 	return &cli.Command{
 		Name:  "rm",
 		Usage: "Remove a server you added with nk sync",
-		Description: "Connects as root with your own ssh, removes the Nokku CA, the sshd drop-in, " +
-			"and the principals files, then deletes the target in Nokku.",
+		Description: "Connects as root with your own ssh, removes the Nokku CA and the sshd drop-in, " +
+			"then deletes the target in Nokku.",
 		ArgsUsage: "<host | root@host | target-name>",
 		Flags: []cli.Flag{
 			portFlag,

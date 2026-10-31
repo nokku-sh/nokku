@@ -11,6 +11,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
+	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -25,16 +26,15 @@ const (
 )
 
 type Workspace struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Slug        *string                `protobuf:"bytes,2,opt,name=slug" json:"slug,omitempty"`
-	Name        *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	Description *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
-	Settings    *WorkspaceSettings     `protobuf:"bytes,5,opt,name=settings" json:"settings,omitempty"`
-	CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	// requestable_tags names the targets members may ask access for. Set with SetRequestableTags.
-	RequestableTags []string `protobuf:"bytes,8,rep,name=requestable_tags,json=requestableTags" json:"requestable_tags,omitempty"`
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Slug            *string                `protobuf:"bytes,2,opt,name=slug" json:"slug,omitempty"`
+	Name            *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	Description     *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
+	Settings        *WorkspaceSettings     `protobuf:"bytes,5,opt,name=settings" json:"settings,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	RequestableTags []string               `protobuf:"bytes,8,rep,name=requestable_tags,json=requestableTags" json:"requestable_tags,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -129,10 +129,9 @@ type WorkspaceSettings struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	DefaultDaemonConfig *DaemonConfig          `protobuf:"bytes,1,opt,name=default_daemon_config,json=defaultDaemonConfig" json:"default_daemon_config,omitempty"`
 	EnforceSso          *bool                  `protobuf:"varint,2,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
-	// session_idle_timeout closes interactive sessions on every daemon after that long without input. Zero is off.
-	SessionIdleTimeout *durationpb.Duration `protobuf:"bytes,3,opt,name=session_idle_timeout,json=sessionIdleTimeout" json:"session_idle_timeout,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	SessionIdleTimeout  *durationpb.Duration   `protobuf:"bytes,3,opt,name=session_idle_timeout,json=sessionIdleTimeout" json:"session_idle_timeout,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *WorkspaceSettings) Reset() {
@@ -225,8 +224,7 @@ func (*GetWorkspaceRequest) Descriptor() ([]byte, []int) {
 type GetWorkspaceResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Workspace *Workspace             `protobuf:"bytes,1,opt,name=workspace" json:"workspace,omitempty"`
-	// base_url is where this workspace lives, the slug host on the hosted service. Callback and SCIM URLs start with it.
-	BaseUrl *string `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
+	BaseUrl   *string                `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
 	// inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner subscribes.
 	Inactive *bool `protobuf:"varint,3,opt,name=inactive" json:"inactive,omitempty"`
 	// delete_at is when an inactive workspace is deleted, unless the owner subscribes before.
@@ -321,11 +319,10 @@ func (x *GetWorkspaceResponse) GetPlanNames() map[string]string {
 }
 
 type PlanFeature struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Key   *string                `protobuf:"bytes,1,opt,name=key" json:"key,omitempty"`
-	Label *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
-	// plan is the code of the smallest plan that has the feature, every larger one has it too.
-	Plan          *string `protobuf:"bytes,3,opt,name=plan" json:"plan,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           *string                `protobuf:"bytes,1,opt,name=key" json:"key,omitempty"`
+	Label         *string                `protobuf:"bytes,2,opt,name=label" json:"label,omitempty"`
+	Plan          *string                `protobuf:"bytes,3,opt,name=plan" json:"plan,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -386,6 +383,7 @@ type UpdateWorkspaceRequest struct {
 	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,2,opt,name=description" json:"description,omitempty"`
 	Settings      *WorkspaceSettings     `protobuf:"bytes,3,opt,name=settings" json:"settings,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,4,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -437,6 +435,13 @@ func (x *UpdateWorkspaceRequest) GetDescription() string {
 func (x *UpdateWorkspaceRequest) GetSettings() *WorkspaceSettings {
 	if x != nil {
 		return x.Settings
+	}
+	return nil
+}
+
+func (x *UpdateWorkspaceRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
+	if x != nil {
+		return x.UpdateMask
 	}
 	return nil
 }
@@ -1218,7 +1223,7 @@ var File_nokku_v1_workspace_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\n" +
-	"\x18nokku/v1/workspace.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\x1a\x15nokku/v1/daemon.proto\"\xbf\x02\n" +
+	"\x18nokku/v1/workspace.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\x1a\x15nokku/v1/daemon.proto\"\xbf\x02\n" +
 	"\tWorkspace\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04slug\x18\x02 \x01(\tR\x04slug\x12\x12\n" +
@@ -1254,12 +1259,14 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\vPlanFeature\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
-	"\x04plan\x18\x03 \x01(\tR\x04plan\"\x9d\x01\n" +
+	"\x04plan\x18\x03 \x01(\tR\x04plan\"\xa1\x04\n" +
 	"\x16UpdateWorkspaceRequest\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x03\x18\x80\x02R\x04name\x12*\n" +
 	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x127\n" +
-	"\bsettings\x18\x03 \x01(\v2\x1b.nokku.v1.WorkspaceSettingsR\bsettings\"L\n" +
+	"\bsettings\x18\x03 \x01(\v2\x1b.nokku.v1.WorkspaceSettingsR\bsettings\x12\x81\x03\n" +
+	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB\xc3\x02\xbaH\xbf\x02\xc8\x01\x01\xe2\x01\xb8\x02\x12\x04name\x12\vdescription\x12.settings.default_daemon_config.record_sessions\x12/settings.default_daemon_config.allow_forwarding\x125settings.default_daemon_config.allow_agent_forwarding\x12,settings.default_daemon_config.gateway_ports\x12(settings.default_daemon_config.ephemeral\x12\x14settings.enforce_sso\x12\x1dsettings.session_idle_timeoutR\n" +
+	"updateMask\"L\n" +
 	"\x17UpdateWorkspaceResponse\x121\n" +
 	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\x18\n" +
 	"\x16DeleteWorkspaceRequest\"\x19\n" +
@@ -1300,18 +1307,18 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x18TransferOwnershipRequest\x12*\n" +
 	"\fnew_owner_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
 	"newOwnerId\"\x1b\n" +
-	"\x19TransferOwnershipResponse2\x96\a\n" +
+	"\x19TransferOwnershipResponse2\x9a\a\n" +
 	"\x10WorkspaceService\x12X\n" +
 	"\fGetWorkspace\x12\x1d.nokku.v1.GetWorkspaceRequest\x1a\x1e.nokku.v1.GetWorkspaceResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12^\n" +
-	"\x0fUpdateWorkspace\x12 .nokku.v1.UpdateWorkspaceRequest\x1a!.nokku.v1.UpdateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12^\n" +
-	"\x0fDeleteWorkspace\x12 .nokku.v1.DeleteWorkspaceRequest\x1a!.nokku.v1.DeleteWorkspaceResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12O\n" +
+	"\x0fUpdateWorkspace\x12 .nokku.v1.UpdateWorkspaceRequest\x1a!.nokku.v1.UpdateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12`\n" +
+	"\x0fDeleteWorkspace\x12 .nokku.v1.DeleteWorkspaceRequest\x1a!.nokku.v1.DeleteWorkspaceResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12O\n" +
 	"\tListUsers\x12\x1a.nokku.v1.ListUsersRequest\x1a\x1b.nokku.v1.ListUsersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12I\n" +
 	"\aGetUser\x12\x18.nokku.v1.GetUserRequest\x1a\x19.nokku.v1.GetUserResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12[\n" +
 	"\x0eUpdateUserRole\x12\x1f.nokku.v1.UpdateUserRoleRequest\x1a .nokku.v1.UpdateUserRoleResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12X\n" +
 	"\rSetUserActive\x12\x1e.nokku.v1.SetUserActiveRequest\x1a\x1f.nokku.v1.SetUserActiveResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12O\n" +
 	"\n" +
-	"DeleteUser\x12\x1b.nokku.v1.DeleteUserRequest\x1a\x1c.nokku.v1.DeleteUserResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12d\n" +
-	"\x11TransferOwnership\x12\".nokku.v1.TransferOwnershipRequest\x1a#.nokku.v1.TransferOwnershipResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12^\n" +
+	"DeleteUser\x12\x1b.nokku.v1.DeleteUserRequest\x1a\x1c.nokku.v1.DeleteUserResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12f\n" +
+	"\x11TransferOwnership\x12\".nokku.v1.TransferOwnershipRequest\x1a#.nokku.v1.TransferOwnershipResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12^\n" +
 	"\x0fCreateWorkspace\x12 .nokku.v1.CreateWorkspaceRequest\x1a!.nokku.v1.CreateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\b\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eWorkspaceProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
@@ -1357,8 +1364,9 @@ var file_nokku_v1_workspace_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),     // 25: google.protobuf.Timestamp
 	(*DaemonConfig)(nil),              // 26: nokku.v1.DaemonConfig
 	(*durationpb.Duration)(nil),       // 27: google.protobuf.Duration
-	(WorkspaceRole)(0),                // 28: nokku.v1.WorkspaceRole
-	(*User)(nil),                      // 29: nokku.v1.User
+	(*fieldmaskpb.FieldMask)(nil),     // 28: google.protobuf.FieldMask
+	(WorkspaceRole)(0),                // 29: nokku.v1.WorkspaceRole
+	(*User)(nil),                      // 30: nokku.v1.User
 }
 var file_nokku_v1_workspace_proto_depIdxs = []int32{
 	1,  // 0: nokku.v1.Workspace.settings:type_name -> nokku.v1.WorkspaceSettings
@@ -1372,36 +1380,37 @@ var file_nokku_v1_workspace_proto_depIdxs = []int32{
 	4,  // 8: nokku.v1.GetWorkspaceResponse.catalog:type_name -> nokku.v1.PlanFeature
 	24, // 9: nokku.v1.GetWorkspaceResponse.plan_names:type_name -> nokku.v1.GetWorkspaceResponse.PlanNamesEntry
 	1,  // 10: nokku.v1.UpdateWorkspaceRequest.settings:type_name -> nokku.v1.WorkspaceSettings
-	0,  // 11: nokku.v1.UpdateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	28, // 12: nokku.v1.ListUsersRequest.role:type_name -> nokku.v1.WorkspaceRole
-	29, // 13: nokku.v1.ListUsersResponse.users:type_name -> nokku.v1.User
-	29, // 14: nokku.v1.GetUserResponse.user:type_name -> nokku.v1.User
-	28, // 15: nokku.v1.UpdateUserRoleRequest.role:type_name -> nokku.v1.WorkspaceRole
-	2,  // 16: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
-	5,  // 17: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
-	7,  // 18: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
-	11, // 19: nokku.v1.WorkspaceService.ListUsers:input_type -> nokku.v1.ListUsersRequest
-	13, // 20: nokku.v1.WorkspaceService.GetUser:input_type -> nokku.v1.GetUserRequest
-	15, // 21: nokku.v1.WorkspaceService.UpdateUserRole:input_type -> nokku.v1.UpdateUserRoleRequest
-	17, // 22: nokku.v1.WorkspaceService.SetUserActive:input_type -> nokku.v1.SetUserActiveRequest
-	19, // 23: nokku.v1.WorkspaceService.DeleteUser:input_type -> nokku.v1.DeleteUserRequest
-	21, // 24: nokku.v1.WorkspaceService.TransferOwnership:input_type -> nokku.v1.TransferOwnershipRequest
-	9,  // 25: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
-	3,  // 26: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
-	6,  // 27: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
-	8,  // 28: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
-	12, // 29: nokku.v1.WorkspaceService.ListUsers:output_type -> nokku.v1.ListUsersResponse
-	14, // 30: nokku.v1.WorkspaceService.GetUser:output_type -> nokku.v1.GetUserResponse
-	16, // 31: nokku.v1.WorkspaceService.UpdateUserRole:output_type -> nokku.v1.UpdateUserRoleResponse
-	18, // 32: nokku.v1.WorkspaceService.SetUserActive:output_type -> nokku.v1.SetUserActiveResponse
-	20, // 33: nokku.v1.WorkspaceService.DeleteUser:output_type -> nokku.v1.DeleteUserResponse
-	22, // 34: nokku.v1.WorkspaceService.TransferOwnership:output_type -> nokku.v1.TransferOwnershipResponse
-	10, // 35: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
-	26, // [26:36] is the sub-list for method output_type
-	16, // [16:26] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	28, // 11: nokku.v1.UpdateWorkspaceRequest.update_mask:type_name -> google.protobuf.FieldMask
+	0,  // 12: nokku.v1.UpdateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
+	29, // 13: nokku.v1.ListUsersRequest.role:type_name -> nokku.v1.WorkspaceRole
+	30, // 14: nokku.v1.ListUsersResponse.users:type_name -> nokku.v1.User
+	30, // 15: nokku.v1.GetUserResponse.user:type_name -> nokku.v1.User
+	29, // 16: nokku.v1.UpdateUserRoleRequest.role:type_name -> nokku.v1.WorkspaceRole
+	2,  // 17: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
+	5,  // 18: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
+	7,  // 19: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
+	11, // 20: nokku.v1.WorkspaceService.ListUsers:input_type -> nokku.v1.ListUsersRequest
+	13, // 21: nokku.v1.WorkspaceService.GetUser:input_type -> nokku.v1.GetUserRequest
+	15, // 22: nokku.v1.WorkspaceService.UpdateUserRole:input_type -> nokku.v1.UpdateUserRoleRequest
+	17, // 23: nokku.v1.WorkspaceService.SetUserActive:input_type -> nokku.v1.SetUserActiveRequest
+	19, // 24: nokku.v1.WorkspaceService.DeleteUser:input_type -> nokku.v1.DeleteUserRequest
+	21, // 25: nokku.v1.WorkspaceService.TransferOwnership:input_type -> nokku.v1.TransferOwnershipRequest
+	9,  // 26: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
+	3,  // 27: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
+	6,  // 28: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
+	8,  // 29: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
+	12, // 30: nokku.v1.WorkspaceService.ListUsers:output_type -> nokku.v1.ListUsersResponse
+	14, // 31: nokku.v1.WorkspaceService.GetUser:output_type -> nokku.v1.GetUserResponse
+	16, // 32: nokku.v1.WorkspaceService.UpdateUserRole:output_type -> nokku.v1.UpdateUserRoleResponse
+	18, // 33: nokku.v1.WorkspaceService.SetUserActive:output_type -> nokku.v1.SetUserActiveResponse
+	20, // 34: nokku.v1.WorkspaceService.DeleteUser:output_type -> nokku.v1.DeleteUserResponse
+	22, // 35: nokku.v1.WorkspaceService.TransferOwnership:output_type -> nokku.v1.TransferOwnershipResponse
+	10, // 36: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
+	27, // [27:37] is the sub-list for method output_type
+	17, // [17:27] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_workspace_proto_init() }

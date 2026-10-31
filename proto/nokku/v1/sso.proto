@@ -12,7 +12,10 @@ service SSOService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc PutSSOProvider(PutSSOProviderRequest) returns (PutSSOProviderResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      fresh: true
+    };
   }
   rpc DeleteSSOProvider(DeleteSSOProviderRequest) returns (DeleteSSOProviderResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
@@ -35,7 +38,6 @@ message SSOProvider {
 message ListSSOProvidersRequest {}
 message ListSSOProvidersResponse {
   repeated SSOProvider providers = 1;
-  // What the owner registers with every provider.
   string redirect_uri = 2;
 }
 
@@ -55,11 +57,9 @@ message PutSSOProviderRequest {
     min_len: 1
     max_len: 1000
   }];
-  // Empty keeps the stored secret.
   string client_secret = 6 [(buf.validate.field).string.max_len = 1000];
   repeated string scopes = 7;
   bool jit_provisioning = 8;
-  // Links an existing account by an address the provider sends without email_verified, as Entra does.
   bool trust_unverified_email = 9;
 }
 message PutSSOProviderResponse {

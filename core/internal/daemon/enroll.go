@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -23,12 +22,14 @@ var ErrEnrollToken = errors.New("invalid or expired enrollment token")
 type EnrollInput struct {
 	Token string
 	// Binding is the DPoP key thumbprint.
-	Binding  string
-	Metadata []byte
+	Binding string
+	Version string
 	// ReqMetadata is the host's own report. Its hostname may become the daemon's name.
 	ReqMetadata map[string]string
 	// CanCreate only runs for new machines, so re-enrolling works at the cap.
 	CanCreate func(ctx context.Context, workspaceID string) error
+	// Connected lists the daemons online right now. An ephemeral enrollment never takes the name of one of them.
+	Connected []string
 }
 
 type Enrolled struct {
@@ -41,23 +42,18 @@ type Enrolled struct {
 
 // Enroll checks the quota between its two transactions. Nested, parallel enrollments could exhaust the pool.
 func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, error) {
-	parsed, err := crypto.Parse(in.Token)
-	if err != nil || parsed.ID == "" {
+	hash, ok := crypto.TokenHash(in.Token, crypto.TokenEnroll)
+	if !ok {
 		return nil, ErrEnrollToken
 	}
-	hash := crypto.HashToken(in.Token)
 
 	var (
 		token     *db.JoinToken
 		workspace *db.Workspace
 		out       *Enrolled
 	)
-	err = conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		token, err = q.GetLiveJoinToken(ctx, &db.GetLiveJoinTokenParams{
-			ID:        parsed.ID,
-			Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL,
-			TokenHash: hash,
-		})
+	err := conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+		token, err = q.GetLiveJoinToken(ctx, hash)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrEnrollToken
 		}
@@ -79,7 +75,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	// quota, since the old one frees what the new one takes.
 	wanted, named := namegen.FromHostname(in.ReqMetadata["hostname"])
 	if token.RetireAfter != nil && named {
-		if err := replaceOffline(ctx, conn, token.ID, wanted); err != nil {
+		if err := replaceOffline(ctx, conn, token.ID, wanted, in.Connected); err != nil {
 			return nil, err
 		}
 	}
@@ -115,12 +111,13 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 			}
 			created, err := q.CreateDaemon(ctx, &db.CreateDaemonParams{
 				Name:          name,
-				Metadata:      in.Metadata,
+				Version:       in.Version,
 				Status:        status,
 				Config:        config,
 				KeyThumbprint: &in.Binding,
 				JoinTokenID:   &token.ID,
 				RetireAfter:   token.RetireAfter,
+				CaID:          token.CaID,
 			})
 			if errors.Is(err, pgx.ErrNoRows) {
 				continue
@@ -129,21 +126,10 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 				return err
 			}
 			// A token that ran out meanwhile rolls the new daemon back.
-			if _, err := q.RedeemJoinToken(ctx, &db.RedeemJoinTokenParams{
-				ID:        parsed.ID,
-				Kind:      nokkuv1.JoinTokenKind_JOIN_TOKEN_KIND_ENROLL,
-				TokenHash: hash,
-			}); err != nil {
+			if _, err := q.RedeemJoinToken(ctx, hash); err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					return ErrEnrollToken
 				}
-				return err
-			}
-			// A NULL CA falls back to the workspace default.
-			if _, err := q.UpdateTargetCA(ctx, &db.UpdateTargetCAParams{
-				DaemonID: &created.ID,
-				CaID:     token.CaID,
-			}); err != nil {
 				return err
 			}
 			if err := seedTarget(ctx, q, token, created.TargetID, report); err != nil {
@@ -189,12 +175,12 @@ func seedTarget(ctx context.Context, q *db.Queries, token *db.JoinToken, targetI
 
 // replaceOffline deletes the daemon an ephemeral token enrolled under this name, if it is gone. A live one
 // keeps its name and the newcomer gets a generated one.
-func replaceOffline(ctx context.Context, conn connection, tokenID, name string) error {
+func replaceOffline(ctx context.Context, conn connection, tokenID, name string, connected []string) error {
 	return conn.TenantTx(ctx, func(q *db.Queries) error {
 		old, err := q.GetOfflineDaemonByTokenAndName(ctx, &db.GetOfflineDaemonByTokenAndNameParams{
 			JoinTokenID: &tokenID,
 			Name:        name,
-			SeenBefore:  time.Now().Add(-db.DaemonOnlineWindow),
+			Connected:   connected,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil

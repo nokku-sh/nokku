@@ -57,7 +57,7 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  id, workspace_id, name, description, role, last_used_at, tags, created_at, updated_at
+  id, workspace_id, name, description, role, tags, last_used_at, created_at, updated_at
 FROM
   service_accounts
 WHERE
@@ -73,8 +73,8 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 		&i.Name,
 		&i.Description,
 		&i.Role,
-		&i.LastUsedAt,
 		&i.Tags,
+		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -83,7 +83,7 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.last_used_at, sa.tags, sa.created_at, sa.updated_at,
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.tags, sa.last_used_at, sa.created_at, sa.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
@@ -143,8 +143,8 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.ServiceAccount.Name,
 			&i.ServiceAccount.Description,
 			&i.ServiceAccount.Role,
-			&i.ServiceAccount.LastUsedAt,
 			&i.ServiceAccount.Tags,
+			&i.ServiceAccount.LastUsedAt,
 			&i.ServiceAccount.CreatedAt,
 			&i.ServiceAccount.UpdatedAt,
 			&i.TotalCount,

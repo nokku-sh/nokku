@@ -24,7 +24,7 @@ func TestServerAuditEvents(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	log, events := auditLog()
-	addr, closeFn := startTestServerOpts(t, ca, Options{Log: log})
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log))
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -101,7 +101,7 @@ func TestServerAuditNoSuccessWithoutKey(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	log, events := auditLog()
-	addr, closeFn := startTestServerOpts(t, ca, Options{Log: log})
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log))
 	defer closeFn()
 
 	newSigner := func() (ssh.PublicKey, ssh.Signer) {
@@ -132,7 +132,7 @@ func TestServerAuditFileTransferAndRemoteForward(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	log, events := auditLog()
-	addr, closeFn := startTestServerOpts(t, ca, Options{Log: log, Policy: DefaultPolicy})
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(defaultPolicy))
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))

@@ -3,22 +3,34 @@ package ssh
 import (
 	"context"
 
+	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
 // Rollover replaces both keys. The replaced ones stay trusted until their certificates expire, unless
 // revokePrevious drops them at once, for a key that leaked.
-func Rollover(ctx context.Context, q *db.Queries, ca *db.SSHCA, revokePrevious bool) (*db.SSHCA, error) {
-	keys, err := NewCA()
+func Rollover(
+	ctx context.Context,
+	q *db.Queries,
+	keys *kms.Keyset,
+	ca *db.SSHCA,
+	revokePrevious bool,
+) (*db.SSHCA, error) {
+	user, host, err := newKeys()
 	if err != nil {
 		return nil, err
 	}
-	return q.ReplaceCA(ctx, &db.ReplaceCAParams{
+	next, err := q.ReplaceCA(ctx, &db.ReplaceCAParams{
 		CaID:           ca.ID,
-		PrivateKey:     keys.PrivateKey,
-		PublicKey:      keys.PublicKey,
-		HostPrivateKey: keys.HostPrivateKey,
-		HostPublicKey:  keys.HostPublicKey,
+		PublicKey:      user.public,
+		HostPublicKey:  host.public,
 		RevokePrevious: revokePrevious,
 	})
+	if err != nil {
+		return nil, err
+	}
+	if err := putKeys(ctx, q, keys, next, user, host); err != nil {
+		return nil, err
+	}
+	return next, nil
 }

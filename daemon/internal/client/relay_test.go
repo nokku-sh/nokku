@@ -17,6 +17,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
+	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
 // Canceling ctx fails Receive, like a canceled connect stream.
@@ -202,8 +204,10 @@ func TestRelayServesSSH(t *testing.T) {
 	must.NoError(err)
 	caKey, err := ssh.NewPublicKey(caPub)
 	must.NoError(err)
-	c.cache.Replace(map[string][]string{cur.Username: {"subject-1"}}, nil, "", "", nil, 1)
-	c.srv.SetTrust(string(ssh.MarshalAuthorizedKey(caKey)), nil)
+	c.srv.SetAccess(&state.Access{
+		Principals: map[string][]string{cur.Username: {"subject-1"}},
+		CA:         string(ssh.MarshalAuthorizedKey(caKey)),
+	})
 
 	_, userPriv, err := ed25519.GenerateKey(rand.Reader)
 	must.NoError(err)
@@ -229,7 +233,7 @@ func TestRelayServesSSH(t *testing.T) {
 	served := make(chan struct{})
 	go func() {
 		defer close(served)
-		c.srv.ServeConn(&relayConn{
+		c.srv.ServeConn(ctx, &relayConn{
 			stream: stream,
 			cancel: cancel,
 			remote: clientAddr("203.0.113.7"),

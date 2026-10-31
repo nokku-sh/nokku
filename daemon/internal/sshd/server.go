@@ -1,10 +1,8 @@
 package sshd
 
 import (
-	"cmp"
 	"context"
 	"errors"
-	"io"
 	"log/slog"
 	"net"
 	"net/netip"
@@ -17,11 +15,16 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
+	"github.com/nokku-sh/nokku/daemon/internal/recording"
+	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
 const (
-	maxConns    = 100
-	maxStartups = 10
+	maxConns = 100
+	// Relayed connections get half the slots at most, so people on the relay cannot crowd out direct logins.
+	maxRelayedConns = maxConns / 2
+	maxStartups     = 10
 	// One remote address cannot hold every pre-auth slot.
 	maxSourceStartups = 3
 	// Per connection, sessions and forwards alike.
@@ -47,33 +50,22 @@ type Policy struct {
 	IdleTimeout time.Duration
 }
 
-// DefaultPolicy also fills any field the core leaves unset.
-var DefaultPolicy = Policy{Record: true, AllowForwarding: true, AllowAgentForwarding: true}
-
-// RecordingSink gets a ctx that outlives the session teardown.
-type RecordingSink func(ctx context.Context, sessionID, username, principal string) io.WriteCloser
-
-type Options struct {
-	// Principals are compared as whole strings.
-	Principals func(username string) []string
-	// Log gets the audit events. Nil means the default logger.
-	Log           *slog.Logger
-	Policy        Policy
-	RecordingSink RecordingSink
-}
+// defaultPolicy also fills any field the core leaves unset.
+var defaultPolicy = Policy{Record: true, AllowForwarding: true, AllowAgentForwarding: true}
 
 type Server struct {
-	principals    func(username string) []string
-	log           *slog.Logger
-	recordingSink RecordingSink
+	// log gets the audit events. Tests point it at a buffer.
+	log     *slog.Logger
+	uploads *recording.Uploads
+	access  atomic.Pointer[access]
 	// Tests point it away from /etc/nologin.
 	nologinFile string
-	policy      atomic.Pointer[Policy]
 	// Tests swap the lookup to shape the account.
 	lookupAccount func(name string) (*account, error)
 
 	// Limits live on the server so tests can shrink them.
-	conns chan struct{}
+	conns   chan struct{}
+	relayed chan struct{}
 	// Loopback has its own pre-auth budget, a local proxy puts every client behind that one address.
 	startups      chan struct{}
 	localStartups chan struct{}
@@ -87,28 +79,22 @@ type Server struct {
 	liveMu sync.Mutex
 	live   map[*ssh.ServerConn]struct{}
 
-	// The host key stays open while the server runs, a connection signs with it again on every rekey.
-	hostKey    ssh.Signer
-	hostKeyDev io.Closer
+	hostKey ssh.Signer
 
-	mu         sync.RWMutex
-	cfg        *ssh.ServerConfig
-	trustedCAs map[string]struct{}
-	retiredCAs map[string]time.Time
+	mu  sync.RWMutex
+	cfg *ssh.ServerConfig
 }
 
-// New trusts no CA. Those come from SetTrust, and until then every login is refused.
-func New(opts Options) (*Server, error) {
-	if opts.Principals == nil {
-		return nil, errors.New("sshd: Principals is required")
-	}
+// New trusts no CA. Those come from SetAccess, and until then every login is refused. uploads sends the recordings
+// to the core, nil keeps them on disk.
+func New(uploads *recording.Uploads) (*Server, error) {
 	s := &Server{
-		principals:     opts.Principals,
-		log:            cmp.Or(opts.Log, slog.Default()),
-		recordingSink:  opts.RecordingSink,
+		log:            slog.Default(),
+		uploads:        uploads,
 		nologinFile:    nologinPath,
 		lookupAccount:  lookupAccount,
 		conns:          make(chan struct{}, maxConns),
+		relayed:        make(chan struct{}, maxRelayedConns),
 		startups:       make(chan struct{}, maxStartups),
 		localStartups:  make(chan struct{}, maxStartups),
 		sourceStartups: map[netip.Addr]int{},
@@ -116,17 +102,17 @@ func New(opts Options) (*Server, error) {
 		maxChannels:    maxChannels,
 		aliveInterval:  aliveInterval,
 	}
-	s.policy.Store(&opts.Policy)
+	s.SetAccess(&state.Access{})
 	var err error
-	if s.hostKey, s.hostKeyDev, err = loadHostKey(); err != nil {
+	if s.hostKey, err = loadHostKey(); err != nil {
 		return nil, err
 	}
 	s.Reload()
 	return s, nil
 }
 
-func PolicyFrom(cfg *nokkuv1.DaemonConfig) Policy {
-	p := DefaultPolicy
+func policyFrom(cfg *nokkuv1.DaemonConfig) Policy {
+	p := defaultPolicy
 	if cfg == nil {
 		return p
 	}
@@ -142,10 +128,6 @@ func PolicyFrom(cfg *nokkuv1.DaemonConfig) Policy {
 	set(&p.GatewayPorts, cfg.GatewayPorts)                 //nolint:protogetter // presence check
 	p.IdleTimeout = cfg.GetIdleTimeout().AsDuration()
 	return p
-}
-
-func (s *Server) SetPolicy(p Policy) {
-	s.policy.Store(&p)
 }
 
 // Reload rereads the host certificate. Established connections keep the one they handshook with.
@@ -167,11 +149,12 @@ func (s *Server) Reload() {
 	s.cfg = cfg
 }
 
-// Serve leaves established sessions to die with the process.
+// Serve returns once ctx is done and every connection it accepted is closed, with its sessions torn down.
 func (s *Server) Serve(ctx context.Context, l net.Listener) {
 	stop := context.AfterFunc(ctx, func() { _ = l.Close() })
 	defer stop()
-	defer s.hostKeyDev.Close()
+	var conns sync.WaitGroup
+	defer conns.Wait()
 
 	var delay time.Duration
 	for {
@@ -194,15 +177,24 @@ func (s *Server) Serve(ctx context.Context, l net.Listener) {
 			_ = nc.Close()
 			continue
 		}
-		go func() {
+		conns.Go(func() {
 			defer func() { <-s.conns }()
-			s.handleConn(nc, false)
-		}()
+			s.handleConn(ctx, nc, false)
+		})
 	}
 }
 
-// ServeConn takes no pre-auth slot, the core already authenticated the user. The connection cap still counts.
-func (s *Server) ServeConn(nc net.Conn) {
+// ServeConn takes no pre-auth slot, the core already authenticated the user. It takes a relay slot and a
+// connection slot.
+func (s *Server) ServeConn(ctx context.Context, nc net.Conn) {
+	select {
+	case s.relayed <- struct{}{}:
+	default:
+		slog.Warn("dropping relayed connection, the relay slots are full", "remote", nc.RemoteAddr())
+		_ = nc.Close()
+		return
+	}
+	defer func() { <-s.relayed }()
 	select {
 	case s.conns <- struct{}{}:
 	default:
@@ -211,16 +203,17 @@ func (s *Server) ServeConn(nc net.Conn) {
 		return
 	}
 	defer func() { <-s.conns }()
-	s.handleConn(nc, true)
+	s.handleConn(ctx, nc, true)
 }
 
-// DropRevoked makes a revoke end open sessions too. Principals and CA trust only gate new logins.
+// DropRevoked makes a revoke end open sessions too. SetAccess alone only gates new logins.
 func (s *Server) DropRevoked() {
+	a := s.access.Load()
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
 	for conn := range s.live {
 		ext := conn.Permissions.Extensions
-		if slices.Contains(s.principals(conn.User()), ext["nokku-principal"]) && s.trustedCAWire(ext["nokku-ca"]) {
+		if slices.Contains(a.principals[conn.User()], ext["nokku-principal"]) && a.trusts(ext["nokku-ca"]) {
 			continue
 		}
 		slog.Info("closing connection, access was revoked", "user", conn.User(), "remote", conn.RemoteAddr())
@@ -228,9 +221,12 @@ func (s *Server) DropRevoked() {
 	}
 }
 
-func (s *Server) handleConn(nc net.Conn, relayed bool) {
+// The connection closes when ctx ends, which ends its sessions the way a client that hangs up does.
+func (s *Server) handleConn(ctx context.Context, nc net.Conn, relayed bool) {
 	defer nc.Close()
 	defer recoverPanic("connection")
+	stop := context.AfterFunc(ctx, func() { _ = nc.Close() })
+	defer stop()
 
 	conn, chans, reqs, err := s.handshake(nc, relayed)
 	if errors.Is(err, errBusy) {
@@ -262,10 +258,13 @@ func (s *Server) handleConn(nc net.Conn, relayed bool) {
 	go s.keepAlive(conn, done)
 	go s.handleGlobalRequests(st, reqs)
 
+	// A session's context is its connection's, canceled before the wait so a closed connection ends them all.
+	ctx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	defer wg.Wait()
+	defer cancel()
 	for newCh := range chans {
-		var serve func(*connState, ssh.NewChannel)
+		var serve func(context.Context, *connState, ssh.NewChannel)
 		switch newCh.ChannelType() {
 		case "session":
 			serve = s.serveSession
@@ -282,7 +281,7 @@ func (s *Server) handleConn(nc net.Conn, relayed bool) {
 		wg.Go(func() {
 			defer st.releaseChannel()
 			defer recoverPanic(newCh.ChannelType())
-			serve(st, newCh)
+			serve(ctx, st, newCh)
 		})
 	}
 }
@@ -370,7 +369,7 @@ func (s *Server) keepAlive(conn *ssh.ServerConn, done <-chan struct{}) {
 }
 
 func (s *Server) banner(ssh.ConnMetadata) string {
-	if !s.policy.Load().Record {
+	if !s.access.Load().policy.Record {
 		return ""
 	}
 	return "This session is recorded and audited.\r\n"

@@ -274,83 +274,66 @@ ORDER BY
   p.username;
 
 -- name: ListSubjectUsernamesForTargets :many
--- A team grant counts for its members. Subject UUIDs are unique across kinds. The access lasts until the latest
--- grant that applies ends, or for good when one of them is.
+-- What a person or a service account holds on each target, a team's own grants for a team. The access lasts until
+-- the latest grant that applies ends, or for good when one of them is. user_ok and daemon_ok say whether it lets
+-- anyone in today, see effective_access. A team's rows are its grants as given, they carry no mark.
 SELECT
-  p.target_id,
-  p.username,
-  bool_or(g.expires_at IS NULL)::BOOLEAN AS for_good,
+  a.target_id,
+  a.username,
+  bool_or(a.expires_at IS NULL)::BOOLEAN AS for_good,
   -- Only read when not for good, then no grant has a NULL. The epoch keeps the column scannable.
-  COALESCE(max(g.expires_at), 'epoch')::TIMESTAMPTZ AS expires_at
+  COALESCE(max(a.expires_at), 'epoch')::TIMESTAMPTZ AS expires_at,
+  bool_and(a.user_ok)::BOOLEAN AS user_ok,
+  bool_and(a.daemon_ok)::BOOLEAN AS daemon_ok
 FROM
-  target_accounts p
-  JOIN live_grants g ON g.account_id = p.id
+  (
+    SELECT
+      e.target_id,
+      e.username,
+      e.expires_at,
+      e.user_ok,
+      e.daemon_ok
+    FROM
+      effective_access e
+    WHERE
+      e.subject_id = @subject_id
+    UNION ALL
+    SELECT
+      p.target_id,
+      p.username,
+      g.expires_at,
+      TRUE,
+      TRUE
+    FROM
+      live_grants g
+      JOIN target_accounts p ON p.id = g.account_id
+    WHERE
+      g.team_id = @subject_id
+  ) a
 WHERE
-  p.target_id = ANY (@target_ids::UUID[])
-  AND (
-    g.subject_id = @subject_id
-    OR (
-      g.subject_kind = 'team'
-      AND g.subject_id IN (
-        SELECT
-          tm.team_id
-        FROM
-          team_members tm
-        WHERE
-          tm.user_id = @subject_id
-      )
-    )
-  )
+  a.target_id = ANY (@target_ids::UUID[])
 GROUP BY
-  p.target_id,
-  p.username
+  a.target_id,
+  a.username
 ORDER BY
-  p.target_id,
-  p.username;
+  a.target_id,
+  a.username;
 
 -- name: ListAccountSubjectsForTarget :many
--- Teams are expanded so the host needs no team knowledge. Users are joined, so an inactive account drops out.
+-- Who a server lets in as which account, as the subjects its certificates name.
 SELECT
-  p.username,
-  array_agg(DISTINCT ids)::TEXT[] AS ids
+  e.username,
+  array_agg(DISTINCT e.subject_id)::TEXT[] AS ids
 FROM
-  target_accounts p
-  CROSS JOIN LATERAL (
-    SELECT
-      g.subject_id AS ids
-    FROM
-      live_grants g
-    WHERE
-      g.account_id = p.id
-      AND g.subject_kind = 'service_account'
-    UNION
-    SELECT
-      u.id
-    FROM
-      live_grants g
-      JOIN users u ON u.id = g.subject_id
-      AND u.active
-    WHERE
-      g.account_id = p.id
-      AND g.subject_kind = 'user'
-    UNION
-    SELECT
-      u.id
-    FROM
-      live_grants g
-      JOIN team_members tm ON tm.team_id = g.subject_id
-      JOIN users u ON u.id = tm.user_id
-      AND u.active
-    WHERE
-      g.account_id = p.id
-      AND g.subject_kind = 'team'
-  ) AS combined (ids)
+  effective_access e
 WHERE
-  p.target_id = @target_id
+  e.target_id = @target_id
+  AND e.user_ok
+  AND e.daemon_ok
 GROUP BY
-  p.username
+  e.username
 ORDER BY
-  p.username;
+  e.username;
 
 -- name: DeleteTargetAccount :exec
 DELETE FROM target_accounts

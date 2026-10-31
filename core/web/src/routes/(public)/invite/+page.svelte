@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { auth } from '#lib/api/auth.svelte.js';
 	import { invite } from '#lib/api/workspaces.svelte.js';
 	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
 	import LegalConsent from '#lib/components/blocks/LegalConsent.svelte';
@@ -13,45 +13,33 @@
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { roleLabel } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
-	import { CircleX, LogIn, Mail, MailCheck, PartyPopper } from '@lucide/svelte';
+	import { CircleX, LogIn, PartyPopper, UserPlus } from '@lucide/svelte';
 
 	const token = page.url.searchParams.get('token') ?? '';
 	const invitation = invite.get(token);
-	const options = auth.options();
 	const accept = invite.accept();
 
 	let name = $state('');
-	let email = $state('');
 
-	const valid = $derived(!!name.trim() && email.includes('@'));
-
-	// The account is made by a mailed link. Without mail or under required SSO there is none, so the form is left out.
-	const blocked = $derived.by(() => {
-		if (!options.data || options.data.magicLink) return undefined;
-		if (!options.data.emailConfigured) {
-			return {
-				title: 'Invitations are off',
-				description:
-					'This server sends no email, so it cannot create your account. Ask whoever invited you to set up email.'
-			};
-		}
-		return {
-			title: 'Sign in with your provider',
-			description:
-				'This workspace requires single sign-on, so an invitation cannot create an account. Sign in with its identity provider instead.'
-		};
-	});
-
-	function byEmail(e: SubmitEvent) {
+	// Only the button spends the invite. A mail scanner that opens the link must not.
+	function join(e: SubmitEvent) {
 		e.preventDefault();
-		accept.mutate({ token, name: name.trim(), email: email.trim() });
+		// A new account has only this session, so it lands where it can add a passkey.
+		accept.mutate(
+			{ token, name: name.trim() },
+			{ onSuccess: () => void goto('/profile/security') }
+		);
 	}
 </script>
 
-{#if !token || invitation.isError}
+{#if accept.isPending || accept.isSuccess}
+	<AuthCard title="Creating your account" description="One moment" icon={UserPlus}>
+		<Spinner class="size-6 self-center text-primary" />
+	</AuthCard>
+{:else if !token || invitation.isError}
 	<AuthCard
 		title="Invitation unavailable"
-		description="This link is expired, used up or invalid. Ask whoever invited you for a new one."
+		description="This link is expired, used or invalid. Ask whoever invited you for a new one."
 		icon={CircleX}
 		tone="destructive"
 	>
@@ -60,34 +48,15 @@
 			Sign in instead
 		</Button>
 	</AuthCard>
-{:else if invitation.isLoading || options.isLoading}
+{:else if invitation.isLoading}
 	<AuthCard title="Checking your invitation" description="One moment">
 		<Skeleton class="h-10 w-full" />
 		<Skeleton class="h-10 w-full" />
 	</AuthCard>
-{:else if blocked}
-	<AuthCard
-		title={blocked.title}
-		description={blocked.description}
-		icon={CircleX}
-		tone="destructive"
-	>
-		<Button href="/login" variant="outline">
-			<LogIn data-icon="inline-start" />
-			Go to sign in
-		</Button>
-	</AuthCard>
-{:else if accept.isSuccess}
-	<AuthCard
-		title="Check your email"
-		description={`A link to finish creating your account is on its way to ${email}. It works for 15 minutes and may land in spam.`}
-		icon={MailCheck}
-		tone="success"
-	/>
 {:else}
 	<AuthCard
 		title={`Join ${invitation.data?.workspaceName || 'the workspace'}`}
-		description="You were invited, this creates your account"
+		description={`You were invited as ${invitation.data?.email}`}
 		icon={PartyPopper}
 		wide
 	>
@@ -98,40 +67,24 @@
 			{/if}
 		</div>
 
-		<form class="flex flex-col gap-4" onsubmit={byEmail}>
-			<Field.Group class="gap-4">
-				<Field.Field>
-					<Field.Label for="name">Full name</Field.Label>
-					<Input
-						id="name"
-						autocomplete="name"
-						bind:value={name}
-						placeholder="Ada Lovelace"
-						required
-					/>
-				</Field.Field>
-				<Field.Field>
-					<Field.Label for="email">Email</Field.Label>
-					<Input
-						id="email"
-						type="email"
-						autocomplete="email"
-						bind:value={email}
-						placeholder="you@company.com"
-						required
-					/>
-					<Field.Description>
-						How your team and the audit log know you. We mail a link that creates your account, and
-						you can add a passkey right after.
-					</Field.Description>
-				</Field.Field>
-			</Field.Group>
+		<form class="flex flex-col gap-4" onsubmit={join}>
+			<Field.Field>
+				<Field.Label for="name">Full name</Field.Label>
+				<Input
+					id="name"
+					autocomplete="name"
+					bind:value={name}
+					placeholder="Ada Lovelace"
+					required
+				/>
+				<Field.Description>
+					How your team and the audit log know you. You can add a passkey right after.
+				</Field.Description>
+			</Field.Field>
 
-			<Button type="submit" disabled={!valid || accept.isPending}>
-				{#if accept.isPending}<Spinner data-icon="inline-start" />{:else}<Mail
-						data-icon="inline-start"
-					/>{/if}
-				Email me a link
+			<Button type="submit" disabled={!name.trim()}>
+				<UserPlus data-icon="inline-start" />
+				Join
 			</Button>
 		</form>
 

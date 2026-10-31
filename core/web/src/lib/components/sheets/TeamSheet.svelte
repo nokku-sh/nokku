@@ -52,7 +52,9 @@
 	const removeMember = teamApi.removeMember();
 	const revokeAll = accountApi.revokeSubject();
 
-	const autoSave = useAutoSave(() => update.mutateAsync({ ...model }));
+	const autoSave = useAutoSave(() =>
+		draft.save((changes) => update.mutateAsync({ ...changes, id: model?.id }))
+	);
 	const save = () => autoSave.save();
 
 	function toggleMember(userId: string) {

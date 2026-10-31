@@ -16,6 +16,7 @@ import (
 	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/dpop"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
@@ -78,11 +79,11 @@ func TestSessionIsBoundToItsWorkspace(t *testing.T) {
 	a, b := e.org(t), e.org(t)
 	_, token := e.session(t, a.ws, a.owner, actor.KindUser)
 
-	_, _, err := e.svc.AuthenticateToken(anon(t.Context(), a.ws), token)
+	_, _, err := e.svc.AuthenticateToken(anon(t.Context(), a.ws), token, accessTokens...)
 	require.NoError(t, err)
-	_, _, err = e.svc.AuthenticateToken(anon(t.Context(), b.ws), token)
+	_, _, err = e.svc.AuthenticateToken(anon(t.Context(), b.ws), token, accessTokens...)
 	require.Error(t, err, "a session of workspace a authenticated on workspace b")
-	_, _, err = e.svc.AuthenticateToken(t.Context(), token)
+	_, _, err = e.svc.AuthenticateToken(t.Context(), token, accessTokens...)
 	require.ErrorIs(t, err, db.ErrWorkspaceNotPinned, "a session authenticated with no workspace")
 }
 
@@ -121,7 +122,7 @@ func TestLogoutRevokesBoundSession(t *testing.T) {
 	assert.Equal(t, 1, e.sessions(t, o.ws, o.owner.ID), "a token without its proof ended the session")
 
 	proof := func() string {
-		return signProof(t, key, testBaseURL+procedure, iam.DPoPATH(token), e.svc.DPoP.CurrentNonce(), time.Now())
+		return signProof(t, key, testBaseURL+procedure, dpop.ATH(token), e.svc.DPoP.CurrentNonce(), time.Now())
 	}
 	header.Set("DPoP", proof())
 	require.NoError(t, e.svc.Logout(ctx, header, procedure))
@@ -131,13 +132,14 @@ func TestLogoutRevokesBoundSession(t *testing.T) {
 	require.NoError(t, e.svc.Logout(ctx, header, procedure))
 }
 
+// The exact address, not the /64 rate limits count by, it is for forensics.
 func TestSessionRecordsDevice(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	header := http.Header{"User-Agent": {"Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"}}
 	ctx := actor.ContextWithRequestMeta(
 		anon(t.Context(), o.ws),
-		actor.RequestMeta{Header: header, RemoteAddr: "203.0.113.7:4242"},
+		actor.RequestMeta{Header: header, RemoteAddr: "[2001:db8:abcd:1234::7]:4242"},
 	)
 
 	sess, _, err := e.svc.IssueToken(ctx, iam.TokenParams{
@@ -145,7 +147,7 @@ func TestSessionRecordsDevice(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, header.Get("User-Agent"), sess.UserAgent)
-	assert.Equal(t, "203.0.113.7", sess.Ip)
+	assert.Equal(t, "2001:db8:abcd:1234::7", sess.Ip)
 	assert.Equal(t, o.ws.ID, sess.WorkspaceID)
 }
 
@@ -155,11 +157,11 @@ func TestInactiveUserLosesCLISession(t *testing.T) {
 	u := e.user(t, o.ws, "user@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	_, token := e.session(t, o.ws, u, actor.KindCLI)
 	ctx := anon(t.Context(), o.ws)
-	_, _, err := e.svc.AuthenticateToken(ctx, token)
+	_, _, err := e.svc.AuthenticateToken(ctx, token, accessTokens...)
 	require.NoError(t, err)
 
 	require.NoError(t, e.conn.Sys().SetUserActive(t.Context(), &db.SetUserActiveParams{ID: u.ID, Active: false}))
-	_, _, err = e.svc.AuthenticateToken(ctx, token)
+	_, _, err = e.svc.AuthenticateToken(ctx, token, accessTokens...)
 	require.ErrorIs(t, err, iam.ErrInactive)
 }
 
@@ -170,11 +172,11 @@ func TestDeletedUserLosesSessions(t *testing.T) {
 	u := e.user(t, o.ws, "user@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	_, token := e.session(t, o.ws, u, actor.KindCLI)
 	ctx := anon(t.Context(), o.ws)
-	_, _, err := e.svc.AuthenticateToken(ctx, token)
+	_, _, err := e.svc.AuthenticateToken(ctx, token, accessTokens...)
 	require.NoError(t, err)
 
 	require.NoError(t, e.conn.Sys().DeleteUser(t.Context(), u.ID))
-	_, _, err = e.svc.AuthenticateToken(ctx, token)
+	_, _, err = e.svc.AuthenticateToken(ctx, token, accessTokens...)
 	require.Error(t, err, "the session of a deleted account still authenticates")
 }
 
@@ -236,7 +238,7 @@ func TestEmailChange(t *testing.T) {
 	got = e.userByEmail(t, o.ws, oldEmail)
 	require.NotNil(t, got)
 	assert.Equal(t, u.ID, got.ID)
-	_, _, err = e.svc.AuthenticateToken(ctx, session)
+	_, _, err = e.svc.AuthenticateToken(ctx, session, accessTokens...)
 	require.Error(t, err, "a session survived the revert")
 	require.ErrorIs(t, e.svc.CancelEmailChange(ctx, cancel), iam.ErrInvalidToken, "second revert")
 }
@@ -258,7 +260,7 @@ func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 	require.ErrorIs(t, e.svc.ConfirmEmailChange(ctx, confirm), iam.ErrInvalidToken, "confirm after cancel")
 	require.NotNil(t, e.userByEmail(t, o.ws, u.Email), "cancel changed the address")
 	// Nothing changed yet, so nobody is signed out.
-	_, _, err = e.svc.AuthenticateToken(ctx, session)
+	_, _, err = e.svc.AuthenticateToken(ctx, session, accessTokens...)
 	require.NoError(t, err, "cancel of a pending change ended the session")
 }
 
@@ -426,7 +428,7 @@ func TestSCIMTokenIsNoConnectCredential(t *testing.T) {
 	require.NoError(t, err)
 	ctx := anon(t.Context(), o.ws)
 
-	p, _, err := e.svc.AuthenticateToken(ctx, token)
+	p, _, err := e.svc.AuthenticateToken(ctx, token, accessTokens...)
 	require.NoError(t, err)
 	assert.Equal(t, actor.KindSCIM, p.Kind)
 	_, _, err = e.svc.Authenticate(
@@ -446,7 +448,7 @@ func TestLogoutLeavesServiceAccountTokenAlone(t *testing.T) {
 	header := http.Header{"Authorization": {"Bearer " + secret}}
 
 	require.NoError(t, e.svc.Logout(ctx, header, "/nokku.v1.AuthService/Logout"))
-	p, _, err := e.svc.AuthenticateToken(ctx, secret)
+	p, _, err := e.svc.AuthenticateToken(ctx, secret, accessTokens...)
 	require.NoError(t, err, "logout ended the key")
 	assert.Equal(t, actor.KindServiceAccount, p.Kind)
 }
@@ -456,7 +458,7 @@ func TestExpiredTokenIsDeletedOnUse(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	saID := e.serviceAccount(t, o.ws)
-	secret, hash := nkcrypto.NewKey(nkcrypto.KeyPrefixServiceAccount)
+	secret, hash := nkcrypto.NewToken(nkcrypto.TokenServiceAccount)
 	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
 		_, err := q.CreateAccessToken(t.Context(), &db.CreateAccessTokenParams{
 			TokenHash: hash, Kind: string(actor.KindServiceAccount), SubjectID: &saID,
@@ -465,7 +467,7 @@ func TestExpiredTokenIsDeletedOnUse(t *testing.T) {
 		return err
 	}))
 
-	_, _, err := e.svc.AuthenticateToken(anon(t.Context(), o.ws), secret)
+	_, _, err := e.svc.AuthenticateToken(anon(t.Context(), o.ws), secret, accessTokens...)
 	require.Error(t, err, "an expired key signed in")
 	var left []*db.AccessToken
 	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
@@ -473,24 +475,4 @@ func TestExpiredTokenIsDeletedOnUse(t *testing.T) {
 		return err
 	}))
 	assert.Empty(t, left, "the expired key is still listed")
-}
-
-// A session secret is random and may start like a key. It is still a session.
-func TestSessionSecretMayStartLikeAKey(t *testing.T) {
-	e := newTestEnv(t)
-	o := e.org(t)
-	raw := "nk_" + nkcrypto.RandomString(30)
-	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
-		_, err := q.CreateAccessToken(t.Context(), &db.CreateAccessTokenParams{
-			TokenHash: nkcrypto.HashToken(raw),
-			SubjectID: &o.owner.ID,
-			Kind:      string(actor.KindUser),
-			Method:    string(iam.MethodPasskey),
-		})
-		return err
-	}))
-
-	p, _, err := e.svc.AuthenticateToken(anon(t.Context(), o.ws), raw)
-	require.NoError(t, err, "a session starting with nk_ was taken for a bad key")
-	assert.Equal(t, o.owner.ID, p.ID)
 }

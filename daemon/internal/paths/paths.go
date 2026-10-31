@@ -8,10 +8,8 @@ import (
 )
 
 const (
-	configFilename      = "config.json"
-	cacheFilename       = "cache.json"
+	stateFilename       = "daemon.json"
 	signerStateFilename = "state.json"
-	hostSignerFilename  = "ssh_host_signer.json"
 	recordsDir          = "recordings"
 	hostKeyName         = "ssh_host_ecdsa_key"
 )
@@ -25,13 +23,11 @@ func dataDir() string {
 
 func RecordsDir() string { return filepath.Join(dataDir(), recordsDir) }
 
-func ConfigFile() string { return filepath.Join(dataDir(), configFilename) }
-
-func CacheFile() string { return filepath.Join(dataDir(), cacheFilename) }
+func StateFile() string { return filepath.Join(dataDir(), stateFilename) }
 
 func SignerStateFile() string { return filepath.Join(dataDir(), signerStateFilename) }
 
-func HostSignerStateFile() string { return filepath.Join(dataDir(), hostSignerFilename) }
+func HostKey() string { return filepath.Join(dataDir(), hostKeyName) }
 
 func HostKeyPub() string { return filepath.Join(dataDir(), hostKeyName+".pub") }
 

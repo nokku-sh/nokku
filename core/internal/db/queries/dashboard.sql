@@ -14,7 +14,7 @@ SELECT
       JOIN daemons d ON d.workspace_id = t.workspace_id
       AND d.id = t.daemon_id
     WHERE
-      d.last_seen_at > @seen_after::TIMESTAMPTZ
+      COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
   )::INTEGER AS targets_online,
   (
     SELECT
@@ -41,7 +41,7 @@ FROM
       (COUNT(*) FILTER (
         WHERE
           status <> 1 -- pending
-          AND last_seen_at > @seen_after::TIMESTAMPTZ
+          AND COALESCE(id = ANY (@connected::UUID[]), FALSE)
       ))::INTEGER AS online
     FROM
       daemons
@@ -67,7 +67,7 @@ FROM
   daemons
 WHERE
   status = 2 -- accepted
-  AND COALESCE(last_seen_at <= @seen_after::TIMESTAMPTZ, TRUE)
+  AND NOT COALESCE(id = ANY (@connected::UUID[]), FALSE)
 ORDER BY
   id ASC
 LIMIT
@@ -87,7 +87,7 @@ FROM
 WHERE
   r.ended_at IS NULL
   AND r.started_at > NOW() - INTERVAL '24 hours'
-  AND d.last_seen_at > @seen_after::TIMESTAMPTZ
+  AND COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
 ORDER BY
   r.started_at DESC
 LIMIT

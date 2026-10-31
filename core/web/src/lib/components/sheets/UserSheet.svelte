@@ -2,6 +2,7 @@
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { users } from '#lib/api/workspaces.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
@@ -110,14 +111,16 @@
 				description: 'Hand over the workspace. You become an admin.',
 				label: 'Transfer',
 				onClick: () =>
-					confirm({
-						title: `Make ${name} the owner?`,
-						description:
-							'They get full control, including single sign-on, billing and deleting the workspace. You become an admin, and only they can hand it back.',
-						confirmText: 'Transfer ownership',
-						typeToConfirm: person.email,
-						onConfirm: () => transfer.mutateAsync({ newOwnerId: person.id })
-					})
+					whenFresh(() =>
+						confirm({
+							title: `Make ${name} the owner?`,
+							description:
+								'They get full control, including single sign-on, billing and deleting the workspace. You become an admin, and only they can hand it back.',
+							confirmText: 'Transfer ownership',
+							typeToConfirm: person.email,
+							onConfirm: () => transfer.mutateAsync({ newOwnerId: person.id })
+						})
+					)
 			});
 		}
 		if (canManage) {

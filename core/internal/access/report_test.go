@@ -19,7 +19,7 @@ func TestReportCSV(t *testing.T) {
 	rows := []*db.ListAccessReportRow{
 		{
 			Kind: "user", SubjectID: "u1", Name: "Ada", Email: "ada@x", Active: true, Via: "ops", Target: "web-1",
-			Username: "deploy", GrantedAt: granted, Stale: true,
+			Username: "deploy", GrantedAt: granted, Enforced: true, Stale: true,
 		},
 		{
 			Kind: "service_account", SubjectID: "s1", Name: "ci", Active: true, Target: "web-1", Username: "deploy",
@@ -35,8 +35,9 @@ func TestReportCSV(t *testing.T) {
 	require.Len(t, records, 3, "a header and one line per row")
 	assert.Equal(t, []string{
 		"user", "u1", "Ada", "ada@x", "true", "ops", "web-1", "deploy",
-		"2026-01-02T03:04:05Z", "", "", "true",
+		"2026-01-02T03:04:05Z", "", "", "true", "true",
 	}, records[1], "a stale grant through a team")
+	assert.Equal(t, "false", records[2][11], "a grant that lets nobody in today is marked")
 	assert.Equal(t, "2026-01-04T03:04:05Z", records[2][9], "the end of a grant that ends")
 	assert.Equal(t, "2026-01-02T04:04:05Z", records[2][10], "the last certificate")
 }

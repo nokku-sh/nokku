@@ -13,7 +13,6 @@ const (
 	FeatureIdleTimeout    = "idle_timeout"
 	FeatureAccessRequests = "access_requests"
 	FeatureAuditStreaming = "audit_streaming"
-	FeatureLegalHold      = "legal_hold"
 )
 
 const (
@@ -45,7 +44,6 @@ var CatalogFeatures = []Feature{
 	{FeatureSCIM, "SCIM provisioning", PlanEnterprise},
 	{FeatureAccessRequests, "Access requests", PlanEnterprise},
 	{FeatureAuditStreaming, "Audit log streaming", PlanEnterprise},
-	{FeatureLegalHold, "Legal hold", PlanEnterprise},
 }
 
 // PlanNames are the names people see, by plan code.

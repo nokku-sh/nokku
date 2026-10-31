@@ -58,7 +58,7 @@ Prefer to add the package repository yourself? The [package repository](https://
 
 - Every `nk ls` refreshes what you can reach.
 - An SSH connection refreshes it too, when the last sync is more than a minute old.
-- A revoke applies at once, because the server enforces it.
+- A revoke applies at once, because the server enforces it. On a server set up with `nk sync` it lands within an hour, see [below](#servers-without-the-daemon).
 - When the core is unreachable, `nk` fails fast and works from cached data and the certificates you still hold.
 - Direct addresses and the Nokku relay are tried in parallel, so an unreachable private address never slows a connection down.
 - When there is another way in, a private address must show the server's own host key first. Another machine at that address on your network, like a NAS at home, is skipped.
@@ -100,11 +100,11 @@ nk sync web --dry-run       # show what would change on a known target
 What it does:
 
 - It connects as root with your own `ssh`, so your keys and SSH config apply and a password is asked at most once.
-- It writes the Nokku CA, an sshd drop-in and one principals file per account.
+- It writes the Nokku CA and an sshd drop-in with one fixed rule: let in a certificate Nokku signed for this server and the account asked for.
 - It checks the result with `sshd -t` and rolls every file back if sshd rejects it, or if the run breaks off halfway.
 - Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
 
-Run it again whenever access changes. `nk sync` and `nk rm` find a server by its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
+Access changes need no new sync. Nokku decides who gets a certificate for the server, so a new grant works at once. A revoke lands within an hour: certificates for these servers last an hour at most, and the core signs no new one without the grant. Run `nk sync` again after the CA is rotated. `nk sync` and `nk rm` find a server by its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
 
 A new server can start with access in place, so nobody has to open the web app after the first sync:
 
@@ -120,7 +120,7 @@ The first sync trusts the server the way your own `ssh` does. When `ssh` asks ab
 
 From then on the sync pins the host key it saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key` to pin the new one.
 
-For scripts, `--json` prints one object with the target, the files written and the stale principals files removed. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server cannot know its principals yet, so their files are empty and `grants` lists the subjects per account as you typed them.
+For scripts, `--json` prints one object with the target and the files written. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server has no target id yet, so the drop-in shows `<target-id>` in its place and `grants` lists the subjects per account as you typed them.
 
 `nk rm` undoes it:
 
@@ -128,19 +128,19 @@ For scripts, `--json` prints one object with the target, the files written and t
 nk rm web        # or the address, like nk sync
 ```
 
-It checks the pinned host key first, then removes the drop-in, the CA and the principals files over the same root `ssh`, reloads sshd, and only then deletes the target in Nokku. If sshd rejects its config without the drop-in, everything is put back and the target stays. Pass `--keep-host` when the server is already gone.
+It checks the pinned host key first, then removes the drop-in and the CA over the same root `ssh`, reloads sshd, and only then deletes the target in Nokku. If sshd rejects its config without the drop-in, everything is put back and the target stays. Pass `--keep-host` when the server is already gone.
 
 ## Commands
 
-| Command                      | Purpose                                                                                       |
-| ---------------------------- | --------------------------------------------------------------------------------------------- |
-| `nk login` (alias `refresh`) | Sign in and sync local state                                                                  |
-| `nk ls` / `nk list`          | List the servers you can reach, and until when for access that ends                           |
-| `nk request <host> <user>`   | Ask an admin for an account on a server for a while, then wait for the answer                 |
-| `nk doctor`                  | Check the core, the TPM and your local SSH setup                                              |
-| `nk sync <host>`             | Add a server without the daemon, or refresh one you added                                     |
-| `nk rm <host>`               | Clean up a server you added with `nk sync` and delete its target                              |
-| `nk logout`                  | Sign out, stop the agent and remove local credentials and state. Asks about a CA it installed |
+| Command                      | Purpose                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `nk login` (alias `refresh`) | Sign in and sync local state                                                  |
+| `nk ls` / `nk list`          | List the servers you can reach, and until when for access that ends           |
+| `nk request <host> <user>`   | Ask an admin for an account on a server for a while, then wait for the answer |
+| `nk doctor`                  | Check the core, the TPM and your local SSH setup                              |
+| `nk sync <host>`             | Add a server without the daemon, or refresh one you added                     |
+| `nk rm <host>`               | Clean up a server you added with `nk sync` and delete its target              |
+| `nk logout`                  | Sign out, stop the agent and remove local credentials and state               |
 
 ### Command flags
 
@@ -154,16 +154,15 @@ It checks the pinned host key first, then removes the drop-in, the CA and the pr
 
 ## Configuration
 
-| Flag            | Environment         | Purpose                                                                                                                    |
-| --------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `--api`         | `NK_API_URL`        | Address of the core                                                                                                        |
-|                 | `NK_TOKEN`          | Service account key (`nk_sa_...`) for CI. Environment only, never a flag                                                   |
-| `--ttl`         | `NK_TTL`            | Requested SSH certificate lifetime, kept for later connections. `0` goes back to the CA default                            |
-| `--require-tpm` | `NK_REQUIRE_TPM`    | Require a TPM 2.0 or the Secure Enclave, refuse the software key fallback                                                  |
-|                 | `NK_SECURE_ENCLAVE` | Set to `1` on macOS to keep new keys in the Secure Enclave. Experimental                                                   |
-| `--pin`         | `NK_API_PIN`        | Fingerprint of the core's private CA, `sha256:...`. The web app shows it under **Profile, Security**. Without it `nk` asks |
-| `--ca-file`     | `NK_CA_FILE`        | PEM file with the core's private CA, instead of a pin                                                                      |
-| `--debug`       | `NK_DEBUG`          | Debug logging                                                                                                              |
+| Flag            | Environment         | Purpose                                                                                         |
+| --------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
+| `--api`         | `NK_API_URL`        | Address of the core                                                                             |
+|                 | `NK_TOKEN`          | Service account key (`nk_sa_...`) for CI. Environment only, never a flag                        |
+| `--ttl`         | `NK_TTL`            | Requested SSH certificate lifetime, kept for later connections. `0` goes back to the CA default |
+| `--require-tpm` | `NK_REQUIRE_TPM`    | Require a TPM 2.0 or the Secure Enclave, refuse the software key fallback                       |
+|                 | `NK_SECURE_ENCLAVE` | Set to `1` on macOS to keep new keys in the Secure Enclave. Experimental                        |
+| `--ca-file`     | `NK_CA_FILE`        | PEM file with the core's private CA, kept for later runs                                        |
+| `--debug`       | `NK_DEBUG`          | Debug logging                                                                                   |
 
 `--api` is remembered after the first use. Switching to another core drops the old session. The other flags apply to one run only.
 

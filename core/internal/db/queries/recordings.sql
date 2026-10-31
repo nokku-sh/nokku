@@ -72,13 +72,18 @@ WITH
   )
 SELECT
   sqlc.embed(r),
-  legal_hold_covers (r.workspace_id, r.started_at)::BOOLEAN AS held,
   (
     SELECT
       COUNT(*)
     FROM
       filtered
-  )::INTEGER AS total_count
+  )::INTEGER AS total_count,
+  -- The same rule as ListOpenRecordings.
+  (
+    r.ended_at IS NULL
+    AND r.started_at > NOW() - INTERVAL '24 hours'
+    AND COALESCE(r.daemon_id = ANY (@connected::UUID[]), FALSE)
+  )::BOOLEAN AS live
 FROM
   recordings r
   JOIN paginated pp ON pp.id = r.id
@@ -91,56 +96,52 @@ SELECT
 FROM
   recordings;
 
--- name: SetRecordingSize :exec
--- An upload in progress counts toward the storage cap by its row.
-UPDATE recordings
-SET
-  size_bytes = @size_bytes
+-- name: LockRecording :one
+-- Uploads of one recording end one at a time, so each sees what the one before it stored.
+SELECT
+  *
+FROM
+  recordings
 WHERE
-  id = @id;
+  id = @id
+FOR UPDATE;
 
--- name: SetRecordingComplete :one
+-- name: FinishRecordingUpload :one
+-- A NULL object leaves the stored copy in place, a NULL end leaves a session running. An end from a wrong clock counts
+-- as now.
 UPDATE recordings
 SET
+  object_id = COALESCE(sqlc.narg('object_id')::UUID, object_id),
   size_bytes = @size_bytes,
-  ended_at = NOW(),
-  complete = @complete
+  complete = @complete,
+  ended_at = CASE
+    WHEN sqlc.narg('ended_at')::TIMESTAMPTZ IS NULL THEN ended_at
+    WHEN sqlc.narg('ended_at')::TIMESTAMPTZ BETWEEN started_at AND NOW() THEN sqlc.narg('ended_at')::TIMESTAMPTZ
+    ELSE NOW()
+  END
 WHERE
   id = @id
 RETURNING
   *;
 
+-- name: QueueLostRecordingObject :exec
+SELECT
+  queue_lost_recording_object (@object_id);
+
 -- name: DeleteRecording :execrows
--- Nothing is deleted when a legal hold covers it.
-DELETE FROM recordings r
+DELETE FROM recordings
 WHERE
-  r.id = @id
-  AND NOT legal_hold_covers (r.workspace_id, r.started_at);
+  id = @id;
 
 -- name: OldestRecordings :many
--- Held recordings are never evicted, so they are never offered.
 SELECT
-  r.*
+  *
 FROM
-  recordings r
-WHERE
-  NOT legal_hold_covers (r.workspace_id, r.started_at)
+  recordings
 ORDER BY
-  r.started_at ASC
+  started_at ASC
 LIMIT
   sqlc.narg('limit');
-
--- name: RecordingHeld :one
-SELECT
-  EXISTS (
-    SELECT
-      1
-    FROM
-      recordings r
-    WHERE
-      r.id = @id
-      AND legal_hold_covers (r.workspace_id, r.started_at)
-  )::BOOLEAN;
 
 -- name: ListRecordingWorkspaceIDs :many
 -- Hops from one workspace to the next in the index. A DISTINCT reads every recording to name a few hundred ids.
@@ -182,13 +183,36 @@ FROM
 WHERE
   workspace_id IS NOT NULL;
 
--- name: DeleteRecordingsBefore :many
--- A legal hold keeps its range.
-DELETE FROM recordings r
+-- name: DeleteRecordingsBefore :exec
+DELETE FROM recordings
 WHERE
-  r.workspace_id = @workspace_id
-  AND r.started_at < @cutoff
-  AND NOT legal_hold_covers (r.workspace_id, r.started_at)
-RETURNING
-  id,
-  size_bytes;
+  workspace_id = @workspace_id
+  AND started_at < @cutoff;
+
+-- name: NextRecordingDelete :one
+SELECT
+  workspace_id,
+  object_id
+FROM
+  recording_deletes
+WHERE
+  next_try_at <= NOW()
+ORDER BY
+  next_try_at
+LIMIT
+  1;
+
+-- name: FinishRecordingDelete :exec
+DELETE FROM recording_deletes
+WHERE
+  object_id = @object_id;
+
+-- name: DeferRecordingDelete :exec
+-- Waits 10 minutes after the first failure, doubling up to a day.
+UPDATE recording_deletes
+SET
+  attempts = attempts + 1,
+  last_error = @last_error,
+  next_try_at = NOW() + LEAST(INTERVAL '1 day', INTERVAL '10 minutes' * POWER(2, LEAST(attempts, 10)))
+WHERE
+  object_id = @object_id;
