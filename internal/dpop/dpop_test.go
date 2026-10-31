@@ -24,7 +24,7 @@ func testKey(t *testing.T) *ecdsa.PrivateKey {
 // verifiedClaims checks the compact JWS against pub and returns its claims.
 func verifiedClaims(t *testing.T, proof string, pub *ecdsa.PublicKey) map[string]any {
 	t.Helper()
-	jws, err := jose.ParseSigned(proof, []jose.SignatureAlgorithm{jose.ES256})
+	jws, err := jose.ParseSignedCompact(proof, []jose.SignatureAlgorithm{jose.ES256})
 	require.NoError(t, err)
 	payload, err := jws.Verify(&jose.JSONWebKey{Key: pub})
 	require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestSignRejectsWrongKey(t *testing.T) {
 	proof, err := p.Sign("GET", "https://api.example.com/x", "", "")
 	require.NoError(t, err)
 
-	jws, err := jose.ParseSigned(proof, []jose.SignatureAlgorithm{jose.ES256})
+	jws, err := jose.ParseSignedCompact(proof, []jose.SignatureAlgorithm{jose.ES256})
 	require.NoError(t, err)
 	_, err = jws.Verify(&jose.JSONWebKey{Key: &testKey(t).PublicKey})
 	require.Error(t, err, "proof verified under the wrong key")

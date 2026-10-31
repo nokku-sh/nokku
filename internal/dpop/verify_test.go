@@ -65,6 +65,21 @@ func TestVerify(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidProof, "not a proof")
 }
 
+func TestVerifyTakesOnlyTheCompactForm(t *testing.T) {
+	const htu = "https://nokku.example.com/x"
+	v := newTestVerifier(1)
+	p, err := NewProofer(testKey(t))
+	require.NoError(t, err)
+	proof := testProof(t, p, htu, "", v.CurrentNonce())
+	_, err = v.Verify(proof, "", http.MethodPost, htu, "")
+	require.NoError(t, err)
+
+	jws, err := jose.ParseSignedCompact(proof, allowedAlgs)
+	require.NoError(t, err)
+	_, err = v.Verify(jws.FullSerialize(), "", http.MethodPost, htu, "")
+	require.ErrorIs(t, err, ErrInvalidProof, "the same proof as JSON")
+}
+
 // Anyone can sign a proof without a session, so it never takes room in the replay store. What it is for, enrolling
 // a daemon or polling a device grant, is single-use anyway.
 func TestAnonymousProofsCannotFillTheSessionStore(t *testing.T) {

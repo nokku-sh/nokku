@@ -97,12 +97,9 @@ func (v *Verifier) nonceValid(nonce string) bool {
 // for none. A non-empty binding is the jkt the token is bound to, it has to
 // match before the jti takes room in the replay store.
 func (v *Verifier) Verify(proofJWT, accessToken, htm, htu, binding string) (string, error) {
-	sig, err := jose.ParseSigned(proofJWT, allowedAlgs)
+	sig, err := jose.ParseSignedCompact(proofJWT, allowedAlgs)
 	if err != nil {
 		return "", fmt.Errorf("%w: parse: %w", ErrInvalidProof, err)
-	}
-	if len(sig.Signatures) != 1 {
-		return "", fmt.Errorf("%w: expected a single signature", ErrInvalidProof)
 	}
 
 	hdr := sig.Signatures[0].Protected
