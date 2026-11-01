@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ca } from '#lib/api/certificates.svelte.js';
+	import { ca, manualKeyState } from '#lib/api/certificates.svelte.js';
 	import { useConnect } from '#lib/api/connect.svelte.js';
 	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
@@ -21,7 +21,6 @@
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
-	import { timestampDate } from '@bufbuild/protobuf/wkt';
 	import {
 		ChevronDown,
 		Copy,
@@ -67,19 +66,7 @@
 	const accounts = $derived(entity?.accounts ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
 	const lastSynced = $derived(formatTs(entity?.lastSyncAt, 'relative-short'));
-	// The server only learns a new CA key from nk sync.
-	const caRotated = $derived.by(() => {
-		const rotatedAt = authority.data?.rotatedAt;
-		const syncedAt = entity?.lastSyncAt;
-		return !!syncedAt && !!rotatedAt && timestampDate(rotatedAt) > timestampDate(syncedAt);
-	});
-	// A sync while the old key still counts writes both, and the server has no way to drop one on a date.
-	const oldKeyUntil = $derived.by(() => {
-		const until = authority.data?.previousTrustedUntil;
-		const syncedAt = entity?.lastSyncAt;
-		if (!isManual || caRotated || !until || !syncedAt) return undefined;
-		return timestampDate(syncedAt) < timestampDate(until) ? until : undefined;
-	});
+	const keyState = $derived(manualKeyState(authority.data, entity?.lastSyncAt));
 	const syncCommand = $derived(`nk sync ${model?.name ?? '<name>'}`);
 	const systemInfo = $derived(
 		Object.entries(entity?.metadata ?? {})
@@ -243,16 +230,16 @@
 					icon={RefreshCw}
 					description={lastSynced ? `Last synced ${lastSynced}.` : 'Not synced yet.'}
 				>
-					{#if caRotated}
+					{#if keyState.rotated}
 						<p class="text-sm text-warning">
 							The certificate authority was rotated after the last sync. Sync again, or this server
 							rejects new certificates.
 						</p>
-					{:else if oldKeyUntil}
+					{:else if keyState.oldKeyUntil}
 						<p class="text-sm text-warning">
 							This server still trusts the previous key of the certificate authority. Sync again
 							after
-							{formatTs(oldKeyUntil)}, it can't drop that key on its own.
+							{formatTs(keyState.oldKeyUntil)}, it can't drop that key on its own.
 						</p>
 					{/if}
 					<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">

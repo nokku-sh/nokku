@@ -20,7 +20,7 @@ internal/billing/stripe.go Stripe.activeSubscription Sys GetSubscription
 internal/billing/stripe.go Stripe.billableSeats Sys CountActiveUsers
 internal/billing/stripe.go Stripe.sync Sys UpsertSubscription
 internal/billing/stripe.go Stripe.syncAll Sys ListProviderSubscriptions
-internal/crypto/kms/kms.go Keyset.Rotate SysTx LockKeyset,UpdateKeyset,rotateKeys(q)
+internal/crypto/kms/kms.go Keyset.Rotate SysTx LockKeyset,TryAdvisoryXactLock,UpdateKeyset,rotateKeys(q)
 internal/crypto/kms/kms.go Keyset.load Sys GetKeysetData
 internal/crypto/kms/kms.go Keyset.load Sys GetKeysetData
 internal/crypto/kms/kms.go Keyset.load Sys InsertKeyset

@@ -18,6 +18,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/cryptosigner"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
@@ -378,6 +379,12 @@ func TestCreateSession(t *testing.T) {
 	assert.Equal(t, "root", sshd.ConnUser(), "sshd saw the requested OS user")
 	assert.Equal(t, "nokku:web:session:"+sessionID, sshd.KeyID(), "the session id travels in the certificate")
 	assert.Len(t, cfg.Pool.ListSessions(enrolled.GetId()), 1)
+	assert.Contains(
+		t,
+		certificateKeyIDs(t, cfg),
+		"nokku:web:session:"+sessionID,
+		"a terminal certificate needs its row",
+	)
 
 	_, res, err := websocket.Dial(t.Context(), srv.URL+"/terminal/ws?session_id="+sessionID,
 		&websocket.DialOptions{
@@ -392,6 +399,14 @@ func TestCreateSession(t *testing.T) {
 	assert.Eventually(t, func() bool {
 		return len(cfg.Pool.ListSessions(enrolled.GetId())) == 0
 	}, 5*time.Second, 20*time.Millisecond, "session outlived its socket")
+
+	// No row, no certificate, so the shell never opens.
+	restore := blockAuditWrites(t)
+	_, ws = openShell()
+	_, _, err = ws.Read(t.Context())
+	assert.Equal(t, websocket.StatusInternalError, websocket.CloseStatus(err), "a shell opened with no row, %v", err)
+	assert.Empty(t, cfg.Pool.ListSessions(enrolled.GetId()), "a session started with no row in the log")
+	restore()
 
 	// Ctrl+D ends the shell, and the socket says so with its own close code.
 	_, ws = openShell()
@@ -755,13 +770,16 @@ func TestSignHostCertificate(t *testing.T) {
 	hostPub, err := gossh.NewPublicKey(&hostKey.PublicKey)
 	require.NoError(t, err)
 
-	res, err := nokkuv1connect.NewDaemonControlServiceClient(clientOn(srv, daemonAuth(
-		t, cfg, key, enrolled.GetAccessToken(),
-		nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure,
-	))).
-		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{
-			PublicKey: new(string(gossh.MarshalAuthorizedKey(hostPub))),
-		})
+	sign := func() (*nokkuv1.SignHostCertificateResponse, error) {
+		return nokkuv1connect.NewDaemonControlServiceClient(clientOn(srv, daemonAuth(
+			t, cfg, key, enrolled.GetAccessToken(),
+			nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure,
+		))).
+			SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{
+				PublicKey: new(string(gossh.MarshalAuthorizedKey(hostPub))),
+			})
+	}
+	res, err := sign()
 	require.NoError(t, err)
 
 	parsed, _, _, _, err := gossh.ParseAuthorizedKey([]byte(res.GetSignedCertificate()))
@@ -773,6 +791,10 @@ func TestSignHostCertificate(t *testing.T) {
 	ca, _, _, _, err := gossh.ParseAuthorizedKey([]byte(caKey))
 	require.NoError(t, err)
 	assert.Equal(t, ca.Marshal(), cert.SignatureKey.Marshal(), "signed by the host key of the target's CA")
+
+	blockAuditWrites(t)
+	_, err = sign()
+	require.Error(t, err, "a host certificate went out with no row in the log")
 }
 
 // Unenrolling removes the daemon and spends its session with it.
@@ -802,4 +824,40 @@ func TestUnenrollDaemon(t *testing.T) {
 	_, err = control(nokkuv1connect.DaemonControlServiceSyncDaemonProcedure).
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the session outlived the daemon, got %v", err)
+}
+
+// blockAuditWrites takes the app's insert on the log until the test or restore.
+func blockAuditWrites(t *testing.T) (restore func()) {
+	t.Helper()
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	restore = func() {
+		_, err := owner.Exec(context.WithoutCancel(t.Context()), "GRANT INSERT ON audit.audit_logs TO nokku_app")
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() { restore(); _ = owner.Close(context.WithoutCancel(t.Context())) })
+	_, err = owner.Exec(t.Context(), "REVOKE INSERT ON audit.audit_logs FROM nokku_app")
+	require.NoError(t, err)
+	return restore
+}
+
+// certificateKeyIDs reads the key id of every certificate the log holds.
+func certificateKeyIDs(t *testing.T, cfg *config.Config) []string {
+	t.Helper()
+	var rows []*db.ListAuditLogsRow
+	require.NoError(t, cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
+		rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+			Actions: []string{"SignSSHCertificate"}, Limit: 1000,
+		})
+		return err
+	}))
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		var details struct {
+			KeyID string `json:"key_id"`
+		}
+		require.NoError(t, json.Unmarshal(row.Details, &details))
+		ids = append(ids, details.KeyID)
+	}
+	return ids
 }

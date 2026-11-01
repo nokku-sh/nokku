@@ -68,6 +68,19 @@ OFFSET
   sqlc.narg('offset');
 
 -- name: UpdateTarget :one
+-- A rename reaches the daemon too, sessions and recordings show its name.
+WITH renamed AS (
+  UPDATE daemons d
+  SET
+    name = sqlc.narg('name'),
+    updated_at = NOW()
+  FROM
+    targets t
+  WHERE
+    t.id = @target_id
+    AND d.id = t.daemon_id
+    AND sqlc.narg('name')::TEXT IS NOT NULL
+)
 UPDATE targets
 SET
   name = COALESCE(sqlc.narg('name'), name),
@@ -78,7 +91,7 @@ SET
   host_public_key = COALESCE(sqlc.narg('host_public_key'), host_public_key),
   updated_at = NOW()
 WHERE
-  id = @target_id
+  targets.id = @target_id
 RETURNING
   *;
 

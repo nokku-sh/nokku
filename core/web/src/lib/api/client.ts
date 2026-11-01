@@ -56,16 +56,10 @@ export const queryClient = new QueryClient({
 		}
 	}),
 	mutationCache: new MutationCache({
-		onSuccess: async (_data, _variables, _context, mutation) => {
+		// Screens mix services, so a change refreshes everything on screen.
+		onSuccess: async () => {
 			connection.answered();
-			const mutationKey = mutation.options.mutationKey;
-			if (mutationKey && mutationKey.length >= 2 && mutationKey[0] === 'connect-query') {
-				const serviceName = mutationKey[1];
-
-				await queryClient.invalidateQueries({ queryKey: ['connect-query', serviceName] });
-			} else {
-				await queryClient.invalidateQueries({ queryKey: ['connect-query'] });
-			}
+			await queryClient.invalidateQueries({ queryKey: ['connect-query'] });
 		},
 		onError: (error) => {
 			if (!(error instanceof ConnectError)) return;

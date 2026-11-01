@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -319,7 +320,13 @@ func TestSCIMGroupsStayInWorkspace(t *testing.T) {
 // deactivation in one request.
 func TestSCIMRenamesTheLogin(t *testing.T) {
 	mail := newMailbox()
-	e := newTestEnvWith(t, mail.deps())
+	moved := make(chan [2]string, 4)
+	deps := mail.deps()
+	deps.SendEmailMoved = func(_ context.Context, _, email, newEmail string) error {
+		moved <- [2]string{email, newEmail}
+		return nil
+	}
+	e := newTestEnvWith(t, deps)
 	o := e.org(t)
 	c := e.scim(t, o)
 	first, second, third := "first@"+testDomain(), "second@"+testDomain(), "third@"+testDomain()
@@ -351,6 +358,12 @@ func TestSCIMRenamesTheLogin(t *testing.T) {
 	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, path, patchOps(work(second), off), &patched))
 	assert.Equal(t, second, patched.UserName)
 	assert.False(t, patched.Active, "the deactivation did not land")
+	select {
+	case got := <-moved:
+		assert.Equal(t, [2]string{first, second}, got, "the old address gets the notice")
+	case <-time.After(2 * time.Second):
+		t.Fatal("the old address got no notice of the rename")
+	}
 	_, _, err := e.svc.ConsumeMagicLink(ctx, oldLink)
 	require.ErrorIs(t, err, iam.ErrInvalidToken, "a link mailed to the old address still signed in")
 

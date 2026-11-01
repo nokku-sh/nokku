@@ -181,11 +181,13 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	uploadsBy := (<-stopped).Add(stopGrace - unenrollTimeout)
 	// Serve returns once every session ended, so all recordings are closed.
 	wg.Wait()
-	if !uploads.Wait(time.Until(uploadsBy)) {
+	uploaded := uploads.Wait(time.Until(uploadsBy))
+	if !uploaded {
 		slog.Warn("recordings still uploading at shutdown, the next start sends them")
 	}
-	// An ephemeral host never comes back, so it deletes its own record.
-	if err == nil && st.Access().DaemonConfig.GetEphemeral() {
+	// An ephemeral host never comes back, so it deletes its own record. With
+	// recordings left it keeps its files, and the core retires it later.
+	if err == nil && uploaded && st.Access().DaemonConfig.GetEphemeral() {
 		unenroll(context.WithoutCancel(ctx), cl)
 	}
 	return err

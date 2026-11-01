@@ -150,7 +150,7 @@ Requiring single sign-on closes passkeys and email links for everyone else, and 
 
 - **An account links by address only when the provider vouches for it.** A provider that sends `email_verified: true` links to the account with that address. One that sends `false` never does. Entra sends nothing at all, so it only links when the owner turns on **Trust addresses it does not verify** for that provider. Do that only for a directory you run, like your own Entra tenant, never for one where people pick their own address.
 - **New ways in need a fresh sign-in.** Adding a passkey, linking a provider, approving `nk` on a device, changing the email address, handing out a join, service account or SCIM token, adding or removing a CI rule on a service account, changing an SSO provider, changing the CA or rolling it over, changing the limits of a service account, transferring ownership and deleting the workspace take a browser session from the last 10 minutes. A service account never does these, whatever its role. An older one is signed out and has to sign in again, so a stolen session cookie cannot turn into a lasting way in. `nk` can do none of these.
-- **Every new way in is mailed.** A sign-in from a device the account has not used, a new passkey, a linked provider and a change of the email address each send the account a mail, one per device or credential. Someone who got hold of a session cannot add a way in without the owner of the mailbox seeing it. This needs `NOKKU_SMTP_HOST`.
+- **Every new way in is mailed.** A sign-in from a device the account has not used, a new passkey, a linked provider and a change of the email address each send the account a mail, one per device or credential. A rename through SCIM mails the old address. Someone who got hold of a session cannot add a way in without the owner of the mailbox seeing it. This needs `NOKKU_SMTP_HOST`.
 
 ### Network
 
@@ -207,6 +207,8 @@ The answer is a service account token of an hour at most, never past the job tok
 **The relay and the browser terminal.** A connection from `nk` through the relay stays encrypted end to end, the core only carries SSH ciphertext. The browser terminal is different: the core is the SSH client there, so what is on the screen passes through it in the clear.
 
 **Session recordings.** Daemons stream recordings to the core, where each is encrypted with a key of its own. Nothing is redacted: a secret printed on the terminal is in the recording, so treat recordings like the servers they come from. Typed passwords are not recorded, the daemon records input only while the terminal echoes. Every playback is written to the audit log.
+
+**Audit log retention.** The log keeps rows for your plan's retention. An enabled audit stream holds back what it has not sent, up to 365 days, so a stream that is down loses nothing in that time. A paused stream holds nothing back, so what ages out while it is paused never goes out. Deleting a user or a server deletes their access requests too. The audit log keeps who asked and who decided.
 
 **Row-level security is a safety net, not a wall.** Every tenant row belongs to one workspace, and a request only sees the rows of its own. The policy is the only workspace filter, queries name none. A connection with no workspace set sees nothing. This protects against application bugs. It does not protect against a compromised core: it holds the password of `nokku_system` too, and the workspace setting is an ordinary session variable. Queries are parameterized through sqlc, which is the defense against injection.
 

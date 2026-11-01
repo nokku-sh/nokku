@@ -158,7 +158,7 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 				case opName == "replace" && expr == nil:
 					return setTeamMembers(ctx, q, id, ids)
 				case opName != "remove":
-					return addTeamMembers(ctx, q, id, ids)
+					return q.AddTeamMembers(ctx, &db.AddTeamMembersParams{TeamID: id, UserIds: ids})
 				case value == nil && expr == nil:
 					// A bare remove takes every value (RFC 7644 3.5.2.2).
 					return setTeamMembers(ctx, q, id, nil)
@@ -210,22 +210,7 @@ func setTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs [
 			return err
 		}
 	}
-	return addTeamMembers(ctx, q, teamID, userIDs)
-}
-
-// addTeamMembers skips non-members, a group never widens the workspace.
-func addTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs []string) error {
-	for _, uid := range userIDs {
-		if _, err := q.GetUser(ctx, uid); errors.Is(err, pgx.ErrNoRows) {
-			continue
-		} else if err != nil {
-			return err
-		}
-		if err := q.AddTeamMember(ctx, &db.AddTeamMemberParams{TeamID: teamID, UserID: uid}); err != nil {
-			return err
-		}
-	}
-	return nil
+	return q.AddTeamMembers(ctx, &db.AddTeamMembersParams{TeamID: teamID, UserIds: userIDs})
 }
 
 func groupResource(

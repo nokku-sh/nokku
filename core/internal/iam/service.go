@@ -81,6 +81,8 @@ type Deps struct {
 	SendInvite   func(ctx context.Context, email, workspace, role, link string, expiry time.Duration) error
 	SendNewLogin func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
 	SendNewWayIn func(ctx context.Context, userID, email, credentialID, what, ip string) error
+	// SendEmailMoved tells the old address that a provider changed it.
+	SendEmailMoved func(ctx context.Context, userID, email, newEmail string) error
 }
 
 type Service struct {
@@ -97,10 +99,11 @@ type Service struct {
 	// spent holds the ids of finished flows, see spendFlow.
 	spent *cache.TTL[string, struct{}]
 
-	sendMagicLink func(ctx context.Context, userID, email, link string, expiry time.Duration) error
-	sendInvite    func(ctx context.Context, email, workspace, role, link string, expiry time.Duration) error
-	sendNewLogin  func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
-	sendNewWayIn  func(ctx context.Context, userID, email, credentialID, what, ip string) error
+	sendMagicLink  func(ctx context.Context, userID, email, link string, expiry time.Duration) error
+	sendInvite     func(ctx context.Context, email, workspace, role, link string, expiry time.Duration) error
+	sendNewLogin   func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
+	sendNewWayIn   func(ctx context.Context, userID, email, credentialID, what, ip string) error
+	sendEmailMoved func(ctx context.Context, userID, email, newEmail string) error
 
 	DPoP    *dpop.Verifier
 	Device  *DeviceFlow
@@ -114,17 +117,18 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		return nil, errors.New("iam: conn and keyset are required")
 	}
 	s := &Service{
-		conn:          d.Conn,
-		keys:          d.Keyset,
-		audit:         d.Audit,
-		secure:        d.Secure,
-		now:           time.Now,
-		canJoin:       d.CanJoin,
-		strict:        d.StrictEmail,
-		sendMagicLink: d.SendMagicLink,
-		sendInvite:    d.SendInvite,
-		sendNewLogin:  d.SendNewLogin,
-		sendNewWayIn:  d.SendNewWayIn,
+		conn:           d.Conn,
+		keys:           d.Keyset,
+		audit:          d.Audit,
+		secure:         d.Secure,
+		now:            time.Now,
+		canJoin:        d.CanJoin,
+		strict:         d.StrictEmail,
+		sendMagicLink:  d.SendMagicLink,
+		sendInvite:     d.SendInvite,
+		sendNewLogin:   d.SendNewLogin,
+		sendNewWayIn:   d.SendNewWayIn,
+		sendEmailMoved: d.SendEmailMoved,
 	}
 	var err error
 	if s.idp, err = egress.NewClient(providerHTTPTimeout); err != nil {
@@ -173,6 +177,20 @@ func (s *Service) credentialAdded(ctx context.Context, r *http.Request, u *db.Us
 		defer cancel()
 		if err := s.sendNewWayIn(ctx, u.ID, u.Email, id, what, ip); err != nil {
 			slog.Warn("new sign-in method email not sent", "error", err)
+		}
+	}()
+}
+
+// emailMoved warns the old address, a stolen SCIM token can move an account.
+func (s *Service) emailMoved(ctx context.Context, userID, oldEmail, newEmail string) {
+	if s.sendEmailMoved == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mailTimeout)
+	go func() {
+		defer cancel()
+		if err := s.sendEmailMoved(ctx, userID, oldEmail, newEmail); err != nil {
+			slog.Warn("email moved notice not sent", "error", err)
 		}
 	}()
 }

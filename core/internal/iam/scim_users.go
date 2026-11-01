@@ -227,6 +227,7 @@ func (h scimUserHandler) apply(
 		h.svc.record(ctx, event{
 			Action: actionEmailChanged, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email,
 		})
+		h.svc.emailMoved(ctx, u.ID, before.Email, u.Email)
 	}
 	return userResource(u), nil
 }

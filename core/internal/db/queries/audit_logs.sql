@@ -158,10 +158,22 @@ WHERE
   workspace_id IS NOT NULL;
 
 -- name: DeleteWorkspaceAuditLogs :execrows
-DELETE FROM audit.audit_logs
+-- An enabled stream holds what it has not sent yet, a paused one gives that up.
+-- DeleteAuditLogsBefore still ends it at the longest retention.
+DELETE FROM audit.audit_logs l
 WHERE
-  workspace_id = @workspace_id
-  AND timestamp < @cutoff;
+  l.workspace_id = @workspace_id
+  AND l.timestamp < @cutoff
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      audit_streams s
+    WHERE
+      s.workspace_id = @workspace_id
+      AND s.enabled
+      AND s.cursor_ts <= l.timestamp
+  );
 
 -- name: DeleteAuditLogsBefore :execrows
 -- The longest retention for every row, also the ones whose workspace is gone.

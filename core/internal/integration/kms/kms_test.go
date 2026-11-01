@@ -3,8 +3,10 @@
 package kms_test
 
 import (
+	"context"
 	"os"
 	"testing"
+	"time"
 	"uuid"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -147,6 +149,25 @@ func TestRotateSecret(t *testing.T) {
 	plaintext, err = enc.Open(detached, after)
 	require.NoError(t, err)
 	assert.Equal(t, "recording frame", string(plaintext))
+}
+
+// A running core can't read what a rotation moves, so one blocks the rotation.
+func TestRotateRefusesARunningServer(t *testing.T) {
+	conn := freshDB(t)
+	enc, err := openKeyset(t, conn, secretA)
+	require.NoError(t, err)
+
+	ctx, stop := context.WithCancel(t.Context())
+	defer stop()
+	require.NoError(t, conn.HoldServerLock(ctx))
+	require.ErrorIs(t, enc.Rotate(t.Context(), "secret:"+secretB), kms.ErrServerRunning)
+	_, err = openKeyset(t, conn, secretA)
+	require.NoError(t, err, "a refused rotation changed the keyset")
+
+	stop()
+	require.Eventually(t, func() bool {
+		return enc.Rotate(t.Context(), "secret:"+secretB) == nil
+	}, 5*time.Second, 20*time.Millisecond, "the rotation stayed blocked after the server stopped")
 }
 
 func TestRotateRefusesBadTarget(t *testing.T) {

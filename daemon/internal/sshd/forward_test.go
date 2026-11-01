@@ -2,6 +2,7 @@ package sshd
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -430,7 +431,7 @@ func TestTCPIPForwardAfterClose(t *testing.T) {
 	}}
 	st := newConnState(conn, 1)
 	st.close()
-	ok, _ := srv.tcpipForward(st, ssh.Marshal(tcpipForwardData{BindAddr: "127.0.0.1", BindPort: 0}))
+	ok, _ := srv.tcpipForward(t.Context(), st, ssh.Marshal(tcpipForwardData{BindAddr: "127.0.0.1", BindPort: 0}))
 	assert.False(t, ok)
 }
 
@@ -442,12 +443,26 @@ func TestDialAsReportsTheDialError(t *testing.T) {
 	closed := ln.Addr().String()
 	require.NoError(t, ln.Close())
 
-	_, err = dialAs(sysUser, closed)
+	_, err = dialAs(t.Context(), sysUser, closed)
 	require.ErrorContains(t, err, "connection refused", "the client is told why a forward failed")
 
 	// A cut address could name another host than the one in the audit log.
-	_, err = dialAs(sysUser, strings.Repeat("a", maxForwardAddr+1))
+	_, err = dialAs(t.Context(), sysUser, strings.Repeat("a", maxForwardAddr+1))
 	require.ErrorContains(t, err, "too long")
+}
+
+// A dial ends with its connection, not at the timeout.
+func TestDialAsStopsWithItsContext(t *testing.T) {
+	sysUser, err := lookupAccount(currentUser(t))
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	start := time.Now()
+	// TEST-NET-1 never answers, so only the ctx can end this.
+	_, err = dialAs(ctx, sysUser, "192.0.2.1:9")
+	require.Error(t, err)
+	assert.Less(t, time.Since(start), forwardTimeout/2, "the dial waited for its timeout")
 }
 
 // To the kernel a forward is the user's socket, not the daemon's.
@@ -459,12 +474,12 @@ func TestForwardSocketsBelongToTheUser(t *testing.T) {
 	sysUser := &account{Name: "nobody", UID: nobody, GID: nobody, Home: "/"}
 	helperForEveryone(t)
 
-	ln, err := listenAs(sysUser, "127.0.0.1:0")
+	ln, err := listenAs(t.Context(), sysUser, "127.0.0.1:0")
 	require.NoError(t, err)
 	defer ln.Close()
 	assert.Equal(t, nobody, tcpSocketUID(t, ln.Addr()), "listener of a remote forward")
 
-	c, err := dialAs(sysUser, ln.Addr().String())
+	c, err := dialAs(t.Context(), sysUser, ln.Addr().String())
 	require.NoError(t, err)
 	defer c.Close()
 	assert.Equal(t, nobody, tcpSocketUID(t, c.LocalAddr()), "connection of a direct forward")

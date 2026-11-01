@@ -68,7 +68,7 @@ func (st *connState) close() {
 	st.forwards = nil
 }
 
-func (s *Server) serveDirectTCPIP(_ context.Context, st *connState, newCh ssh.NewChannel) {
+func (s *Server) serveDirectTCPIP(ctx context.Context, st *connState, newCh ssh.NewChannel) {
 	var d tcpipChannelData
 	if err := ssh.Unmarshal(newCh.ExtraData(), &d); err != nil {
 		_ = newCh.Reject(ssh.ConnectionFailed, "bad direct-tcpip request")
@@ -80,7 +80,7 @@ func (s *Server) serveDirectTCPIP(_ context.Context, st *connState, newCh ssh.Ne
 	}
 
 	dest := net.JoinHostPort(d.DestAddr, strconv.FormatUint(uint64(d.DestPort), 10))
-	dconn, err := dialAs(st.user, dest)
+	dconn, err := dialAs(ctx, st.user, dest)
 	if err != nil {
 		slog.Debug("direct-tcpip dial failed", "addr", dest, "error", err)
 		_ = newCh.Reject(ssh.ConnectionFailed, err.Error())
@@ -104,11 +104,11 @@ func (s *Server) forwardingAllowed(conn *ssh.ServerConn) bool {
 	return s.access.Load().policy.AllowForwarding && certExt(conn, "permit-port-forwarding")
 }
 
-func (s *Server) handleGlobalRequests(st *connState, reqs <-chan *ssh.Request) {
+func (s *Server) handleGlobalRequests(ctx context.Context, st *connState, reqs <-chan *ssh.Request) {
 	for req := range reqs {
 		switch req.Type {
 		case "tcpip-forward":
-			_ = req.Reply(s.tcpipForward(st, req.Payload))
+			_ = req.Reply(s.tcpipForward(ctx, st, req.Payload))
 		case "cancel-tcpip-forward":
 			_ = req.Reply(s.cancelTCPIPForward(st, req.Payload), nil)
 		case "keepalive@openssh.com":
@@ -119,7 +119,7 @@ func (s *Server) handleGlobalRequests(st *connState, reqs <-chan *ssh.Request) {
 	}
 }
 
-func (s *Server) tcpipForward(st *connState, payload []byte) (bool, []byte) {
+func (s *Server) tcpipForward(ctx context.Context, st *connState, payload []byte) (bool, []byte) {
 	var f tcpipForwardData
 	if !s.forwardingAllowed(st.conn) || ssh.Unmarshal(payload, &f) != nil || f.BindPort > 65535 {
 		return false, nil
@@ -134,7 +134,7 @@ func (s *Server) tcpipForward(st *connState, payload []byte) (bool, []byte) {
 	if st.forwards == nil || st.forwards[forwardKey(f)] != nil || !st.acquireChannel() {
 		return false, nil
 	}
-	ln, err := listenAs(st.user, forwardAddr(f, s.access.Load().policy.GatewayPorts))
+	ln, err := listenAs(ctx, st.user, forwardAddr(f, s.access.Load().policy.GatewayPorts))
 	if err != nil {
 		st.releaseChannel()
 		return false, nil

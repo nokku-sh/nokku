@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/nokku-sh/nokku/internal/dpop"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
@@ -151,8 +153,12 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	g, err := h.svc.conn.Tenant().GetDeviceGrant(ctx, hash)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		writeOAuthError(w, "expired_token")
+		return
+	}
+	if err != nil {
+		writeOAuthError(w, "server_error")
 		return
 	}
 	consume := func() bool {
@@ -187,8 +193,12 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		writeOAuthError(w, "access_denied")
 	case grantApproved:
 		u, err := h.svc.getUser(ctx, deref(g.UserID))
-		if err != nil {
+		if errors.Is(err, ErrNotFound) {
 			writeOAuthError(w, "access_denied")
+			return
+		}
+		if err != nil {
+			writeOAuthError(w, "server_error")
 			return
 		}
 
@@ -204,26 +214,40 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Consume before issuing so racing polls never yield two sessions.
-		if !consume() {
-			writeOAuthError(w, "expired_token")
-			return
-		}
-
-		// The rules apply now. SSO may have been enforced since the approval.
-		sess, token, err := h.svc.IssueSignIn(ctx, u, TokenParams{
-			Kind:    actor.KindCLI,
-			Method:  Method(cmp.Or(deref(g.ApprovedMethod), string(MethodDevice))),
-			Binding: binding,
-			Label:   cmp.Or(truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel), "Terminal"),
-			TTL:     deviceSessionTTL,
+		// One transaction: racing polls get one session, and a failure keeps the
+		// approval for nk's retry.
+		var sess *db.AccessToken
+		var token string
+		var refused bool
+		err = h.svc.conn.TenantTx(ctx, func(q *db.Queries) error {
+			_, err := q.ConsumeDeviceGrant(ctx, &db.ConsumeDeviceGrantParams{DeviceCodeHash: hash, Status: g.Status})
+			if err != nil {
+				return err
+			}
+			// The rules apply now. SSO may have been enforced since the approval.
+			sess, token, err = h.svc.issueSignIn(ctx, q, u, TokenParams{
+				Kind:    actor.KindCLI,
+				Method:  Method(cmp.Or(deref(g.ApprovedMethod), string(MethodDevice))),
+				Binding: binding,
+				Label:   cmp.Or(truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel), "Terminal"),
+				TTL:     deviceSessionTTL,
+			})
+			// A refusal is final, so the grant goes with it.
+			if errors.Is(err, ErrInactive) || errors.Is(err, ErrSSORequired) {
+				refused = true
+				return nil
+			}
+			return err
 		})
-		if errors.Is(err, ErrInactive) || errors.Is(err, ErrSSORequired) {
-			writeOAuthError(w, "access_denied")
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
 			return
-		}
-		if err != nil {
+		case err != nil:
 			writeOAuthError(w, "server_error")
+			return
+		case refused:
+			writeOAuthError(w, "access_denied")
 			return
 		}
 		// Only a key new to the account is mailed, so the mail stays rare.
@@ -316,5 +340,10 @@ func normalizeUserCode(code string) string {
 
 // writeOAuthError uses the RFC 6749 section 5.2 shape.
 func writeOAuthError(w http.ResponseWriter, code string) {
-	WriteJSON(w, http.StatusBadRequest, map[string]string{"error": code})
+	status := http.StatusBadRequest
+	// nk retries a 5xx. Anything else ends its login.
+	if code == "server_error" {
+		status = http.StatusInternalServerError
+	}
+	WriteJSON(w, status, map[string]string{"error": code})
 }

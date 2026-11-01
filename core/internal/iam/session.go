@@ -62,11 +62,21 @@ func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToke
 	if p.Kind == actor.KindUser || p.Kind == actor.KindCLI {
 		return nil, "", errors.New("iam: a person's token comes from IssueSignIn")
 	}
-	return s.issue(ctx, p)
+	return s.issue(ctx, s.conn.Tenant(), p)
 }
 
 // IssueSignIn is the one way a person gets a token, in a browser or in nk.
 func (s *Service) IssueSignIn(ctx context.Context, u *db.User, p TokenParams) (*db.AccessToken, string, error) {
+	return s.issueSignIn(ctx, s.conn.Tenant(), u, p)
+}
+
+// q ties the token to the caller's transaction, if it has one.
+func (s *Service) issueSignIn(
+	ctx context.Context,
+	q *db.Queries,
+	u *db.User,
+	p TokenParams,
+) (*db.AccessToken, string, error) {
 	deny := func(err error, detail string) (*db.AccessToken, string, error) {
 		s.record(ctx, event{Action: actionLoginDenied, Method: p.Method, UserID: u.ID, Email: u.Email, Detail: detail})
 		return nil, "", err
@@ -75,10 +85,11 @@ func (s *Service) IssueSignIn(ctx context.Context, u *db.User, p TokenParams) (*
 		return deny(ErrInactive, "inactive")
 	}
 	if p.Method != MethodOIDC {
-		enforced, err := s.ssoEnforced(ctx)
+		w, err := q.GetWorkspace(ctx)
 		if err != nil {
 			return nil, "", err
 		}
+		enforced := w.Settings.GetEnforceSso()
 		// The owner keeps passkey and link, to fix a broken provider.
 		breakGlass := u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER &&
 			(p.Method == MethodPasskey || p.Method == MethodMagicLink)
@@ -87,15 +98,15 @@ func (s *Service) IssueSignIn(ctx context.Context, u *db.User, p TokenParams) (*
 		}
 	}
 	// An unclaimed workspace is purged, so failing to claim fails the sign-in.
-	if err := s.conn.Tenant().ClaimWorkspace(ctx); err != nil {
+	if err := q.ClaimWorkspace(ctx); err != nil {
 		return nil, "", err
 	}
 	p.SubjectID = u.ID
-	return s.issue(ctx, p)
+	return s.issue(ctx, q, p)
 }
 
 // issue pins the token to the request's workspace and stores only its hash.
-func (s *Service) issue(ctx context.Context, p TokenParams) (*db.AccessToken, string, error) {
+func (s *Service) issue(ctx context.Context, q *db.Queries, p TokenParams) (*db.AccessToken, string, error) {
 	kind, ok := tokenKinds[p.Kind]
 	if !ok {
 		return nil, "", errors.New("iam: no token for kind " + string(p.Kind))
@@ -127,7 +138,7 @@ func (s *Service) issue(ctx context.Context, p TokenParams) (*db.AccessToken, st
 		}
 	}
 	params.WorkloadJti = nonEmpty(p.WorkloadJTI)
-	tok, err := s.conn.Tenant().CreateAccessToken(ctx, params)
+	tok, err := q.CreateAccessToken(ctx, params)
 	if err != nil {
 		return nil, "", err
 	}
@@ -148,14 +159,6 @@ func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) 
 		event{Action: actionLoginSucceeded, Kind: actor.KindUser, Method: method, UserID: u.ID, Email: u.Email},
 	)
 	return s.newCookie(sessionCookieName, token, *sess.ExpiresAt), nil
-}
-
-func (s *Service) ssoEnforced(ctx context.Context) (bool, error) {
-	w, err := s.conn.Tenant().GetWorkspace(ctx)
-	if err != nil {
-		return false, err
-	}
-	return w.Settings.GetEnforceSso(), nil
 }
 
 // IssueDaemonSession replaces earlier sessions and does not expire. A deleted

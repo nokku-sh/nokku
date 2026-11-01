@@ -65,8 +65,8 @@ func shellJoin(argv []string) string {
 	return strings.Join(quoted, " ")
 }
 
-func dialAs(a *account, addr string) (net.Conn, error) {
-	f, err := openSocketAs(a, forwardDial, addr)
+func dialAs(ctx context.Context, a *account, addr string) (net.Conn, error) {
+	f, err := openSocketAs(ctx, a, forwardDial, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +83,8 @@ func dialAs(a *account, addr string) (net.Conn, error) {
 	return c, nil
 }
 
-func listenAs(a *account, addr string) (net.Listener, error) {
-	f, err := openSocketAs(a, forwardListen, addr)
+func listenAs(ctx context.Context, a *account, addr string) (net.Listener, error) {
+	f, err := openSocketAs(ctx, a, forwardListen, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -101,11 +101,11 @@ func listenAs(a *account, addr string) (net.Listener, error) {
 }
 
 // A socket keeps its maker's credentials, so firewall owner rules see the user.
-func openSocketAs(a *account, mode, addr string) (*os.File, error) {
+func openSocketAs(ctx context.Context, a *account, mode, addr string) (*os.File, error) {
 	if len(addr) > maxForwardAddr {
 		return nil, errors.New("forward address too long")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), forwardTimeout)
+	ctx, cancel := context.WithTimeout(ctx, forwardTimeout)
 	defer cancel()
 
 	pair, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_SEQPACKET|unix.SOCK_CLOEXEC, 0)

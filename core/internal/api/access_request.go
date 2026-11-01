@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
@@ -20,7 +21,12 @@ import (
 )
 
 // maxDailyRequests stops asking and cancelling from flooding admins' inboxes.
-const maxDailyRequests = 50
+const (
+	maxDailyRequests = 50
+
+	// Covers every approver's mail, sent one after another.
+	notifyTimeout = 2 * time.Minute
+)
 
 type accessRequestService struct {
 	cfg *config.Config
@@ -259,6 +265,8 @@ func (s *accessRequestService) SetRequestableTags(
 }
 
 func (s *accessRequestService) notifyApprovers(ctx context.Context, r *db.AccessRequestDetail) {
+	ctx, cancel := context.WithTimeout(ctx, notifyTimeout)
+	defer cancel()
 	approvers, err := s.cfg.Conn.Tenant().ListApprovers(ctx, r.RequesterID)
 	if err != nil {
 		slog.Warn("approvers not notified", "error", err, "request_id", r.ID)
@@ -283,6 +291,8 @@ func (s *accessRequestService) notifyApprovers(ctx context.Context, r *db.Access
 }
 
 func (s *accessRequestService) notifyRequester(ctx context.Context, r *db.AccessRequestDetail) {
+	ctx, cancel := context.WithTimeout(ctx, notifyTimeout)
+	defer cancel()
 	if err := s.cfg.Email.SendAccessDecisionEmail(ctx, email.AccessDecision{
 		UserID:    r.RequesterID,
 		Email:     r.RequesterEmail,

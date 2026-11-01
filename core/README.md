@@ -331,11 +331,12 @@ Three things live in [SECURITY.md](./SECURITY.md#running-nokku-securely) instead
 
 ## Before you go live
 
-- **Back up PostgreSQL and `NOKKU_SECRET` together.** The database holds the encrypted CA keys and the secret unlocks them. Losing the secret means losing the CAs. With `KMS_URI`, the KMS key takes the place of the secret.
-- **Run one instance.** The core keeps daemon connections, relays and half-finished sign-ins in memory. A restart ends open browser terminals and sign-ins in progress. People stay signed in and daemons reconnect by themselves.
+- **Back up PostgreSQL, `NOKKU_STORAGE_URL` and `NOKKU_SECRET` together.** The database holds the encrypted CA keys and the secret unlocks them. Losing the secret means losing the CAs. With `KMS_URI`, the KMS key takes the place of the secret. Recordings live in the storage, and their keys live in the database, so one is no use without the other.
+- **Know how to restore.** Stop the core, put back the database and the storage, set the same `NOKKU_SECRET` or `KMS_URI`, and start it. Daemons reconnect and take the state they find. Everything since the backup is gone: a revoke made after it is undone, so check access first, and a server enrolled after it enrolls again.
+- **Run one instance.** The core keeps daemon connections, relays and half-finished sign-ins in memory. A restart ends open browser terminals, relayed `nk` sessions and sign-ins in progress. A direct `ssh` is untouched. People stay signed in and daemons reconnect by themselves.
 - **Set up email**, or make sure everyone has a passkey or an identity provider.
 - **Watch `/healthz`.** It answers while the core is up, and only once it has fully started.
-- **Deploy with `docker compose pull nokku`, then `docker compose up -d --no-deps nokku`.** The pull then happens while the old core still serves, and a new version is up in about a second. Pin `NOKKU_IMAGE` to a version so going back means changing the tag. Leave Caddy out of it, a new Caddy ends every web terminal.
+- **Deploy with `docker compose pull nokku`, then `docker compose up -d --no-deps nokku`.** The pull then happens while the old core still serves, and a new version is up in about a second. Pin `NOKKU_IMAGE` to a version so going back means changing the tag. That only holds while the schema stays the same. An older image refuses to start on a database a newer one migrated, so back up before an upgrade and restore that backup to go back. Leave Caddy out of it, a new Caddy ends every web terminal.
 - **Read [SECURITY.md](./SECURITY.md#running-nokku-securely)** for the settings worth a second look.
 
 ## Plans

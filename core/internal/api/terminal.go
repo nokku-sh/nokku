@@ -6,15 +6,18 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/coder/websocket"
 	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/daemon"
@@ -114,6 +117,27 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	defer cancel()
 	logger := slog.With("session_id", sessionID, "daemon_id", ticket.DaemonID)
 
+	principal := login.Principal(ticket.UserID, targetID, ticket.Username)
+	sessionSigner, cert, err := daemon.MintSessionCert(ca, signer, principal, sessionID)
+	if err == nil {
+		// The event is the cert's only record, written before a daemon sees it.
+		err = t.cfg.Audit.Confirm(ctx, &audit.Event{
+			Action: "SignSSHCertificate",
+			Target: ca.ID,
+			Details: map[string]any{
+				"serial":     strconv.FormatUint(cert.Serial, 10),
+				"key_id":     cert.KeyId,
+				"principals": cert.ValidPrincipals,
+				"expires_at": ssh.TimeFromUnix(cert.ValidBefore),
+			},
+		})
+	}
+	if err != nil {
+		logger.Error("web session certificate failed", "error", err)
+		_ = conn.Close(websocket.StatusInternalError, "could not sign the session")
+		return
+	}
+
 	// The dial runs after the upgrade so the browser can show why it failed.
 	sess, err := t.cfg.Pool.StartSession(ctx, daemon.SessionConfig{
 		DaemonID:      ticket.DaemonID,
@@ -121,7 +145,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		Username:      ticket.Username,
 		UserID:        ticket.UserID,
 		CA:            ca,
-		CASigner:      signer,
+		Signer:        sessionSigner,
 		HostPrincipal: targetID,
 		ClientAddr:    realip.Client(r.Header, r.RemoteAddr),
 	})

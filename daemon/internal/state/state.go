@@ -92,7 +92,8 @@ func New(cfg Config) *State {
 	return s
 }
 
-// Load ignores a missing or corrupted file, the next sync rebuilds it.
+// Load ignores a missing or corrupted file. A sync rebuilds the access, but the
+// enrollment is in there too, so a corrupted file means enrolling again.
 func Load() (*State, error) {
 	var f file
 	if err := fsutil.LoadJSON(paths.StateFile(), &f); err != nil {

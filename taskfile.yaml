@@ -55,4 +55,6 @@ tasks:
   snapshot:
     desc: Build a snapshot of every binary, package and image
     cmds:
+      # The core embeds the web app, a snapshot without it serves an empty UI.
+      - go generate ./core/web
       - goreleaser --snapshot --clean --skip=validate,sign,sbom,archive

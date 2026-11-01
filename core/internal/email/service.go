@@ -264,6 +264,24 @@ func (s *Service) SendEmailChangeNotice(
 	})
 }
 
+// SendEmailMovedNotice goes to the old address. A provider owns the address, so
+// nothing here can undo it. The new one is masked like in SendEmailChangeNotice.
+func (s *Service) SendEmailMovedNotice(ctx context.Context, userID, email, newEmail string) error {
+	local, domain, _ := strings.Cut(newEmail, "@")
+	_, first := utf8.DecodeRuneInString(local)
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   userID,
+		to:       email,
+		subject:  "Your email address was changed",
+		template: "email-moved",
+		ref:      newEmail,
+		data: changeNoticeTemplateData{
+			Operator: s.Operator,
+			NewEmail: local[:first] + "***@" + domain,
+		},
+	})
+}
+
 // SendNewLoginEmail cools down per device, so a second device gets its own.
 func (s *Service) SendNewLoginEmail(
 	ctx context.Context,

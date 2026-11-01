@@ -26,6 +26,9 @@ import (
 
 const minSecretLen = 32
 
+// ErrServerRunning stops a rotation. A running core can't read what it moves.
+var ErrServerRunning = errors.New("a Nokku server is running on this database, stop it first")
+
 // Keyset is fixed at start. Only rotate-secrets changes it, server stopped.
 type Keyset struct {
 	db *db.Connection
@@ -140,6 +143,13 @@ func (k *Keyset) Rotate(ctx context.Context, target string) error {
 	}
 	var primitive tink.AEAD
 	err = k.db.SysTx(ctx, func(q *db.Queries) error {
+		idle, err := q.TryAdvisoryXactLock(ctx, db.ServerLock)
+		if err != nil {
+			return err
+		}
+		if !idle {
+			return ErrServerRunning
+		}
 		// The row lock keeps two rotations from running at once.
 		row, err := q.LockKeyset(ctx)
 		if err != nil {

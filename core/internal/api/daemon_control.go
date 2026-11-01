@@ -196,6 +196,10 @@ func (s *daemonControlService) SignHostCertificate(
 	audit.Set(ctx, "key_id", cert.KeyId)
 	audit.Set(ctx, "principals", cert.ValidPrincipals)
 	audit.Set(ctx, "expires_at", ssh.TimeFromUnix(cert.ValidBefore))
+	// The event is the cert's only record, written before anyone holds one.
+	if err := s.cfg.Audit.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return &nokkuv1.SignHostCertificateResponse{
 		SignedCertificate: new(ssh.MarshalKey(cert)),
 	}, nil

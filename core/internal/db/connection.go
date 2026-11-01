@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 )
+
+// ServerLock is held shared by a running core. TryAdvisoryXactLock on it fails
+// while one runs, with the same key space as pg_advisory_lock_shared.
+const ServerLock = "nokku_server"
 
 var (
 	ErrPermissionDenied   = errors.New("missing required permission")
@@ -67,8 +72,12 @@ func settings() (*Connection, *pgxpool.Config, error) {
 	}
 
 	for key, fallback := range defaults {
-		if os.Getenv(key) == "" {
-			_ = os.Setenv(key, fallback)
+		if os.Getenv(key) != "" {
+			continue
+		}
+		_ = os.Setenv(key, fallback)
+		if key == "PGPASSWORD" || key == "PGSSLMODE" {
+			slog.Warn(key + " is not set, the default is only fit for a local try")
 		}
 	}
 
@@ -191,6 +200,18 @@ func (c *Connection) Tenant() *Queries { return c.tenant }
 // TenantTx fails closed without a workspace, actor.WithWorkspace pins one.
 func (c *Connection) TenantTx(ctx context.Context, fn func(*Queries) error) error {
 	return pgx.BeginFunc(ctx, c.Pool, func(tx pgx.Tx) error { return fn(New(tx)) })
+}
+
+// HoldServerLock marks this process as a running core until ctx ends. A lost
+// connection drops the mark too, it only catches a mistake.
+func (c *Connection) HoldServerLock(ctx context.Context) error {
+	conn, err := pgx.ConnectConfig(ctx, c.sysPool.Config().ConnConfig)
+	if err != nil {
+		return fmt.Errorf("connecting for the server lock: %w", err)
+	}
+	context.AfterFunc(ctx, func() { _ = conn.Close(context.WithoutCancel(ctx)) })
+	_, err = conn.Exec(ctx, "SELECT pg_advisory_lock_shared(hashtext($1))", ServerLock)
+	return err
 }
 
 // Sys runs as nokku_system (BYPASSRLS), for pre-auth lookups and jobs.

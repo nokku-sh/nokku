@@ -379,6 +379,18 @@ func (q *Queries) TouchTargetSync(ctx context.Context, targetID string) error {
 }
 
 const updateTarget = `-- name: UpdateTarget :one
+WITH renamed AS (
+  UPDATE daemons d
+  SET
+    name = $1,
+    updated_at = NOW()
+  FROM
+    targets t
+  WHERE
+    t.id = $7
+    AND d.id = t.daemon_id
+    AND $1::TEXT IS NOT NULL
+)
 UPDATE targets
 SET
   name = COALESCE($1, name),
@@ -389,7 +401,7 @@ SET
   host_public_key = COALESCE($6, host_public_key),
   updated_at = NOW()
 WHERE
-  id = $7
+  targets.id = $7
 RETURNING
   id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
 `
@@ -404,6 +416,7 @@ type UpdateTargetParams struct {
 	TargetID      string   `json:"targetId"`
 }
 
+// A rename reaches the daemon too, sessions and recordings show its name.
 func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error) {
 	row := q.db.QueryRow(ctx, updateTarget,
 		arg.Name,

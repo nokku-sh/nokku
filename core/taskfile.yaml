@@ -73,6 +73,7 @@ tasks:
       IMAGE: ghcr.io/nokku-sh/nokku
     dir: ..
     cmds:
+      - go generate ./core/web
       - goreleaser release --snapshot --clean --skip=validate,sign,sbom,archive,nfpm,docker
       - docker tag goreleaser.ko.local:latest $IMAGE:nightly
       - grype $IMAGE:nightly
@@ -83,6 +84,7 @@ tasks:
       NOKKU_ONLY: core
     dir: ..
     cmds:
+      - go generate ./core/web
       - goreleaser build --snapshot --clean {{.CLI_ARGS}}
 
   stripe:

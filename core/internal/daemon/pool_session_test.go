@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/nokku-sh/nokku/internal/login"
+
+	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
 
@@ -19,11 +22,17 @@ func TestSessionCertificateLimits(t *testing.T) {
 	ca, signer := sshtest.NewCA(t)
 	ca.SourceAddress = "10.0.0.0/8"
 
-	session, err := mintSessionCert(ca, signer, "user@target:root", "session")
+	session, cert, err := MintSessionCert(ca, signer, "user@target:root", "session")
 	require.NoError(t, err)
-	cert, ok := session.PublicKey().(*ssh.Certificate)
-	require.True(t, ok, "the session signer holds a %T", session.PublicKey())
+	assert.Equal(t, cert, session.PublicKey(), "the signer logs in with this certificate")
 	assert.Equal(t, map[string]string{"source-address": "10.0.0.0/8"}, cert.CriticalOptions)
+}
+
+func sessionSigner(t *testing.T, ca *db.SSHCA, caSigner ssh.Signer, target, sessionID string) ssh.Signer {
+	t.Helper()
+	signer, _, err := MintSessionCert(ca, caSigner, login.Principal("u1", target, "user"), sessionID)
+	require.NoError(t, err)
+	return signer
 }
 
 // bridgeToServer plays the daemon's DaemonRelay handler for one relay.
@@ -116,6 +125,7 @@ func startTestSession(t *testing.T, p *Pool, srv *sshtest.Server, sessionID stri
 		err error
 	}
 	res := make(chan result, 1)
+	signer := sessionSigner(t, srv.CA(), srv.CASigner(), srv.HostPrincipal, sessionID)
 	go func() {
 		s, err := p.StartSession(t.Context(), SessionConfig{
 			DaemonID:      "d1",
@@ -123,7 +133,7 @@ func startTestSession(t *testing.T, p *Pool, srv *sshtest.Server, sessionID stri
 			Username:      "user",
 			UserID:        "u1",
 			CA:            srv.CA(),
-			CASigner:      srv.CASigner(),
+			Signer:        signer,
 			HostPrincipal: srv.HostPrincipal,
 		})
 		res <- result{s, err}
@@ -172,7 +182,7 @@ func TestPool_StartSession_EndsWithContext(t *testing.T) {
 		Username:      "user",
 		UserID:        "u1",
 		CA:            srv.CA(),
-		CASigner:      srv.CASigner(),
+		Signer:        sessionSigner(t, srv.CA(), srv.CASigner(), srv.HostPrincipal, "web-ctx"),
 		HostPrincipal: srv.HostPrincipal,
 	})
 	require.NoError(t, err, "StartSession")
@@ -235,6 +245,7 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 
 	rogue, rogueSigner := sshtest.NewCA(t)
 	errCh := make(chan error, 1)
+	signer := sessionSigner(t, rogue, rogueSigner, srv.HostPrincipal, "web-2")
 	go func() {
 		_, err := p.StartSession(t.Context(), SessionConfig{
 			DaemonID:      "d1",
@@ -242,7 +253,7 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 			Username:      "user",
 			UserID:        "u1",
 			CA:            rogue,
-			CASigner:      rogueSigner,
+			Signer:        signer,
 			HostPrincipal: srv.HostPrincipal,
 		})
 		errCh <- err

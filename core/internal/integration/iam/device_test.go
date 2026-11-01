@@ -17,6 +17,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -248,6 +249,43 @@ func TestDeviceGrantIsSpent(t *testing.T) {
 	require.Equal(t, http.StatusOK, pollDevice(t, e, o.ws, grant, key).Code)
 	again := pollDevice(t, e, o.ws, grant, key)
 	assert.Equal(t, http.StatusBadRequest, again.Code)
+	assert.Contains(t, again.Body.String(), "expired_token", "a grant gave two sessions")
+}
+
+// nk retries a 5xx, so a failed issue has to leave the approval in place.
+func TestDeviceGrantSurvivesAFailedIssue(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	grant := beginDevice(t, e, o.ws)
+	approved := devicePost(
+		o.ws,
+		e.svc.Device.Verify,
+		"/auth/device/verify",
+		"192.0.2.1:1",
+		url.Values{"user_code": {grant.UserCode}},
+		o.owner,
+	)
+	require.Equal(t, http.StatusOK, approved.Code)
+
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	restore := func() {
+		_, err := owner.Exec(context.WithoutCancel(t.Context()), "GRANT INSERT ON access_tokens TO nokku_app")
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() { restore(); _ = owner.Close(context.WithoutCancel(t.Context())) })
+	_, err = owner.Exec(t.Context(), "REVOKE INSERT ON access_tokens FROM nokku_app")
+	require.NoError(t, err)
+
+	failed := pollDevice(t, e, o.ws, grant, key)
+	assert.Equal(t, http.StatusInternalServerError, failed.Code, failed.Body.String())
+	assert.Contains(t, failed.Body.String(), "server_error")
+
+	restore()
+	require.Equal(t, http.StatusOK, pollDevice(t, e, o.ws, grant, key).Code, "the failed poll burned the approval")
+	again := pollDevice(t, e, o.ws, grant, key)
 	assert.Contains(t, again.Body.String(), "expired_token", "a grant gave two sessions")
 }
 

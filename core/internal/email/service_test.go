@@ -110,6 +110,15 @@ func TestRenderTemplates(t *testing.T) {
 			},
 		},
 		{
+			name: "email-moved",
+			data: changeNoticeTemplateData{NewEmail: "n***@example.com"},
+			contains: []string{
+				"Your email address was changed.",
+				"n***@example.com",
+				"tell your administrator",
+			},
+		},
+		{
 			name: "email-confirm",
 			data: linkTemplateData{
 				LinkURL:    "https://acme.nokku.sh/email-change?token=t",

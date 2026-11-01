@@ -254,13 +254,12 @@ func (s *Server) handleConn(ctx context.Context, nc net.Conn, relayed bool) {
 	done := make(chan struct{})
 	defer close(done)
 	go s.keepAlive(conn, done)
-	go s.handleGlobalRequests(st, reqs)
-
 	// Canceled before the wait, so a closed connection ends all its sessions.
 	ctx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	defer cancel()
+	go s.handleGlobalRequests(ctx, st, reqs)
 	for newCh := range chans {
 		var serve func(context.Context, *connState, ssh.NewChannel)
 		switch newCh.ChannelType() {

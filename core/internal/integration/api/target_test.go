@@ -145,6 +145,49 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "viewer may not sync, got %v", err)
 }
 
+// Sessions and recordings show the daemon's name, so a rename has to reach it.
+func TestRenameReachesTheDaemon(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := testWorkspace.ID
+	_, first := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	_, second := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	editor := nokkuv1connect.NewTargetServiceClient(clientOn(srv, header(
+		"Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	)))
+	daemonName := func(id string) string {
+		var name string
+		require.NoError(t, cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) error {
+			d, err := q.GetDaemon(t.Context(), id)
+			if err != nil {
+				return err
+			}
+			name = d.Name
+			return nil
+		}))
+		return name
+	}
+
+	name := uniq("renamed")
+	_, err := editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
+		Id: new(first.GetTargetId()), Name: &name,
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, name, daemonName(first.GetId()))
+
+	before := daemonName(second.GetId())
+	_, err = editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
+		Id: new(second.GetTargetId()), Description: new("no name in this update"),
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, before, daemonName(second.GetId()), "an update without a name renamed the daemon")
+
+	_, err = editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
+		Id: new(second.GetTargetId()), Name: &name,
+	}))
+	require.Error(t, err, "two daemons got one name")
+	assert.Equal(t, before, daemonName(second.GetId()), "a refused rename still reached the daemon")
+}
+
 func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := testWorkspace.ID

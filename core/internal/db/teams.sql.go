@@ -33,6 +33,33 @@ func (q *Queries) AddTeamMember(ctx context.Context, arg *AddTeamMemberParams) e
 	return err
 }
 
+const addTeamMembers = `-- name: AddTeamMembers :exec
+INSERT INTO
+  team_members (workspace_id, user_id, team_id)
+SELECT
+  t.workspace_id,
+  u.id,
+  t.id
+FROM
+  teams t
+  JOIN users u ON u.workspace_id = t.workspace_id
+  AND u.id = ANY ($1::UUID[])
+WHERE
+  t.id = $2
+ON CONFLICT (user_id, team_id) DO NOTHING
+`
+
+type AddTeamMembersParams struct {
+	UserIds []string `json:"userIds"`
+	TeamID  string   `json:"teamId"`
+}
+
+// Skips an id that is no user here, a group never widens the workspace.
+func (q *Queries) AddTeamMembers(ctx context.Context, arg *AddTeamMembersParams) error {
+	_, err := q.db.Exec(ctx, addTeamMembers, arg.UserIds, arg.TeamID)
+	return err
+}
+
 const countTeamMembers = `-- name: CountTeamMembers :many
 SELECT
   tm.team_id,

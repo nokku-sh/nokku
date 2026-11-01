@@ -40,6 +40,9 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
+			if err := cfg.Conn.HoldServerLock(running); err != nil {
+				return err
+			}
 			return api.New(cfg).Start(ctx)
 		},
 		Commands: []*cli.Command{
@@ -107,7 +110,7 @@ func main() {
 					"old key versions are retired there.\n\n" +
 					"KMS credentials (VAULT_TOKEN, ...) are read from the environment. " +
 					"Run it with the server stopped, a running one cannot read what was " +
-					"re-encrypted. Then set NOKKU_SECRET or KMS_URI to the new value, remove " +
+					"re-encrypted, so it refuses otherwise. Then set NOKKU_SECRET or KMS_URI to the new value, remove " +
 					"the other one and start it. The server refuses to start with the old one.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{

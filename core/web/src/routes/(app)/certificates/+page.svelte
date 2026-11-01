@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { whenFresh } from '#lib/api/auth.svelte.js';
-	import { ca } from '#lib/api/certificates.svelte.js';
+	import { ca, manualKeyState } from '#lib/api/certificates.svelte.js';
+	import { target } from '#lib/api/targets.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
@@ -18,7 +19,7 @@
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
 	import { formatTs, toDate } from '#lib/utils.js';
 	import type { Duration } from '@bufbuild/protobuf/wkt';
-	import { Fingerprint, History, KeyRound, Server } from '@lucide/svelte';
+	import { Clock, Fingerprint, History, KeyRound, RefreshCw, Server } from '@lucide/svelte';
 
 	const can = user.can();
 	const query = ca.get();
@@ -57,6 +58,17 @@
 		model[key] = value;
 		save();
 	}
+
+	const targets = target.list();
+	const manual = $derived((targets.data?.targets ?? []).filter((t) => !t.daemonId));
+	const missingKey = $derived(
+		manual.filter((t) => manualKeyState(entity, t.lastSyncAt).rotated).map((t) => t.name)
+	);
+	const keepsOldKey = $derived(
+		manual.filter((t) => manualKeyState(entity, t.lastSyncAt).oldKeyUntil).map((t) => t.name)
+	);
+	const syncCommands = (names: string[]) => names.map((name) => `nk sync ${name}`).join('\n');
+	const unchecked = $derived((targets.data?.total ?? 0) - (targets.data?.targets.length ?? 0));
 
 	const previousTrusted = $derived(
 		!!entity?.previousPublicKey &&
@@ -115,6 +127,42 @@
 	<Skeleton class="h-56 w-full rounded-xl" />
 	<Skeleton class="h-36 w-full rounded-xl" />
 {:else}
+	{#if missingKey.length || keepsOldKey.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title><h2>Servers to sync</h2></Card.Title>
+				<Card.Description>
+					These servers were set up with nk sync, so they only learn a key when you run it.
+					{#if unchecked > 0}
+						{unchecked} more servers were not checked, open them under Infrastructure.
+					{/if}
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-col divide-y">
+				{#if missingKey.length}
+					<Section
+						title="Missing the new key"
+						icon={RefreshCw}
+						description="They refuse new certificates until you run this on your own machine."
+					>
+						<CodeSnippet code={syncCommands(missingKey)} language="bash" wrap />
+					</Section>
+				{/if}
+				{#if keepsOldKey.length}
+					<Section
+						title="Still trusting the old key"
+						icon={Clock}
+						description="They can't drop it on their own. Run this after {formatTs(
+							entity.previousTrustedUntil
+						)}."
+					>
+						<CodeSnippet code={syncCommands(keepsOldKey)} language="bash" wrap />
+					</Section>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title><h2>Certificate lifetime</h2></Card.Title>

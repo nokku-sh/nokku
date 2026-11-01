@@ -147,14 +147,15 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	go cfg.Keyset.VaultTokenLoop(ctx)
 
 	deps := iam.Deps{
-		Conn:         cfg.Conn,
-		Keyset:       cfg.Keyset,
-		Audit:        cfg.Audit,
-		Secure:       strings.HasPrefix(cfg.FullURL(), "https://"),
-		CanJoin:      cfg.Entitlements.CanInvite,
-		StrictEmail:  cfg.SaaS,
-		SendNewLogin: cfg.Email.SendNewLoginEmail,
-		SendNewWayIn: cfg.Email.SendNewWayInEmail,
+		Conn:           cfg.Conn,
+		Keyset:         cfg.Keyset,
+		Audit:          cfg.Audit,
+		Secure:         strings.HasPrefix(cfg.FullURL(), "https://"),
+		CanJoin:        cfg.Entitlements.CanInvite,
+		StrictEmail:    cfg.SaaS,
+		SendNewLogin:   cfg.Email.SendNewLoginEmail,
+		SendNewWayIn:   cfg.Email.SendNewWayInEmail,
+		SendEmailMoved: cfg.Email.SendEmailMovedNotice,
 	}
 	// No mail, no links. The login page then offers passkeys and providers.
 	if cfg.Email.HasSMTP() {

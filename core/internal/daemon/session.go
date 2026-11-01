@@ -31,8 +31,8 @@ type SessionConfig struct {
 	Username  string
 	UserID    string
 	CA        *db.SSHCA
-	// CASigner is the user key of CA, from ssh.CASigner.
-	CASigner ssh.Signer
+	// Signer holds the certificate from MintSessionCert.
+	Signer ssh.Signer
 	// HostPrincipal is the daemon's target id.
 	HostPrincipal string
 	// ClientAddr is the browser's address, reported to the daemon's sshd.
@@ -70,11 +70,6 @@ func (s *Session) Close() { s.close() }
 
 // StartSession ends with ctx, the shell, the daemon, Close or the TTL.
 func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
-	principal := login.Principal(cfg.UserID, cfg.HostPrincipal, cfg.Username)
-	signer, err := mintSessionCert(cfg.CA, cfg.CASigner, principal, cfg.SessionID)
-	if err != nil {
-		return nil, fmt.Errorf("mint session certificate: %w", err)
-	}
 	hostCAs, err := hostCAKeys(cfg.CA)
 	if err != nil {
 		return nil, err
@@ -91,7 +86,7 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	term, err := sshclient.DialTerminal(dialCtx, &relayConn{relay: relay}, sshclient.Config{
 		HostPrincipal: cfg.HostPrincipal,
 		Username:      cfg.Username,
-		Signer:        signer,
+		Signer:        cfg.Signer,
 		HostCAs:       hostCAs,
 	})
 	if err != nil {
@@ -148,14 +143,19 @@ func hostCAKeys(ca *db.SSHCA) ([]ssh.PublicKey, error) {
 	return keys, nil
 }
 
-func mintSessionCert(ca *db.SSHCA, caSigner ssh.Signer, principal, sessionID string) (ssh.Signer, error) {
+// MintSessionCert signs a key for one browser terminal. caSigner is CA's user key.
+func MintSessionCert(
+	ca *db.SSHCA,
+	caSigner ssh.Signer,
+	principal, sessionID string,
+) (ssh.Signer, *ssh.Certificate, error) {
 	_, key, err := ed25519.GenerateKey(crand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("generate session key: %w", err)
+		return nil, nil, fmt.Errorf("generate session key: %w", err)
 	}
 	pub, err := ssh.NewPublicKey(key.Public())
 	if err != nil {
-		return nil, fmt.Errorf("session public key: %w", err)
+		return nil, nil, fmt.Errorf("session public key: %w", err)
 	}
 	cert, err := nokkussh.SignCertificate(
 		ca,
@@ -168,13 +168,14 @@ func mintSessionCert(ca *db.SSHCA, caSigner ssh.Signer, principal, sessionID str
 		nokkussh.Limits{SourceAddress: ca.SourceAddress},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("sign session certificate: %w", err)
+		return nil, nil, fmt.Errorf("sign session certificate: %w", err)
 	}
 	base, err := ssh.NewSignerFromKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("session signer: %w", err)
+		return nil, nil, fmt.Errorf("session signer: %w", err)
 	}
-	return ssh.NewCertSigner(cert, base)
+	signer, err := ssh.NewCertSigner(cert, base)
+	return signer, cert, err
 }
 
 // SessionDaemons names the daemons with an open terminal, in every workspace.

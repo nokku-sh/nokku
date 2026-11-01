@@ -69,6 +69,22 @@ WHERE
   t.id = @team_id
 ON CONFLICT (user_id, team_id) DO NOTHING;
 
+-- name: AddTeamMembers :exec
+-- Skips an id that is no user here, a group never widens the workspace.
+INSERT INTO
+  team_members (workspace_id, user_id, team_id)
+SELECT
+  t.workspace_id,
+  u.id,
+  t.id
+FROM
+  teams t
+  JOIN users u ON u.workspace_id = t.workspace_id
+  AND u.id = ANY (@user_ids::UUID[])
+WHERE
+  t.id = @team_id
+ON CONFLICT (user_id, team_id) DO NOTHING;
+
 -- name: RemoveTeamMember :exec
 DELETE FROM team_members
 WHERE

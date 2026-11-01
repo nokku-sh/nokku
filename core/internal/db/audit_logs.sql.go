@@ -26,10 +26,20 @@ func (q *Queries) DeleteAuditLogsBefore(ctx context.Context, cutoff time.Time) (
 }
 
 const deleteWorkspaceAuditLogs = `-- name: DeleteWorkspaceAuditLogs :execrows
-DELETE FROM audit.audit_logs
+DELETE FROM audit.audit_logs l
 WHERE
-  workspace_id = $1
-  AND timestamp < $2
+  l.workspace_id = $1
+  AND l.timestamp < $2
+  AND NOT EXISTS (
+    SELECT
+      1
+    FROM
+      audit_streams s
+    WHERE
+      s.workspace_id = $1
+      AND s.enabled
+      AND s.cursor_ts <= l.timestamp
+  )
 `
 
 type DeleteWorkspaceAuditLogsParams struct {
@@ -37,6 +47,8 @@ type DeleteWorkspaceAuditLogsParams struct {
 	Cutoff      time.Time `json:"cutoff"`
 }
 
+// An enabled stream holds what it has not sent yet, a paused one gives that up.
+// DeleteAuditLogsBefore still ends it at the longest retention.
 func (q *Queries) DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorkspaceAuditLogsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteWorkspaceAuditLogs, arg.WorkspaceID, arg.Cutoff)
 	if err != nil {
