@@ -10,7 +10,7 @@ require (
 	connectrpc.com/validate v0.9.0
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/cenkalti/backoff/v7 v7.0.2
+	github.com/cenkalti/backoff/v7 v7.0.3
 	github.com/coder/websocket v1.8.15
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/descope/virtualwebauthn v1.0.5
