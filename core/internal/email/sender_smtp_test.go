@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeRelay offers CRAM-MD5 because go-mail keeps PLAIN and LOGIN off a connection without TLS.
+// fakeRelay offers CRAM-MD5, go-mail keeps PLAIN and LOGIN off plain TCP.
 func fakeRelay(t *testing.T, authReply string) (port int) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -99,7 +99,7 @@ func TestNew_UnreachableRelayStillStarts(t *testing.T) {
 	assert.True(t, svc.HasSMTP())
 }
 
-// A relay that takes the connection and then says nothing must not hold up the start either.
+// A relay that connects and then says nothing must not hold up the start.
 func TestNew_HungRelayDoesNotHoldUpTheStart(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

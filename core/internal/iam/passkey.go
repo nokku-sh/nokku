@@ -20,9 +20,8 @@ import (
 )
 
 const (
-	challengeTTL       = 5 * time.Minute
-	ceremonyCookieName = "webauthn_session"
-	// A relying party is built per workspace host and kept for a while.
+	challengeTTL        = 5 * time.Minute
+	ceremonyCookieName  = "webauthn_session"
 	relyingPartyTTL     = time.Hour
 	relyingPartyEntries = 10_000
 )
@@ -32,16 +31,16 @@ type webUser struct {
 	creds []webauthn.Credential
 }
 
-func (u *webUser) WebAuthnID() []byte                         { return []byte(u.user.ID) }
-func (u *webUser) WebAuthnName() string                       { return u.user.Email }
-func (u *webUser) WebAuthnDisplayName() string                { return u.user.Name }
-func (u *webUser) WebAuthnCredentials() []webauthn.Credential { return u.creds }
-
 type passkeyFlow struct {
 	svc   *Service
 	rps   *cache.TTL[string, *webauthn.WebAuthn]
 	state *sealed[webauthn.SessionData]
 }
+
+func (u *webUser) WebAuthnID() []byte                         { return []byte(u.user.ID) }
+func (u *webUser) WebAuthnName() string                       { return u.user.Email }
+func (u *webUser) WebAuthnDisplayName() string                { return u.user.Name }
+func (u *webUser) WebAuthnCredentials() []webauthn.Credential { return u.creds }
 
 func newPasskeyFlow(svc *Service) *passkeyFlow {
 	return &passkeyFlow{
@@ -51,109 +50,6 @@ func newPasskeyFlow(svc *Service) *passkeyFlow {
 			svc: svc, cookie: ceremonyCookieName, use: "webauthn:session", ttl: challengeTTL,
 		},
 	}
-}
-
-// rp is the relying party of the workspace. Its id is the host, so a passkey never answers for another workspace.
-func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
-	ws, ok := actor.WorkspaceFromContext(ctx)
-	if !ok {
-		return nil, db.ErrWorkspaceNotPinned
-	}
-	if wa, ok := f.rps.Get(ws.ID); ok {
-		return wa, nil
-	}
-	u, err := url.Parse(ws.BaseURL)
-	if err != nil {
-		return nil, err
-	}
-	row, err := f.svc.conn.Tenant().GetWorkspace(ctx)
-	if err != nil {
-		return nil, err
-	}
-	wa, err := webauthn.New(&webauthn.Config{
-		RPDisplayName: cmp.Or(row.Name, "Nokku"),
-		RPID:          u.Hostname(),
-		RPOrigins:     []string{ws.BaseURL},
-		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			ResidentKey:      protocol.ResidentKeyRequirementRequired,
-			UserVerification: protocol.VerificationRequired,
-		},
-		AttestationPreference: protocol.PreferNoAttestation,
-	})
-	if err != nil {
-		return nil, err
-	}
-	f.rps.Set(ws.ID, wa)
-	return wa, nil
-}
-
-func (f *passkeyFlow) clearedCeremonyCookie() *http.Cookie {
-	return f.svc.newCookie(ceremonyCookieName, "", time.Unix(0, 0))
-}
-
-func (f *passkeyFlow) webUserFor(ctx context.Context, u *db.User) (*webUser, error) {
-	creds, err := f.svc.conn.Tenant().ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-		UserID: u.ID,
-		Type:   string(MethodPasskey),
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]webauthn.Credential, 0, len(creds))
-	for _, c := range creds {
-		var wc webauthn.Credential
-		if err := json.Unmarshal(c.Data, &wc); err == nil {
-			out = append(out, wc)
-		}
-	}
-	return &webUser{user: u, creds: out}, nil
-}
-
-func (f *passkeyFlow) sessionUser(ctx context.Context, w http.ResponseWriter) (*webUser, bool) {
-	u, err := f.svc.GetUser(ctx)
-	if errors.Is(err, ErrNotFound) {
-		writeError(w, http.StatusUnauthorized, "sign in first")
-		return nil, false
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return nil, false
-	}
-	wu, err := f.webUserFor(ctx, u)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return nil, false
-	}
-	return wu, true
-}
-
-func passkeyCredentialID(cred *webauthn.Credential) string {
-	return "passkey:" + base64.RawURLEncoding.EncodeToString(cred.ID)
-}
-
-// savePasskey keeps the label on a refresh. The upsert never moves a credential id to another account.
-func savePasskey(ctx context.Context, q *db.Queries, userID string, cred *webauthn.Credential) (string, error) {
-	data, err := json.Marshal(cred)
-	if err != nil {
-		return "", err
-	}
-	subject := base64.RawURLEncoding.EncodeToString(cred.ID)
-	label := authenticatorName(cred)
-	if existing, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
-		Type:    string(MethodPasskey),
-		Subject: subject,
-	}); err == nil && existing.Label != "" {
-		label = existing.Label
-	}
-	_, err = q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-		ID:      passkeyCredentialID(cred),
-		UserID:  userID,
-		Type:    string(MethodPasskey),
-		Subject: subject,
-		Data:    data,
-		Label:   label,
-	})
-	return label, err
 }
 
 func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) {
@@ -178,6 +74,42 @@ func (f *passkeyFlow) BeginRegistration(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	WriteJSON(w, http.StatusOK, creation)
+}
+
+func (f *passkeyFlow) sessionUser(ctx context.Context, w http.ResponseWriter) (*webUser, bool) {
+	u, err := f.svc.GetUser(ctx)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusUnauthorized, "sign in first")
+		return nil, false
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return nil, false
+	}
+	wu, err := f.webUserFor(ctx, u)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return nil, false
+	}
+	return wu, true
+}
+
+func (f *passkeyFlow) webUserFor(ctx context.Context, u *db.User) (*webUser, error) {
+	creds, err := f.svc.conn.Tenant().ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
+		UserID: u.ID,
+		Type:   string(MethodPasskey),
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]webauthn.Credential, 0, len(creds))
+	for _, c := range creds {
+		var wc webauthn.Credential
+		if err := json.Unmarshal(c.Data, &wc); err == nil {
+			out = append(out, wc)
+		}
+	}
+	return &webUser{user: u, creds: out}, nil
 }
 
 func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request) {
@@ -215,6 +147,39 @@ func (f *passkeyFlow) FinishRegistration(w http.ResponseWriter, r *http.Request)
 		base64.RawURLEncoding.EncodeToString(cred.ID), fmt.Sprintf("The passkey %q", name))
 	http.SetCookie(w, f.clearedCeremonyCookie())
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "name": name})
+}
+
+// savePasskey keeps the label. The upsert never moves an id between accounts.
+func savePasskey(ctx context.Context, q *db.Queries, userID string, cred *webauthn.Credential) (string, error) {
+	data, err := json.Marshal(cred)
+	if err != nil {
+		return "", err
+	}
+	subject := base64.RawURLEncoding.EncodeToString(cred.ID)
+	label := authenticatorName(cred)
+	if existing, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
+		Type:    string(MethodPasskey),
+		Subject: subject,
+	}); err == nil && existing.Label != "" {
+		label = existing.Label
+	}
+	_, err = q.UpsertCredential(ctx, &db.UpsertCredentialParams{
+		ID:      passkeyCredentialID(cred),
+		UserID:  userID,
+		Type:    string(MethodPasskey),
+		Subject: subject,
+		Data:    data,
+		Label:   label,
+	})
+	return label, err
+}
+
+func passkeyCredentialID(cred *webauthn.Credential) string {
+	return "passkey:" + base64.RawURLEncoding.EncodeToString(cred.ID)
+}
+
+func (f *passkeyFlow) clearedCeremonyCookie() *http.Cookie {
+	return f.svc.newCookie(ceremonyCookieName, "", time.Unix(0, 0))
 }
 
 func (f *passkeyFlow) BeginLogin(w http.ResponseWriter, r *http.Request) {
@@ -301,4 +266,38 @@ func (f *passkeyFlow) discoverableUser(ctx context.Context) webauthn.Discoverabl
 		}
 		return f.webUserFor(ctx, u)
 	}
+}
+
+// rp has the host as its id, a passkey never answers for another workspace.
+func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
+	ws, ok := actor.WorkspaceFromContext(ctx)
+	if !ok {
+		return nil, db.ErrWorkspaceNotPinned
+	}
+	if wa, ok := f.rps.Get(ws.ID); ok {
+		return wa, nil
+	}
+	u, err := url.Parse(ws.BaseURL)
+	if err != nil {
+		return nil, err
+	}
+	row, err := f.svc.conn.Tenant().GetWorkspace(ctx)
+	if err != nil {
+		return nil, err
+	}
+	wa, err := webauthn.New(&webauthn.Config{
+		RPDisplayName: cmp.Or(row.Name, "Nokku"),
+		RPID:          u.Hostname(),
+		RPOrigins:     []string{ws.BaseURL},
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			ResidentKey:      protocol.ResidentKeyRequirementRequired,
+			UserVerification: protocol.VerificationRequired,
+		},
+		AttestationPreference: protocol.PreferNoAttestation,
+	})
+	if err != nil {
+		return nil, err
+	}
+	f.rps.Set(ws.ID, wa)
+	return wa, nil
 }

@@ -7,7 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
 )
 
 func TestListAuditLogsFilters(t *testing.T) {
@@ -25,29 +29,27 @@ func TestListAuditLogsFilters(t *testing.T) {
 		{"CreateTarget", false, `{"code":"invalid_argument"}`},
 		{"LoginDenied", false, `{}`},
 	} {
-		if err := c.Tenant().InsertAuditLog(pinned(t, f.ws), &db.InsertAuditLogParams{
+		require.NoError(t, c.Tenant().InsertAuditLog(testenv.Pinned(t, f.ws), &db.InsertAuditLogParams{
 			WorkspaceID: f.ws,
 			ActorID:     f.owner,
 			ActorKind:   "user",
 			Action:      e.action,
 			Ok:          e.ok,
 			Details:     []byte(e.details),
-		}); err != nil {
-			t.Fatalf("insert %s: %v", e.action, err)
-		}
+		}), "insert %s", e.action)
 	}
 
 	cases := map[string]struct {
-		outcome string
+		outcome *string
 		actions []string
 		want    []string
 	}{
-		"succeeded": {outcome: "succeeded", want: []string{"DeleteTarget", "UpdateWorkspace"}},
+		"succeeded": {outcome: new("succeeded"), want: []string{"DeleteTarget", "UpdateWorkspace"}},
 		"failed includes deny": {
-			outcome: "failed",
+			outcome: new("failed"),
 			want:    []string{"CreateTarget", "LoginDenied", "UpdateUserRole"},
 		},
-		"denied only": {outcome: "denied", want: []string{"LoginDenied", "UpdateUserRole"}},
+		"denied only": {outcome: new("denied"), want: []string{"LoginDenied", "UpdateUserRole"}},
 		"exact name":  {actions: []string{"UpdateWorkspace"}, want: []string{"UpdateWorkspace"}},
 		"prefix with star": {
 			actions: []string{"Update*"},
@@ -63,13 +65,11 @@ func TestListAuditLogsFilters(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			p := &db.ListAuditLogsParams{
+				Outcome:   tc.outcome,
 				Actions:   tc.actions,
 				StartDate: &start,
 				EndDate:   &end,
 				Limit:     100,
-			}
-			if tc.outcome != "" {
-				p.Outcome = &tc.outcome
 			}
 			var got []string
 			asOwner(t, c, f, func(q *db.Queries) error {
@@ -80,9 +80,7 @@ func TestListAuditLogsFilters(t *testing.T) {
 				return err
 			})
 			slices.Sort(got)
-			if !slices.Equal(got, tc.want) {
-				t.Errorf("got %v, want %v", got, tc.want)
-			}
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

@@ -2,7 +2,7 @@
 
 package iam_test
 
-// End-to-end OIDC against a small provider of its own, so attacks can swap in a crafted id_token.
+// End-to-end OIDC against a small provider, so attacks can swap in an id_token.
 
 import (
 	"context"
@@ -20,38 +20,52 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/go-jose/go-jose/v4"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
+const (
+	oidcTestSubject  = "sub-1"
+	oidcClientID     = "nokku"
+	oidcClientSecret = "idp-client-secret"
+	oidcKeyID        = "idp"
+	testProviderID   = "test"
+)
+
 type oidcIDPHarness struct {
+	t      *testing.T
 	key    *rsa.PrivateKey
 	ts     *httptest.Server
 	issuer string
-	// The last authorize handed these out. A redeemed code is empty, so it works once.
+	// From the last authorize. A redeemed code is empty, so it works once.
 	code, challenge string
-	// lastNonce must be carried by crafted tokens unless they break it on purpose.
+	// lastNonce goes in crafted tokens, unless they break it on purpose.
 	lastNonce string
-	mint      func() string
-	org       org
-	email     string
+	// mint runs on the server's goroutine, so it must not touch t.
+	mint  func() (string, error)
+	org   org
+	email string
+}
+
+type oidcFlowRun struct {
+	idp         *oidcIDPHarness
+	loginRec    *httptest.ResponseRecorder
+	callbackURL string
 }
 
 func newOIDCIdP(t *testing.T) *oidcIDPHarness {
 	t.Helper()
 
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate idp key: %v", err)
-	}
+	require.NoError(t, err, "generate idp key")
 
-	h := &oidcIDPHarness{key: key}
-	h.mint = func() string { return signIDToken(t, key, oidcKeyID, h.tokenClaims(t, nil)) }
+	h := &oidcIDPHarness{t: t, key: key}
+	h.mint = func() (string, error) { return signIDToken(key, oidcKeyID, h.tokenClaims(nil)) }
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /oidc/authorize", h.authorize)
 	mux.HandleFunc("POST /oidc/token", h.token)
@@ -77,7 +91,7 @@ func newOIDCIdP(t *testing.T) *oidcIDPHarness {
 	return h
 }
 
-// authorize signs the user straight in, like a provider that already has a session for them.
+// authorize signs the user straight in, like a provider that has a session.
 func (h *oidcIDPHarness) authorize(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	back, err := url.Parse(q.Get("redirect_uri"))
@@ -113,11 +127,13 @@ func (h *oidcIDPHarness) token(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid_grant", http.StatusBadRequest)
 		return
 	}
+	idToken, err := h.mint()
+	assert.NoError(h.t, err, "mint the id_token")
 	writeJSON(w, map[string]any{
 		"access_token": "idp-access-token",
 		"token_type":   "Bearer",
 		"expires_in":   600,
-		"id_token":     h.mint(),
+		"id_token":     idToken,
 	})
 }
 
@@ -126,25 +142,13 @@ func writeJSON(w http.ResponseWriter, v any) {
 	_ = json.MarshalWrite(w, v)
 }
 
-func noRedirectClient() *http.Client {
-	return &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
-		return http.ErrUseLastResponse
-	}}
-}
-
-type oidcFlowRun struct {
-	idp        *oidcIDPHarness
-	loginRec   *httptest.ResponseRecorder
-	callbackUR string
-}
-
 func (h *oidcIDPHarness) startOIDCFlow(t *testing.T, svc *iam.Service) *oidcFlowRun {
 	t.Helper()
 	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil)
 	return h.startOIDCFlowFrom(t, svc, login.WithContext(anon(login.Context(), h.org.ws)))
 }
 
-// startOIDCFlowFrom takes the login request, for a flow somebody signed in starts.
+// startOIDCFlowFrom takes the login request, for a signed-in user's flow.
 func (h *oidcIDPHarness) startOIDCFlowFrom(t *testing.T, svc *iam.Service, login *http.Request) *oidcFlowRun {
 	t.Helper()
 	loginRec := httptest.NewRecorder()
@@ -155,30 +159,25 @@ func (h *oidcIDPHarness) startOIDCFlowFrom(t *testing.T, svc *iam.Service, login
 	start(loginRec, login)
 
 	authorizeURL := loginRec.Header().Get("Location")
-	if authorizeURL == "" {
-		t.Fatalf("login did not redirect, code=%d body=%s", loginRec.Code, loginRec.Body.String())
-	}
+	require.NotEmpty(t, authorizeURL, "login did not redirect, code=%d body=%s", loginRec.Code, loginRec.Body.String())
 	u, err := url.Parse(authorizeURL)
-	if err != nil {
-		t.Fatalf("parse authorize redirect: %v", err)
-	}
+	require.NoError(t, err, "parse authorize redirect")
 	h.lastNonce = u.Query().Get("nonce")
 
-	resp, err := noRedirectClient().Get(authorizeURL)
-	if err != nil {
-		t.Fatalf("authorize: %v", err)
-	}
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	resp, err := client.Get(authorizeURL)
+	require.NoError(t, err, "authorize")
 	defer resp.Body.Close()
 	cbURL := resp.Header.Get("Location")
-	if cbURL == "" {
-		t.Fatalf("authorize did not redirect back, code=%d", resp.StatusCode)
-	}
-	return &oidcFlowRun{idp: h, loginRec: loginRec, callbackUR: cbURL}
+	require.NotEmpty(t, cbURL, "authorize did not redirect back, code=%d", resp.StatusCode)
+	return &oidcFlowRun{idp: h, loginRec: loginRec, callbackURL: cbURL}
 }
 
 func (f *oidcFlowRun) callback(t *testing.T, svc *iam.Service, extraQuery string) *httptest.ResponseRecorder {
 	t.Helper()
-	cbURL := f.callbackUR
+	cbURL := f.callbackURL
 	if extraQuery != "" {
 		cbURL += "&" + extraQuery
 	}
@@ -229,18 +228,14 @@ func TestOIDCFlowHappyPath(t *testing.T) {
 	wantSSOSuccess(t, rec)
 
 	u := e.userByEmail(t, h.org.ws, h.email)
-	if u == nil {
-		t.Fatal("JIT provisioned user missing")
+	require.NotNil(t, u, "JIT provisioned user missing")
+	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, u.Role)
+	assert.Equal(t, "Alice", u.Name)
+	c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject)
+	if assert.NotNil(t, c, "oidc credential not linked") {
+		assert.Equal(t, u.ID, c.UserID, "oidc credential not linked")
 	}
-	if u.Role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER || u.Name != "" && u.Name != "Alice" {
-		t.Errorf("JIT user = %+v", u)
-	}
-	if c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject); c == nil || c.UserID != u.ID {
-		t.Error("oidc credential not linked")
-	}
-	if n := e.sessions(t, h.org.ws, u.ID); n != 1 {
-		t.Errorf("sessions issued = %d, want 1", n)
-	}
+	assert.Equal(t, 1, e.sessions(t, h.org.ws, u.ID), "sessions issued")
 }
 
 func TestOIDCFlowJITDisabledRejectsUnknownIdentity(t *testing.T) {
@@ -248,12 +243,10 @@ func TestOIDCFlowJITDisabledRejectsUnknownIdentity(t *testing.T) {
 	e, svc := h.setup(t, false)
 
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
-	if e.userByEmail(t, h.org.ws, h.email) != nil {
-		t.Error("unknown identity was provisioned with JIT off")
-	}
+	assert.Nil(t, e.userByEmail(t, h.org.ws, h.email), "unknown identity was provisioned with JIT off")
 }
 
-// A provider belongs to its workspace, another workspace's host does not know it.
+// A provider belongs to its workspace, another's host does not know it.
 func TestOIDCFlowProviderStaysInItsWorkspace(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
@@ -269,13 +262,10 @@ func TestOIDCFlowDisabledProvider(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
 	p, err := svc.GetSSOProvider(anon(t.Context(), h.org.ws), testProviderID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	p.Enabled = false
-	if _, err := e.svc.PutSSOProvider(anon(t.Context(), h.org.ws), *p); err != nil {
-		t.Fatal(err)
-	}
+	_, err = e.svc.PutSSOProvider(anon(t.Context(), h.org.ws), *p)
+	require.NoError(t, err)
 
 	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil)
 	rec := httptest.NewRecorder()
@@ -289,7 +279,7 @@ func TestOIDCFlowStateReplay(t *testing.T) {
 
 	f := h.startOIDCFlow(t, svc)
 	wantSSOSuccess(t, f.callback(t, svc, ""))
-	// The state is single use, a replayed callback fails.
+	// The state is single use.
 	wantSSOFailure(t, f.callback(t, svc, ""))
 }
 
@@ -299,7 +289,7 @@ func TestOIDCFlowFlowCookieMismatch(t *testing.T) {
 
 	f := h.startOIDCFlow(t, svc)
 	// A callback URL relayed to a different browser.
-	cb := httptest.NewRequest(http.MethodGet, f.callbackUR, nil)
+	cb := httptest.NewRequest(http.MethodGet, f.callbackURL, nil)
 	cb.AddCookie(&http.Cookie{Name: "nokku_flow", Value: "stolen"})
 	cbRec := httptest.NewRecorder()
 	svc.OIDC.Callback(cbRec, cb.WithContext(anon(cb.Context(), h.org.ws)))
@@ -313,11 +303,25 @@ func TestOIDCFlowIssParameterMismatch(t *testing.T) {
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, "iss="+url.QueryEscape("http://evil.example/oidc")))
 }
 
-// The next three tests mint a valid id_token with one broken claim or the wrong key.
+func TestOIDCFlowIDTokenExpired(t *testing.T) {
+	h := newOIDCIdP(t)
+	h.mintBadToken(map[string]any{"exp": time.Now().Add(-time.Hour).Unix()})
+	_, svc := h.setup(t, true)
+
+	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
+}
+
+func TestOIDCFlowIDTokenWrongIssuer(t *testing.T) {
+	h := newOIDCIdP(t)
+	h.mintBadToken(map[string]any{"iss": "http://evil.example/oidc"})
+	_, svc := h.setup(t, true)
+
+	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
+}
 
 func TestOIDCFlowIDTokenWrongNonce(t *testing.T) {
 	h := newOIDCIdP(t)
-	h.mintBadToken(t, map[string]any{"nonce": "replayed"})
+	h.mintBadToken(map[string]any{"nonce": "replayed"})
 	_, svc := h.setup(t, true)
 
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
@@ -325,7 +329,7 @@ func TestOIDCFlowIDTokenWrongNonce(t *testing.T) {
 
 func TestOIDCFlowIDTokenWrongAudience(t *testing.T) {
 	h := newOIDCIdP(t)
-	h.mintBadToken(t, map[string]any{"aud": "another-client"})
+	h.mintBadToken(map[string]any{"aud": "another-client"})
 	_, svc := h.setup(t, true)
 
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
@@ -333,89 +337,81 @@ func TestOIDCFlowIDTokenWrongAudience(t *testing.T) {
 
 func TestOIDCFlowIDTokenBadSignature(t *testing.T) {
 	h := newOIDCIdP(t)
-	// Signed with another key but the advertised kid, so the failure is the signature check itself.
+	// Another key but the advertised kid, so the signature check itself fails.
 	attackerKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate attacker key: %v", err)
-	}
-	h.mint = func() string {
-		return signIDToken(t, attackerKey, oidcKeyID, h.tokenClaims(t, nil))
+	require.NoError(t, err, "generate attacker key")
+	h.mint = func() (string, error) {
+		return signIDToken(attackerKey, oidcKeyID, h.tokenClaims(nil))
 	}
 	_, svc := h.setup(t, true)
 
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
 }
 
-// A provider that calls the address unverified can neither claim an account with it nor create one.
+// An unverified address can neither claim an account nor make one.
 func TestOIDCFlowUnverifiedEmail(t *testing.T) {
 	h := newOIDCIdP(t)
-	h.mintBadToken(t, map[string]any{"email_verified": false})
+	h.mintBadToken(map[string]any{"email_verified": false})
 	e, svc := h.setup(t, true)
 
 	rec := h.runOIDCFlow(t, svc, "")
 	wantSSOFailure(t, rec)
-	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "email+not+verified") {
-		t.Errorf("error redirect = %q, want the unverified email message", loc)
-	}
-	if e.userByEmail(t, h.org.ws, h.email) != nil {
-		t.Error("an unverified address was provisioned")
-	}
+	assert.Contains(t, rec.Header().Get("Location"), "email+not+verified", "want the unverified email message")
+	assert.Nil(t, e.userByEmail(t, h.org.ws, h.email), "an unverified address was provisioned")
 }
 
-// Entra sends no email_verified at all. A new account takes such an address only when the owner trusts the provider,
-// or whoever picks the address there could create the account a later invite or SCIM adopts.
+// Entra sends no email_verified at all. A new account takes such an address
+// only when the owner trusts the provider, or whoever picks the address there
+// could create the account a later invite or SCIM adopts.
 func TestOIDCFlowMissingEmailVerified(t *testing.T) {
-	for name, trust := range map[string]bool{"refused": false, "trusted": true} {
-		t.Run(name, func(t *testing.T) {
-			h := newOIDCIdP(t)
-			h.mintBadToken(t, map[string]any{"email_verified": nil})
-			e, svc := h.setupProvider(t, iam.OIDCProvider{JITProvisioning: true, TrustUnverifiedEmail: trust})
-
-			rec := h.runOIDCFlow(t, svc, "")
-			created := e.userByEmail(t, h.org.ws, h.email) != nil
-			if !trust {
-				wantSSOFailure(t, rec)
-				if created {
-					t.Error("an address nobody vouched for got an account")
-				}
-				return
-			}
-			wantSSOSuccess(t, rec)
-			if !created {
-				t.Error("a trusted provider without the claim could not sign in")
-			}
-		})
+	flow := func(t *testing.T, trust bool) (*oidcIDPHarness, *testEnv, *httptest.ResponseRecorder) {
+		t.Helper()
+		h := newOIDCIdP(t)
+		h.mintBadToken(map[string]any{"email_verified": nil})
+		e, svc := h.setupProvider(t, iam.OIDCProvider{JITProvisioning: true, TrustUnverifiedEmail: trust})
+		return h, e, h.runOIDCFlow(t, svc, "")
 	}
+	t.Run("refused", func(t *testing.T) {
+		h, e, rec := flow(t, false)
+		wantSSOFailure(t, rec)
+		assert.Nil(t, e.userByEmail(t, h.org.ws, h.email), "an address nobody vouched for got an account")
+	})
+	t.Run("trusted", func(t *testing.T) {
+		h, e, rec := flow(t, true)
+		wantSSOSuccess(t, rec)
+		assert.NotNil(t, e.userByEmail(t, h.org.ws, h.email), "a trusted provider without the claim could not sign in")
+	})
 }
 
-// Without email_verified the provider does not vouch for the address, so it only claims an account when the owner
-// said it may.
+// Without email_verified the provider does not vouch for the address, so it
+// only claims an account when the owner said it may.
 func TestOIDCFlowMissingEmailVerifiedLinksOnlyWhenTrusted(t *testing.T) {
-	for name, trust := range map[string]bool{"refused": false, "trusted": true} {
-		t.Run(name, func(t *testing.T) {
-			h := newOIDCIdP(t)
-			h.mintBadToken(t, map[string]any{"email_verified": nil})
-			e, svc := h.setupProvider(t, iam.OIDCProvider{TrustUnverifiedEmail: trust})
-			member := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
-
-			rec := h.runOIDCFlow(t, svc, "")
-			linked := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject)
-			if !trust {
-				wantSSOFailure(t, rec)
-				if linked != nil {
-					t.Error("an address nobody vouched for claimed an account")
-				}
-				return
-			}
-			wantSSOSuccess(t, rec)
-			if linked == nil || linked.UserID != member.ID {
-				t.Error("a trusted provider could not link the account")
-			}
-		})
+	flow := func(t *testing.T, trust bool) (*oidcIDPHarness, *testEnv, *db.User, *httptest.ResponseRecorder) {
+		t.Helper()
+		h := newOIDCIdP(t)
+		h.mintBadToken(map[string]any{"email_verified": nil})
+		e, svc := h.setupProvider(t, iam.OIDCProvider{TrustUnverifiedEmail: trust})
+		member := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+		return h, e, member, h.runOIDCFlow(t, svc, "")
 	}
+	t.Run("refused", func(t *testing.T) {
+		h, e, _, rec := flow(t, false)
+		wantSSOFailure(t, rec)
+		assert.Nil(t, e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject),
+			"an address nobody vouched for claimed an account")
+	})
+	t.Run("trusted", func(t *testing.T) {
+		h, e, member, rec := flow(t, true)
+		wantSSOSuccess(t, rec)
+		linked := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject)
+		if assert.NotNil(t, linked, "a trusted provider could not link the account") {
+			assert.Equal(t, member.ID, linked.UserID, "a trusted provider could not link the account")
+		}
+	})
 }
 
-// A provider may give a leaver's address to someone new, with a new subject. That person must not land on the account.
+// A provider may give a leaver's address to someone new, with a new subject.
+// That person must not land on the account.
 func TestOIDCFlowRefusesASecondSubjectOnAnAccount(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
@@ -449,42 +445,27 @@ func TestOIDCFlowNeverMatchesTheOwnerByEmail(t *testing.T) {
 
 	rec := h.runOIDCFlow(t, svc, "")
 	wantSSOFailure(t, rec)
-	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "owner+link+required") {
-		t.Errorf("error redirect = %q, want the owner link message", loc)
-	}
-	if c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject); c != nil {
-		t.Error("the identity was linked to the owner by email")
-	}
-	if n := e.sessions(t, h.org.ws, owner.ID); n != 0 {
-		t.Errorf("sessions issued = %d, want 0", n)
-	}
+	assert.Contains(t, rec.Header().Get("Location"), "owner+link+required", "want the owner link message")
+	assert.Nil(t, e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject),
+		"the identity was linked to the owner by email")
+	assert.Zero(t, e.sessions(t, h.org.ws, owner.ID), "sessions issued")
 
 	// Signed in, the owner links it themselves.
 	f := h.startOIDCFlowFrom(t, svc, linkRequest(as(t.Context(), h.org.ws, owner)))
 	wantSSOSuccess(t, f.callback(t, svc, ""))
-	if c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject); c == nil ||
-		c.UserID != owner.ID {
-		t.Errorf("credential linked to %v, want the owner", c)
+	c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject)
+	if assert.NotNil(t, c, "no credential, want one of the owner") {
+		assert.Equal(t, owner.ID, c.UserID, "credential linked to someone else")
 	}
 }
 
-func (h *oidcIDPHarness) mintBadToken(t *testing.T, override map[string]any) {
-	t.Helper()
-	h.mint = func() string {
-		return signIDToken(t, h.key, oidcKeyID, h.tokenClaims(t, override))
+func (h *oidcIDPHarness) mintBadToken(override map[string]any) {
+	h.mint = func() (string, error) {
+		return signIDToken(h.key, oidcKeyID, h.tokenClaims(override))
 	}
 }
 
-const (
-	oidcTestSubject  = "sub-1"
-	oidcClientID     = "nokku"
-	oidcClientSecret = "idp-client-secret"
-	oidcKeyID        = "idp"
-	testProviderID   = "test"
-)
-
-func (h *oidcIDPHarness) tokenClaims(t *testing.T, override map[string]any) map[string]any {
-	t.Helper()
+func (h *oidcIDPHarness) tokenClaims(override map[string]any) map[string]any {
 	claims := map[string]any{
 		"iss":            h.issuer,
 		"sub":            oidcTestSubject,
@@ -500,11 +481,10 @@ func (h *oidcIDPHarness) tokenClaims(t *testing.T, override map[string]any) map[
 	return claims
 }
 
-func signIDToken(t *testing.T, key *rsa.PrivateKey, kid string, claims map[string]any) string {
-	t.Helper()
+func signIDToken(key *rsa.PrivateKey, kid string, claims map[string]any) (string, error) {
 	b, err := json.Marshal(claims)
 	if err != nil {
-		t.Fatalf("marshal claims: %v", err)
+		return "", err
 	}
 	opts := (&jose.SignerOptions{}).WithType("JWT")
 	if kid != "" {
@@ -515,17 +495,13 @@ func signIDToken(t *testing.T, key *rsa.PrivateKey, kid string, claims map[strin
 		opts,
 	)
 	if err != nil {
-		t.Fatalf("build signer: %v", err)
+		return "", err
 	}
 	obj, err := signer.Sign(b)
 	if err != nil {
-		t.Fatalf("sign token: %v", err)
+		return "", err
 	}
-	s, err := obj.CompactSerialize()
-	if err != nil {
-		t.Fatalf("serialize token: %v", err)
-	}
-	return s
+	return obj.CompactSerialize()
 }
 
 // linkRequest is what the profile page's link button sends.
@@ -536,7 +512,6 @@ func linkRequest(ctx context.Context) *http.Request {
 }
 
 func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
-	// A signed-in user who asks for it links the identity to their account.
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
 	existing := e.user(t, h.org.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
@@ -545,46 +520,33 @@ func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
 	rec := f.callback(t, svc, "")
 	wantSSOSuccess(t, rec)
 	for _, c := range rec.Result().Cookies() {
-		if strings.HasSuffix(c.Name, "nokku_session") && c.Value != "" {
-			t.Errorf("the link started a second session %s, it must keep the one that asked", c.Name)
-		}
+		started := strings.HasSuffix(c.Name, "nokku_session") && c.Value != ""
+		assert.False(t, started, "the link started a second session %s, it must keep the one that asked", c.Name)
 	}
 
-	if c := e.oidcCredential(
-		t,
-		h.org.ws,
-		testProviderID,
-		oidcTestSubject,
-	); c == nil ||
-		c.UserID != existing.ID {
-		t.Errorf("credential linked to %v, want existing user %s", c, existing.ID)
+	c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject)
+	if assert.NotNil(t, c, "no credential, want one of the existing user") {
+		assert.Equal(t, existing.ID, c.UserID, "credential linked to someone else")
 	}
-	if e.userByEmail(t, h.org.ws, h.email) != nil {
-		t.Error("a second account was provisioned for the linked identity")
-	}
+	assert.Nil(t, e.userByEmail(t, h.org.ws, h.email), "a second account was provisioned for the linked identity")
 }
 
 func wantSSOFailure(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
 	loc := rec.Header().Get("Location")
-	if !strings.HasPrefix(loc, "/sso-error?") {
-		t.Fatalf("expected SSO error redirect, got code=%d location=%q body=%s",
-			rec.Code, loc, rec.Body.String())
-	}
-	if !strings.Contains(loc, "error=") {
-		t.Errorf("error redirect carries no message: %q", loc)
-	}
+	require.True(t, strings.HasPrefix(loc, "/sso-error?"),
+		"expected SSO error redirect, got code=%d location=%q body=%s", rec.Code, loc, rec.Body.String())
+	assert.Contains(t, loc, "error=", "error redirect carries no message")
 }
 
 func wantSSOSuccess(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
-	if got := rec.Header().Get("Location"); got != "/" {
-		t.Fatalf("expected redirect to returnTo, got code=%d location=%q body=%s",
-			rec.Code, got, rec.Body.String())
-	}
+	require.Equal(t, "/", rec.Header().Get("Location"), "expected redirect to returnTo, code=%d body=%s",
+		rec.Code, rec.Body.String())
 }
 
-// A live session alone never links. Whoever signs in at the provider gets their own account, not the session's.
+// A live session alone never links. Whoever signs in at the provider gets their
+// own account, not the session's.
 func TestOIDCFlowPlainLoginNeverLinks(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
@@ -595,12 +557,9 @@ func TestOIDCFlowPlainLoginNeverLinks(t *testing.T) {
 	wantSSOSuccess(t, f.callback(t, svc, ""))
 
 	c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject)
-	if c == nil || c.UserID == bob.ID {
-		t.Fatalf("credential = %v, want one that is not bob's", c)
-	}
-	if n := e.sessions(t, h.org.ws, bob.ID); n != 0 {
-		t.Errorf("the provider's user got %d sessions as bob", n)
-	}
+	require.NotNil(t, c, "no credential, want one that is not bob's")
+	require.NotEqual(t, bob.ID, c.UserID, "the credential is bob's")
+	assert.Zero(t, e.sessions(t, h.org.ws, bob.ID), "the provider's user got sessions as bob")
 }
 
 // A link that cannot be honored stops, it does not go on as a plain sign-in.
@@ -611,7 +570,5 @@ func TestOIDCFlowRefusedLinkStops(t *testing.T) {
 	rec := httptest.NewRecorder()
 	svc.OIDC.Link(rec, linkRequest(anon(t.Context(), h.org.ws)))
 	wantSSOFailure(t, rec)
-	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "link+refused") {
-		t.Errorf("redirect = %q, want the link refused message", loc)
-	}
+	assert.Contains(t, rec.Header().Get("Location"), "link+refused", "want the link refused message")
 }

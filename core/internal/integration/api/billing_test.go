@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/mizuchilabs/inkan/license"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +21,7 @@ import (
 // The mode entitlement.New takes, named so the calls read.
 const modeSelfHosted = false
 
-// issueLicense makes a signing key and a year's license for plan. A server built with pubHex accepts key.
+// issueLicense signs a year's license for plan. A server with pubHex takes key.
 func issueLicense(t *testing.T, plan string) (pubHex, key string) {
 	t.Helper()
 	privB64, pubHex, err := license.GenerateKey()
@@ -35,7 +33,7 @@ func issueLicense(t *testing.T, plan string) (pubHex, key string) {
 	return pubHex, key
 }
 
-// The real queries: the key lands in the database, applies at once, and a restart finds it.
+// The key lands in the database, applies at once, and a restart finds it.
 func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	selfHostedOnly(t, "the hosted service has no license")
 	cfg, _ := newTestAPI(t)
@@ -43,16 +41,16 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 
 	pubHex, key := issueLicense(t, entitlement.PlanEnterprise)
 
-	// A server with its own entitlement service, so the shared one stays unlicensed.
+	// Its own entitlement service, so the shared one stays unlicensed.
 	local := *cfg
 	var err error
 	local.Entitlements, err = entitlement.New(ctx, cfg.Conn, pubHex, modeSelfHosted)
 	require.NoError(t, err)
 	srv := httptest.NewServer(serving(api.New(&local).Handler(ctx)))
 	t.Cleanup(srv.Close)
-	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
+	owner := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
 	sut := nokkuv1connect.NewBillingServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
+		clientOn(srv, header("Authorization", "Bearer "+owner)),
 	)
 
 	before, err := sut.GetLicense(ctx, &nokkuv1.GetLicenseRequest{})
@@ -69,7 +67,7 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, after.GetActive(), "the key must apply without a restart")
 	assert.Equal(t, entitlement.PlanEnterprise, after.GetPlan())
-	// The reported bug: a self-hosted instance with a valid Enterprise license must see what the plan adds.
+	// The reported bug: a valid license must show what the plan adds.
 	billing, err = sut.GetBilling(ctx, &nokkuv1.GetBillingRequest{})
 	require.NoError(t, err)
 	assert.True(t, billing.GetFeatures()[entitlement.FeatureSCIM])

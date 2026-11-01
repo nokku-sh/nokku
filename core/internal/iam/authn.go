@@ -1,7 +1,6 @@
 package iam
 
-// Every bearer is one lookup in access_tokens, inside the request's workspace. Its prefix says what it is, and the
-// kinds a caller takes are checked before the lookup.
+// A bearer is looked up in the request's workspace, its kind is checked first.
 
 import (
 	"context"
@@ -18,7 +17,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// Authenticate resolves the credential of a connect call.
 func (s *Service) Authenticate(
 	ctx context.Context,
 	header http.Header,
@@ -40,8 +38,7 @@ func (s *Service) Authenticate(
 	return p, tok, nil
 }
 
-// AuthenticateToken takes a token of one of kinds. It loads the account for user and CLI sessions, so inactive
-// accounts fail closed.
+// AuthenticateToken loads the account, so an inactive one fails closed.
 func (s *Service) AuthenticateToken(
 	ctx context.Context,
 	token string,
@@ -96,7 +93,7 @@ func (s *Service) verifySessionProof(
 	return err
 }
 
-// AdvertiseDPoPNonce also sends the canonical API URL, so a recovering client corrects the htu it signs.
+// AdvertiseDPoPNonce also sends the API URL, so a client can fix its htu.
 func (s *Service) AdvertiseDPoPNonce(ctx context.Context, h interface{ Set(key, value string) }) {
 	h.Set(deviceURLHeader, baseURL(ctx))
 	h.Set("DPoP-Nonce", s.DPoP.CurrentNonce())

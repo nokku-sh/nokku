@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mizuchilabs/kata/fsutil"
-
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 )
 
@@ -45,9 +43,9 @@ func TestSetupKeyIsStable(t *testing.T) {
 func TestSetupKeyChangedIdentityDropsCerts(t *testing.T) {
 	setupSSHDir(t)
 	cert := paths.SSHCertificate("0199a0a0-0000-7000-8000-000000000002")
-	require.NoError(t, fsutil.WriteFile(paths.PubKeyFile(), []byte("ssh-ed25519 AAAAstale x@nokku\n"), 0o600))
-	require.NoError(t, fsutil.WriteFile(cert, []byte("stale"), 0o600))
+	require.NoError(t, os.WriteFile(paths.PubKeyFile(), []byte("ssh-ed25519 AAAAstale x@nokku\n"), 0o600))
+	require.NoError(t, os.WriteFile(cert, []byte("stale"), 0o600))
 
 	require.NoError(t, SetupKey(false))
-	assert.False(t, fsutil.FileExists(cert), "certificates for the old identity must be removed")
+	assert.NoFileExists(t, cert, "certificates for the old identity must be removed")
 }

@@ -25,6 +25,24 @@ import (
 
 const fakeJobToken = "head.body.sig"
 
+// fakeExchange is the core's side of nk login --ci.
+type fakeExchange struct {
+	nokkuv1connect.UnimplementedAuthServiceHandler
+
+	expiresAt time.Time
+	err       error
+	got       *nokkuv1.ExchangeWorkloadTokenRequest
+	calls     int
+}
+
+// signingExchange answers a stale nonce with a fresh one, like the core.
+type signingExchange struct {
+	nokkuv1connect.UnimplementedAuthServiceHandler
+
+	verify func(h http.Header, token string) (string, error)
+	nonce  func() string
+}
+
 func clearJobEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{"ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "NK_ID_TOKEN"} {
@@ -32,9 +50,10 @@ func clearJobEnv(t *testing.T) {
 	}
 }
 
-// fakeGitHub answers like the token endpoint of a runner, and checks what a real one needs.
-func fakeGitHub(t *testing.T, audience string) *httptest.Server {
-	t.Helper()
+func TestJobTokenFromGitHubActions(t *testing.T) {
+	const audience = "https://nokku.example.com"
+	clearJobEnv(t)
+	// Like a runner's token endpoint, checking what a real one needs.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "bearer request-token", r.Header.Get("Authorization"))
 		assert.Equal(t, audience, r.URL.Query().Get("audience"))
@@ -42,17 +61,11 @@ func fakeGitHub(t *testing.T, audience string) *httptest.Server {
 		_, _ = w.Write([]byte(`{"count":1,"value":"` + fakeJobToken + `"}`))
 	}))
 	t.Cleanup(srv.Close)
-	return srv
-}
-
-func TestJobTokenFromGitHubActions(t *testing.T) {
-	clearJobEnv(t)
-	srv := fakeGitHub(t, "https://nokku.example.com")
 	t.Setenv("ACTIONS_ID_TOKEN_REQUEST_URL", srv.URL+"/token?api-version=2.0")
 	t.Setenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "request-token")
 	t.Setenv("NK_ID_TOKEN", "the platform asked first wins over this")
 
-	got, err := jobToken(t.Context(), "https://nokku.example.com")
+	got, err := jobToken(t.Context(), audience)
 	require.NoError(t, err)
 	assert.Equal(t, fakeJobToken, got)
 }
@@ -91,16 +104,6 @@ func TestJobTokenSaysWhatToSet(t *testing.T) {
 	for _, hint := range []string{"id-token: write", "NK_ID_TOKEN", "id_tokens"} {
 		assert.ErrorContains(t, err, hint)
 	}
-}
-
-// fakeExchange is the core's side of nk login --ci.
-type fakeExchange struct {
-	nokkuv1connect.UnimplementedAuthServiceHandler
-
-	expiresAt time.Time
-	err       error
-	got       *nokkuv1.ExchangeWorkloadTokenRequest
-	calls     int
 }
 
 func (f *fakeExchange) ExchangeWorkloadToken(
@@ -154,7 +157,7 @@ func TestLoginCISavesTheSession(t *testing.T) {
 	assert.True(t, saved.CIJob(), "a later nk run must know this is a job")
 }
 
-// Through the client dial builds, nonce round included: a proof goes out with no session, and nothing of an old one.
+// A proof goes out through dial's client, nothing of the old session does.
 func TestLoginCISignsTheExchange(t *testing.T) {
 	setTestDirs(t)
 	clearJobEnv(t)
@@ -194,14 +197,6 @@ func TestLoginCISignsTheExchange(t *testing.T) {
 		jobTokens,
 		"the nonce round repeats the call, the core spent nothing",
 	)
-}
-
-// signingExchange answers like the core: a stale nonce with a fresh one, then a session for a proof that verifies.
-type signingExchange struct {
-	nokkuv1connect.UnimplementedAuthServiceHandler
-
-	verify func(h http.Header, token string) (string, error)
-	nonce  func() string
 }
 
 func (s *signingExchange) ExchangeWorkloadToken(
@@ -263,7 +258,7 @@ func TestLoginCIKeepsTheOldSessionOnARefusal(t *testing.T) {
 	assert.Equal(t, 1, core.calls, "a job token works once, nk must not send it again")
 }
 
-// ciState is a job whose session ran out. A device flow would end in another error than the one these tests expect.
+// ciState's session ran out. A device flow would end in another error.
 func ciState() *state.State {
 	s := &state.State{}
 	s.SessionToken = "nk_sa_session"
@@ -301,7 +296,7 @@ func TestRejectedCISessionNeverOpensABrowser(t *testing.T) {
 	}
 }
 
-// The cache hides an outage. A session that ended is none, a job must stop with the reason.
+// The cache hides an outage, not an ended session. A job stops with the reason.
 func TestEndedCISessionSkipsTheCache(t *testing.T) {
 	setTestDirs(t)
 	c := newSyncTestClient(t, &fakeCore{})
@@ -316,7 +311,7 @@ func TestEndedCISessionSkipsTheCache(t *testing.T) {
 func TestEnsureCertNamesAnEndedCISession(t *testing.T) {
 	setTestDirs(t)
 	core := &fakeCore{
-		sign: func(*testing.T, *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
+		sign: func(*nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
 			return nil, connect.NewError(connect.CodeUnauthenticated, assert.AnError.Error()).WithCause(assert.AnError)
 		},
 	}

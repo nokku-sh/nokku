@@ -15,12 +15,12 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
+// How long an ephemeral daemon may be away before the sweep deletes it.
+const defaultRetireAfter = 15 * time.Minute
+
 type joinTokenService struct {
 	cfg *config.Config
 }
-
-// defaultRetireAfter is how long an ephemeral daemon may be away before the sweep deletes it.
-const defaultRetireAfter = 15 * time.Minute
 
 // CreateJoinToken returns the plaintext once, only its hash is stored.
 func (s *joinTokenService) CreateJoinToken(
@@ -28,7 +28,7 @@ func (s *joinTokenService) CreateJoinToken(
 	req *nokkuv1.CreateJoinTokenRequest,
 ) (*nokkuv1.CreateJoinTokenResponse, error) {
 	if req.GetRetireAfter() != nil && !req.GetEphemeral() {
-		return nil, newError(connect.CodeInvalidArgument, "retire_after needs an ephemeral token")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "retire_after needs an ephemeral token")
 	}
 	params := &db.CreateJoinTokenParams{
 		Label:       req.GetLabel(),
@@ -57,7 +57,7 @@ func (s *joinTokenService) CreateJoinToken(
 			return err
 		}
 		if err = addJoinTokenGrants(ctx, q, created.ID, req.GetGrants()); db.IsForeignKeyViolation(err) {
-			return newError(connect.CodeInvalidArgument, "a grant names a subject that does not exist")
+			return connect.NewError(connect.CodeInvalidArgument, "a grant names a subject that does not exist")
 		}
 		return err
 	})
@@ -73,7 +73,6 @@ func (s *joinTokenService) CreateJoinToken(
 	}, nil
 }
 
-// addJoinTokenGrants stores one row per subject, like AddSubjects does for a target account.
 func addJoinTokenGrants(ctx context.Context, q *db.Queries, tokenID string, grants []*nokkuv1.JoinTokenGrant) error {
 	for _, g := range grants {
 		subjects := map[string][]string{

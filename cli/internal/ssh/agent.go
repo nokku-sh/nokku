@@ -21,15 +21,27 @@ import (
 )
 
 const (
-	// agentIdle is how long the background agent lives without a connection.
-	agentIdle = 30 * time.Minute
-	// shutdownExtension asks a running agent to exit, nk logout sends it.
+	agentIdle         = 30 * time.Minute
 	shutdownExtension = "shutdown@nokku.sh"
 )
 
 var errSignOnly = errors.New("the nk agent only signs with the Nokku identity")
 
-// EnsureAgent starts one shared agent that outlives every ssh session, so parallel sessions never lose their signer.
+// Reloads the signer on a new public key, so no agent restart is needed.
+type identity struct {
+	requireTPM bool
+	pub        []byte
+	ring       agent.ExtendedAgent
+}
+
+// Signing only. ssh-add can't add keys, remove the key or lock the agent.
+type signOnly struct {
+	agent.ExtendedAgent
+
+	shutdown func()
+}
+
+// EnsureAgent starts a shared agent that outlives every ssh session.
 func EnsureAgent(ctx context.Context, requireTPM bool) error {
 	if agentAlive(ctx) {
 		return nil
@@ -64,7 +76,7 @@ func EnsureAgent(ctx context.Context, requireTPM bool) error {
 	return errors.New("the nk agent did not start, run nk doctor")
 }
 
-// Without the service account token, the agent never talks to the core and outlives its command.
+// Drops NK_TOKEN, the agent never calls the core and outlives its command.
 func agentEnv() []string {
 	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
 		key, _, _ := strings.Cut(kv, "=")
@@ -72,7 +84,6 @@ func agentEnv() []string {
 	})
 }
 
-// RunAgent returns at once when another agent already serves the socket.
 func RunAgent(ctx context.Context, requireTPM bool) error {
 	if agentAlive(ctx) {
 		return nil
@@ -107,13 +118,6 @@ func RunAgent(ctx context.Context, requireTPM bool) error {
 			_ = agent.ServeAgent(signOnly{ExtendedAgent: ring, shutdown: shutdown}, conn)
 		}()
 	}
-}
-
-// Reloads the signer when nk wrote a new public key, so a recreated identity needs no agent restart.
-type identity struct {
-	requireTPM bool
-	pub        []byte
-	ring       agent.ExtendedAgent
 }
 
 func (id *identity) keyring() (agent.ExtendedAgent, error) {
@@ -155,7 +159,7 @@ func agentAlive(ctx context.Context) bool {
 	return true
 }
 
-// StopAgent is best effort, an agent that does not answer exits on its own once idle.
+// StopAgent is best effort, an agent that misses it exits once idle.
 func StopAgent(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
@@ -165,13 +169,6 @@ func StopAgent(ctx context.Context) {
 	}
 	defer func() { _ = conn.Close() }()
 	_, _ = agent.NewClient(conn).Extension(shutdownExtension, nil)
-}
-
-// Signing only, so ssh-add cannot load other keys into nk's agent, remove its key, or lock it.
-type signOnly struct {
-	agent.ExtendedAgent
-
-	shutdown func()
 }
 
 func (signOnly) Add(agent.AddedKey) error         { return errSignOnly }

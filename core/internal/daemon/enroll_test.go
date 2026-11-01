@@ -8,12 +8,21 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
 type failingConn struct{}
+
+type failingTx struct{ db.DBTX }
+
+type failingRow struct{}
+
+// untouchedConn fails the test when asked, a wrong token must not get that far.
+type untouchedConn struct{ t *testing.T }
 
 func (failingConn) SysTx(_ context.Context, fn func(*db.Queries) error) error {
 	return fn(db.New(failingTx{}))
@@ -23,11 +32,7 @@ func (c failingConn) TenantTx(ctx context.Context, fn func(*db.Queries) error) e
 	return c.SysTx(ctx, fn)
 }
 
-type failingTx struct{ db.DBTX }
-
 func (failingTx) QueryRow(context.Context, string, ...any) pgx.Row { return failingRow{} }
-
-type failingRow struct{}
 
 func (failingRow) Scan(...any) error { return errors.New("connection lost") }
 
@@ -35,13 +40,9 @@ func (failingRow) Scan(...any) error { return errors.New("connection lost") }
 func TestEnroll_LookupFailureIsNotABadToken(t *testing.T) {
 	token, _ := crypto.NewToken(crypto.TokenEnroll)
 	_, err := Enroll(t.Context(), failingConn{}, EnrollInput{Token: token})
-	if err == nil || errors.Is(err, ErrEnrollToken) {
-		t.Fatalf("err = %v, want the lookup failure", err)
-	}
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrEnrollToken, "want the lookup failure")
 }
-
-// untouchedConn fails the test when asked, a token that is no enroll token must not get that far.
-type untouchedConn struct{ t *testing.T }
 
 func (c untouchedConn) SysTx(context.Context, func(*db.Queries) error) error {
 	c.t.Error("the token reached the database")
@@ -65,8 +66,6 @@ func TestEnroll_RefusesAWrongTokenWithoutAQuery(t *testing.T) {
 		"the old format": uuid.NewV7().String() + "_" + crypto.RandomString(32),
 	} {
 		_, err := Enroll(t.Context(), untouchedConn{t}, EnrollInput{Token: token})
-		if !errors.Is(err, ErrEnrollToken) {
-			t.Errorf("%s: err = %v, want ErrEnrollToken", name, err)
-		}
+		assert.ErrorIs(t, err, ErrEnrollToken, name)
 	}
 }

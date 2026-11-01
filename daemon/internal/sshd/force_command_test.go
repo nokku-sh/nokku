@@ -32,7 +32,7 @@ func TestServerForceCommand(t *testing.T) {
 	is.Equal("forced\n", string(out))
 }
 
-// Restricted-command wrappers like git-shell and rrsync read the client's request from SSH_ORIGINAL_COMMAND.
+// git-shell and rrsync read the client's request from SSH_ORIGINAL_COMMAND.
 func TestServerForceCommandOriginalCommand(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -55,7 +55,7 @@ func TestServerForceCommandOriginalCommand(t *testing.T) {
 	is.Equal("[git-upload-pack 'repo.git']", string(out))
 	_ = sess.Close()
 
-	// A shell request asked for nothing, so the variable stays unset like in sshd.
+	// A shell asks for nothing, so the variable stays unset like in sshd.
 	sess, err = client.NewSession()
 	must.NoError(err)
 	defer sess.Close()

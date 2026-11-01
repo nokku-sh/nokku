@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	// deleteEvery is how often the objects of deleted recordings go. An eviction only frees disk once they do.
+	// An eviction only frees disk once its objects are gone.
 	deleteEvery = 10 * time.Minute
-	// maxFailedDeletes in a row ends a pass, storage that is down is asked again on the next one.
+	// maxFailedDeletes in a row ends a pass, the next one asks again.
 	maxFailedDeletes = 3
 )
 
@@ -32,7 +32,7 @@ func (s *Service) runRetention(ctx context.Context) {
 	}
 }
 
-// runDeletes is apart from retention, a long queue must not hold up what expires.
+// Apart from retention, a long queue must not hold up what expires.
 func (s *Service) runDeletes(ctx context.Context) {
 	tick := time.Tick(deleteEvery)
 	for {
@@ -47,7 +47,7 @@ func (s *Service) runDeletes(ctx context.Context) {
 	}
 }
 
-// cleanup gives each workspace a transaction of its own, so one that fails holds back no other.
+// One transaction per workspace, so one that fails holds back no other.
 func (s *Service) cleanup(ctx context.Context) {
 	now := time.Now()
 	workspaceIDs, err := s.conn.Sys().ListRecordingWorkspaceIDs(ctx)
@@ -70,7 +70,7 @@ func (s *Service) cleanup(ctx context.Context) {
 	}
 }
 
-// expire deletes the recordings of wsID from before cutoff. Their objects go through the delete queue.
+// The expired recordings' objects go through the delete queue.
 func (s *Service) expire(ctx context.Context, wsID string, cutoff time.Time) error {
 	return s.conn.SysTx(ctx, func(q *db.Queries) error {
 		locked, err := q.TryAdvisoryXactLock(ctx, "recording-retention:"+wsID)
@@ -84,7 +84,7 @@ func (s *Service) expire(ctx context.Context, wsID string, cutoff time.Time) err
 	})
 }
 
-// DeleteQueued holds no transaction during a bucket call, and a delete that runs twice does no harm.
+// DeleteQueued holds no tx during a bucket call, a repeat delete does no harm.
 func (s *Service) DeleteQueued(ctx context.Context) error {
 	for failures := 0; failures < maxFailedDeletes; {
 		item, err := s.conn.Sys().NextRecordingDelete(ctx)
@@ -113,7 +113,6 @@ func (s *Service) DeleteQueued(ctx context.Context) error {
 	return fmt.Errorf("stopped after %d failed deletes in a row", maxFailedDeletes)
 }
 
-// deleteObject gives up on a bucket that hangs after a minute.
 func (s *Service) deleteObject(ctx context.Context, workspaceID, objectID string) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()

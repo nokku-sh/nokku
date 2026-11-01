@@ -12,8 +12,9 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
-// The first start is sent to a host port this test holds, which is what losing the pick looks like. Docker's
-// own wording of that failure is what run looks for, so this fails when the wording changes.
+// The first start is sent to a host port this test holds, which is what losing
+// the pick looks like. run looks for Docker's own wording of that failure, so
+// this fails when the wording changes.
 func TestRunStartsAgainWhenTheHostPortIsTaken(t *testing.T) {
 	held, err := net.Listen("tcp4", "0.0.0.0:0")
 	require.NoError(t, err)
@@ -21,7 +22,7 @@ func TestRunStartsAgainWhenTheHostPortIsTaken(t *testing.T) {
 	_, taken, err := net.SplitHostPort(held.Addr().String())
 	require.NoError(t, err)
 
-	// Options are applied once per start, a host config modifier more often than that.
+	// Options run once per start, a host config modifier more often.
 	starts := 0
 	clash := testcontainers.CustomizeRequestOption(func(req *testcontainers.GenericContainerRequest) error {
 		if starts++; starts > 1 {

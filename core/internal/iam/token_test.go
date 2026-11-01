@@ -13,7 +13,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 )
 
-// The Service has no connection, so a check that let a token through to its lookup would panic.
+// The Service has no connection, so a token past its check would panic.
 
 func TestAWrongTokenNeverReachesTheDatabase(t *testing.T) {
 	s := &Service{}

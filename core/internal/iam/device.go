@@ -1,6 +1,6 @@
 package iam
 
-// RFC 8628 device flow. The CLI starts a grant, the user approves it in the browser, the CLI polls for a session.
+// RFC 8628 device flow. The CLI asks, a browser approves, the CLI polls.
 
 import (
 	"cmp"
@@ -21,13 +21,12 @@ import (
 )
 
 const (
-	// maxLabel keeps a terminal's user agent readable in the sessions list.
 	maxLabel = 64
 
 	grantTTL        = 15 * time.Minute
 	slowDownPenalty = 5 * time.Second
 	deviceInterval  = 5 * time.Second
-	// deviceSessionTTL bounds a lost machine nobody noticed, the session only works with the key of its machine.
+	// deviceSessionTTL bounds a lost machine, the session is bound to its key.
 	deviceSessionTTL = 30 * 24 * time.Hour
 
 	deviceURLHeader = "Nokku-Api-Url"
@@ -36,14 +35,14 @@ const (
 	grantDenied     = "denied"
 )
 
-// DeviceFlow keeps its grants in device_grants, under the workspace of the host like every tenant row.
+// DeviceFlow keeps grants under the host's workspace, like every tenant row.
 type DeviceFlow struct {
 	svc *Service
 }
 
 func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	// Only a workspace's own host can approve a code, the root host of the hosted service has none to offer.
+	// Only a workspace's own host can approve a code, the root host has none.
 	if actor.WorkspaceIDFromContext(ctx) == "" {
 		WriteJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "invalid_request", "error_description": "sign in at the URL of your workspace",
@@ -106,8 +105,7 @@ func (h *DeviceFlow) Deny(w http.ResponseWriter, r *http.Request) {
 	h.decide(w, r, false)
 }
 
-// decide spends the code. The CLI session inherits how the approving session signed in, so enforcing single sign-on
-// can tell it apart.
+// decide hands the CLI session the approver's sign-in method, for enforced SSO.
 func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 	p, ok := actor.PrincipalFromContext(r.Context())
 	tok, _ := CurrentToken(r.Context())
@@ -196,7 +194,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 
 		binding, derr := h.deviceBinding(ctx, r)
 		if derr != nil {
-			// Retryable, the grant stays usable. The advertised URL also fixes clients that signed the wrong htu.
+			// Retryable, the grant stays usable. The URL fixes a wrong htu.
 			h.svc.AdvertiseDPoPNonce(ctx, w.Header())
 			if errors.Is(derr, dpop.ErrNonce) {
 				writeOAuthError(w, "use_dpop_nonce")
@@ -208,11 +206,11 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 
 		// Consume before issuing so racing polls never yield two sessions.
 		if !consume() {
-			writeOAuthError(w, "expired_token") // a concurrent poll consumed it
+			writeOAuthError(w, "expired_token")
 			return
 		}
 
-		// The rules apply now, not at the approval. SSO may have been enforced in the meantime.
+		// The rules apply now. SSO may have been enforced since the approval.
 		sess, token, err := h.svc.IssueSignIn(ctx, u, TokenParams{
 			Kind:    actor.KindCLI,
 			Method:  Method(cmp.Or(deref(g.ApprovedMethod), string(MethodDevice))),
@@ -228,7 +226,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			writeOAuthError(w, "server_error")
 			return
 		}
-		// Only a key new to the account is mailed, so the mail stays rare enough to be read.
+		// Only a key new to the account is mailed, so the mail stays rare.
 		if !h.svc.seenDevice(ctx, u.ID, binding) {
 			if _, err := h.svc.addDevice(ctx, u, binding, sess.UserAgent, sess.Label, sess.Ip); err != nil {
 				slog.Error("failed to remember terminal", "error", err)
@@ -271,8 +269,7 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 	return h.svc.DPoP.Verify(proof, "", r.Method, baseURL(ctx)+r.URL.Path, "")
 }
 
-// tooFast reports a poll inside the interval. Each one widens it, the way RFC 8628 asks of slow_down. A note that
-// fails lets the poll through.
+// tooFast widens the interval on every early poll, as RFC 8628 slow_down asks.
 func (h *DeviceFlow) tooFast(ctx context.Context, g *db.DeviceGrant) bool {
 	now := h.svc.now()
 	required := deviceInterval + time.Duration(g.Violations)*slowDownPenalty
@@ -287,7 +284,7 @@ func (h *DeviceFlow) tooFast(ctx context.Context, g *db.DeviceGrant) bool {
 	return fast
 }
 
-// randomUserCode is a correlation handle, not a secret, approval needs a session. The charset avoids 0/O/1/I.
+// randomUserCode is no secret, approval needs a session. Charset skips 0/O/1/I.
 func randomUserCode() (string, error) {
 	const chars = "BCDFGHJKLMNPQRSTVWXZ23456789"
 	out := make([]byte, 8)

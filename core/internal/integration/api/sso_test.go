@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -26,7 +25,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// fakeIssuer serves a discovery document under any path, so each path is an issuer of its own.
+// fakeIssuer serves discovery under any path, each path is its own issuer.
 func fakeIssuer(t *testing.T) *httptest.Server {
 	t.Helper()
 	const wellKnown = "/.well-known/openid-configuration"
@@ -54,17 +53,17 @@ func fakeIssuer(t *testing.T) *httptest.Server {
 	return ts
 }
 
-// A provider and the SCIM tokens decide who signs in as anyone. An admin who could change them could become owner.
+// An admin who could change providers or SCIM tokens could become owner.
 func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ctx := t.Context()
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	owner := header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER))
 	admin := header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
 
-	sso := nokkuv1connect.NewSSOServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), admin))
+	sso := nokkuv1connect.NewSSOServiceClient(clientOn(srv, admin))
 	scim := nokkuv1connect.NewSCIMServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), admin),
+		clientOn(srv, admin),
 	)
 	issuer := fakeIssuer(t).URL + "/evil"
 	provider := &nokkuv1.PutSSOProviderRequest{
@@ -106,14 +105,14 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 
 	// The owner stores it, and the login page offers it right away.
 	ownerSSO := nokkuv1connect.NewSSOServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner),
+		clientOn(srv, owner),
 	)
 	stored, err := ownerSSO.PutSSOProvider(ctx, provider)
 	require.NoError(t, err)
 	assert.Equal(t, "mine", stored.GetProvider().GetProviderId())
 	assert.Equal(t, issuer, stored.GetProvider().GetIssuerUrl())
 
-	options, err := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+	options, err := nokkuv1connect.NewAuthServiceClient(clientOn(srv)).
 		GetLoginOptions(ctx, &nokkuv1.GetLoginOptionsRequest{})
 	require.NoError(t, err)
 	var ids []string
@@ -134,9 +133,9 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	owner := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
-	sso := nokkuv1connect.NewSSOServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner))
+	sso := nokkuv1connect.NewSSOServiceClient(clientOn(srv, owner))
 	lab := fakeIssuer(t).URL
 	issuer := lab + "/realms/master"
 	stored, err := sso.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{
@@ -164,14 +163,14 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// A typo in the issuer fails on save. A provider that is down later still saves, so it can be turned off.
+// A bad issuer fails on save, a provider that went down can be turned off.
 func TestNewIssuerMustAnswer(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	owner := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
-	sso := nokkuv1connect.NewSSOServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner))
+	sso := nokkuv1connect.NewSSOServiceClient(clientOn(srv, owner))
 	idp := httptest.NewTLSServer(http.NotFoundHandler())
 	t.Cleanup(idp.Close)
 
@@ -204,26 +203,25 @@ func TestEnforceSSOIsGated(t *testing.T) {
 	t.Cleanup(withoutAPlan(t, cfg))
 	owner := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner)).
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(clientOn(srv, owner)).
 		UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
 			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
 		}))
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "got %v", err)
 }
 
-// A field the mask leaves out is not changed, so it cannot trip a plan gate either. A client may send back the whole
-// workspace it read and name only what it changes.
+// A client may send back the whole workspace and name only what it changes.
 func TestPlanGateReadsOnlyMaskedFields(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	t.Cleanup(withoutAPlan(t, cfg))
 	owner := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner),
+		clientOn(srv, owner),
 	)
 	got, err := workspaces.GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 	require.NoError(t, err)
@@ -237,12 +235,12 @@ func TestPlanGateReadsOnlyMaskedFields(t *testing.T) {
 	assert.False(t, updated.GetWorkspace().GetSettings().GetEnforceSso(), "a field outside the mask was stored")
 }
 
-// seedProvider is an enabled provider, which enforced SSO takes. Call it before the test saves what it restores, so
-// enforcement is off again by the time the provider goes.
+// seedProvider is an enabled provider. Call it before saving what the test
+// restores, so enforcement is off by the time it goes.
 func seedProvider(t *testing.T, cfg *config.Config) {
 	t.Helper()
 	id := uniq("provider")
-	_, err := cfg.IAM.PutSSOProvider(wsCtx(t, cfg), iam.SSOProvider{
+	_, err := cfg.IAM.PutSSOProvider(wsCtx(t), iam.SSOProvider{
 		ProviderID: id, Name: "Seeded", Enabled: true,
 		OIDC: iam.OIDCProvider{IssuerURL: "https://idp.test", ClientID: "nokku", ClientSecret: "s3cret"},
 	})
@@ -254,20 +252,20 @@ func seedProvider(t *testing.T, cfg *config.Config) {
 	})
 }
 
-// With enforced SSO and no provider, only the owner gets in. So the rule holds from every side that could break it.
+// Enforced SSO with no provider locks everyone but the owner out.
 func TestEnforcedSSOKeepsAProvider(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	srv := enterpriseServer(t)
 	var original *db.Workspace
-	inWorkspace(t, cfg, seedWorkspace(t, cfg), func(q *db.Queries) (err error) {
+	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) (err error) {
 		original, err = q.GetWorkspace(t.Context())
 		return err
 	})
 	t.Cleanup(func() { restoreWorkspace(context.WithoutCancel(t.Context()), t, cfg, original) })
 
-	owner := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header(
+	owner := clientOn(srv, header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	))
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(owner)
 	sso := nokkuv1connect.NewSSOServiceClient(owner)
@@ -314,16 +312,15 @@ func TestEnforcedSSOKeepsAProvider(t *testing.T) {
 	require.NoError(t, remove(second), "without the rule any provider can go")
 }
 
-// Requiring single sign-on signs out everyone a passkey or a mailed link let in, in the browser and in nk. The owner
-// keeps a way in, and sessions a provider started stay.
+// Enforced SSO ends sessions that came from elsewhere, but not the owner's.
 func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	srv := enterpriseServer(t)
 	seedProvider(t, cfg)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	issue := func(u *db.User, kind actor.Kind, method iam.Method) string {
-		_, token, err := cfg.IAM.IssueSignIn(wsCtx(t, cfg), u, iam.TokenParams{Kind: kind, Method: method})
+		_, token, err := cfg.IAM.IssueSignIn(wsCtx(t), u, iam.TokenParams{Kind: kind, Method: method})
 		require.NoError(t, err)
 		return token
 	}
@@ -338,14 +335,14 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	}
 
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
+		clientOn(srv, header("Authorization", "Bearer "+owner)),
 	)
 	var original *db.Workspace
 	inWorkspace(t, cfg, ws, func(q *db.Queries) (err error) {
 		original, err = q.GetWorkspace(t.Context())
 		return err
 	})
-	// The workspace is shared. A mailed link fails in every test after this one, and an explicit false shows in others.
+	// Shared workspace, a mailed link would fail in every later test.
 	t.Cleanup(func() { restoreWorkspace(context.WithoutCancel(t.Context()), t, cfg, original) })
 
 	_, err := workspaces.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
@@ -354,7 +351,7 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	require.NoError(t, err)
 
 	for token, stays := range sessions {
-		_, tok, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), token, accessTokens...)
+		_, tok, err := cfg.IAM.AuthenticateToken(wsCtx(t), token, accessTokens...)
 		if stays {
 			assert.NoError(t, err, "a %s session of kind %s was ended", tok.Method, tok.Kind)
 		} else {
@@ -363,12 +360,12 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	}
 }
 
-// An old owner session can rename the workspace. It can't change who may sign in, in either direction.
+// An old owner session can rename the workspace, not change who may sign in.
 func TestEnforcedSSONeedsARecentSignIn(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	srv := enterpriseServer(t)
 	seedProvider(t, cfg)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	owner := seedOwner(t, cfg)
 	var original *db.Workspace
 	inWorkspace(t, cfg, ws, func(q *db.Queries) (err error) {
@@ -378,8 +375,8 @@ func TestEnforcedSSONeedsARecentSignIn(t *testing.T) {
 	t.Cleanup(func() { restoreWorkspace(context.WithoutCancel(t.Context()), t, cfg, original) })
 
 	client := func(age time.Duration) nokkuv1connect.WorkspaceServiceClient {
-		return nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL), signedIn(t, cfg, browserSession(t, cfg, owner, age)),
+		return nokkuv1connect.NewWorkspaceServiceClient(clientOn(
+			srv, signedIn(t, cfg, browserSession(t, cfg, owner, age)),
 		))
 	}
 
@@ -399,10 +396,10 @@ func TestEnforcedSSONeedsARecentSignIn(t *testing.T) {
 	require.NoError(t, err, "a recent sign-in was refused")
 }
 
-// For a person their provider gave a new subject. It signs them out, and never reaches the owner or the caller.
+// Clearing a link signs the person out, and never reaches owner or caller.
 func TestClearUserIdentities(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	link := func(u *db.User) {
@@ -427,8 +424,8 @@ func TestClearUserIdentities(t *testing.T) {
 		return n
 	}
 	unlink := func(age time.Duration, u *db.User) error {
-		_, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL), signedIn(t, cfg, browserSession(t, cfg, admin, age)),
+		_, err := nokkuv1connect.NewWorkspaceServiceClient(clientOn(
+			srv, signedIn(t, cfg, browserSession(t, cfg, admin, age)),
 		)).ClearUserIdentities(t.Context(), &nokkuv1.ClearUserIdentitiesRequest{UserId: new(u.ID)})
 		return err
 	}
@@ -454,6 +451,6 @@ func TestClearUserIdentities(t *testing.T) {
 
 	require.NoError(t, unlink(0, member))
 	assert.Zero(t, links(member), "the link stayed")
-	_, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), session, accessTokens...)
+	_, _, err := cfg.IAM.AuthenticateToken(wsCtx(t), session, accessTokens...)
 	assert.Error(t, err, "the session a wrong link gave lives on")
 }

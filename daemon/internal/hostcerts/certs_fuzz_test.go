@@ -3,10 +3,11 @@ package hostcerts
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 )
 
-// Arbitrary control-plane bytes must never panic, and only host certificates that round-trip are accepted.
+// Control-plane bytes must never panic. Only host certs that round-trip pass.
 func FuzzParseCertificate(f *testing.F) {
 	ca := newTestCA(f)
 	certText := signHostCert(f, ca, newHostPub(f), "some-target-id", 0, ssh.CertTimeInfinity)
@@ -21,22 +22,15 @@ func FuzzParseCertificate(f *testing.F) {
 		if err != nil {
 			return
 		}
-		if cert.CertType != ssh.HostCert {
-			t.Fatalf(
-				"parseCertificateBytes accepted cert with type %d, want %d",
-				cert.CertType,
-				ssh.HostCert,
-			)
-		}
-		if _, _, _, _, err = ssh.ParseAuthorizedKey(ssh.MarshalAuthorizedKey(cert)); err != nil {
-			t.Fatalf("accepted certificate does not round-trip: %v", err)
-		}
+		require.Equal(t, uint32(ssh.HostCert), cert.CertType, "parseCertificateBytes accepted another cert type")
+		_, _, _, _, err = ssh.ParseAuthorizedKey(ssh.MarshalAuthorizedKey(cert))
+		require.NoError(t, err, "accepted certificate does not round-trip")
 		_ = isValid(cert, "")
 		_ = isValid(cert, "some-target-id")
 	})
 }
 
-// Whatever is stored must be signed by the trusted CA and leave a parseable file behind.
+// What is stored must be signed by the trusted CA and leave a parseable file.
 func FuzzSaveCertificate(f *testing.F) {
 	ca := newTestCA(f)
 	certText := signHostCert(f, ca, newHostPub(f), "some-target-id", 0, ssh.CertTimeInfinity)
@@ -52,11 +46,7 @@ func FuzzSaveCertificate(f *testing.F) {
 			return
 		}
 		cert, err := Load()
-		if err != nil {
-			t.Fatalf("saveCertificate succeeded but the certificate does not load: %v", err)
-		}
-		if !signedBy(cert, ca.pub) {
-			t.Fatal("saveCertificate stored a certificate of another CA")
-		}
+		require.NoError(t, err, "saveCertificate succeeded but the certificate does not load")
+		require.True(t, signedBy(cert, ca.pub), "saveCertificate stored a certificate of another CA")
 	})
 }

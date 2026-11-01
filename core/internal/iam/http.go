@@ -15,16 +15,14 @@ import (
 const (
 	sessionTTL        = 168 * time.Hour
 	sessionCookieName = "nokku_session"
-	// sessionSeenEvery is how exact "last active" is. A busy session must not turn every request into a write.
+	// sessionSeenEvery keeps a busy session from writing on every request.
 	sessionSeenEvery = time.Minute
 )
 
-// cookieName prefixes __Host- over https. A browser never takes such a cookie from a sibling host.
-func (s *Service) cookieName(name string) string {
-	if s.secure {
-		return "__Host-" + name
-	}
-	return name
+type tokenKey struct{}
+
+func (s *Service) ClearSessionCookie() *http.Cookie {
+	return s.newCookie(sessionCookieName, "", time.Unix(0, 0))
 }
 
 func (s *Service) newCookie(name, value string, expires time.Time) *http.Cookie {
@@ -39,26 +37,16 @@ func (s *Service) newCookie(name, value string, expires time.Time) *http.Cookie 
 	}
 }
 
-func (s *Service) ClearSessionCookie() *http.Cookie {
-	return s.newCookie(sessionCookieName, "", time.Unix(0, 0))
-}
-
-// cookieValue reads headers because connect only exposes those, not an [http.Request].
-func (s *Service) cookieValue(h http.Header, name string) string {
-	name = s.cookieName(name)
-	for _, line := range h.Values("Cookie") {
-		for pair := range strings.SplitSeq(line, ";") {
-			n, v, _ := strings.Cut(pair, "=")
-			if strings.TrimSpace(n) != name {
-				continue
-			}
-			return strings.Trim(strings.TrimSpace(v), `"`)
-		}
+// cookieName adds __Host- over https, no sibling host can set such a cookie.
+func (s *Service) cookieName(name string) string {
+	if s.secure {
+		return "__Host-" + name
 	}
-	return ""
+	return name
 }
 
-// Middleware attaches a cookie session's principal and continues either way. Header tokens belong to connect.
+// Middleware attaches a cookie session's principal and continues either way.
+// Header tokens belong to connect.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, tok, err := s.AuthenticateToken(r.Context(), s.cookieValue(r.Header, sessionCookieName), crypto.TokenSession)
@@ -71,6 +59,21 @@ func (s *Service) Middleware(next http.Handler) http.Handler {
 		ctx = ContextWithToken(ctx, tok)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// cookieValue reads headers, connect exposes no [http.Request].
+func (s *Service) cookieValue(h http.Header, name string) string {
+	name = s.cookieName(name)
+	for _, line := range h.Values("Cookie") {
+		for pair := range strings.SplitSeq(line, ";") {
+			n, v, _ := strings.Cut(pair, "=")
+			if strings.TrimSpace(n) != name {
+				continue
+			}
+			return strings.Trim(strings.TrimSpace(v), `"`)
+		}
+	}
+	return ""
 }
 
 func ContextWithToken(ctx context.Context, tok db.AccessToken) context.Context {
@@ -87,8 +90,8 @@ func (s *Service) RequireLogin(next http.Handler) http.Handler {
 	})
 }
 
-// RequireFresh guards a route that adds a way in, so a stolen cookie cannot become a lasting one. A GET is taken
-// only from the app itself, the Lax cookie rides on any navigation and an old session ends here.
+// RequireFresh stops a stolen cookie adding a lasting way in. A GET must come
+// from the app, the Lax cookie rides on any navigation and would end a session.
 func (s *Service) RequireFresh(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if (r.Method == http.MethodGet || r.Method == http.MethodHead) &&
@@ -109,13 +112,10 @@ func (s *Service) RequireFresh(next http.Handler) http.Handler {
 	})
 }
 
-// CurrentToken is the credential the request authenticated with.
 func CurrentToken(ctx context.Context) (db.AccessToken, bool) {
 	tok, ok := ctx.Value(tokenKey{}).(db.AccessToken)
 	return tok, ok
 }
-
-type tokenKey struct{}
 
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

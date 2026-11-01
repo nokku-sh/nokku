@@ -3,7 +3,6 @@ package email
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -21,6 +20,8 @@ type mockSender struct {
 	calls int
 	err   error
 }
+
+type countingSender struct{ n atomic.Int32 }
 
 func (m *mockSender) Send(_ context.Context, msg message) error {
 	m.calls++
@@ -51,26 +52,14 @@ func TestSendTemplate_CallsSender(t *testing.T) {
 		"https://acme.nokku.sh/invite?token=secret",
 		7*24*time.Hour,
 	)
-	if err != nil {
-		t.Fatalf("SendInviteEmail: %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(sender.sent) != 1 {
-		t.Fatalf("sender called %d times, want 1", len(sender.sent))
-	}
+	require.Len(t, sender.sent, 1)
 	msg := sender.sent[0]
-	if msg.From != "Nokku <noreply@system.nokku.sh>" {
-		t.Errorf("From = %q", msg.From)
-	}
-	if msg.To != "ada@example.com" {
-		t.Errorf("To = %q, want ada@example.com", msg.To)
-	}
-	if msg.Subject != "Join Acme on Nokku" {
-		t.Errorf("Subject = %q", msg.Subject)
-	}
-	if !strings.Contains(msg.HTML, "editor") {
-		t.Error("HTML body missing rendered role")
-	}
+	assert.Equal(t, "Nokku <noreply@system.nokku.sh>", msg.From)
+	assert.Equal(t, "ada@example.com", msg.To)
+	assert.Equal(t, "Join Acme on Nokku", msg.Subject)
+	assert.Contains(t, msg.HTML, "editor", "HTML body missing rendered role")
 }
 
 func TestSendTemplate_Cooldown(t *testing.T) {
@@ -78,17 +67,11 @@ func TestSendTemplate_Cooldown(t *testing.T) {
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", 10*time.Minute); err != nil {
-		t.Fatalf("first send: %v", err)
-	}
+	require.NoError(t, svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", 10*time.Minute), "first send")
 
 	err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "url", 10*time.Minute)
-	if !errors.Is(err, ErrCooldown) {
-		t.Fatalf("second send = %v, want ErrCooldown", err)
-	}
-	if len(sender.sent) != 1 {
-		t.Errorf("sender called %d times, want 1", len(sender.sent))
-	}
+	require.ErrorIs(t, err, ErrCooldown, "second send")
+	assert.Len(t, sender.sent, 1)
 }
 
 func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
@@ -96,33 +79,15 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	// Different templates for the same user must not share a cooldown key.
-	if err := svc.SendInviteEmail(ctx, "a@b.io", "Acme", "member", "u", 10*time.Minute); err != nil {
-		t.Fatal(err)
-	}
-	if err := svc.SendNewLoginEmail(ctx, "user-1", "a@b.io", "d1", "Chrome", "Vienna"); err != nil {
-		t.Fatalf("different template blocked by cooldown: %v", err)
-	}
-	// Same template again is still blocked.
-	if err := svc.SendInviteEmail(
-		ctx,
-		"a@b.io",
-		"Acme",
-		"member",
-		"u",
-		10*time.Minute,
-	); !errors.Is(
-		err,
-		ErrCooldown,
-	) {
-		t.Errorf("repeat of same template = %v, want ErrCooldown", err)
-	}
-	if len(sender.sent) != 2 {
-		t.Errorf("sender called %d times, want 2", len(sender.sent))
-	}
+	require.NoError(t, svc.SendInviteEmail(ctx, "a@b.io", "Acme", "member", "u", 10*time.Minute))
+	require.NoError(t, svc.SendNewLoginEmail(ctx, "user-1", "a@b.io", "d1", "Chrome", "Vienna"),
+		"different template blocked by cooldown")
+	err := svc.SendInviteEmail(ctx, "a@b.io", "Acme", "member", "u", 10*time.Minute)
+	assert.Len(t, sender.sent, 2)
+	assert.ErrorIs(t, err, ErrCooldown, "repeat of same template")
 }
 
-// Another workspace inviting the same address is not held back, and learns nothing of the first invite.
+// Another workspace is not held back, and learns nothing of the first invite.
 func TestSendInviteEmail_CooldownPerWorkspace(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
@@ -130,68 +95,42 @@ func TestSendInviteEmail_CooldownPerWorkspace(t *testing.T) {
 		return actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws})
 	}
 
-	if err := svc.SendInviteEmail(in("w1"), "a@b.io", "Acme", "member", "u", 10*time.Minute); err != nil {
-		t.Fatal(err)
-	}
-	if err := svc.SendInviteEmail(in("w2"), "a@b.io", "Other", "member", "u", 10*time.Minute); err != nil {
-		t.Fatalf("another workspace was held back: %v", err)
-	}
+	require.NoError(t, svc.SendInviteEmail(in("w1"), "a@b.io", "Acme", "member", "u", 10*time.Minute))
+	require.NoError(t, svc.SendInviteEmail(in("w2"), "a@b.io", "Other", "member", "u", 10*time.Minute),
+		"another workspace was held back")
 	err := svc.SendInviteEmail(in("w1"), "a@b.io", "Acme", "member", "u", 10*time.Minute)
-	if !errors.Is(err, ErrCooldown) {
-		t.Errorf("same workspace again = %v, want ErrCooldown", err)
-	}
+	assert.ErrorIs(t, err, ErrCooldown, "same workspace again")
 }
 
-// A sign-in link a moment ago must not hold back an email change. A second change still waits.
+// A sign-in link must not hold back an email change. A second change waits.
 func TestSendEmailChangeConfirm_OwnCooldown(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute); err != nil {
-		t.Fatal(err)
-	}
-	if svc.EmailChangeOnCooldown("user-1") {
-		t.Fatal("a sign-in link counts as an email change")
-	}
-	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", time.Hour); err != nil {
-		t.Fatalf("confirmation blocked by the sign-in link: %v", err)
-	}
-	if !svc.EmailChangeOnCooldown("user-1") {
-		t.Error("no cooldown after a confirmation went out")
-	}
-	if err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", time.Hour); !errors.Is(err, ErrCooldown) {
-		t.Errorf("second confirmation = %v, want ErrCooldown", err)
-	}
-	if len(sender.sent) != 2 {
-		t.Errorf("sender called %d times, want 2", len(sender.sent))
-	}
+	require.NoError(t, svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute))
+	require.False(t, svc.EmailChangeOnCooldown("user-1"), "a sign-in link counts as an email change")
+	require.NoError(t, svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", time.Hour),
+		"confirmation blocked by the sign-in link")
+	assert.True(t, svc.EmailChangeOnCooldown("user-1"), "no cooldown after a confirmation went out")
+	err := svc.SendEmailChangeConfirm(ctx, "user-1", "new@b.io", "u", time.Hour)
+	assert.Len(t, sender.sent, 2)
+	assert.ErrorIs(t, err, ErrCooldown, "second confirmation")
 }
 
-// Every hosted signup makes a new owner, so only the address can hold back a second mail.
+// Each hosted signup is a new owner, so only the address holds back a mail.
 func TestSendOwnerLinkEmail_CooldownPerAddress(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	if svc.OwnerLinkOnCooldown("a@b.io") {
-		t.Fatal("cooldown before any link went out")
-	}
-	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", 24*time.Hour); err != nil {
-		t.Fatal(err)
-	}
-	if !svc.OwnerLinkOnCooldown("a@b.io") {
-		t.Error("no cooldown after the link went out")
-	}
-	if err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", 24*time.Hour); !errors.Is(err, ErrCooldown) {
-		t.Errorf("second link to the address = %v, want ErrCooldown", err)
-	}
-	if svc.OwnerLinkOnCooldown("c@b.io") {
-		t.Error("another address shares the cooldown")
-	}
-	if len(sender.sent) != 1 {
-		t.Errorf("sender called %d times, want 1", len(sender.sent))
-	}
+	require.False(t, svc.OwnerLinkOnCooldown("a@b.io"), "cooldown before any link went out")
+	require.NoError(t, svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", 24*time.Hour))
+	assert.True(t, svc.OwnerLinkOnCooldown("a@b.io"), "no cooldown after the link went out")
+	err := svc.SendOwnerLinkEmail(ctx, "a@b.io", "u", 24*time.Hour)
+	assert.False(t, svc.OwnerLinkOnCooldown("c@b.io"), "another address shares the cooldown")
+	assert.Len(t, sender.sent, 1)
+	assert.ErrorIs(t, err, ErrCooldown, "second link to the address")
 }
 
 func TestSendTemplate_CooldownPerUser(t *testing.T) {
@@ -199,13 +138,9 @@ func TestSendTemplate_CooldownPerUser(t *testing.T) {
 	svc := newTestService(sender)
 	ctx := t.Context()
 
-	if err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute); err != nil {
-		t.Fatal(err)
-	}
-	// A different user must not be blocked by user-1's cooldown.
-	if err := svc.SendMagicLinkEmail(ctx, "user-2", "b@b.io", "u", 10*time.Minute); err != nil {
-		t.Fatalf("other user blocked by cooldown: %v", err)
-	}
+	require.NoError(t, svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute))
+	require.NoError(t, svc.SendMagicLinkEmail(ctx, "user-2", "b@b.io", "u", 10*time.Minute),
+		"other user blocked by cooldown")
 }
 
 func TestSendTemplate_SendErrorPropagatesWithoutCooldown(t *testing.T) {
@@ -214,18 +149,11 @@ func TestSendTemplate_SendErrorPropagatesWithoutCooldown(t *testing.T) {
 	ctx := t.Context()
 
 	err := svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute)
-	if err == nil || !strings.Contains(err.Error(), "smtp down") {
-		t.Fatalf("error = %v, want smtp down", err)
-	}
+	require.ErrorContains(t, err, "smtp down")
 
-	// Failed sends must not set the cooldown, so a retry is possible.
 	err = svc.SendMagicLinkEmail(ctx, "user-1", "a@b.io", "u", 10*time.Minute)
-	if errors.Is(err, ErrCooldown) {
-		t.Fatal("failed send set cooldown, retry impossible")
-	}
-	if sender.calls != 2 {
-		t.Errorf("sender called %d times, want 2", sender.calls)
-	}
+	require.NotErrorIs(t, err, ErrCooldown, "failed send set cooldown, retry impossible")
+	assert.Equal(t, 2, sender.calls)
 }
 
 // A cooldown store someone filled must not hold back a reset or an alert.
@@ -235,23 +163,18 @@ func TestSendTemplate_FullCooldownStoreSendsAnyway(t *testing.T) {
 	svc.cache = cache.New[string, struct{}](1, cooldown)
 	svc.cache.Set("taken", struct{}{})
 
-	if err := svc.SendMagicLinkEmail(
+	err := svc.SendMagicLinkEmail(
 		t.Context(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", 15*time.Minute,
-	); err != nil {
-		t.Fatalf("SendMagicLinkEmail with a full cooldown store: %v", err)
-	}
-	if len(sender.sent) != 1 {
-		t.Fatalf("sender called %d times, want 1", len(sender.sent))
-	}
+	)
+	require.NoError(t, err)
+	require.Len(t, sender.sent, 1)
 }
 
 func TestSendTemplate_MissingUserID(t *testing.T) {
 	svc := newTestService(&mockSender{})
 
 	err := svc.SendMagicLinkEmail(t.Context(), "", "a@b.io", "u", 10*time.Minute)
-	if err == nil {
-		t.Fatal("missing user id: want error")
-	}
+	require.Error(t, err, "missing user id")
 }
 
 func TestSendTemplate_UnknownTemplate(t *testing.T) {
@@ -263,9 +186,7 @@ func TestSendTemplate_UnknownTemplate(t *testing.T) {
 		subject:  "x",
 		template: "does-not-exist",
 	})
-	if err == nil {
-		t.Fatal("unknown template: want error")
-	}
+	require.Error(t, err, "unknown template")
 }
 
 func TestSendTemplate_MessageAndData(t *testing.T) {
@@ -281,43 +202,33 @@ func TestSendTemplate_MessageAndData(t *testing.T) {
 		"Web browser",
 		"203.0.113.7",
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	msg := sender.sent[0]
-	if !strings.Contains(msg.HTML, "203.0.113.7") {
-		t.Error("body missing IP address")
-	}
-	if !strings.Contains(msg.HTML, "device-42") {
-		t.Error("body missing device id")
-	}
-	if !strings.Contains(msg.HTML, "https://app.nokku.sh/profile/security") {
-		t.Error("body missing profile URL")
-	}
-	if msg.Subject != "New sign-in from Web browser" {
-		t.Errorf("subject = %q", msg.Subject)
-	}
-	if !strings.Contains(msg.Text, "203.0.113.7") ||
-		!strings.Contains(msg.Text, "https://app.nokku.sh/profile/security") {
-		t.Error("text part missing the IP address or the profile URL")
-	}
+	assert.Contains(t, msg.HTML, "203.0.113.7", "body missing IP address")
+	assert.Contains(t, msg.HTML, "device-42", "body missing device id")
+	assert.Contains(t, msg.HTML, "https://app.nokku.sh/profile/security", "body missing profile URL")
+	assert.Equal(t, "New sign-in from Web browser", msg.Subject)
+	assert.Contains(t, msg.Text, "203.0.113.7", "text part missing the IP address")
+	assert.Contains(t, msg.Text, "https://app.nokku.sh/profile/security", "text part missing the profile URL")
 }
 
-// The text part is not html escaped, so a link with several query parameters stays clickable.
+// The text part is not html escaped, so a long query stays clickable.
 func TestSendTemplate_TextPartKeepsURLs(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
 	link := "https://app.nokku.sh/email-change?cancel=1&token=t"
-	if err := svc.SendEmailChangeNotice(t.Context(), "user-1", "a@b.io", "new@b.io", link, 7*24*time.Hour); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, svc.SendEmailChangeNotice(t.Context(), "user-1", "a@b.io", "new@b.io", link, 7*24*time.Hour))
 	msg := sender.sent[0]
-	if !strings.Contains(msg.Text, link) {
-		t.Errorf("text part does not contain %q", link)
-	}
-	if !strings.Contains(msg.HTML, "cancel=1&amp;token=t") {
-		t.Error("html part is not escaped")
-	}
+	assert.Contains(t, msg.Text, link)
+	assert.Contains(t, msg.HTML, "cancel=1&amp;token=t", "html part is not escaped")
+}
+
+// The mask keeps a whole letter, half of one is invalid UTF-8.
+func TestEmailChangeNoticeMasksWholeLetters(t *testing.T) {
+	sender := &mockSender{}
+	svc := newTestService(sender)
+	require.NoError(t, svc.SendEmailChangeNotice(t.Context(), "user-1", "a@b.io", "éa@b.io", "https://x", time.Hour))
+	assert.Contains(t, sender.sent[0].Text, "é***@b.io")
 }
 
 // Concurrent sends for the same user and template must deliver exactly once.
@@ -331,12 +242,8 @@ func TestSendTemplate_ConcurrentSendsOnce(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if n := sender.n.Load(); n != 1 {
-		t.Errorf("sent %d times, want 1", n)
-	}
+	assert.EqualValues(t, 1, sender.n.Load())
 }
-
-type countingSender struct{ n atomic.Int32 }
 
 func (c *countingSender) Send(context.Context, message) error {
 	c.n.Add(1)
@@ -355,13 +262,11 @@ func TestLifetime(t *testing.T) {
 		{7 * 24 * time.Hour, "7 days"},
 	}
 	for _, tt := range tests {
-		if got := lifetime(tt.d); got != tt.want {
-			t.Errorf("lifetime(%s) = %q, want %q", tt.d, got, tt.want)
-		}
+		assert.Equal(t, tt.want, lifetime(tt.d))
 	}
 }
 
-// A security mail never hides another: each new device and each new way in gets its own, a repeat waits.
+// A security mail never hides another: each device and way in gets its own.
 func TestSecurityMailsCoolDownPerDeviceAndCredential(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)

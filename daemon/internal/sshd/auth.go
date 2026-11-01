@@ -13,12 +13,14 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
+const accountKey = "nokku-account"
+
 var errNoCertificates = errors.New("sshd: only certificate authentication is supported")
 
-// access is one sync, parsed for logins. A sync swaps it whole, so a login never sees half of one.
+// access is one sync. It is swapped whole, so a login never sees half of one.
 type access struct {
 	principals map[string][]string
-	policy     Policy
+	policy     policy
 	// The CA keys are in wire form. An empty active key trusts none.
 	ca      string
 	retired map[string]time.Time
@@ -32,8 +34,9 @@ func (a *access) trusts(wire string) bool {
 	return ok && time.Now().Before(until)
 }
 
-// SetAccess applies a sync to new logins, DropRevoked to open connections. An active CA key that does not parse
-// trusts no CA at all, retired ones included. An emergency rollover sends no retired key.
+// SetAccess applies a sync to new logins, DropRevoked to open connections. An
+// active CA key that does not parse trusts no CA, retired ones included. An
+// emergency rollover sends no retired key.
 func (s *Server) SetAccess(sa *state.Access) {
 	a := &access{
 		principals: sa.Principals,
@@ -60,18 +63,18 @@ func (s *Server) SetAccess(sa *state.Access) {
 	s.access.Store(a)
 }
 
-// One certificate principal has to match the list synced for the requested account as a whole string.
+// A cert principal must match the account's synced list as a whole string.
 func (s *Server) publicKeyCallback(
 	conn ssh.ConnMetadata,
 	key ssh.PublicKey,
 ) (*ssh.Permissions, error) {
 	cert, ok := key.(*ssh.Certificate)
 	if !ok {
-		// Clients offer every agent key before the certificate, so a plain key is noise, not an audit event.
+		// Clients offer agent keys first, so a plain key is no audit event.
 		slog.Debug("ignoring plain public key", "user", conn.User(), "remote", conn.RemoteAddr())
 		return nil, errNoCertificates
 	}
-	// CheckCert does not validate the cert type, so a host certificate from a shared CA could log in as a user.
+	// CheckCert skips the type, so a host cert from a shared CA could log in.
 	if cert.CertType != ssh.UserCert {
 		return nil, s.deny(conn, fmt.Errorf("sshd: certificate has type %d, want user certificate", cert.CertType))
 	}
@@ -102,7 +105,8 @@ func (s *Server) publicKeyCallback(
 		)
 	}
 
-	// Built per auth so a new trust applies at once. CheckCert enforces critical options, validity and signature.
+	// Built per auth so a new trust applies at once. CheckCert enforces
+	// critical options, validity and signature.
 	checker := ssh.CertChecker{
 		IsUserAuthority:          trusted,
 		SupportedCriticalOptions: []string{"force-command", "source-address"},
@@ -111,7 +115,7 @@ func (s *Server) publicKeyCallback(
 		return nil, s.deny(conn, err)
 	}
 
-	// The stack enforces CriticalOptions, the session Extensions. A nil Extensions map would panic on write.
+	// The stack enforces CriticalOptions, the session Extensions.
 	perms := &ssh.Permissions{
 		CriticalOptions: maps.Clone(cert.CriticalOptions),
 		Extensions:      maps.Clone(cert.Extensions),
@@ -122,7 +126,7 @@ func (s *Server) publicKeyCallback(
 	perms.Extensions["nokku-principal"] = matched
 	// DropRevoked closes the connection once this CA is no longer trusted.
 	perms.Extensions["nokku-ca"] = string(cert.SignatureKey.Marshal())
-	// The CA signature covers the key id, so the session can trust it to tell a web session from a direct login.
+	// The CA signs the key id, so a session can trust it to spot web logins.
 	perms.Extensions["nokku-cert-key-id"] = cert.KeyId
 	if fc := cert.CriticalOptions["force-command"]; fc != "" {
 		perms.Extensions["force-command"] = fc
@@ -130,10 +134,7 @@ func (s *Server) publicKeyCallback(
 	return perms, nil
 }
 
-// accountKey is where the login's local account sits in the permissions.
-const accountKey = "nokku-account"
-
-// Runs once the client proved it holds the key. The account is checked here so nologin stops forwards too.
+// Runs after key proof. Checks the account here so nologin stops forwards too.
 func (s *Server) verifiedPublicKey(
 	conn ssh.ConnMetadata,
 	_ ssh.PublicKey,

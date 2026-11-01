@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Files that are not recordings, and recordings still being written, are never touched.
+// Non-recordings and recordings still being written are never touched.
 func TestEnforceRetention(t *testing.T) {
 	dir := newRecordsDir(t)
 	is := assert.New(t)

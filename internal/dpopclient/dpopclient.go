@@ -1,8 +1,5 @@
-// Package dpopclient provides the DPoP-authenticated connect client stack
-// shared by the Nokku binaries. It signs every RPC with a proof bound to the
-// machine's signing key, carries the access token with the "DPoP" scheme,
-// learns the server nonce, and retries once when the server rejects a stale
-// nonce. Proofs bind to the configured API URL and nothing else.
+// Package dpopclient is the DPoP-authenticated connect client the Nokku
+// binaries share. Proofs bind to the configured API URL and nothing else.
 package dpopclient
 
 import (
@@ -32,25 +29,18 @@ const (
 	apiURLHeader      = "Nokku-Api-Url"
 )
 
-// ErrAPIURLMismatch signals that the server lives at another URL than the
-// configured one. Proofs only verify for the URL the server knows itself by,
-// so the caller has to be pointed at that URL.
+// ErrAPIURLMismatch stops calls, proofs only verify for the server's own URL.
 var ErrAPIURLMismatch = errors.New("dpopclient: the server is not at the configured API URL")
 
-// Options configures a Client.
 type Options struct {
-	// BaseURL is the configured API URL. Requests go there and proofs bind to
-	// it, so it must be the URL the server knows itself by.
+	// BaseURL must be the URL the server knows itself by, proofs bind to it.
 	BaseURL string
-	// UnboundProcedures are always signed with an unbound proof (no token, no
-	// ath), such as enrollment. A stored token is never sent to them.
+	// UnboundProcedures get a proof with no ath, and never a stored token.
 	UnboundProcedures map[string]bool
-	// UserAgent, when non-empty, is set on every request.
-	UserAgent string
+	UserAgent         string
 }
 
-// Client is a connect interceptor that authenticates requests with a
-// DPoP-bound access token. It is safe for concurrent use.
+// Client is safe for concurrent use.
 type Client struct {
 	proofer *dpop.Proofer
 	httpc   *http.Client
@@ -65,9 +55,27 @@ type Client struct {
 	triedAt   time.Time
 }
 
-// New builds a client. proofer signs the proofs. token returns the current
-// access token, or "" before enrollment and for service-account calls, which
-// are left unauthenticated here and signed by the caller's own interceptor.
+// retryStream keeps a unary request to resend it after a stale-nonce rejection.
+type retryStream struct {
+	connect.ClientStream
+
+	c       *Client
+	ctx     context.Context
+	spec    connect.Spec
+	next    connect.ClientFunc
+	info    *connect.CallInfo
+	req     any
+	retried bool
+}
+
+// learningStream records the nonce a rejected stream came back with.
+type learningStream struct {
+	connect.ClientStream
+
+	c    *Client
+	info *connect.CallInfo
+}
+
 func New(
 	proofer *dpop.Proofer,
 	httpc *http.Client,
@@ -84,11 +92,7 @@ func New(
 	}
 }
 
-// NewHTTPClient builds the HTTP/2-only, TLS 1.3 minimum client the control
-// plane expects. roots is what the server certificate is verified against,
-// nil means the system roots. See the trust package for a server behind a
-// private CA. dialTimeout bounds connection setup. Redirects are not followed,
-// a proof is only valid for the URL it was signed for.
+// NewHTTPClient follows no redirect, a proof only holds for the URL it signs.
 func NewHTTPClient(roots *x509.CertPool, dialTimeout time.Duration) (*http.Client, error) {
 	proto := new(http.Protocols)
 	proto.SetHTTP1(false)
@@ -112,9 +116,7 @@ func NewHTTPClient(roots *x509.CertPool, dialTimeout time.Duration) (*http.Clien
 	}, nil
 }
 
-// FetchNonce bootstraps the DPoP nonce before the first protected request,
-// avoiding a deliberate 401 round-trip. It fails with [ErrAPIURLMismatch] when
-// the server says it lives at another URL than baseURL.
+// FetchNonce saves the first protected request a 401 round trip.
 func FetchNonce(ctx context.Context, httpc *http.Client, baseURL string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, nonceFetchTimeout)
 	defer cancel()
@@ -136,11 +138,9 @@ func FetchNonce(ctx context.Context, httpc *http.Client, baseURL string) (string
 	return resp.Header.Get("DPoP-Nonce"), nil
 }
 
-// Intercept signs every call. A unary call is retried once when the server
-// rejects the proof with a stale nonce that came with a fresh one. A stream is
-// signed once and cannot retry, a stale-nonce rejection tears it down before
-// the first message lands. A failed stream still records the nonce, so the
-// next dial signs with it. A call that cannot be signed is never sent.
+// Intercept retries a unary call once on a stale nonce. A stream cannot retry,
+// it dies before the first message and records the nonce for the next dial. A
+// call that cannot be signed is never sent.
 func (c *Client) Intercept(next connect.ClientFunc) connect.ClientFunc {
 	return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {
 		info, _ := connect.CallInfoForClientContext(ctx)
@@ -158,11 +158,7 @@ func (c *Client) Intercept(next connect.ClientFunc) connect.ClientFunc {
 	}
 }
 
-// Proof signs a DPoP proof for a request to urlPath on the configured API
-// URL, carrying the ath claim when an access token exists. Like every signed
-// request it fetches a nonce first when the cached one is old, and fails with
-// [ErrAPIURLMismatch] when the server lives at another URL. Device-flow
-// endpoints call it directly for raw HTTP requests.
+// Proof signs raw HTTP calls like the device flow, refreshing an old nonce.
 func (c *Client) Proof(ctx context.Context, method, urlPath string) (string, error) {
 	if err := c.refreshNonce(ctx); err != nil {
 		return "", err
@@ -170,8 +166,7 @@ func (c *Client) Proof(ctx context.Context, method, urlPath string) (string, err
 	return c.proof(method, urlPath, c.token())
 }
 
-// Learn records a nonce taken from a raw HTTP response. A learned nonce
-// counts as fresh, so the next proof skips the prefetch.
+// Learn records a nonce from a raw response, the next proof skips the prefetch.
 func (c *Client) Learn(nonce string) {
 	if nonce == "" {
 		return
@@ -182,9 +177,7 @@ func (c *Client) Learn(nonce string) {
 	c.learnedAt = time.Now()
 }
 
-// learnFrom records a fresh nonce from a stale-nonce rejection and reports
-// whether the server advertised one. v2 errors carry no metadata, the nonce
-// comes back as a response header or trailer.
+// v2 errors carry no metadata, the nonce comes as a response header or trailer.
 func (c *Client) learnFrom(info *connect.CallInfo, err error) bool {
 	if connect.CodeOf(err) != connect.CodeUnauthenticated {
 		return false
@@ -192,20 +185,6 @@ func (c *Client) learnFrom(info *connect.CallInfo, err error) bool {
 	nonce := cmp.Or(info.ResponseHeader().Get("DPoP-Nonce"), info.ResponseTrailer().Get("DPoP-Nonce"))
 	c.Learn(nonce)
 	return nonce != ""
-}
-
-// retryStream keeps the request of a unary call, so a stale-nonce rejection
-// can be sent again with a fresh proof.
-type retryStream struct {
-	connect.ClientStream
-
-	c       *Client
-	ctx     context.Context
-	spec    connect.Spec
-	next    connect.ClientFunc
-	info    *connect.CallInfo
-	req     any
-	retried bool
 }
 
 func (r *retryStream) Send(msg any) error {
@@ -221,7 +200,6 @@ func (r *retryStream) Receive(msg any) error {
 	r.retried = true
 	_ = r.ClientStream.Close()
 
-	// Wipe the rejected proof before signing again.
 	r.info.RequestHeader().Delete("DPoP")
 	if err = r.c.sign(r.ctx, r.info.RequestHeader(), r.spec.Procedure); err != nil {
 		return err
@@ -240,14 +218,6 @@ func (r *retryStream) Receive(msg any) error {
 	return stream.Receive(msg)
 }
 
-// learningStream records the nonce a rejected stream came back with.
-type learningStream struct {
-	connect.ClientStream
-
-	c    *Client
-	info *connect.CallInfo
-}
-
 func (l *learningStream) Receive(msg any) error {
 	err := l.ClientStream.Receive(msg)
 	if err != nil {
@@ -263,7 +233,7 @@ func (c *Client) sign(ctx context.Context, header *connect.Header, procedure str
 	}
 	token := c.token()
 	if c.unbound[procedure] {
-		// An enrollment may go to another server than the one the stored token came from.
+		// An unbound call may go to another server than the token came from.
 		token = ""
 	} else if token == "" {
 		return nil
@@ -291,7 +261,7 @@ func (c *Client) proof(method, urlPath, token string) (string, error) {
 	return c.proofer.Sign(method, c.base+urlPath, ath, c.currentNonce())
 }
 
-// Best effort, a failed prefetch keeps the cached nonce. Only a URL mismatch is returned, nothing works until fixed.
+// Best effort, only a URL mismatch is returned, nothing works until it's fixed.
 func (c *Client) refreshNonce(ctx context.Context) error {
 	c.mu.Lock()
 	fresh := within(c.learnedAt, nonceRefreshAfter) || within(c.triedAt, nonceRetryAfter)
@@ -321,7 +291,7 @@ func (c *Client) currentNonce() string {
 	return c.nonce
 }
 
-// within measures on the wall clock, the monotonic one stops in a suspend and would keep an old nonce fresh.
+// Wall clock, a suspend stops the monotonic one, an old nonce would look fresh.
 func within(t time.Time, d time.Duration) bool {
 	age := time.Since(t.Round(0))
 	return age >= 0 && age <= d

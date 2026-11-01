@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
@@ -25,30 +27,21 @@ func testConfig(t *testing.T, srv *sshtest.Server) Config {
 func dialForTest(t *testing.T, srv *sshtest.Server, cfg Config) *Terminal {
 	t.Helper()
 	conn, err := net.Dial("tcp", srv.Addr())
-	if err != nil {
-		t.Fatalf("dial test server: %v", err)
-	}
+	require.NoError(t, err, "dial test server")
 	term, err := DialTerminal(t.Context(), conn, cfg)
 	if err != nil {
 		_ = conn.Close()
-		t.Fatalf("DialTerminal: %v", err)
 	}
+	require.NoError(t, err, "DialTerminal")
 	return term
 }
 
 func waitForShell(t *testing.T, srv *sshtest.Server) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if srv.ShellStarted() {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("shell request never reached the server")
+	require.Eventually(t, srv.ShellStarted, 2*time.Second, time.Millisecond, "shell request never reached the server")
 }
 
-// The full dial: host verification against the CA, the pty size, echo and window-change.
+// The full dial: host check against the CA, pty size, echo and window-change.
 func TestDialTerminal_HappyPath(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
@@ -56,19 +49,13 @@ func TestDialTerminal_HappyPath(t *testing.T) {
 
 	waitForShell(t, srv)
 
-	if got := srv.ConnUser(); got != "user" {
-		t.Errorf("connection user = %q, want user", got)
-	}
-	if _, cols, rows := srv.Pty(); cols != 80 || rows != 24 {
-		t.Errorf("pty size = %dx%d, want 80x24", cols, rows)
-	}
+	assert.Equal(t, "user", srv.ConnUser())
+	_, cols, rows := srv.Pty()
+	assert.EqualValues(t, 80, cols)
+	assert.EqualValues(t, 24, rows)
 
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		if _, err := term.Write([]byte("ping\n")); err != nil {
-			t.Errorf("Write: %v", err)
-		}
-	}()
+	_, err := term.Write([]byte("ping\n"))
+	require.NoError(t, err)
 
 	deadline := time.After(2 * time.Second)
 	var got []byte
@@ -76,9 +63,7 @@ collect:
 	for {
 		select {
 		case chunk, ok := <-term.Stdout():
-			if !ok {
-				t.Fatal("stdout closed before echo arrived")
-			}
+			require.True(t, ok, "stdout closed before echo arrived")
 			got = append(got, chunk...)
 			if strings.Contains(string(got), "ping") {
 				break collect
@@ -88,27 +73,15 @@ collect:
 		}
 	}
 
-	if err := term.Resize(100, 40); err != nil {
-		t.Fatalf("Resize: %v", err)
-	}
-	deadline = time.After(2 * time.Second)
-	for {
-		select {
-		case <-deadline:
-			t.Fatal("window change never reached the server")
-		default:
-		}
-		if changes := srv.WindowChanges(); len(changes) > 0 {
-			if changes[0].Cols != 100 || changes[0].Rows != 40 {
-				t.Errorf("window change = %+v, want 100x40", changes[0])
-			}
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
+	require.NoError(t, term.Resize(100, 40))
+	require.Eventually(t, func() bool { return len(srv.WindowChanges()) > 0 },
+		2*time.Second, time.Millisecond, "window change never reached the server")
+	change := srv.WindowChanges()[0]
+	assert.EqualValues(t, 100, change.Cols)
+	assert.EqualValues(t, 40, change.Rows)
 }
 
-// The security-critical one: a host certificate signed by any other CA must fail the handshake.
+// A host certificate signed by any other CA must fail the handshake.
 func TestDialTerminal_WrongCA(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	rogue := sshtest.NewServer(t)
@@ -117,38 +90,29 @@ func TestDialTerminal_WrongCA(t *testing.T) {
 	cfg.HostCAs = []ssh.PublicKey{rogue.HostCAKey()}
 
 	conn, err := net.Dial("tcp", srv.Addr())
-	if err != nil {
-		t.Fatalf("dial test server: %v", err)
-	}
+	require.NoError(t, err, "dial test server")
 	defer func() { _ = conn.Close() }()
-	if _, err := DialTerminal(t.Context(), conn, cfg); err == nil {
-		t.Fatal("handshake with a rogue CA must fail")
-	}
+	_, err = DialTerminal(t.Context(), conn, cfg)
+	require.Error(t, err, "handshake with a rogue CA must fail")
 }
 
-// The server rejects certificates it does not know, and the dial fails instead of hanging.
+// The server rejects an unknown certificate, and the dial fails, not hangs.
 func TestDialTerminal_BadUserCert(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	cfg := testConfig(t, srv)
-	// A cert for a principal the server does not accept.
 	cfg.Signer = srv.UserSigner(t, "someone-else", "user")
 
 	conn, err := net.Dial("tcp", srv.Addr())
-	if err != nil {
-		t.Fatalf("dial test server: %v", err)
-	}
+	require.NoError(t, err, "dial test server")
 	defer func() { _ = conn.Close() }()
-	if _, err := DialTerminal(t.Context(), conn, cfg); err == nil {
-		t.Fatal("handshake with an unauthorized principal must fail")
-	}
+	_, err = DialTerminal(t.Context(), conn, cfg)
+	require.Error(t, err, "handshake with an unauthorized principal must fail")
 }
 
-// A server that accepts TCP but never speaks SSH must not hang the caller past the context deadline.
+// A server that never speaks SSH must not hang the caller past its deadline.
 func TestDialTerminal_CtxCancel(t *testing.T) {
 	stall, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
+	require.NoError(t, err)
 	defer func() { _ = stall.Close() }()
 	go func() {
 		for {
@@ -156,25 +120,28 @@ func TestDialTerminal_CtxCancel(t *testing.T) {
 			if err != nil {
 				return
 			}
-			// Hold the connection open silently.
-			go func() {
-				time.Sleep(5 * time.Second)
-				_ = c.Close()
-			}()
+			t.Cleanup(func() { _ = c.Close() })
 		}
 	}()
 
 	conn, err := net.Dial("tcp", stall.Addr().String())
-	if err != nil {
-		t.Fatalf("dial stall server: %v", err)
-	}
+	require.NoError(t, err, "dial stall server")
 	defer func() { _ = conn.Close() }()
 
 	srv := sshtest.NewServer(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 150*time.Millisecond)
 	defer cancel()
-	if _, err := DialTerminal(ctx, conn, testConfig(t, srv)); err == nil {
-		t.Fatal("dial must fail when the context expires")
+	cfg := testConfig(t, srv)
+	dialed := make(chan error, 1)
+	go func() {
+		_, err := DialTerminal(ctx, conn, cfg)
+		dialed <- err
+	}()
+	select {
+	case err := <-dialed:
+		require.Error(t, err, "dial must fail when the context expires")
+	case <-time.After(5 * time.Second):
+		t.Fatal("dial ignored its context")
 	}
 }
 
@@ -187,24 +154,21 @@ func TestTerminal_CloseTeardown(t *testing.T) {
 	term.Close()
 	select {
 	case _, ok := <-term.Stdout():
-		if ok {
-			t.Error("stdout should be closed after Close")
-		}
+		assert.False(t, ok, "stdout should be closed after Close")
 	case <-time.After(2 * time.Second):
 		t.Fatal("stdout not closed after Close")
 	}
 }
 
-// Ctrl+D ends the remote shell. That is the only ending the web terminal closes its tab for.
+// Ctrl+D ends the remote shell, the only ending that closes the web tab.
 func TestTerminal_ShellExit(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
 	defer term.Close()
 	waitForShell(t, srv)
 
-	if _, err := term.Write([]byte{0x04}); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
+	_, err := term.Write([]byte{0x04})
+	require.NoError(t, err)
 	deadline := time.After(2 * time.Second)
 	for {
 		select {
@@ -212,9 +176,7 @@ func TestTerminal_ShellExit(t *testing.T) {
 			if ok {
 				continue
 			}
-			if !term.Exited() {
-				t.Error("Exited should be true after the shell reported its exit status")
-			}
+			assert.True(t, term.Exited(), "Exited should be true after the shell reported its exit status")
 			return
 		case <-deadline:
 			t.Fatal("stdout not closed after the shell exited")
@@ -222,7 +184,7 @@ func TestTerminal_ShellExit(t *testing.T) {
 	}
 }
 
-// A dropped connection closes Stdout, which is how the pool wiring notices a dead relay.
+// A dropped connection closes Stdout, that is how the pool sees a dead relay.
 func TestTerminal_TransportDeath(t *testing.T) {
 	srv := sshtest.NewServer(t)
 	term := dialForTest(t, srv, testConfig(t, srv))
@@ -234,9 +196,7 @@ func TestTerminal_TransportDeath(t *testing.T) {
 		select {
 		case _, ok := <-term.Stdout():
 			if !ok {
-				if term.Exited() {
-					t.Error("a dropped connection is not a shell exit")
-				}
+				assert.False(t, term.Exited(), "a dropped connection is not a shell exit")
 				return
 			}
 		case <-deadline:

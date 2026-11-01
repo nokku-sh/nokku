@@ -22,19 +22,21 @@ import (
 
 type stubConn struct{}
 
+// versionConn answers the state version query with what the test stored.
+type versionConn struct {
+	stubConn
+
+	version atomic.Int64
+}
+
+type versionRow int64
+
 func (stubConn) SysTx(context.Context, func(*db.Queries) error) error {
 	return nil
 }
 
 func (stubConn) TenantTx(context.Context, func(*db.Queries) error) error {
 	return nil
-}
-
-// versionConn answers the state version query with what the test stored.
-type versionConn struct {
-	stubConn
-
-	version atomic.Int64
 }
 
 func (c *versionConn) SysTx(_ context.Context, fn func(*db.Queries) error) error {
@@ -53,8 +55,6 @@ func (c *versionConn) QueryRow(context.Context, string, ...any) pgx.Row {
 	return versionRow(c.version.Load())
 }
 
-type versionRow int64
-
 func (r versionRow) Scan(dest ...any) error {
 	*dest[0].(*int64) = int64(r)
 	return nil
@@ -65,22 +65,15 @@ func newTestPool(t *testing.T) *Pool {
 	return New(stubConn{})
 }
 
-// waitRelayPending waits for the pending entry, so registerRelay cannot win a race the test isn't about.
+// waitRelayPending stops registerRelay winning a race the test isn't about.
 func waitRelayPending(t *testing.T, p *Pool, relayID string) {
 	t.Helper()
-	deadline := time.Now().Add(time.Second)
-	for {
+	require.Eventually(t, func() bool {
 		p.mu.RLock()
+		defer p.mu.RUnlock()
 		_, ok := p.pendingRelays[relayID]
-		p.mu.RUnlock()
-		if ok {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("relay %s never became pending", relayID)
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return ok
+	}, time.Second, time.Millisecond, "relay %s never became pending", relayID)
 }
 
 // A reconnect storm: each registration cancels its predecessor's connection.
@@ -109,13 +102,9 @@ func TestPool_ReconnectStorm(t *testing.T) {
 
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	if len(p.byID) != 0 {
-		t.Errorf("byID has %d entries after storm, want 0", len(p.byID))
-	}
+	assert.Empty(t, p.byID, "byID after the storm")
 	for wksp, daemons := range p.byWksp {
-		if len(daemons) != 0 {
-			t.Errorf("workspace %s still lists %d daemons", wksp, len(daemons))
-		}
+		assert.Empty(t, daemons, "workspace %s still lists daemons", wksp)
 	}
 }
 
@@ -156,7 +145,7 @@ func TestPool_PokeStorm(t *testing.T) {
 	wg.Wait()
 }
 
-// A burst of pokes collapses into one queued StateUpdate per daemon, and only reaches the poked workspace.
+// A burst of pokes is one queued StateUpdate, only in the poked workspace.
 func TestPool_PokeCoalesces(t *testing.T) {
 	p := newTestPool(t)
 	c := p.registerDaemon(t.Context(), "d1", "w1")
@@ -168,18 +157,12 @@ func TestPool_PokeCoalesces(t *testing.T) {
 		p.poke("w1")
 	}
 
-	if got := len(c.state); got != 1 {
-		t.Fatalf("queued state updates = %d, want 1", got)
-	}
-	if msg := <-c.state; msg.GetStateUpdate() == nil {
-		t.Fatal("queued message is not a StateUpdate")
-	}
-	if got := len(other.state); got != 0 {
-		t.Fatalf("other workspace got %d state updates, want 0", got)
-	}
+	require.Len(t, c.state, 1, "queued state updates")
+	require.NotNil(t, (<-c.state).GetStateUpdate(), "queued message is not a StateUpdate")
+	require.Empty(t, other.state, "the other workspace got state updates")
 }
 
-// Coalescing state updates never drops a control message queued on the same connection.
+// Coalescing state updates never drops a queued control message.
 func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	p := newTestPool(t)
 	c := p.registerDaemon(t.Context(), "d1", "w1")
@@ -191,23 +174,19 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 			RelayOpen: &nokkuv1.RelayOpen{RelayId: &rid},
 		},
 	}
-	if err := p.sendToDaemonWait(t.Context(), "d1", relayOpen, time.Second); err != nil {
-		t.Fatalf("queue relay open: %v", err)
-	}
+	require.NoError(t, p.sendToDaemonWait(t.Context(), "d1", relayOpen, time.Second), "queue relay open")
 	for range 10 {
 		p.poke("w1")
 	}
 	select {
 	case msg := <-c.send:
-		if msg.GetRelayOpen() == nil {
-			t.Fatal("state storm replaced a control message")
-		}
+		require.NotNil(t, msg.GetRelayOpen(), "state storm replaced a control message")
 	default:
 		t.Fatal("control message lost after state storm")
 	}
 }
 
-// RequestRelay may time out and clean up while RegisterRelay closes the pending channel.
+// RequestRelay may time out while registerRelay closes the pending channel.
 func TestPool_RelayRequestRace(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -237,18 +216,12 @@ func TestPool_RelayRequestRace(t *testing.T) {
 
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	if len(p.pendingRelays) != 0 {
-		t.Errorf("%d pending relay requests left behind", len(p.pendingRelays))
-	}
-	if len(p.relays) != 0 {
-		t.Errorf("%d relays left behind", len(p.relays))
-	}
-	if len(p.relayCounts) != 0 {
-		t.Errorf("relay slots left held: %v", p.relayCounts)
-	}
+	assert.Empty(t, p.pendingRelays, "pending relay requests left behind")
+	assert.Empty(t, p.relays, "relays left behind")
+	assert.Empty(t, p.relayCounts, "relay slots left held")
 }
 
-// The over-limit request is refused before anything reaches the daemon, and released slots come back.
+// An over-limit request never reaches the daemon, and released slots come back.
 func TestPool_RelayCap(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -259,40 +232,34 @@ func TestPool_RelayCap(t *testing.T) {
 		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
-			if _, err := p.RequestRelay(ctx, "d1", rid, "u1", ""); err != nil {
-				t.Errorf("RequestRelay %s: %v", rid, err)
-			}
+			_, err := p.RequestRelay(ctx, "d1", rid, "u1", "")
+			assert.NoError(t, err, "RequestRelay %s", rid)
 		})
-		time.Sleep(time.Millisecond)
-		if r := p.registerRelay(rid, "d1"); r == nil {
-			t.Fatalf("relay %s was not pending", rid)
-		}
+		waitRelayPending(t, p, rid)
+		require.NotNil(t, p.registerRelay(rid, "d1"), "relay %s was not pending", rid)
 	}
 	wg.Wait()
 
-	if _, err := p.RequestRelay(t.Context(), "d1", "over", "u1", ""); !errors.Is(err, ErrRelayLimit) {
-		t.Fatalf("over-cap request: err=%v, want ErrRelayLimit", err)
-	}
+	_, err := p.RequestRelay(t.Context(), "d1", "over", "u1", "")
+	require.ErrorIs(t, err, ErrRelayLimit, "over-cap request")
 
-	// A different principal gets past the cap and fails on the never registered pending wait instead.
+	// Another principal passes the cap and ends in the pending wait instead.
 	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
-	if _, err := p.RequestRelay(ctx, "d1", "other", "u2", ""); errors.Is(err, ErrRelayLimit) {
-		t.Fatal("u2 must not be blocked by u1's cap")
-	}
+	_, err = p.RequestRelay(ctx, "d1", "other", "u2", "")
+	require.NotErrorIs(t, err, ErrRelayLimit, "u2 must not be blocked by u1's cap")
 
 	for i := range maxRelaysPerPrincipal {
 		p.UnregisterRelay(fmt.Sprintf("r%d", i))
 	}
-	// Reusable, but the pending wait still needs a bound since nothing will register this relay.
+	// Reusable. Nothing registers it, so the pending wait needs a bound.
 	ctx2, cancel2 := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel2()
-	if _, err := p.RequestRelay(ctx2, "d1", "again", "u1", ""); errors.Is(err, ErrRelayLimit) {
-		t.Fatal("released slots must be reusable")
-	}
+	_, err = p.RequestRelay(ctx2, "d1", "again", "u1", "")
+	require.NotErrorIs(t, err, ErrRelayLimit, "released slots must be reusable")
 }
 
-// A request behind a daemon that reads nothing ends with its own context and leaves nothing held.
+// A request to a stuck daemon ends with its own ctx and leaves nothing held.
 func TestPool_RelayRequestEndsWithItsContext(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		p := newTestPool(t)
@@ -315,7 +282,7 @@ func TestPool_RelayRequestEndsWithItsContext(t *testing.T) {
 	})
 }
 
-// A relay through the full request and register lifecycle, with bytes in both directions.
+// A relay through request and register, with bytes in both directions.
 func TestPool_RelayBridging(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -333,26 +300,16 @@ func TestPool_RelayBridging(t *testing.T) {
 	}()
 	waitRelayPending(t, p, "r1")
 	relay := p.registerRelay("r1", "d1")
-	if relay == nil {
-		t.Fatal("relay was not pending")
-	}
+	require.NotNil(t, relay, "relay was not pending")
 	got := <-res
-	if got.err != nil {
-		t.Fatalf("RequestRelay: %v", got.err)
-	}
+	require.NoError(t, got.err, "RequestRelay")
 
-	if r := p.registerRelay("ghost", "d1"); r != nil {
-		t.Fatal("unknown relay id must not register")
-	}
+	require.Nil(t, p.registerRelay("ghost", "d1"), "unknown relay id must not register")
 
 	relay.toDaemon <- []byte("ping")
 	relay.toUser <- []byte("pong")
-	if data := <-relay.toDaemon; string(data) != "ping" {
-		t.Errorf("ToDaemon carried %q", data)
-	}
-	if data := <-relay.toUser; string(data) != "pong" {
-		t.Errorf("ToUser carried %q", data)
-	}
+	assert.Equal(t, "ping", string(<-relay.toDaemon), "ToDaemon")
+	assert.Equal(t, "pong", string(<-relay.toUser), "ToUser")
 
 	select {
 	case <-relay.done():
@@ -370,9 +327,7 @@ func TestPool_RelayBridging(t *testing.T) {
 
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	if len(p.relayCounts) != 0 {
-		t.Errorf("relay slots left held: %v", p.relayCounts)
-	}
+	assert.Empty(t, p.relayCounts, "relay slots left held")
 }
 
 // A daemon disconnect tears down its relays and frees their slots.
@@ -388,28 +343,17 @@ func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
 		res <- err
 	}()
 	waitRelayPending(t, p, "r1")
-	if r := p.registerRelay("r1", "d1"); r == nil {
-		t.Fatal("relay was not pending")
-	}
-	if err := <-res; err != nil {
-		t.Fatalf("RequestRelay: %v", err)
-	}
+	require.NotNil(t, p.registerRelay("r1", "d1"), "relay was not pending")
+	require.NoError(t, <-res, "RequestRelay")
 
 	p.unregisterDaemon("d1", c)
 	p.mu.RLock()
-	relay := p.relays["r1"]
-	p.mu.RUnlock()
-	if relay != nil {
-		t.Fatal("relay outlived its daemon")
-	}
-	p.mu.RLock()
 	defer p.mu.RUnlock()
-	if len(p.relayCounts) != 0 {
-		t.Errorf("relay slots left held: %v", p.relayCounts)
-	}
+	require.Nil(t, p.relays["r1"], "relay outlived its daemon")
+	assert.Empty(t, p.relayCounts, "relay slots left held")
 }
 
-// A disconnect tears down exactly that daemon's sessions and relays, and leaves no index entry behind.
+// A disconnect tears down only that daemon's sessions, its index entry too.
 func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	p := newTestPool(t)
 	c1 := p.registerDaemon(t.Context(), "d1", "w1")
@@ -427,25 +371,15 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 
 	p.unregisterDaemon("d1", c1)
 
-	if !closed["s1"] {
-		t.Fatal("session of the disconnected daemon is still running")
-	}
-	if closed["s2"] {
-		t.Fatal("session of another daemon was torn down")
-	}
-	if p.sessions["s1"] != nil || p.sessions["s2"] == nil {
-		t.Fatal("session map out of sync with the teardown")
-	}
-	if _, ok := p.owned["d1"]; ok {
-		t.Fatal("index entry of the disconnected daemon survived")
-	}
-	if got := len(p.ListSessions("d2")); got != 1 {
-		t.Fatalf("ListSessions(d2) = %d, want 1", got)
-	}
+	require.True(t, closed["s1"], "session of the disconnected daemon is still running")
+	require.False(t, closed["s2"], "session of another daemon was torn down")
+	require.Nil(t, p.sessions["s1"], "session map out of sync with the teardown")
+	require.NotNil(t, p.sessions["s2"], "session map out of sync with the teardown")
+	require.NotContains(t, p.owned, "d1", "index entry of the disconnected daemon survived")
+	require.Len(t, p.ListSessions("d2"), 1)
 }
 
-// The listener may stay connected and still lose a notification. The heartbeat check reads the version on its own,
-// so the daemon hears of the change at its next heartbeat.
+// A notification can get lost, so the heartbeat reads the version on its own.
 func TestPool_StateVersionNeedsNoListener(t *testing.T) {
 	conn := &versionConn{}
 	conn.version.Store(1)
@@ -461,7 +395,7 @@ func TestPool_StateVersionNeedsNoListener(t *testing.T) {
 	assert.Equal(t, int64(2), v, "the change never reached the heartbeat check")
 }
 
-// A daemon only counts as behind on a version it had a whole heartbeat to reach, so a busy one never does.
+// A daemon is behind only on a version it had a whole heartbeat to reach.
 func TestHeartbeatFindsADaemonThatFellBehind(t *testing.T) {
 	c := &daemonConn{}
 	assert.False(t, c.heartbeat(0, 5), "the first heartbeat has nothing to compare with")

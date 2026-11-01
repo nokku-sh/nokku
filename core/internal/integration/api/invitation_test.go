@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,17 +17,16 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// Without mail the admin gets the link. An invite stays listed until it is used or revoked, and never makes an owner.
+// Without mail the admin gets the link. An invite never makes an owner.
 func TestInvitationWithoutMail(t *testing.T) {
-	// The Enterprise seat cap, the community one runs out in the workspace every test shares.
+	// Enterprise seats, the community cap runs out in the shared workspace.
 	base, _ := enterprise(t)
 	cfg, srv := iamServer(t, base, iam.Deps{})
 	ctx := t.Context()
-	transport := connecthttp.NewTransport(srv.Client(), srv.URL)
-	inviter := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+	inviter := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	admin := browserSession(t, cfg, inviter, 0)
-	invitations := nokkuv1connect.NewInvitationServiceClient(connect.NewClient(transport, signedIn(t, cfg, admin)))
-	public := nokkuv1connect.NewInvitationServiceClient(connect.NewClient(transport))
+	invitations := nokkuv1connect.NewInvitationServiceClient(clientOn(srv, signedIn(t, cfg, admin)))
+	public := nokkuv1connect.NewInvitationServiceClient(clientOn(srv))
 	email := newMailAddress()
 
 	created, err := invitations.CreateInvitation(ctx, &nokkuv1.CreateInvitationRequest{

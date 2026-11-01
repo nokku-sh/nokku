@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-// All three signals reach a collector over OTLP HTTP on the one standard variable.
+// All three signals reach a collector over OTLP HTTP on the standard variable.
 func TestTelemetryExportsOverHTTP(t *testing.T) {
 	var mu sync.Mutex
 	got := map[string]bool{}
@@ -33,7 +33,7 @@ func TestTelemetryExportsOverHTTP(t *testing.T) {
 		otel.SetMeterProvider(meter)
 	})
 
-	// newTelemetry wraps the default handler. Go's own one writes through log, which slog.SetDefault then points back.
+	// newTelemetry wraps the default handler, and Go's own loops through log.
 	slog.SetDefault(slog.New(slog.DiscardHandler))
 
 	ctx, cancel := context.WithCancel(t.Context())

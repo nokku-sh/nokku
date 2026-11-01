@@ -1,4 +1,4 @@
-// Package web embeds the built UI. A committed .gitkeep lets the Go build work without node.
+// Package web embeds the built UI. A .gitkeep lets Go build without node.
 package web
 
 import (
@@ -22,16 +22,42 @@ import (
 	"github.com/vearutop/statigz/brotli"
 )
 
+const uiRoot = "build"
+
 //go:generate pnpm install
 //go:generate pnpm build
 //go:generate touch build/.gitkeep
 //go:embed all:build
 var staticFS embed.FS
 
-// Where the UI sits inside staticFS.
-const uiRoot = "build"
+var inlineScript = regexp.MustCompile(`(?s)<script([^>]*)>(.*?)</script>`)
 
-// Handler serves the embedded SPA, or what the Vite dev server hands out. The browser only talks to this server.
+// InlineScriptHashes spare the CSP 'unsafe-inline' for SvelteKit's bootstrap.
+var InlineScriptHashes = sync.OnceValue(func() []string {
+	var hashes []string
+	_ = fs.WalkDir(staticFS, uiRoot, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".html") {
+			return err
+		}
+		page, err := staticFS.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		for _, m := range inlineScript.FindAllSubmatch(page, -1) {
+			if bytes.Contains(m[1], []byte("src=")) {
+				continue
+			}
+			sum := sha256.Sum256(m[2])
+			if hash := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"; !slices.Contains(hashes, hash) {
+				hashes = append(hashes, hash)
+			}
+		}
+		return nil
+	})
+	return hashes
+})
+
+// Handler serves the embedded SPA, or proxies the Vite dev server.
 func Handler() http.Handler {
 	if dev := os.Getenv("NOKKU_DEV_UI"); dev != "" {
 		return devProxy(dev)
@@ -45,7 +71,7 @@ func Handler() http.Handler {
 			case exists(p + ".html"):
 				p += ".html"
 			case strings.HasPrefix(p, "/_app/"):
-				// A chunk from before a deploy is gone. The index page would reach the browser as broken JS.
+				// An old chunk, the index page would arrive as broken JS.
 				w.Header().Set("Cache-Control", "no-store")
 				http.NotFound(w, r)
 				return
@@ -74,33 +100,6 @@ func devProxy(target string) http.Handler {
 		},
 	}
 }
-
-var inlineScript = regexp.MustCompile(`(?s)<script([^>]*)>(.*?)</script>`)
-
-// InlineScriptHashes allows SvelteKit's inline bootstrap by hash, so the policy needs no 'unsafe-inline'.
-var InlineScriptHashes = sync.OnceValue(func() []string {
-	var hashes []string
-	_ = fs.WalkDir(staticFS, uiRoot, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".html") {
-			return err
-		}
-		page, err := staticFS.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		for _, m := range inlineScript.FindAllSubmatch(page, -1) {
-			if bytes.Contains(m[1], []byte("src=")) {
-				continue
-			}
-			sum := sha256.Sum256(m[2])
-			if hash := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"; !slices.Contains(hashes, hash) {
-				hashes = append(hashes, hash)
-			}
-		}
-		return nil
-	})
-	return hashes
-})
 
 // pinMimeTypes keeps content types host independent.
 func pinMimeTypes() {

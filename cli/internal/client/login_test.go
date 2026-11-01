@@ -28,10 +28,11 @@ import (
 
 const testAPI = "https://nokku.example.com"
 
-// fakeDeviceFlow mirrors iam.DeviceFlow closely enough for the poll loop, DPoP checks and replay store included.
+// fakeDeviceFlow mirrors iam.DeviceFlow, DPoP checks and replay store included.
 type fakeDeviceFlow struct {
 	mu         sync.Mutex
 	grants     map[string]*fakeGrant // by device code
+	agents     []string
 	replay     map[string]bool
 	nonce      string
 	baseURL    string
@@ -44,8 +45,10 @@ type fakeGrant struct {
 	deviceCode string
 	userCode   string
 	status     string
-	userAgent  string
 }
+
+// inMemory has no socket, so a synctest bubble can skip the poll interval.
+type inMemory struct{ h http.Handler }
 
 func newFakeDeviceFlow() (*fakeDeviceFlow, http.Handler) {
 	f := &fakeDeviceFlow{
@@ -71,9 +74,9 @@ func (f *fakeDeviceFlow) begin(w http.ResponseWriter, r *http.Request) {
 		deviceCode: fmt.Sprintf("dev-%d", len(f.grants)),
 		userCode:   fmt.Sprintf("USER-%d", len(f.grants)),
 		status:     "pending",
-		userAgent:  r.Header.Get("User-Agent"),
 	}
 	f.grants[g.deviceCode] = g
+	f.agents = append(f.agents, r.Header.Get("User-Agent"))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"device_code":               g.deviceCode,
 		"user_code":                 g.userCode,
@@ -95,7 +98,7 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 	}
 	switch g.status {
 	case "pending":
-		// tooFast: the required interval grows by 5s with each poll that came too soon.
+		// Like tooFast, each early poll adds 5s to the interval.
 		required := time.Second + time.Duration(f.violations[code])*5*time.Second
 		now := time.Now()
 		if last := f.lastPoll[code]; !last.IsZero() && now.Sub(last) < required {
@@ -111,7 +114,7 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 	case "approved":
 		jkt, derr := f.verifyProof(r)
 		if derr != "" {
-			// Like the server, the canonical URL and the nonce ride every proof failure.
+			// Like the server, every proof failure carries the URL and nonce.
 			w.Header().Set("Nokku-Api-Url", f.baseURL)
 			w.Header().Set("DPoP-Nonce", f.nonce)
 			writeOAuthErr(w, derr)
@@ -134,7 +137,7 @@ func (f *fakeDeviceFlow) nonceEndpoint(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// verifyProof checks the claims the server checks at issuance, not the signature.
+// verifyProof checks the claims the server checks, not the signature.
 func (f *fakeDeviceFlow) verifyProof(r *http.Request) (string, string) {
 	proof := r.Header.Get("DPoP")
 	if proof == "" {
@@ -186,9 +189,6 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// inMemory serves requests without a socket, so the fake clock of a synctest bubble runs the poll interval at once.
-type inMemory struct{ h http.Handler }
-
 func (m inMemory) RoundTrip(r *http.Request) (*http.Response, error) {
 	rec := httptest.NewRecorder()
 	m.h.ServeHTTP(rec, r)
@@ -213,7 +213,7 @@ func testClient(t *testing.T, h http.Handler) *Client {
 	return c
 }
 
-// runDeviceLogin runs deviceLogin without the browser and approves after a few polls, like a user clicking accept.
+// runDeviceLogin skips the browser and approves after a few polls, like a user.
 func runDeviceLogin(t *testing.T, c *Client, f *fakeDeviceFlow) (string, error) {
 	t.Helper()
 	ctx, cfg, err := c.deviceFlow(t.Context())
@@ -243,16 +243,17 @@ func TestDeviceFlowTwoConsecutiveLogins(t *testing.T) {
 			assert.Equal(t, "tok-for-jkt", token, "login %d", i+1)
 		}
 
-		// The approval page shows who asked, so the request has to say it is nk.
+		// The approval page shows who asked, so the request must say it is nk.
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		for _, g := range f.grants {
-			assert.True(t, strings.HasPrefix(g.userAgent, "nk/"), "device request user agent = %q", g.userAgent)
+		require.NotEmpty(t, f.agents)
+		for _, agent := range f.agents {
+			assert.True(t, strings.HasPrefix(agent, "nk/"), "device request user agent = %q", agent)
 		}
 	})
 }
 
-// RFC 8628 section 3.5: each slow_down adds 5 seconds to this and every later poll.
+// RFC 8628 section 3.5: each slow_down adds 5 seconds to all later polls.
 func TestDeviceFlowSlowsDown(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var polls []time.Time
@@ -290,7 +291,7 @@ func TestDeviceFlowSlowsDown(t *testing.T) {
 	})
 }
 
-// The code runs out after expires_in, so the poll ends then even if the server never says so.
+// The poll ends at expires_in even if the server never says so.
 func TestDeviceFlowExpires(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f, h := newFakeDeviceFlow()
@@ -308,12 +309,12 @@ func TestDeviceFlowExpires(t *testing.T) {
 	})
 }
 
-// The OS opener also launches files and custom schemes, so a core may only send a web page.
+// The OS opener also launches files and schemes, so only web links may pass.
 func TestDeviceFlowRejectsNonWebLink(t *testing.T) {
 	f, h := newFakeDeviceFlow()
 	f.baseURL = "file:///etc/passwd"
 	c := testClient(t, h)
-	// The fake names the file URL as its own, so only the link check can stop it.
+	// The fake claims the file URL, so only the link check can stop it.
 	c.dpop = nil
 
 	ctx, cfg, err := c.deviceFlow(t.Context())
@@ -322,7 +323,7 @@ func TestDeviceFlowRejectsNonWebLink(t *testing.T) {
 	require.ErrorContains(t, err, "not a web address")
 }
 
-// pollAnswers runs the poll against a token endpoint that gives the answers in turn, the last one for good.
+// pollAnswers polls an endpoint that gives answers in turn, the last for good.
 func pollAnswers(t *testing.T, answers ...func(w http.ResponseWriter)) (int32, error) {
 	t.Helper()
 	var polls atomic.Int32
@@ -416,7 +417,7 @@ func TestPollDeviceTokenRetriesNonceWithoutWaiting(t *testing.T) {
 	})
 }
 
-// A refused proof, like one from a wrong clock, ends the login. No other URL is tried.
+// A refused proof, like one from a wrong clock, ends the login.
 func TestPollDeviceTokenGivesUpOnARejectedProof(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		polls, err := pollAnswers(t, answer(http.StatusBadRequest, `{"error":"invalid_dpop_proof"}`))
@@ -425,7 +426,7 @@ func TestPollDeviceTokenGivesUpOnARejectedProof(t *testing.T) {
 	})
 }
 
-// A proof only verifies for the URL the server knows itself by, so a login through another URL stops at once.
+// A proof only verifies for the server's own URL, so another URL stops at once.
 func TestDeviceLoginRefusesAServerAtAnotherURL(t *testing.T) {
 	f, h := newFakeDeviceFlow()
 	f.baseURL = "https://other.example.com"

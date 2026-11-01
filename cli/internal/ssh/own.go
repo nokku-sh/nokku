@@ -22,11 +22,18 @@ const (
 type ownBlock struct {
 	// patterns are lowercased, see hostAliases. A leading ! negates.
 	patterns []string
-	// Set when the block says where to connect. Without it the block only adds options, to a Nokku server too.
+	// Set when the block says where to connect, else it only adds options.
 	dest bool
 }
 
 type ownHosts []*ownBlock
+
+type ownReader struct {
+	blocks ownHosts
+	// cur carries into an Include and is restored after it, like ssh.
+	cur   *ownBlock
+	files int
+}
 
 // claims reports whether the user's config sends name somewhere itself.
 func (o ownHosts) claims(name string) bool {
@@ -39,7 +46,7 @@ func (o ownHosts) claims(name string) bool {
 	return false
 }
 
-// Like ssh: one pattern has to match and no negated one may. A wildcard-only pattern like Host * names nothing.
+// Like ssh, one must match and no negated one may. Host * names nothing.
 func (b *ownBlock) matches(name string) bool {
 	named := false
 	for _, raw := range b.patterns {
@@ -56,14 +63,6 @@ func (b *ownBlock) matches(name string) bool {
 	return named
 }
 
-type ownReader struct {
-	blocks ownHosts
-	// cur carries into an Include and is back after it, the way ssh keeps its active block.
-	cur   *ownBlock
-	files int
-}
-
-// Skips the file nk writes there, and what it cannot read or parse.
 func readOwnHosts() ownHosts {
 	var r ownReader
 	r.read(userConfig(), 0)
@@ -112,7 +111,7 @@ func (r *ownReader) read(file string, depth int) {
 	}
 }
 
-// ssh takes whitespace or one = after the keyword, double quotes around an argument, and a # that ends the line.
+// ssh allows one = after the keyword, double quotes, and a # ending the line.
 func configLine(line string) (string, []string) {
 	line = strings.TrimSpace(line)
 	if line == "" || line[0] == '#' {
@@ -148,7 +147,7 @@ func configLine(line string) (string, []string) {
 	return strings.ToLower(key), args
 }
 
-// The other criteria of a Match only narrow the block, so leaving them out errs toward the user's side.
+// Other Match criteria only narrow the block, so skipping them favors the user.
 func matchHosts(args []string) []string {
 	var out []string
 	for i := 0; i < len(args); i++ {
@@ -167,7 +166,7 @@ func matchHosts(args []string) []string {
 	return out
 }
 
-// Like ssh for a user config: ~ is the home directory and a relative path starts in ~/.ssh.
+// Like ssh: ~ is the home directory and a relative path starts in ~/.ssh.
 func includedFiles(arg string) []string {
 	if rest, ok := strings.CutPrefix(arg, "~"); ok && (rest == "" || strings.ContainsRune(`/\`, rune(rest[0]))) {
 		home, err := os.UserHomeDir()

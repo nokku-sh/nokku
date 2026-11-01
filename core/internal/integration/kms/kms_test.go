@@ -3,7 +3,6 @@
 package kms_test
 
 import (
-	"context"
 	"os"
 	"testing"
 	"uuid"
@@ -14,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -27,7 +25,7 @@ const (
 	secretB = "secret-b-0123456789-0123456789-01"
 )
 
-// detached is the row of a ciphertext that is in no table, so no rotation converts it.
+// detached is the row of a ciphertext in no table, so no rotation converts it.
 var detached = crypto.AAD{Table: "nowhere", Column: "secret", Workspace: "none", Row: "1"}
 
 func TestMain(m *testing.M) {
@@ -44,7 +42,7 @@ func openKeyset(t *testing.T, conn *db.Connection, secret string) (*kms.Keyset, 
 	return kms.New(t.Context(), conn, false)
 }
 
-// freshDB returns a connection to a database without a keyset, and without the secrets an earlier one sealed.
+// freshDB returns a connection to a database without a keyset or its secrets.
 func freshDB(t *testing.T) *db.Connection {
 	t.Helper()
 	conn, err := db.NewConnection(t.Context())
@@ -73,7 +71,7 @@ func seedProvider(t *testing.T, conn *db.Connection, keys *kms.Keyset, secret st
 	ws := uuid.NewV7().String()
 	sealed, err := keys.Seal(iam.SSOConfigAAD(ws, "p"), []byte(secret))
 	require.NoError(t, err)
-	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) error {
 		if _, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
 			ID: ws, Slug: uuid.NewV7().String(), Name: "kms", Settings: &nokkuv1.WorkspaceSettings{},
 		}); err != nil {
@@ -87,15 +85,10 @@ func seedProvider(t *testing.T, conn *db.Connection, keys *kms.Keyset, secret st
 	return ws
 }
 
-func pinned(t *testing.T, ws string) context.Context {
-	t.Helper()
-	return actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws})
-}
-
 func readConfig(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) string {
 	t.Helper()
 	var row *db.SsoProvider
-	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) (err error) {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) (err error) {
 		row, err = q.GetSSOProvider(t.Context(), "p")
 		return err
 	}))
@@ -126,7 +119,8 @@ func TestKeysetSurvivesRestart(t *testing.T) {
 	assert.Error(t, err, "a wrong NOKKU_SECRET must fail at boot, not run with broken keys")
 }
 
-// Everything written before stays readable, and nothing written after is in reach of the old secret.
+// What was written stays readable, what comes after is out of the old secret's
+// reach.
 func TestRotateSecret(t *testing.T) {
 	conn := freshDB(t)
 	enc, err := openKeyset(t, conn, secretA)
@@ -167,7 +161,8 @@ func TestRotateRefusesBadTarget(t *testing.T) {
 	assert.NoError(t, err, "a refused rotation changed the keyset")
 }
 
-// A rotation moves the database to the new key and drops the older ones, so the keyset never grows past two.
+// A rotation moves the database to the new key and drops older ones, so the
+// keyset never grows past two.
 func TestRotationReencryptsAndPrunes(t *testing.T) {
 	conn := freshDB(t)
 	enc, err := openKeyset(t, conn, secretA)

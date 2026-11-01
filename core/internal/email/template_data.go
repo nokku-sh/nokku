@@ -47,11 +47,11 @@ type trialTemplateData struct {
 	Operator Operator
 
 	Workspace  string
-	Left       string // "3 days"
+	Left       string
 	EndDate    string
 	DeleteDate string
 	BillingURL string
-	Next       string // when the next reminder comes, empty for none
+	Next       string
 }
 
 type deletionTemplateData struct {
@@ -63,7 +63,7 @@ type deletionTemplateData struct {
 	EndDate    string
 	DeleteDate string
 	BillingURL string
-	Next       string // when the next warning comes, empty for none
+	Next       string
 }
 
 type accessRequestTemplateData struct {
@@ -72,7 +72,7 @@ type accessRequestTemplateData struct {
 	Requester  string
 	Target     string
 	Account    string
-	Duration   string // "2 hours"
+	Duration   string
 	Reason     string
 	RequestURL string
 	RequestID  string
@@ -81,11 +81,11 @@ type accessRequestTemplateData struct {
 type accessDecisionTemplateData struct {
 	Operator Operator
 
-	Decision   string // "approved" or "denied"
+	Decision   string
 	Decider    string
 	Target     string
 	Account    string
-	Until      string // empty when denied
+	Until      string
 	RequestURL string
 	RequestID  string
 }

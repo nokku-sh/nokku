@@ -35,6 +35,31 @@ const (
 	testProcedure = "/nokku.v1.DaemonService/SyncDaemon"
 )
 
+type countingTransport struct {
+	calls atomic.Int64
+	nonce string
+	base  string
+}
+
+// fakeStream stands in for the transport. recv is what Receive answers.
+type fakeStream struct {
+	sent int
+	recv func() error
+}
+
+type hangingTransport struct{ calls atomic.Int64 }
+
+// brokenSigner has a public key and cannot sign, like a TPM that went away.
+type brokenSigner struct{ pub crypto.PublicKey }
+
+// nonceCore rejects the first call with a fresh nonce, like a stale proof.
+type nonceCore struct {
+	nokkuv1connect.UnimplementedDaemonControlServiceHandler
+
+	calls  atomic.Int32
+	proofs []string
+}
+
 func testProofer(t *testing.T) *dpop.Proofer {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -44,7 +69,7 @@ func testProofer(t *testing.T) *dpop.Proofer {
 	return p
 }
 
-// testClient talks to testBase through rt. An empty token is a client that has no session yet.
+// testClient talks to testBase through rt. An empty token means no session.
 func testClient(t *testing.T, rt http.RoundTripper, token string) *Client {
 	t.Helper()
 	return New(testProofer(t), &http.Client{Transport: rt}, func() string { return token }, Options{BaseURL: testBase})
@@ -62,7 +87,7 @@ func claims(t *testing.T, proof string) map[string]any {
 	return out
 }
 
-// An enrollment may go to another server than the one the stored token came from, so it never carries one.
+// An enrollment may go to another server, so it never carries the stored token.
 func TestSignUnboundProcedure(t *testing.T) {
 	const enroll = "/nokku.v1.DaemonService/EnrollDaemon"
 	httpc := &http.Client{Transport: &countingTransport{}}
@@ -102,14 +127,6 @@ func TestSignBoundToken(t *testing.T) {
 	assert.Equal(t, http.MethodPost, got["htm"])
 }
 
-// countingTransport counts requests so a test can assert a prefetch did or did
-// not happen.
-type countingTransport struct {
-	calls atomic.Int64
-	nonce string
-	base  string
-}
-
 func (t *countingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	t.calls.Add(1)
 	h := http.Header{}
@@ -139,9 +156,7 @@ func TestRefreshNonceLearnsNonce(t *testing.T) {
 	assert.EqualValues(t, 1, tr.calls.Load(), "a learned nonce counts as fresh")
 }
 
-// TestLearnMarksNonceFresh is the regression for a learned nonce from a
-// raw response not being treated as fresh, which caused a prefetch (and a
-// potential rejection) on the next request.
+// A nonce from a raw response counts as fresh, so the next call won't prefetch.
 func TestLearnMarksNonceFresh(t *testing.T) {
 	tr := &countingTransport{}
 	c := testClient(t, tr, "")
@@ -168,12 +183,6 @@ func TestLearnFrom(t *testing.T) {
 
 	assert.False(t, c.learnFrom(info, connect.NewError(connect.CodeInternal, "boom")),
 		"a non-authentication error carries no nonce to learn")
-}
-
-// fakeStream stands in for the transport. recv is what Receive answers.
-type fakeStream struct {
-	sent int
-	recv func() error
 }
 
 func (s *fakeStream) SendHeaders() error { return nil }
@@ -282,7 +291,7 @@ func TestFetchNonceRefusesAServerAtAnotherURL(t *testing.T) {
 	assert.ErrorContains(t, err, "https://other.example.com", "the error names the URL to use")
 }
 
-// The mismatch is checked again on every call, so the reason never turns into a bare rejection by the server.
+// Checked on every call, so the reason never becomes a bare server rejection.
 func TestUnaryStopsOnAURLMismatch(t *testing.T) {
 	tr := &countingTransport{nonce: "n", base: "https://other.example.com"}
 	c := testClient(t, tr, "tok")
@@ -330,9 +339,6 @@ func TestHTTPClientDoesNotFollowRedirects(t *testing.T) {
 	assert.False(t, followed.Load())
 }
 
-// hangingTransport accepts the request and never answers.
-type hangingTransport struct{ calls atomic.Int64 }
-
 func (t *hangingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	t.calls.Add(1)
 	<-req.Context().Done()
@@ -367,7 +373,7 @@ func TestPrefetchWithoutANonceIsNotRepeatedAtOnce(t *testing.T) {
 	assert.EqualValues(t, 1, tr.calls.Load())
 }
 
-// The server only promises a nonce 5 minutes, so the refresh has to come before that.
+// The server only promises a nonce 5 minutes, so refresh before that.
 func TestNonceIsRefreshedBeforeTheServerDropsIt(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		tr := &countingTransport{nonce: "n2"}
@@ -391,9 +397,6 @@ func TestNonceAgeUsesTheWallClock(t *testing.T) {
 	assert.False(t, within(time.Now().Add(time.Hour), 2*time.Minute), "a clock set back must not keep a nonce")
 	assert.False(t, within(time.Time{}, 2*time.Minute))
 }
-
-// brokenSigner has a public key and cannot sign, like a TPM that went away.
-type brokenSigner struct{ pub crypto.PublicKey }
 
 func (s brokenSigner) Public() crypto.PublicKey { return s.pub }
 
@@ -437,7 +440,7 @@ func TestStreamIsSigned(t *testing.T) {
 	assert.Equal(t, "n", claims(t, info.RequestHeader().Get("DPoP"))["nonce"])
 }
 
-// A daemon redials its control stream, the nonce of the rejected one must sign the next.
+// A daemon redials, so the rejected stream's nonce must sign the next one.
 func TestRejectedStreamLearnsTheNonce(t *testing.T) {
 	c := testClient(t, &countingTransport{nonce: "n"}, "tok")
 
@@ -453,14 +456,6 @@ func TestRejectedStreamLearnsTheNonce(t *testing.T) {
 
 	require.Error(t, stream.Receive(&emptypb.Empty{}))
 	assert.Equal(t, "fresh", c.currentNonce())
-}
-
-// nonceCore turns the first call down with a fresh nonce, the way core answers a stale proof.
-type nonceCore struct {
-	nokkuv1connect.UnimplementedDaemonControlServiceHandler
-
-	calls  atomic.Int32
-	proofs []string
 }
 
 func (n *nonceCore) reject(next connect.ServerFunc) connect.ServerFunc {
@@ -479,7 +474,7 @@ func (*nonceCore) SyncDaemon(context.Context, *nokkuv1.SyncDaemonRequest) (*nokk
 	return &nokkuv1.SyncDaemonResponse{}, nil
 }
 
-// nonceServer serves core behind the real HTTP transport, so the nonce travels as a response header.
+// nonceServer uses the real HTTP transport, the nonce travels as a header.
 func nonceServer(t *testing.T, core *nonceCore) (*Client, nokkuv1connect.DaemonControlServiceClient) {
 	t.Helper()
 	server := connect.NewServer(core.reject)

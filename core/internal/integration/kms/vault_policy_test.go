@@ -27,8 +27,8 @@ func docPolicy(t *testing.T, kek string) string {
 	return policy
 }
 
-// The policy in SECURITY.md is all the core needs. It lets the KEK only encrypt and decrypt, so nothing the core does
-// can delete it.
+// The policy in SECURITY.md is all the core needs. The KEK can only encrypt and
+// decrypt, so nothing the core does can delete it.
 func TestVaultPolicyFromTheDocs(t *testing.T) {
 	conn := freshDB(t)
 	root, kek, kekURI := testVaultKey(t)

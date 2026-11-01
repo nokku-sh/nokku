@@ -1,4 +1,4 @@
-// Package manual renders the probe and the script of a manual sync. It does no I/O, which keeps both testable.
+// Package manual renders the probe and script of a manual sync, with no I/O.
 package manual
 
 import (
@@ -8,12 +8,11 @@ import (
 	"github.com/nokku-sh/nokku/internal/login"
 )
 
-// The web UI names these paths too, see TargetSheet.svelte.
 const (
 	caPath     = "/etc/ssh/nokku_ca.pub"
 	dropInDir  = "/etc/ssh/sshd_config.d"
 	dropInPath = dropInDir + "/60-nokku.conf"
-	// oldPrincipalsDir held a file per account before the drop-in named a command. A sync removes it.
+	// Held a file per account before the drop-in named a command.
 	oldPrincipalsDir = "/etc/ssh/nokku_principals"
 )
 
@@ -25,7 +24,7 @@ const (
 // Writing /etc/ssh needs root, so the script stops early with a clear message.
 const requireRoot = `[ "$(id -u)" = 0 ] || { echo "nk must connect as root" >&2; exit 1; }` + "\n"
 
-// ProbeCommand gathers the accounts and the host key (ed25519 first) in one ssh round trip.
+// ProbeCommand gathers accounts and the host key in one ssh round trip.
 const ProbeCommand = requireRoot +
 	`echo '` + sectionPasswd + `'
 getent passwd 2>/dev/null || cat /etc/passwd

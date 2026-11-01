@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A token is found by its hash alone, so every hash column has a unique index of its own.
+// A token is found by its hash alone, so each hash column has a unique index.
 func TestEveryTokenHashIsUnique(t *testing.T) {
 	c := testConnection(t)
 	rows, err := c.sysPool.Query(t.Context(), `

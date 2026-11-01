@@ -30,7 +30,7 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-// A fixed id far from the usual ones, so the account never owns the files of whoever built the binary.
+// Far from the usual ids, so the account never owns the builder's files.
 const (
 	asUser   = "nokku-asuser"
 	asUserID = 4242
@@ -38,8 +38,9 @@ const (
 
 var procIDs = regexp.MustCompile(`(Uid|Gid|Groups):[ \t]*([0-9 \t]*)`)
 
-// Needs root, so it runs in a container: task daemon:test:root. Every way a session reaches the OS must do so as the
-// user, a feature that forgets the switch runs as root.
+// Needs root, so it runs in a container: task daemon:test:root. Every way a
+// session reaches the OS must do so as the user, a feature that forgets the
+// switch runs as root.
 func TestSessionsRunAsTheUser(t *testing.T) {
 	require.Zero(t, os.Geteuid(), "this test needs root, run it with task daemon:test:root")
 	addUser(t)
@@ -104,7 +105,7 @@ func TestSessionsRunAsTheUser(t *testing.T) {
 		require.NoError(t, err)
 		defer c.Close()
 
-		// The far end of the accepted connection is the socket the forward dialed with.
+		// The far end of this connection is the socket the forward dialed with.
 		assert.Equal(t, asUserID, socketOwner(t, addrPort(c.RemoteAddr()), addrPort(ln.Addr())),
 			"the forward dialed as another user")
 	})
@@ -134,13 +135,13 @@ func TestSessionsRunAsTheUser(t *testing.T) {
 	})
 
 	t.Run("signal", func(t *testing.T) {
-		// Sent as the user, a signal reaches the user's own process, and not one that became root like a sudo.
+		// Sent as the user, a signal reaches only the user's own processes.
 		assert.True(t, signalReaches(t, client, os.Args[0]), "a signal to the user's own process got lost")
 		assert.False(t, signalReaches(t, client, setuidCopy(t)), "a signal reached a process that became root")
 	})
 }
 
-// Not a test: the process a signal is sent to. It turns fully root first when it runs setuid.
+// Not a test: the signal's target. It turns fully root first when setuid.
 func TestSignalTarget(t *testing.T) {
 	if !slices.Contains(os.Args, "signal-target") {
 		t.Skip("only runs as the target of the signal check")
@@ -177,7 +178,7 @@ func dialAsUser(t *testing.T) *ssh.Client {
 	a := testAccess(t, ca)
 	a.Principals = map[string][]string{asUser: {testPrincipal}}
 	srv.SetAccess(a)
-	withPolicy(Policy{AllowForwarding: true, AllowAgentForwarding: true})(srv)
+	withPolicy(policy{AllowForwarding: true, AllowAgentForwarding: true})(srv)
 	var lc net.ListenConfig
 	l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -188,7 +189,7 @@ func dialAsUser(t *testing.T) *ssh.Client {
 	return client
 }
 
-// assertIDs checks the Uid, Gid and Groups lines of /proc/<pid>/status: real, effective, saved and fs ids alike.
+// assertIDs checks the real, effective, saved and fs ids in /proc/<pid>/status.
 func assertIDs(t *testing.T, status, want string) {
 	t.Helper()
 	got := map[string][]string{}
@@ -200,7 +201,7 @@ func assertIDs(t *testing.T, status, want string) {
 	assert.Equal(t, []string{want}, got["Groups"], "supplementary groups in %q", status)
 }
 
-// socketOwner reads the uid of a TCP socket from /proc/net/tcp. A zero remote matches a listener.
+// socketOwner reads a uid from /proc/net/tcp. A zero remote means a listener.
 func socketOwner(t *testing.T, local, remote netip.AddrPort) int {
 	t.Helper()
 	f, err := os.Open("/proc/net/tcp")
@@ -225,7 +226,7 @@ func socketOwner(t *testing.T, local, remote netip.AddrPort) int {
 	return -1
 }
 
-// procAddr parses 0100007F:1F90, the address in host byte order and the port in hex.
+// procAddr parses 0100007F:1F90, an address in host byte order and a hex port.
 func procAddr(t *testing.T, field string) netip.AddrPort {
 	t.Helper()
 	ip, port, ok := strings.Cut(field, ":")
@@ -239,7 +240,7 @@ func procAddr(t *testing.T, field string) netip.AddrPort {
 	return netip.AddrPortFrom(netip.AddrFrom4(b), uint16(p))
 }
 
-// signalReaches starts bin as the session's command, sends it SIGUSR1 through the session and says if it arrived.
+// signalReaches runs bin in a session and says if a SIGUSR1 sent there arrives.
 func signalReaches(t *testing.T, client *ssh.Client, bin string) bool {
 	t.Helper()
 	sess, err := client.NewSession()
@@ -274,7 +275,7 @@ func signalReaches(t *testing.T, client *ssh.Client, bin string) bool {
 	}
 }
 
-// setuidCopy is the test binary owned by root with the setuid bit, in a directory the user can reach.
+// setuidCopy is the setuid root test binary, in a directory the user reaches.
 func setuidCopy(t *testing.T) string {
 	t.Helper()
 	//nolint:usetesting // the parent of t.TempDir() is root-only, the user could not reach the binary

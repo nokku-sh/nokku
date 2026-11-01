@@ -13,14 +13,12 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 )
 
-// Manual, against a real TPM: NK_TPM_E2E=1 XDG_CONFIG_HOME=$(mktemp -d) go test -run TestSetupTPMKey ./internal/ssh/.
+// Manual, against a real TPM.
 func TestSetupTPMKey(t *testing.T) {
 	if os.Getenv("NK_TPM_E2E") == "" {
-		t.Skip("manual test: NK_TPM_E2E=1 XDG_CONFIG_HOME=$(mktemp -d)")
+		t.Skip("manual test: NK_TPM_E2E=1")
 	}
-	xdg := os.Getenv("XDG_CONFIG_HOME")
-	require.True(t, xdg != "" && strings.HasPrefix(paths.ConfigDir(), xdg),
-		"XDG_CONFIG_HOME must be set to a scratch dir before the test binary starts")
+	t.Setenv("HOME", t.TempDir())
 	probe := tpm.Available()
 	if probe != nil {
 		t.Skipf("no TPM available: %v", probe)
@@ -28,16 +26,14 @@ func TestSetupTPMKey(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(paths.SSHCertDir(), 0o700))
 
-	// Login: only the public key may touch disk.
 	require.NoError(t, SetupKey(true), "SetupKey(true)")
-	assert.Equal(t, tpm.MethodTPM, tpm.IdentityMethod(paths.SSHSignerFile()),
-		"expected a TPM identity: public key without a private key file")
+	assert.Equal(t, tpm.MethodTPM, tpm.IdentityMethod(paths.SSHSignerFile()), "expected a TPM identity")
 	pub, err := os.ReadFile(paths.PubKeyFile())
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(string(pub), "ecdsa-sha2-nistp256 "),
 		"unexpected TPM public key format: %q", pub)
 
-	// Deterministic primary: re-running reproduces the same key.
+	// The key file in the state brings the same key back.
 	require.NoError(t, SetupKey(true), "SetupKey(true) again")
 	pub2, err := os.ReadFile(paths.PubKeyFile())
 	require.NoError(t, err)

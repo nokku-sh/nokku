@@ -21,6 +21,8 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
+const webSessionID = "0197a3f2-7c1b-7de1-9a2b-3f4c5d6e7f80"
+
 func TestRecoverPanic(t *testing.T) {
 	assert.NotPanics(t, func() {
 		defer recoverPanic("test")
@@ -43,7 +45,7 @@ func TestServerDisconnectReapsCommand(t *testing.T) {
 
 	must.NoError(sess.Start("sleep 30"), "start")
 
-	// Drop the connection mid-command. The server must kill the child and return promptly.
+	// The server must kill the child and return promptly.
 	done := make(chan struct{})
 	go func() {
 		_ = client.Close()
@@ -53,11 +55,11 @@ func TestServerDisconnectReapsCommand(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("client close hung; server likely failed to reap the command")
+		t.Fatal("client close hung, the server likely failed to reap the command")
 	}
 }
 
-// A dropped client hangs up the shell like a closed terminal, so it can save its history and run its traps.
+// A dropped client hangs up the shell, so it can save history and run traps.
 func TestServerDisconnectHangsUpTheShell(t *testing.T) {
 	ca := newTestCA(t)
 	addr, closeFn := startTestServer(t, ca)
@@ -169,11 +171,11 @@ func TestServerEnvWhitelist(t *testing.T) {
 	is.Equal("fr_FR.UTF-8", fields[1])
 	is.Empty(fields[2])
 	is.Empty(fields[3])
-	// Not the client-injected value. It may still inherit the daemon's own agent socket.
+	// It may still inherit the daemon's own agent socket.
 	is.NotEqual("/tmp/evil.sock", fields[4])
 }
 
-// Even whitelisted client variables are refused, so an injected BASH_ENV cannot bend a restricted command.
+// Even whitelisted variables are refused, so BASH_ENV cannot bend the command.
 func TestServerForceCommandBlocksEnv(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -200,7 +202,7 @@ func TestServerForceCommandBlocksEnv(t *testing.T) {
 	is.Equal("force:", string(out))
 }
 
-// recordedCast waits for the one recording a session closed whole, and returns what it holds.
+// recordedCast waits for the one whole recording and returns what it holds.
 func recordedCast(t *testing.T) (name, cast string) {
 	t.Helper()
 	var files []string
@@ -230,7 +232,7 @@ func TestPlainSessionRecorded(t *testing.T) {
 	srv, err := New(nil)
 	must.NoError(err, "new server")
 	srv.SetAccess(testAccess(t, ca))
-	withPolicy(Policy{Record: true})(srv)
+	withPolicy(policy{Record: true})(srv)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	must.NoError(err, "listen")
 	defer func() { _ = l.Close() }()
@@ -265,7 +267,7 @@ func TestPlainSessionRecorded(t *testing.T) {
 	is.NotContains(cast, `"i"`, "plain sessions must not record stdin")
 }
 
-// /etc/nologin refuses the login itself, so it stops forwards as well as sessions.
+// /etc/nologin refuses the login itself, so it stops forwards and sessions.
 func TestLoginDeniedByNologin(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root, where /etc/nologin does not apply")
@@ -276,7 +278,7 @@ func TestLoginDeniedByNologin(t *testing.T) {
 	must.NoError(os.WriteFile(nologin, []byte("maintenance\n"), 0o644))
 
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}), func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}), func(s *Server) {
 		s.nologinFile = nologin
 	})
 	defer closeFn()
@@ -295,67 +297,62 @@ func TestLoginDeniedByNologin(t *testing.T) {
 	must.Error(err, "login succeeded while /etc/nologin was present")
 }
 
-// A direct login must not label its recording with another session's id, only a web terminal cert may.
+// Only a web terminal cert may label its recording with another session's id.
 func TestRecordingCorrelatesWebSessionID(t *testing.T) {
-	const webSessionID = "0197a3f2-7c1b-7de1-9a2b-3f4c5d6e7f80"
+	t.Run("web session", func(t *testing.T) {
+		gotID := recordingIDFor(t, "nokku:web:session:"+webSessionID)
+		assert.Equal(t, webSessionID, gotID, "recording must carry the key id's session id")
+	})
 
-	cases := []struct {
-		name         string
-		keyID        string
-		wantPromoted bool
-	}{
-		{"web session", "nokku:web:session:" + webSessionID, true},
-		{"direct login", "nokku:login:user:" + testPrincipal, false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			is := assert.New(t)
-			must := require.New(t)
-			t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-			must.NoError(paths.Verify(), "verify paths")
+	t.Run("direct login", func(t *testing.T) {
+		gotID := recordingIDFor(t, "nokku:login:user:"+testPrincipal)
+		assert.NotEmpty(t, gotID, "recording must carry a session id")
+		assert.NotEqual(t, webSessionID, gotID, "a direct login must not hijack another session's recording id")
+	})
+}
 
-			cur := currentUser(t)
-			ca := newTestCA(t)
-			srv, err := New(nil)
-			must.NoError(err, "new server")
-			srv.SetAccess(testAccess(t, ca))
-			withPolicy(Policy{Record: true})(srv)
-			l, err := net.Listen("tcp", "127.0.0.1:0")
-			must.NoError(err, "listen")
-			defer func() { _ = l.Close() }()
-			go srv.Serve(t.Context(), l)
+// recordingIDFor records a session of a cert with keyID that claims
+// webSessionID in its environment, and returns the id on the recording.
+func recordingIDFor(t *testing.T, keyID string) string {
+	t.Helper()
+	must := require.New(t)
+	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
+	must.NoError(paths.Verify(), "verify paths")
 
-			auth := userCertOpts(t, ca, func(c *ssh.Certificate) {
-				c.KeyId = tc.keyID
-			}, testPrincipal)
-			client, err := dial(t, l.Addr().String(), cur, auth)
-			must.NoError(err, "dial")
-			defer client.Close()
+	cur := currentUser(t)
+	ca := newTestCA(t)
+	srv, err := New(nil)
+	must.NoError(err, "new server")
+	srv.SetAccess(testAccess(t, ca))
+	withPolicy(policy{Record: true})(srv)
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	must.NoError(err, "listen")
+	defer func() { _ = l.Close() }()
+	go srv.Serve(t.Context(), l)
 
-			sess, err := client.NewSession()
-			must.NoError(err, "new session")
-			defer sess.Close()
+	auth := userCertOpts(t, ca, func(c *ssh.Certificate) {
+		c.KeyId = keyID
+	}, testPrincipal)
+	client, err := dial(t, l.Addr().String(), cur, auth)
+	must.NoError(err, "dial")
+	defer client.Close()
 
-			// The id comes from the signed key id alone, the environment cannot claim one.
-			ok, err := sess.SendRequest("env", true, ssh.Marshal(
-				struct{ Name, Value string }{"NOKKU_SESSION_ID", webSessionID},
-			))
-			must.NoError(err, "env request")
-			is.False(ok, "NOKKU_SESSION_ID is not a client variable")
+	sess, err := client.NewSession()
+	must.NoError(err, "new session")
+	defer sess.Close()
 
-			_, err = sess.Output("printf env-recorded")
-			must.NoError(err, "exec")
+	// The id comes from the signed key id, the environment cannot claim one.
+	ok, err := sess.SendRequest("env", true, ssh.Marshal(
+		struct{ Name, Value string }{"NOKKU_SESSION_ID", webSessionID},
+	))
+	must.NoError(err, "env request")
+	assert.False(t, ok, "NOKKU_SESSION_ID is not a client variable")
 
-			gotID, _ := recordedCast(t)
-			if tc.wantPromoted {
-				is.Equal(webSessionID, gotID, "recording must carry the key id's session id")
-			} else {
-				is.NotEmpty(gotID, "recording must carry a session id")
-				is.NotEqual(webSessionID, gotID,
-					"a direct login must not hijack another session's recording id")
-			}
-		})
-	}
+	_, err = sess.Output("printf env-recorded")
+	must.NoError(err, "exec")
+
+	gotID, _ := recordedCast(t)
+	return gotID
 }
 
 // A client must not pile up ptys it never uses.
@@ -422,7 +419,7 @@ func TestShellStartsLikeOpenSSH(t *testing.T) {
 			case <-time.After(20 * time.Second):
 				t.Fatal("the shell did not exit")
 			}
-			// A pty echoes the typed line and bash puts a bracketed paste escape before the answer.
+			// A pty echoes the line and bash adds a bracketed paste escape.
 			lines := strings.Split(strings.ReplaceAll(out.String(), "\r", ""), "\n")
 			must.True(
 				slices.ContainsFunc(lines, func(l string) bool { return strings.HasSuffix(l, tt.want) }),
@@ -517,16 +514,16 @@ func TestNoTermWithoutPTY(t *testing.T) {
 	require.NoError(t, err, "new session")
 	defer sess.Close()
 
-	// What nokkud handed the shell. bash sets TERM=dumb for itself when it has none.
+	// What nokkud handed the shell, bash sets TERM=dumb for itself if unset.
 	out, err := sess.Output(`tr '\0' '\n' </proc/$$/environ | grep '^TERM=' || echo unset`)
 	require.NoError(t, err)
 	assert.Equal(t, "unset\n", string(out))
 }
 
-// An interactive session ends at the cap, or a flood would switch recording off for what is typed next.
+// It ends at the cap, or a flood would leave what is typed next unrecorded.
 func TestFullRecordingEndsAnInteractiveSession(t *testing.T) {
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{Record: true}), func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{Record: true}), func(s *Server) {
 		require.NoError(t, paths.Verify(), "verify paths")
 		s.maxRecording = 1024
 	})
@@ -555,11 +552,11 @@ func TestFullRecordingEndsAnInteractiveSession(t *testing.T) {
 	assert.Contains(t, stdout.String(), "the recording of this session is full")
 }
 
-// Exec has a cap far below a shell's. This binary output stays well under 50 MB and still stops the recording.
+// Exec has a cap far below a shell's, this stays well under 50 MB and trips it.
 func TestExecRecordingStopsAtItsOwnCap(t *testing.T) {
 	ca := newTestCA(t)
 	log, events := auditLog()
-	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(Policy{Record: true}), func(*Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(policy{Record: true}), func(*Server) {
 		require.NoError(t, paths.Verify(), "verify paths")
 	})
 	defer closeFn()
@@ -577,11 +574,11 @@ func TestExecRecordingStopsAtItsOwnCap(t *testing.T) {
 		5*time.Second, 20*time.Millisecond, "the recording ran past the exec cap")
 }
 
-// An exec session runs on past the cap, a git clone or rsync must not die halfway. The gap is on the audit trail.
+// A git clone or rsync must not die halfway. The gap is on the audit trail.
 func TestFullRecordingKeepsAnExecSessionRunning(t *testing.T) {
 	ca := newTestCA(t)
 	log, events := auditLog()
-	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(Policy{Record: true}), func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(policy{Record: true}), func(s *Server) {
 		require.NoError(t, paths.Verify(), "verify paths")
 		s.maxRecording = 1024
 	})

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"slices"
 	"strings"
 	"testing"
 
@@ -16,23 +15,16 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-func testState() *state.State {
-	return &state.State{
-		Targets: []state.Target{
-			{ID: "t-1", Name: "web", Endpoints: []string{"10.0.0.5:2222"}},
-			{ID: "t-2", Name: "db", DaemonID: "d", Endpoints: []string{"10.0.0.6"}},
-			{ID: "t-3", Name: "dup", Endpoints: []string{"10.0.0.7"}},
-			{ID: "t-4", Name: "other", Endpoints: []string{"10.0.0.7"}},
-		},
-	}
-}
-
 func TestFindTarget(t *testing.T) {
 	t.Parallel()
-	targets := slices.Concat(testState().Targets, []state.Target{
+	targets := []state.Target{
+		{ID: "t-1", Name: "web", Endpoints: []string{"10.0.0.5:2222"}},
+		{ID: "t-2", Name: "db", DaemonID: "d", Endpoints: []string{"10.0.0.6"}},
+		{ID: "t-3", Name: "dup", Endpoints: []string{"10.0.0.7"}},
+		{ID: "t-4", Name: "other", Endpoints: []string{"10.0.0.7"}},
 		{ID: "t-5", Name: "nat-a", Endpoints: []string{"1.2.3.4:2201"}},
 		{ID: "t-6", Name: "nat-b", Endpoints: []string{"1.2.3.4:2202"}},
-	})
+	}
 	aliases := map[string]string{"t-1": "nokku/web"}
 
 	tests := []struct {
@@ -146,7 +138,7 @@ func TestSyncResultJSON(t *testing.T) {
 	assert.Contains(t, string(b), `"grants":{"root":["me","team:ops"]}`, "as typed, ids stay out")
 }
 
-// urfave splits a slice flag at commas unless told not to, tearing one account's subjects apart.
+// urfave splits slice flags at commas unless told, tearing a grant apart.
 func TestSyncKeepsTheSubjectsOfAGrantTogether(t *testing.T) {
 	t.Parallel()
 	var got []string

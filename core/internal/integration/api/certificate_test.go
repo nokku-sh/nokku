@@ -8,9 +8,9 @@ import (
 	"crypto/rand"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,10 +26,10 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// Without a grant nothing is signed. The daemon is handed the very principal the certificate carries.
+// No grant, no certificate. The daemon gets the very principal it carries.
 func TestSignSSHCertificate(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	adminAuth := header(
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
@@ -39,15 +39,15 @@ func TestSignSSHCertificate(t *testing.T) {
 	otherID := seedTarget(t, cfg, workspaceID)
 
 	memberToken := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	member, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken, accessTokens...)
+	member, _, err := cfg.IAM.AuthenticateToken(wsCtx(t), memberToken, accessTokens...)
 	require.NoError(t, err)
 	wantPrincipal := member.ID + "@" + targetID + ":root"
 	nkToken := cliSessionFor(t, cfg, &db.User{ID: member.ID, Active: true})
 
-	principals := nokkuv1connect.NewTargetAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	targetAccounts := nokkuv1connect.NewTargetAccountServiceClient(
+		clientOn(srv, adminAuth),
 	)
-	root, err := principals.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
+	root, err := targetAccounts.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
 		TargetId: &targetID,
 		Username: new("root"),
 	})
@@ -57,7 +57,7 @@ func TestSignSSHCertificate(t *testing.T) {
 		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
 		SubjectIds: []string{member.ID},
 	}
-	_, err = principals.AddSubjects(t.Context(), grant)
+	_, err = targetAccounts.AddSubjects(t.Context(), grant)
 	require.NoError(t, err)
 
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
@@ -65,7 +65,7 @@ func TestSignSSHCertificate(t *testing.T) {
 	sshPub, err := gossh.NewPublicKey(pub)
 	require.NoError(t, err)
 	sign := func(target string) ([]string, error) {
-		res, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+nkToken))).
+		res, err := nokkuv1connect.NewCertificateServiceClient(clientOn(srv, header("Authorization", "Bearer "+nkToken))).
 			SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
 				TargetId:  &target,
 				PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
@@ -80,10 +80,14 @@ func TestSignSSHCertificate(t *testing.T) {
 		return cert.ValidPrincipals, nil
 	}
 
+	_, err = sign(uuid.NewV7().String())
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
+		"an unknown id must answer like a missing grant, %v", err)
+
 	_, err = sign(targetID)
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err),
 		"a daemon nobody approved got a certificate signed, %v", err)
-	_, err = nokkuv1connect.NewDaemonServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
+	_, err = nokkuv1connect.NewDaemonServiceClient(clientOn(srv, adminAuth)).
 		UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
 			Id:     new(enrolled.GetId()),
 			Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
@@ -98,7 +102,7 @@ func TestSignSSHCertificate(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
 		"a server without a grant got a certificate signed, %v", err)
 
-	synced, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(t, cfg, daemonKey, enrolled.GetAccessToken(),
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(clientOn(srv, daemonAuth(t, cfg, daemonKey, enrolled.GetAccessToken(),
 		nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))).
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	require.NoError(t, err)
@@ -106,7 +110,7 @@ func TestSignSSHCertificate(t *testing.T) {
 	assert.Equal(t, []string{wantPrincipal}, synced.GetPrincipals()[0].GetCertPrincipals(),
 		"the daemon must be told the principal the certificate carries")
 
-	_, err = principals.RemoveSubjects(t.Context(), &nokkuv1.RemoveSubjectsRequest{
+	_, err = targetAccounts.RemoveSubjects(t.Context(), &nokkuv1.RemoveSubjectsRequest{
 		Id:         grant.Id,
 		Kind:       grant.Kind,
 		SubjectIds: grant.GetSubjectIds(),
@@ -117,11 +121,11 @@ func TestSignSSHCertificate(t *testing.T) {
 		"a revoked grant still got a certificate signed, %v", err)
 
 	// A certificate goes out only once the log has it, and gets one row.
-	_, err = principals.AddSubjects(t.Context(), grant)
+	_, err = targetAccounts.AddSubjects(t.Context(), grant)
 	require.NoError(t, err)
 	issued := func() int {
 		var rows []*db.ListAuditLogsRow
-		require.NoError(t, cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+		require.NoError(t, cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
 			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
 				Actions: []string{"SignSSHCertificate"}, Limit: 1000,
 			})
@@ -148,10 +152,10 @@ func TestSignSSHCertificate(t *testing.T) {
 	restore()
 }
 
-// A service account's certificate lives an hour at most and never past the token it was asked for with.
+// A service account's certificate lives an hour at most, never past its token.
 func TestServiceAccountCertificateLifetime(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	adminAuth := header(
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
@@ -161,7 +165,7 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	targetID := enrolled.GetTargetId()
 
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+		clientOn(srv, adminAuth),
 	)
 	created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
 		Name: new(uniq("ci")),
@@ -171,15 +175,15 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	tokenExpiry := time.Now().Add(10 * time.Minute)
 	short := serviceAccountToken(t, accounts, id, timestamppb.New(tokenExpiry))
 
-	principals := nokkuv1connect.NewTargetAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	targetAccounts := nokkuv1connect.NewTargetAccountServiceClient(
+		clientOn(srv, adminAuth),
 	)
-	root, err := principals.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
+	root, err := targetAccounts.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
 		TargetId: &targetID,
 		Username: new("root"),
 	})
 	require.NoError(t, err)
-	_, err = principals.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
+	_, err = targetAccounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
 		Id:         new(root.GetAccount().GetId()),
 		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum(),
 		SubjectIds: []string{id},
@@ -192,7 +196,7 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	require.NoError(t, err)
 	// It asks for two days, which the CA would give a person.
 	validUntil := func(token string) time.Time {
-		res, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
+		res, err := nokkuv1connect.NewCertificateServiceClient(clientOn(srv, header("Authorization", "Bearer "+token))).
 			SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
 				TargetId:  &targetID,
 				PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
@@ -209,7 +213,7 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 		"a token good for a month gets the hour, the cap follows the token and not the account")
 }
 
-// setCA changes the workspace CA for one test. Every test shares it, so what it held comes back after.
+// setCA changes the shared workspace CA for one test, cleanup puts it back.
 func setCA(
 	t *testing.T,
 	cfg *config.Config,
@@ -231,18 +235,19 @@ func setCA(
 	require.NoError(t, err)
 }
 
-// A person's certificate takes the CA's source list and no forced command. A service account's takes its own limits
-// and nothing from the CA, an office list must not block a hosted runner. Lifetimes depend on the caller and the server.
+// A person gets the CA's source list and no forced command. A service account
+// gets its own limits and nothing from the CA, an office list must not block a
+// hosted runner.
 func TestCertificateLimitsPerSubjectKind(t *testing.T) {
 	const (
 		day        = 24 * time.Hour
 		officeList = "10.0.0.0/8,192.0.2.7"
 	)
 	n := newNKSync(t)
-	workspaceID := seedWorkspace(t, n.cfg)
+	workspaceID := testWorkspace.ID
 	adminAuth := header("Authorization",
 		"Bearer "+seedMember(t, n.cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
-	admin := connect.NewClient(connecthttp.NewTransport(n.srv.Client(), n.srv.URL), adminAuth)
+	admin := clientOn(n.srv, adminAuth)
 
 	setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new(officeList)})
 	ca := workspaceCA(t, n.cfg)
@@ -379,13 +384,13 @@ func TestCertificateLimitsPerSubjectKind(t *testing.T) {
 	})
 }
 
-// The CA stores its source list the way a server reads it, and refuses a list no server can read.
+// The list is stored the way a server reads it, an unreadable one is refused.
 func TestCASourceList(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	admin := nokkuv1connect.NewCertificateServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header(
+		clientOn(srv, header(
 			"Authorization",
-			"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+			"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 		)),
 	)
 

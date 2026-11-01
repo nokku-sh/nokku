@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -23,18 +22,17 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
 
-// Every secret the server hands out, its format, that it works, and how a copy with one character changed fails.
+// Each secret handed out: its format, that it works, how a tampered copy fails.
 func TestTokenKinds(t *testing.T) {
-	// SCIM is a paid feature and an invited account needs a seat, the Enterprise license has both.
+	// SCIM is paid and an invite needs a seat, the Enterprise license has both.
 	base, _ := enterprise(t)
 	cfg, srv, box := mailServer(t, base)
 	ctx := t.Context()
-	ws := seedWorkspace(t, cfg)
-	transport := connecthttp.NewTransport(srv.Client(), srv.URL)
+	ws := testWorkspace.ID
 	owner := browserSession(t, cfg, seedOwner(t, cfg), 0)
-	as := func(s login) *connect.Client { return connect.NewClient(transport, signedIn(t, cfg, s)) }
+	as := func(s login) *connect.Client { return clientOn(srv, signedIn(t, cfg, s)) }
 	bearer := func(token string) *connect.Client {
-		return connect.NewClient(transport, header("Authorization", "Bearer "+token))
+		return clientOn(srv, header("Authorization", "Bearer "+token))
 	}
 	whoami := func(client *connect.Client) string {
 		res, err := nokkuv1connect.NewTargetServiceClient(client).
@@ -52,7 +50,7 @@ func TestTokenKinds(t *testing.T) {
 		r := send(t, srv, http.MethodGet, path, nil, func(h http.Header) { h.Set("Authorization", "Bearer "+token) })
 		return "GET " + path + " " + r.String()
 	}
-	auth := nokkuv1connect.NewAuthServiceClient(connect.NewClient(transport))
+	auth := nokkuv1connect.NewAuthServiceClient(clientOn(srv))
 
 	lines := []string{
 		"# kind | fact | value",
@@ -129,7 +127,7 @@ func TestTokenKinds(t *testing.T) {
 	terminal, _ := polled.body["access_token"].(string)
 	fact(cli, "shape", shape(terminal))
 	fact(cli, "tampered", whoami(as(login{token: tamper(terminal), key: key})))
-	fact(cli, "without its proof", whoami(connect.NewClient(transport, header("Authorization", "DPoP "+terminal))))
+	fact(cli, "without its proof", whoami(clientOn(srv, header("Authorization", "DPoP "+terminal))))
 	fact(cli, "verifies", whoami(as(login{token: terminal, key: key})))
 
 	const enrollToken, daemon = "enroll token", "daemon session"
@@ -142,7 +140,7 @@ func TestTokenKinds(t *testing.T) {
 	require.NoError(t, err)
 	enroll := func(token string) (*nokkuv1.EnrollDaemonResponse, error) {
 		proof := header("DPoP", dpopProof(t, cfg, host, nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure, ""))
-		return nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(transport, proof)).
+		return nokkuv1connect.NewDaemonControlServiceClient(clientOn(srv, proof)).
 			EnrollDaemon(ctx, &nokkuv1.EnrollDaemonRequest{Token: &token})
 	}
 	fact(enrollToken, "shape", shape(created.GetSecret()))
@@ -157,13 +155,13 @@ func TestTokenKinds(t *testing.T) {
 		return "SyncDaemon " + rpcAnswer(err)
 	}
 	signed := func(token string) *connect.Client {
-		return connect.NewClient(transport,
+		return clientOn(srv,
 			daemonAuth(t, cfg, host, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))
 	}
 	hostToken := enrolled.GetAccessToken()
 	fact(daemon, "shape", shape(hostToken))
 	fact(daemon, "tampered", sync(signed(tamper(hostToken))))
-	fact(daemon, "without its proof", sync(connect.NewClient(transport, header("Authorization", "DPoP "+hostToken))))
+	fact(daemon, "without its proof", sync(clientOn(srv, header("Authorization", "DPoP "+hostToken))))
 	fact(daemon, "verifies", sync(signed(hostToken)))
 
 	const serviceKey = "service account key"
@@ -198,7 +196,7 @@ func TestTokenKinds(t *testing.T) {
 	link = box.next(t, newcomer)
 	fact(invite, "shape", shape(link))
 	token = tokenOf(t, link)
-	invitations := nokkuv1connect.NewInvitationServiceClient(connect.NewClient(transport))
+	invitations := nokkuv1connect.NewInvitationServiceClient(clientOn(srv))
 	_, err = invitations.GetInvitation(ctx, &nokkuv1.GetInvitationRequest{Token: new(tamper(token))})
 	fact(invite, "tampered", "GetInvitation "+rpcAnswer(err))
 	_, err = invitations.GetInvitation(ctx, &nokkuv1.GetInvitationRequest{Token: &token})
@@ -212,10 +210,10 @@ func TestTokenKinds(t *testing.T) {
 	assert.Equal(t, newcomer, joined.GetUser().GetEmail())
 	fact(invite, "verifies", "AcceptInvitation "+rpcAnswer(err))
 
-	// The confirm and cancel links are mailed by the API, which this server sends nowhere. The tokens come from iam.
+	// The API's mails go nowhere here, so these tokens come from iam.
 	const confirmLink, cancelLink = "email change confirm token", "email change cancel token"
 	mover := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t, cfg), mover, newMailAddress())
+	confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t), mover, newMailAddress())
 	require.NoError(t, err)
 	fact(confirmLink, "shape", shape(confirm))
 	_, err = auth.ConfirmEmailChange(ctx, &nokkuv1.ConfirmEmailChangeRequest{Token: new(tamper(confirm))})
@@ -240,7 +238,7 @@ func tokenOf(t *testing.T, link string) string {
 	return token
 }
 
-// cookieAttributes leaves out the expiry date, only how long the cookie lives from now.
+// cookieAttributes gives how long the cookie lives, not its expiry date.
 func cookieAttributes(c *http.Cookie) string {
 	sameSite := map[http.SameSite]string{
 		http.SameSiteDefaultMode: "default",

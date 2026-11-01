@@ -30,8 +30,7 @@ type Connection struct {
 	sysPool *pgxpool.Pool
 }
 
-// Migrate brings the schema up to date and sets the passwords of the two runtime roles. It is the only code that
-// logs in as the owner role (PGUSER), and only the server runs it.
+// Migrate alone logs in as the owner role (PGUSER), only the server runs it.
 func Migrate(ctx context.Context) error {
 	c, config, err := settings()
 	if err != nil {
@@ -40,8 +39,7 @@ func Migrate(ctx context.Context) error {
 	return c.setupSchema(ctx, config.ConnConfig)
 }
 
-// NewConnection opens the two runtime pools and changes nothing in the database, so a command can run next to the
-// server.
+// NewConnection changes nothing in the database, the server may be running.
 func NewConnection(ctx context.Context) (*Connection, error) {
 	c, config, err := settings()
 	if err != nil {
@@ -98,14 +96,14 @@ func (c *Connection) poolConfig() (*pgxpool.Config, error) {
 	config.MaxConnIdleTime = 5 * time.Minute
 	config.HealthCheckPeriod = time.Minute
 	config.ConnConfig.ConnectTimeout = 5 * time.Second
-	// A cached plan is costed for the workspace pinned when it was built, then reused for every other one.
+	// A cached plan is costed for one workspace, then reused for all others.
 	config.ConnConfig.RuntimeParams["plan_cache_mode"] = "force_custom_plan"
 	// Compiling a query costs more than it saves on requests this short.
 	config.ConnConfig.RuntimeParams["jit"] = "off"
 	return config, nil
 }
 
-// createPools logs in as the two runtime roles, so no runtime path holds owner rights.
+// Two runtime roles, so no runtime path holds owner rights.
 func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config) error {
 	appConfig.ConnConfig.User = "nokku_app"
 	appConfig.ConnConfig.Password = c.AppPassword
@@ -120,7 +118,7 @@ func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config)
 
 	sysConfig := appConfig.Copy()
 	sysConfig.ConnConfig.User = "nokku_system"
-	// Never pinned. A leftover pin would send an insert that names no workspace into the wrong one.
+	// Never pinned, a leftover pin would send an insert to the wrong workspace.
 	sysConfig.PrepareConn = nil
 	sysConfig.MaxConns = min(c.MaxConns, 4)
 	c.sysPool, err = pgxpool.NewWithConfig(ctx, sysConfig)
@@ -137,7 +135,6 @@ func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config)
 	return nil
 }
 
-// setupSchema is the only place the owner role (PGUSER) is used.
 func (c *Connection) setupSchema(ctx context.Context, owner *pgx.ConnConfig) error {
 	conn, err := pgx.ConnectConfig(ctx, owner)
 	if err != nil {
@@ -145,7 +142,7 @@ func (c *Connection) setupSchema(ctx context.Context, owner *pgx.ConnConfig) err
 	}
 	defer conn.Close(context.WithoutCancel(ctx))
 
-	// Serializes instances booting at once. The lock is per database, test packages still race on the roles.
+	// Serializes boots. Per database, so test packages still race on the roles.
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('nokku_schema'))"); err != nil {
 		return fmt.Errorf("acquiring schema lock: %w", err)
 	}
@@ -155,10 +152,10 @@ func (c *Connection) setupSchema(ctx context.Context, owner *pgx.ConnConfig) err
 	return c.setupRoles(ctx, conn)
 }
 
-// setupRoles lets the two runtime roles log in, the migration creates them without a password.
+// The migration creates the runtime roles without a password.
 func (c *Connection) setupRoles(ctx context.Context, conn *pgx.Conn) error {
 	for _, role := range []string{"nokku_app", "nokku_system"} {
-		// ALTER ROLE takes no bind parameters, so format() quotes it server-side.
+		// ALTER ROLE takes no bind parameters, format() quotes it server-side.
 		var stmt string
 		if err := conn.QueryRow(
 			ctx,
@@ -174,7 +171,7 @@ func (c *Connection) setupRoles(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
-// pinWorkspace runs every time a connection leaves the request pool. It refuses a context without a workspace.
+// pinWorkspace runs on every acquire and refuses a ctx without a workspace.
 func pinWorkspace(ctx context.Context, conn *pgx.Conn) (bool, error) {
 	ws := actor.WorkspaceIDFromContext(ctx)
 	if ws == "" {
@@ -186,17 +183,17 @@ func pinWorkspace(ctx context.Context, conn *pgx.Conn) (bool, error) {
 	return true, nil
 }
 
-// Pick the scope by what the query may see. System code only calls queries that name the workspace.
+// System code only calls queries that name the workspace.
 
-// Tenant runs single statements as nokku_app, each pinned to the workspace on its context.
+// Tenant runs as nokku_app, each statement pinned to the ctx's workspace.
 func (c *Connection) Tenant() *Queries { return c.tenant }
 
-// TenantTx fails closed without a workspace on the context. Outside a request, actor.WithWorkspace pins one.
+// TenantTx fails closed without a workspace, actor.WithWorkspace pins one.
 func (c *Connection) TenantTx(ctx context.Context, fn func(*Queries) error) error {
 	return pgx.BeginFunc(ctx, c.Pool, func(tx pgx.Tx) error { return fn(New(tx)) })
 }
 
-// Sys runs single statements as nokku_system (BYPASSRLS), for pre-auth lookups and jobs.
+// Sys runs as nokku_system (BYPASSRLS), for pre-auth lookups and jobs.
 func (c *Connection) Sys() *Queries { return c.sys }
 
 // SysTx bypasses RLS, only cross-tenant work belongs here.

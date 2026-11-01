@@ -25,7 +25,7 @@ func setHome(t *testing.T) {
 	require.NoError(t, paths.EnsureDirs())
 }
 
-// runFlags parses args with the real root flags and returns the resulting state.
+// runFlags parses args with the real root flags and returns the state.
 func runFlags(t *testing.T, args ...string) (*state.State, error) {
 	t.Helper()
 	// The flags read these, and a developer's shell must not leak in.
@@ -126,7 +126,7 @@ func TestLoadStateRejectsNonServiceToken(t *testing.T) {
 	setHome(t)
 	for _, token := range []string{
 		"nk_sess_" + strings.Repeat("a", 34),
-		"nk_sa_" + strings.Repeat("a", 38), // the format before the one for every token
+		"nk_sa_" + strings.Repeat("a", 38), // the old format
 		"nk_sa_abc",
 		"nk_sa_" + strings.Repeat("a", 34), // a whole key with a wrong checksum
 	} {

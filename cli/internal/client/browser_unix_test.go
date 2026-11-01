@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The link comes from the core, so it reaches the opener as one argument and never a shell.
+// A core-sent link goes to the opener as one argument, never through a shell.
 func TestOpenBrowserPassesTheLinkAsOneArgument(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "args")

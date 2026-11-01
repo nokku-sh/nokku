@@ -224,12 +224,13 @@ func TestEmailChange(t *testing.T) {
 	assert.Empty(t, e.svc.PendingEmail(ctx, u.ID))
 	require.ErrorIs(t, e.svc.ConfirmEmailChange(ctx, confirm), iam.ErrInvalidToken, "second confirm")
 
-	// The old inbox undoes the change and signs everyone out. A passkey added meanwhile may be the intruder's.
+	// The old inbox undoes the change and signs everyone out. A passkey added
+	// meanwhile may be the intruder's.
 	_, session := e.session(t, o.ws, u, actor.KindUser)
 	e.putCredential(t, o.ws, db.UpsertCredentialParams{
 		ID: "pk-" + u.ID, UserID: u.ID, Type: string(iam.MethodPasskey), Subject: "pk-" + u.ID, Data: []byte{},
 	})
-	// Whoever sits at the new address asks for one more change and holds a revert link to it.
+	// Whoever sits at the new address asks for a change and holds its revert.
 	_, flipBack, err := e.svc.RequestEmailChange(ctx, got, "third@"+testDomain())
 	require.NoError(t, err)
 	require.NoError(t, e.svc.CancelEmailChange(ctx, cancel))
@@ -276,7 +277,8 @@ func TestEmailChangeRefusedForManagedAccounts(t *testing.T) {
 	require.ErrorIs(t, err, iam.ErrManagedAccount)
 }
 
-// A browser is mailed once, when it is new to the account, and what remembers it is no way to sign in.
+// A browser is mailed once, when it is new to the account, and what remembers
+// it is no way to sign in.
 func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
 	mailed := make(chan string, 4)
 	e := newTestEnvWith(t, iam.Deps{SendNewLogin: func(_ context.Context, userID, _, _, name, ip string) error {
@@ -323,7 +325,8 @@ func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
 		require.Error(t, err, "the device cookie signed in")
 	}
 
-	// Another account on the same browser gets a cookie of its own. Under one name the browser would drop the first.
+	// Another account on the browser gets its own cookie. Under one name the
+	// browser would drop the first.
 	other := e.user(t, o.ws, "other@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	second := e.svc.RememberDevice(ctx, header, addr, other)
 	require.NotNil(t, second, "a device of one account is known to another")
@@ -358,7 +361,7 @@ func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
 		require.NotNil(t, row.LastSeenAt)
 		return *row.LastSeenAt
 	}
-	// seen moves the stamp into the past, the clock of the service is not ours to move.
+	// seen moves the stamp into the past, the service's clock is not ours.
 	seen := func(ago time.Duration) time.Time {
 		t.Helper()
 		at := time.Now().Add(-ago)
@@ -401,7 +404,7 @@ func (e *testEnv) key(t *testing.T, ws actor.Workspace, saID string) (*db.Access
 	return tok, secret
 }
 
-// A key with a bad checksum fails before the lookup, so with no workspace pinned the pin is never missed.
+// A bad checksum fails before the lookup, which would need a workspace pin.
 func TestBadChecksumNeverReachesTheDatabase(t *testing.T) {
 	e := newTestEnv(t)
 	whoami := func(token string) error {
@@ -418,7 +421,7 @@ func TestBadChecksumNeverReachesTheDatabase(t *testing.T) {
 	require.ErrorIs(t, whoami(secret), db.ErrWorkspaceNotPinned, "a good checksum is looked up")
 }
 
-// A SCIM token provisions accounts and nothing else. On a connect call it is no credential at all.
+// A SCIM token provisions accounts and nothing else. A connect call refuses it.
 func TestSCIMTokenIsNoConnectCredential(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

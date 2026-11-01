@@ -10,10 +10,10 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// reportRow is one row of the report, and its shape in JSON.
 type reportRow struct {
 	Kind              string     `json:"kind"`
 	SubjectID         string     `json:"subject_id"`
@@ -26,7 +26,7 @@ type reportRow struct {
 	GrantedAt         time.Time  `json:"granted_at"`
 	ExpiresAt         *time.Time `json:"expires_at,omitzero"`
 	LastCertificateAt *time.Time `json:"last_certificate_at,omitzero"`
-	// Enforced is false for a grant that lets nobody in today, like one on a server waiting for approval.
+	// Enforced is false if it lets nobody in today, like on a pending server.
 	Enforced bool `json:"enforced"`
 	Stale    bool `json:"stale"`
 }
@@ -69,10 +69,11 @@ func reportCSV(rows []reportRow) ([]byte, error) {
 		"kind", "subject_id", "name", "email", "active", "via",
 		"target", "account", "granted_at", "expires_at", "last_certificate_at", "enforced", "stale",
 	})
+	safe := audit.SpreadsheetSafe
 	for _, r := range rows {
 		_ = w.Write([]string{
-			r.Kind, r.SubjectID, r.Name, r.Email, strconv.FormatBool(r.Active), r.Via,
-			r.Target, r.Account, stamp(&r.GrantedAt), stamp(r.ExpiresAt), stamp(r.LastCertificateAt),
+			r.Kind, r.SubjectID, safe(r.Name), safe(r.Email), strconv.FormatBool(r.Active), safe(r.Via),
+			safe(r.Target), safe(r.Account), stamp(&r.GrantedAt), stamp(r.ExpiresAt), stamp(r.LastCertificateAt),
 			strconv.FormatBool(r.Enforced), strconv.FormatBool(r.Stale),
 		})
 	}

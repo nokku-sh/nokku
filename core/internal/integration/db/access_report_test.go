@@ -5,10 +5,12 @@ package db_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// The fixture's user holds the account directly and through the team, the report lists both ways.
+// u holds the account directly and through the team, the report lists both.
 func TestAccessReportListsEveryWayIn(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -25,20 +27,15 @@ func TestAccessReportListsEveryWayIn(t *testing.T) {
 		return err
 	})
 
-	if len(rows) != 2 {
-		t.Fatalf("want the direct grant and the team grant, got %d rows", len(rows))
-	}
+	require.Len(t, rows, 2, "want the direct grant and the team grant")
 	vias := map[string]bool{}
 	for _, r := range rows {
 		vias[r.Via] = true
-		if r.SubjectID != f.u || r.Username != "deploy" || r.Target != "t" {
-			t.Fatalf("unexpected row %+v", r)
-		}
-		if r.LastCertAt == nil || r.Stale {
-			t.Fatalf("a certificate just now: last %v, stale %v", r.LastCertAt, r.Stale)
-		}
+		require.Equal(t, f.u, r.SubjectID)
+		require.Equal(t, "deploy", r.Username)
+		require.Equal(t, "t", r.Target)
+		require.NotNil(t, r.LastCertAt, "a certificate just now left no time")
+		require.False(t, r.Stale, "a certificate just now counts as stale")
 	}
-	if !vias[""] || !vias["team"] {
-		t.Fatalf("ways in = %v, want direct and the team", vias)
-	}
+	require.Equal(t, map[string]bool{"": true, "team": true}, vias)
 }

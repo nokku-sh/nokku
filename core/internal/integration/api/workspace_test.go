@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,15 +17,12 @@ import (
 
 func TestTransferOwnership(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	owner := seedOwner(t, cfg)
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
 	stranger := seedUser(t, cfg, seedOtherWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
-			header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
-		),
+		clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, owner))),
 	)
 	transfer := func(to string) error {
 		_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &to})
@@ -49,11 +45,12 @@ func TestTransferOwnership(t *testing.T) {
 	assert.Equal(t, member.ID, seedOwner(t, cfg).ID)
 }
 
-// A write to the owner row after the new owner joined puts it behind that row. One statement that swaps both roles
-// then makes the new owner first and trips the index that allows a single owner.
+// A later write moves the owner row behind the new owner's. One statement that
+// swaps both roles then makes the new owner first and trips the one-owner
+// index.
 func TestTransferOwnershipAfterTheOwnerRowMoved(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
 	owner := seedOwner(t, cfg)
 	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
@@ -62,10 +59,7 @@ func TestTransferOwnershipAfterTheOwnerRowMoved(t *testing.T) {
 	})
 
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
-			header("Authorization", "Bearer "+sessionFor(t, cfg, owner)),
-		),
+		clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, owner))),
 	)
 	_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &member.ID})
 	require.NoError(t, err)
@@ -75,15 +69,12 @@ func TestTransferOwnershipAfterTheOwnerRowMoved(t *testing.T) {
 // Admins manage users below them and never the owner or themselves.
 func TestManageUsers(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	owner := seedOwner(t, cfg)
 	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	viewer := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
-			header("Authorization", "Bearer "+sessionFor(t, cfg, admin)),
-		),
+		clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, admin))),
 	)
 
 	_, err := workspaces.UpdateUserRole(t.Context(), &nokkuv1.UpdateUserRoleRequest{
@@ -105,7 +96,7 @@ func TestManageUsers(t *testing.T) {
 		&nokkuv1.SetUserActiveRequest{UserId: &viewer.ID, Active: new(false)},
 	)
 	require.NoError(t, err)
-	_, _, err = cfg.IAM.AuthenticateToken(wsCtx(t, cfg), viewerToken, accessTokens...)
+	_, _, err = cfg.IAM.AuthenticateToken(wsCtx(t), viewerToken, accessTokens...)
 	require.Error(t, err, "a deactivated user kept their session")
 
 	users, err := workspaces.ListUsers(
@@ -128,13 +119,13 @@ func TestSelfHostHasOneWorkspace(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	owner := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner)).
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(clientOn(srv, owner)).
 		DeleteWorkspace(t.Context(), &nokkuv1.DeleteWorkspaceRequest{})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "got %v", err)
 
-	_, err = nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+	_, err = nokkuv1connect.NewWorkspaceServiceClient(clientOn(srv)).
 		CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{
 			Slug: new("acme"), Name: new("Acme"), OwnerEmail: new("o@acme.test"),
 		})

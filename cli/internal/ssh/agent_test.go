@@ -60,7 +60,7 @@ func e2eSigner(t *testing.T) tpm.Signer {
 	return signer
 }
 
-// The TPM identity against a real sshd. The certificate's private key only exists in the TPM, behind the agent.
+// The TPM identity against a real sshd, the private key lives only in the TPM.
 func TestAgentSSHDInterop(t *testing.T) {
 	sshd, err := exec.LookPath("sshd")
 	if err != nil {
@@ -76,7 +76,6 @@ func TestAgentSSHDInterop(t *testing.T) {
 	sshPub, err := cryptossh.NewPublicKey(key.Public())
 	require.NoError(t, err, "public key")
 
-	// Sign the TPM public key with a throwaway CA, like the core does.
 	_, caPriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	caSigner, err := cryptossh.NewSignerFromKey(caPriv)
@@ -136,12 +135,11 @@ func TestAgentSSHDInterop(t *testing.T) {
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=" + filepath.Join(dir, "known_hosts"),
 		"-o", "CertificateFile=" + certFile,
-		"-o", "IdentityFile=" + pubFile, // public key only, key lives in the agent
+		"-o", "IdentityFile=" + pubFile, // the key lives in the agent
 		"-o", "LogLevel=DEBUG1",
 	}
 	env := []string{"SSH_AUTH_SOCK="} // never leak the user's real agent
 
-	// With the TPM agent, certificate auth must succeed.
 	out, err := sshCmd(env, append(baseArgs,
 		"-o", "IdentityAgent="+sockFile,
 		current.Username+"@127.0.0.1", "true",
@@ -156,7 +154,7 @@ func TestAgentSSHDInterop(t *testing.T) {
 	assert.Error(t, err, "ssh without agent unexpectedly succeeded:\n%s", out)
 }
 
-// The software key against a real sshd, through the agent and the IdentityFile and IdentityAgent nk writes.
+// The software key against a real sshd, with the options nk writes.
 func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 	sshd, err := exec.LookPath("sshd")
 	if err != nil {
@@ -169,7 +167,7 @@ func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 
 	setupSSHDir(t)
 
-	// An unusable TPM forces the software path, so the real device is never touched.
+	// An unusable TPM forces the software path and spares the real device.
 	soft, err := tpm.NewSigner(tpm.SignerOptions{
 		StatePath: paths.SSHSignerFile(),
 		OpenTPM: func() (transport.TPMCloser, error) {
@@ -197,7 +195,6 @@ func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 	pub, _, _, _, err := cryptossh.ParseAuthorizedKey(pubLine)
 	require.NoError(t, err, "parse public key")
 
-	// Sign the software public key with a throwaway CA, like the core does.
 	_, caPriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	caSigner, err := cryptossh.NewSignerFromKey(caPriv)
@@ -239,31 +236,26 @@ func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 }
 
 func sshCmd(env, args []string) (string, error) {
-	// The host's ssh config, like a ControlMaster, would change what these runs prove.
+	// A host ssh config, like a ControlMaster, would change what this proves.
 	cmd := exec.Command("ssh", append([]string{"-F", "/dev/null"}, args...)...)
 	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
 
-// startSSHD launches a same-user sshd trusting the test CA and returns its port.
+// startSSHD launches a same-user sshd trusting the test CA, returns its port.
 func startSSHD(t *testing.T, sshd, dir, caFile string) string {
 	t.Helper()
 
 	hostKey := filepath.Join(dir, "host_key")
 	keygen := exec.Command("ssh-keygen", "-t", "ed25519", "-f", hostKey, "-N", "", "-q")
-	if out, err := keygen.CombinedOutput(); err != nil {
-		t.Fatalf("ssh-keygen: %v\n%s", err, out)
-	}
+	out, err := keygen.CombinedOutput()
+	require.NoError(t, err, "ssh-keygen: %s", out)
 
 	portLn, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	port := strconv.Itoa(portLn.Addr().(*net.TCPAddr).Port)
-	if err = portLn.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, portLn.Close())
 
 	cfg := filepath.Join(dir, "sshd_config")
 	config := fmt.Sprintf(`Port %s
@@ -277,44 +269,31 @@ AuthorizedKeysFile none
 TrustedUserCAKeys %s
 StrictModes no
 `, port, hostKey, filepath.Join(dir, "sshd.pid"), caFile)
-	if err = os.WriteFile(cfg, []byte(config), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(cfg, []byte(config), 0o600))
 
 	cmd := exec.Command(sshd, "-f", cfg, "-D", "-e")
 	logFile, err := os.Create(filepath.Join(dir, "sshd.log"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	cmd.Stderr = logFile
-	if err = cmd.Start(); err != nil {
-		t.Fatalf("start sshd: %v", err)
-	}
+	require.NoError(t, cmd.Start(), "start sshd")
 	t.Cleanup(func() {
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 		_ = logFile.Close()
 	})
 
-	for range 50 {
+	started := assert.Eventually(t, func() bool {
 		conn, dialErr := net.DialTimeout("tcp", "127.0.0.1:"+port, 100*time.Millisecond)
-		if dialErr == nil {
-			_ = conn.Close()
-			return port
+		if dialErr != nil {
+			return false
 		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	t.Fatalf("sshd did not start; log:\n%s", readFile(t, filepath.Join(dir, "sshd.log")))
-	return ""
-}
-
-func readFile(t *testing.T, path string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Clean(path))
-	if err != nil {
-		return err.Error()
-	}
-	return string(data)
+		_ = conn.Close()
+		return true
+	}, 10*time.Second, 100*time.Millisecond)
+	// Read after the wait, sshd has written nothing before it.
+	sshdLog, _ := os.ReadFile(logFile.Name())
+	require.True(t, started, "sshd did not start, log:\n%s", sshdLog)
+	return port
 }
 
 func TestAgentSignOnlyAndShutdown(t *testing.T) {
@@ -352,7 +331,7 @@ func TestAgentSignOnlyAndShutdown(t *testing.T) {
 	}
 }
 
-// Two agents starting at once must not both listen, or the loser removes the winner's socket.
+// Two agents must not both listen, the loser would remove the winner's socket.
 func TestAgentSocketHasOneOwner(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("named pipes are exclusive already")

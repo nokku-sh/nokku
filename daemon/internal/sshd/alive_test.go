@@ -48,22 +48,25 @@ func TestServerMaxStartups(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.localStartups = make(chan struct{}, 1) })
+	slots := make(chan struct{}, 1)
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.localStartups = slots })
 	defer closeFn()
 
-	// A raw TCP connection that never completes the handshake holds the single pre-auth slot.
+	auth := userCert(t, ca, testPrincipal)
+	user := currentUser(t)
+
+	// A raw TCP connection that never shakes hands holds the only slot.
 	nc, err := net.Dial("tcp", addr)
 	must.NoError(err)
 	defer nc.Close()
-	// Give the server time to accept and take the slot.
-	time.Sleep(100 * time.Millisecond)
+	must.Eventually(func() bool { return len(slots) == 1 }, 5*time.Second, 5*time.Millisecond, "slot never taken")
 
-	_, err = dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	_, err = dial(t, addr, user, auth)
 	must.Error(err, "dial succeeded while the pre-auth slot was held")
 
 	nc.Close()
 	is.Eventually(func() bool {
-		c, derr := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+		c, derr := dial(t, addr, user, auth)
 		if derr == nil {
 			c.Close()
 			return true
@@ -72,7 +75,7 @@ func TestServerMaxStartups(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond, "pre-auth slot never released")
 }
 
-// The slot only bounds half-open peers, an authenticated idle connection must not hold one.
+// The slot bounds half-open peers, an idle login must not hold one.
 func TestServerMaxStartupsReleasedAfterHandshake(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
@@ -86,7 +89,7 @@ func TestServerMaxStartupsReleasedAfterHandshake(t *testing.T) {
 	first, err := dial(t, addr, user, auth)
 	must.NoError(err, "first connection")
 	defer first.Close()
-	// The client sees auth success before the server goroutine releases the slot.
+	// The client sees auth success before the server releases the slot.
 	must.Eventually(func() bool { return len(slots) == 0 }, 5*time.Second, 5*time.Millisecond, "slot never released")
 
 	second, err := dial(t, addr, user, auth)
@@ -137,7 +140,7 @@ func TestServerClientAlive(t *testing.T) {
 	)
 	defer closeFn()
 
-	// A responsive client sends a global request now and then, so the server sees inbound traffic.
+	// A responsive client sends global requests, so the server sees traffic.
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
 	must.NoError(err)
 	defer client.Close()
@@ -174,7 +177,7 @@ func TestServerClientAliveSilent(t *testing.T) {
 	)
 	defer closeFn()
 
-	// The handshake completes but global requests are never serviced, so the keepalives go unanswered.
+	// The handshake completes but nothing services the keepalives.
 	nc, err := net.Dial("tcp", addr)
 	must.NoError(err)
 	defer nc.Close()
@@ -182,7 +185,7 @@ func TestServerClientAliveSilent(t *testing.T) {
 	cfg := &ssh.ClientConfig{
 		User:            currentUser(t),
 		Auth:            []ssh.AuthMethod{userCert(t, ca, testPrincipal)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - test server
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 	}
 	conn, _, _, err := ssh.NewClientConn(nc, "tcp", cfg)
@@ -226,7 +229,7 @@ func TestServerBackgroundProcessReleasesConnection(t *testing.T) {
 	}, 8*time.Second, 50*time.Millisecond, "background process kept the connection slot")
 }
 
-// The process ignores SIGHUP, like a job an interactive shell put in the background.
+// The process ignores SIGHUP, like a job an interactive shell backgrounded.
 func TestServerBackgroundProcessOnPTYReleasesConnection(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
@@ -284,7 +287,7 @@ func TestStartupSlotsPerSource(t *testing.T) {
 	_, ok = s.acquireStartup(addr("[2001:db8::ffff]:1000"))
 	is.False(ok, "addresses in one /64 must share a cap")
 
-	// Remote slots are now exhausted (3 + 1 + 3 of 10 used, fill the rest).
+	// 3 + 1 + 3 of the 10 remote slots are used, fill the rest.
 	for i := range 3 {
 		_, ok = s.acquireStartup(addr(fmt.Sprintf("192.0.2.%d:1000", i+1)))
 		must.True(ok)
@@ -335,14 +338,14 @@ func TestDropRevoked(t *testing.T) {
 	}
 }
 
-// The sync's DropRevoked cannot see a connection that is still in its handshake.
+// The sync's DropRevoked cannot see a connection still in its handshake.
 func TestRevokeDuringHandshake(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	revoked := testAccess(t, ca)
 	revoked.Principals = nil
 	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) {
-		// The account lookup runs after the principal check, so this revoke lands mid-handshake.
+		// The lookup runs after the principal check, so this is mid-handshake.
 		lookup := s.lookupAccount
 		s.lookupAccount = func(name string) (*account, error) {
 			s.SetAccess(revoked)

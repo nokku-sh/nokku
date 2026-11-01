@@ -17,15 +17,13 @@ import (
 )
 
 const (
-	// vaultTokenTimeout caps one renewal of VAULT_TOKEN.
 	vaultTokenTimeout = 15 * time.Second
-	// vaultTokenRetry is how soon a failed renewal of VAULT_TOKEN tries again.
-	vaultTokenRetry = time.Minute
-	// vaultTokenCheck is the longest between two renewals, so a token outlives a Vault down for less than its period.
+	vaultTokenRetry   = time.Minute
+	// Longest gap between renewals, so a token outlives a short Vault outage.
 	vaultTokenCheck = time.Hour
 )
 
-// kmsKEK returns the key encryption key behind uri. It never leaves the KMS, every wrap is a call to it.
+// The key encryption key never leaves the KMS, every wrap is a call to it.
 func (k *Keyset) kmsKEK(uri string) (tink.AEAD, error) {
 	provider, _, _ := strings.Cut(uri, "://")
 
@@ -54,12 +52,11 @@ func (k *Keyset) kmsKEK(uri string) (tink.AEAD, error) {
 	return client.GetAEAD(uri)
 }
 
-// vaultClient talks https to the Vault at hostPort with VAULT_TOKEN. It asks Vault nothing yet.
 func (k *Keyset) vaultClient(hostPort string) (*api.Client, error) {
 	if k.VaultToken == "" {
 		return nil, errors.New("VAULT_TOKEN required for hcvault")
 	}
-	// DefaultConfig brings the request timeout and retries. It reads VAULT_SKIP_VERIFY and skips the certificate check.
+	// Brings timeout and retries. VAULT_SKIP_VERIFY turns off the TLS check.
 	cfg := api.DefaultConfig()
 	cfg.Address = "https://" + hostPort
 	client, err := api.NewClient(cfg)
@@ -71,7 +68,7 @@ func (k *Keyset) vaultClient(hostPort string) (*api.Client, error) {
 	return client, nil
 }
 
-// VaultTokenLoop keeps VAULT_TOKEN alive, an ended one stops the core from opening its keyset at the next start.
+// VaultTokenLoop keeps VAULT_TOKEN alive, an ended one can't open the keyset.
 func (k *Keyset) VaultTokenLoop(ctx context.Context) {
 	if k.vault == nil {
 		return
@@ -90,7 +87,7 @@ func (k *Keyset) VaultTokenLoop(ctx context.Context) {
 	}
 }
 
-// renewVaultToken returns when to renew next. A token that isn't periodic hits Vault's limit, so it warns every time.
+// A token that isn't periodic hits Vault's limit, so it warns every time.
 func (k *Keyset) renewVaultToken(ctx context.Context) (time.Duration, error) {
 	ctx, cancel := context.WithTimeout(ctx, vaultTokenTimeout)
 	defer cancel()

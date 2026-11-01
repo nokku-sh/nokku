@@ -31,7 +31,7 @@ import (
 // deadPort is reserved and nothing listens on it, so a dial is refused at once.
 const deadPort = "http://127.0.0.1:1"
 
-// unreachableCore counts the calls that tried to reach the core, the sync point a refused dial does not give.
+// unreachableCore counts calls, the sync point a refused dial does not give.
 type unreachableCore struct {
 	http.RoundTripper
 
@@ -49,8 +49,8 @@ func (u *unreachableCore) RoundTrip(req *http.Request) (*http.Response, error) {
 	return u.RoundTripper.RoundTrip(req)
 }
 
-// A core that is down at start leaves the daemon on what it last synced, so the host stays usable and closed. The
-// file is written by hand because a release must keep reading the cache the one before it left.
+// A core down at start leaves the daemon on its last sync, usable and closed.
+// The file is hand-written, a release must read what the one before it left.
 func TestRunServesFromCacheWhenCoreIsDown(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -78,7 +78,7 @@ func TestRunServesFromCacheWhenCoreIsDown(t *testing.T) {
 	must.NoError(err)
 	srv, err := sshd.New(nil)
 	must.NoError(err)
-	// The same step as run in cmd/nokkud, which needs root and so has no test of its own.
+	// As run does in cmd/nokkud, which needs root and has no test itself.
 	srv.SetAccess(st.Access())
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	must.NoError(err)
@@ -152,7 +152,7 @@ func certLogin(t *testing.T, addr, username string, ca ssh.Signer, principal str
 	return ssh.Dial("tcp", addr, &ssh.ClientConfig{
 		User:            username,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(certSigner)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - test server
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 	})
 }

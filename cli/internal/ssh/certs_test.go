@@ -95,7 +95,7 @@ func TestCertFresh(t *testing.T) {
 	}
 }
 
-// A server with no daemon still trusts the old key until nk sync runs, and nk sync needs a certificate it takes.
+// A server with no daemon trusts the old key until nk sync, which needs a cert.
 func TestCertFreshKeepsTheOldKeyOnAServerWithNoDaemon(t *testing.T) {
 	setupSSHDir(t)
 	old, current := newSigner(t), newSigner(t)
@@ -127,7 +127,7 @@ func TestCertFreshKeepsTheOldKeyOnAServerWithNoDaemon(t *testing.T) {
 	assert.False(t, CertFresh(manual, ca), "an emergency rollover distrusts the old key at once")
 }
 
-// A certificate signed before a grant misses the new account, so it counts as stale.
+// A certificate from before a grant misses the new account, so it is stale.
 func TestCertFreshNeedsEveryGrantedAccount(t *testing.T) {
 	setupSSHDir(t)
 	signer := newSigner(t)

@@ -14,11 +14,11 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
 )
 
-// testVaultKey starts a Vault, creates a transit key on it and returns the key's KMS URI.
+// testVaultKey starts a Vault with a transit key and returns the key's KMS URI.
 func testVaultKey(t *testing.T) (*api.Client, string, string) {
 	t.Helper()
 	addr, caFile := testenv.Vault(t)
-	// Verified like a real install. Whatever a dev shell exports for another Vault must not leak in.
+	// Verified like a real install. A dev shell's Vault settings stay out.
 	for _, name := range []string{
 		"VAULT_SKIP_VERIFY", "VAULT_CAPATH", "VAULT_CLIENT_CERT", "VAULT_CLIENT_KEY",
 		"VAULT_TLS_SERVER_NAME", "VAULT_NAMESPACE",
@@ -39,7 +39,7 @@ func testVaultKey(t *testing.T) (*api.Client, string, string) {
 	return client, name, "hcvault://" + addr + "/transit/keys/" + name
 }
 
-// A real Vault transit key: boot, restart, rotation in Vault, and the move to NOKKU_SECRET and back.
+// A real Vault transit key: boot, restart, rotation, to NOKKU_SECRET and back.
 func TestVault(t *testing.T) {
 	client, name, uri := testVaultKey(t)
 	conn := freshDB(t)
@@ -61,7 +61,8 @@ func TestVault(t *testing.T) {
 	}
 	readable("restart")
 
-	// Vault rotates its key. A rotation to the same URI moves the keyset to the new version, so the old one can go.
+	// Vault rotates its key. A rotation to the same URI moves the keyset to the
+	// new version, so the old one can go.
 	_, err = client.Logical().WriteWithContext(t.Context(), "transit/keys/"+name+"/rotate", nil)
 	require.NoError(t, err)
 	require.NoError(t, enc.Rotate(t.Context(), "kms:"+uri))
@@ -85,7 +86,7 @@ func TestVault(t *testing.T) {
 	require.NoError(t, err, "the keyset did not move back under Vault")
 }
 
-// With a KMS the whole core starts without NOKKU_SECRET, nothing else leans on it.
+// With a KMS the whole core starts without NOKKU_SECRET.
 func TestCoreStartsWithAKMSAndNoSecret(t *testing.T) {
 	freshDB(t)
 	_, _, kekURI := testVaultKey(t)

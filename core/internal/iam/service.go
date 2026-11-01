@@ -1,4 +1,4 @@
-// Package iam owns identity and never answers "may this actor do X". Every call runs inside the request's workspace.
+// Package iam owns identity, not authz. Calls run in the request's workspace.
 package iam
 
 import (
@@ -23,8 +23,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
-type Method string
-
 const (
 	MethodPasskey   Method = "passkey"
 	MethodMagicLink Method = "magic_link"
@@ -32,12 +30,9 @@ const (
 	MethodDevice    Method = "device"
 	MethodToken     Method = "token" // a key made by hand, shown once
 	MethodSCIM      Method = "scim"
-	// MethodFederation is a CI job that traded its platform's token, see workload.go.
+	// MethodFederation is a CI job that traded its platform's token.
 	MethodFederation Method = "federation"
 )
-
-// action is the name an event gets in the audit log.
-type action string
 
 const (
 	actionUserCreated     action = "UserCreated"
@@ -52,6 +47,13 @@ const (
 	actionCredentialAdded action = "CredentialAdded" //nolint:gosec // an audit action name, not a credential
 )
 
+// A marker lives three minutes, so this fits about 550 proofs a second.
+const dpopReplayEntries = 100_000
+
+type Method string
+
+type action string
+
 type event struct {
 	Action action
 	Kind   actor.Kind
@@ -61,27 +63,23 @@ type event struct {
 	Detail string
 }
 
-// Deps requires Conn and Keyset.
 type Deps struct {
 	Conn *db.Connection
 	// Keyset seals the configs of SSO providers.
 	Keyset *kms.Keyset
-	// Audit gets the sign-in events. Unset, they are not recorded.
-	Audit *audit.Service
+	Audit  *audit.Service
 	// Secure marks cookies, true when the server is reached over https.
 	Secure bool
-	// StrictEmail needs DNS, so it is for the public SaaS, not air-gapped installs.
+	// StrictEmail needs DNS, so it is for SaaS, not air-gapped installs.
 	StrictEmail bool
 	// CanJoin gates new users on the seat cap. used is read in the creating tx.
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
 
 	// SendMagicLink mails a sign-in link. Unset, the login page offers none.
 	SendMagicLink func(ctx context.Context, userID, email, link string, expiry time.Duration) error
-	// SendInvite mails the link that creates an invited account. Unset, the admin gets the link to hand over.
-	SendInvite func(ctx context.Context, email, workspace, role, link string, expiry time.Duration) error
-	// SendNewLogin tells an account about a sign-in from a device new to it.
+	// SendInvite mails an invite. Unset, the admin gets the link to hand over.
+	SendInvite   func(ctx context.Context, email, workspace, role, link string, expiry time.Duration) error
 	SendNewLogin func(ctx context.Context, userID, email, deviceID, deviceName, ip string) error
-	// SendNewWayIn tells an account about a passkey or provider it gained.
 	SendNewWayIn func(ctx context.Context, userID, email, credentialID, what, ip string) error
 }
 
@@ -94,9 +92,9 @@ type Service struct {
 	canJoin func(ctx context.Context, workspaceID string, used int64) error
 	strict  bool
 	idp     *http.Client // guarded, see egress.NewClient
-	// flowAEAD seals flow state into its cookie. XChaCha, anyone can start a flow and random nonces must never run out.
+	// XChaCha, anyone can start a flow and random nonces must never run out.
 	flowAEAD cipher.AEAD
-	// spent holds the ids of flows that ended in a login, see spendFlow.
+	// spent holds the ids of finished flows, see spendFlow.
 	spent *cache.TTL[string, struct{}]
 
 	sendMagicLink func(ctx context.Context, userID, email, link string, expiry time.Duration) error
@@ -110,9 +108,6 @@ type Service struct {
 	Passkey *passkeyFlow
 	SCIM    *SCIMFlow
 }
-
-// A marker lives for dpop.ReplayWindow, three minutes, so this is room for about 550 proofs a second.
-const dpopReplayEntries = 100_000
 
 func New(ctx context.Context, d Deps) (*Service, error) {
 	if d.Conn == nil || d.Keyset == nil {
@@ -135,7 +130,7 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 	if s.idp, err = egress.NewClient(providerHTTPTimeout); err != nil {
 		return nil, err
 	}
-	// Random per boot, like the replay stores below. After a restart clients fetch a new nonce and a sign-in starts over.
+	// Random per boot, so a restart means a new nonce and a new sign-in flow.
 	nonceKey, flowKey := make([]byte, 32), make([]byte, chacha20poly1305.KeySize)
 	_, _ = rand.Read(nonceKey)
 	_, _ = rand.Read(flowKey)
@@ -158,10 +153,28 @@ func (s *Service) MagicLinkEnabled() bool {
 	return s.sendMagicLink != nil
 }
 
-// baseURL is where this workspace lives, the root of every link and cookie.
 func baseURL(ctx context.Context) string {
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	return ws.BaseURL
+}
+
+// credentialAdded mails a new way in, so a stolen session adding one shows up.
+func (s *Service) credentialAdded(ctx context.Context, r *http.Request, u *db.User, method Method, id, what string) {
+	s.record(
+		ctx,
+		event{Action: actionCredentialAdded, Kind: actor.KindUser, Method: method, UserID: u.ID, Email: u.Email},
+	)
+	if s.sendNewWayIn == nil {
+		return
+	}
+	ip := realip.Client(r.Header, r.RemoteAddr)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mailTimeout)
+	go func() {
+		defer cancel()
+		if err := s.sendNewWayIn(ctx, u.ID, u.Email, id, what, ip); err != nil {
+			slog.Warn("new sign-in method email not sent", "error", err)
+		}
+	}()
 }
 
 func (s *Service) record(ctx context.Context, e event) {
@@ -185,27 +198,6 @@ func (s *Service) record(ctx context.Context, e event) {
 	})
 }
 
-// credentialAdded records a new way into the account and mails it, so a stolen session that adds one shows up in
-// the inbox. id tells two of them apart, what names it in the mail.
-func (s *Service) credentialAdded(ctx context.Context, r *http.Request, u *db.User, method Method, id, what string) {
-	s.record(
-		ctx,
-		event{Action: actionCredentialAdded, Kind: actor.KindUser, Method: method, UserID: u.ID, Email: u.Email},
-	)
-	if s.sendNewWayIn == nil {
-		return
-	}
-	ip := realip.Client(r.Header, r.RemoteAddr)
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mailTimeout)
-	go func() {
-		defer cancel()
-		if err := s.sendNewWayIn(ctx, u.ID, u.Email, id, what, ip); err != nil {
-			slog.Warn("new sign-in method email not sent", "error", err)
-		}
-	}()
-}
-
-// notifyNewDevice is detached, the sign-in does not wait for the mail.
 func (s *Service) notifyNewDevice(ctx context.Context, u *db.User, deviceID, name, ip string) {
 	if s.sendNewLogin == nil {
 		return

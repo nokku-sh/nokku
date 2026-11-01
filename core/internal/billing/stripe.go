@@ -20,13 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
 
-var (
-	ErrActiveSubscription = errors.New("workspace already has an active subscription")
-	errDisabled           = errors.New("billing provider is not configured")
-)
-
 const (
-	// minBillableSeats is the pricing floor.
 	minBillableSeats = 3
 	// Stripe defaults the checkout quantity picker to 99.
 	maxCheckoutSeats = 10000
@@ -34,7 +28,12 @@ const (
 	minTrialLeft = 48 * time.Hour
 )
 
-// Stripe moves money and never decides what a workspace may do. A nil Stripe is a self-hosted server.
+var (
+	ErrActiveSubscription = errors.New("workspace already has an active subscription")
+	errDisabled           = errors.New("billing provider is not configured")
+)
+
+// Stripe never decides what a workspace may do. Nil on a self-hosted server.
 type Stripe struct {
 	client *stripe.Client
 	db     *db.Connection
@@ -45,7 +44,6 @@ type Stripe struct {
 	WebhookSecret     string `env:"STRIPE_WEBHOOK_SECRET"`
 }
 
-// New returns nil on a self-hosted server, see newStripe.
 func New(ctx context.Context, conn *db.Connection, saas bool) (*Stripe, error) {
 	s, err := newStripe(conn, saas)
 	if err != nil || s == nil {
@@ -55,7 +53,6 @@ func New(ctx context.Context, conn *db.Connection, saas bool) (*Stripe, error) {
 	return s, nil
 }
 
-// newStripe never guesses the mode. Hosted needs every setting, self-hosted with any of them fails the start.
 func newStripe(conn *db.Connection, saas bool) (*Stripe, error) {
 	s, err := env.ParseAs[Stripe]()
 	if err != nil {
@@ -82,7 +79,7 @@ func newStripe(conn *db.Connection, saas bool) (*Stripe, error) {
 	return &s, nil
 }
 
-// Checkout starts at the current member count. The paid quantity becomes the seat cap.
+// Checkout sells seats, the paid quantity becomes the seat cap.
 func (s *Stripe) Checkout(ctx context.Context, ws actor.Workspace, email string, yearly bool) (string, error) {
 	if s == nil {
 		return "", errDisabled
@@ -92,8 +89,12 @@ func (s *Stripe) Checkout(ctx context.Context, ws actor.Workspace, email string,
 		return "", errors.New("missing workspace ID")
 	}
 
-	if _, err := s.activeSubscription(ctx, workspaceID); err == nil {
+	_, err := s.activeSubscription(ctx, workspaceID)
+	if err == nil {
 		return "", ErrActiveSubscription
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
 	}
 
 	quantity, err := s.billableSeats(ctx, workspaceID)
@@ -107,7 +108,7 @@ func (s *Stripe) Checkout(ctx context.Context, ws actor.Workspace, email string,
 	}
 	params := &stripe.CheckoutSessionCreateParams{
 		Mode: stripe.String(stripe.CheckoutSessionModeSubscription),
-		// Stripe is the merchant of record and handles tax, so the session must not set automatic_tax or tax_id_collection.
+		// Stripe is merchant of record: no automatic_tax or tax_id_collection.
 		ManagedPayments: &stripe.CheckoutSessionCreateManagedPaymentsParams{Enabled: new(true)},
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{{
 			Price:    stripe.String(price),
@@ -126,13 +127,12 @@ func (s *Stripe) Checkout(ctx context.Context, ws actor.Workspace, email string,
 		},
 	}
 	sub, err := s.db.Sys().GetSubscription(ctx, workspaceID)
-	// A workspace that paid before keeps its customer, Checkout makes one for a new workspace.
 	if err == nil && sub.CustomerID != "" {
 		params.Customer = stripe.String(sub.CustomerID)
 	} else if email != "" {
 		params.CustomerEmail = stripe.String(email)
 	}
-	// Paying early keeps the rest of the trial, the first charge comes when it ends.
+	// Paying early keeps the rest of the trial.
 	if err == nil && sub.Source == entitlement.SourceTrial && sub.CurrentPeriodEnd != nil &&
 		time.Until(*sub.CurrentPeriodEnd) > minTrialLeft {
 		params.SubscriptionData.TrialEnd = new(sub.CurrentPeriodEnd.Unix())
@@ -145,7 +145,7 @@ func (s *Stripe) Checkout(ctx context.Context, ws actor.Workspace, email string,
 	return session.URL, nil
 }
 
-// activeSubscription is the row Stripe is paid for, pgx.ErrNoRows without one. Stripe flows run outside a tenant scope.
+// activeSubscription uses Sys, Stripe flows run outside a tenant scope.
 func (s *Stripe) activeSubscription(
 	ctx context.Context,
 	workspaceID string,
@@ -160,7 +160,7 @@ func (s *Stripe) activeSubscription(
 	return sub, nil
 }
 
-// Portal is where seats are bought, so the Stripe portal configuration must allow quantity updates.
+// Portal sells seats, so the Stripe portal config must allow quantity updates.
 func (s *Stripe) Portal(ctx context.Context, ws actor.Workspace) (string, error) {
 	if s == nil {
 		return "", errDisabled
@@ -186,8 +186,7 @@ func (s *Stripe) Portal(ctx context.Context, ws actor.Workspace) (string, error)
 	return session.URL, nil
 }
 
-// Page is the billing page of the workspace at baseURL. It is on the workspace host, the hosted root host has no
-// workspace to land in.
+// Page is on the workspace host, the hosted root host has no workspace.
 func Page(baseURL string) string {
 	return baseURL + "/settings/billing"
 }
@@ -206,13 +205,13 @@ func (s *Stripe) Cancel(
 	}
 	sub, err := s.activeSubscription(ctx, workspaceID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil // free workspaces have nothing to cancel
+		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("get active subscription: %w", err)
 	}
 	if sub.SubscriptionID == "" {
-		return nil // no Stripe subscription to cancel
+		return nil
 	}
 
 	if immediate {
@@ -236,7 +235,7 @@ func (s *Stripe) Cancel(
 	return nil
 }
 
-// sync is the only writer of subscription state, so the webhook, cancel and reconcile can never disagree.
+// sync is the only writer of subscription state, so callers never disagree.
 func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 	remote, err := s.client.V1Subscriptions.Retrieve(
 		ctx, subscriptionID,
@@ -256,7 +255,7 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 		return err
 	}
 	if err == nil && active.SubscriptionID != "" && active.SubscriptionID != remote.ID {
-		// A late event for an old subscription must not downgrade the live one.
+		// A late event of an old subscription must not downgrade the live one.
 		if remote.Status == stripe.SubscriptionStatusCanceled {
 			return nil
 		}
@@ -269,7 +268,7 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 			return fmt.Errorf("fetch stored subscription: %w", err)
 		}
 		if live.Status != stripe.SubscriptionStatusCanceled {
-			// Backstop so a workspace never ends up with two active subscriptions.
+			// Backstop so a workspace never has two active subscriptions.
 			slog.Warn("cancelling duplicate subscription",
 				"workspace_id", workspaceID, "keep", active.SubscriptionID, "duplicate", remote.ID)
 			if _, err := s.client.V1Subscriptions.Cancel(ctx, remote.ID, nil); err != nil {
@@ -314,8 +313,8 @@ func (s *Stripe) sync(ctx context.Context, subscriptionID string) error {
 	return err
 }
 
-// trueUp raises the paid seats to the member count, or dropping seats in the portal would keep members for free.
-// The update fires a webhook that syncs again, and that one finds nothing to raise.
+// trueUp stops a seat drop in the portal from keeping members for free. Its
+// update fires a webhook that syncs again and finds nothing to raise.
 func (s *Stripe) trueUp(
 	ctx context.Context,
 	workspaceID string,
@@ -345,7 +344,7 @@ func (s *Stripe) trueUp(
 	return updated, nil
 }
 
-// reconcile lets missed webhooks self-heal, 5 minutes after start and then every 12 hours.
+// reconcile lets missed webhooks self-heal.
 func (s *Stripe) reconcile(ctx context.Context) {
 	timer := time.NewTimer(5 * time.Minute)
 	defer timer.Stop()

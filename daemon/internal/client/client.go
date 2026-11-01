@@ -59,7 +59,7 @@ func New(ctx context.Context, st *state.State, requireTPM bool, enrollToken stri
 	if err != nil {
 		return nil, err
 	}
-	// The identity is bound to the enrollment, so only a new enrollment may recreate it.
+	// The identity is bound to the enrollment, only a new one may recreate it.
 	proofer, err := dpopclient.NewProofer(tpm.SignerOptions{
 		StatePath:  paths.SignerStateFile(),
 		RequireTPM: requireTPM,
@@ -76,7 +76,7 @@ func New(ctx context.Context, st *state.State, requireTPM bool, enrollToken stri
 		UnboundProcedures: map[string]bool{nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure: true},
 		UserAgent:         buildinfo.UserAgent("nokkud"),
 	})
-	// Unbounded like the v1 client, a sync carries every principal of the workspace.
+	// Unbounded, a sync carries every principal of the workspace.
 	transport := connecthttp.NewTransport(httpc, apiURL, connecthttp.WithReadMaxBytes(0))
 	c.ctl = nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(transport, c.dpop.Intercept))
 
@@ -88,7 +88,7 @@ func New(ctx context.Context, st *state.State, requireTPM bool, enrollToken stri
 	return c, nil
 }
 
-// The DPoP proof is unbound, the server binds the issued session to the daemon's key.
+// The proof is unbound, the server binds the new session to the daemon's key.
 func (c *Client) enroll(ctx context.Context, token string) error {
 	ctx, cancel := context.WithTimeout(ctx, enrollTimeout)
 	defer cancel()
@@ -106,12 +106,11 @@ func (c *Client) enroll(ctx context.Context, token string) error {
 	c.state.TargetID = res.GetTargetId()
 	c.state.DaemonID = res.GetId()
 	c.state.SessionToken = res.GetAccessToken()
-	// A re-enrollment may move the host to another Nokku, so nothing the old one trusted may survive.
+	// Re-enrolling may change Nokku, so nothing the old one trusted survives.
 	c.state.SetAccess(&state.Access{DaemonConfig: res.GetConfig()})
 	return c.state.Save()
 }
 
-// StartUploads sends the recordings to the core, the ones an earlier run left first.
 func (c *Client) StartUploads(ctx context.Context) *recording.Uploads {
 	return recording.NewUploads(ctx, c.ctl)
 }
@@ -146,7 +145,7 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 		if ctx.Err() != nil {
 			return nil
 		}
-		// Connect returns before the core answers, so only a stream that stayed up proves it was reachable.
+		// Connect returns before the core answers, so judge it by uptime.
 		if time.Since(start) > 2*heartbeatInterval {
 			b.Reset()
 			warned = false
@@ -163,7 +162,7 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 			return nil
 		case <-time.After(next):
 		}
-		// A daemon deleted while offline gets no stream and no poke, only a sync tells it to stop.
+		// Deleted while offline means no poke, only a sync tells it to stop.
 		if errors.Is(c.syncDaemon(ctx), errDaemonRejected) {
 			return errDaemonRejected
 		}
@@ -171,8 +170,6 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 }
 
 func (c *Client) Unenroll(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
 	_, err := c.ctl.UnenrollDaemon(ctx, &nokkuv1.UnenrollDaemonRequest{})
 	return err
 }

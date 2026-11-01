@@ -127,10 +127,10 @@ Follow the conventions already in the codebase. Before opening a PR, run:
 task lint
 ```
 
-which runs `go mod tidy`, `buf lint`, `go fmt`, `go vet`, `govulncheck`, the
-Go unit tests with the race detector and `golangci-lint run --fix` (the
-config enables golines formatting). `task core:lint` adds `pnpm fmt` and
-`pnpm lint` for the frontend.
+which runs `go mod tidy`, `buf lint`, `go fmt`, `go vet`, a dead code check,
+`govulncheck`, the Go unit tests with the race detector and
+`golangci-lint run --fix` (the config enables golines formatting).
+`task core:lint` adds `pnpm fmt` and `pnpm lint` for the frontend.
 
 ## Tests
 

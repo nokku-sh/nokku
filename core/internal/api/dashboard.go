@@ -17,7 +17,7 @@ import (
 
 const dashboardChangesCap = 8
 
-// routineActions happen on every login or session, they would drown the changes an operator wants to see.
+// routineActions happen on every login or session, drowning the real changes.
 var routineActions = []string{
 	"Login",
 	"SessionIssued",
@@ -61,7 +61,7 @@ func (s *dashboardService) GetDashboard(
 		if offline, err = q.ListOfflineDaemons(ctx, connected); err != nil {
 			return err
 		}
-		// The pool holds the terminals of every workspace, the query keeps the daemons of this one.
+		// The pool spans all workspaces, the query keeps this one's daemons.
 		if ids := s.cfg.Pool.SessionDaemons(); len(ids) > 0 {
 			if terminals, err = q.GetDaemonsByIDs(ctx, ids); err != nil {
 				return err
@@ -112,7 +112,7 @@ func (s *dashboardService) GetDashboard(
 	return res, nil
 }
 
-// liveSessions merges browser terminals with open recordings. A recorded terminal is in both, the recording marks it.
+// liveSessions merges terminals and recordings, marking recorded terminals.
 func (s *dashboardService) liveSessions(
 	terminals []*db.GetDaemonsByIDsRow,
 	recordings []*db.ListOpenRecordingsRow,

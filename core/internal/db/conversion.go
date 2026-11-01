@@ -13,28 +13,14 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-func mapSlice[T, R any](in []T, fn func(T) R) []R {
-	if in == nil {
-		return nil
-	}
-	out := make([]R, len(in))
-	for i, v := range in {
-		out[i] = fn(v)
-	}
-	return out
-}
+// MaxTargetAccounts stops a host from reporting accounts without bound.
+const MaxTargetAccounts = 1000
 
-// jsonMap logs a malformed blob and returns an empty map, the row is still readable without it.
-func jsonMap(column string, raw []byte) map[string]string {
-	m := make(map[string]string)
-	if len(raw) == 0 {
-		return m
-	}
-	if err := json.Unmarshal(raw, &m); err != nil {
-		slog.Warn("dropping malformed jsonb column", "column", column, "error", err)
-	}
-	return m
-}
+// The status and kind columns hold the enum names, lower case, no prefix.
+const (
+	accessRequestStatusPrefix = "ACCESS_REQUEST_STATUS_"
+	auditStreamKindPrefix     = "AUDIT_STREAM_KIND_"
+)
 
 func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	if w == nil {
@@ -182,6 +168,18 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	}
 }
 
+// A malformed blob only logs, the row is still readable without it.
+func jsonMap(column string, raw []byte) map[string]string {
+	m := make(map[string]string)
+	if len(raw) == 0 {
+		return m
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		slog.Warn("dropping malformed jsonb column", "column", column, "error", err)
+	}
+	return m
+}
+
 func (a *TargetAccount) ToProto() *nokkuv1.TargetAccount {
 	if a == nil {
 		return nil
@@ -220,7 +218,6 @@ func expiries(ids []string, at []time.Time) map[string]*timestamppb.Timestamp {
 	return out
 }
 
-// Until is when the access ends, nil when it is for good.
 func (r *ListSubjectUsernamesForTargetsRow) Until() *time.Time {
 	if r.ForGood {
 		return nil
@@ -249,10 +246,7 @@ func UsersToProto(rows []*ListUsersRow) []*nokkuv1.User {
 	return mapSlice(rows, func(r *ListUsersRow) *nokkuv1.User { return r.User.ToProto() })
 }
 
-// MaxTargetAccounts stops a host from reporting accounts without bound.
-const MaxTargetAccounts = 1000
-
-// DefaultDaemonConfig must match nokkud's DefaultPolicy, which covers the time before its first sync.
+// DefaultDaemonConfig must match nokkud's defaultPolicy, used until first sync.
 func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 	return &nokkuv1.DaemonConfig{
 		RecordSessions:       new(true),
@@ -263,8 +257,7 @@ func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 	}
 }
 
-// EffectiveConfig is what the daemon and the UI see. Ephemeral comes from the row, not the stored config,
-// so an admin's config edit cannot change it.
+// EffectiveConfig reads Ephemeral off the row, a config edit can't change it.
 func (d *Daemon) EffectiveConfig() *nokkuv1.DaemonConfig {
 	cfg := ResolveDaemonConfig(d.Config)
 	cfg.Ephemeral = new(d.RetireAfter != nil)
@@ -273,7 +266,7 @@ func (d *Daemon) EffectiveConfig() *nokkuv1.DaemonConfig {
 	return cfg
 }
 
-// ResolveDaemonConfig fills unset fields, so the daemon, the API and the UI never read one differently.
+// ResolveDaemonConfig fills unset fields, so every reader sees the same.
 func ResolveDaemonConfig(cfg *nokkuv1.DaemonConfig) *nokkuv1.DaemonConfig {
 	resolved := DefaultDaemonConfig()
 	if cfg != nil {
@@ -282,7 +275,7 @@ func ResolveDaemonConfig(cfg *nokkuv1.DaemonConfig) *nokkuv1.DaemonConfig {
 	return resolved
 }
 
-// ToProto takes online from the caller. It means connected right now, which only the pool knows.
+// ToProto takes online from the caller, only the pool knows it.
 func (d *Daemon) ToProto(online bool) *nokkuv1.Daemon {
 	if d == nil {
 		return nil
@@ -339,13 +332,6 @@ func (p *ListTargetAccountsRow) ToProto() *nokkuv1.TargetAccount {
 	return out
 }
 
-// The status and kind columns hold the enum names in lower case, without the prefix.
-const (
-	accessRequestStatusPrefix = "ACCESS_REQUEST_STATUS_"
-	auditStreamKindPrefix     = "AUDIT_STREAM_KIND_"
-)
-
-// AccessRequestStatus is the column value of status, empty for none.
 func AccessRequestStatus(status nokkuv1.AccessRequestStatus) string {
 	if status == nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_UNSPECIFIED {
 		return ""
@@ -353,7 +339,6 @@ func AccessRequestStatus(status nokkuv1.AccessRequestStatus) string {
 	return strings.ToLower(strings.TrimPrefix(status.String(), accessRequestStatusPrefix))
 }
 
-// GrantedUntil is when an approved request's access ends, nil for any other.
 func (r *AccessRequestDetail) GrantedUntil() *time.Time {
 	if r.Status != AccessRequestStatus(nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED) ||
 		r.DecidedAt == nil {
@@ -388,7 +373,6 @@ func (r *AccessRequestDetail) ToProto() *nokkuv1.AccessRequest {
 	}
 }
 
-// AuditStreamKind is the column value of kind.
 func AuditStreamKind(kind nokkuv1.AuditStreamKind) string {
 	return strings.ToLower(strings.TrimPrefix(kind.String(), auditStreamKindPrefix))
 }
@@ -443,7 +427,7 @@ func (t *JoinToken) ToProto() *nokkuv1.JoinToken {
 	return out
 }
 
-// JoinTokensToProto attaches each token's grants. The rows come sorted by token and username.
+// JoinTokensToProto needs grants sorted by token and username.
 func JoinTokensToProto(ts []*JoinToken, grants []*ListJoinTokenGrantsRow) []*nokkuv1.JoinToken {
 	byToken := make(map[string][]*ListJoinTokenGrantsRow)
 	for _, g := range grants {
@@ -451,13 +435,13 @@ func JoinTokensToProto(ts []*JoinToken, grants []*ListJoinTokenGrantsRow) []*nok
 	}
 	return mapSlice(ts, func(t *JoinToken) *nokkuv1.JoinToken {
 		out := t.ToProto()
-		out.Grants = JoinTokenGrantsToProto(byToken[t.ID])
+		out.Grants = joinTokenGrantsToProto(byToken[t.ID])
 		return out
 	})
 }
 
-// JoinTokenGrantsToProto folds one token's rows into one grant per account.
-func JoinTokenGrantsToProto(rows []*ListJoinTokenGrantsRow) []*nokkuv1.JoinTokenGrant {
+// joinTokenGrantsToProto folds one token's rows into one grant per account.
+func joinTokenGrantsToProto(rows []*ListJoinTokenGrantsRow) []*nokkuv1.JoinTokenGrant {
 	var out []*nokkuv1.JoinTokenGrant
 	for _, r := range rows {
 		if len(out) == 0 || out[len(out)-1].GetUsername() != r.Username {
@@ -475,6 +459,17 @@ func JoinTokenGrantsToProto(rows []*ListJoinTokenGrantsRow) []*nokkuv1.JoinToken
 		case SubjectKindServiceAccount:
 			g.ServiceAccountIds = append(g.ServiceAccountIds, r.SubjectID)
 		}
+	}
+	return out
+}
+
+func mapSlice[T, R any](in []T, fn func(T) R) []R {
+	if in == nil {
+		return nil
+	}
+	out := make([]R, len(in))
+	for i, v := range in {
+		out[i] = fn(v)
 	}
 	return out
 }

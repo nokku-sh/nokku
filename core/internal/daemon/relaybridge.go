@@ -16,17 +16,6 @@ const (
 	relayBurst     = 1 << 20
 )
 
-// waitRelayBytes steps in burst-sized chunks since WaitN rejects larger ones.
-func waitRelayBytes(ctx context.Context, l *rate.Limiter, n int) error {
-	for n > relayBurst {
-		if err := l.WaitN(ctx, relayBurst); err != nil {
-			return err
-		}
-		n -= relayBurst
-	}
-	return l.WaitN(ctx, n)
-}
-
 // BridgeRelay is a dumb pipe, the SSH session inside is end-to-end encrypted.
 func BridgeRelay(
 	ctx context.Context,
@@ -95,10 +84,10 @@ func BridgeRelay(
 			retErr = err
 		}
 	}
-	// Stop the pump now so the join cannot deadlock on a peer that stopped reading.
+	// Stop the pump so the join can't deadlock on a peer that stopped reading.
 	cancel()
 	<-outDone
-	// What the daemon sent before it closed is still queued, and the pump is gone.
+	// What the daemon sent before it closed is still queued, the pump is gone.
 	for range len(relay.toUser) {
 		if err := stream.Send(&nokkuv1.RelayResponse{
 			Msg: &nokkuv1.RelayResponse_Data{Data: <-relay.toUser},
@@ -111,4 +100,15 @@ func BridgeRelay(
 		Msg: &nokkuv1.RelayResponse_Closed{Closed: &nokkuv1.RelayClosed{}},
 	})
 	return retErr
+}
+
+// waitRelayBytes steps in burst-sized chunks since WaitN rejects larger ones.
+func waitRelayBytes(ctx context.Context, l *rate.Limiter, n int) error {
+	for n > relayBurst {
+		if err := l.WaitN(ctx, relayBurst); err != nil {
+			return err
+		}
+		n -= relayBurst
+	}
+	return l.WaitN(ctx, n)
 }

@@ -24,9 +24,24 @@ import (
 
 const testPrincipal = "9a3c2a0f-5f1e-4a7b-9c4d-2e6b8f0a1c3d"
 
+// The core's default cert template. The daemon enforces permit-*.
+var defaultExtensions = map[string]string{
+	"permit-pty":              "",
+	"permit-user-rc":          "",
+	"permit-port-forwarding":  "",
+	"permit-agent-forwarding": "",
+}
+
 type testCA struct {
 	pub    ssh.PublicKey
 	signer ssh.Signer
+}
+
+// relayed is a connection with the remote address a relay reports for it.
+type relayed struct {
+	net.Conn
+
+	remote net.Addr
 }
 
 func newTestCA(t *testing.T) testCA {
@@ -43,14 +58,6 @@ func newTestCA(t *testing.T) testCA {
 func userCert(t *testing.T, ca testCA, principals ...string) ssh.AuthMethod {
 	t.Helper()
 	return userCertOpts(t, ca, nil, principals...)
-}
-
-// The core's default cert template. The daemon enforces permit-*, so tests grant them explicitly.
-var defaultExtensions = map[string]string{
-	"permit-pty":              "",
-	"permit-user-rc":          "",
-	"permit-port-forwarding":  "",
-	"permit-agent-forwarding": "",
 }
 
 func userCertOpts(
@@ -105,7 +112,7 @@ func startTestServerOpts(t *testing.T, ca testCA, tweaks ...func(*Server)) (addr
 	return l.Addr().String(), func() { _ = l.Close() }
 }
 
-// testAccess trusts ca and lets testPrincipal log in as the current user. Every policy switch is off.
+// testAccess trusts ca and admits testPrincipal as this user, policy off.
 func testAccess(t *testing.T, ca testCA) *state.Access {
 	t.Helper()
 	off := new(false)
@@ -120,8 +127,8 @@ func withLog(log *slog.Logger) func(*Server) {
 	return func(s *Server) { s.log = log }
 }
 
-// withPolicy turns on only the switches of p. A config from the core leaves the unset ones on.
-func withPolicy(p Policy) func(*Server) {
+// withPolicy sets only the switches of p, a core config leaves unset ones on.
+func withPolicy(p policy) func(*Server) {
 	return func(s *Server) {
 		a := *s.access.Load()
 		a.policy = p
@@ -134,7 +141,7 @@ func dial(t *testing.T, addr, username string, auth ssh.AuthMethod) (*ssh.Client
 	cfg := &ssh.ClientConfig{
 		User:            username,
 		Auth:            []ssh.AuthMethod{auth},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - test server
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 	}
 	return ssh.Dial("tcp", addr, cfg)
@@ -196,7 +203,7 @@ func TestServerExecExitSignal(t *testing.T) {
 	must.NoError(err, "new session")
 	defer sess.Close()
 
-	// The command kills its own shell, so the server reports exit-signal and the Go client maps it to 128+signal.
+	// Killing its own shell gives exit-signal, the Go client maps it to 128+n.
 	err = sess.Run("kill -TERM $$")
 	var ee *ssh.ExitError
 	must.ErrorAs(err, &ee)
@@ -261,6 +268,26 @@ func TestServerDeniesUntrustedCA(t *testing.T) {
 	is.Error(err, "expected auth to fail with untrusted CA")
 }
 
+func TestServerDeniesCertificateOutsideItsValidity(t *testing.T) {
+	ca := newTestCA(t)
+	addr, closeFn := startTestServer(t, ca)
+	defer closeFn()
+
+	now := uint64(time.Now().Unix())
+	for name, window := range map[string][2]uint64{
+		"expired":       {now - 7200, now - 3600},
+		"not yet valid": {now + 3600, now + 7200},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cert := userCertOpts(t, ca, func(c *ssh.Certificate) {
+				c.ValidAfter, c.ValidBefore = window[0], window[1]
+			}, testPrincipal)
+			_, err := dial(t, addr, currentUser(t), cert)
+			require.Error(t, err, "logged in outside the window of the certificate")
+		})
+	}
+}
+
 func TestServerDeniesWrongPrincipal(t *testing.T) {
 	is := assert.New(t)
 	ca := newTestCA(t)
@@ -271,7 +298,7 @@ func TestServerDeniesWrongPrincipal(t *testing.T) {
 	is.Error(err, "expected auth to fail with unauthorized principal")
 }
 
-// The principal is compared as a whole, so one for another server or account opens nothing.
+// Principals compare whole, so one for another server or account opens nothing.
 func TestServerDeniesCertificateOfAnotherServerOrAccount(t *testing.T) {
 	ca := newTestCA(t)
 	cur := currentUser(t)
@@ -376,13 +403,6 @@ func TestPolicyFrom(t *testing.T) {
 	is.True(got.AllowForwarding, "unset field lost its default")
 }
 
-// relayed is a connection with the remote address a relay reports for it.
-type relayed struct {
-	net.Conn
-
-	remote net.Addr
-}
-
 func (c relayed) RemoteAddr() net.Addr { return c.remote }
 
 func TestServeConnReportsRelayedClient(t *testing.T) {
@@ -414,7 +434,7 @@ func TestServeConnReportsRelayedClient(t *testing.T) {
 		conn, chans, reqs, sshErr := ssh.NewClientConn(client, "relay", &ssh.ClientConfig{
 			User:            currentUser(t),
 			Auth:            []ssh.AuthMethod{office},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - test server
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 			Timeout:         10 * time.Second,
 		})
 		if sshErr != nil {
@@ -438,7 +458,7 @@ func TestServeConnReportsRelayedClient(t *testing.T) {
 	is.True(strings.HasPrefix(string(out), "203.0.113.7 0 "), "SSH_CLIENT = %q, want the relayed address", out)
 }
 
-// Relayed connections hold at most half the slots, so people on the relay never lock out a direct login.
+// Relayed connections hold at most half the slots, so direct logins stay open.
 func TestRelayCapLeavesRoomForDirectLogins(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 	srv, err := New(nil)

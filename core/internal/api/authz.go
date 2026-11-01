@@ -19,8 +19,22 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
 
-// procedureAccess holds the (access) option of every RPC. RPCs without one are denied.
+// procedureAccess holds each RPC's (access) option. Without one it is denied.
 var procedureAccess = loadProcedureAccess()
+
+// authorizationInterceptor applies the (access) option in this order: daemon,
+// role or self, people only, fresh sign-in, plan feature, signing, cap.
+type authorizationInterceptor struct {
+	cfg *config.Config
+}
+
+type authorizedStream struct {
+	connect.ServerStream
+
+	ctx       context.Context
+	procedure string
+	a         *authorizationInterceptor
+}
 
 func loadProcedureAccess() map[string]*nokkuv1.Access {
 	out := make(map[string]*nokkuv1.Access)
@@ -39,18 +53,9 @@ func loadProcedureAccess() map[string]*nokkuv1.Access {
 	return out
 }
 
-func isPublicEndpoint(procedure string) bool {
-	return procedureAccess[procedure].GetPublic()
-}
-
-// authorizationInterceptor applies the (access) option of the call, in this order: role, self or daemon, people
-// only, a fresh sign-in, the plan feature, signing, the resource cap.
-type authorizationInterceptor struct {
-	cfg *config.Config
-}
-
-// A unary call is checked once its request is decoded, so the plan gates can read it and the audit row of a denied
-// call still names the target. Generated handlers receive before they run, a stream is checked up front.
+// A unary call is checked once decoded, so plan gates can read it and a denied
+// call's audit row names the target. Generated handlers receive before they
+// run. A stream is checked up front.
 func (a *authorizationInterceptor) intercept(next connect.ServerFunc) connect.ServerFunc {
 	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
 		if spec.StreamType == connect.StreamTypeUnary {
@@ -63,14 +68,6 @@ func (a *authorizationInterceptor) intercept(next connect.ServerFunc) connect.Se
 	}
 }
 
-type authorizedStream struct {
-	connect.ServerStream
-
-	ctx       context.Context
-	procedure string
-	a         *authorizationInterceptor
-}
-
 func (s *authorizedStream) Receive(msg any) error {
 	if err := s.ServerStream.Receive(msg); err != nil {
 		return err
@@ -78,7 +75,7 @@ func (s *authorizedStream) Receive(msg any) error {
 	return s.a.authorize(s.ctx, s.procedure, msg)
 }
 
-// authorize gets the decoded request of a unary call, a stream passes nil and no plan gate applies to it.
+// msg is a unary call's request. A stream passes nil and skips the plan gates.
 func (a *authorizationInterceptor) authorize(ctx context.Context, procedure string, msg any) error {
 	access := procedureAccess[procedure]
 	if access == nil {
@@ -100,7 +97,7 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 		return db.ErrPermissionDenied
 	}
 	if access.GetPeopleOnly() && caller.Kind == actor.KindServiceAccount {
-		return newError(connect.CodePermissionDenied, "only people can do this, not a service account")
+		return connect.NewError(connect.CodePermissionDenied, "only people can do this, not a service account")
 	}
 	if access.GetFresh() {
 		if err := a.fresh(ctx, caller); err != nil {
@@ -110,7 +107,7 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	if msg == nil {
 		return nil
 	}
-	// The handler prunes too, but a plan gate must not read a field the mask leaves out.
+	// A plan gate must not read a field the mask leaves out.
 	if req, ok := msg.(maskedRequest); ok {
 		if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
 			return err
@@ -141,8 +138,7 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	return nil
 }
 
-// requestedFresh finds a change that needs a fresh sign-in inside a call that otherwise doesn't, like renaming a
-// workspace next to its enforced SSO.
+// requestedFresh finds fields that need a fresh sign-in in an ordinary update.
 func requestedFresh(msg any) bool {
 	switch req := msg.(type) {
 	case *nokkuv1.UpdateWorkspaceRequest:
@@ -153,25 +149,25 @@ func requestedFresh(msg any) bool {
 	return false
 }
 
-// fresh refuses nk outright and a browser session older than 10 minutes, which ends here. The web app reads
-// Unauthenticated as a session to sign in again. A service account follows people_only.
+// fresh refuses nk outright and ends a browser session past 10 minutes, the web
+// app then asks to sign in. A service account follows people_only.
 func (a *authorizationInterceptor) fresh(ctx context.Context, caller actor.Principal) error {
 	switch caller.Kind {
 	case actor.KindCLI:
-		return newError(connect.CodePermissionDenied, "do this in the web app")
+		return connect.NewError(connect.CodePermissionDenied, "do this in the web app")
 	case actor.KindUser:
 		if err := a.cfg.IAM.RequireRecentSignIn(ctx); err != nil {
 			if ci, ok := connect.CallInfoForServerContext(ctx); ok {
 				setCookie(ci, a.cfg.IAM.ClearSessionCookie())
 			}
-			return newError(connect.CodeUnauthenticated, "sign in again to continue")
+			return connect.NewError(connect.CodeUnauthenticated, "sign in again to continue")
 		}
 	case actor.KindServiceAccount, actor.KindDaemon, actor.KindSCIM:
 	}
 	return nil
 }
 
-// daemonAccepted keeps a daemon that is not accepted away from every RPC but its status and removing itself.
+// A daemon that is not accepted gets only its status and removing itself.
 func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID, procedure string) error {
 	switch procedure {
 	case nokkuv1connect.DaemonControlServiceSyncDaemonProcedure,

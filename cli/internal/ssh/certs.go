@@ -33,7 +33,7 @@ func CertWindow(cert *ssh.Certificate) (after, before time.Time) {
 	return unixTime(cert.ValidAfter), unixTime(cert.ValidBefore)
 }
 
-// CheckCert wants a certificate signed by caKey, valid now and for at least margin.
+// CheckCert wants a certificate from caKey, valid for at least margin.
 func CheckCert(data []byte, caKey string, margin time.Duration) error {
 	cert, err := ParseCert(data)
 	if err != nil {
@@ -53,7 +53,7 @@ func CheckCert(data []byte, caKey string, margin time.Duration) error {
 	return nil
 }
 
-// CertValid takes a certificate of the key a rollover replaced too, the server trusts it during the grace period.
+// CertValid also takes the key a rollover replaced, during its grace period.
 func CertValid(target state.Target, ca state.CA, margin time.Duration) bool {
 	data, err := os.ReadFile(paths.SSHCertificate(target.ID))
 	return err == nil && slices.ContainsFunc(ca.TrustedKeys(), func(key string) bool {
@@ -61,7 +61,7 @@ func CertValid(target state.Target, ca state.CA, margin time.Duration) bool {
 	})
 }
 
-// CertFresh ends at half the certificate's life, so a core outage finds an active user with half a lifetime left.
+// CertFresh ends at half life, so a core outage leaves a user half a lifetime.
 func CertFresh(target state.Target, ca state.CA) bool {
 	data, err := os.ReadFile(paths.SSHCertificate(target.ID))
 	if err != nil {
@@ -75,13 +75,13 @@ func CertFresh(target state.Target, ca state.CA) bool {
 	if CheckCert(data, ca.PublicKey, before.Sub(after)/2) == nil {
 		return true
 	}
-	// A server with no daemon learns a new key from nk sync alone, so a new certificate would lock this user out.
+	// A manual server gets a new key only from nk sync, so stay on the old one.
 	return target.Manual() && slices.ContainsFunc(ca.TrustedKeys()[1:], func(key string) bool {
 		return CheckCert(data, key, 0) == nil
 	})
 }
 
-// CertCovers is false for a certificate signed before a grant, the server refuses that account until renewal.
+// CertCovers is false for a certificate older than a grant.
 func CertCovers(target state.Target) bool {
 	data, err := os.ReadFile(paths.SSHCertificate(target.ID))
 	if err != nil {
@@ -91,7 +91,7 @@ func CertCovers(target state.Target) bool {
 	return err == nil && covers(cert, target.Usernames)
 }
 
-// Relies on one thing about the principals the core signs: each ends with ":" and its account.
+// Relies on the core's principals ending in ":" and the account.
 func covers(cert *ssh.Certificate, accounts []string) bool {
 	for _, account := range accounts {
 		if !slices.ContainsFunc(cert.ValidPrincipals, func(p string) bool {

@@ -17,31 +17,30 @@ import (
 
 const DefaultAPIURL = "https://app.nokku.sh"
 
-// ErrReplaced is a nokkud enroll on this host while the service runs. The new enrollment takes over at the next start.
-var ErrReplaced = errors.New("another enrollment replaced this one on disk, restart nokkud to use it")
+var errReplaced = errors.New("another enrollment replaced this one on disk, restart nokkud to use it")
 
 // Config is the enrollment.
 type Config struct {
 	TargetID string `json:"target_id,omitempty"`
 	DaemonID string `json:"daemon_id,omitempty"`
 	APIURL   string `json:"api_url,omitempty"`
-	// APICA is the PEM of a private CA for the API, empty when the system roots know its certificate.
+	// APICA is a private CA's PEM, empty when the system roots know the API.
 	APICA        string `json:"api_ca,omitempty"`
 	SessionToken string `json:"session_token,omitempty"`
 }
 
-// Access is everything one sync decides. Nobody changes one once it is stored, so it is read without a lock.
+// Access is one sync's outcome. Never change a stored one, reads take no lock.
 type Access struct {
 	Principals   map[string][]string     `json:"principals,omitempty"`
 	DaemonConfig *nokkuv1.DaemonConfig   `json:"daemon_config,omitempty"`
 	CA           string                  `json:"ca,omitempty"`
 	RetiredCAs   []*nokkuv1.RetiredCAKey `json:"retired_cas,omitempty"`
-	// HostCA signs the host certificate. Logins are only ever checked against CA and RetiredCAs.
+	// HostCA signs the host cert. Logins only ever check CA and RetiredCAs.
 	HostCA       string `json:"host_ca,omitempty"`
 	StateVersion int64  `json:"state_version,omitzero"`
 }
 
-// State is the daemon's one state file. Its Config is set before the client starts and only read after.
+// State has a Config set before the client starts and only read after.
 type State struct {
 	Config
 
@@ -50,7 +49,7 @@ type State struct {
 	saved atomic.Int64
 
 	mu sync.Mutex
-	// owner is the daemon the file named when this state was read, a save never writes over another one.
+	// The daemon the file named at load, a save never overwrites another.
 	owner string
 }
 
@@ -60,7 +59,6 @@ type file struct {
 	Access *Access `json:"access,omitempty"`
 }
 
-// AccessFrom is the access a sync answer gives.
 func AccessFrom(res *nokkuv1.SyncDaemonResponse) *Access {
 	principals := make(map[string][]string, len(res.GetPrincipals()))
 	for _, p := range res.GetPrincipals() {
@@ -76,7 +74,7 @@ func AccessFrom(res *nokkuv1.SyncDaemonResponse) *Access {
 	}
 }
 
-// validAccounts drops every name that is no valid account, so neither the core nor the file can sneak in an unsafe one.
+// validAccounts keeps the core or the file from sneaking in an unsafe name.
 func validAccounts(principals map[string][]string) map[string][]string {
 	maps.DeleteFunc(principals, func(name string, _ []string) bool {
 		if login.ValidUsername(name) {
@@ -88,14 +86,13 @@ func validAccounts(principals map[string][]string) map[string][]string {
 	return principals
 }
 
-// New holds cfg and no access.
 func New(cfg Config) *State {
 	s := &State{Config: cfg}
 	s.access.Store(&Access{})
 	return s
 }
 
-// Load starts empty when the file is missing and ignores a corrupted one, the next sync rebuilds it.
+// Load ignores a missing or corrupted file, the next sync rebuilds it.
 func Load() (*State, error) {
 	var f file
 	if err := fsutil.LoadJSON(paths.StateFile(), &f); err != nil {
@@ -120,7 +117,7 @@ func (s *State) SetAccess(a *Access) {
 	s.access.Store(a)
 }
 
-// Save writes both halves as one file, unless that file now names another daemon than the one this state was read with.
+// Save never writes over a file that now names another daemon.
 func (s *State) Save() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -128,7 +125,7 @@ func (s *State) Save() error {
 		var onDisk file
 		if err := fsutil.LoadJSON(paths.StateFile(), &onDisk); err == nil && onDisk.DaemonID != "" &&
 			onDisk.DaemonID != s.owner {
-			return ErrReplaced
+			return errReplaced
 		}
 	}
 	a := s.Access()
@@ -140,7 +137,7 @@ func (s *State) Save() error {
 	return nil
 }
 
-// Dropped is the state after a rejection: the API kept, the enrollment and access gone. It saves only over this one.
+// Dropped is the state after a rejection. It saves only over this one.
 func (s *State) Dropped() *State {
 	d := New(Config{APIURL: s.APIURL, APICA: s.APICA})
 	s.mu.Lock()

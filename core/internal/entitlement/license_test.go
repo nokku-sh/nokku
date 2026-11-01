@@ -10,7 +10,7 @@ import (
 
 const year = 365 * 24 * time.Hour
 
-// Every refusal comes before the key is stored. The key that is taken is in internal/integration/api.
+// Every refusal comes before the store. internal/integration/api takes a key.
 func TestActivateLicense_Refusals(t *testing.T) {
 	ctx := t.Context()
 	sut := selfHosted(t)

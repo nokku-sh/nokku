@@ -27,7 +27,7 @@ func signalByName(name string) (os.Signal, bool) {
 	return sig, ok
 }
 
-// code is the shell exit code (128+n). ok is false on a normal exit, where the caller sends exit-status.
+// code is the shell's 128+n. ok is false on a normal exit.
 func processSignal(st *os.ProcessState) (name string, code int, ok bool) {
 	if st == nil {
 		return "", 0, false

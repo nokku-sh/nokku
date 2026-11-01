@@ -15,15 +15,14 @@ import (
 )
 
 const (
-	tokenLogin   = "login"
-	magicLinkTTL = 15 * time.Minute
-	// BootstrapTTL is how long an owner link works, the signup mail says so.
+	tokenLogin     = "login"
+	magicLinkTTL   = 15 * time.Minute
 	BootstrapTTL   = 24 * time.Hour
 	mailTimeout    = 30 * time.Second
 	loginVerifyURL = "/login/verify?token="
 )
 
-// RequestMagicLink runs detached, so neither the answer nor how long it takes tells whether the address exists.
+// RequestMagicLink runs detached, so timing never shows if the address exists.
 func (s *Service) RequestMagicLink(ctx context.Context, email string) {
 	if s.sendMagicLink == nil {
 		return
@@ -50,11 +49,11 @@ func (s *Service) mailLoginLink(ctx context.Context, email string) error {
 		if err != nil {
 			return err
 		}
+		u = found
 		if !found.Active {
 			return nil
 		}
 		link, hash, err = s.putLoginToken(sendCtx, q, found.ID, magicLinkTTL)
-		u = found
 		return err
 	})
 	if err != nil {
@@ -65,6 +64,10 @@ func (s *Service) mailLoginLink(ctx context.Context, email string) error {
 		return nil
 	}
 	if link == "" {
+		s.record(
+			ctx,
+			event{Action: actionLoginDenied, Method: MethodMagicLink, Email: email, Detail: "inactive account"},
+		)
 		return nil
 	}
 	if err := s.sendMagicLink(sendCtx, u.ID, u.Email, link, magicLinkTTL); err != nil {
@@ -73,7 +76,7 @@ func (s *Service) mailLoginLink(ctx context.Context, email string) error {
 	return nil
 }
 
-// dropUnsent forgets a link whose mail did not go out. Nothing here counts requests, the mail cooldown does.
+// dropUnsent forgets an unsent link. Only the mail cooldown counts requests.
 func (s *Service) dropUnsent(ctx context.Context, hash crypto.HashedToken, cause error) {
 	if !errors.Is(cause, emailverify.ErrCooldown) {
 		slog.Warn("link not sent", "error", cause)
@@ -102,7 +105,7 @@ func (s *Service) putLoginToken(
 	return baseURL(ctx) + loginVerifyURL + raw, hash, nil
 }
 
-// IssueBootstrapLink is how the first admin gets in before any passkey exists. It replaces earlier links.
+// IssueBootstrapLink lets the first admin in before any passkey exists.
 func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, error) {
 	var link string
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -117,7 +120,6 @@ func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, e
 	return link, err
 }
 
-// ConsumeMagicLink spends a sign-in link.
 func (s *Service) ConsumeMagicLink(ctx context.Context, raw string) (*db.User, *http.Cookie, error) {
 	hash, ok := crypto.TokenHash(raw, crypto.TokenLogin)
 	if !ok {

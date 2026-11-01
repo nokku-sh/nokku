@@ -33,19 +33,19 @@ type Synced struct {
 	Principals  []*nokkuv1.AccountPrincipals
 	CAPublicKey string
 	RetiredCAs  []*nokkuv1.RetiredCAKey
-	// HostCAPublicKey is the key the daemon's host certificate has to come from.
+	// HostCAPublicKey is what the daemon's host certificate must come from.
 	HostCAPublicKey string
 }
 
-// Sync answers a server with what it may trust, then saves what the server reported about itself. The save runs on
-// its own, a failed one never keeps a server from its principal list.
+// Sync saves the report on its own, a failure never costs the principal list.
 func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	res := &Synced{}
 	var targetID string
 	err := conn.TenantTx(ctx, func(q *db.Queries) error {
 		daemon, err := q.GetDaemon(ctx, in.DaemonID)
-		// A deleted daemon still serves its cached principals. REJECTED makes the host drop them. Its token stays until
-		// it expires, an answer that got lost must be there on the next try, and nothing else takes that token.
+		// A deleted daemon still serves its cached principals, REJECTED makes
+		// the host drop them. Its token stays until it expires, so a lost
+		// answer comes again, and nothing else takes it.
 		if errors.Is(err, pgx.ErrNoRows) {
 			res.Status = new(nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)
 			return nil
@@ -70,7 +70,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 			res.Config.IdleTimeout = idle
 		}
 
-		// Read the version first, so a change in between costs one extra sync instead of a stale daemon.
+		// Read the version first, a race then costs a sync, not a stale daemon.
 		res.Version, err = q.GetWorkspaceStateVersion(ctx, daemon.WorkspaceID)
 		if err != nil {
 			return err
@@ -125,15 +125,14 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	return res, nil
 }
 
-// saveReport keeps what the host said about itself. An account it adds has no grants yet, so the principal list
-// read before never misses one.
+// An account saved here has no grants yet, so the list read before misses none.
 func saveReport(ctx context.Context, conn connection, in SyncInput, targetID string) error {
 	targetMeta, err := json.Marshal(in.ReqMetadata)
 	if err != nil {
 		return err
 	}
 	return conn.TenantTx(ctx, func(q *db.Queries) error {
-		// Never write status here, the combined update would clobber an admin's accept or reject.
+		// Never write status here, that would clobber an admin's decision.
 		if err := q.UpdateDaemonVersion(ctx, &db.UpdateDaemonVersionParams{
 			DaemonID: in.DaemonID,
 			Version:  in.Version,
@@ -147,7 +146,7 @@ func saveReport(ctx context.Context, conn connection, in SyncInput, targetID str
 		}); err != nil {
 			return err
 		}
-		// Never deletes, a host that cannot enumerate users must not change who has access.
+		// Never deletes, a host that can't list users must not change access.
 		return q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
 			TargetID:    targetID,
 			Usernames:   ValidUsers(in.Users),
@@ -163,7 +162,7 @@ func ValidUsers(names []string) []string {
 	})
 }
 
-// validEndpoints keeps what a daemon can listen on, an ip:port. Nil keeps the stored endpoints.
+// validEndpoints keeps only ip:port. Nil keeps the stored endpoints.
 func validEndpoints(endpoints []string) []string {
 	valid := slices.DeleteFunc(slices.Clone(endpoints), func(ep string) bool {
 		_, err := netip.ParseAddrPort(ep)

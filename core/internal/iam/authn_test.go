@@ -7,14 +7,14 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/cryptosigner"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/internal/dpop"
 
@@ -39,18 +39,14 @@ func TestRequestCredential(t *testing.T) {
 			if tt.authorization != "" {
 				header.Set("Authorization", tt.authorization)
 			}
-			if got := (&Service{}).requestCredential(header); got != tt.want {
-				t.Fatalf("requestCredential() = %q, want %q", got, tt.want)
-			}
+			require.Equal(t, tt.want, (&Service{}).requestCredential(header))
 		})
 	}
 
 	t.Run("cookie", func(t *testing.T) {
 		header := http.Header{}
 		header.Add("Cookie", sessionCookieName+"=cookietok")
-		if got := (&Service{}).requestCredential(header); got != "cookietok" {
-			t.Fatalf("requestCredential() = %q, want cookietok", got)
-		}
+		require.Equal(t, "cookietok", (&Service{}).requestCredential(header))
 	})
 }
 
@@ -79,26 +75,18 @@ func signProof(
 		claims["ath"] = ath
 	}
 	payload, err := json.Marshal(claims)
-	if err != nil {
-		t.Fatalf("marshal claims: %v", err)
-	}
+	require.NoError(t, err)
 	opts := (&jose.SignerOptions{}).WithType("dpop+jwt")
 	opts.EmbedJWK = true
 	signer, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: cryptosigner.Opaque(key)},
 		opts,
 	)
-	if err != nil {
-		t.Fatalf("new signer: %v", err)
-	}
+	require.NoError(t, err)
 	jws, err := signer.Sign(payload)
-	if err != nil {
-		t.Fatalf("sign: %v", err)
-	}
+	require.NoError(t, err)
 	compact, err := jws.CompactSerialize()
-	if err != nil {
-		t.Fatalf("serialize: %v", err)
-	}
+	require.NoError(t, err)
 	return compact
 }
 
@@ -115,48 +103,35 @@ func TestVerifySessionProof(t *testing.T) {
 	htu := "https://nokku.example.com" + procedure
 
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
+	require.NoError(t, err)
 
-	t.Run("valid bound proof", func(t *testing.T) {
+	t.Run("a valid proof for another key", func(t *testing.T) {
 		proof := signProof(t, key, htu, dpop.ATH(token), svc.DPoP.CurrentNonce(), now)
 		header := http.Header{}
 		header.Set("Authorization", "DPoP "+token)
 		header.Set("DPoP", proof)
 		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
-		// The fixture binding cannot match. Anything but a binding mismatch means the proof itself failed.
-		if err == nil {
-			t.Fatal("expected a jkt mismatch for the fixture binding")
-		}
-		if !strings.Contains(err.Error(), "jkt mismatch") {
-			t.Fatalf("verifySessionProof() = %v, want a jkt mismatch", err)
-		}
+		// The fixture binding can't match, any other error is a bad proof.
+		require.ErrorContains(t, err, "jkt mismatch")
 	})
 
 	t.Run("proof bound to the session key passes verification", func(t *testing.T) {
 		jwk := &jose.JSONWebKey{Key: &key.PublicKey}
 		tp, err := jwk.Thumbprint(crypto.SHA256)
-		if err != nil {
-			t.Fatalf("thumbprint: %v", err)
-		}
+		require.NoError(t, err)
 		realBinding := base64.RawURLEncoding.EncodeToString(tp)
 
 		proof := signProof(t, key, htu, dpop.ATH(token), svc.DPoP.CurrentNonce(), now)
 		header := http.Header{}
 		header.Set("DPoP", proof)
-		if err := svc.verifySessionProof(ctx, header, procedure, token, realBinding); err != nil {
-			t.Fatalf("verifySessionProof() = %v, want nil", err)
-		}
+		require.NoError(t, svc.verifySessionProof(ctx, header, procedure, token, realBinding))
 	})
 
 	t.Run("missing proof is ErrDPoPRequired", func(t *testing.T) {
 		header := http.Header{}
 		header.Set("Authorization", "DPoP "+token)
 		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
-		if err == nil || !errors.Is(err, ErrDPoPRequired) {
-			t.Fatalf("verifySessionProof() = %v, want ErrDPoPRequired", err)
-		}
+		require.ErrorIs(t, err, ErrDPoPRequired)
 	})
 
 	t.Run("stale nonce maps to dpop.ErrNonce", func(t *testing.T) {
@@ -164,9 +139,7 @@ func TestVerifySessionProof(t *testing.T) {
 		header := http.Header{}
 		header.Set("DPoP", proof)
 		err := svc.verifySessionProof(ctx, header, procedure, token, binding)
-		if !errors.Is(err, dpop.ErrNonce) {
-			t.Fatalf("verifySessionProof() = %v, want dpop.ErrNonce", err)
-		}
+		require.ErrorIs(t, err, dpop.ErrNonce)
 	})
 }
 
@@ -179,11 +152,7 @@ func TestAdvertiseDPoPNonce(t *testing.T) {
 	t.Run("sets nonce and the workspace url", func(t *testing.T) {
 		header := http.Header{}
 		svc.AdvertiseDPoPNonce(ctx, header)
-		if header.Get("DPoP-Nonce") != svc.DPoP.CurrentNonce() {
-			t.Error("AdvertiseDPoPNonce did not set the DPoP-Nonce header")
-		}
-		if header.Get(deviceURLHeader) != "https://acme.nokku.example" {
-			t.Error("AdvertiseDPoPNonce did not set the canonical URL header")
-		}
+		assert.Equal(t, svc.DPoP.CurrentNonce(), header.Get("DPoP-Nonce"), "the DPoP-Nonce header")
+		assert.Equal(t, "https://acme.nokku.example", header.Get(deviceURLHeader), "the canonical URL header")
 	})
 }

@@ -19,12 +19,12 @@ import (
 )
 
 func TestSignIsTheDocumentedHMAC(t *testing.T) {
-	// echo -n '1700000000.{}' | openssl dgst -sha256 -hmac secret, what a receiver computes.
+	// echo -n '1700000000.{}' | openssl dgst -sha256 -hmac secret
 	assert.Equal(t, "b8569b78799ff9e3cbff0fc2d63a33a2b57f3282abd07c37ae5e8e7d79a5f163",
-		Sign("secret", "1700000000", []byte("{}")))
-	assert.NotEqual(t, Sign("secret", "1700000000", []byte("{}")), Sign("secret", "1700000001", []byte("{}")),
+		sign("secret", "1700000000", []byte("{}")))
+	assert.NotEqual(t, sign("secret", "1700000000", []byte("{}")), sign("secret", "1700000001", []byte("{}")),
 		"the timestamp must be signed, or an old request replays")
-	assert.NotEqual(t, Sign("secret", "1", []byte("{}")), Sign("other", "1", []byte("{}")))
+	assert.NotEqual(t, sign("secret", "1", []byte("{}")), sign("other", "1", []byte("{}")))
 }
 
 func testEvents() []*Event {
@@ -84,7 +84,7 @@ func TestSendSetsEachDestinationsAuth(t *testing.T) {
 		want   func(r *http.Request, body []byte) string
 	}{
 		{StreamWebhook, "X-Nokku-Signature", func(r *http.Request, body []byte) string {
-			return "sha256=" + Sign("s3cret-key", r.Header.Get("X-Nokku-Timestamp"), body)
+			return "sha256=" + sign("s3cret-key", r.Header.Get("X-Nokku-Timestamp"), body)
 		}},
 		{StreamSplunk, "Authorization", func(*http.Request, []byte) string { return "Splunk s3cret-key" }},
 		{StreamDatadog, "DD-API-KEY", func(*http.Request, []byte) string { return "s3cret-key" }},

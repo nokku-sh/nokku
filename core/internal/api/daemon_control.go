@@ -33,32 +33,30 @@ import (
 )
 
 const (
-	// maxUploadBytes ends an upload. nokkud stops a recording at 50 MB, so only a daemon that ignores that gets here.
+	// nokkud stops at 50 MB, so only a daemon that ignores that gets here.
 	maxUploadBytes = 64 << 20
 
-	// maxOpenUploads bounds what one bad daemon costs. A try over the limit waits for its retry and loses nothing, the
-	// file stays on the daemon.
+	// Bounds one bad daemon. Over it a try retries, the daemon keeps the file.
 	maxOpenUploads = 64
 
-	// maxUploadMemory is what one upload can keep in core memory on its way to a bucket. It only counts toward the
-	// storage cap once stored, so the core counts it here. A quiet session holds what it sent, which is why these limit
-	// bytes and not uploads: a live session may stay open for hours.
+	// One upload's bytes on the way to a bucket, before the storage cap sees
+	// them. A live session stays open for hours, so limit bytes, not uploads.
 	maxUploadMemory = 26 << 20
 
-	// maxCoreUploadMemory bounds all of it. A try over a limit is cut and comes again, the file stays on the daemon.
+	// All uploads together. Over it a try is cut and comes again.
 	maxCoreUploadMemory = 2 << 30
 
-	// maxWorkspaceUploadMemory keeps one hosted workspace from taking the share of the others.
+	// Keeps one hosted workspace from taking the others' share.
 	maxWorkspaceUploadMemory = 512 << 20
 
-	// storeTimeout bounds the commit and the transaction after it, each on its own.
+	// storeTimeout bounds the commit and the transaction after it, each alone.
 	storeTimeout = 30 * time.Second
 )
 
-// errRecordingFinalized tells the daemon the core holds the whole recording, so its copy can go.
+// errRecordingFinalized tells the daemon it can delete its copy.
 var errRecordingFinalized = connect.NewError(connect.CodeAlreadyExists, "recording is already finalized")
 
-// daemonControlService is everything a daemon calls. Connect and DaemonRelay come from the embedded pool.
+// Connect and DaemonRelay come from the embedded pool.
 type daemonControlService struct {
 	*nokkudaemon.Pool
 
@@ -82,7 +80,7 @@ func (s *daemonControlService) EnrollDaemon(
 	if !ok {
 		return nil, errInternal
 	}
-	// The session is bound to the daemon's DPoP key, so a stolen token is useless without it.
+	// Bound to the daemon's DPoP key, so a stolen token is useless alone.
 	binding, err := s.enrollBinding(ctx, ci)
 	if err != nil {
 		return nil, err
@@ -94,13 +92,13 @@ func (s *daemonControlService) EnrollDaemon(
 		Version:     daemonVersion(ci.RequestHeader().Get("User-Agent")),
 		ReqMetadata: req.GetMetadata(),
 		Connected:   s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
-		// The token must verify before anything is spent on the cap, so it is checked here instead of in the guard.
+		// Not in the guard, only a verified token may spend on the cap.
 		CanCreate: func(ctx context.Context, workspaceID string) error {
 			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)
 		},
 	})
 	if errors.Is(err, nokkudaemon.ErrEnrollToken) {
-		return nil, newError(connect.CodeFailedPrecondition, err.Error())
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	}
 	if err != nil {
 		return nil, err
@@ -209,16 +207,16 @@ func (s *daemonControlService) UploadRecording(
 ) (*nokkuv1.UploadRecordingResponse, error) {
 	daemonID := actor.DaemonIDFromContext(ctx)
 	if daemonID == "" {
-		return nil, newError(connect.CodePermissionDenied, "only daemons can upload recordings")
+		return nil, connect.NewError(connect.CodePermissionDenied, "only daemons can upload recordings")
 	}
 
 	first, err := stream.Receive()
 	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 	meta := first.GetMeta()
 	if meta == nil || meta.GetRecordingId() == "" {
-		return nil, newError(connect.CodeInvalidArgument, "missing recording metadata")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 
 	release, ok := s.takeUploadSlot(daemonID)
@@ -227,7 +225,7 @@ func (s *daemonControlService) UploadRecording(
 	}
 	defer release()
 
-	// Asked before the row exists, so a refused upload leaves nothing behind. The daemon tries again later.
+	// Before the row exists, so a refused upload leaves nothing behind.
 	if !s.cfg.Record.MakeRoom(ctx, actor.WorkspaceIDFromContext(ctx), meta.GetRecordingId()) {
 		return nil, errRecordingStorageFull
 	}
@@ -236,7 +234,7 @@ func (s *daemonControlService) UploadRecording(
 		return nil, err
 	}
 	audit.SetTarget(ctx, rec.ID)
-	// A daemon that dies takes ctx with it. What arrived by then is the evidence, so the writer outlives it.
+	// What arrived before a daemon died is evidence, the writer outlives ctx.
 	wctx, abort := context.WithCancel(context.WithoutCancel(ctx))
 	defer abort()
 	objectID := uuid.NewV7().String()
@@ -261,11 +259,11 @@ receive:
 		case msg = <-msgs:
 		case err := <-recvErr:
 			if !errors.Is(err, io.EOF) {
-				ended = newError(connect.CodeUnknown, "recording stream interrupted")
+				ended = connect.NewError(connect.CodeUnknown, "recording stream interrupted")
 			}
 			break receive
 		case <-ctx.Done():
-			ended = newError(connect.CodeUnavailable, "the core is shutting down, the rest goes up later")
+			ended = connect.NewError(connect.CodeUnavailable, "the core is shutting down, the rest goes up later")
 			break receive
 		}
 		switch m := msg.GetMsg().(type) {
@@ -275,8 +273,8 @@ receive:
 				continue
 			}
 			if size+int64(len(data)) > maxUploadBytes {
-				// The daemon keeps a refused file and stops sending it until its next start.
-				ended = newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
+				// The daemon keeps the file, unsent until its next start.
+				ended = connect.NewError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
 				break receive
 			}
 			var ok bool
@@ -293,7 +291,7 @@ receive:
 			final = m.Final
 		}
 	}
-	// Complete takes a recording nothing cut, of which every byte of the daemon's file arrived.
+	// Complete: nothing cut it and every byte of the daemon's file arrived.
 	complete := ended == nil && final != nil && final.GetCutReason() == "" && final.GetSizeBytes() == size
 	if reason := final.GetCutReason(); reason != "" {
 		audit.Set(ctx, "cut_reason", reason)
@@ -302,7 +300,7 @@ receive:
 		audit.Set(ctx, "missing_bytes", final.GetSizeBytes()-size)
 	}
 
-	// Only the last message says the session ended. Any other end of a stream is one try, the session may run on.
+	// Only the last message ends the session. Any other stream end is one try.
 	var endedAt *time.Time
 	if final != nil {
 		endedAt = new(time.Now())
@@ -329,7 +327,6 @@ receive:
 	}, nil
 }
 
-// takeUploadSlot counts an upload against its daemon. release gives the slot back.
 func (s *daemonControlService) takeUploadSlot(daemonID string) (release func(), ok bool) {
 	s.uploadsMu.Lock()
 	defer s.uploadsMu.Unlock()
@@ -346,8 +343,7 @@ func (s *daemonControlService) takeUploadSlot(daemonID string) (release func(), 
 	}, true
 }
 
-// holdUploadMemory counts n more bytes of an upload holding held so far, against the core and, on the hosted service,
-// the workspace. It returns what the upload holds now.
+// Charges the core and, if hosted, the workspace. Returns the new hold.
 func (s *daemonControlService) holdUploadMemory(workspaceID string, held, n int64) (int64, bool) {
 	n = min(n, maxUploadMemory-held)
 	if n <= 0 {
@@ -372,8 +368,8 @@ func (s *daemonControlService) releaseUploadMemory(workspaceID string, n int64) 
 	}
 }
 
-// receiveApart runs Receive on its own, Receive does not watch ctx. A deploy ends ctx, and must not wait out its
-// grace on a quiet stream. The handler's return closes the stream, which ends the receiving too.
+// Receive ignores ctx, and a deploy must not wait out its grace on a quiet
+// stream. The handler's return closes the stream, which ends the goroutine.
 func receiveApart(
 	ctx context.Context,
 	stream nokkuv1connect.DaemonControlServiceUploadRecordingServerStream,
@@ -397,9 +393,9 @@ func receiveApart(
 	return msgs, recvErr
 }
 
-// storeUpload commits the object of this try, then keeps it under the row lock if it holds at least what is stored.
-// The commit stays out of the transaction, a bucket that hangs holds neither a row nor a connection. An object that
-// lost goes to the delete queue.
+// The commit stays out of the transaction, so a hung bucket holds no row or
+// connection. Under the row lock the object is kept if it holds at least what
+// is stored, a loser goes to the delete queue.
 func (s *daemonControlService) storeUpload(
 	ctx context.Context,
 	opened *db.Recording,
@@ -432,14 +428,13 @@ func (s *daemonControlService) storeUpload(
 		case err != nil:
 			return err
 		case !bytes.Equal(row.Key, opened.Key):
-			// Deleted and made again, or a rotation resealed the key. The daemon sends the file again either way.
+			// Remade, or a rotation resealed it. The daemon resends the file.
 			answer = pgx.ErrNoRows
 		case row.Complete:
 			rec, answer = row, errRecordingFinalized
 		default:
 			kept = stored && upload.SizeBytes >= row.SizeBytes
-			// An earlier try stored more, or this one nothing. The larger copy wins, a shorter one that calls itself
-			// whole too.
+			// The larger copy wins, even over a shorter one marked complete.
 			next := &db.FinishRecordingUploadParams{ID: row.ID, SizeBytes: row.SizeBytes, EndedAt: upload.EndedAt}
 			if kept {
 				next = upload
@@ -465,17 +460,17 @@ func (s *daemonControlService) resolveUpload(
 	daemonID string,
 	rm *nokkuv1.RecordingMeta,
 ) (*db.Recording, error) {
-	// The id is sealed into the recording's key. Postgres would hand back another spelling than a capital one.
+	// The id is in the key's AAD, and Postgres would lowercase a capital one.
 	if !login.ValidID(rm.GetRecordingId()) {
-		return nil, newError(connect.CodeInvalidArgument, "the recording id must be a lowercase UUID")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "the recording id must be a lowercase UUID")
 	}
 	var rec *db.Recording
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		existing, err := q.GetRecording(ctx, rm.GetRecordingId())
 		if err == nil {
 			if existing.DaemonID == nil || *existing.DaemonID != daemonID {
-				// Refused, not AlreadyExists, so the daemon keeps its file and nobody can get another server's deleted.
-				return newError(connect.CodeInvalidArgument, "recording belongs to another daemon")
+				// AlreadyExists would get another server's file deleted.
+				return connect.NewError(connect.CodeInvalidArgument, "recording belongs to another daemon")
 			}
 			if existing.Complete {
 				return errRecordingFinalized
@@ -490,7 +485,7 @@ func (s *daemonControlService) resolveUpload(
 		if t := rm.GetStartedAt(); t.IsValid() {
 			startedAt = new(t.AsTime())
 		}
-		// The reported principal must name this daemon's target and the session's account, or the recording is misfiled.
+		// A principal of another target or account misfiles the recording.
 		var subjectID *string
 		if rm.GetPrincipal() != "" {
 			target, err := q.GetTargetByDaemon(ctx, &daemonID)
@@ -499,7 +494,7 @@ func (s *daemonControlService) resolveUpload(
 			}
 			p, ok := login.ParsePrincipal(rm.GetPrincipal())
 			if !ok || p.TargetID != target.ID || p.Username != rm.GetUsername() {
-				return newError(connect.CodeInvalidArgument, "the principal does not match the session")
+				return connect.NewError(connect.CodeInvalidArgument, "the principal does not match the session")
 			}
 			subjectID = &p.SubjectID
 		}
@@ -518,8 +513,8 @@ func (s *daemonControlService) resolveUpload(
 			StartedAt: startedAt,
 		})
 		if db.IsUniqueViolation(err) {
-			// Another upload of this id made the row first. AlreadyExists would tell the daemon to delete its file.
-			return newError(connect.CodeAborted, "another upload of this recording just started, try again")
+			// A race with another upload. AlreadyExists would delete the file.
+			return connect.NewError(connect.CodeAborted, "another upload of this recording just started, try again")
 		}
 		return err
 	}); err != nil {
@@ -528,7 +523,6 @@ func (s *daemonControlService) resolveUpload(
 	return rec, nil
 }
 
-// UnenrollDaemon removes the calling daemon and the session it called with.
 func (s *daemonControlService) UnenrollDaemon(
 	ctx context.Context,
 	_ *nokkuv1.UnenrollDaemonRequest,
@@ -549,18 +543,18 @@ func (s *daemonControlService) UnenrollDaemon(
 	return &nokkuv1.UnenrollDaemonResponse{}, nil
 }
 
-// enrollBinding returns the DPoP key thumbprint. A missing proof is an error, daemons must enroll key-bound.
+// enrollBinding returns the DPoP key thumbprint. Daemons must enroll key-bound.
 func (s *daemonControlService) enrollBinding(ctx context.Context, ci *connect.CallInfo) (string, error) {
 	svc := s.cfg.IAM
 	if svc.DPoP == nil {
-		return "", newError(connect.CodeUnimplemented, "DPoP is not configured")
+		return "", connect.NewError(connect.CodeUnimplemented, "DPoP is not configured")
 	}
 
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	meta, _ := actor.RequestMetaFromContext(ctx)
 	proof, err := dpop.ProofFrom(meta.Header)
 	if err != nil {
-		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")
+		return "", connect.NewError(connect.CodeInvalidArgument, "invalid DPoP proof")
 	}
 	binding, err := svc.DPoP.Verify(
 		proof,
@@ -572,18 +566,17 @@ func (s *daemonControlService) enrollBinding(ctx context.Context, ci *connect.Ca
 	if err != nil {
 		if errors.Is(err, dpop.ErrNonce) {
 			svc.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
-			return "", newError(connect.CodeUnauthenticated, "stale DPoP nonce")
+			return "", connect.NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
 		}
 		if !iam.IsCredentialError(err) {
 			return "", err
 		}
-		return "", newError(connect.CodeInvalidArgument, "invalid DPoP proof")
+		return "", connect.NewError(connect.CodeInvalidArgument, "invalid DPoP proof")
 	}
 	return binding, nil
 }
 
-// daemonVersion takes the version out of nokkud's user agent, "nokkud/<version> (<os>/<arch>)". Any other agent,
-// or a version too long to be one, gives none.
+// daemonVersion reads "nokkud/<version> (<os>/<arch>)", anything else gives "".
 func daemonVersion(userAgent string) string {
 	rest, ok := strings.CutPrefix(userAgent, "nokkud/")
 	if !ok {

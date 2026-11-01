@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newTestVerifier keeps up to size jti markers, the oldest goes first like in the core's store.
+// newTestVerifier drops the oldest jti past size, like the core's store.
 func newTestVerifier(size int) *Verifier {
 	var seen [][32]byte
 	return NewVerifier([]byte("test-secret"), func(jti [32]byte) bool {
@@ -80,8 +80,8 @@ func TestVerifyTakesOnlyTheCompactForm(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidProof, "the same proof as JSON")
 }
 
-// Anyone can sign a proof without a session, so it never takes room in the replay store. What it is for, enrolling
-// a daemon or polling a device grant, is single-use anyway.
+// Anyone can sign a proof without a session, so it takes no room in the replay
+// store. Enrolling and device polls are single-use anyway.
 func TestAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
 	const htu = "https://nokku.example.com/x"
 	v := newTestVerifier(2)
@@ -100,7 +100,7 @@ func TestAnonymousProofsCannotFillTheSessionStore(t *testing.T) {
 	}
 }
 
-// A valid token with someone else's key must not take room in the store every bound session shares.
+// A valid token with the wrong key must take no room in the shared store.
 func TestWrongKeyLeavesNoMarker(t *testing.T) {
 	const htu, token = "https://nokku.example.com/x", "session-token"
 	v := newTestVerifier(1)

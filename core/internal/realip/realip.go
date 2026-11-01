@@ -17,8 +17,8 @@ var (
 	warnUntrusted sync.Once
 )
 
-// SetTrustedProxies with no entries trusts a peer on loopback or a private network for one hop. A list replaces
-// that, and its entries are skipped in X-Forwarded-For too, so a chain like a CDN in front of the proxy works.
+// SetTrustedProxies with no entries trusts a loopback or private peer for one
+// hop. A list replaces that, and X-Forwarded-For skips its entries too.
 func SetTrustedProxies(proxies []string) error {
 	trustedProxies = nil
 	for _, raw := range proxies {
@@ -50,30 +50,13 @@ func parseProxy(entry string) (*net.IPNet, error) {
 	return ipNet, nil
 }
 
-func isTrustedProxy(ip net.IP) bool {
-	for _, ipNet := range trustedProxies {
-		if ipNet.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
-// Without a list, anything on a private network that reaches the core directly can name any client.
-func mayForward(peer net.IP) bool {
-	if len(trustedProxies) == 0 {
-		return peer.IsLoopback() || peer.IsPrivate()
-	}
-	return isTrustedProxy(peer)
-}
-
-// Bucket is Client as a rate-limit key, where one IPv6 /64 counts as one client. Anything stored takes Client, so
-// the audit log keeps the exact address.
+// Bucket is Client as a rate-limit key, one IPv6 /64 counts as one client.
+// Anything stored takes Client, so the audit log keeps the exact address.
 func Bucket(header http.Header, remoteAddr string) string {
 	return canonicalizeIP(Client(header, remoteAddr))
 }
 
-// Client is the rightmost X-Forwarded-For hop that is not a listed proxy, read only from a peer that may forward.
+// Client is the rightmost unlisted forwarded hop, if the peer may forward.
 func Client(header http.Header, remoteAddr string) string {
 	peer := remoteAddr
 	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
@@ -107,6 +90,23 @@ func Client(header http.Header, remoteAddr string) string {
 	return peer
 }
 
+// Without a list, anything on a private network can name any client.
+func mayForward(peer net.IP) bool {
+	if len(trustedProxies) == 0 {
+		return peer.IsLoopback() || peer.IsPrivate()
+	}
+	return isTrustedProxy(peer)
+}
+
+func isTrustedProxy(ip net.IP) bool {
+	for _, ipNet := range trustedProxies {
+		if ipNet.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 // parseHop also takes an address with a port, Azure's gateways send one.
 func parseHop(hop string) net.IP {
 	if ip := net.ParseIP(hop); ip != nil {
@@ -123,7 +123,6 @@ func canonicalizeIP(ip string) string {
 	if parsed == nil {
 		return ip
 	}
-	// Collapse IPv6 to /64 prefix so a single /64 block shares one bucket.
 	if parsed.To4() == nil {
 		return parsed.Mask(net.CIDRMask(64, 128)).String()
 	}

@@ -23,7 +23,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
-// newTelemetry turns OTel on when an OTLP endpoint is set. It speaks OTLP over HTTP, and the rest follows OTEL_*.
+// newTelemetry is off without an OTLP endpoint. The rest follows OTEL_*.
 func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return nil
@@ -71,7 +71,6 @@ func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 	)
 	otel.SetMeterProvider(mp)
 
-	// The collector gets warnings and errors, nothing below.
 	lp := log.NewLoggerProvider(
 		log.WithProcessor(minsev.NewLogProcessor(log.NewBatchProcessor(logExporter), minsev.SeverityWarn)),
 		log.WithResource(res),
@@ -92,7 +91,7 @@ func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 		slog.Warn("failed to start runtime metrics", "error", err)
 	}
 
-	// Nothing waits for the flush, the last seconds before an exit may not arrive.
+	// Nothing waits for this flush, so the last seconds may never arrive.
 	context.AfterFunc(ctx, func() {
 		bg := context.WithoutCancel(ctx)
 		_ = lp.Shutdown(bg)

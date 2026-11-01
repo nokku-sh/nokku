@@ -1,6 +1,6 @@
 package iam
 
-// OIDC providers of a workspace. The config, secret included, is one JSON blob sealed to its row.
+// A provider's config, secret included, is one JSON blob sealed to its row.
 
 import (
 	"context"
@@ -23,8 +23,9 @@ type OIDCProvider struct {
 	ClientSecret    string   `json:"client_secret,omitempty"`
 	Scopes          []string `json:"scopes,omitempty"`
 	JITProvisioning bool     `json:"jit_provisioning,omitempty"`
-	// TrustUnverifiedEmail takes an address the provider sends without email_verified, as Entra does, to link an
-	// account or create one. A provider that says false is never trusted, and the owner is never linked by email.
+	// TrustUnverifiedEmail takes an address sent without email_verified, as
+	// Entra does. A provider that says false is never trusted, and the owner is
+	// never linked by email.
 	TrustUnverifiedEmail bool `json:"trust_unverified_email,omitempty"`
 }
 
@@ -61,7 +62,6 @@ func (s *Service) GetSSOProvider(ctx context.Context, providerID string) (*SSOPr
 	return s.ssoProviderFromRow(row)
 }
 
-// loginProvider is a provider that may sign people in right now.
 func (s *Service) loginProvider(ctx context.Context, providerID string) (*SSOProvider, error) {
 	p, err := s.GetSSOProvider(ctx, providerID)
 	if err != nil {
@@ -73,7 +73,6 @@ func (s *Service) loginProvider(ctx context.Context, providerID string) (*SSOPro
 	return p, nil
 }
 
-// PutSSOProvider keeps the stored client secret when the new one is empty, unless the issuer changed.
 func (s *Service) PutSSOProvider(ctx context.Context, p SSOProvider) (*SSOProvider, error) {
 	var out *SSOProvider
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -99,14 +98,14 @@ func (s *Service) putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvid
 	}
 	issuerChanged := prev != nil && prev.OIDC.IssuerURL != p.OIDC.IssuerURL
 	if p.OIDC.ClientSecret == "" && prev != nil {
-		// The secret goes to the issuer's token endpoint, so a new issuer must not inherit it.
+		// The secret goes to the issuer, so a new issuer must not inherit it.
 		if issuerChanged {
 			return nil, ErrSecretRequired
 		}
 		p.OIDC.ClientSecret = prev.OIDC.ClientSecret
 	}
 	if issuerChanged {
-		// sub is only unique per issuer, so the identities the old one vouched for are stale.
+		// sub is only unique per issuer, so the old identities are stale.
 		if _, err := q.DeleteCredentialsByProvider(ctx, &db.DeleteCredentialsByProviderParams{
 			Type: string(MethodOIDC), Provider: p.ProviderID,
 		}); err != nil {
@@ -133,7 +132,6 @@ func (s *Service) putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvid
 	return s.ssoProviderFromRow(row)
 }
 
-// DeleteSSOProvider also unlinks every identity the provider vouched for.
 func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) error {
 	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := keepSSOProvider(ctx, q, providerID); err != nil {
@@ -153,7 +151,7 @@ func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) erro
 	})
 }
 
-// HasSSOProvider reports whether a provider can sign people in. Enforced SSO takes one, only the owner gets in without.
+// HasSSOProvider guards enforced SSO, without one only the owner gets in.
 func HasSSOProvider(ctx context.Context, q *db.Queries) (bool, error) {
 	return hasSSOProviderBesides(ctx, q, "")
 }
@@ -168,8 +166,8 @@ func hasSSOProviderBesides(ctx context.Context, q *db.Queries, providerID string
 	}), nil
 }
 
-// keepSSOProvider refuses to take the last provider away from a workspace that enforces SSO. The lock keeps a save
-// that turns enforcement on from slipping past.
+// keepSSOProvider refuses to drop the last provider of enforced SSO. The lock
+// keeps a save that turns enforcement on from slipping past.
 func keepSSOProvider(ctx context.Context, q *db.Queries, providerID string) error {
 	ws, err := q.GetWorkspaceForUpdate(ctx)
 	if err != nil || !ws.Settings.GetEnforceSso() {
@@ -205,8 +203,7 @@ func SSOConfigAAD(workspaceID, providerID string) crypto.AAD {
 	return crypto.AAD{Table: "sso_providers", Column: "config", Workspace: workspaceID, Row: providerID}
 }
 
-// CheckIssuer loads the issuer's discovery document, so a typo fails on save and not at the first sign-in.
-// It skips the discovery cache, an issuer that is typed but never saved must not stay in it.
+// CheckIssuer skips the discovery cache, an unsaved issuer must not stay in it.
 func (s *Service) CheckIssuer(ctx context.Context, issuer string) error {
 	_, err := oidc.NewProvider(s.providerContext(ctx), issuer)
 	return err

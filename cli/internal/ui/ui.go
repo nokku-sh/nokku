@@ -10,7 +10,6 @@ import (
 	"golang.org/x/term"
 )
 
-// colorEnabled resolves once at startup, honoring NO_COLOR.
 var colorEnabled = func() bool {
 	if os.Getenv("NO_COLOR") != "" {
 		return false
@@ -18,21 +17,13 @@ var colorEnabled = func() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }()
 
-// code is the SGR code without the leading ESC[ and the trailing m.
-func color(code, s string) string {
-	if !colorEnabled {
-		return s
-	}
-	return "\x1b[" + code + "m" + s + "\x1b[0m"
-}
-
 func Bold(s string) string   { return color("1", s) }
 func Dim(s string) string    { return color("2", s) }
 func Red(s string) string    { return color("31", s) }
 func Green(s string) string  { return color("32", s) }
 func Yellow(s string) string { return color("33", s) }
 
-// Plain is for text nk did not write, like a server's error message, so it cannot send escape sequences.
+// Plain strips text nk did not write, so it cannot send escape sequences.
 func Plain(s string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) && r != '\n' {
@@ -42,12 +33,10 @@ func Plain(s string) string {
 	}, s)
 }
 
-// PlainLine is Plain for a value that must stay on one line, like a name.
 func PlainLine(s string) string {
 	return strings.ReplaceAll(Plain(s), "\n", "")
 }
 
-// HumanizeDuration formats a non-negative duration like "3h12m", "45s", or "900ms".
 func HumanizeDuration(d time.Duration) string {
 	if d < 0 {
 		d = 0
@@ -79,4 +68,11 @@ func HumanizeDuration(d time.Duration) string {
 		}
 		return fmt.Sprintf("%dd%dh", days, h)
 	}
+}
+
+func color(code, s string) string {
+	if !colorEnabled {
+		return s
+	}
+	return "\x1b[" + code + "m" + s + "\x1b[0m"
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/dpopclient"
 )
 
-// What nk and nokkud sign is what the core verifies, nonce, URL and token hash included.
+// What nk and nokkud sign is what the core verifies, token hash included.
 func TestClientProofPassesTheVerifier(t *testing.T) {
 	const token, procedure = "session-token", "/nokku.v1.UserService/Whoami"
 	v := dpop.NewVerifier([]byte("secret"), func([32]byte) bool { return true }, time.Now)

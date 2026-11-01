@@ -3,22 +3,21 @@ package realip
 import (
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // setProxies restores the default after the test.
 func setProxies(t *testing.T, proxies ...string) {
 	t.Helper()
-	if err := SetTrustedProxies(proxies); err != nil {
-		t.Fatalf("SetTrustedProxies(%v): %v", proxies, err)
-	}
+	require.NoError(t, SetTrustedProxies(proxies))
 	t.Cleanup(func() {
-		if err := SetTrustedProxies(nil); err != nil {
-			t.Errorf("resetting trusted proxies: %v", err)
-		}
+		assert.NoError(t, SetTrustedProxies(nil), "resetting trusted proxies")
 	})
 }
 
-func TestGetRemoteIP_DefaultPublicPeer(t *testing.T) {
+func TestBucket_DefaultPublicPeer(t *testing.T) {
 	setProxies(t)
 
 	tests := []struct {
@@ -55,15 +54,13 @@ func TestGetRemoteIP_DefaultPublicPeer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Bucket(tt.header, tt.remoteAddr); got != tt.want {
-				t.Errorf("Bucket() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, Bucket(tt.header, tt.remoteAddr))
 		})
 	}
 }
 
-// Without a list the proxy on this machine or a private network is trusted for one hop, whatever the client's range.
-func TestGetRemoteIP_DefaultPrivatePeer(t *testing.T) {
+// Without a list a local or private proxy gets one hop, any client range.
+func TestClient_DefaultPrivatePeer(t *testing.T) {
 	setProxies(t)
 
 	tests := []struct {
@@ -87,14 +84,12 @@ func TestGetRemoteIP_DefaultPrivatePeer(t *testing.T) {
 			if tt.forwarded != "" {
 				header.Set("X-Forwarded-For", tt.forwarded)
 			}
-			if got := Client(header, tt.remoteAddr); got != tt.want {
-				t.Errorf("Client() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, Client(header, tt.remoteAddr))
 		})
 	}
 }
 
-func TestGetRemoteIP_TrustedProxyHeaders(t *testing.T) {
+func TestBucket_TrustedProxyHeaders(t *testing.T) {
 	setProxies(t, "10.0.0.0/8")
 
 	header := func(pairs ...string) http.Header {
@@ -173,42 +168,35 @@ func TestGetRemoteIP_TrustedProxyHeaders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Bucket(tt.header, tt.remoteAddr); got != tt.want {
-				t.Errorf("Bucket() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, Bucket(tt.header, tt.remoteAddr))
 		})
 	}
 }
 
-func TestGetRemoteIP_TrustedProxyCIDR(t *testing.T) {
+func TestBucket_TrustedProxyCIDR(t *testing.T) {
 	setProxies(t, "10.0.0.0/8", "192.168.1.1")
 
 	tests := []struct {
-		name   string
-		peer   string
-		header bool
-		want   string
+		name string
+		peer string
+		want string
 	}{
-		{"peer inside /8", "10.0.0.1:80", true, "203.0.113.1"},
-		{"peer outside /8", "172.16.0.1:80", false, "172.16.0.1"},
-		{"exact IP entry", "192.168.1.1:80", true, "203.0.113.1"},
-		{"IP entry does not cover subnet", "192.168.1.2:80", false, "192.168.1.2"},
+		{"peer inside /8", "10.0.0.1:80", "203.0.113.1"},
+		{"peer outside /8", "172.16.0.1:80", "172.16.0.1"},
+		{"exact IP entry", "192.168.1.1:80", "203.0.113.1"},
+		{"IP entry does not cover subnet", "192.168.1.2:80", "192.168.1.2"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := http.Header{}
-			if tt.header {
-				h.Set("X-Forwarded-For", "203.0.113.1")
-			}
-			if got := Bucket(h, tt.peer); got != tt.want {
-				t.Errorf("Bucket() = %q, want %q", got, tt.want)
-			}
+			h.Set("X-Forwarded-For", "203.0.113.1")
+			assert.Equal(t, tt.want, Bucket(h, tt.peer))
 		})
 	}
 }
 
-func TestGetRemoteIP_HeaderIPCanonicalization(t *testing.T) {
+func TestBucket_HeaderIPCanonicalization(t *testing.T) {
 	setProxies(t, "10.0.0.0/8")
 
 	tests := []struct {
@@ -226,9 +214,7 @@ func TestGetRemoteIP_HeaderIPCanonicalization(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := http.Header{}
 			h.Set("X-Forwarded-For", tt.header)
-			if got := Bucket(h, "10.1.2.3:80"); got != tt.want {
-				t.Errorf("Bucket() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, Bucket(h, "10.1.2.3:80"))
 		})
 	}
 }
@@ -251,19 +237,12 @@ func TestSetTrustedProxies(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := SetTrustedProxies(tt.proxies)
-			if (err != nil) != tt.wantErr {
-				t.Errorf(
-					"SetTrustedProxies(%v) error = %v, wantErr %v",
-					tt.proxies,
-					err,
-					tt.wantErr,
-				)
-			}
+			assert.Equal(t, tt.wantErr, err != nil, "SetTrustedProxies(%v): %v", tt.proxies, err)
 		})
 	}
 }
 
-// A relay reports the client itself, so the address must not be collapsed to its /64.
+// A relay reports the client itself, so Client must not collapse it to /64.
 func TestClientIPKeepsTheHost(t *testing.T) {
 	setProxies(t, "10.0.0.1")
 	tests := []struct {
@@ -282,12 +261,8 @@ func TestClientIPKeepsTheHost(t *testing.T) {
 			if tt.forwarded != "" {
 				header.Set("X-Forwarded-For", tt.forwarded)
 			}
-			if got := Client(header, tt.remoteAddr); got != tt.want {
-				t.Errorf("Client() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, Client(header, tt.remoteAddr))
 		})
 	}
-	if got := Bucket(http.Header{}, "[2001:db8::7]:5000"); got != "2001:db8::" {
-		t.Errorf("Bucket() = %q, want the /64", got)
-	}
+	assert.Equal(t, "2001:db8::", Bucket(http.Header{}, "[2001:db8::7]:5000"), "Bucket keeps the /64")
 }

@@ -20,7 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
-// workspaceService serves the workspace of the request's host. Only CreateWorkspace runs outside one.
+// Only CreateWorkspace runs outside the workspace of the request's host.
 type workspaceService struct {
 	cfg *config.Config
 }
@@ -75,7 +75,7 @@ func (s *workspaceService) UpdateWorkspace(
 				return err
 			}
 			if !has {
-				return newError(
+				return connect.NewError(
 					connect.CodeFailedPrecondition,
 					"add and enable a provider before requiring single sign-on",
 				)
@@ -99,7 +99,7 @@ func (s *workspaceService) UpdateWorkspace(
 	return &nokkuv1.UpdateWorkspaceResponse{Workspace: workspace.ToProto()}, nil
 }
 
-// DeleteWorkspace only exists on the hosted service, a self-hosted server has nothing else to serve.
+// DeleteWorkspace is hosted only, a self-hosted server serves nothing else.
 func (s *workspaceService) DeleteWorkspace(
 	ctx context.Context,
 	_ *nokkuv1.DeleteWorkspaceRequest,
@@ -117,7 +117,7 @@ func (s *workspaceService) DeleteWorkspace(
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
 }
 
-// deleteWorkspace removes ws. Its recording objects go through the delete queue.
+// A deleted workspace's recording objects go through the delete queue.
 func deleteWorkspace(ctx context.Context, cfg *config.Config, ws actor.Workspace) error {
 	ctx = actor.WithWorkspace(ctx, ws)
 	if err := cfg.Conn.Tenant().DeleteWorkspace(ctx, ws.ID); err != nil {
@@ -127,31 +127,31 @@ func deleteWorkspace(ctx context.Context, cfg *config.Config, ws actor.Workspace
 	return nil
 }
 
-// CreateWorkspace is the hosted signup. The workspace is deleted again when nobody uses the sign-in link.
+// CreateWorkspace is the hosted signup, undone if the sign-in link goes unused.
 func (s *workspaceService) CreateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.CreateWorkspaceRequest,
 ) (*nokkuv1.CreateWorkspaceResponse, error) {
 	if !s.cfg.SaaS || actor.WorkspaceIDFromContext(ctx) != "" {
-		return nil, newError(connect.CodeFailedPrecondition, "signup only happens on the root host")
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "signup only happens on the root host")
 	}
 	if tenant.Forbidden(req.GetSlug()) {
-		return nil, newError(connect.CodeInvalidArgument, "this name is not available")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "this name is not available")
 	}
-	// Asked before anything exists. A workspace whose owner gets no mail would sit there until the purge.
+	// Checked first, a workspace whose owner gets no mail sits until the purge.
 	addr := iam.NormalizeEmail(req.GetOwnerEmail())
 	if s.cfg.Email.OwnerLinkOnCooldown(addr) {
-		return nil, newError(
+		return nil, connect.NewError(
 			connect.CodeResourceExhausted,
 			"a sign-in link went to this address a moment ago, try again later",
 		)
 	}
 	if err := email.Verify(ctx, addr, true); err != nil {
-		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "please enter a valid email address")
 	}
 	ws, err := tenant.Create(ctx, s.cfg.Conn, s.cfg.Keyset, req.GetSlug(), strings.TrimSpace(req.GetName()))
 	if db.IsUniqueViolation(err) {
-		return nil, newError(connect.CodeAlreadyExists, "this name is taken")
+		return nil, connect.NewError(connect.CodeAlreadyExists, "this name is taken")
 	}
 	if err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func (s *workspaceService) UpdateUserRole(
 	req *nokkuv1.UpdateUserRoleRequest,
 ) (*nokkuv1.UpdateUserRoleResponse, error) {
 	if !db.CanAssign(callerRole(ctx), req.GetRole()) {
-		return nil, newError(connect.CodePermissionDenied, "role cannot be assigned by you")
+		return nil, connect.NewError(connect.CodePermissionDenied, "role cannot be assigned by you")
 	}
 	audit.Set(ctx, "role", db.RoleLabel(req.GetRole()))
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
@@ -238,7 +238,7 @@ func (s *workspaceService) UpdateUserRole(
 	return &nokkuv1.UpdateUserRoleResponse{}, nil
 }
 
-// SetUserActive ends the user's sessions on a deactivation. Grants stay, so switching back on restores access.
+// SetUserActive ends a deactivated user's sessions. Grants stay for a return.
 func (s *workspaceService) SetUserActive(
 	ctx context.Context,
 	req *nokkuv1.SetUserActiveRequest,
@@ -277,7 +277,7 @@ func (s *workspaceService) DeleteUser(
 	return &nokkuv1.DeleteUserResponse{}, nil
 }
 
-// ClearUserIdentities signs the person out too, a wrong link must not keep the session it gave.
+// ClearUserIdentities also signs out, a wrong link must not keep its session.
 func (s *workspaceService) ClearUserIdentities(
 	ctx context.Context,
 	req *nokkuv1.ClearUserIdentitiesRequest,
@@ -296,10 +296,10 @@ func (s *workspaceService) ClearUserIdentities(
 	return &nokkuv1.ClearUserIdentitiesResponse{}, nil
 }
 
-// checkCanManageUser also protects the owner, and keeps people from managing themselves.
+// checkCanManageUser also protects the owner.
 func checkCanManageUser(ctx context.Context, q *db.Queries, userID string) error {
 	if userID == actor.UserIDFromContext(ctx) {
-		return newError(connect.CodeFailedPrecondition, "you cannot change your own account here")
+		return connect.NewError(connect.CodeFailedPrecondition, "you cannot change your own account here")
 	}
 	u, err := q.GetUser(ctx, userID)
 	if err != nil {
@@ -317,16 +317,16 @@ func (s *workspaceService) TransferOwnership(
 	req *nokkuv1.TransferOwnershipRequest,
 ) (*nokkuv1.TransferOwnershipResponse, error) {
 	if req.GetNewOwnerId() == actor.UserIDFromContext(ctx) {
-		return nil, newError(connect.CodeInvalidArgument, "you are the owner already")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "you are the owner already")
 	}
-	// A transaction on purpose. A missing new owner means the old one already lost the role, the rollback gives it back.
+	// With no new owner, the rollback gives the old one the role back.
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		ok, err := q.TransferOwnership(ctx, req.GetNewOwnerId())
 		if err != nil {
 			return err
 		}
 		if !ok {
-			return newError(connect.CodeNotFound, "the new owner must be an active user of this workspace")
+			return connect.NewError(connect.CodeNotFound, "the new owner must be an active user of this workspace")
 		}
 		return nil
 	}); err != nil {

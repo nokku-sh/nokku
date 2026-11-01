@@ -56,7 +56,7 @@ var (
 	)
 )
 
-// errTooManyUploads is not ResourceExhausted, a daemon waits an hour on that and this frees up with the next commit.
+// errTooManyUploads is not ResourceExhausted, a daemon waits an hour on that.
 var errTooManyUploads = connect.NewError(
 	connect.CodeUnavailable,
 	"the core is holding too many recording uploads, try again",
@@ -68,14 +68,14 @@ var errRecordingStorageFull = connect.NewError(
 	"the recording storage of this workspace is full",
 )
 
-// errMailNotSent is not Unavailable, the client reads that as the server being gone.
+// errMailNotSent is not Unavailable, clients read that as the server gone.
 var errMailNotSent = connect.NewError(
 	connect.CodeFailedPrecondition,
 	"the email could not be sent, try again in a few minutes",
 )
 
-// errLinkInvalid is Unauthenticated, the client skips its generic toast for that code.
 var (
+	// errLinkInvalid is Unauthenticated, the client skips its generic toast.
 	errLinkInvalid = connect.NewError(
 		connect.CodeUnauthenticated,
 		"this link is invalid or expired",
@@ -96,7 +96,7 @@ var (
 		connect.CodeNotFound,
 		"no such workspace",
 	)
-	// errWorkloadRefused is every refused exchange. Which check failed goes to the logs, not to whoever asked.
+	// Every refused exchange. The failed check goes to logs, not the caller.
 	errWorkloadRefused = connect.NewError(
 		connect.CodeUnauthenticated,
 		"this job can't sign in as this service account. Check its name and the issuer of its rules, "+
@@ -127,24 +127,20 @@ var (
 	)
 )
 
-func newError(code connect.Code, msg string) error {
-	return connect.NewError(code, msg)
-}
-
-// errorInterceptor maps every handler error onto a connect error. It sits inside audit so that sees the final code.
+// errorInterceptor sits inside audit, so audit sees the final code.
 func errorInterceptor(next connect.ServerFunc) connect.ServerFunc {
 	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
 		return toConnectError(ctx, next(ctx, spec, stream))
 	}
 }
 
-// toConnectError sorts an error into six groups a client can act on. Anything else is internal, and logged here
-// once with what the client never sees. Connect errors pass through, so handlers can return domain failures.
+// toConnectError maps an error to a code a client can act on. The rest is
+// internal, logged here and never shown. Connect errors pass through.
 func toConnectError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
-	// Before the pass-through, a seat refusal carries the plan's own connect error.
+	// Before the pass-through, a seat refusal carries the plan's connect error.
 	switch {
 	case errors.Is(err, iam.ErrSeatLimit):
 		return errSeatLimit
@@ -153,11 +149,11 @@ func toConnectError(ctx context.Context, err error) error {
 	case errors.Is(err, iam.ErrInviteSpent):
 		return errInviteInvalid
 	case errors.Is(err, iam.ErrLastSSOProvider):
-		return newError(connect.CodeFailedPrecondition,
+		return connect.NewError(connect.CodeFailedPrecondition,
 			"this is the last provider that can sign people in, turn off required single sign-on first")
 	}
 	if refused, ok := errors.AsType[*ssh.RefusedError](err); ok {
-		return newError(connect.CodeInvalidArgument, refused.Reason)
+		return connect.NewError(connect.CodeInvalidArgument, refused.Reason)
 	}
 	if _, ok := errors.AsType[*connect.Error](err); ok {
 		return err
@@ -175,15 +171,15 @@ func toConnectError(ctx context.Context, err error) error {
 	case errors.Is(err, pgx.ErrNoRows):
 		return errNotFound
 	case code == pgerrcode.UniqueViolation, code == pgerrcode.ExclusionViolation:
-		return newError(connect.CodeAlreadyExists, "a record with this value already exists")
+		return connect.NewError(connect.CodeAlreadyExists, "a record with this value already exists")
 	case code == pgerrcode.ForeignKeyViolation, code == pgerrcode.RestrictViolation:
-		return newError(connect.CodeFailedPrecondition, "a related record is missing or still in use")
+		return connect.NewError(connect.CodeFailedPrecondition, "a related record is missing or still in use")
 	case code == pgerrcode.NotNullViolation, code == pgerrcode.CheckViolation, pgerrcode.IsDataException(code):
 		return errInvalidValue
 	case code == pgerrcode.SerializationFailure, code == pgerrcode.DeadlockDetected:
-		return newError(connect.CodeAborted, "the operation conflicted with another, please retry")
+		return connect.NewError(connect.CodeAborted, "the operation conflicted with another, please retry")
 	case errors.Is(err, context.Canceled), code == pgerrcode.QueryCanceled:
-		return newError(connect.CodeCanceled, "the request was canceled")
+		return connect.NewError(connect.CodeCanceled, "the request was canceled")
 	case errors.Is(err, context.DeadlineExceeded):
 		return errTimeout
 	}

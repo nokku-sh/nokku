@@ -7,11 +7,13 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgerrcode"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// Every way a recording row goes leaves its object to the sweeper, whoever deletes it.
+// However a recording row goes, its object is left to the sweeper.
 func TestDeletedRecordingsAreQueued(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -43,17 +45,12 @@ func TestDeletedRecordingsAreQueued(t *testing.T) {
 		_, err := q.DeleteRecording(t.Context(), byApp.ID)
 		return err
 	})
-	if !queued(byApp) {
-		t.Error("a recording the app deleted was not queued")
-	}
+	assert.True(t, queued(byApp), "a recording the app deleted was not queued")
 
 	bySystem := record(f)
-	if _, err := c.sysPool.Exec(t.Context(), `DELETE FROM recordings WHERE id = $1`, bySystem.ID); err != nil {
-		t.Fatalf("delete as system: %v", err)
-	}
-	if !queued(bySystem) {
-		t.Error("a recording the system deleted was not queued")
-	}
+	_, err := c.sysPool.Exec(t.Context(), `DELETE FROM recordings WHERE id = $1`, bySystem.ID)
+	require.NoError(t, err, "delete as system")
+	assert.True(t, queued(bySystem), "a recording the system deleted was not queued")
 
 	replaced := record(f)
 	asOwner(t, c, f, func(q *db.Queries) error {
@@ -62,24 +59,18 @@ func TestDeletedRecordingsAreQueued(t *testing.T) {
 		})
 		return err
 	})
-	if !queued(replaced) {
-		t.Error("an object a larger copy replaced was not queued")
-	}
+	assert.True(t, queued(replaced), "an object a larger copy replaced was not queued")
 
 	kept := record(f)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		_, err := q.FinishRecordingUpload(t.Context(), &db.FinishRecordingUploadParams{ID: kept.ID, SizeBytes: 1})
 		return err
 	})
-	if queued(kept) {
-		t.Error("an upload that kept the stored copy queued it for deletion")
-	}
+	assert.False(t, queued(kept), "an upload that kept the stored copy queued it for deletion")
 
 	lost := &db.Recording{ObjectID: new(uuid.NewV7().String())}
 	asOwner(t, c, f, func(q *db.Queries) error { return q.QueueLostRecordingObject(t.Context(), *lost.ObjectID) })
-	if !queued(lost) {
-		t.Error("an object that lost to a larger copy was not queued")
-	}
+	assert.True(t, queued(lost), "an object that lost to a larger copy was not queued")
 
 	empty := uuid.NewV7().String()
 	asOwner(t, c, f, func(q *db.Queries) error {
@@ -92,21 +83,14 @@ func TestDeletedRecordingsAreQueued(t *testing.T) {
 		return err
 	})
 
-	err := pinnedConn(t, c, f.ws).QueryRow(t.Context(), `SELECT count(*) FROM recording_deletes`).Scan(new(int))
-	if code := pgCode(err); code != pgerrcode.InsufficientPrivilege {
-		t.Errorf("the app role read the queue, error code %q", code)
-	}
+	err = pinnedConn(t, c, f.ws).QueryRow(t.Context(), `SELECT count(*) FROM recording_deletes`).Scan(new(int))
+	assert.Equal(t, pgerrcode.InsufficientPrivilege, pgCode(err), "the app role read the queue")
 
 	inWorkspace := record(f)
 	asOwner(t, c, f, func(q *db.Queries) error { return q.DeleteWorkspace(t.Context(), f.ws) })
-	if !queued(inWorkspace) {
-		t.Error("the recordings of a workspace the app deleted were not queued")
-	}
+	assert.True(t, queued(inWorkspace), "the recordings of a workspace the app deleted were not queued")
 	inOther := record(other)
-	if _, err := c.sysPool.Exec(t.Context(), `DELETE FROM workspaces WHERE id = $1`, other.ws); err != nil {
-		t.Fatalf("delete a workspace as system: %v", err)
-	}
-	if !queued(inOther) {
-		t.Error("the recordings of a workspace the system deleted were not queued")
-	}
+	_, err = c.sysPool.Exec(t.Context(), `DELETE FROM workspaces WHERE id = $1`, other.ws)
+	require.NoError(t, err, "delete a workspace as system")
+	assert.True(t, queued(inOther), "the recordings of a workspace the system deleted were not queued")
 }

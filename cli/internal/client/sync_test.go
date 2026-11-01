@@ -24,15 +24,24 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// fakeCore serves GetSubjectAccess and SignSSHCertificate, the two calls the CLI syncs against.
+const (
+	targetID = "0199a0a0-0000-7000-8000-000000000003"
+)
+
+// fakeCore serves the two calls the CLI syncs against.
 type fakeCore struct {
 	nokkuv1connect.UnimplementedTargetServiceHandler
 	nokkuv1connect.UnimplementedCertificateServiceHandler
 
 	access    *nokkuv1.GetSubjectAccessResponse
 	accessErr error
-	test      *testing.T
-	sign      func(t *testing.T, req *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error)
+	sign      func(*nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error)
+}
+
+// fakeCA shows its key in authorized_keys form, like a core CA.
+type fakeCA struct {
+	signer cryptossh.Signer
+	pubKey string
 }
 
 func (f *fakeCore) GetSubjectAccess(
@@ -49,13 +58,7 @@ func (f *fakeCore) SignSSHCertificate(
 	if f.sign == nil {
 		return nil, connect.NewError(connect.CodeUnimplemented, assert.AnError.Error()).WithCause(assert.AnError)
 	}
-	return f.sign(f.test, req)
-}
-
-// fakeCA signs test certificates and shows its key in authorized_keys form, like a core CA.
-type fakeCA struct {
-	signer cryptossh.Signer
-	pubKey string
+	return f.sign(req)
 }
 
 func newFakeCA(t *testing.T) *fakeCA {
@@ -70,7 +73,7 @@ func newFakeCA(t *testing.T) *fakeCA {
 	}
 }
 
-// signCert signs key into a user certificate valid from an hour ago until validFor from now.
+// signCert's certificate is valid from an hour ago until validFor from now.
 func (f *fakeCA) signCert(t *testing.T, key cryptossh.PublicKey, validFor time.Duration) string {
 	t.Helper()
 	cert := &cryptossh.Certificate{
@@ -83,19 +86,6 @@ func (f *fakeCA) signCert(t *testing.T, key cryptossh.PublicKey, validFor time.D
 	return string(cryptossh.MarshalAuthorizedKey(cert))
 }
 
-// signRequest signs the public key carried by an issuance request.
-func (f *fakeCA) signRequest(t *testing.T, req *nokkuv1.SignSSHCertificateRequest) string {
-	t.Helper()
-	pub, _, _, _, err := cryptossh.ParseAuthorizedKey([]byte(req.GetPublicKey()))
-	require.NoError(t, err, "issuance request carries an unparsable public key")
-	return f.signCert(t, pub, time.Hour)
-}
-
-const (
-	targetID = "0199a0a0-0000-7000-8000-000000000003"
-)
-
-// setTestDirs points home at a temp dir and creates what EnsureDirs would.
 func setTestDirs(t *testing.T) {
 	t.Helper()
 	home := t.TempDir()
@@ -106,7 +96,6 @@ func setTestDirs(t *testing.T) {
 
 func newSyncTestClient(t *testing.T, core *fakeCore) *Client {
 	t.Helper()
-	core.test = t
 	mux := http.NewServeMux()
 	server := connect.NewServer()
 	nokkuv1connect.RegisterTargetServiceHandler(server, core)
@@ -158,7 +147,6 @@ func TestSyncCommitsAccessSnapshot(t *testing.T) {
 	// The snapshot is committed to disk for offline use.
 	assert.NotNil(t, state.Load().User)
 
-	// And the derived SSH config was regenerated.
 	content, err := os.ReadFile(paths.SSHConfigFile())
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "Host prod\n")
@@ -274,18 +262,22 @@ func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 	setTestDirs(t)
 	ca := newFakeCA(t)
 	require.NoError(t, ssh.SetupKey(false))
+	cliPub, err := ssh.PubKey()
+	require.NoError(t, err)
+	pub, _, _, _, err := cryptossh.ParseAuthorizedKey([]byte(cliPub))
+	require.NoError(t, err)
+	issued := ca.signCert(t, pub, time.Hour)
 
 	core := &fakeCore{
-		sign: func(t *testing.T, req *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
+		sign: func(req *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
 			assert.Equal(t, targetID, req.GetTargetId(), "a certificate is asked for one server")
-			return &nokkuv1.SignSSHCertificateResponse{
-				SignedCertificate: new(ca.signRequest(t, req)),
-			}, nil
+			assert.Equal(t, cliPub, req.GetPublicKey(), "the request must carry nk's key")
+			return &nokkuv1.SignSSHCertificateResponse{SignedCertificate: new(issued)}, nil
 		},
 	}
 	c := newSyncTestClient(t, core)
 
-	err := c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{PublicKey: ca.pubKey})
+	err = c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{PublicKey: ca.pubKey})
 	require.NoError(t, err)
 
 	certPath := paths.SSHCertificate(targetID)
@@ -295,7 +287,7 @@ func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 		"the written certificate must pass local validation")
 }
 
-// Renewed past half its life, so an outage never finds it near expiry. A failed renewal keeps the old one.
+// Renewed past half its life, so an outage never finds it near expiry.
 func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	setTestDirs(t)
 	ca := newFakeCA(t)
@@ -320,10 +312,9 @@ func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, aging, string(kept), "a failed renewal must leave the working certificate")
 
-	core.sign = func(t *testing.T, _ *nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
-		return &nokkuv1.SignSSHCertificateResponse{
-			SignedCertificate: new(ca.signCert(t, pub, 3*time.Hour)),
-		}, nil
+	issued := ca.signCert(t, pub, 3*time.Hour)
+	core.sign = func(*nokkuv1.SignSSHCertificateRequest) (*nokkuv1.SignSSHCertificateResponse, error) {
+		return &nokkuv1.SignSSHCertificateResponse{SignedCertificate: new(issued)}, nil
 	}
 	require.NoError(t, c.EnsureCert(t.Context(), target, authority))
 	renewed, err := os.ReadFile(certPath)
@@ -332,7 +323,7 @@ func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	assert.True(t, ssh.CertFresh(target, authority))
 }
 
-// A private CA reaches nk through --ca-file only, so nothing is asked and the error names the flag.
+// A private CA reaches nk through --ca-file only, the error names the flag.
 func TestSyncUntrustedServerNamesCAFile(t *testing.T) {
 	setTestDirs(t)
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

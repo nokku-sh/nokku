@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -68,12 +67,12 @@ func countEvents(lines []auditLine, typ eventType) int {
 	return n
 }
 
-// Recording fails open, so a host whose recorder cannot start still lets its admins in. The gap is on the audit trail.
+// Recording fails open, a dead recorder locks no one out. The gap is audited.
 func TestRecordingThatCannotStartLeavesTheSessionRunning(t *testing.T) {
 	ca := newTestCA(t)
 	log, audit := auditLines()
-	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(Policy{Record: true}), func(*Server) {
-		// A file where the recordings directory belongs, so New cannot create one. Unlike a chmod this holds for root.
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(policy{Record: true}), func(*Server) {
+		// A file in place of the directory stops New, even for root.
 		require.NoError(t, os.WriteFile(paths.RecordsDir(), nil, 0o600))
 	})
 	defer closeFn()
@@ -98,19 +97,18 @@ func TestRecordingThatCannotStartLeavesTheSessionRunning(t *testing.T) {
 	require.Eventually(t, func() bool { return len(degradedReasons(audit())) == 2 },
 		5*time.Second, 20*time.Millisecond, "one recording_degraded per session, got %v", audit())
 	for _, reason := range degradedReasons(audit()) {
-		// The errno depends on the host, a small tmpfs trips the free space check first.
+		// The errno varies, a small tmpfs trips the free space check first.
 		assert.True(t, strings.HasPrefix(reason, "not recorded: "), "reason %q", reason)
 	}
 }
 
-// A disk that fills mid-session fails the recorder's writes. The session runs on, the file stops where the disk did
-// and keeps its .part name, and the gap is on the audit trail.
+// The session runs on, the file stops with the disk and stays a .part.
 func TestWriteErrorMidSessionIsOnTheAuditTrail(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
 	log, audit := auditLines()
-	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(Policy{Record: true}), func(*Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(policy{Record: true}), func(*Server) {
 		require.NoError(t, paths.Verify(), "verify paths")
 	})
 	defer closeFn()
@@ -126,7 +124,7 @@ func TestWriteErrorMidSessionIsOnTheAuditTrail(t *testing.T) {
 	must.NoError(syscall.Getrlimit(syscall.RLIMIT_FSIZE, &limit))
 	lowered := limit
 	lowered.Cur = fileLimit
-	// A write past RLIMIT_FSIZE fails with EFBIG like on a full disk. Go ignores the SIGXFSZ that comes with it.
+	// Past RLIMIT_FSIZE writes fail like a full disk. Go ignores the SIGXFSZ.
 	must.NoError(syscall.Setrlimit(syscall.RLIMIT_FSIZE, &lowered))
 	restore := sync.OnceFunc(func() { _ = syscall.Setrlimit(syscall.RLIMIT_FSIZE, &limit) })
 	t.Cleanup(restore)
@@ -160,11 +158,11 @@ func TestWriteErrorMidSessionIsOnTheAuditTrail(t *testing.T) {
 	is.True(strings.HasPrefix(reasons[0], "recording stopped: write failed: "), "reason %q", reasons[0])
 }
 
-// The cap ends an interactive session, the one exception to failing open, and says so on the audit trail.
+// The cap ends an interactive session, the one exception to failing open.
 func TestFullRecordingEndsAnInteractiveSessionOnTheAuditTrail(t *testing.T) {
 	ca := newTestCA(t)
 	log, audit := auditLines()
-	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(Policy{Record: true}), func(s *Server) {
+	addr, closeFn := startTestServerOpts(t, ca, withLog(log), withPolicy(policy{Record: true}), func(s *Server) {
 		require.NoError(t, paths.Verify(), "verify paths")
 		s.maxRecording = 1024
 	})
@@ -190,5 +188,5 @@ func TestFullRecordingEndsAnInteractiveSessionOnTheAuditTrail(t *testing.T) {
 	require.Eventually(t, func() bool { return len(degradedReasons(audit())) == 1 },
 		5*time.Second, 20*time.Millisecond, "the cap left no audit event")
 	assert.Equal(t, []string{"size limit reached, session ended"}, degradedReasons(audit()))
-	assert.True(t, slices.ContainsFunc(audit(), func(l auditLine) bool { return l.Type == eventSessionEnd }))
+	assert.Positive(t, countEvents(audit(), eventSessionEnd), "the session never ended on the audit trail")
 }

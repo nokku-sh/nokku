@@ -28,7 +28,13 @@ type fakeRelayStream struct {
 	recv chan *nokkuv1.DaemonRelayResponse
 }
 
-// Send copies the frame like the real stream. The ssh transport reuses its write buffer.
+// The user's side of a fake relay, the mirror image of relayConn.
+type userEnd struct {
+	stream  *fakeRelayStream
+	pending []byte
+}
+
+// Send copies the frame, the ssh transport reuses its write buffer.
 func (s *fakeRelayStream) Send(req *nokkuv1.DaemonRelayRequest) error {
 	s.sent <- proto.CloneOf(req)
 	return nil
@@ -143,12 +149,6 @@ func TestRelayConnDeadline(t *testing.T) {
 	}
 }
 
-// The user's side of a fake relay, the mirror image of relayConn.
-type userEnd struct {
-	stream  *fakeRelayStream
-	pending []byte
-}
-
 func (u *userEnd) Read(p []byte) (int, error) {
 	for len(u.pending) == 0 {
 		select {
@@ -244,7 +244,7 @@ func TestRelayServesSSH(t *testing.T) {
 	conn, chans, reqs, err := ssh.NewClientConn(&userEnd{stream: stream}, "relay", &ssh.ClientConfig{
 		User:            cur.Username,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(certSigner)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - test server
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 	})
 	must.NoError(err, "ssh over the relay")

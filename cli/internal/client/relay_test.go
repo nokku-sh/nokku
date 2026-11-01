@@ -10,7 +10,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// A relay message may arrive over many small Read calls, ssh framing depends on it.
+// A relay message may take many small Read calls, ssh framing depends on it.
 func TestRelayStreamRead(t *testing.T) {
 	t.Parallel()
 

@@ -41,7 +41,7 @@ func randomBytes(n int) []byte {
 	return b
 }
 
-// storedCopy is the recording as storage gives it back, nil when there is no object.
+// storedCopy is the recording as storage has it, nil with no object.
 func storedCopy(t *testing.T, cfg *config.Config, id string) []byte {
 	t.Helper()
 	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
@@ -63,7 +63,7 @@ func finalOf(size int, cutReason string) *nokkuv1.UploadRecordingRequest {
 	}}
 }
 
-// uploadFile sends a file the way nokkud does: meta, 32 KiB chunks and the last message with the file's size.
+// uploadFile sends a file like nokkud: meta, chunks, then the final message.
 func uploadFile(
 	t *testing.T,
 	cfg *config.Config,
@@ -93,7 +93,7 @@ func sendLive(t *testing.T, stream uploadStream, data []byte) {
 	}
 }
 
-// waitHandled waits until the handler made the row, then gives it a moment for the chunks in flight.
+// waitHandled waits for the row, then gives chunks in flight a moment.
 func waitHandled(t *testing.T, cfg *config.Config, id string) {
 	t.Helper()
 	require.Eventually(t, func() bool {
@@ -115,7 +115,7 @@ func waitStored(t *testing.T, cfg *config.Config, id string, size int) *db.Recor
 	return rec
 }
 
-// startSecondCore runs another core on the shared config. stop is a deploy: the core shuts down and its streams end.
+// startSecondCore runs a core on the shared config, stop is a deploy.
 func startSecondCore(t *testing.T, cfg *config.Config) (client *http.Client, base string, stop func()) {
 	t.Helper()
 	free, err := net.Listen("tcp", "127.0.0.1:0")
@@ -144,7 +144,7 @@ func startSecondCore(t *testing.T, cfg *config.Config) (client *http.Client, bas
 		<-stopped
 	})
 	t.Cleanup(stop)
-	// A client stream needs HTTP/2, which a proxy speaks to the core without TLS.
+	// A client stream needs HTTP/2, a proxy speaks it to the core without TLS.
 	var h2c http.Protocols
 	h2c.SetUnencryptedHTTP2(true)
 	return &http.Client{Transport: &http.Transport{Protocols: &h2c}}, base, stop
@@ -174,12 +174,11 @@ func openUploadAt(
 	return stream
 }
 
-// A deploy lands in the middle of a live upload. The old core stores what arrived and leaves the session open, the
-// daemon's next try stores the whole recording, and a repeat of it is told the core holds it already.
+// The old core keeps a part, the retry stores the whole, a repeat is refused.
 func TestCoreRestartMidUploadEndsWithTheWholeRecordingOnce(t *testing.T) {
 	selfHostedOnly(t, "it dials the real listener, which reads no workspace host")
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 	id := uuid.NewV7().String()
@@ -224,11 +223,10 @@ func TestCoreRestartMidUploadEndsWithTheWholeRecordingOnce(t *testing.T) {
 	assert.Equal(t, whole, storedCopy(t, cfg, id))
 }
 
-// What a crashed daemon leaves is a flushed gzip stream without its footer. Sent with its cut reason it stays
-// incomplete, and so does a file of which bytes went missing.
+// A crashed daemon leaves a gzip stream with no footer and a cut reason.
 func TestCutOrShortRecordingIsNeverComplete(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 	var leftover bytes.Buffer
@@ -246,16 +244,17 @@ func TestCutOrShortRecordingIsNeverComplete(t *testing.T) {
 	assert.False(t, rec.Complete, "a cut recording counts as whole")
 	assert.Equal(t, leftover.Bytes(), storedCopy(t, cfg, cut), "what there is of it is kept")
 	var events []*db.ListAuditLogsRow
+	ctx := wsCtx(t)
 	require.Eventually(t, func() bool {
-		inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
-			events, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+		err := cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+			events, err = q.ListAuditLogs(ctx, &db.ListAuditLogsParams{
 				Actions: []string{"UploadRecording"},
 				Target:  &cut,
 				Limit:   10,
 			})
 			return err
 		})
-		return len(events) == 1
+		return err == nil && len(events) == 1
 	}, 5*time.Second, 20*time.Millisecond, "the upload left no audit event")
 	assert.Contains(t, string(events[0].Details), reason, "the audit log does not say why the recording is cut")
 
@@ -275,7 +274,7 @@ func TestCutOrShortRecordingIsNeverComplete(t *testing.T) {
 // The larger copy wins, also over a shorter upload that calls itself whole.
 func TestShorterWholeUploadKeepsTheLongerPart(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 	id := uuid.NewV7().String()
@@ -297,11 +296,10 @@ func TestShorterWholeUploadKeepsTheLongerPart(t *testing.T) {
 	assert.Equal(t, part, storedCopy(t, cfg, id), "the shorter upload replaced what only the live stream had")
 }
 
-// A live stream the core has not seen end yet outlives the retry. When it ends, it sees the finished recording under
-// the row lock and its object goes to the delete queue.
+// A stale stream finds the row finished, its object goes to the delete queue.
 func TestStaleLiveStreamCannotReplaceTheFinishedRetry(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 	id := uuid.NewV7().String()
@@ -331,23 +329,22 @@ func TestStaleLiveStreamCannotReplaceTheFinishedRetry(t *testing.T) {
 		"the stale stream left an object nothing tracks")
 }
 
-// Two first uploads of one recording race to make its row. The one that loses is told to try again. AlreadyExists
-// would tell nokkud that the core holds the whole file, and it would delete its copy.
+// AlreadyExists would make nokkud delete its copy, the core has no whole file.
 func TestRacingFirstUploadIsToldToRetry(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	id := uuid.NewV7().String()
 	sealed, err := cfg.Keyset.Seal(recording.KeyAAD(workspaceID, id), recording.NewKey())
 	require.NoError(t, err)
 
-	// The other upload's row stays uncommitted until this upload's insert waits on it.
+	// The other row stays uncommitted until this upload's insert waits on it.
 	made, commit := make(chan struct{}), make(chan struct{})
 	release := sync.OnceFunc(func() { close(commit) })
 	t.Cleanup(release)
 	other := make(chan error, 1)
 	go func() {
-		other <- cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) error {
+		other <- cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) error {
 			_, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
 				ID:       id,
 				DaemonID: enrolled.GetId(),
@@ -367,7 +364,7 @@ func TestRacingFirstUploadIsToldToRetry(t *testing.T) {
 	stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
 	require.Eventually(t, func() bool {
 		var waiting bool
-		err := cfg.Conn.Pool.QueryRow(wsCtx(t, cfg), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+		err := cfg.Conn.Pool.QueryRow(wsCtx(t), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity
 			WHERE wait_event_type = 'Lock' AND query LIKE '%name: CreateRecording%')`).Scan(&waiting)
 		return err == nil && waiting
 	}, 5*time.Second, 20*time.Millisecond, "the upload never waited on the other row")

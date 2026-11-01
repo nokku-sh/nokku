@@ -29,6 +29,22 @@ type scimClient struct {
 	token string
 }
 
+type scimResource struct {
+	ID          string `json:"id"`
+	UserName    string `json:"userName"`
+	DisplayName string `json:"displayName"`
+	Active      bool   `json:"active"`
+	ExternalID  string `json:"externalId"`
+	Members     []struct {
+		Value string `json:"value"`
+	} `json:"members"`
+}
+
+type scimList struct {
+	TotalResults int            `json:"totalResults"`
+	Resources    []scimResource `json:"Resources"`
+}
+
 func (e *testEnv) scim(t *testing.T, o org) *scimClient {
 	t.Helper()
 	_, token, err := e.svc.IssueToken(as(t.Context(), o.ws, o.owner), iam.TokenParams{
@@ -43,9 +59,7 @@ func (c *scimClient) do(method, path string, body any, out any) int {
 	c.t.Helper()
 	var buf bytes.Buffer
 	if body != nil {
-		if err := json.NewEncoder(&buf).Encode(body); err != nil {
-			c.t.Fatal(err)
-		}
+		require.NoError(c.t, json.NewEncoder(&buf).Encode(body))
 	}
 	req := httptest.NewRequest(method, "/scim/v2"+path, &buf)
 	req.Header.Set("Authorization", "Bearer "+c.token)
@@ -53,9 +67,7 @@ func (c *scimClient) do(method, path string, body any, out any) int {
 	rec := httptest.NewRecorder()
 	c.svc.SCIMHandler().ServeHTTP(rec, req.WithContext(anon(req.Context(), c.ws)))
 	if out != nil && rec.Body.Len() > 0 {
-		if err := json.Unmarshal(rec.Body.Bytes(), out); err != nil {
-			c.t.Fatalf("decode %s %s: %v: %s", method, path, err, rec.Body.String())
-		}
+		require.NoError(c.t, json.Unmarshal(rec.Body.Bytes(), out), "decode %s %s: %s", method, path, rec.Body.String())
 	}
 	return rec.Code
 }
@@ -81,22 +93,6 @@ func patchOps(ops ...map[string]any) map[string]any {
 	}
 }
 
-type scimResource struct {
-	ID          string `json:"id"`
-	UserName    string `json:"userName"`
-	DisplayName string `json:"displayName"`
-	Active      bool   `json:"active"`
-	ExternalID  string `json:"externalId"`
-	Members     []struct {
-		Value string `json:"value"`
-	} `json:"members"`
-}
-
-type scimList struct {
-	TotalResults int            `json:"totalResults"`
-	Resources    []scimResource `json:"Resources"`
-}
-
 func TestSCIMAuth(t *testing.T) {
 	e := newTestEnv(t)
 	a, b := e.org(t), e.org(t)
@@ -108,8 +104,8 @@ func TestSCIMAuth(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, ca.do(http.MethodGet, "/Users", nil, nil), "bogus token")
 }
 
-// A lookup that fails is no bad token. A provider that gets a 401 takes its credentials for broken, a 500 it retries.
-// A big group is a real request, past that the provider hears why it was refused. Nothing without a token gets read.
+// A big group is a real request, past that the provider hears why it was
+// refused. Nothing without a token gets read.
 func TestSCIMBodyLimit(t *testing.T) {
 	const limit = 4 << 20
 	e := newTestEnv(t)
@@ -143,10 +139,12 @@ func TestSCIMBodyLimit(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, code)
 }
 
+// A lookup that fails is no bad token. A provider that gets a 401 takes its
+// credentials for broken, a 500 it retries.
 func TestSCIMAnswers500WhenTheLookupFails(t *testing.T) {
 	e := newTestEnv(t)
 	c := e.scim(t, e.org(t))
-	// A canceled request never reaches the database, like one that arrives while it is away.
+	// A canceled request never reaches the database, as when it is away.
 	ctx, cancel := context.WithCancel(anon(t.Context(), c.ws))
 	cancel()
 
@@ -224,7 +222,8 @@ func TestSCIMUserEmailComesFromEmails(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, c.do(http.MethodPost, "/Users", body, nil), "no address anywhere")
 }
 
-// The IdP link is no way to sign in. The account cannot list or drop it, and its address stays the IdP's.
+// The IdP link is no way to sign in. The account cannot list or drop it, and
+// its address stays the IdP's.
 func TestSCIMLinkIsNoCredential(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -253,7 +252,8 @@ func TestSCIMLinkIsNoCredential(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, c.do(http.MethodPost, "/Users", other, nil))
 }
 
-// The IdP cannot switch the owner off. Okta and Entra deactivate with PATCH, PUT and POST carry the same flag.
+// The IdP cannot switch the owner off. Okta and Entra deactivate with PATCH,
+// PUT and POST carry the same flag.
 func TestSCIMKeepsTheOwnerActive(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -315,7 +315,8 @@ func TestSCIMGroupsStayInWorkspace(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, cb.do(http.MethodGet, "/Users/"+member.ID, nil, nil), "foreign user read")
 }
 
-// The IdP owns the address of its accounts. Entra sends a changed one and the deactivation in one request.
+// The IdP owns the address of its accounts. Entra sends a changed one and the
+// deactivation in one request.
 func TestSCIMRenamesTheLogin(t *testing.T) {
 	mail := newMailbox()
 	e := newTestEnvWith(t, mail.deps())
@@ -332,7 +333,7 @@ func TestSCIMRenamesTheLogin(t *testing.T) {
 	e.svc.RequestMagicLink(ctx, first)
 	oldLink := linkToken(t, mail.link(t))
 
-	// A second address, a removal and a userName that may be no address at all are not the login.
+	// A second address, a removal or a bare userName are not the login.
 	home := []any{map[string]any{"value": "home@" + testDomain(), "type": "home"}}
 	for what, body := range map[string]map[string]any{
 		"another type by filter": patchOp("replace", `emails[type eq "home"].value`, "home@"+testDomain()),
@@ -367,18 +368,19 @@ func TestSCIMRenamesTheLogin(t *testing.T) {
 	)
 	require.NotNil(t, e.userByEmail(t, o.ws, third), "a refused rename changed the address")
 
-	// An account the IdP never linked is not its to rename, a sign-in link would hand it over.
+	// Not its to rename if never linked, a sign-in link would hand it over.
 	admin := e.user(t, o.ws, "admin@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	c.do(http.MethodPatch, "/Users/"+admin.ID, patchOps(work("evil@"+testDomain())), nil)
 	assert.NotNil(t, e.userByEmail(t, o.ws, admin.Email), "the IdP renamed an account it never linked")
 
-	// Linking an account by its address does not make it the IdP's, the token would take over anyone by email.
+	// Linking by address does not make an account the IdP's, or the token would
+	// take over anyone by email.
 	member := e.user(t, o.ws, "member@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", scimUser(member.Email, "entra-2"), nil))
 	c.do(http.MethodPatch, "/Users/"+member.ID, patchOps(work("evil@"+testDomain())), nil)
 	assert.NotNil(t, e.userByEmail(t, o.ws, member.Email), "the IdP renamed an account it only linked")
 
-	// An account the IdP created and someone made admin is renamed in Nokku only.
+	// An IdP account someone made admin is renamed in Nokku only.
 	boss := "boss@" + testDomain()
 	var promoted scimResource
 	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", scimUser(boss, "entra-3"), &promoted))
@@ -391,7 +393,7 @@ func TestSCIMRenamesTheLogin(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, c.do(http.MethodPatch, "/Users/"+promoted.ID, rename, nil))
 	assert.NotNil(t, e.userByEmail(t, o.ws, boss), "the IdP renamed an admin")
 
-	// Whoever could rename the owner would get the owner's sign-in links, linked or not.
+	// Whoever renames the owner gets the owner's sign-in links, linked or not.
 	owner := "/Users/" + o.owner.ID
 	require.Equal(t, http.StatusOK, c.do(http.MethodPut, owner, scimUser(o.owner.Email, "entra-0"), nil))
 	c.do(http.MethodPatch, owner, patchOps(work("ceo@"+testDomain())), nil)
@@ -462,7 +464,8 @@ func TestSCIMGroupPatchMembers(t *testing.T) {
 	assert.Empty(t, members(bare), "a bare remove left members")
 }
 
-// Pocket ID finds its groups again by externalId. One it cannot find it creates again, then deletes.
+// Pocket ID finds groups by externalId. One it can't find it recreates,
+// deletes.
 func TestSCIMGroupKeepsExternalID(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -502,7 +505,7 @@ func TestSCIMGroupKeepsExternalID(t *testing.T) {
 	)
 }
 
-// A team made by hand is taken over by the group of its name, so it keeps its id and grants.
+// A group takes over the hand-made team of its name, which keeps id and grants.
 func TestSCIMGroupAdoptsAnUnlinkedTeam(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -526,7 +529,7 @@ func TestSCIMGroupAdoptsAnUnlinkedTeam(t *testing.T) {
 		}
 	}
 
-	// Until a group takes it over, SCIM does not see the team. An IdP that syncs would delete it.
+	// SCIM does not see the team until then. An IdP that syncs would delete it.
 	var list scimList
 	require.Equal(t, http.StatusOK, c.do(http.MethodGet, "/Groups", nil, &list))
 	for _, r := range list.Resources {
@@ -597,4 +600,15 @@ func TestSCIMAdvertisesWhatItSupports(t *testing.T) {
 	assert.True(t, cfg.Patch.Supported, "patch")
 	assert.True(t, cfg.Filter.Supported, "filter")
 	assert.Positive(t, cfg.Filter.MaxResults, "filter.maxResults")
+}
+
+// RFC 7235: the scheme is case-insensitive, like on the rest of the API.
+func TestSCIMTakesAnyCaseOfBearer(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.scim(t, e.org(t))
+	req := httptest.NewRequest(http.MethodGet, "/scim/v2/Users", nil)
+	req.Header.Set("Authorization", "bearer "+c.token)
+	rec := httptest.NewRecorder()
+	c.svc.SCIMHandler().ServeHTTP(rec, req.WithContext(anon(req.Context(), c.ws)))
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 }

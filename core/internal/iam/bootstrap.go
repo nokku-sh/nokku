@@ -24,8 +24,7 @@ type bootstrapConfig struct {
 	MicrosoftTenantID     string `env:"MICROSOFT_TENANT_ID"`
 }
 
-// Bootstrap seeds the providers and the owner from the environment. It reports whether the owner still has no way
-// in, so the server can point them to admin-link.
+// Bootstrap reports whether the owner has no way in yet, see admin-link.
 func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (bool, error) {
 	cfg, err := env.ParseAs[bootstrapConfig]()
 	if err != nil {
@@ -34,7 +33,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (bool, erro
 	ctx = actor.WithWorkspace(ctx, ws)
 
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
-		// Any Google account can sign in to the issuer, so it creates no accounts until an admin turns that on.
+		// Any Google account can sign in here, so JIT starts off.
 		if err := s.seedProvider(ctx, SSOProvider{
 			ProviderID: "google",
 			Name:       "Google",
@@ -49,7 +48,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (bool, erro
 		}
 	}
 	if cfg.MicrosoftClientID != "" && cfg.MicrosoftClientSecret != "" {
-		// The tenant-wide endpoints issue tokens whose iss names the tenant, which OIDC discovery cannot verify.
+		// Tenant-wide iss names the tenant, which OIDC discovery cannot verify.
 		tenant := strings.ToLower(cfg.MicrosoftTenantID)
 		if tenant == "" || tenant == "common" || tenant == "organizations" || tenant == "consumers" {
 			return false, errors.New("iam: MICROSOFT_TENANT_ID must be a tenant id")
@@ -63,7 +62,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (bool, erro
 				ClientID:        cfg.MicrosoftClientID,
 				ClientSecret:    cfg.MicrosoftClientSecret,
 				JITProvisioning: true,
-				// Entra sends no email_verified. The tenant is pinned above, so its addresses are the operator's.
+				// Entra sends no email_verified, the pinned tenant vouches.
 				TrustUnverifiedEmail: true,
 			},
 		}); err != nil {
@@ -98,7 +97,7 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (bool, erro
 	return len(creds) == 0, nil
 }
 
-// seedProvider writes the issuer and client of the environment. What an admin set on a stored provider stays.
+// seedProvider keeps what an admin set on a stored provider.
 func (s *Service) seedProvider(ctx context.Context, p SSOProvider) error {
 	prev, err := s.GetSSOProvider(ctx, p.ProviderID)
 	switch {
@@ -114,7 +113,7 @@ func (s *Service) seedProvider(ctx context.Context, p SSOProvider) error {
 	return err
 }
 
-// AdminLink issues a 24 hour sign-in link for the owner, the way back in when every passkey is gone.
+// AdminLink is the way back in for an owner who lost every passkey.
 func (s *Service) AdminLink(ctx context.Context, ws actor.Workspace) (*db.User, string, error) {
 	ctx = actor.WithWorkspace(ctx, ws)
 	owner, err := s.conn.Tenant().GetOwner(ctx)

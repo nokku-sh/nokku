@@ -34,19 +34,19 @@ type Relay struct {
 	releaseSlot func()
 }
 
-func (r *Relay) done() <-chan struct{} { return r.closed }
-
-func (r *Relay) close() {
-	r.closeOnce.Do(func() { close(r.closed) })
-}
-
 type relayPending struct {
 	ready       chan struct{}
 	daemonID    string
 	releaseSlot func()
 }
 
-// RequestRelay releases its slot exactly once. registerRelay hands the release to the Relay, failure paths run it.
+func (r *Relay) done() <-chan struct{} { return r.closed }
+
+func (r *Relay) close() {
+	r.closeOnce.Do(func() { close(r.closed) })
+}
+
+// RequestRelay releases its slot once, by the Relay or on a failure path.
 func (p *Pool) RequestRelay(
 	ctx context.Context,
 	daemonID, relayID, userID, clientAddr string,
@@ -95,7 +95,7 @@ func (p *Pool) RequestRelay(
 		err = fmt.Errorf("%w: %w", errRelayUnavailable, ctx.Err())
 	}
 
-	// The relay may have registered just as the wait gave up, and then it owns the slot.
+	// It may have registered just as the wait gave up, then it owns the slot.
 	p.mu.Lock()
 	r := p.relays[relayID]
 	p.mu.Unlock()
@@ -109,7 +109,7 @@ func (p *Pool) RequestRelay(
 	return r, nil
 }
 
-// registerRelay returns nil unless this daemon was asked for this relay, so a rogue daemon cannot claim one.
+// registerRelay refuses a daemon that was not asked, a rogue cannot claim one.
 func (p *Pool) registerRelay(relayID, daemonID string) *Relay {
 	p.mu.Lock()
 	pend, ok := p.pendingRelays[relayID]

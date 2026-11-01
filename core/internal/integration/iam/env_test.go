@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/require"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -22,11 +23,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
-// accessTokens are the kinds of every access token, for a test that takes whichever it got.
-var accessTokens = []crypto.TokenKind{
-	crypto.TokenSession, crypto.TokenCLI, crypto.TokenDaemon, crypto.TokenServiceAccount, crypto.TokenSCIM,
-}
-
 const (
 	testBaseURL = "http://nokku.test"
 	// What a browser holds and a mailed link carries.
@@ -35,10 +31,21 @@ const (
 	inviteURL         = "/invite?token="
 )
 
+// accessTokens are all kinds, for a test that takes whichever it got.
+var accessTokens = []crypto.TokenKind{
+	crypto.TokenSession, crypto.TokenCLI, crypto.TokenDaemon, crypto.TokenServiceAccount, crypto.TokenSCIM,
+}
+
 type testEnv struct {
 	svc  *iam.Service
 	conn *db.Connection
 	keys *kms.Keyset
+}
+
+// org is a workspace with its owner.
+type org struct {
+	ws    actor.Workspace
+	owner *db.User
 }
 
 func newTestEnv(t *testing.T) *testEnv {
@@ -46,25 +53,19 @@ func newTestEnv(t *testing.T) *testEnv {
 	return newTestEnvWith(t, iam.Deps{})
 }
 
-// newTestEnvWith takes the mail functions and the seat cap. Conn, Secret and Keyset are filled in.
+// newTestEnvWith takes the mail and seat functions, fills in Conn and Keyset.
 func newTestEnvWith(t *testing.T, deps iam.Deps) *testEnv {
 	t.Helper()
 	// The mock IdPs listen on loopback.
 	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
 	conn, err := db.NewConnection(t.Context())
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
+	require.NoError(t, err, "connect")
 	t.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
 	keys, err := kms.New(t.Context(), conn, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "open the keyset")
 	deps.Conn, deps.Keyset = conn, keys
 	svc, err := iam.New(t.Context(), deps)
-	if err != nil {
-		t.Fatalf("build iam service: %v", err)
-	}
+	require.NoError(t, err, "build iam service")
 	return &testEnv{svc: svc, conn: conn, keys: keys}
 }
 
@@ -83,9 +84,7 @@ func (e *testEnv) workspace(t *testing.T) actor.Workspace {
 	t.Helper()
 	slug := "w" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[:12]
 	ws, err := tenant.Create(t.Context(), e.conn, e.keys, slug, "Test")
-	if err != nil {
-		t.Fatalf("create workspace: %v", err)
-	}
+	require.NoError(t, err, "create workspace")
 	return actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: testBaseURL}
 }
 
@@ -93,12 +92,6 @@ func (e *testEnv) workspace(t *testing.T) actor.Workspace {
 func (e *testEnv) in(t *testing.T, ws actor.Workspace, fn func(q *db.Queries) error) error {
 	t.Helper()
 	return e.conn.TenantTx(anon(t.Context(), ws), fn)
-}
-
-// org is a workspace with its owner.
-type org struct {
-	ws    actor.Workspace
-	owner *db.User
 }
 
 func (e *testEnv) org(t *testing.T) org {
@@ -110,39 +103,33 @@ func (e *testEnv) org(t *testing.T) org {
 func (e *testEnv) user(t *testing.T, ws actor.Workspace, email string, role nokkuv1.WorkspaceRole) *db.User {
 	t.Helper()
 	var u *db.User
-	err := e.in(t, ws, func(q *db.Queries) (err error) {
+	require.NoError(t, e.in(t, ws, func(q *db.Queries) (err error) {
 		u, err = q.CreateUser(t.Context(), &db.CreateUserParams{
 			Email: normalizeEmail(email), Name: "Test", Role: role,
 		})
 		return err
-	})
-	if err != nil {
-		t.Fatalf("create user %s: %v", email, err)
-	}
+	}), "create user %s", email)
 	return u
 }
 
 func (e *testEnv) provider(t *testing.T, ws actor.Workspace, p iam.SSOProvider) {
 	t.Helper()
 	p.Enabled = true
-	if _, err := e.svc.PutSSOProvider(anon(t.Context(), ws), p); err != nil {
-		t.Fatalf("store provider: %v", err)
-	}
+	_, err := e.svc.PutSSOProvider(anon(t.Context(), ws), p)
+	require.NoError(t, err, "store provider")
 }
 
 func (e *testEnv) putCredential(t *testing.T, ws actor.Workspace, p db.UpsertCredentialParams) {
 	t.Helper()
-	if err := e.in(t, ws, func(q *db.Queries) error {
+	require.NoError(t, e.in(t, ws, func(q *db.Queries) error {
 		_, err := q.UpsertCredential(t.Context(), &p)
 		return err
-	}); err != nil {
-		t.Fatalf("store credential %s: %v", p.ID, err)
-	}
+	}), "store credential %s", p.ID)
 }
 
 func (e *testEnv) setEnforceSSO(t *testing.T, ws actor.Workspace, on bool) {
 	t.Helper()
-	if err := e.in(t, ws, func(q *db.Queries) error {
+	require.NoError(t, e.in(t, ws, func(q *db.Queries) error {
 		w, err := q.GetWorkspace(t.Context())
 		if err != nil {
 			return err
@@ -150,9 +137,7 @@ func (e *testEnv) setEnforceSSO(t *testing.T, ws actor.Workspace, on bool) {
 		w.Settings.EnforceSso = new(on)
 		_, err = q.UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{Settings: w.Settings})
 		return err
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}))
 }
 
 func (e *testEnv) userByEmail(t *testing.T, ws actor.Workspace, email string) *db.User {
@@ -165,9 +150,7 @@ func (e *testEnv) userByEmail(t *testing.T, ws actor.Workspace, email string) *d
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return u
 }
 
@@ -189,35 +172,29 @@ func (e *testEnv) oidcCredential(
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return c
 }
 
 func (e *testEnv) sessions(t *testing.T, ws actor.Workspace, subjectID string) int {
 	t.Helper()
 	var rows []*db.AccessToken
-	if err := e.in(t, ws, func(q *db.Queries) (err error) {
+	require.NoError(t, e.in(t, ws, func(q *db.Queries) (err error) {
 		rows, err = q.ListUserSessions(t.Context(), subjectID)
 		return err
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}))
 	return len(rows)
 }
 
 func (e *testEnv) passkeys(t *testing.T, ws actor.Workspace, userID string) int {
 	t.Helper()
 	var rows []*db.Credential
-	if err := e.in(t, ws, func(q *db.Queries) (err error) {
+	require.NoError(t, e.in(t, ws, func(q *db.Queries) (err error) {
 		rows, err = q.ListCredentialsByType(t.Context(), &db.ListCredentialsByTypeParams{
 			UserID: userID, Type: string(iam.MethodPasskey),
 		})
 		return err
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}))
 	return len(rows)
 }
 
@@ -226,7 +203,7 @@ func anon(ctx context.Context, ws actor.Workspace) context.Context {
 	return actor.WithWorkspace(ctx, ws)
 }
 
-// as is a request on the workspace's host from a browser that signed in as u a moment ago.
+// as is a request on the workspace's host from a browser u just signed in on.
 func as(ctx context.Context, ws actor.Workspace, u *db.User) context.Context {
 	ctx = iam.ContextWithToken(ctx, db.AccessToken{Kind: string(actor.KindUser), CreatedAt: time.Now()})
 	return actor.ContextWithPrincipal(anon(ctx, ws), actor.Principal{ID: u.ID, Kind: actor.KindUser, Role: u.Role})
@@ -236,8 +213,7 @@ func as(ctx context.Context, ws actor.Workspace, u *db.User) context.Context {
 func linkToken(t *testing.T, link string) string {
 	t.Helper()
 	_, token, ok := strings.Cut(link, "token=")
-	if !ok || token == "" {
-		t.Fatalf("link %q carries no token", link)
-	}
+	require.True(t, ok, "link %q carries no token", link)
+	require.NotEmpty(t, token, "link %q carries no token", link)
 	return token
 }

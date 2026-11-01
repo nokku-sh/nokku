@@ -9,12 +9,12 @@ import (
 	"time"
 )
 
+const mailDomainTimeout = 5 * time.Second
+
 var (
 	errInvalidAddress = errors.New("invalid email address")
 	errNoMailDomain   = errors.New("email domain does not accept mail")
 )
-
-const mailDomainTimeout = 5 * time.Second
 
 // Verify asks DNS only with strict, self-hosted installs may have no DNS.
 func Verify(ctx context.Context, addr string, strict bool) error {

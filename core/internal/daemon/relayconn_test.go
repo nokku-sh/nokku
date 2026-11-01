@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-// The daemon queues its last bytes and closes right after, so a closed relay must still hand them out.
+// A daemon closes right after its last bytes, so a closed relay drains them.
 func TestRelayConn_ReadDrainsAfterClose(t *testing.T) {
 	for range 50 {
 		relay := &Relay{toUser: make(chan []byte, relayBufferSize), closed: make(chan struct{})}
@@ -16,11 +18,7 @@ func TestRelayConn_ReadDrainsAfterClose(t *testing.T) {
 		relay.close()
 
 		got, err := io.ReadAll(&relayConn{relay: relay})
-		if err != nil {
-			t.Fatalf("ReadAll: %v", err)
-		}
-		if want := bytes.Repeat([]byte("tail"), relayBufferSize); !bytes.Equal(got, want) {
-			t.Fatalf("read %d bytes after close, want %d", len(got), len(want))
-		}
+		require.NoError(t, err)
+		require.Equal(t, bytes.Repeat([]byte("tail"), relayBufferSize), got)
 	}
 }

@@ -20,7 +20,12 @@ import (
 
 var generatedName = regexp.MustCompile(`^[a-z]+-[a-z]+$`)
 
-// seedTeamGrant gives the token a grant of username to a fresh team and returns the team id.
+type seededTarget struct {
+	target   *db.Target
+	accounts []*db.GetTargetAccountsByTargetIDsRow
+}
+
+// seedTeamGrant grants username to a fresh team on the token, returns its id.
 func seedTeamGrant(t *testing.T, f fixture, username string) string {
 	t.Helper()
 	var teamID string
@@ -41,11 +46,6 @@ func seedTeamGrant(t *testing.T, f fixture, username string) string {
 	return teamID
 }
 
-type seededTarget struct {
-	target   *db.Target
-	accounts []*db.GetTargetAccountsByTargetIDsRow
-}
-
 func readTarget(t *testing.T, f fixture, daemonID string) seededTarget {
 	t.Helper()
 	var out seededTarget
@@ -63,7 +63,8 @@ func hostname(name string) map[string]string {
 	return map[string]string{"hostname": name, "os": "linux"}
 }
 
-// The token's grants and tags land on the target once. A later change in the web app is not undone by a re-enroll.
+// The token's grants and tags land on the target once. A re-enroll does not
+// undo a later change in the web app.
 func TestEnrollSeedsTokenGrantsOnce(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.Tags = []string{"sandbox"} })
 	teamID := seedTeamGrant(t, f, "dev")
@@ -92,7 +93,7 @@ func TestEnrollSeedsTokenGrantsOnce(t *testing.T) {
 	assert.Empty(t, readTarget(t, f, out.DaemonID).accounts[0].TeamIds, "the re-enroll put the grant back")
 }
 
-// A hostname a person chose becomes the name. A default one, or a taken one, gets a generated name instead.
+// A hostname a person chose is the name. A default or taken one is generated.
 func TestEnrollNamesFromHostname(t *testing.T) {
 	f, token := enrollToken(t, nil)
 
@@ -125,7 +126,8 @@ func ephemeralToken(t *testing.T, retireAfter time.Duration) (fixture, string) {
 	})
 }
 
-// An ephemeral box that comes back under its name replaces the one that went away. A live one keeps its name.
+// An ephemeral box back under its name replaces the one that went away, not a
+// live one.
 func TestEnrollEphemeralReplacesOffline(t *testing.T) {
 	f, token := ephemeralToken(t, 10*time.Minute)
 
@@ -154,8 +156,9 @@ func TestEnrollEphemeralReplacesOffline(t *testing.T) {
 	}))
 }
 
-// A container coming or going wakes nobody, or a busy fleet would sync without end. The version still moves, so every
-// daemon catches up at its next heartbeat, and a real change wakes them all at once.
+// A container coming or going wakes nobody, or a busy fleet would sync without
+// end. The version still moves, so every daemon catches up at its next
+// heartbeat, and a real change wakes them all at once.
 func TestContainerChurnWakesNobody(t *testing.T) {
 	f, token := ephemeralToken(t, 10*time.Minute)
 	teamID := seedTeamGrant(t, f, "deploy")
@@ -205,7 +208,7 @@ func TestContainerChurnWakesNobody(t *testing.T) {
 	assert.True(t, woken(), "a revoke must wake the fleet at once")
 }
 
-// A leaked token that ran out names an offline daemon, and must not be able to delete it.
+// A leaked token that ran out must not delete an offline daemon by naming it.
 func TestSpentTokenReplacesNothing(t *testing.T) {
 	retire, uses := 10*time.Minute, int32(1)
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
@@ -224,13 +227,13 @@ func TestSpentTokenReplacesNothing(t *testing.T) {
 	}), "a spent token deleted the offline daemon of that name")
 }
 
-// The sweep deletes an ephemeral daemon once it has been away longer than retire_after, and only then.
+// The sweep deletes an ephemeral daemon once away past retire_after, only then.
 func TestRetireSweep(t *testing.T) {
 	f, token := ephemeralToken(t, time.Second)
 	out, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
 	require.NoError(t, err)
 
-	// The sweep spans workspaces and takes what earlier tests left too, only this daemon counts.
+	// The sweep spans workspaces, only this daemon counts.
 	var events []*audit.Event
 	record := func(_ context.Context, e *audit.Event) {
 		if e.Target == out.DaemonID {
@@ -271,8 +274,9 @@ func TestRetireSweepKeepsAConnectedDaemon(t *testing.T) {
 	}), "the connected daemon is gone")
 }
 
-// A crash stamps no daemon as gone, so one that was connected looks away since it connected. The sweep counts from
-// the restart instead, and a daemon still reconnecting gets its whole retire_after.
+// A crash stamps no daemon as gone, so one that was connected looks away since
+// it connected. The sweep counts from the restart, so a daemon still
+// reconnecting gets its whole retire_after.
 func TestRetireSweepCountsFromTheRestart(t *testing.T) {
 	f, token := ephemeralToken(t, time.Second)
 	out, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
@@ -283,7 +287,7 @@ func TestRetireSweepCountsFromTheRestart(t *testing.T) {
 
 	time.Sleep(1100 * time.Millisecond)
 	restarted := time.Now()
-	// The sweep spans workspaces and takes what earlier tests left too, only this daemon counts.
+	// The sweep spans workspaces, only this daemon counts.
 	var retired []string
 	record := func(_ context.Context, e *audit.Event) { retired = append(retired, e.Target) }
 	require.NoError(t, daemon.Retire(f.ctx, f.conn, nil, restarted, record))

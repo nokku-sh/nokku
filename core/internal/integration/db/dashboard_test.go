@@ -7,7 +7,11 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
 )
 
 func TestDashboardCounts(t *testing.T) {
@@ -26,13 +30,12 @@ func TestDashboardCounts(t *testing.T) {
 	}
 
 	got := counts()
-	if got.Targets != 1 || got.TargetsOnline != 0 || got.TargetsManual != 0 || got.Users != 2 {
-		t.Fatalf("offline daemon: got %+v", got)
-	}
+	require.EqualValues(t, 1, got.Targets, "offline daemon")
+	require.Zero(t, got.TargetsOnline, "offline daemon")
+	require.Zero(t, got.TargetsManual, "offline daemon")
+	require.EqualValues(t, 2, got.Users, "offline daemon")
 
-	if got = counts(f.daemon); got.TargetsOnline != 1 {
-		t.Errorf("online daemon: targets online = %d, want 1", got.TargetsOnline)
-	}
+	assert.EqualValues(t, 1, counts(f.daemon).TargetsOnline, "online daemon")
 }
 
 func TestListOpenRecordings(t *testing.T) {
@@ -63,12 +66,12 @@ func TestListOpenRecordings(t *testing.T) {
 	}
 
 	// A daemon that is not connected may have died mid session.
-	if rows := list(); len(rows) != 0 {
-		t.Fatalf("offline daemon: got %d open recordings, want 0", len(rows))
-	}
+	require.Empty(t, list(), "offline daemon")
 
-	if rows := list(f.daemon); len(rows) != 1 || rows[0].ID != open || rows[0].DaemonName != "d" {
-		t.Errorf("online daemon: got %+v, want only %s on d", rows, open)
+	rows := list(f.daemon)
+	if assert.Len(t, rows, 1, "online daemon") {
+		assert.Equal(t, open, rows[0].ID)
+		assert.Equal(t, "d", rows[0].DaemonName)
 	}
 }
 
@@ -90,10 +93,9 @@ func TestListRecordingsMarksWhatIsLive(t *testing.T) {
 		})
 		return err
 	})
-	if _, err := c.sysPool.Exec(t.Context(),
-		`UPDATE recordings SET started_at = NOW() - INTERVAL '25 hours' WHERE id = $1`, stale); err != nil {
-		t.Fatalf("age a recording: %v", err)
-	}
+	_, err := c.sysPool.Exec(t.Context(),
+		`UPDATE recordings SET started_at = NOW() - INTERVAL '25 hours' WHERE id = $1`, stale)
+	require.NoError(t, err, "age a recording")
 	live := func(connected ...string) map[string]bool {
 		t.Helper()
 		got := map[string]bool{}
@@ -109,28 +111,22 @@ func TestListRecordingsMarksWhatIsLive(t *testing.T) {
 		return got
 	}
 
-	if got := live(); got[running] || got[ended] || got[stale] {
-		t.Errorf("offline daemon: got %v, want nothing live", got)
-	}
-	if got := live(f.daemon); !got[running] || got[ended] || got[stale] {
-		t.Errorf("online daemon: got %v, want only %s", got, running)
-	}
+	assert.Equal(t, map[string]bool{running: false, ended: false, stale: false}, live(), "offline daemon")
+	assert.Equal(t, map[string]bool{running: true, ended: false, stale: false}, live(f.daemon), "online daemon")
 }
 
 func TestAuditActivityByHour(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 	for _, ok := range []bool{true, true, false} {
-		if err := c.Tenant().InsertAuditLog(pinned(t, f.ws), &db.InsertAuditLogParams{
+		require.NoError(t, c.Tenant().InsertAuditLog(testenv.Pinned(t, f.ws), &db.InsertAuditLogParams{
 			WorkspaceID: f.ws,
 			ActorID:     f.owner,
 			ActorKind:   "user",
 			Action:      "UpdateTarget",
 			Ok:          ok,
 			Details:     []byte(`{}`),
-		}); err != nil {
-			t.Fatalf("insert audit log: %v", err)
-		}
+		}), "insert audit log")
 	}
 
 	var rows []*db.AuditActivityByHourRow
@@ -143,9 +139,8 @@ func TestAuditActivityByHour(t *testing.T) {
 		events += r.Events
 		failures += r.Failures
 	}
-	if events != 3 || failures != 1 {
-		t.Errorf("got %d events and %d failures, want 3 and 1", events, failures)
-	}
+	assert.EqualValues(t, 3, events)
+	assert.EqualValues(t, 1, failures)
 }
 
 // A deleted server must not take the record of what was done on it along.
@@ -167,7 +162,6 @@ func TestRecordingOutlivesDaemon(t *testing.T) {
 		rec, err = q.GetRecording(t.Context(), id)
 		return err
 	})
-	if rec.DaemonID != nil || rec.DaemonName != "d" {
-		t.Errorf("got daemon %v named %q, want none named d", rec.DaemonID, rec.DaemonName)
-	}
+	assert.Nil(t, rec.DaemonID)
+	assert.Equal(t, "d", rec.DaemonName)
 }

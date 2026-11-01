@@ -210,11 +210,7 @@ func TestNextRenewal(t *testing.T) {
 		t.Setenv("NOKKUD_DATA_DIR", dir)
 		got := NextRenewal("target-1", caKey)
 
-		want := now.Add(84 * time.Hour)
-		is.InDelta(
-			float64(want.UnixNano()), float64(got.UnixNano()), float64(2*time.Minute),
-			"NextRenewal = %v, want ~%v", got, want,
-		)
+		is.WithinDuration(now.Add(84*time.Hour), got, 2*time.Minute)
 	})
 
 	t.Run("a certificate that never expires is not polled", func(t *testing.T) {
@@ -272,7 +268,7 @@ func TestRenewHostCertsSignFailure(t *testing.T) {
 	}
 
 	caKey := string(ssh.MarshalAuthorizedKey(newTestCA(t).pub))
-	renewed, err := RenewHostCerts(context.Background(), "target-1", caKey, sign)
+	renewed, err := RenewHostCerts(t.Context(), "target-1", caKey, sign)
 	must.Error(err, "expected the sign error to be returned")
 	is.False(renewed)
 	is.Equal(1, calls)
@@ -290,7 +286,7 @@ func TestRenewHostCertsWithoutCA(t *testing.T) {
 		t.Fatal("signed a host certificate without a trusted CA")
 		return "", nil
 	}
-	renewed, err := RenewHostCerts(context.Background(), "target-1", "", sign)
+	renewed, err := RenewHostCerts(t.Context(), "target-1", "", sign)
 	require.NoError(t, err)
 	assert.False(t, renewed)
 }
@@ -319,17 +315,17 @@ func TestRenewHostCertsFollowsCA(t *testing.T) {
 	}
 	oldKey, nextKey := string(ssh.MarshalAuthorizedKey(old.pub)), string(ssh.MarshalAuthorizedKey(next.pub))
 
-	renewed, err := RenewHostCerts(context.Background(), "target-1", oldKey, sign)
+	renewed, err := RenewHostCerts(t.Context(), "target-1", oldKey, sign)
 	must.NoError(err, "renew under the same CA")
 	is.False(renewed, "a valid certificate was rewritten")
 
-	// The core still signs with the old key, so the certificate is refused and the one on disk stays.
-	renewed, err = RenewHostCerts(context.Background(), "target-1", nextKey, sign)
+	// The core still signs with the old key, so the cert on disk stays.
+	renewed, err = RenewHostCerts(t.Context(), "target-1", nextKey, sign)
 	must.Error(err, "a certificate from another CA than the trusted one was stored")
 	is.False(renewed)
 
 	signer = next
-	renewed, err = RenewHostCerts(context.Background(), "target-1", nextKey, sign)
+	renewed, err = RenewHostCerts(t.Context(), "target-1", nextKey, sign)
 	must.NoError(err, "renew after the rollover")
 	is.True(renewed, "the certificate of the replaced CA was kept")
 	cert, err := Load()

@@ -6,13 +6,13 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -27,18 +27,18 @@ import (
 // oldSignIn is past the ten minutes RequireRecentSignIn allows.
 const oldSignIn = 11 * time.Minute
 
-// Which routes that add a way in or move ownership refuse an old browser session, and which refuse nk.
+// Which routes that add a way in or move ownership refuse old sessions and nk.
 func TestFreshSignInMatrix(t *testing.T) {
-	// SCIM is a paid feature, the test workspace runs on an Enterprise license here.
+	// SCIM is a paid feature, so this runs on an Enterprise license.
 	base, _ := enterprise(t)
 	cfg, srv, _ := mailServer(t, base)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	owner := seedOwner(t, cfg)
 
 	rpc := func(s login) *connect.Client {
-		return connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), signedIn(t, cfg, s))
+		return clientOn(srv, signedIn(t, cfg, s))
 	}
 	refusedRPC := func(err error) (string, bool) {
 		code := connect.CodeOf(err)
@@ -66,11 +66,12 @@ func TestFreshSignInMatrix(t *testing.T) {
 		CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{Name: new(uniq("sa"))})
 	require.NoError(t, err)
 
-	routes := []struct {
+	type route struct {
 		name    string
 		subject *db.User
 		probe   func(s login) (string, bool)
-	}{
+	}
+	routes := []route{
 		{"POST /passkey/register/begin", member, func(s login) (string, bool) {
 			r := send(t, srv, http.MethodPost, "/passkey/register/begin", nil, withCookie(s.token))
 			return r.String(), r.status == http.StatusUnauthorized
@@ -105,7 +106,7 @@ func TestFreshSignInMatrix(t *testing.T) {
 				&nokkuv1.CreateInvitationRequest{Email: new(newMailAddress())})
 			return refusedRPC(err)
 		}},
-		// The emergency kind, so no later test finds a replaced key still trusted on the shared CA.
+		// The emergency kind, no later test may trust a replaced shared key.
 		{"CertificateService.RolloverCertificateAuthority", admin, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewCertificateServiceClient(rpc(s)).RolloverCertificateAuthority(t.Context(),
 				&nokkuv1.RolloverCertificateAuthorityRequest{RevokePrevious: new(true)})
@@ -143,7 +144,7 @@ func TestFreshSignInMatrix(t *testing.T) {
 				})
 			return refusedRPC(err)
 		}},
-		// No rule has this id. A call that gets past the fresh check answers not_found.
+		// No rule has this id, a call past the fresh check answers not_found.
 		{"ServiceAccountService.RemoveServiceAccountFederation", admin, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).RemoveServiceAccountFederation(t.Context(),
 				&nokkuv1.RemoveServiceAccountFederationRequest{
@@ -161,17 +162,20 @@ func TestFreshSignInMatrix(t *testing.T) {
 			_, err := nokkuv1connect.NewSSOServiceClient(rpc(s)).PutSSOProvider(t.Context(), provider)
 			return refusedRPC(err)
 		}},
-		// The shared owner stays, a new owner nobody has makes the handler answer not_found once it runs.
+		// The shared owner stays, an unknown new owner answers not_found.
 		{"WorkspaceService.TransferOwnership", owner, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).TransferOwnership(t.Context(),
 				&nokkuv1.TransferOwnershipRequest{NewOwnerId: new(uuid.NewV7().String())})
 			return refusedRPC(err)
 		}},
-		{"WorkspaceService.DeleteWorkspace", owner, func(s login) (string, bool) {
+	}
+	// Hosted, this deletes the shared workspace. See TestHostedDeleteWorkspace.
+	if !hosted {
+		routes = append(routes, route{"WorkspaceService.DeleteWorkspace", owner, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).DeleteWorkspace(t.Context(),
 				&nokkuv1.DeleteWorkspaceRequest{})
 			return refusedRPC(err)
-		}},
+		}})
 	}
 
 	terminals := map[string]login{}
@@ -188,10 +192,6 @@ func TestFreshSignInMatrix(t *testing.T) {
 		"# plain HTTP routes, as Authorization: DPoP with a proof on RPCs. old is signed in 11m ago.",
 	}
 	for _, r := range routes {
-		// It would delete the workspace every test shares, TestHostedDeleteWorkspace has its own.
-		if hosted && r.name == "WorkspaceService.DeleteWorkspace" {
-			continue
-		}
 		for _, c := range []struct {
 			name string
 			s    login
@@ -213,26 +213,22 @@ func TestFreshSignInMatrix(t *testing.T) {
 	assertGolden(t, hostedGolden("fresh_signin.golden"), lines)
 }
 
-// The web app reads fresh_for to ask for a new sign-in before a form opens, so it counts like the check does.
+// The web app asks for a new sign-in by fresh_for, it must match the check.
 func TestSessionsSayHowLongTheyStayFresh(t *testing.T) {
 	base, _ := enterprise(t)
 	cfg, srv, _ := mailServer(t, base)
-	seedWorkspace(t, cfg)
 	owner := seedOwner(t, cfg)
 	freshFor := func(s login) time.Duration {
 		t.Helper()
 		client := nokkuv1connect.NewAccountServiceClient(
-			connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), signedIn(t, cfg, s)),
+			clientOn(srv, signedIn(t, cfg, s)),
 		)
 		res, err := client.ListAccountSessions(t.Context(), &nokkuv1.ListAccountSessionsRequest{})
 		require.NoError(t, err)
-		for _, sess := range res.GetSessions() {
-			if sess.GetCurrent() {
-				return sess.GetFreshFor().AsDuration()
-			}
-		}
-		t.Fatal("the list has no current session")
-		return 0
+		sessions := res.GetSessions()
+		i := slices.IndexFunc(sessions, func(s *nokkuv1.AccountSession) bool { return s.GetCurrent() })
+		require.NotEqual(t, -1, i, "the list has no current session")
+		return sessions[i].GetFreshFor().AsDuration()
 	}
 
 	fresh := freshFor(browserSession(t, cfg, owner, 0))

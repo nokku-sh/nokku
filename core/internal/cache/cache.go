@@ -1,4 +1,4 @@
-// Package cache holds short-lived state in the process. It is lost on a restart and not shared.
+// Package cache holds short-lived state, lost on restart and not shared.
 package cache
 
 import (
@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// TTL keeps every entry for the same time, so the order entries came in is the order they expire in. When full it
-// drops the oldest one: a flood costs old state, it never locks out new callers.
+// TTL keeps every entry for the same time, so insertion order is expiry order.
+// When full it drops the oldest, so a flood never locks out new callers.
 type TTL[K comparable, V any] struct {
 	mu    sync.Mutex
 	ttl   time.Duration
@@ -78,7 +78,7 @@ func (c *TTL[K, V]) liveLocked(key K) (V, bool) {
 	return zero, false
 }
 
-// setLocked drops what expired, and the oldest entry when still full, from the front before it adds to the back.
+// setLocked evicts from the front: what expired, then the oldest when full.
 func (c *TTL[K, V]) setLocked(key K, value V) {
 	c.removeLocked(key)
 	now := time.Now()

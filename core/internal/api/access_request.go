@@ -19,12 +19,12 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/email"
 )
 
+// maxDailyRequests stops asking and cancelling from flooding admins' inboxes.
+const maxDailyRequests = 50
+
 type accessRequestService struct {
 	cfg *config.Config
 }
-
-// maxDailyRequests keeps asking and cancelling from filling the table and the admins' inboxes.
-const maxDailyRequests = 50
 
 func (s *accessRequestService) ListRequestableAccounts(
 	ctx context.Context,
@@ -54,16 +54,16 @@ func (s *accessRequestService) CreateAccessRequest(
 			return err
 		}
 		if recent >= maxDailyRequests {
-			return newError(connect.CodeResourceExhausted,
+			return connect.NewError(connect.CodeResourceExhausted,
 				fmt.Sprintf("you asked %d times today, try again tomorrow", maxDailyRequests))
 		}
-		// A target that is not requestable answers like one that does not exist.
+		// A target that is not requestable answers like a missing one.
 		accountID, err := q.GetRequestableAccount(ctx, &db.GetRequestableAccountParams{
 			Target:   req.GetTarget(),
 			Username: req.GetUsername(),
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
-			return newError(connect.CodeNotFound, "there is no such account to ask for")
+			return connect.NewError(connect.CodeNotFound, "there is no such account to ask for")
 		}
 		if err != nil {
 			return err
@@ -75,7 +75,10 @@ func (s *accessRequestService) CreateAccessRequest(
 			Reason:      req.GetReason(),
 		})
 		if db.IsUniqueViolation(err) {
-			return newError(connect.CodeAlreadyExists, "you already asked for this account, it waits for an answer")
+			return connect.NewError(
+				connect.CodeAlreadyExists,
+				"you already asked for this account, it waits for an answer",
+			)
 		}
 		return err
 	}); err != nil {
@@ -107,7 +110,7 @@ func (s *accessRequestService) GetAccessRequest(
 	}
 	if callerRole(ctx) < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN &&
 		row.RequesterID != actor.UserIDFromContext(ctx) {
-		return nil, newError(connect.CodeNotFound, "no such request")
+		return nil, connect.NewError(connect.CodeNotFound, "no such request")
 	}
 	return &nokkuv1.GetAccessRequestResponse{Request: row.ToProto()}, nil
 }
@@ -169,8 +172,7 @@ func (s *accessRequestService) DenyAccessRequest(
 	return &nokkuv1.DenyAccessRequestResponse{Request: row.ToProto()}, nil
 }
 
-// decide answers a pending request. An approval grants the account from now for the duration asked, and never
-// shortens access the requester already has.
+// An approval runs from now and never shortens access the requester has.
 func (s *accessRequestService) decide(
 	ctx context.Context,
 	id string,
@@ -216,16 +218,15 @@ func (s *accessRequestService) decide(
 	return row, nil
 }
 
-// whyUndecided names what kept a request from being decided.
 func whyUndecided(ctx context.Context, q *db.Queries, id, caller string) error {
 	r, err := q.GetAccessRequest(ctx, id)
 	switch {
 	case err != nil:
 		return err
 	case r.RequesterID == caller:
-		return newError(connect.CodePermissionDenied, "another admin has to answer your own request")
+		return connect.NewError(connect.CodePermissionDenied, "another admin has to answer your own request")
 	}
-	return newError(connect.CodeFailedPrecondition, "the request is "+r.Status+" already")
+	return connect.NewError(connect.CodeFailedPrecondition, "the request is "+r.Status+" already")
 }
 
 func (s *accessRequestService) CancelAccessRequest(
@@ -241,7 +242,7 @@ func (s *accessRequestService) CancelAccessRequest(
 		return nil, err
 	}
 	if cancelled == 0 {
-		return nil, newError(connect.CodeFailedPrecondition, "only your own pending requests can be cancelled")
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "only your own pending requests can be cancelled")
 	}
 	return &nokkuv1.CancelAccessRequestResponse{}, nil
 }

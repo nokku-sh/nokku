@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidUsername(t *testing.T) {
@@ -42,7 +43,7 @@ func TestValidUsername(t *testing.T) {
 	}
 }
 
-// An accepted name must always be safe as a path component and as one word on a config line.
+// An accepted name must be safe as a path component and as one config word.
 func FuzzValidUsername(f *testing.F) {
 	f.Add("roxas")
 	f.Add("..")
@@ -51,9 +52,8 @@ func FuzzValidUsername(f *testing.F) {
 		if !ValidUsername(name) {
 			return
 		}
-		if name == "." || name == ".." || strings.ContainsAny(name, "/\x00 \t\r\n\"'%") {
-			t.Fatalf("ValidUsername(%q) accepted an unsafe name", name)
-		}
+		bad := name == "." || name == ".." || strings.ContainsAny(name, "/\x00 \t\r\n\"'%")
+		require.False(t, bad, "ValidUsername(%q) accepted an unsafe name", name)
 	})
 }
 
@@ -90,7 +90,7 @@ func TestParsePrincipal(t *testing.T) {
 	}
 }
 
-// The command prints the very principal the core signs for the account sshd asks about.
+// The command prints the principal the core signs for sshd's account.
 func TestPrincipalsCommand(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, "server:root", ServerPrincipal("server", "root"))

@@ -4,6 +4,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var namePattern = regexp.MustCompile(`^[a-z]+-[a-z]+$`)
@@ -12,14 +15,10 @@ func TestGenerate(t *testing.T) {
 	seen := make(map[string]bool)
 	for range 1000 {
 		name := Generate()
-		if !namePattern.MatchString(name) {
-			t.Fatalf("Generate() = %q, want adjective-noun", name)
-		}
+		require.Regexp(t, namePattern, name, "want adjective-noun")
 		seen[name] = true
 	}
-	if len(seen) < 100 {
-		t.Fatalf("generated only %d distinct names in 1000 draws", len(seen))
-	}
+	require.GreaterOrEqual(t, len(seen), 100, "too few distinct names in 1000 draws")
 }
 
 func TestNoDuplicateWords(t *testing.T) {
@@ -27,9 +26,7 @@ func TestNoDuplicateWords(t *testing.T) {
 		t.Helper()
 		seen := make(map[string]bool, len(list))
 		for _, w := range list {
-			if seen[w] {
-				t.Fatalf("duplicate word %q in %s", w, name)
-			}
+			require.False(t, seen[w], "duplicate word %q in %s", w, name)
 			seen[w] = true
 		}
 	}
@@ -66,8 +63,7 @@ func TestFromHostname(t *testing.T) {
 	}
 	for _, tc := range cases {
 		got, ok := FromHostname(tc.host)
-		if got != tc.want || ok != tc.ok {
-			t.Errorf("FromHostname(%q) = %q, %v, want %q, %v", tc.host, got, ok, tc.want, tc.ok)
-		}
+		assert.Equal(t, tc.want, got, "FromHostname(%q)", tc.host)
+		assert.Equal(t, tc.ok, ok, "FromHostname(%q)", tc.host)
 	}
 }

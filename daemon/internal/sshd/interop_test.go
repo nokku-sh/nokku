@@ -24,7 +24,7 @@ func TestBinaryInterop(t *testing.T) {
 
 	ca := newTestCA(t)
 	configDir := t.TempDir()
-	// Written in the daemon's on-disk format, not via State.Save, so the harness stays independent of state wiring.
+	// Written by hand, so the harness stays independent of state wiring.
 	must.NoError(writeStateFile(configDir, ca.pub, currentUser(t), []string{testPrincipal}), "seed state")
 
 	cmd := exec.Command(
@@ -69,7 +69,6 @@ func TestBinaryInterop(t *testing.T) {
 	scratch := homeScratch(t)
 	payload := []byte("interop payload\n")
 
-	// 1. ssh exec
 	out, err := runCmd(
 		"ssh",
 		append(baseOpts, "-q", fmt.Sprintf("%s@%s", user, host), "echo hello")...,
@@ -77,7 +76,6 @@ func TestBinaryInterop(t *testing.T) {
 	must.NoError(err, "ssh exec: %s", out)
 	is.Equal("hello\n", string(out))
 
-	// 2. scp -O (legacy)
 	src := filepath.Join(scratch, "legacy.txt")
 	must.NoError(os.WriteFile(src, payload, 0o644), "write scp source")
 	up := filepath.Join(scratch, "legacy-up.txt")
@@ -91,7 +89,6 @@ func TestBinaryInterop(t *testing.T) {
 	must.NoError(err, "read scp -O upload")
 	is.Equal(string(payload), string(b))
 
-	// 3. scp -s (SFTP-based modern)
 	down := filepath.Join(scratch, "modern-down.txt")
 	out, err = runCmd(
 		"scp",
@@ -102,19 +99,15 @@ func TestBinaryInterop(t *testing.T) {
 	must.NoError(err, "read scp -s download")
 	is.Equal(string(payload), string(b))
 
-	// 4. sftp batch
 	sftpOps := fmt.Sprintf("get %s %s\nbye\n", src, filepath.Join(scratch, "sftp-down.txt"))
-	out, err = runCmdWithInput(
-		"sftp",
-		sftpOps,
-		append(fileOpts, "-b", "-", fmt.Sprintf("%s@%s", user, host))...,
-	)
+	sftpCmd := exec.Command("sftp", append(fileOpts, "-b", "-", fmt.Sprintf("%s@%s", user, host))...)
+	sftpCmd.Stdin = strings.NewReader(sftpOps)
+	out, err = sftpCmd.CombinedOutput()
 	must.NoError(err, "sftp: %s", out)
 	b, err = os.ReadFile(filepath.Join(scratch, "sftp-down.txt"))
 	must.NoError(err, "read sftp download")
 	is.Equal(string(payload), string(b))
 
-	// 5. rsync
 	rsrc := filepath.Join(t.TempDir(), "rsync.txt")
 	must.NoError(os.WriteFile(rsrc, payload, 0o600), "write rsync source")
 	sshOpts := fmt.Sprintf("ssh %s", strings.Join(baseOpts, " "))
@@ -130,7 +123,6 @@ func TestBinaryInterop(t *testing.T) {
 	must.NoError(err, "read rsync copy")
 	is.Equal(string(payload), string(b))
 
-	// 6. git clone/push over the embedded server
 	gitDir := filepath.Join(t.TempDir(), "repo.git")
 	runGit(t, "init", "--bare", gitDir)
 	gitSSH := fmt.Sprintf(
@@ -162,7 +154,6 @@ func TestBinaryInterop(t *testing.T) {
 	)
 	runGit(t, "-C", work, "-c", "core.sshCommand="+gitSSH, "push", "origin", "HEAD")
 
-	// 7. -L forward through the real binary
 	echo := testEchoServer(t)
 	defer echo.Close()
 	_, echoPortStr, _ := net.SplitHostPort(echo.Addr().String())
@@ -194,7 +185,7 @@ func TestBinaryInterop(t *testing.T) {
 	must.NoError(err, "-L read")
 	is.Equal("forward", string(buf))
 
-	// 8. -A agent forwarding. CI runners have no SSH_AUTH_SOCK, so a dedicated ssh-agent is started.
+	// CI runners have no SSH_AUTH_SOCK, so start a dedicated ssh-agent.
 	sock, stopAgent := testAgent(t)
 	defer stopAgent()
 	agentSSH := exec.Command(
@@ -206,7 +197,7 @@ func TestBinaryInterop(t *testing.T) {
 	must.NoError(aerr, "ssh -A: %s", aout)
 	is.NotEmpty(strings.TrimSpace(string(aout)), "ssh -A did not expose SSH_AUTH_SOCK")
 
-	// 9. Audit events were logged for the clients above. Wait reaps the server and finishes the stderr copy.
+	// Wait reaps the server and finishes the stderr copy.
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
 	is.Contains(stderr.String(), "type=auth_success")
@@ -232,18 +223,11 @@ func buildTestServer(t *testing.T) string {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "sshd-testserver")
 	cmd := exec.Command("go", "build", "-o", bin, "./internal/sshd/testserver")
-	cmd.Dir = repoRoot(t)
+	cmd.Dir = "../.."
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("cannot build the test ssh server: %v\n%s", err, out)
 	}
 	return bin
-}
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	wd, err := os.Getwd()
-	require.NoError(t, err)
-	return filepath.Clean(filepath.Join(wd, "..", ".."))
 }
 
 func readLine(t *testing.T, r io.Reader, timeout time.Duration) string {
@@ -284,19 +268,13 @@ func runCmd(name string, args ...string) ([]byte, error) {
 	return exec.Command(name, args...).CombinedOutput()
 }
 
-func runCmdWithInput(name, input string, args ...string) ([]byte, error) {
-	cmd := exec.Command(name, args...)
-	cmd.Stdin = strings.NewReader(input)
-	return cmd.CombinedOutput()
-}
-
 func runGit(t *testing.T, args ...string) {
 	t.Helper()
 	out, err := exec.Command("git", args...).CombinedOutput()
 	require.NoError(t, err, "git %v: %s", args, out)
 }
 
-// A dedicated ssh-agent keeps the -A check independent of the host's environment.
+// A dedicated ssh-agent keeps the -A check independent of the host.
 func testAgent(t *testing.T) (string, func()) {
 	t.Helper()
 	if _, err := exec.LookPath("ssh-agent"); err != nil {
@@ -318,9 +296,7 @@ func testAgent(t *testing.T) (string, func()) {
 			pid = val
 		}
 	}
-	if sock == "" {
-		t.Fatalf("ssh-agent did not report SSH_AUTH_SOCK: %s", out)
-	}
+	require.NotEmpty(t, sock, "ssh-agent did not report SSH_AUTH_SOCK: %s", out)
 	stop := func() {
 		if pid != "" {
 			_ = exec.Command("kill", pid).Run()

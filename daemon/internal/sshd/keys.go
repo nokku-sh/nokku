@@ -19,7 +19,7 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
-// CreateHostKey gives the host a new SSH host key, a root-only file like sshd's. Every enrollment makes one.
+// CreateHostKey writes a root-only key like sshd's. Every enrollment makes one.
 func CreateHostKey() error {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -39,7 +39,7 @@ func CreateHostKey() error {
 	return writeHostPubKey(pub)
 }
 
-// A host that has no key yet gets one, the way sshd makes its keys on first boot.
+// A host with no key gets one, the way sshd makes its keys on first boot.
 func loadHostKey() (ssh.Signer, error) {
 	info, err := os.Stat(paths.HostKey())
 	if errors.Is(err, fs.ErrNotExist) {
@@ -69,7 +69,7 @@ func loadHostKey() (ssh.Signer, error) {
 	return signer, nil
 }
 
-// Without a certificate clients see the bare key and its fingerprint prompt, so a missing one is worth a line.
+// Without a cert clients get the bare key and its fingerprint prompt.
 func withHostCert(key ssh.Signer) ssh.Signer {
 	cert, err := hostcerts.Load()
 	if errors.Is(err, fs.ErrNotExist) {
@@ -86,14 +86,14 @@ func withHostCert(key ssh.Signer) ssh.Signer {
 	return key
 }
 
-// A cert for a previous key is dropped so the sync renews it.
+// A cert for a previous key is dropped so the watcher renews it.
 func writeHostPubKey(pub ssh.PublicKey) error {
 	pubData := ssh.MarshalAuthorizedKey(pub)
 	old, readErr := os.ReadFile(paths.HostKeyPub())
 	if readErr == nil && bytes.Equal(bytes.TrimSpace(old), bytes.TrimSpace(pubData)) {
 		return nil
 	}
-	// #nosec G306 G703 - a host public key is world-readable by design, and the path is the daemon's own.
+	// #nosec G306 G703 - a host public key is world-readable, the path is ours.
 	if err := os.WriteFile(paths.HostKeyPub(), pubData, 0o644); err != nil {
 		return fmt.Errorf("sshd: write host public key: %w", err)
 	}

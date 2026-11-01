@@ -15,12 +15,16 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/nokku-sh/nokku/core/internal/iam"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
 )
 
@@ -30,15 +34,20 @@ const (
 	keycloakClientSec = "nokku-test-exchange"
 	keycloakUsername  = "alice"
 	keycloakLogin     = "hunter2-test"
+	keycloakEmail     = "alice@example.com"
 )
+
+var reKeycloakFormAction = regexp.MustCompile(`<form[^>]*action="([^"]+)"`)
+
+type keycloakBrowser struct {
+	c *http.Client
+}
 
 // startKeycloak returns the issuer of a fresh test realm.
 func startKeycloak(t *testing.T) string {
 	t.Helper()
 	base := testenv.Keycloak(t) + "/realms/" + keycloakRealm
-	if err := keycloakSetupRealm(base); err != nil {
-		t.Fatalf("set up keycloak realm: %v", err)
-	}
+	require.NoError(t, keycloakSetupRealm(base), "set up keycloak realm")
 	return base
 }
 
@@ -124,7 +133,7 @@ func keycloakRealmJSON() []byte {
 		"sslRequired": "none",
 		"users": []map[string]any{{
 			"username":      keycloakUsername,
-			"email":         "alice@example.com",
+			"email":         keycloakEmail,
 			"firstName":     "Alice",
 			"lastName":      "Example",
 			"enabled":       true,
@@ -155,10 +164,6 @@ func keycloakRealmJSON() []byte {
 	return out
 }
 
-type keycloakBrowser struct {
-	c *http.Client
-}
-
 func newKeycloakBrowser() *keycloakBrowser {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -176,14 +181,10 @@ func newKeycloakBrowser() *keycloakBrowser {
 func (b *keycloakBrowser) get(t *testing.T, rawURL string) (*http.Response, string) {
 	t.Helper()
 	resp, err := b.c.Get(rawURL)
-	if err != nil {
-		t.Fatalf("GET %s: %v", rawURL, err)
-	}
+	require.NoError(t, err, "GET %s", rawURL)
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read %s: %v", rawURL, err)
-	}
+	require.NoError(t, err, "read %s", rawURL)
 	return resp, string(body)
 }
 
@@ -195,9 +196,7 @@ func (b *keycloakBrowser) follow(t *testing.T, rawURL string) (*http.Response, s
 			return resp, page
 		}
 		next := resp.Header.Get("Location")
-		if next == "" {
-			t.Fatalf("redirect without Location at %s", rawURL)
-		}
+		require.NotEmpty(t, next, "redirect without Location at %s", rawURL)
 		rawURL = next
 	}
 	t.Fatalf("too many redirects starting at %s", rawURL)
@@ -207,19 +206,13 @@ func (b *keycloakBrowser) follow(t *testing.T, rawURL string) (*http.Response, s
 func (b *keycloakBrowser) postForm(t *testing.T, action string, vals url.Values) (*http.Response, string) {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodPost, action, strings.NewReader(vals.Encode()))
-	if err != nil {
-		t.Fatalf("build POST %s: %v", action, err)
-	}
+	require.NoError(t, err, "build POST %s", action)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := b.c.Do(req)
-	if err != nil {
-		t.Fatalf("POST %s: %v", action, err)
-	}
+	require.NoError(t, err, "POST %s", action)
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read %s: %v", action, err)
-	}
+	require.NoError(t, err, "read %s", action)
 	return resp, string(body)
 }
 
@@ -232,15 +225,11 @@ func loginFormAction(page string) string {
 	return ""
 }
 
-var reKeycloakFormAction = regexp.MustCompile(`<form[^>]*action="([^"]+)"`)
-
 func keycloakAuthenticate(t *testing.T, b *keycloakBrowser, startURL string) (*http.Response, string) {
 	t.Helper()
 	_, page := b.follow(t, startURL)
 	action := loginFormAction(page)
-	if action == "" {
-		t.Fatalf("keycloak returned no login form, body: %s", page)
-	}
+	require.NotEmpty(t, action, "keycloak returned no login form, body: %s", page)
 	resp, body := b.postForm(t, action, url.Values{
 		"username":     {keycloakUsername},
 		"password":     {keycloakLogin},
@@ -270,16 +259,12 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 	loginRec := httptest.NewRecorder()
 	svc.OIDC.Login(loginRec, login.WithContext(anon(login.Context(), o.ws)))
 	authURL := loginRec.Header().Get("Location")
-	if authURL == "" {
-		t.Fatalf("app login did not redirect, code=%d body=%s", loginRec.Code, loginRec.Body.String())
-	}
+	require.NotEmpty(t, authURL, "app login did not redirect, code=%d body=%s", loginRec.Code, loginRec.Body.String())
 
 	b := newKeycloakBrowser()
 	resp, _ := keycloakAuthenticate(t, b, authURL)
 	cbURL := resp.Header.Get("Location")
-	if cbURL == "" {
-		t.Fatalf("keycloak login did not redirect back to the app")
-	}
+	require.NotEmpty(t, cbURL, "keycloak login did not redirect back to the app")
 
 	callback := func() *httptest.ResponseRecorder {
 		cb := httptest.NewRequest(http.MethodGet, cbURL, nil)
@@ -293,15 +278,15 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 	wantSSOSuccess(t, callback())
 
 	u := e.userByEmail(t, o.ws, keycloakEmail)
-	if u == nil {
-		t.Fatal("JIT provisioned user missing after keycloak login")
-	}
-	if c := e.oidcCredential(t, o.ws, "keycloak", ""); c != nil && c.UserID != u.ID {
-		t.Error("credential linked to someone else")
-	}
+	require.NotNil(t, u, "JIT provisioned user missing after keycloak login")
+	var creds []*db.Credential
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
+		creds, err = q.ListUserCredentials(t.Context(), u.ID)
+		return err
+	}))
+	assert.True(t, slices.ContainsFunc(creds, func(c *db.Credential) bool { return c.Provider == "keycloak" }),
+		"no keycloak credential on the user")
 
 	// The consumed state must not survive a replay.
 	wantSSOFailure(t, callback())
 }
-
-const keycloakEmail = "alice@example.com"

@@ -4,21 +4,16 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSafeTimestamp(t *testing.T) {
 	now := time.Now().Truncate(time.Millisecond)
 
-	if got := SafeTimestamp(nil); got != nil {
-		t.Errorf("SafeTimestamp(nil) = %v, want nil", got)
-	}
+	assert.Nil(t, SafeTimestamp(nil))
 
 	got := SafeTimestamp(&now)
-	if got == nil {
-		t.Fatal("SafeTimestamp(non-nil) = nil")
-	}
-	if want := timestamppb.New(now); !got.AsTime().Equal(want.AsTime()) {
-		t.Errorf("SafeTimestamp() = %v, want %v", got.AsTime(), want.AsTime())
-	}
+	require.NotNil(t, got)
+	assert.WithinDuration(t, now, got.AsTime(), 0)
 }

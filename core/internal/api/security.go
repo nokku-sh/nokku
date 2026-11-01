@@ -10,7 +10,7 @@ import (
 	"github.com/nokku-sh/nokku/core/web"
 )
 
-// withCSRF is the only cross-origin gate. The UI is same-origin, so there is no CORS to configure.
+// The UI is same-origin, so no CORS. The terminal websocket checks its origin.
 func (s *Server) withCSRF(h http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
 	if err := cop.AddTrustedOrigin(s.cfg.FullURL()); err != nil {
@@ -24,7 +24,7 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 	protected := cop.Handler(h)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Webhooks and SSO callbacks come from external servers, their protection is the single-use flow state.
+		// External senders. Webhooks are signed, SSO has single-use state.
 		if r.URL.Path == "/oidc/callback" ||
 			strings.HasPrefix(r.URL.Path, "/webhooks/") {
 			h.ServeHTTP(w, r)
@@ -35,10 +35,10 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 	})
 }
 
-// withHTTPS sends a client on plain http to https. X-Forwarded-Proto is taken from anyone, a browser never sends it,
-// so faking it only fools the core about the faker's own connection.
+// X-Forwarded-Proto is taken from anyone. A browser never sends it, so faking
+// it only fools the core about the faker's own connection.
 func (s *Server) withHTTPS(h http.Handler) http.Handler {
-	// A browser takes http://localhost as secure, so a try on this machine needs no certificate.
+	// A browser takes http://localhost as secure, so no certificate is needed.
 	if s.cfg.Hostname() == "localhost" {
 		return h
 	}
@@ -62,7 +62,7 @@ func (s *Server) withHTTPS(h http.Handler) http.Handler {
 				// Every workspace of the hosted service has a host of its own.
 				target = "https://" + r.Host
 			}
-			// #nosec G710 -- the same host on https, only the path is the client's
+			// #nosec G710 -- same host on https, only the path is the client's
 			http.Redirect(w, r, target+r.URL.RequestURI(), http.StatusTemporaryRedirect)
 		default:
 			// A redirect would come back through the same proxy.
@@ -75,13 +75,13 @@ func (s *Server) withHTTPS(h http.Handler) http.Handler {
 }
 
 func (s *Server) withHeaders(h http.Handler) http.Handler {
-	// Only the bootstrap of the built pages runs inline, an injected script would reach the web terminal.
+	// Only the bootstrap runs inline, injected code would reach the terminal.
 	pinned := web.InlineScriptHashes()
 	workers := ""
 	if os.Getenv("NOKKU_DEV_UI") != "" {
 		// The pages of the Vite dev server change with every edit.
 		pinned = []string{"'unsafe-inline'"}
-		// Vite's client pings the server from a blob worker, to reload once it is back.
+		// Vite pings from a blob worker, to reload once the server is back.
 		workers = " worker-src 'self' blob:;"
 	}
 	// The recording player compiles WebAssembly.
@@ -90,7 +90,7 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 	csp := "default-src 'self'; script-src " + scripts +
 		"; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;" + workers
 
-	// A browser keeps HSTS for localhost on every port, which would break whatever else is developed here.
+	// HSTS on localhost holds for every port and breaks other dev servers.
 	hsts := s.cfg.Hostname() != "localhost"
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -100,12 +100,12 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Content-Security-Policy", csp)
 
-		// No API response may be cached. The static handler sets its own policy.
+		// No API response may be cached. The static handler sets its own.
 		if r.Method == http.MethodGet {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 
-		// Sent to a faker on plain http it does nothing, a browser takes HSTS only over https.
+		// Harmless if faked, a browser takes HSTS only over https.
 		if hsts && r.Header.Get("X-Forwarded-Proto") == "https" {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}

@@ -35,7 +35,7 @@ func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
 	case "customer.subscription.created",
 		"customer.subscription.updated",
 		"customer.subscription.deleted":
-		// Events can arrive late or out of order, so the payload only says which subscription to read again.
+		// Events come late or out of order, so only trust the subscription id.
 		var sub struct {
 			ID string `json:"id"`
 		}
@@ -52,7 +52,7 @@ func (s *Stripe) webhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		// Unhandled event types are expected, Stripe sends everything subscribed.
+		// Other event types are expected, Stripe sends all subscribed ones.
 	}
 
 	w.WriteHeader(http.StatusOK)

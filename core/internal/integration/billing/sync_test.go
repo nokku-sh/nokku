@@ -37,13 +37,6 @@ import (
 
 const webhookSecret = "whsec_test"
 
-func TestMain(m *testing.M) {
-	stop := testenv.Postgres()
-	code := m.Run()
-	stop()
-	os.Exit(code)
-}
-
 type remoteSub struct {
 	status   string
 	seats    int64
@@ -51,7 +44,7 @@ type remoteSub struct {
 	cancelAt bool
 }
 
-// fakeStripe is the hosted service on a Stripe that serves the two subscription calls a sync makes.
+// fakeStripe is the hosted service on a Stripe that serves a sync's two calls.
 type fakeStripe struct {
 	billing *billing.Stripe
 	conn    *db.Connection
@@ -62,6 +55,13 @@ type fakeStripe struct {
 	cancelled   []string
 	raised      []string
 	checkouts   []url.Values
+}
+
+func TestMain(m *testing.M) {
+	stop := testenv.Postgres()
+	code := m.Run()
+	stop()
+	os.Exit(code)
 }
 
 func (f *fakeStripe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +147,7 @@ func newSync(t *testing.T) *fakeStripe {
 	return fake
 }
 
-// event delivers the webhook and returns the status Stripe gets back. Anything but 200 makes it retry.
+// event delivers the webhook. Any status but 200 makes Stripe retry.
 func (f *fakeStripe) event(t *testing.T, subscriptionID string) int {
 	t.Helper()
 	payload := fmt.Appendf(
@@ -463,7 +463,7 @@ func TestCheckout_KeepsTheRestOfTheTrial(t *testing.T) {
 	assert.Empty(t, fake.checkouts[1].Get("subscription_data[trial_end]"), "an ended trial is charged at once")
 }
 
-// Quotas fail open, features fail closed, and the purge jobs get an error instead of a shorter window.
+// Quotas fail open, features fail closed, purge jobs get an error.
 func TestLookup_WhenTheDatabaseDoesNotAnswer(t *testing.T) {
 	fake := newSync(t)
 	ent := fake.plans(t)
@@ -476,7 +476,6 @@ func TestLookup_WhenTheDatabaseDoesNotAnswer(t *testing.T) {
 	plan := ent.Resolve(down, fake.workspaceID)
 	assert.Equal(t, entitlement.PlanCommunity, plan.Name, "an outage must never hand out paid features")
 	assert.False(t, plan.Has(entitlement.FeatureAuditExport))
-	assert.NotEqual(t, entitlement.PlanInactive, plan.Name, "an outage must never stop the workspace from signing")
 	_, err := ent.AuditRetentionDays(down, fake.workspaceID)
 	require.Error(t, err, "an outage must never shorten what is kept")
 	assert.NoError(t, ent.CheckResources(down, fake.workspaceID), "a count that fails must not block a create")

@@ -86,7 +86,7 @@ func (s *billingService) CreateCheckout(
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	url, err := s.cfg.Billing.Checkout(ctx, ws, user.Email, req.GetYearly())
 	if errors.Is(err, billing.ErrActiveSubscription) {
-		return nil, newError(
+		return nil, connect.NewError(
 			connect.CodeFailedPrecondition,
 			"This workspace already has an active subscription. Manage it in the billing portal.",
 		)
@@ -134,7 +134,7 @@ func (s *billingService) CancelSubscription(
 	return &nokkuv1.CancelSubscriptionResponse{}, nil
 }
 
-// GetLicense keeps reporting an expired license, so the UI can ask for the renewal.
+// GetLicense still reports an expired license, so the UI can ask to renew.
 func (s *billingService) GetLicense(
 	_ context.Context,
 	_ *nokkuv1.GetLicenseRequest,
@@ -163,24 +163,24 @@ func (s *billingService) ActivateLicense(
 	err := s.cfg.Entitlements.ActivateLicense(ctx, req.GetKey())
 	switch {
 	case errors.Is(err, entitlement.ErrLicenseInvalid):
-		return nil, newError(connect.CodeInvalidArgument,
+		return nil, connect.NewError(connect.CodeInvalidArgument,
 			"This license key is not valid. Paste it exactly as it came in the email.")
 	case errors.Is(err, entitlement.ErrLicenseExpired):
-		return nil, newError(connect.CodeInvalidArgument,
+		return nil, connect.NewError(connect.CodeInvalidArgument,
 			"This license key has already expired. Use the key from your latest renewal email.")
 	case errors.Is(err, entitlement.ErrLicenseShorter):
-		return nil, newError(connect.CodeFailedPrecondition,
+		return nil, connect.NewError(connect.CodeFailedPrecondition,
 			"The active license is valid for longer than this key.")
 	case errors.Is(err, entitlement.ErrNotSelfHosted),
 		errors.Is(err, entitlement.ErrLicenseUnsupported):
-		return nil, newError(connect.CodeFailedPrecondition, err.Error())
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	case err != nil:
 		return nil, err
 	}
 	return &nokkuv1.ActivateLicenseResponse{}, nil
 }
 
-// featuresProto returns the whole catalog so clients can render locked features.
+// featuresProto returns the whole catalog so clients can show locked features.
 func featuresProto(p entitlement.Plan) map[string]bool {
 	features := make(map[string]bool, len(entitlement.CatalogFeatures))
 	for _, feature := range entitlement.CatalogFeatures {

@@ -6,12 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// An edit moves updated_at. What a host reports about itself is no edit, or every sync would look like one.
+// An edit moves updated_at. What a host reports about itself is no edit, or
+// every sync would look like one.
 func TestEditsMoveUpdatedAt(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -25,9 +29,7 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 	updatedAt := func(table, id string) (at time.Time) {
 		t.Helper()
 		err := c.sysPool.QueryRow(t.Context(), `SELECT updated_at FROM `+table+` WHERE id = $1`, id).Scan(&at)
-		if err != nil {
-			t.Fatalf("read %s.updated_at: %v", table, err)
-		}
+		require.NoError(t, err, "read %s.updated_at", table)
 		return at
 	}
 
@@ -62,9 +64,7 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 	} {
 		before := updatedAt(edit.table, edit.id)
 		asOwner(t, c, f, edit.run)
-		if after := updatedAt(edit.table, edit.id); !after.After(before) {
-			t.Errorf("an edit of %s left updated_at at %s", edit.table, after)
-		}
+		assert.Greater(t, updatedAt(edit.table, edit.id), before, "an edit of %s left updated_at", edit.table)
 	}
 
 	daemon, target := updatedAt("daemons", f.daemon), updatedAt("targets", f.target)
@@ -89,7 +89,6 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 		}
 		return q.TouchTargetSync(t.Context(), f.target)
 	})
-	if d, tg := updatedAt("daemons", f.daemon), updatedAt("targets", f.target); !d.Equal(daemon) || !tg.Equal(target) {
-		t.Errorf("a report moved updated_at: daemon %s to %s, target %s to %s", daemon, d, target, tg)
-	}
+	assert.WithinDuration(t, daemon, updatedAt("daemons", f.daemon), 0, "a report moved the daemon's updated_at")
+	assert.WithinDuration(t, target, updatedAt("targets", f.target), 0, "a report moved the target's updated_at")
 }

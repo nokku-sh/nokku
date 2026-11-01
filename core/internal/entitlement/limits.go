@@ -7,12 +7,6 @@ import (
 	"connectrpc.com/connect/v2"
 )
 
-func errInactive() error {
-	return connect.NewError(connect.CodeFailedPrecondition,
-		"this workspace has no active plan, the owner can subscribe under Billing")
-}
-
-// CanInvite is shared by the invitation, SSO, and SCIM join paths.
 func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64) error {
 	plan := s.Resolve(ctx, workspaceID)
 	if plan.Name == PlanInactive {
@@ -30,7 +24,12 @@ func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64)
 		"all %d seats are in use; add seats under Billing to invite more", plan.SeatCap)
 }
 
-// CheckResources allows the create when the count cannot be read, quotas fail open.
+func errInactive() error {
+	return connect.NewError(connect.CodeFailedPrecondition,
+		"this workspace has no active plan, the owner can subscribe under Billing")
+}
+
+// CheckResources fails open, a count that can't be read allows the create.
 func (s *Service) CheckResources(ctx context.Context, workspaceID string) error {
 	plan := s.Resolve(ctx, workspaceID)
 	if plan.Name == PlanInactive {

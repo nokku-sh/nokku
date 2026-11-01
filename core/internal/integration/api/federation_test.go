@@ -19,7 +19,6 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/go-jose/go-jose/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
@@ -46,10 +45,20 @@ const (
 		"its rules, the audit log says why for a token its issuer signed"
 )
 
-// jobIssuer is a CI platform: it serves discovery and its keys over https, and signs the token of each job.
+// jobIssuer is a CI platform: discovery and keys over https, a token per job.
 type jobIssuer struct {
 	srv *httptest.Server
 	key *rsa.PrivateKey
+}
+
+type federation struct {
+	cfg      *config.Config
+	srv      *httptest.Server
+	accounts nokkuv1connect.ServiceAccountServiceClient
+	issuer   *jobIssuer
+	account  *nokkuv1.ServiceAccount
+	rule     *nokkuv1.ServiceAccountFederation
+	key      *ecdsa.PrivateKey
 }
 
 func newJobIssuer(t *testing.T) *jobIssuer {
@@ -79,8 +88,8 @@ func newJobIssuer(t *testing.T) *jobIssuer {
 
 func (j *jobIssuer) url() string { return j.srv.URL }
 
-// claims are those of a job a rule of the fixture takes. A test changes what it is about.
-func (j *jobIssuer) claims(_ *config.Config) map[string]any {
+// claims are a job the fixture's rule takes. A test changes what it is about.
+func (j *jobIssuer) claims() map[string]any {
 	now := time.Now()
 	return map[string]any{
 		"iss":           j.url(),
@@ -110,16 +119,6 @@ func (j *jobIssuer) sign(t *testing.T, claims map[string]any) string {
 	return raw
 }
 
-type federation struct {
-	cfg      *config.Config
-	srv      *httptest.Server
-	accounts nokkuv1connect.ServiceAccountServiceClient
-	issuer   *jobIssuer
-	account  *nokkuv1.ServiceAccount
-	rule     *nokkuv1.ServiceAccountFederation
-	key      *ecdsa.PrivateKey
-}
-
 func dpopKey(t *testing.T) *ecdsa.PrivateKey {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -127,17 +126,17 @@ func dpopKey(t *testing.T) *ecdsa.PrivateKey {
 	return key
 }
 
-// newFederation is an account with limits and one rule that takes the jobs of jobIssuer.claims.
+// newFederation is a limited account with a rule that takes jobIssuer.claims.
 func newFederation(t *testing.T) *federation {
 	t.Helper()
 	cfg, srv := newTestAPI(t)
 	admin := header("Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
 	f := &federation{
 		cfg: cfg,
 		srv: srv,
 		accounts: nokkuv1connect.NewServiceAccountServiceClient(
-			connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), admin),
+			clientOn(srv, admin),
 		),
 		issuer: newJobIssuer(t),
 		key:    dpopKey(t),
@@ -180,7 +179,7 @@ func (f *federation) exchange(
 ) (*nokkuv1.ExchangeWorkloadTokenResponse, error) {
 	t.Helper()
 	return nokkuv1connect.NewAuthServiceClient(
-		connect.NewClient(connecthttp.NewTransport(f.srv.Client(), f.srv.URL), interceptors...),
+		clientOn(f.srv, interceptors...),
 	).ExchangeWorkloadToken(t.Context(), &nokkuv1.ExchangeWorkloadTokenRequest{ServiceAccount: &name, Token: &token})
 }
 
@@ -191,7 +190,7 @@ func (f *federation) proof(t *testing.T) connect.ClientInterceptor {
 
 func (f *federation) signIn(t *testing.T) (*nokkuv1.ExchangeWorkloadTokenResponse, login) {
 	t.Helper()
-	res, err := f.exchange(t, f.account.GetName(), f.issuer.sign(t, f.issuer.claims(f.cfg)), f.proof(t))
+	res, err := f.exchange(t, f.account.GetName(), f.issuer.sign(t, f.issuer.claims()), f.proof(t))
 	require.NoError(t, err)
 	return res, login{token: res.GetAccessToken(), key: f.key}
 }
@@ -200,7 +199,7 @@ func (f *federation) signIn(t *testing.T) (*nokkuv1.ExchangeWorkloadTokenRespons
 func (f *federation) whoami(t *testing.T, s connect.ClientInterceptor) (string, error) {
 	t.Helper()
 	res, err := nokkuv1connect.NewTargetServiceClient(
-		connect.NewClient(connecthttp.NewTransport(f.srv.Client(), f.srv.URL), s),
+		clientOn(f.srv, s),
 	).GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{})
 	return res.GetServiceAccount().GetId(), err
 }
@@ -209,7 +208,7 @@ func (f *federation) whoami(t *testing.T, s connect.ClientInterceptor) (string, 
 func (f *federation) exchangeRows(t *testing.T) []*db.ListAuditLogsRow {
 	t.Helper()
 	var rows []*db.ListAuditLogsRow
-	require.NoError(t, f.cfg.Conn.TenantTx(wsCtx(t, f.cfg), func(q *db.Queries) (err error) {
+	require.NoError(t, f.cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
 		rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
 			Actions: []string{"ExchangeWorkloadToken"}, Limit: 1000,
 		})
@@ -218,15 +217,15 @@ func (f *federation) exchangeRows(t *testing.T) []*db.ListAuditLogsRow {
 	return rows
 }
 
-// A job that matches a rule signs in with nothing stored, and the certificate it gets is a service account's.
+// A job that matches a rule signs in with nothing stored, as a service account.
 func TestExchangeSignsAJobIn(t *testing.T) {
 	f := newFederation(t)
-	_, enrolled := enrollTestDaemon(t, f.cfg, f.srv, seedWorkspace(t, f.cfg), true)
+	_, enrolled := enrollTestDaemon(t, f.cfg, f.srv, testWorkspace.ID, true)
 	targetID := enrolled.GetTargetId()
 	admin := header("Authorization",
-		"Bearer "+seedMember(t, f.cfg, seedWorkspace(t, f.cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
+		"Bearer "+seedMember(t, f.cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
 	grants := nokkuv1connect.NewTargetAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(f.srv.Client(), f.srv.URL), admin),
+		clientOn(f.srv, admin),
 	)
 	root, err := grants.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
 		TargetId: &targetID, Username: new("root"),
@@ -249,7 +248,7 @@ func TestExchangeSignsAJobIn(t *testing.T) {
 	sshKey, err := gossh.NewPublicKey(f.key.Public())
 	require.NoError(t, err)
 	signed, err := nokkuv1connect.NewCertificateServiceClient(
-		connect.NewClient(connecthttp.NewTransport(f.srv.Client(), f.srv.URL), signedIn(t, f.cfg, session)),
+		clientOn(f.srv, signedIn(t, f.cfg, session)),
 	).SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
 		TargetId:  &targetID,
 		PublicKey: new(string(gossh.MarshalAuthorizedKey(sshKey))),
@@ -278,7 +277,7 @@ func TestExchangeSignsAJobIn(t *testing.T) {
 // A session lasts as long as the job token at most, and an hour at most.
 func TestExchangeSessionLifetime(t *testing.T) {
 	f := newFederation(t)
-	claims := f.issuer.claims(f.cfg)
+	claims := f.issuer.claims()
 	exp := time.Now().Add(10 * time.Minute).Truncate(time.Second)
 	claims["exp"] = exp.Unix()
 	short, err := f.exchange(t, f.account.GetName(), f.issuer.sign(t, claims), f.proof(t))
@@ -286,7 +285,7 @@ func TestExchangeSessionLifetime(t *testing.T) {
 	assert.WithinDuration(t, exp, short.GetExpiresAt().AsTime(), time.Second, "a session must end with its job token")
 	assert.False(t, short.GetExpiresAt().AsTime().After(exp), "a session outlives its job token")
 
-	claims = f.issuer.claims(f.cfg)
+	claims = f.issuer.claims()
 	claims["exp"] = time.Now().Add(6 * time.Hour).Unix()
 	long, err := f.exchange(t, f.account.GetName(), f.issuer.sign(t, claims), f.proof(t))
 	require.NoError(t, err)
@@ -301,14 +300,14 @@ func TestExchangeTakesATokenWithinItsWindow(t *testing.T) {
 		"old, inside the window": time.Now().Add(-58 * time.Minute),
 		"a little ahead":         time.Now().Add(30 * time.Second),
 	} {
-		claims := f.issuer.claims(f.cfg)
+		claims := f.issuer.claims()
 		claims["iat"] = iat.Unix()
 		_, err := f.exchange(t, f.account.GetName(), f.issuer.sign(t, claims), f.proof(t))
 		require.NoError(t, err, name)
 	}
 }
 
-// Every way to be refused answers the same, so a caller learns nothing about which step failed. The audit row says.
+// Every refusal looks alike to a caller, only the audit row says why.
 func TestExchangeRefusals(t *testing.T) {
 	f := newFederation(t)
 	cfg := f.cfg
@@ -338,13 +337,13 @@ func TestExchangeRefusals(t *testing.T) {
 	})
 
 	claimed := func(change func(c map[string]any)) string {
-		c := f.issuer.claims(cfg)
+		c := f.issuer.claims()
 		change(c)
 		return f.issuer.sign(t, c)
 	}
 	without := func(name string) string { return claimed(func(c map[string]any) { delete(c, name) }) }
 	tampered := func() string {
-		parts := strings.Split(f.issuer.sign(t, f.issuer.claims(cfg)), ".")
+		parts := strings.Split(f.issuer.sign(t, f.issuer.claims()), ".")
 		payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 		require.NoError(t, err)
 		parts[1] = base64.RawURLEncoding.EncodeToString(
@@ -354,13 +353,13 @@ func TestExchangeRefusals(t *testing.T) {
 	}()
 	forged := func() string {
 		// Another key, under the name of the issuer the rule trusts.
-		c := other.claims(cfg)
+		c := other.claims()
 		c["iss"] = f.issuer.url()
 		return other.sign(t, c)
 	}()
 	unsigned := func() string {
 		head := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-		body, err := json.Marshal(f.issuer.claims(cfg))
+		body, err := json.Marshal(f.issuer.claims())
 		require.NoError(t, err)
 		return head + "." + base64.RawURLEncoding.EncodeToString(body) + "."
 	}()
@@ -370,11 +369,11 @@ func TestExchangeRefusals(t *testing.T) {
 		name    string
 		account string
 		token   string
-		reason  string // for the audit log, empty when no issuer vouched for the token
+		reason  string // the audit row's reason, empty if no issuer vouched
 	}{
 		{"wrong audience", f.account.GetName(), claimed(func(c map[string]any) { c["aud"] = "https://elsewhere.test" }), "expected audience"},
 		{"no audience", f.account.GetName(), without("aud"), "expected audience"},
-		{"wrong issuer", f.account.GetName(), other.sign(t, other.claims(cfg)), ""},
+		{"wrong issuer", f.account.GetName(), other.sign(t, other.claims()), ""},
 		{"no issuer", f.account.GetName(), without("iss"), ""},
 		{"tampered signature", f.account.GetName(), tampered, ""},
 		{"another key under the issuer's name", f.account.GetName(), forged, ""},
@@ -387,8 +386,8 @@ func TestExchangeRefusals(t *testing.T) {
 		{"iat too old", f.account.GetName(), claimed(func(c map[string]any) {
 			c["iat"] = time.Now().Add(-2 * time.Hour).Unix()
 		}), "too old"},
-		// A session row lives an hour and an iat may run a minute ahead. Past 59 minutes the row can be gone, so the
-		// job token would work again.
+		// A session row lives an hour and an iat may run a minute ahead. Past
+		// 59 minutes the row can be gone, and the job token replays.
 		{"iat older than a session row covers", f.account.GetName(), claimed(func(c map[string]any) {
 			c["iat"] = time.Now().Add(-59*time.Minute - 30*time.Second).Unix()
 		}), "too old"},
@@ -401,10 +400,10 @@ func TestExchangeRefusals(t *testing.T) {
 		{"a jti too long", f.account.GetName(), claimed(func(c map[string]any) { c["jti"] = longJTI }), "no usable jti"},
 		{"a claim that differs", f.account.GetName(), claimed(func(c map[string]any) { c["sub"] = "repo:acme/app:ref:refs/heads/dev" }), "no rule of the issuer matches"},
 		{"a claim that is no string", f.account.GetName(), claimed(func(c map[string]any) { c["sub"] = "numbers" }), "no rule of the issuer matches"},
-		{"a rule of another account", rogue.GetName(), f.issuer.sign(t, f.issuer.claims(cfg)), "no rule of the issuer matches"},
-		{"an account with no rules", empty.GetName(), f.issuer.sign(t, f.issuer.claims(cfg)), ""},
-		{"an unknown account", uniq("nobody"), f.issuer.sign(t, f.issuer.claims(cfg)), ""},
-		{"an account of another workspace", foreign, f.issuer.sign(t, f.issuer.claims(cfg)), ""},
+		{"a rule of another account", rogue.GetName(), f.issuer.sign(t, f.issuer.claims()), "no rule of the issuer matches"},
+		{"an account with no rules", empty.GetName(), f.issuer.sign(t, f.issuer.claims()), ""},
+		{"an unknown account", uniq("nobody"), f.issuer.sign(t, f.issuer.claims()), ""},
+		{"an account of another workspace", foreign, f.issuer.sign(t, f.issuer.claims()), ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			before := len(f.exchangeRows(t))
@@ -423,33 +422,33 @@ func TestExchangeRefusals(t *testing.T) {
 	}
 
 	t.Run("no DPoP proof", func(t *testing.T) {
-		token := f.issuer.sign(t, f.issuer.claims(cfg))
+		token := f.issuer.sign(t, f.issuer.claims())
 		_, err := f.exchange(t, f.account.GetName(), token)
 		assert.Equal(t, refusedAs, rpcAnswer(err))
 		_, err = f.exchange(t, f.account.GetName(), token, f.proof(t))
 		require.NoError(t, err, "a call refused for its proof must not spend the job token")
 	})
 	t.Run("a bad DPoP proof", func(t *testing.T) {
-		_, err := f.exchange(t, f.account.GetName(), f.issuer.sign(t, f.issuer.claims(cfg)),
+		_, err := f.exchange(t, f.account.GetName(), f.issuer.sign(t, f.issuer.claims()),
 			header("DPoP", "not-a-proof"))
 		assert.Equal(t, refusedAs, rpcAnswer(err))
 	})
 }
 
-// The nonce is a step of the protocol, no refusal. It comes first, so signing again does not cost the job token.
+// A stale nonce is no refusal, signing again does not cost the job token.
 func TestExchangeStaleNonceKeepsTheJobToken(t *testing.T) {
 	f := newFederation(t)
-	token := f.issuer.sign(t, f.issuer.claims(f.cfg))
+	token := f.issuer.sign(t, f.issuer.claims())
 	before := len(f.exchangeRows(t))
 	_, err := f.exchange(t, f.account.GetName(), token,
-		header("DPoP", dpopProofWithNonce(t, f.cfg, f.key, exchange, "", "stale")))
+		header("DPoP", dpopProofWithNonce(t, f.key, exchange, "", "stale")))
 	assert.Equal(t, "unauthenticated: stale DPoP nonce", rpcAnswer(err))
 	assert.Len(t, f.exchangeRows(t), before, "signing again is no refused exchange")
 	_, err = f.exchange(t, f.account.GetName(), token, f.proof(t))
 	require.NoError(t, err)
 }
 
-// Through the client nk uses against the real core: its first proof has no nonce, so the nonce round runs for real.
+// With nk's real client, whose first proof has no nonce, so that round runs.
 func TestExchangeThroughTheClientOfNk(t *testing.T) {
 	f := newFederation(t)
 	proofer, err := dpop.NewProofer(f.key)
@@ -459,13 +458,13 @@ func TestExchangeThroughTheClientOfNk(t *testing.T) {
 		BaseURL:           testWorkspace.BaseURL,
 		UnboundProcedures: map[string]bool{exchange: true},
 	})
-	rpc := connect.NewClient(connecthttp.NewTransport(f.srv.Client(), f.srv.URL), signer.Intercept)
+	rpc := clientOn(f.srv, signer.Intercept)
 	before := len(f.exchangeRows(t))
 
 	res, err := nokkuv1connect.NewAuthServiceClient(rpc).ExchangeWorkloadToken(t.Context(),
 		&nokkuv1.ExchangeWorkloadTokenRequest{
 			ServiceAccount: f.account.Name,
-			Token:          new(f.issuer.sign(t, f.issuer.claims(f.cfg))),
+			Token:          new(f.issuer.sign(t, f.issuer.claims())),
 		})
 	require.NoError(t, err)
 	session = res.GetAccessToken()
@@ -479,10 +478,10 @@ func TestExchangeThroughTheClientOfNk(t *testing.T) {
 	assert.Equal(t, f.account.GetId(), access.GetServiceAccount().GetId())
 }
 
-// A job token works once, whatever key asks and however the first session ended.
+// A job token works once, whatever key asks and however its session ended.
 func TestExchangeReplay(t *testing.T) {
 	f := newFederation(t)
-	token := f.issuer.sign(t, f.issuer.claims(f.cfg))
+	token := f.issuer.sign(t, f.issuer.claims())
 	first, err := f.exchange(t, f.account.GetName(), token, f.proof(t))
 	require.NoError(t, err)
 
@@ -522,7 +521,7 @@ func TestExchangeReplay(t *testing.T) {
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "got %v", err)
 }
 
-// The session is bound to the proof's key, so what leaks from a job log is worth nothing without it.
+// The session is bound to the proof's key, a leaked token is useless alone.
 func TestExchangeBindsTheSessionToItsKey(t *testing.T) {
 	f := newFederation(t)
 	_, session := f.signIn(t)
@@ -560,7 +559,7 @@ func TestRemovedRuleStopsWorking(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = f.exchange(t, f.account.GetName(), f.issuer.sign(t, f.issuer.claims(f.cfg)), f.proof(t))
+	_, err = f.exchange(t, f.account.GetName(), f.issuer.sign(t, f.issuer.claims()), f.proof(t))
 	assert.Equal(t, refusedAs, rpcAnswer(err), "a removed rule still signs in")
 	_, err = f.accounts.RemoveServiceAccountFederation(t.Context(), &nokkuv1.RemoveServiceAccountFederationRequest{
 		ServiceAccountId: f.account.Id,
@@ -569,7 +568,6 @@ func TestRemovedRuleStopsWorking(t *testing.T) {
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "removing it twice, %v", err)
 }
 
-// Deleting the account takes its rules along, and the workspace of another request never sees them.
 func TestRulesGoWithTheirAccount(t *testing.T) {
 	f := newFederation(t)
 	_, err := f.accounts.DeleteServiceAccount(t.Context(), &nokkuv1.DeleteServiceAccountRequest{Id: f.account.Id})
@@ -581,7 +579,7 @@ func TestRulesGoWithTheirAccount(t *testing.T) {
 	assert.Empty(t, listed.GetFederations())
 }
 
-// A rule is only as narrow as what it demands, so the weak ones never get stored. The error says why, an admin reads it.
+// A weak rule never gets stored, and the error tells the admin why.
 func TestFederationRuleValidation(t *testing.T) {
 	const (
 		github = "https://token.actions.githubusercontent.com"
@@ -660,10 +658,10 @@ func TestFederationRuleValidation(t *testing.T) {
 	}
 }
 
-// A refused exchange names the workspace and the account in the log and never holds the job token.
+// A refused exchange logs workspace and account, never the job token.
 func TestRefusedExchangeReachesTheAuditLog(t *testing.T) {
 	f := newFederation(t)
-	claims := f.issuer.claims(f.cfg)
+	claims := f.issuer.claims()
 	claims["sub"] = "repo:acme/app:ref:refs/heads/dev"
 	token := f.issuer.sign(t, claims)
 	_, err := f.exchange(t, f.account.GetName(), token, f.proof(t))
@@ -673,7 +671,7 @@ func TestRefusedExchangeReachesTheAuditLog(t *testing.T) {
 	require.NotEmpty(t, rows)
 	row := rows[0]
 	assert.False(t, row.Ok)
-	assert.Equal(t, seedWorkspace(t, f.cfg), row.WorkspaceID)
+	assert.Equal(t, testWorkspace.ID, row.WorkspaceID)
 	assert.Equal(t, f.account.GetName(), row.ActorName)
 	assert.Equal(t, f.account.GetId(), row.ActorID)
 	var details map[string]any
@@ -697,35 +695,37 @@ func TestExchangeFollowsThePlan(t *testing.T) {
 	stopped := httptest.NewServer(serving(api.New(&local).Handler(t.Context())))
 	t.Cleanup(stopped.Close)
 
-	// The trial of the shared workspace ended an hour ago, for this server only.
-	ws := seedWorkspace(t, f.cfg)
+	// The shared workspace's trial ended an hour ago, for this server only.
+	ws := testWorkspace.ID
 	sub, err := f.cfg.Conn.Sys().GetSubscription(t.Context(), ws)
 	require.NoError(t, err)
-	trialEnding := func(end time.Time) error {
+	setEnd := func(source string, end time.Time) error {
 		return f.cfg.Conn.Sys().UpsertSubscription(context.WithoutCancel(t.Context()), &db.UpsertSubscriptionParams{
-			WorkspaceID: ws, Source: entitlement.SourceTrial, Plan: sub.Plan, Status: sub.Status,
+			WorkspaceID: ws, Source: source, Plan: sub.Plan, Status: sub.Status,
 			CurrentPeriodEnd: &end,
 		})
 	}
-	require.NoError(t, trialEnding(time.Now().Add(-time.Hour)))
+	restore := func() error { return setEnd(sub.Source, *sub.CurrentPeriodEnd) }
+	t.Cleanup(func() { _ = restore() })
+	require.NoError(t, setEnd(entitlement.SourceTrial, time.Now().Add(-time.Hour)))
 
 	inactive := federation{cfg: f.cfg, srv: stopped}
-	token := f.issuer.sign(t, f.issuer.claims(f.cfg))
+	token := f.issuer.sign(t, f.issuer.claims())
 	_, err = inactive.exchange(t, f.account.GetName(), token, f.proof(t))
 	assert.Equal(t, refusedAs, rpcAnswer(err))
 	rows := f.exchangeRows(t)
 	require.NotEmpty(t, rows)
 	assert.Contains(t, string(rows[0].Details), "does not sign")
 
-	require.NoError(t, trialEnding(*sub.CurrentPeriodEnd))
+	require.NoError(t, restore())
 	_, err = f.exchange(t, f.account.GetName(), token, f.proof(t))
 	require.NoError(t, err, "a plan refusal must not spend the job token")
 }
 
-// nk logout ends a job's session on the core too. Its row stays, so the job token stays spent.
+// nk logout ends a job's session on the core, the job token stays spent.
 func TestLogoutEndsACISession(t *testing.T) {
 	f := newFederation(t)
-	token := f.issuer.sign(t, f.issuer.claims(f.cfg))
+	token := f.issuer.sign(t, f.issuer.claims())
 	res, err := f.exchange(t, f.account.GetName(), token, f.proof(t))
 	require.NoError(t, err)
 	session := signedIn(t, f.cfg, login{token: res.GetAccessToken(), key: f.key})
@@ -733,7 +733,7 @@ func TestLogoutEndsACISession(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = nokkuv1connect.NewAuthServiceClient(
-		connect.NewClient(connecthttp.NewTransport(f.srv.Client(), f.srv.URL), session),
+		clientOn(f.srv, session),
 	).Logout(t.Context(), &nokkuv1.LogoutRequest{})
 	require.NoError(t, err)
 
@@ -743,7 +743,7 @@ func TestLogoutEndsACISession(t *testing.T) {
 	assert.Equal(t, refusedAs, rpcAnswer(err), "a logout freed the job token")
 }
 
-// An account takes so many rules and no more, every exchange that names it loads them all.
+// Rules per account are capped, every exchange that names it loads them all.
 func TestRulesPerAccountAreCapped(t *testing.T) {
 	f := newFederation(t)
 	account := f.addAccount(t)
@@ -761,7 +761,7 @@ func TestRulesPerAccountAreCapped(t *testing.T) {
 	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(add(32)))
 }
 
-// A session goes out only once the log has it. IssueToken writes no row for a service account, so the exchange does.
+// No session goes out before the log has it, the exchange writes that row.
 func TestExchangeNeedsItsAuditRow(t *testing.T) {
 	f := newFederation(t)
 	owner, err := pgx.Connect(t.Context(), "")
@@ -774,7 +774,7 @@ func TestExchangeNeedsItsAuditRow(t *testing.T) {
 	_, err = owner.Exec(t.Context(), "REVOKE INSERT ON audit.audit_logs FROM nokku_app")
 	require.NoError(t, err)
 
-	token := f.issuer.sign(t, f.issuer.claims(f.cfg))
+	token := f.issuer.sign(t, f.issuer.claims())
 	res, err := f.exchange(t, f.account.GetName(), token, f.proof(t))
 	require.Error(t, err, "a session went out with no row in the log")
 	assert.Empty(t, res.GetAccessToken())

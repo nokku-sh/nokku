@@ -16,10 +16,10 @@ func testReport() Report {
 	return Report{
 		Fixes: []string{"made the config dir private"},
 		Checks: []Check{
-			{Section: "System", Name: "nk", Status: StatusInfo, Detail: "dev linux/amd64"},
-			{Section: "System", Name: "TPM", Status: StatusOK},
-			{Section: "SSH", Name: "~/.ssh/config", Status: StatusFail, Detail: "missing the Nokku include"},
-			{Section: "SSH", Name: "identity", Status: StatusWarn, Detail: "none yet"},
+			{Section: "System", Name: "nk", Status: statusInfo, Detail: "dev linux/amd64"},
+			{Section: "System", Name: "TPM", Status: statusOK},
+			{Section: "SSH", Name: "~/.ssh/config", Status: statusFail, Detail: "missing the Nokku include"},
+			{Section: "SSH", Name: "identity", Status: statusWarn, Detail: "none yet"},
 		},
 	}
 }

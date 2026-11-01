@@ -3,6 +3,8 @@ package audit
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -28,16 +30,10 @@ func TestRecordsSkipsReadsAndQuietCalls(t *testing.T) {
 	}
 	for _, tt := range tests {
 		d, err := protoregistry.GlobalFiles.FindDescriptorByName(tt.method)
-		if err != nil {
-			t.Fatalf("%s: %v", tt.method, err)
-		}
-		if got := Records(d); got != tt.audited {
-			t.Errorf("%s audited = %v, want %v", tt.method, got, tt.audited)
-		}
+		require.NoError(t, err, "%s", tt.method)
+		assert.Equal(t, tt.audited, Records(d), "%s audited", tt.method)
 	}
-	if !Records(nil) {
-		t.Error("a call without a schema was skipped")
-	}
+	assert.True(t, Records(nil), "a call without a schema was skipped")
 }
 
 func TestRequestTarget(t *testing.T) {
@@ -55,8 +51,6 @@ func TestRequestTarget(t *testing.T) {
 		{&nokkuv1.ConsumeMagicLinkRequest{Token: new("secret")}, ""},
 	}
 	for _, tt := range tests {
-		if got := requestTarget(tt.msg.ProtoReflect()); got != tt.want {
-			t.Errorf("%T target = %q, want %q", tt.msg, got, tt.want)
-		}
+		assert.Equal(t, tt.want, requestTarget(tt.msg.ProtoReflect()), "%T target", tt.msg)
 	}
 }

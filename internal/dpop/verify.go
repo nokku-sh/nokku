@@ -21,44 +21,37 @@ import (
 const (
 	nonceTTL = 5 * time.Minute
 	maxSkew  = time.Minute
-	// ReplayWindow is how long a replay store has to remember a jti. The iat
-	// check takes a proof for two skews at most, the third is slack for a wall
-	// clock that steps back.
+	// ReplayWindow is how long a replay store keeps a jti: two skews of iat,
+	// plus one for a wall clock that steps back.
 	ReplayWindow = 3 * maxSkew
 )
 
 var (
-	// ErrInvalidProof is a proof that does not verify. Every error of
-	// [Verifier.Verify] but [ErrNonce] wraps it.
+	// ErrInvalidProof wraps every [Verifier.Verify] error but [ErrNonce].
 	ErrInvalidProof = errors.New("dpop: invalid proof")
-	// ErrNonce asks the client to sign again with the nonce the server sends
-	// along (RFC 9449 section 8).
+	// ErrNonce means sign again with the server's nonce (RFC 9449 section 8).
 	ErrNonce = errors.New("dpop: nonce required")
 
 	errReplay          = fmt.Errorf("%w: replayed proof", ErrInvalidProof)
 	errBindingMismatch = fmt.Errorf("%w: jkt mismatch", ErrInvalidProof)
 )
 
-// allowedAlgs is what nk and nokkud sign with, a P-256 key in a TPM or in software.
+// allowedAlgs is what nk and nokkud sign with, a P-256 key.
 var allowedAlgs = []jose.SignatureAlgorithm{jose.ES256}
 
-// Verifier checks proofs on the server. Its nonces are a stateless HMAC over
-// a time bucket. Only proofs of a session take room in its replay store.
+// Verifier uses a stateless HMAC over a time bucket for its nonces.
 type Verifier struct {
 	secret   []byte
 	firstUse func(jti [32]byte) bool
 	now      func() time.Time
 }
 
-// NewVerifier keys the nonces with secret. firstUse records the hash of a
-// proof's jti and reports whether it was new, and has to remember it for
-// [ReplayWindow]. now is the clock.
+// NewVerifier needs firstUse to remember a jti hash for [ReplayWindow].
 func NewVerifier(secret []byte, firstUse func(jti [32]byte) bool, now func() time.Time) *Verifier {
 	return &Verifier{secret: secret, firstUse: firstUse, now: now}
 }
 
-// ProofFrom returns the request's proof, "" without one. Two DPoP headers are
-// refused (RFC 9449 section 4.3).
+// ProofFrom refuses two DPoP headers (RFC 9449 section 4.3).
 func ProofFrom(h http.Header) (string, error) {
 	proofs := h.Values("DPoP")
 	if len(proofs) > 1 {
@@ -70,7 +63,6 @@ func ProofFrom(h http.Header) (string, error) {
 	return proofs[0], nil
 }
 
-// CurrentNonce is the nonce a client should sign with now.
 func (v *Verifier) CurrentNonce() string {
 	return v.nonceFor(v.bucket(v.now()))
 }
@@ -85,17 +77,8 @@ func (v *Verifier) nonceFor(bucket int64) string {
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
-// nonceValid also accepts the previous bucket so proofs survive a rotation.
-func (v *Verifier) nonceValid(nonce string) bool {
-	bucket := v.bucket(v.now())
-	return subtle.ConstantTimeCompare([]byte(nonce), []byte(v.nonceFor(bucket))) == 1 ||
-		subtle.ConstantTimeCompare([]byte(nonce), []byte(v.nonceFor(bucket-1))) == 1
-}
-
-// Verify checks proofJWT for a request of htm to htu and returns the proof
-// key's thumbprint (jkt). accessToken is the token the request carries, ""
-// for none. A non-empty binding is the jkt the token is bound to, it has to
-// match before the jti takes room in the replay store.
+// Verify returns the proof key's thumbprint (jkt). A non-empty binding must
+// match it before the jti takes room in the replay store.
 func (v *Verifier) Verify(proofJWT, accessToken, htm, htu, binding string) (string, error) {
 	sig, err := jose.ParseSignedCompact(proofJWT, allowedAlgs)
 	if err != nil {
@@ -159,8 +142,9 @@ func (v *Verifier) Verify(proofJWT, accessToken, htm, htu, binding string) (stri
 	if binding != "" && jkt != binding {
 		return "", errBindingMismatch
 	}
-	// A proof without a session is for enrollment or the device poll, and each spends something single-use. Anyone
-	// can sign one, so it gets no room in the store.
+	// A proof without a session is for enrollment, the device poll or a job
+	// token exchange, and each spends something single-use. Anyone can sign
+	// one, so it gets no room in the store.
 	if accessToken == "" {
 		return jkt, nil
 	}
@@ -172,9 +156,15 @@ func (v *Verifier) Verify(proofJWT, accessToken, htm, htu, binding string) (stri
 	return jkt, nil
 }
 
-// SameURL compares two URLs the way an htu is compared: host case, a default
-// port, a trailing slash, the query and the fragment do not count. The path
-// counts byte for byte.
+// nonceValid also accepts the previous bucket so proofs survive a rotation.
+func (v *Verifier) nonceValid(nonce string) bool {
+	bucket := v.bucket(v.now())
+	return subtle.ConstantTimeCompare([]byte(nonce), []byte(v.nonceFor(bucket))) == 1 ||
+		subtle.ConstantTimeCompare([]byte(nonce), []byte(v.nonceFor(bucket-1))) == 1
+}
+
+// SameURL compares URLs the way an htu is compared. Host case, a default port,
+// the query and the fragment do not count. Paths go through [path.Clean].
 func SameURL(a, b string) bool {
 	ua, errA := url.Parse(a)
 	ub, errB := url.Parse(b)

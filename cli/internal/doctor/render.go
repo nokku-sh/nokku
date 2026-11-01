@@ -8,25 +8,10 @@ import (
 )
 
 var glyph = map[Status]string{
-	StatusOK:   "✔",
-	StatusWarn: "⚠",
-	StatusFail: "✖",
-	StatusInfo: "ℹ",
-}
-
-func color(status Status) func(string) string {
-	switch status {
-	case StatusOK:
-		return ui.Green
-	case StatusWarn:
-		return ui.Yellow
-	case StatusFail:
-		return ui.Red
-	case StatusInfo:
-		return ui.Dim
-	default:
-		return ui.Dim
-	}
+	statusOK:   "✔",
+	statusWarn: "⚠",
+	statusFail: "✖",
+	statusInfo: "ℹ",
 }
 
 func Print(w io.Writer, r Report) {
@@ -64,17 +49,32 @@ func Print(w io.Writer, r Report) {
 	fmt.Fprintln(w, summarize(r))
 }
 
+func color(status Status) func(string) string {
+	switch status {
+	case statusOK:
+		return ui.Green
+	case statusWarn:
+		return ui.Yellow
+	case statusFail:
+		return ui.Red
+	case statusInfo:
+		return ui.Dim
+	default:
+		return ui.Dim
+	}
+}
+
 func summarize(r Report) string {
 	var ok, warn, fail int
 	for _, c := range r.Checks {
 		switch c.Status {
-		case StatusOK:
+		case statusOK:
 			ok++
-		case StatusWarn:
+		case statusWarn:
 			warn++
-		case StatusFail:
+		case statusFail:
 			fail++
-		case StatusInfo:
+		case statusInfo:
 		}
 	}
 

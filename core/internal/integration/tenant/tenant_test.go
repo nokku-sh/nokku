@@ -43,7 +43,7 @@ func testConnection(t *testing.T) (*db.Connection, *kms.Keyset) {
 func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 	c, keys := testConnection(t)
 	t.Setenv("NOKKU_WORKSPACE_NAME", "Lab")
-	// A self-hosted database is empty before its first boot, so workspaces of other tests go first.
+	// A self-hosted database starts empty, so other tests' workspaces go first.
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	_, err = owner.Exec(t.Context(), "DELETE FROM workspaces")
@@ -131,7 +131,8 @@ func TestPurgeUnclaimed(t *testing.T) {
 	assert.ErrorIs(t, err, tenant.ErrUnknownWorkspace, "purged, and gone from the cache too")
 }
 
-// Nothing but the stored first sign-in keeps it. Sessions and devices end, and an email revert deletes them all.
+// Only the stored first sign-in keeps it. Sessions and devices end, and an
+// email revert deletes them all.
 func TestPurgeKeepsAClaimedWorkspace(t *testing.T) {
 	c, keys := testConnection(t)
 	r, err := tenant.New(t.Context(), c, keys, "https://nokku.test", true)

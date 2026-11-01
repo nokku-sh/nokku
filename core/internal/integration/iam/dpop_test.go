@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/cryptosigner"
+	"github.com/stretchr/testify/require"
 )
 
 // signProof produces a client-style DPoP proof with an ES256 key.
@@ -35,25 +36,17 @@ func signProof(
 		claims["ath"] = ath
 	}
 	payload, err := json.Marshal(claims)
-	if err != nil {
-		t.Fatalf("marshal claims: %v", err)
-	}
+	require.NoError(t, err, "marshal claims")
 	opts := (&jose.SignerOptions{}).WithType("dpop+jwt")
 	opts.EmbedJWK = true
 	signer, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: cryptosigner.Opaque(key)},
 		opts,
 	)
-	if err != nil {
-		t.Fatalf("new signer: %v", err)
-	}
+	require.NoError(t, err, "new signer")
 	jws, err := signer.Sign(payload)
-	if err != nil {
-		t.Fatalf("sign: %v", err)
-	}
+	require.NoError(t, err, "sign")
 	compact, err := jws.CompactSerialize()
-	if err != nil {
-		t.Fatalf("serialize: %v", err)
-	}
+	require.NoError(t, err, "serialize")
 	return compact
 }

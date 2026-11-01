@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Go calls setgroups(2) whenever Credential is set, and non-root gets EPERM for it.
+// Go calls setgroups(2) when Credential is set, and non-root gets EPERM.
 func TestSysProcAttrNoCredentialWhenNonRoot(t *testing.T) {
 	t.Parallel()
 
@@ -50,7 +50,7 @@ func TestSysProcAttrCredentialWhenRoot(t *testing.T) {
 	is.NotNil(attr.Credential)
 }
 
-// A fake getent first on PATH exercises the NSS/LDAP paths without a real directory service.
+// A fake getent first on PATH stands in for NSS and LDAP.
 func withFakeGetent(t *testing.T, script string) {
 	t.Helper()
 	dir := t.TempDir()

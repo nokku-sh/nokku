@@ -25,21 +25,6 @@ type authService struct {
 	cfg *config.Config
 }
 
-func callInfo(ctx context.Context) (*connect.CallInfo, error) {
-	ci, ok := connect.CallInfoForServerContext(ctx)
-	if !ok {
-		return nil, connect.NewError(
-			connect.CodeInternal,
-			"no call info in context",
-		)
-	}
-	return ci, nil
-}
-
-func setCookie(ci *connect.CallInfo, c *http.Cookie) {
-	ci.ResponseHeader().Add("Set-Cookie", c.String())
-}
-
 func (s *authService) GetLoginOptions(
 	ctx context.Context,
 	_ *nokkuv1.GetLoginOptionsRequest,
@@ -95,7 +80,10 @@ func (s *authService) ConsumeMagicLink(
 	case errors.Is(err, iam.ErrSeatLimit):
 		return nil, errSeatLimit
 	case errors.Is(err, iam.ErrEmailTaken):
-		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists, sign in instead")
+		return nil, connect.NewError(
+			connect.CodeAlreadyExists,
+			"an account with this email already exists, sign in instead",
+		)
 	case err != nil:
 		return nil, errLinkInvalid
 	}
@@ -107,6 +95,10 @@ func (s *authService) ConsumeMagicLink(
 	return &nokkuv1.ConsumeMagicLinkResponse{User: u.ToProto()}, nil
 }
 
+func setCookie(ci *connect.CallInfo, c *http.Cookie) {
+	ci.ResponseHeader().Add("Set-Cookie", c.String())
+}
+
 func (s *authService) Logout(
 	ctx context.Context,
 	_ *nokkuv1.LogoutRequest,
@@ -115,9 +107,9 @@ func (s *authService) Logout(
 	if err != nil {
 		return nil, err
 	}
-	// Public endpoint, so authenticate the credential here before revoking.
 	setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	meta, _ := actor.RequestMetaFromContext(ctx)
+	// Public endpoint, so Logout authenticates the credential before revoking.
 	if err := s.cfg.IAM.Logout(ctx, meta.Header, nokkuv1connect.AuthServiceLogoutProcedure); err != nil {
 		if errors.Is(err, dpop.ErrNonce) || errors.Is(err, iam.ErrDPoPRequired) {
 			s.cfg.IAM.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
@@ -134,10 +126,10 @@ func (s *authService) ConfirmEmailChange(
 ) (*nokkuv1.ConfirmEmailChangeResponse, error) {
 	err := s.cfg.IAM.ConfirmEmailChange(ctx, req.GetToken())
 	if errors.Is(err, iam.ErrEmailTaken) {
-		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists")
+		return nil, connect.NewError(connect.CodeAlreadyExists, "an account with this email already exists")
 	}
 	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, "this confirmation link is invalid or expired")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "this confirmation link is invalid or expired")
 	}
 	return &nokkuv1.ConfirmEmailChangeResponse{}, nil
 }
@@ -148,19 +140,19 @@ func (s *authService) CancelEmailChange(
 ) (*nokkuv1.CancelEmailChangeResponse, error) {
 	err := s.cfg.IAM.CancelEmailChange(ctx, req.GetToken())
 	if errors.Is(err, iam.ErrEmailTaken) {
-		return nil, newError(
+		return nil, connect.NewError(
 			connect.CodeAlreadyExists,
 			"another account uses the old address by now, contact your administrator",
 		)
 	}
 	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, "this link is invalid or expired")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "this link is invalid or expired")
 	}
 	return &nokkuv1.CancelEmailChangeResponse{}, nil
 }
 
-// ExchangeWorkloadToken trades a job's token for a session of a service account, bound to the key of the proof. The
-// call is public, so it runs the plan gate itself and writes its own audit row.
+// ExchangeWorkloadToken trades a job's token for a session bound to the proof's
+// key. It is public, so it does its own plan gate and audit row.
 func (s *authService) ExchangeWorkloadToken(
 	ctx context.Context,
 	req *nokkuv1.ExchangeWorkloadTokenRequest,
@@ -173,7 +165,7 @@ func (s *authService) ExchangeWorkloadToken(
 	binding, err := s.workloadBinding(ctx)
 	if errors.Is(err, dpop.ErrNonce) {
 		s.cfg.IAM.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
-		return nil, newError(connect.CodeUnauthenticated, "stale DPoP nonce")
+		return nil, connect.NewError(connect.CodeUnauthenticated, "stale DPoP nonce")
 	}
 	if err != nil {
 		return nil, s.refuseWorkload(ctx, &iam.WorkloadRefusedError{Reason: "no valid DPoP proof"})
@@ -199,7 +191,7 @@ func (s *authService) ExchangeWorkloadToken(
 		return nil, err
 	}
 
-	// IssueToken writes no row for a service account. A session nobody heard of must not go out, it stays unused.
+	// IssueToken writes no audit row here. An unlogged session must not go out.
 	if err := s.cfg.Audit.Confirm(ctx, &audit.Event{
 		Action:    actionExchangeWorkloadToken,
 		ActorID:   job.Account.ID,
@@ -223,7 +215,7 @@ func (s *authService) ExchangeWorkloadToken(
 	}, nil
 }
 
-// workloadBinding returns the thumbprint of the key that signed the proof. No token exists yet, so nothing binds it.
+// workloadBinding is the proof key's thumbprint. No token exists yet to bind.
 func (s *authService) workloadBinding(ctx context.Context) (string, error) {
 	ws, _ := actor.WorkspaceFromContext(ctx)
 	meta, _ := actor.RequestMetaFromContext(ctx)
@@ -240,8 +232,8 @@ func (s *authService) workloadBinding(ctx context.Context) (string, error) {
 	)
 }
 
-// refuseWorkload keeps the reason here, the job gets one answer for every refusal. The call is public, so only a token
-// its issuer signed reaches the audit log. Nobody fills the log of a workspace at the rate limit.
+// The reason stays here, a job gets one answer for every refusal. The call is
+// public, so only a token its issuer signed may fill the audit log.
 func (s *authService) refuseWorkload(ctx context.Context, r *iam.WorkloadRefusedError) error {
 	e := &audit.Event{
 		Action:    actionExchangeWorkloadToken,
@@ -260,4 +252,15 @@ func (s *authService) refuseWorkload(ctx context.Context, r *iam.WorkloadRefused
 		s.cfg.Audit.Record(ctx, e)
 	}
 	return errWorkloadRefused
+}
+
+func callInfo(ctx context.Context) (*connect.CallInfo, error) {
+	ci, ok := connect.CallInfoForServerContext(ctx)
+	if !ok {
+		return nil, connect.NewError(
+			connect.CodeInternal,
+			"no call info in context",
+		)
+	}
+	return ci, nil
 }

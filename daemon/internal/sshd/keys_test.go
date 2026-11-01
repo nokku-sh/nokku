@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -55,7 +54,7 @@ func TestHostKeyIsARootOnlyFile(t *testing.T) {
 	is.Equal(string(ssh.MarshalAuthorizedKey(key.PublicKey())), string(pub))
 }
 
-// If the host key changed, every known_hosts entry would break on daemon restart.
+// A changed host key would break every known_hosts entry on daemon restart.
 func TestHostKeysStable(t *testing.T) {
 	must := require.New(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
@@ -67,7 +66,7 @@ func TestHostKeysStable(t *testing.T) {
 	assert.Equal(t, first.PublicKey().Marshal(), second.PublicKey().Marshal())
 }
 
-// An enrollment starts with a new key, and the certificate of the old one goes with it.
+// An enrollment starts with a new key, and the old key's certificate goes.
 func TestCreateHostKeyReplacesTheKeyAndItsCert(t *testing.T) {
 	must := require.New(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
@@ -92,7 +91,7 @@ func TestHostKeyReadableByOthersIsRefused(t *testing.T) {
 	assert.ErrorContains(t, err, "readable by others")
 }
 
-// The TPM holds only the daemon's identity, so a flood of handshakes can never queue up in front of it.
+// The TPM holds only the daemon's identity, so handshakes never queue for it.
 func TestHandshakeNeedsNoTPM(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go not installed")
@@ -102,5 +101,5 @@ func TestHandshakeNeedsNoTPM(t *testing.T) {
 	require.NoError(t, err, "go list")
 	deps := strings.Fields(string(out))
 	require.Contains(t, deps, "golang.org/x/crypto/ssh", "go list did not list the dependencies")
-	assert.False(t, slices.Contains(deps, "github.com/nokku-sh/nokku/internal/tpm"), "the SSH server reaches the TPM")
+	assert.NotContains(t, deps, "github.com/nokku-sh/nokku/internal/tpm", "the SSH server reaches the TPM")
 }

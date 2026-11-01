@@ -12,9 +12,8 @@ import (
 
 const retireTick = time.Minute
 
-// RetireLoop deletes the daemons of ephemeral tokens that have been away longer than their retire_after. A daemon
-// in connected is never away. Each one is written to the audit log through record. The session stays, like after an
-// admin's delete, so a host that does come back is told it is rejected and drops its cached principals.
+// RetireLoop deletes ephemeral daemons away past retire_after. The session
+// stays, so a host that comes back is rejected and drops its cached principals.
 func RetireLoop(
 	ctx context.Context,
 	conn connection,
@@ -36,7 +35,7 @@ func RetireLoop(
 	}
 }
 
-// Retire is one pass of RetireLoop, on its own for tests. Nothing counts as away before started.
+// Retire is one pass of RetireLoop. Nothing counts as away before started.
 func Retire(
 	ctx context.Context,
 	conn connection,

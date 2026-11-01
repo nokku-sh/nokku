@@ -52,3 +52,20 @@ func TestReportJSONLeavesOutWhatIsUnset(t *testing.T) {
 	assert.NotContains(t, string(data), "last_certificate_at", "no certificate yet")
 	assert.Contains(t, string(data), `"account":"deploy"`)
 }
+
+// These values come from people and SCIM, a spreadsheet must not run them.
+func TestReportCSVStopsFormulas(t *testing.T) {
+	rows := []*db.ListAccessReportRow{{
+		Kind: "user", SubjectID: "u1", Name: "=1+1", Email: "+a@x", Active: true, Via: "-ops", Target: "@web",
+		Username: "=root",
+	}}
+
+	data, err := Report(rows, nokkuv1.ExportAuditLogsRequest_FORMAT_CSV)
+	require.NoError(t, err)
+	records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
+	require.NoError(t, err)
+
+	require.Len(t, records, 2)
+	r := records[1]
+	assert.Equal(t, []string{"'=1+1", "'+a@x", "'-ops", "'@web", "'=root"}, []string{r[2], r[3], r[5], r[6], r[7]})
+}

@@ -9,7 +9,6 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -23,13 +22,13 @@ import (
 
 func TestUpdateServiceAccount(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	auth := header(
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	client := nokkuv1connect.NewServiceAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), auth),
+		clientOn(srv, auth),
 	)
 
 	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
@@ -67,13 +66,13 @@ func TestUpdateServiceAccount(t *testing.T) {
 	assert.Empty(t, cleared.GetServiceAccount().GetTags(), "naming the tags with none clears them")
 }
 
-// An account stores its limits the way a server reads them, and refuses a list no server can read.
+// Limits are stored the way a server reads them, an unreadable list is refused.
 func TestServiceAccountLimits(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	client := nokkuv1connect.NewServiceAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header(
+		clientOn(srv, header(
 			"Authorization",
-			"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+			"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 		)),
 	)
 
@@ -97,7 +96,7 @@ func TestServiceAccountLimits(t *testing.T) {
 	}))
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
 
-	// An update that names neither keeps both, an empty one takes the limit away.
+	// An update naming neither keeps both, an empty one takes the limit away.
 	renamed, err := client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
 		Id: account.Id, Description: new("changed"),
 	}))
@@ -111,14 +110,14 @@ func TestServiceAccountLimits(t *testing.T) {
 	assert.Equal(t, "/usr/local/bin/deploy", cleared.GetServiceAccount().GetForceCommand())
 }
 
-// Only a person changes what limits a machine. An editor account could otherwise lift its own limits, and a CI job that
-// holds one could roll the CA over for the whole workspace.
+// Only a person changes what limits a machine. Else an editor account lifts its
+// own limits, and a CI job rolls the CA over.
 func TestMachinesDoNotChangeTheirLimits(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+	u := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	person := header("Authorization", "Bearer "+sessionFor(t, cfg, u))
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), person),
+		clientOn(srv, person),
 	)
 	created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
 		Name:          new(uniq("editor")),
@@ -135,8 +134,8 @@ func TestMachinesDoNotChangeTheirLimits(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	machine := connect.NewClient(
-		connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+minted.GetSecret()),
+	machine := clientOn(
+		srv, header("Authorization", "Bearer "+minted.GetSecret()),
 	)
 	_, err = nokkuv1connect.NewServiceAccountServiceClient(machine).UpdateServiceAccount(t.Context(),
 		masked(&nokkuv1.UpdateServiceAccountRequest{Id: id, ForceCommand: new(""), SourceAddress: new("")}))
@@ -155,14 +154,14 @@ func TestMachinesDoNotChangeTheirLimits(t *testing.T) {
 	assert.Equal(t, "/usr/local/bin/deploy", got.GetServiceAccount().GetForceCommand())
 
 	// A name is no limit, an old sign-in may change it.
-	old := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL),
+	old := clientOn(srv,
 		header("Cookie", sessionCookie+"="+browserSession(t, cfg, u, oldSignIn).token))
 	oldAccounts := nokkuv1connect.NewServiceAccountServiceClient(old)
 	_, err = oldAccounts.UpdateServiceAccount(t.Context(),
 		masked(&nokkuv1.UpdateServiceAccountRequest{Id: id, Description: new("changed")}))
 	require.NoError(t, err)
 
-	// The web app sends the whole account and names what changed, a field the mask leaves out asks for nothing.
+	// A field outside the mask asks for nothing, the web app sends them all.
 	_, err = oldAccounts.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{
 		Id:           id,
 		Description:  new("changed again"),
@@ -185,10 +184,10 @@ func TestServiceAccountRole(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	auth := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	client := nokkuv1connect.NewServiceAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), auth),
+		clientOn(srv, auth),
 	)
 
 	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
@@ -223,7 +222,7 @@ func TestServiceAccountRole(t *testing.T) {
 		"the editor is the most a service account can be")
 
 	// The table refuses it too, whatever a caller gets past the API.
-	err = cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) error {
+	err = cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) error {
 		_, err := q.CreateServiceAccount(t.Context(), &db.CreateServiceAccountParams{
 			Name: uniq("sa"),
 			Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN,
@@ -233,7 +232,7 @@ func TestServiceAccountRole(t *testing.T) {
 	assert.Error(t, err, "the table took a service account above the editor")
 }
 
-// serviceAccountToken is a key that ends at expiresAt, in a month when it is nil.
+// serviceAccountToken is a key that ends at expiresAt, or in a month if nil.
 func serviceAccountToken(
 	t *testing.T,
 	client nokkuv1connect.ServiceAccountServiceClient,
@@ -252,15 +251,15 @@ func serviceAccountToken(
 	return res.GetSecret()
 }
 
-// Each token is revoked on its own, so a new one can be rolled out before the old one goes.
+// Tokens revoke one by one, so a new one can roll out before the old one goes.
 func TestServiceAccountTokens(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	auth := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	client := nokkuv1connect.NewServiceAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), auth),
+		clientOn(srv, auth),
 	)
 
 	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
@@ -292,7 +291,7 @@ func TestServiceAccountTokens(t *testing.T) {
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a key with no end date, got %v", err)
 
 	whoami := func(token string) (string, error) {
-		res, err := nokkuv1connect.NewTargetServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
+		res, err := nokkuv1connect.NewTargetServiceClient(clientOn(srv, header("Authorization", "Bearer "+token))).
 			GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{})
 		return res.GetServiceAccount().GetId(), err
 	}

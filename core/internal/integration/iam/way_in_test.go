@@ -15,7 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// Every new way into an account mails it, so a stolen session that adds one shows up in the inbox.
+// A new way in is mailed, so a stolen session that adds one shows in the inbox.
 func TestNewWaysInAreMailed(t *testing.T) {
 	mailed := make(chan string, 4)
 	h := newOIDCIdP(t)
@@ -49,12 +49,13 @@ func TestNewWaysInAreMailed(t *testing.T) {
 
 	select {
 	case got := <-mailed:
-		t.Errorf("one more mail than ways in: %s", got)
+		assert.Fail(t, "one more mail than ways in", got)
 	case <-time.After(200 * time.Millisecond):
 	}
 }
 
-// A provider linked by address at a first sign-in is a new way in like any other. A brand new account has nobody to warn.
+// A provider linked by address at a first sign-in is a new way in like any
+// other. A brand new account has nobody to warn.
 func TestFirstSSOSignInMailsAnExistingAccount(t *testing.T) {
 	mailed := make(chan string, 4)
 	h := newOIDCIdP(t)
@@ -68,7 +69,7 @@ func TestFirstSSOSignInMailsAnExistingAccount(t *testing.T) {
 	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
 	select {
 	case got := <-mailed:
-		t.Fatalf("a new account was warned about itself: %s", got)
+		require.FailNow(t, "a new account was warned about itself", got)
 	case <-time.After(100 * time.Millisecond):
 	}
 	created := e.userByEmail(t, h.org.ws, h.email)

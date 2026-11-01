@@ -62,13 +62,13 @@ func (s *Session) Resize(width, height uint32) error {
 	return s.term.Resize(width, height)
 }
 
-// Exited reports whether the shell ended on its own. It is final once Stdout is closed.
+// Exited is whether the shell ended itself, final once Stdout is closed.
 func (s *Session) Exited() bool { return s.term.Exited() }
 
 // Close is idempotent.
 func (s *Session) Close() { s.close() }
 
-// StartSession lives until ctx ends, the shell ends, the daemon drops, Close, or the TTL.
+// StartSession ends with ctx, the shell, the daemon, Close or the TTL.
 func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
 	principal := login.Principal(cfg.UserID, cfg.HostPrincipal, cfg.Username)
 	signer, err := mintSessionCert(cfg.CA, cfg.CASigner, principal, cfg.SessionID)
@@ -130,8 +130,7 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	return s, nil
 }
 
-// hostCAKeys are the current host key and, during a rollover, the one before. A daemon renews its host
-// certificate at its next sync.
+// During a rollover the old host key counts too, daemons renew at next sync.
 func hostCAKeys(ca *db.SSHCA) ([]ssh.PublicKey, error) {
 	current, err := nokkussh.ParsePublicKey(ca.HostPublicKey)
 	if err != nil {
@@ -178,7 +177,7 @@ func mintSessionCert(ca *db.SSHCA, caSigner ssh.Signer, principal, sessionID str
 	return ssh.NewCertSigner(cert, base)
 }
 
-// SessionDaemons names the daemons with a browser terminal open on this server, in every workspace.
+// SessionDaemons names the daemons with an open terminal, in every workspace.
 func (p *Pool) SessionDaemons() []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

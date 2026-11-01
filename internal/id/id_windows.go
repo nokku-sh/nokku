@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// A missing MachineGuid is no ID. Any other failure is an error, the hostname would change every wrapped key.
+// Only a missing MachineGuid is no ID, the hostname would change every key.
 func machineID() (string, error) {
 	k, err := registry.OpenKey(
 		registry.LOCAL_MACHINE,

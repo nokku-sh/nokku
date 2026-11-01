@@ -51,7 +51,7 @@ func (s *accountService) UpdateAccount(
 	return &nokkuv1.UpdateAccountResponse{User: u.ToProto()}, nil
 }
 
-// RequestEmailChange mails the confirm link to the new address and a cancel link to the current one.
+// RequestEmailChange mails the new address to confirm, the old one to cancel.
 func (s *accountService) RequestEmailChange(
 	ctx context.Context,
 	req *nokkuv1.RequestEmailChangeRequest,
@@ -61,20 +61,23 @@ func (s *accountService) RequestEmailChange(
 		return nil, errAccountNotFound
 	}
 	if !s.cfg.Email.HasSMTP() {
-		return nil, newError(connect.CodeUnimplemented, "this server sends no mail, ask your administrator")
+		return nil, connect.NewError(connect.CodeUnimplemented, "this server sends no mail, ask your administrator")
 	}
 	// Asked first, a refused request must not replace the pending change.
 	if s.cfg.Email.EmailChangeOnCooldown(u.ID) {
-		return nil, newError(connect.CodeResourceExhausted, "you asked for a change a moment ago, try again later")
+		return nil, connect.NewError(
+			connect.CodeResourceExhausted,
+			"you asked for a change a moment ago, try again later",
+		)
 	}
 	confirm, cancel, err := s.cfg.IAM.RequestEmailChange(ctx, u, req.GetNewEmail())
 	switch {
 	case errors.Is(err, iam.ErrSameEmail):
-		return nil, newError(connect.CodeInvalidArgument, "this is already your email address")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "this is already your email address")
 	case errors.Is(err, iam.ErrEmailTaken):
-		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists")
+		return nil, connect.NewError(connect.CodeAlreadyExists, "an account with this email already exists")
 	case errors.Is(err, iam.ErrEmailRejected):
-		return nil, newError(connect.CodeInvalidArgument, "please enter a valid email address")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "please enter a valid email address")
 	case errors.Is(err, iam.ErrManagedAccount):
 		return nil, errEmailManaged
 	case err != nil:
@@ -169,7 +172,7 @@ func (s *accountService) ListAccountSessions(
 			Ip:         new(sess.Ip),
 		})
 	}
-	// The list also shows where the account is remembered. Those rows are no sessions.
+	// Remembered devices are listed too, those rows are no sessions.
 	devices, err := s.cfg.IAM.ListDevices(ctx)
 	if err != nil {
 		return nil, err
@@ -208,7 +211,6 @@ func (s *accountService) RemoveSession(
 	return &nokkuv1.RemoveSessionResponse{}, nil
 }
 
-// DeleteAccount is refused for the owner, who hands the workspace on first.
 func (s *accountService) DeleteAccount(
 	ctx context.Context,
 	_ *nokkuv1.DeleteAccountRequest,

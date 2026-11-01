@@ -26,7 +26,6 @@ const (
 // ErrExportLimit means the caller has to narrow the export, not retry it.
 var ErrExportLimit = errors.New("export limit")
 
-// Event is one row of the audit log, and its shape in a JSON export.
 type Event struct {
 	ID          string         `json:"id"`
 	Timestamp   time.Time      `json:"timestamp"`
@@ -41,12 +40,12 @@ type Event struct {
 	UserAgent   string         `json:"user_agent,omitempty"`
 	Details     map[string]any `json:"details,omitempty"`
 
-	// written keeps the interceptor from adding a second row for an event Commit wrote.
+	// written stops the interceptor adding a second row after Commit.
 	written bool
 }
 
-// Append writes the event into its workspace. A job outside a request pins the event's, a request may only write
-// into its own, which the row policy checks.
+// Append pins the event's workspace for a job outside a request. A request may
+// only write into its own, which the row policy checks.
 func (s *Service) Append(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil
@@ -162,14 +161,6 @@ func (s *Service) Export(
 	return buf.Bytes(), nil
 }
 
-// spreadsheetSafe keeps a value a client sent from running as a formula when an admin opens the export.
-func spreadsheetSafe(s string) string {
-	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
-		return "'" + s
-	}
-	return s
-}
-
 func eventsCSV(events []*Event) ([]byte, error) {
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
@@ -188,11 +179,19 @@ func eventsCSV(events []*Event) ([]byte, error) {
 		}
 		_ = w.Write([]string{
 			e.ID, e.Timestamp.Format(time.RFC3339Nano), e.WorkspaceID,
-			e.ActorID, e.ActorKind, spreadsheetSafe(e.ActorName),
-			e.Action, spreadsheetSafe(e.Target), strconv.FormatBool(e.OK),
-			spreadsheetSafe(e.IP), spreadsheetSafe(e.UserAgent), details,
+			e.ActorID, e.ActorKind, SpreadsheetSafe(e.ActorName),
+			e.Action, SpreadsheetSafe(e.Target), strconv.FormatBool(e.OK),
+			SpreadsheetSafe(e.IP), SpreadsheetSafe(e.UserAgent), details,
 		})
 	}
 	w.Flush()
 	return buf.Bytes(), w.Error()
+}
+
+// SpreadsheetSafe stops client values running as formulas in the export.
+func SpreadsheetSafe(s string) string {
+	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
+		return "'" + s
+	}
+	return s
 }

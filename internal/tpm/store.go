@@ -11,14 +11,11 @@ import (
 )
 
 var (
-	// errNoState signals that no signer state exists at the configured path.
-	errNoState = errors.New("tpm: no signer state")
-	// errBadState signals a state file that is there but does not parse.
+	errNoState  = errors.New("tpm: no signer state")
 	errBadState = errors.New("tpm: the signer state does not parse")
 )
 
-// Data is the TPM key file or the wrapped private key of a software key. PubKey only shows which
-// key a state file holds, nothing reads it to sign.
+// PubKey only shows which key a state file holds, nothing reads it to sign.
 type state struct {
 	Method string `json:"method"`
 	PubKey string `json:"pubkey"`
@@ -42,7 +39,7 @@ func loadState(path string) (*state, error) {
 	return &st, nil
 }
 
-// A software key lives only in this file, so the write is atomic and synced to disk.
+// A software key lives only here, so the write is atomic and synced.
 func saveState(path string, st *state) error {
 	if err := fsutil.SaveJSON(path, st, 0o600); err != nil {
 		return fmt.Errorf("tpm: write signer state: %w", err)
@@ -50,7 +47,7 @@ func saveState(path string, st *state) error {
 	return nil
 }
 
-// lockState keeps two processes from creating different keys for one state file. The returned func releases it.
+// lockState keeps two processes from creating two keys for one state file.
 func lockState(statePath string) (func(), error) {
 	f, err := os.OpenFile(statePath+".lock", os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {

@@ -34,28 +34,30 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 	"github.com/nokku-sh/nokku/core/internal/iam"
+	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
 	"github.com/nokku-sh/nokku/core/internal/recording"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 	"github.com/nokku-sh/nokku/core/internal/storage"
 )
 
-// sealedOverride is the sqlc.yaml entry of a sealed column, the same pattern internal/db/reencrypt_test.go reads.
+// sealedOverride is the sqlc.yaml entry of a sealed column.
 var sealedOverride = regexp.MustCompile(
 	`- column: "([a-z_]+\.[a-z_]+)"\s+go_type:\s+import: "[^"]+"\s+type: "Sealed"`,
 )
 
-// sealedValue is one secret in a sealed column, and how the server reads it back.
+// sealedValue is one secret in a sealed column, and how the server reads it.
 type sealedValue struct {
 	table, column string
 	// where picks its row, a table may hold more than one secret.
 	where string
-	// plaintext must not be in the stored bytes. A CA key leaves the server never, so it has none here.
+	// plaintext must not be in the stored bytes. A CA key leaves the server
+	// never, so it has none here.
 	plaintext []byte
 	// read goes the way the server does, with the keyset the server runs with.
 	read func(t *testing.T, keys *kms.Keyset)
 }
 
-// recordingLimits keeps every recording, so the sweeper never takes the one under test.
+// recordingLimits keeps every recording, the sweeper never takes the one here.
 type recordingLimits struct{}
 
 func (recordingLimits) RecordingRetentionDays(context.Context, string) (int64, error) {
@@ -66,7 +68,8 @@ func (recordingLimits) RecordingStorageBytes(context.Context, string) (int64, er
 	return math.MaxInt64, nil
 }
 
-// Each sealed column reads back the same and is rewritten after rotate-secrets to a new secret, Vault and back.
+// Each sealed column reads back the same and is rewritten after rotate-secrets
+// to a new secret, Vault and back.
 func TestEverySealedColumnSurvivesRotation(t *testing.T) {
 	columns := sqlcSealedColumns(t)
 	conn := freshDB(t)
@@ -88,7 +91,7 @@ func TestEverySealedColumnSurvivesRotation(t *testing.T) {
 		"every column sqlc.yaml seals needs a seed and a read in this test")
 
 	stored := checkEveryColumn(t, "first boot", keys, values, nil)
-	// One ciphertext per data key the keyset ever had, oldest first. Tink stores no key list in the clear.
+	// One ciphertext per data key ever had, oldest first. Tink lists no keys.
 	var made [][]byte
 	for _, step := range []struct{ name, key string }{
 		{"to a new secret", "secret:" + secretB},
@@ -103,7 +106,7 @@ func TestEverySealedColumnSurvivesRotation(t *testing.T) {
 	}
 }
 
-// The card's case: a stream secret copied into a stream of another workspace, whose URL someone else picked.
+// A secret copied into another workspace's stream, whose URL that one picked.
 func TestASealedSecretOpensOnlyInItsRow(t *testing.T) {
 	conn := freshDB(t)
 	t.Cleanup(func() { wipe(context.WithoutCancel(t.Context()), t, []string{"audit_streams.secret"}) })
@@ -113,7 +116,7 @@ func TestASealedSecretOpensOnlyInItsRow(t *testing.T) {
 	stream := func(secret string) *db.AuditStream {
 		ws := seedWorkspace(t, conn)
 		id := seedAuditStream(t, conn, keys, ws, siem.URL, secret)
-		st, err := conn.Tenant().GetAuditStream(pinned(t, ws), id)
+		st, err := conn.Tenant().GetAuditStream(testenv.Pinned(t, ws), id)
 		require.NoError(t, err)
 		return st
 	}
@@ -129,7 +132,7 @@ func TestASealedSecretOpensOnlyInItsRow(t *testing.T) {
 		thief.ID,
 	)
 	require.NoError(t, err)
-	thief, err = conn.Tenant().GetAuditStream(pinned(t, thief.WorkspaceID), thief.ID)
+	thief, err = conn.Tenant().GetAuditStream(testenv.Pinned(t, thief.WorkspaceID), thief.ID)
 	require.NoError(t, err)
 
 	streams := auditService(t, conn, keys)
@@ -151,7 +154,8 @@ func sqlcSealedColumns(t *testing.T) []string {
 	return columns
 }
 
-// wipe empties the tables of columns. A ciphertext under a keyset another test replaced fails every rotation.
+// wipe empties the tables of columns. A ciphertext under a keyset another test
+// replaced fails every rotation.
 func wipe(ctx context.Context, t *testing.T, columns []string) {
 	t.Helper()
 	admin, err := pgx.Connect(ctx, "")
@@ -164,7 +168,7 @@ func wipe(ctx context.Context, t *testing.T, columns []string) {
 	}
 }
 
-// boot loads the keyset the way the server does, from key in the form rotate-secrets takes.
+// boot loads the keyset like the server, key in the form rotate-secrets takes.
 func boot(t *testing.T, conn *db.Connection, key string) *kms.Keyset {
 	t.Helper()
 	scheme, value, _ := strings.Cut(key, ":")
@@ -178,14 +182,14 @@ func boot(t *testing.T, conn *db.Connection, key string) *kms.Keyset {
 	return keys
 }
 
-// rotateSecrets is nokku rotate-secrets with the server stopped, then the server started on the new key.
+// rotateSecrets is nokku rotate-secrets, then a server start on the new key.
 func rotateSecrets(t *testing.T, conn *db.Connection, current, next string) *kms.Keyset {
 	t.Helper()
 	require.NoError(t, boot(t, conn, current).Rotate(t.Context(), next))
 	return boot(t, conn, next)
 }
 
-// checkEveryColumn reads each value back through the server and returns what the database holds for it now.
+// checkEveryColumn reads each value through the server, returns what is stored.
 func checkEveryColumn(
 	t *testing.T,
 	step string,
@@ -215,7 +219,8 @@ func checkEveryColumn(
 	return stored
 }
 
-// checkAtMostTwoKeys counts keys by what still opens. Only the last of made, from the replaced key, may.
+// checkAtMostTwoKeys counts keys by what still opens. Only the last of made,
+// from the replaced key, may.
 func checkAtMostTwoKeys(t *testing.T, step string, keys *kms.Keyset, made [][]byte) {
 	t.Helper()
 	assert.NotEqual(t, keyID(made[len(made)-1]), keyID(seal(t, keys, "x")), "%s: no new data key", step)
@@ -251,7 +256,7 @@ func storedValue(t *testing.T, v sealedValue) []byte {
 func seedWorkspace(t *testing.T, conn *db.Connection) string {
 	t.Helper()
 	ws := uuid.NewV7().String()
-	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) error {
 		_, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
 			ID: ws, Slug: ws, Name: "rotation", Settings: &nokkuv1.WorkspaceSettings{},
 		})
@@ -270,11 +275,11 @@ func seedEverySealedColumn(t *testing.T, conn *db.Connection, keys *kms.Keyset) 
 	return values
 }
 
-// seedSSHCA reads each key back by signing with it, a login certificate and a host certificate.
+// seedSSHCA reads each key back by signing a login and a host certificate.
 func seedSSHCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) map[string]sealedValue {
 	t.Helper()
 	var ca *db.SSHCA
-	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) (err error) {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) (err error) {
 		ca, err = ssh.CreateCA(t.Context(), q, keys, ssh.NewCA())
 		return err
 	}))
@@ -287,7 +292,7 @@ func seedSSHCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) m
 		return func(t *testing.T, keys *kms.Keyset) {
 			t.Helper()
 			var signer gossh.Signer
-			require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) (err error) {
+			require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) (err error) {
 				signer, err = ssh.CASigner(t.Context(), q, keys, ca.ID, certType)
 				return err
 			}), "the CA does not sign")
@@ -324,7 +329,7 @@ func seedSSOProvider(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws str
 		ClientSecret: "sso-client-secret-" + uuid.New().String(),
 		Scopes:       []string{"openid", "email"},
 	}
-	_, err := providers(keys).PutSSOProvider(pinned(t, ws), iam.SSOProvider{
+	_, err := providers(keys).PutSSOProvider(testenv.Pinned(t, ws), iam.SSOProvider{
 		ProviderID: "okta", Name: "Okta", Enabled: true, OIDC: oidc,
 	})
 	require.NoError(t, err)
@@ -333,14 +338,14 @@ func seedSSOProvider(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws str
 		plaintext: []byte(oidc.ClientSecret),
 		read: func(t *testing.T, keys *kms.Keyset) {
 			t.Helper()
-			p, err := providers(keys).GetSSOProvider(pinned(t, ws), "okta")
+			p, err := providers(keys).GetSSOProvider(testenv.Pinned(t, ws), "okta")
 			require.NoError(t, err)
 			assert.Equal(t, oidc, p.OIDC)
 		},
 	}}
 }
 
-// seedStream reads the secret off what a test send puts on the wire, the way the delivery loop sends it too.
+// seedStream reads the secret off what a test send puts on the wire.
 func seedStream(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) map[string]sealedValue {
 	t.Helper()
 	got := make(chan string, 1)
@@ -352,7 +357,7 @@ func seedStream(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) 
 		plaintext: []byte(secret),
 		read: func(t *testing.T, keys *kms.Keyset) {
 			t.Helper()
-			st, err := conn.Tenant().GetAuditStream(pinned(t, ws), id)
+			st, err := conn.Tenant().GetAuditStream(testenv.Pinned(t, ws), id)
 			require.NoError(t, err)
 			require.NoError(t, auditService(t, conn, keys).TestStream(t.Context(), st))
 			assert.Equal(t, secret, <-got, "the stream sends another secret")
@@ -360,13 +365,14 @@ func seedStream(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) 
 	}}
 }
 
-// seedAuditStream seals the secret the way CreateAuditStream does. The stream stays off, no delivery loop takes it.
+// seedAuditStream seals the secret like CreateAuditStream. The stream stays
+// off, no delivery loop takes it.
 func seedAuditStream(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws, url, secret string) string {
 	t.Helper()
 	id := uuid.NewV7().String()
 	sealed, err := keys.Seal(audit.SecretAAD(ws, id), []byte(secret))
 	require.NoError(t, err)
-	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) error {
 		if _, err := q.CreateAuditStream(t.Context(), &db.CreateAuditStreamParams{
 			ID: id, Kind: audit.StreamSplunk, URL: url, Secret: sealed,
 		}); err != nil {
@@ -399,7 +405,7 @@ func auditService(t *testing.T, conn *db.Connection, keys *kms.Keyset) *audit.Se
 	return svc
 }
 
-// seedRecording stores a session under the recording's key, and reads the key back by playing the session.
+// seedRecording stores a session under its key, and reads it back by playing.
 func seedRecording(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) map[string]sealedValue {
 	t.Helper()
 	t.Setenv("NOKKU_STORAGE_URL", "file://"+t.TempDir())
@@ -414,7 +420,7 @@ func seedRecording(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws strin
 	sealed, err := keys.Seal(recording.KeyAAD(ws, id), key)
 	require.NoError(t, err)
 	var rec *db.Recording
-	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) error {
 		d, err := q.CreateDaemon(t.Context(), &db.CreateDaemonParams{
 			Name:          "rotation",
 			Status:        nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED,
@@ -435,7 +441,7 @@ func seedRecording(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws strin
 	require.NoError(t, err)
 	require.NoError(t, w.WriteChunk(session))
 	require.NoError(t, w.Close())
-	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) error {
 		_, err := q.FinishRecordingUpload(t.Context(), &db.FinishRecordingUploadParams{
 			ID: rec.ID, ObjectID: &objectID, SizeBytes: int64(len(session)),
 		})
@@ -447,7 +453,7 @@ func seedRecording(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws strin
 		plaintext: key,
 		read: func(t *testing.T, keys *kms.Keyset) {
 			t.Helper()
-			got, err := conn.Tenant().GetRecording(pinned(t, ws), rec.ID)
+			got, err := conn.Tenant().GetRecording(testenv.Pinned(t, ws), rec.ID)
 			require.NoError(t, err)
 			r, err := recorder(keys).OpenReader(t.Context(), got)
 			require.NoError(t, err)

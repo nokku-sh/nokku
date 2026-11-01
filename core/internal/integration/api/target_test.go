@@ -10,7 +10,6 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,6 +22,26 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
+
+type accessFixture struct {
+	workspaceID       string
+	alice, bob, carol string
+	platform, ci      string
+	web1              string
+	outsider          string
+	client            nokkuv1connect.TargetServiceClient
+	memberClient      nokkuv1connect.TargetServiceClient
+	// as signs in as one of the seeded users.
+	as func(userID string) nokkuv1connect.TargetServiceClient
+}
+
+// graphSeed makes web-1 (root: platform, deploy: alice, ci), web-2 (root:
+// platform), db-1 (root: bob) and idle.
+type graphSeed struct {
+	t       *testing.T
+	q       *db.Queries
+	targets map[string]string
+}
 
 func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
 	t.Helper()
@@ -43,7 +62,7 @@ func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
 
 func TestSyncTargetUsers(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	targetID := seedTarget(t, cfg, workspaceID)
 
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
@@ -57,10 +76,10 @@ func TestSyncTargetUsers(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 	)
 	editor := nokkuv1connect.NewTargetServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editorAuth),
+		clientOn(srv, editorAuth),
 	)
-	principals := nokkuv1connect.NewTargetAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editorAuth),
+	accounts := nokkuv1connect.NewTargetAccountServiceClient(
+		clientOn(srv, editorAuth),
 	)
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:      &targetID,
@@ -77,7 +96,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.NotNil(t, got.GetTarget().GetLastSyncAt(), "manual sync stamped")
 
 	usernames := func() []string {
-		res, err := principals.ListTargetAccounts(t.Context(), &nokkuv1.ListTargetAccountsRequest{
+		res, err := accounts.ListTargetAccounts(t.Context(), &nokkuv1.ListTargetAccountsRequest{
 			TargetId: &targetID,
 			Limit:    new(int32(100)),
 		})
@@ -111,8 +130,8 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.ElementsMatch(t, []string{"root", "deploy", "ops", "backup"}, usernames())
 
 	viewer := nokkuv1connect.NewTargetServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
+		clientOn(
+			srv,
 			header(
 				"Authorization",
 				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER),
@@ -128,11 +147,11 @@ func TestSyncTargetUsers(t *testing.T) {
 
 func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	targetID := seedTarget(t, cfg, workspaceID)
 	editor := nokkuv1connect.NewTargetServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
+		clientOn(
+			srv,
 			header(
 				"Authorization",
 				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
@@ -167,25 +186,6 @@ func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 	assert.Equal(t, []string{"10.0.0.9:22"}, updated.GetTarget().GetEndpoints())
 }
 
-type accessFixture struct {
-	workspaceID       string
-	alice, bob, carol string
-	platform, ci      string
-	web1              string
-	outsider          string
-	client            nokkuv1connect.TargetServiceClient
-	memberClient      nokkuv1connect.TargetServiceClient
-	// as signs in as one of the seeded users.
-	as func(userID string) nokkuv1connect.TargetServiceClient
-}
-
-// graphSeed makes web-1 (root: platform, deploy: alice, ci), web-2 (root: platform), db-1 (root: bob) and idle.
-type graphSeed struct {
-	t       *testing.T
-	q       *db.Queries
-	targets map[string]string
-}
-
 func (s graphSeed) member(name string) string {
 	u, err := s.q.CreateUser(s.t.Context(), &db.CreateUserParams{
 		Email: uuid.New().String() + "@api.test", Name: name, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
@@ -194,7 +194,7 @@ func (s graphSeed) member(name string) string {
 	return u.ID
 }
 
-// account creates the target on first use and returns the principal.
+// account creates the target on first use and returns the account.
 func (s graphSeed) account(name string, tags []string, username string) string {
 	if s.targets[name] == "" {
 		target, err := s.q.CreateTarget(s.t.Context(), &db.CreateTargetParams{Name: name, Tags: tags})
@@ -212,9 +212,9 @@ func (s graphSeed) account(name string, tags []string, username string) string {
 	return p.ID
 }
 
-func (s graphSeed) grant(principalID, kind, subjectID string) {
+func (s graphSeed) grant(accountID, kind, subjectID string) {
 	require.NoError(s.t, s.q.PutGrant(s.t.Context(), &db.PutGrantParams{
-		AccountID:   principalID,
+		AccountID:   accountID,
 		SubjectKind: kind,
 		SubjectID:   subjectID,
 	}))
@@ -223,10 +223,10 @@ func (s graphSeed) grant(principalID, kind, subjectID string) {
 func seedAccessGraph(t *testing.T) accessFixture {
 	t.Helper()
 	cfg, srv := newTestAPI(t)
-	f := accessFixture{workspaceID: seedWorkspace(t, cfg)}
+	f := accessFixture{workspaceID: testWorkspace.ID}
 	other := seedOtherWorkspace(t, cfg)
 
-	// The workspace is shared, so earlier tests' grants go first. Only the owner role deletes past RLS.
+	// Earlier tests' grants go first. Only the owner role deletes past RLS.
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	for _, table := range []string{"targets", "teams", "service_accounts"} {
@@ -270,10 +270,7 @@ func seedAccessGraph(t *testing.T) accessFixture {
 
 	client := func(role nokkuv1.WorkspaceRole) nokkuv1connect.TargetServiceClient {
 		return nokkuv1connect.NewTargetServiceClient(
-			connect.NewClient(
-				connecthttp.NewTransport(srv.Client(), srv.URL),
-				header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role)),
-			),
+			clientOn(srv, header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role))),
 		)
 	}
 	f.client, f.memberClient = client(
@@ -284,10 +281,7 @@ func seedAccessGraph(t *testing.T) accessFixture {
 	f.as = func(userID string) nokkuv1connect.TargetServiceClient {
 		token := sessionFor(t, cfg, &db.User{ID: userID, Active: true})
 		return nokkuv1connect.NewTargetServiceClient(
-			connect.NewClient(
-				connecthttp.NewTransport(srv.Client(), srv.URL),
-				header("Authorization", "Bearer "+token),
-			),
+			clientOn(srv, header("Authorization", "Bearer "+token)),
 		)
 	}
 	return f
@@ -296,24 +290,24 @@ func seedAccessGraph(t *testing.T) accessFixture {
 func TestGetSubjectAccess(t *testing.T) {
 	f := seedAccessGraph(t)
 
-	// access returns the accounts per target name and the principal count.
+	// access returns the usernames per target and the count of all accounts.
 	access := func(client nokkuv1connect.TargetServiceClient, subjectID string) (map[string][]string, int) {
 		res, err := client.GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{
 			SubjectId: &subjectID,
 		})
 		require.NoError(t, err)
-		accounts, principals := map[string][]string{}, 0
+		usernames, accounts := map[string][]string{}, 0
 		for _, target := range res.GetTargets() {
-			accounts[target.GetName()] = target.GetUsernames()
-			principals += len(target.GetAccounts())
+			usernames[target.GetName()] = target.GetUsernames()
+			accounts += len(target.GetAccounts())
 		}
-		return accounts, principals
+		return usernames, accounts
 	}
 
-	got, principals := access(f.as(f.carol), f.carol)
+	got, accounts := access(f.as(f.carol), f.carol)
 	assert.Equal(t, map[string][]string{"web-1": {"root"}, "web-2": {"root"}}, got,
 		"a member reads its own access, deploy on web-1 is not carol's")
-	assert.Zero(t, principals, "the grants of others are for viewers")
+	assert.Zero(t, accounts, "the grants of others are for viewers")
 
 	got, _ = access(f.as(f.alice), f.alice)
 	assert.Equal(t, map[string][]string{"web-1": {"deploy", "root"}, "web-2": {"root"}}, got,
@@ -325,9 +319,9 @@ func TestGetSubjectAccess(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
 		"a member may not read another subject, got %v", err)
 
-	got, principals = access(f.client, f.carol)
+	got, accounts = access(f.client, f.carol)
 	assert.Equal(t, map[string][]string{"web-1": {"root"}, "web-2": {"root"}}, got)
-	assert.Equal(t, 3, principals, "a viewer gets every account on those targets")
+	assert.Equal(t, 3, accounts, "a viewer gets every account on those targets")
 }
 
 func TestTargetsCarryPrincipals(t *testing.T) {
@@ -351,13 +345,13 @@ func TestTargetsCarryPrincipals(t *testing.T) {
 		Id: &f.web1,
 	})
 	require.NoError(t, err)
-	principals := got.GetTarget().GetAccounts()
-	require.Len(t, principals, 2, "web-1 has deploy and root")
-	assert.Equal(t, "deploy", principals[0].GetUsername())
-	assert.Equal(t, []string{f.alice}, principals[0].GetUserIds())
-	assert.Equal(t, []string{f.ci}, principals[0].GetServiceAccountIds())
-	assert.Equal(t, "root", principals[1].GetUsername())
-	assert.Equal(t, []string{f.platform}, principals[1].GetTeamIds())
+	web1Accounts := got.GetTarget().GetAccounts()
+	require.Len(t, web1Accounts, 2, "web-1 has deploy and root")
+	assert.Equal(t, "deploy", web1Accounts[0].GetUsername())
+	assert.Equal(t, []string{f.alice}, web1Accounts[0].GetUserIds())
+	assert.Equal(t, []string{f.ci}, web1Accounts[0].GetServiceAccountIds())
+	assert.Equal(t, "root", web1Accounts[1].GetUsername())
+	assert.Equal(t, []string{f.platform}, web1Accounts[1].GetTeamIds())
 }
 
 func TestGetAccessGraph(t *testing.T) {
@@ -525,10 +519,10 @@ func TestNewServerHasTheRootAccount(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	admin := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	targets := nokkuv1connect.NewTargetServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), admin),
+		clientOn(srv, admin),
 	)
 	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("web"))})
 	require.NoError(t, err)
@@ -542,17 +536,17 @@ func TestNewServerHasTheRootAccount(t *testing.T) {
 	assert.Equal(t, []string{"root"}, accounts)
 }
 
-// A server made by hand can start with grants, so the first sync already lets people in.
+// A hand-made server can start with grants, the first sync lets people in.
 func TestNewServerSeedsGrants(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	member := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	editor := header(
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 	)
 	targets := nokkuv1connect.NewTargetServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editor),
+		clientOn(srv, editor),
 	)
 
 	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
@@ -584,11 +578,11 @@ func TestNewServerSeedsGrants(t *testing.T) {
 	assert.Empty(t, listed.GetTargets(), "a refused grant leaves no target behind")
 }
 
-// Deleting a server that runs nokkud takes its daemon along, so no daemon is left without a server.
+// Deleting a server takes its daemon along, no daemon stays without a server.
 func TestDeleteTargetTakesItsDaemon(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
-	admin := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization",
+	workspaceID := testWorkspace.ID
+	admin := clientOn(srv, header("Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
 	_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 

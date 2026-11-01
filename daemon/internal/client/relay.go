@@ -14,14 +14,32 @@ import (
 
 const sessionTTL = 8 * time.Hour
 
+var relayClosed = &nokkuv1.DaemonRelayRequest{
+	Msg: &nokkuv1.DaemonRelayRequest_Closed{Closed: &nokkuv1.DaemonRelayClosed{}},
+}
+
 // A test seam, so the relay can be driven without a core.
 type relayStream interface {
 	Send(*nokkuv1.DaemonRelayRequest) error
 	Receive() (*nokkuv1.DaemonRelayResponse, error)
 }
 
-var relayClosed = &nokkuv1.DaemonRelayRequest{
-	Msg: &nokkuv1.DaemonRelayRequest_Closed{Closed: &nokkuv1.DaemonRelayClosed{}},
+// Remote is the user's, so audit and source-address rules don't see the relay.
+type relayConn struct {
+	stream relayStream
+	// cancel ends the stream, which unblocks a pending Receive or Send.
+	cancel        context.CancelFunc
+	remote, local net.Addr
+
+	// Tail of the last frame. Only the ssh transport's reader touches it.
+	pending []byte
+
+	// sendMu makes Closed the last frame, a stream takes one sender at a time.
+	sendMu sync.Mutex
+	closed bool
+
+	deadlineMu sync.Mutex
+	deadline   *time.Timer
 }
 
 // The sshd enforces its connection cap, so relays need none.
@@ -31,12 +49,11 @@ func (c *Client) runRelay(ctx context.Context, req *nokkuv1.RelayOpen) {
 			slog.Error("relay panicked", "relay", req.GetRelayId(), "panic", r)
 		}
 	}()
-	// Canceling ctx also ends the stream, which unblocks its Receive.
 	ctx, cancel := context.WithTimeout(ctx, sessionTTL)
 	defer cancel()
 	stream, err := c.ctl.DaemonRelay(ctx)
 	if err == nil {
-		// Ready must be the first message, the core resolves its pending relay on it.
+		// Ready goes first, the core resolves its pending relay on it.
 		err = stream.Send(&nokkuv1.DaemonRelayRequest{
 			Msg: &nokkuv1.DaemonRelayRequest_Ready{Ready: &nokkuv1.DaemonRelayReady{RelayId: req.RelayId}},
 		})
@@ -55,7 +72,8 @@ func (c *Client) runRelay(ctx context.Context, req *nokkuv1.RelayOpen) {
 	slog.Debug("relay disconnected", "relay", req.GetRelayId())
 }
 
-// Source-address options need a TCP address. One that does not parse is unspecified and matches none.
+// Source-address options need a TCP address. One that does not parse is
+// unspecified and matches none.
 func clientAddr(addr string) net.Addr {
 	if ap, err := netip.ParseAddrPort(addr); err == nil {
 		return net.TCPAddrFromAddrPort(ap)
@@ -65,24 +83,6 @@ func clientAddr(addr string) net.Addr {
 		ip = netip.IPv4Unspecified()
 	}
 	return net.TCPAddrFromAddrPort(netip.AddrPortFrom(ip, 0))
-}
-
-// Its remote address is the user's, so audit events and source-address options see the user, not the relay.
-type relayConn struct {
-	stream relayStream
-	// cancel ends the stream, which unblocks a pending Receive or Send.
-	cancel        context.CancelFunc
-	remote, local net.Addr
-
-	// pending is the unread tail of the last frame. Only the ssh transport's reader touches it.
-	pending []byte
-
-	// sendMu makes Closed the last frame, the stream takes one sender at a time.
-	sendMu sync.Mutex
-	closed bool
-
-	deadlineMu sync.Mutex
-	deadline   *time.Timer
 }
 
 func (c *relayConn) Read(p []byte) (int, error) {
@@ -118,7 +118,7 @@ func (c *relayConn) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Close skips the Closed frame while a Write is stuck on a dead core. The cancel unblocks that Write.
+// Close skips the Closed frame while a Write is stuck. The cancel unblocks it.
 func (c *relayConn) Close() error {
 	if c.sendMu.TryLock() {
 		if !c.closed {
@@ -131,7 +131,7 @@ func (c *relayConn) Close() error {
 	return c.SetDeadline(time.Time{})
 }
 
-// SetDeadline ends the connection when it passes, a stream cannot time out one read.
+// SetDeadline ends the connection, a stream cannot time out one read.
 func (c *relayConn) SetDeadline(t time.Time) error {
 	c.deadlineMu.Lock()
 	defer c.deadlineMu.Unlock()

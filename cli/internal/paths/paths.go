@@ -21,7 +21,7 @@ func EnsureDirs() error {
 	return nil
 }
 
-// ConfigDir is ~/.config/nk on every OS. The macOS one has a space, which every ssh_config line would have to survive.
+// ConfigDir avoids the macOS dir, its space would hit every ssh_config line.
 func ConfigDir() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "nk")
@@ -41,7 +41,7 @@ func SSHCertDir() string      { return filepath.Join(ConfigDir(), "certs") }
 func SignerStateFile() string { return filepath.Join(ConfigDir(), "signer.json") }
 func SSHSignerFile() string   { return filepath.Join(ConfigDir(), "ssh-signer.json") }
 
-// AgentSocket is a named pipe on Windows, where OpenSSH only speaks to agents over pipes.
+// AgentSocket is a pipe on Windows, OpenSSH speaks to agents only over pipes.
 func AgentSocket() string {
 	if runtime.GOOS == "windows" {
 		sum := sha256.Sum256([]byte(ConfigDir()))
@@ -50,7 +50,7 @@ func AgentSocket() string {
 	return filepath.Join(ConfigDir(), "agent.sock")
 }
 
-// SSHCertificate trusts the id as a path segment. IDs are UUIDs, checked when the core snapshot is mapped.
+// SSHCertificate trusts the id, state.Targets drops any that is not a UUID.
 func SSHCertificate(targetID string) string {
 	return filepath.Join(SSHCertDir(), targetID+"-cert.pub")
 }
@@ -59,7 +59,6 @@ func SSHCertificates() ([]string, error) {
 	return filepath.Glob(filepath.Join(SSHCertDir(), "*-cert.pub"))
 }
 
-// RemoveConfigDir never touches ~/.ssh.
 func RemoveConfigDir() error {
 	if err := os.RemoveAll(ConfigDir()); err != nil {
 		return fmt.Errorf("remove config dir: %w", err)

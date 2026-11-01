@@ -41,7 +41,7 @@ func captureLogs(t *testing.T) *logBuffer {
 	return logs
 }
 
-// docToken holds the policy SECURITY.md gives and nothing else, so that policy has to be enough.
+// docToken holds only the policy SECURITY.md gives, that has to be enough.
 func docToken(t *testing.T, root *api.Client, kek, period string) string {
 	t.Helper()
 	require.NoError(t, root.Sys().PutPolicyWithContext(t.Context(), "nokku-core", docPolicy(t, kek)))
@@ -54,7 +54,8 @@ func docToken(t *testing.T, root *api.Client, kek, period string) string {
 	return token.Auth.ClientToken
 }
 
-// Of two periodic tokens only the one the core holds outlives its period, and a restart still opens the keyset with it.
+// Of two periodic tokens only the core's outlives its period, and a restart
+// still opens the keyset with it.
 func TestCoreKeepsAPeriodicVaultTokenAlive(t *testing.T) {
 	logs := captureLogs(t)
 	conn := freshDB(t)

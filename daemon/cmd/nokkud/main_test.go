@@ -40,7 +40,8 @@ func TestCheckEnrollToken(t *testing.T) {
 	token := nktoken.New("enroll")
 	require.NoError(t, checkEnrollToken(token))
 	for _, bad := range []string{
-		"0199f3a1-7c2e-7d4b-9a10-3f2c1b0e8d7a_" + strings.Repeat("a", 43), // the format before
+		// The old format.
+		"0199f3a1-7c2e-7d4b-9a10-3f2c1b0e8d7a_" + strings.Repeat("a", 43),
 		nktoken.New("invite"),
 		token[:len(token)-1],
 		"nk_enroll_",

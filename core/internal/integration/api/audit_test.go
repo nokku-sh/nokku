@@ -9,7 +9,6 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,10 +20,10 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// A denied call is audited. A session of another workspace does not exist on this host, so it leaves nothing.
+// A denied call is audited. Another workspace's session leaves nothing here.
 func TestAuditDeniedCall(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	viewer := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	other := seedOtherWorkspace(t, cfg)
 	outsider := seedUser(t, cfg, other, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
@@ -37,23 +36,19 @@ func TestAuditDeniedCall(t *testing.T) {
 
 	deleteTarget := func(token, id string) connect.Code {
 		targets := nokkuv1connect.NewTargetServiceClient(
-			connect.NewClient(
-				connecthttp.NewTransport(srv.Client(), srv.URL),
-				header("Authorization", "Bearer "+token),
-			),
+			clientOn(srv, header("Authorization", "Bearer "+token)),
 		)
 		_, err := targets.DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &id})
 		return connect.CodeOf(err)
 	}
-	// The write is detached from the request, so the row shows up a moment later.
 	rows := func(target string) []*db.ListAuditLogsRow {
 		var out []*db.ListAuditLogsRow
-		_ = cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+		assert.NoError(t, cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
 			out, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
 				Target: &target, Limit: 2,
 			})
 			return err
-		})
+		}))
 		return out
 	}
 
@@ -70,14 +65,14 @@ func TestAuditDeniedCall(t *testing.T) {
 	assert.Empty(t, rows(long[:256]), "a stranger's call reached the log")
 }
 
-// The log is for forensics, so it keeps the client's exact address, not the /64 that rate limits count by.
+// Forensics need the exact address, not the /64 that rate limits count by.
 func TestAuditKeepsTheExactAddress(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	viewer := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	viewer := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	// The test server is on loopback, which may name the client by default.
 	targets := nokkuv1connect.NewTargetServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
+		clientOn(
+			srv,
 			header("Authorization", "Bearer "+viewer),
 			header("X-Forwarded-For", "2001:db8:abcd:1234::7"),
 		),
@@ -88,7 +83,7 @@ func TestAuditKeepsTheExactAddress(t *testing.T) {
 
 	var rows []*db.ListAuditLogsRow
 	require.Eventually(t, func() bool {
-		_ = cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+		_ = cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
 			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{Target: &target, Limit: 1})
 			return err
 		})
@@ -97,29 +92,29 @@ func TestAuditKeepsTheExactAddress(t *testing.T) {
 	assert.Equal(t, "2001:db8:abcd:1234::7", rows[0].Ip)
 }
 
-// The log keeps the name of a service account, the account may be long gone when somebody reads the row.
+// The log keeps the name, the account may be long gone when someone reads it.
 func TestAuditNamesServiceAccount(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	adminAuth := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	name := uniq("ci")
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+		clientOn(srv, adminAuth),
 	)
 	sa, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{Name: &name})
 	require.NoError(t, err)
 	token := serviceAccountToken(t, accounts, sa.GetServiceAccount().GetId(), nil)
 
 	target := uuid.NewV7().String()
-	_, err = nokkuv1connect.NewTargetServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
+	_, err = nokkuv1connect.NewTargetServiceClient(clientOn(srv, header("Authorization", "Bearer "+token))).
 		DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &target})
 	require.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 
 	var rows []*db.ListAuditLogsRow
 	require.Eventually(t, func() bool {
-		_ = cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+		_ = cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
 			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{Target: &target, Limit: 2})
 			return err
 		})

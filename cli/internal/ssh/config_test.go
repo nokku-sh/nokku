@@ -37,8 +37,10 @@ func TestRenderSSHConfig(t *testing.T) {
 		"Match originalhost web exec \"nk prepare t-1\"\n\nHost web\n    User alice\n    ProxyCommand nk proxy t-1 %p\n    HostKeyAlias t-1\n",
 		"    CertificateFile " + configValue(paths.SSHCertificate("t-1")) + "\n",
 		"    IdentityAgent " + configValue(paths.AgentSocket()) + "\n",
-		"    ForwardAgent no\n    ForwardX11 no\n", // a Host * of the user never forwards to a target
-		"Host nokku/t-2\n", // names that differ only by case fall back to the id
+		// A Host * of the user never forwards to a target.
+		"    ForwardAgent no\n    ForwardX11 no\n",
+		// Names that differ only by case fall back to the id.
+		"Host nokku/t-2\n",
 		"Host nokku/t-3\n",
 	} {
 		assert.Contains(t, out, want)
@@ -154,7 +156,7 @@ func writtenConfig(t *testing.T, st *state.State) string {
 	return string(out)
 }
 
-// nk's Include sits on top, so a name the user already sends somewhere stays theirs.
+// nk's Include sits on top, so a name the user routes stays theirs.
 func TestOwnSSHConfigKeepsItsNames(t *testing.T) {
 	setupSSHDir(t)
 	sshDir := filepath.Dir(paths.SSHUserConfig())
@@ -195,7 +197,7 @@ Match originalhost gitbox,mirror user git
 	writtenConfig(t, st)
 	out := writtenConfig(t, st)
 
-	// JUMP differs from jump only by case, which neither ssh's Match nor a person tells apart.
+	// JUMP differs from jump only by case, ssh's Match can't tell them apart.
 	for _, taken := range []string{"bastion", "JUMP", "prod-db", "mirror", "nas"} {
 		assert.NotContains(t, out, "\nHost "+taken+"\n", "%s is the user's own name", taken)
 		assert.Contains(t, out, "\nHost nokku/"+taken+"\n", "%s stays reachable under the prefix", taken)
@@ -231,7 +233,7 @@ Include extra
 		"the HostName after the Include belongs to web, like ssh reads it")
 }
 
-// Two servers never share a Host line, and names that differ only by case count as one.
+// Two servers never share a Host line, names differing by case count as one.
 func TestHostLinesAreNeverShared(t *testing.T) {
 	setupSSHDir(t)
 	st := &state.State{

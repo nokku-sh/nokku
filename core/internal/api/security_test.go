@@ -25,7 +25,7 @@ func TestWithHeadersCachePolicy(t *testing.T) {
 	}), "a handler with its own policy keeps it")
 }
 
-// A browser keeps HSTS for a year, so only a client that is on https may get it, and nobody on localhost.
+// Browsers keep HSTS for a year, so it goes to https clients, not localhost.
 func TestHSTSIsOnlySetForAClientOnHTTPS(t *testing.T) {
 	hsts := func(cfg *config.Config, proto string) string {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -41,8 +41,9 @@ func TestHSTSIsOnlySetForAClientOnHTTPS(t *testing.T) {
 	assert.Empty(t, hsts(&config.Config{Port: "3000"}, "https"), "localhost")
 }
 
-// The scheme decides, not who sends it. A browser never sends X-Forwarded-Proto, so faking it only fools the core
-// about the faker's own connection. A redirect through a proxy that names no scheme would never end.
+// The scheme decides, not who sends it. Faking X-Forwarded-Proto only fools the
+// core about the faker's own connection. A redirect through a proxy that names
+// no scheme would never end.
 func TestPlainHTTPIsSentToHTTPS(t *testing.T) {
 	const proxy, stranger = "10.0.0.2:4242", "203.0.113.7:4242"
 	proto := func(scheme string) http.Header { return http.Header{"X-Forwarded-Proto": {scheme}} }
@@ -51,18 +52,28 @@ func TestPlainHTTPIsSentToHTTPS(t *testing.T) {
 		name, path, peer string
 		header           http.Header
 		want             int
+		location         string
 	}{
-		{"the proxy for a client on https", "/", proxy, proto("https"), http.StatusOK},
-		{"a proxy on a public address", "/", stranger, proto("https"), http.StatusOK},
-		{"traefik for a websocket on https", "/terminal/ws", proxy, proto("wss"), http.StatusOK},
-		{"a health probe", "/healthz", stranger, nil, http.StatusOK},
-		{"a client that connects by itself", "/login?next=%2F", stranger, nil, http.StatusTemporaryRedirect},
-		{"the proxy for a client on http", "/", proxy, proto("http"), http.StatusTemporaryRedirect},
-		{"traefik for a websocket on http", "/terminal/ws", proxy, proto("ws"), http.StatusTemporaryRedirect},
+		{"the proxy for a client on https", "/", proxy, proto("https"), http.StatusOK, ""},
+		{"a proxy on a public address", "/", stranger, proto("https"), http.StatusOK, ""},
+		{"traefik for a websocket on https", "/terminal/ws", proxy, proto("wss"), http.StatusOK, ""},
+		{"a health probe", "/healthz", stranger, nil, http.StatusOK, ""},
+		{
+			"a client that connects by itself", "/login?next=%2F", stranger, nil,
+			http.StatusTemporaryRedirect, "https://nokku.example.com/login?next=%2F",
+		},
+		{
+			"the proxy for a client on http", "/", proxy, proto("http"),
+			http.StatusTemporaryRedirect, "https://nokku.example.com/",
+		},
+		{
+			"traefik for a websocket on http", "/terminal/ws", proxy, proto("ws"),
+			http.StatusTemporaryRedirect, "https://nokku.example.com/terminal/ws",
+		},
 		{
 			"the proxy without the scheme", "/", proxy,
 			http.Header{"X-Forwarded-For": {"203.0.113.9"}},
-			http.StatusBadRequest,
+			http.StatusBadRequest, "",
 		},
 	}
 	s := &Server{cfg: &config.Config{BaseURL: "nokku.example.com"}}
@@ -71,20 +82,16 @@ func TestPlainHTTPIsSentToHTTPS(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
 			req.RemoteAddr = tt.peer
-			if tt.header != nil {
-				req.Header = tt.header
-			}
+			req.Header = tt.header
 			w := httptest.NewRecorder()
 			served.ServeHTTP(w, req)
 			assert.Equal(t, tt.want, w.Code)
-			if tt.want == http.StatusTemporaryRedirect {
-				assert.Equal(t, "https://nokku.example.com"+tt.path, w.Header().Get("Location"))
-			}
+			assert.Equal(t, tt.location, w.Header().Get("Location"))
 		})
 	}
 }
 
-// A browser takes http://localhost as secure, so the quick start and the dev server need no certificate.
+// Browsers trust http://localhost, so quick start and dev need no certificate.
 func TestLocalhostIsServedPlain(t *testing.T) {
 	s := &Server{cfg: &config.Config{Port: "3000"}}
 	w := httptest.NewRecorder()

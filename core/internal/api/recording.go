@@ -97,7 +97,7 @@ func (s *recordingService) GetRecording(
 
 	fr, err := s.cfg.Record.OpenReader(ctx, rec)
 	if errors.Is(err, recording.ErrNotStored) {
-		return newError(connect.CodeFailedPrecondition, err.Error())
+		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	}
 	if err != nil {
 		return err
@@ -121,9 +121,9 @@ func (s *recordingService) GetRecording(
 		if errors.Is(readErr, io.EOF) || errors.Is(readErr, io.ErrUnexpectedEOF) {
 			return nil
 		}
-		// What was sent is all that verified, the rest of the object was cut off or changed.
+		// What was sent verified, the rest was cut off or changed.
 		slog.Error("read recording", "recording_id", rec.ID, "error", readErr)
-		return newError(connect.CodeDataLoss, "the recording is damaged or was cut short, it ends here")
+		return connect.NewError(connect.CodeDataLoss, "the recording is damaged or was cut short, it ends here")
 	}
 }
 
@@ -131,7 +131,7 @@ func (s *recordingService) DeleteRecording(
 	ctx context.Context,
 	req *nokkuv1.DeleteRecordingRequest,
 ) (*nokkuv1.DeleteRecordingResponse, error) {
-	// The object goes through the delete queue. Without its row and the key on it, nobody can read it meanwhile.
+	// The delete queue takes the object, unreadable without the row's key.
 	if _, err := s.cfg.Conn.Tenant().DeleteRecording(ctx, req.GetRecordingId()); err != nil {
 		return nil, err
 	}

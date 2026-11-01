@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/audit"
 
 	"connectrpc.com/connect/v2"
+	"github.com/jackc/pgx/v5"
 	gossh "golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -23,9 +25,9 @@ import (
 )
 
 const (
-	// serviceAccountCertTTL caps a service account's certificate, so a leaked token leaves an hour of access, not days.
+	// A leaked service account token leaves an hour of access, not days.
 	serviceAccountCertTTL = time.Hour
-	// daemonlessCertTTL caps a certificate for a server set up with nk sync, so a revoke lands there within the hour.
+	// For servers set up with nk sync, so a revoke lands within the hour.
 	daemonlessCertTTL = time.Hour
 )
 
@@ -63,7 +65,7 @@ func (s *certificateService) UpdateCertificateAuthority(
 	if req.SourceAddress != nil {
 		list, err := ssh.SourceAddresses(req.GetSourceAddress())
 		if err != nil {
-			return nil, newError(connect.CodeInvalidArgument, err.Error())
+			return nil, connect.NewError(connect.CodeInvalidArgument, err.Error())
 		}
 		params.SourceAddress = &list
 	}
@@ -102,30 +104,35 @@ func (s *certificateService) RolloverCertificateAuthority(
 	}, nil
 }
 
-// SignSSHCertificate names the accounts the caller is granted on one server right now, so a revoked grant ends with it.
+// SignSSHCertificate names current grants, so a revoked one ends with the cert.
 func (s *certificateService) SignSSHCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignSSHCertificateRequest,
 ) (*nokkuv1.SignSSHCertificateResponse, error) {
 	caller, _ := actor.PrincipalFromContext(ctx)
-	// A browser cookie must not turn into a certificate for any key it pastes. People sign through nk.
+	// A cookie must not sign any pasted key. People sign through nk.
 	if caller.Kind == actor.KindUser {
-		return nil, newError(connect.CodePermissionDenied, "sign certificates with nk or a service account")
+		return nil, connect.NewError(connect.CodePermissionDenied, "sign certificates with nk or a service account")
 	}
 
 	var ca *db.SSHCA
 	var signer gossh.Signer
 	var limits ssh.Limits
 	var principals []string
-	// until is when the first grant in the certificate ends, nil when all of them are for good.
+	// until is when the first grant ends, nil if none of them do.
 	var until *time.Time
 	var daemonless bool
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		// An unknown id answers like a missing grant, so ids can't be probed.
+		denied := connect.NewError(connect.CodePermissionDenied, "you have no access to this server")
 		target, err := q.GetTarget(ctx, req.GetTargetId())
+		if errors.Is(err, pgx.ErrNoRows) {
+			return denied
+		}
 		if err != nil {
 			return err
 		}
-		// The grant comes first, so a member without one learns nothing about the server.
+		// Grant first, so a member without one learns nothing of the server.
 		accounts, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
 			TargetIds: []string{target.ID},
 			SubjectID: caller.ID,
@@ -134,16 +141,16 @@ func (s *certificateService) SignSSHCertificate(
 			return err
 		}
 		if len(accounts) == 0 || !accounts[0].UserOk {
-			return newError(connect.CodePermissionDenied, "you have no access to this server")
+			return denied
 		}
-		// A daemon that is not approved may still hold the principals of its last sync. It gets no certificates to match.
+		// An unapproved daemon may hold old principals. No certs to match them.
 		if !accounts[0].DaemonOk {
-			return newError(connect.CodeFailedPrecondition, "the daemon of this server is not approved")
+			return connect.NewError(connect.CodeFailedPrecondition, "the daemon of this server is not approved")
 		}
 		daemonless = target.DaemonID == nil
 		for _, a := range accounts {
 			principals = append(principals, login.Principal(caller.ID, target.ID, a.Username))
-			// A server set up with nk sync has one fixed rule, it takes a certificate that names it and the account.
+			// An nk sync server only takes a cert naming it and the account.
 			if daemonless {
 				principals = append(principals, login.ServerPrincipal(target.ID, a.Username))
 			}
@@ -158,7 +165,7 @@ func (s *certificateService) SignSSHCertificate(
 			return err
 		}
 		limits = ssh.Limits{SourceAddress: ca.SourceAddress}
-		// A machine takes its own limits alone, an office list on the CA must not block a hosted runner.
+		// Machines get their own limits, a CA office list would block runners.
 		if caller.Kind == actor.KindServiceAccount {
 			account, err := q.GetServiceAccount(ctx, caller.ID)
 			if err != nil {
@@ -177,17 +184,17 @@ func (s *certificateService) SignSSHCertificate(
 		ttl = serviceAccountTTL(ca, ttl, tok.ExpiresAt)
 		// Nothing left would sign for the CA default.
 		if ttl <= 0 {
-			return nil, newError(connect.CodeUnauthenticated, "the token has expired")
+			return nil, connect.NewError(connect.CodeUnauthenticated, "the token has expired")
 		}
 	}
 	if until != nil {
 		ttl = grantTTL(ca, ttl, *until)
 		if ttl <= 0 {
-			return nil, newError(connect.CodePermissionDenied, "you have no access to this server")
+			return nil, connect.NewError(connect.CodePermissionDenied, "you have no access to this server")
 		}
 	}
 	if daemonless {
-		// Nothing tells such a server about a revoke, the certificate running out is what ends the access.
+		// No revoke reaches such a server, only expiry ends the access.
 		ttl = min(ssh.UserTTL(ca, ttl), daemonlessCertTTL)
 	}
 
@@ -211,7 +218,7 @@ func (s *certificateService) SignSSHCertificate(
 	audit.Set(ctx, "key_id", cert.KeyId)
 	audit.Set(ctx, "principals", cert.ValidPrincipals)
 	audit.Set(ctx, "expires_at", expiry)
-	// The event is the only record of the certificate, so it is written before anyone holds one.
+	// The event is the cert's only record, written before anyone holds one.
 	if err := s.cfg.Audit.Commit(ctx); err != nil {
 		return nil, err
 	}
@@ -222,7 +229,7 @@ func (s *certificateService) SignSSHCertificate(
 	}, nil
 }
 
-// grantTTL keeps the certificate from outliving the first grant in it that ends.
+// grantTTL keeps the certificate from outliving its first grant to end.
 func grantTTL(ca *db.SSHCA, ttl time.Duration, until time.Time) time.Duration {
 	return min(ssh.UserTTL(ca, ttl), time.Until(until))
 }

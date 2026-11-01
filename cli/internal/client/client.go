@@ -62,7 +62,6 @@ func New(s *state.State) (*Client, error) {
 	return c, c.dial()
 }
 
-// Runs again when the CA the API is trusted through changed.
 func (c *Client) dial() error {
 	s := c.State
 	roots, err := trust.Pool([]byte(s.APICA))
@@ -83,7 +82,7 @@ func (c *Client) dial() error {
 		})
 		auth = c.dpop.Intercept
 	}
-	// Unbounded like the v1 client, the access snapshot and target pages grow with the workspace.
+	// Unbounded, the access snapshot and target pages grow with the workspace.
 	cc := connect.NewClient(
 		connecthttp.NewTransport(c.httpc, s.APIURL, connecthttp.WithReadMaxBytes(0)),
 		callTimeout,
@@ -100,7 +99,7 @@ func (c *Client) dial() error {
 	return nil
 }
 
-// Sync without interactive takes a missing or rejected session as an error instead of a browser login.
+// Sync without interactive fails instead of opening a browser.
 func (c *Client) Sync(ctx context.Context, interactive bool) error {
 	err := c.sync(ctx, interactive)
 	if trust.Untrusted(err) {
@@ -116,7 +115,6 @@ func (c *Client) Sync(ctx context.Context, interactive bool) error {
 	if !interactive {
 		return err
 	}
-	// The stored session was rejected, log in once more.
 	c.State.SessionToken, c.State.SessionExpiresAt = "", time.Time{}
 	if err = c.ensureSession(ctx, true); err != nil {
 		return err
@@ -124,13 +122,13 @@ func (c *Client) Sync(ctx context.Context, interactive bool) error {
 	return c.sync(ctx, false)
 }
 
-// SyncOrCache falls back to the cached snapshot, so ssh keeps working while the core is down.
+// SyncOrCache keeps ssh working on the cached snapshot while the core is down.
 func (c *Client) SyncOrCache(ctx context.Context, interactive bool) error {
 	err := c.Sync(ctx, interactive)
 	if err == nil {
 		return nil
 	}
-	// No outage. A job that goes on from the cache would only fail later, with less to say about why.
+	// No outage. Going on from the cache would only fail later, less clearly.
 	if errors.Is(err, ErrCISessionEnded) {
 		return err
 	}
@@ -156,7 +154,7 @@ func (c *Client) sync(ctx context.Context, interactive bool) error {
 	cache.SyncedAt = time.Now()
 	keep := cache.Targets
 	if id := cache.SubjectID(); id == "" || id != c.State.SubjectID() {
-		// A certificate names its subject. One signed in as someone else must not use it.
+		// A certificate names its subject, so another login must not use it.
 		keep = nil
 	}
 	if err = ssh.CleanupCerts(keep); err != nil {
@@ -169,7 +167,7 @@ func (c *Client) sync(ctx context.Context, interactive bool) error {
 	return ssh.WriteConfigs(c.State)
 }
 
-// Logout revokes the session on the core. The caller removes the local state either way.
+// Logout revokes the session. The caller removes local state either way.
 func (c *Client) Logout(ctx context.Context) error {
 	if c.State.IsServiceAccount() || c.State.SessionToken == "" {
 		return nil
@@ -178,7 +176,7 @@ func (c *Client) Logout(ctx context.Context) error {
 	return err
 }
 
-// EnsureCert keeps the certificate on disk when signing fails, so ssh works offline while it is valid.
+// EnsureCert keeps the old certificate if signing fails, for offline ssh.
 func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.CA) error {
 	if ssh.CertFresh(target, ca) {
 		return nil
@@ -224,7 +222,7 @@ func (c *Client) ReportTarget(ctx context.Context, t *state.Target, accounts []s
 	return err
 }
 
-// CreateTarget with an empty name asks the server to generate one. The grants are seeded with it, once.
+// CreateTarget with an empty name lets the server generate one.
 func (c *Client) CreateTarget(
 	ctx context.Context,
 	t *state.Target,
@@ -260,7 +258,7 @@ func (c *Client) DeleteTarget(ctx context.Context, t *state.Target) error {
 	return err
 }
 
-// ListAllTargets is for nk sync and rm. The access sync only carries the targets the subject may log in to.
+// ListAllTargets also has targets the subject can't log in to.
 func (c *Client) ListAllTargets(ctx context.Context) ([]state.Target, error) {
 	var out []state.Target
 	for offset := int32(0); ; offset += lookupLimit {
@@ -278,7 +276,7 @@ func (c *Client) ListAllTargets(ctx context.Context) ([]state.Target, error) {
 	}
 }
 
-// WorkspaceCA is what nk sync writes to a server. It comes from the core, so a rollover reaches the server.
+// WorkspaceCA asks the core and not the cache, so nk sync sees a rollover.
 func (c *Client) WorkspaceCA(ctx context.Context) (*state.CA, error) {
 	res, err := c.certs.GetCertificateAuthority(ctx, &nokkuv1.GetCertificateAuthorityRequest{})
 	if err != nil {

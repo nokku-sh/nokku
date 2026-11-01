@@ -3,6 +3,8 @@ package db
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
@@ -28,14 +30,10 @@ func TestCanAssign(t *testing.T) {
 		{none, member, false},
 	}
 	for _, tt := range tests {
-		if got := CanAssign(tt.caller, tt.target); got != tt.want {
-			t.Errorf("CanAssign(%s, %s) = %v, want %v", tt.caller, tt.target, got, tt.want)
-		}
+		assert.Equal(t, tt.want, CanAssign(tt.caller, tt.target), "CanAssign(%s, %s)", tt.caller, tt.target)
 	}
 }
 
 func TestRoleLabel(t *testing.T) {
-	if got := RoleLabel(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN); got != "admin" {
-		t.Errorf("RoleLabel(admin) = %q", got)
-	}
+	assert.Equal(t, "admin", RoleLabel(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
 }

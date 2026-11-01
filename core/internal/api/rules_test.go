@@ -21,7 +21,27 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
 
-// Every rule of every call in one file, so a change to who may call what shows up as a diff in review.
+// Gated by what a request asks for, kept by hand next to RequestedFeatures.
+var conditionalFeatures = []string{
+	entitlement.FeatureEnforceSSO, entitlement.FeatureExpiringAccess, entitlement.FeatureIdleTimeout,
+	entitlement.FeatureAccessRequests, entitlement.FeatureAuditStreaming,
+}
+
+// uncappedCreates have their bound somewhere else, with the place named.
+var uncappedCreates = map[string]string{
+	"/nokku.v1.WorkspaceService/CreateWorkspace":                "pre-tenant, bounded by the auth rate limit",
+	"/nokku.v1.DaemonService/CreateSession":                     "no lasting row, recording storage evicts",
+	"/nokku.v1.AccessRequestService/CreateAccessRequest":        "handler: maxDailyRequests per person",
+	"/nokku.v1.AuditStreamService/CreateAuditStream":            "handler: maxAuditStreams per workspace",
+	"/nokku.v1.BillingService/CreateCheckout":                   "a Stripe session, no row",
+	"/nokku.v1.BillingService/CreatePortal":                     "a Stripe session, no row",
+	"/nokku.v1.InvitationService/CreateInvitation":              "one row per address, gone in 7 days, the seat cap refuses it",
+	"/nokku.v1.JoinTokenService/CreateJoinToken":                "a token, enrolling counts against the cap",
+	"/nokku.v1.ServiceAccountService/CreateServiceAccountToken": "a token on a capped account",
+	"/nokku.v1.SCIMService/CreateSCIMToken":                     "a token, SCIM users count against seats",
+}
+
+// Every rule of every call in one file, so a change shows up in review.
 // UPDATE_GOLDEN=1 writes the file.
 func TestRulesGolden(t *testing.T) {
 	var lines []string
@@ -49,13 +69,7 @@ func TestRulesGolden(t *testing.T) {
 	assert.Equal(t, string(want), got, "the rules changed, review the diff and rerun with UPDATE_GOLDEN=1")
 }
 
-// conditionalFeatures are gated by what a request asks for, kept by hand next to entitlement.RequestedFeatures.
-var conditionalFeatures = []string{
-	entitlement.FeatureEnforceSSO, entitlement.FeatureExpiringAccess, entitlement.FeatureIdleTimeout,
-	entitlement.FeatureAccessRequests, entitlement.FeatureAuditStreaming,
-}
-
-// A paid feature that no call enforces is revenue leakage, a gate on a feature no plan has is dead weight.
+// A paid feature no call enforces leaks revenue, a gate no plan has is dead.
 func TestEveryFeatureIsGated(t *testing.T) {
 	gated := slices.Clone(conditionalFeatures)
 	for _, procedure := range allProcedures(t) {
@@ -64,29 +78,28 @@ func TestEveryFeatureIsGated(t *testing.T) {
 		}
 	}
 	for _, f := range entitlement.CatalogFeatures {
-		if !slices.Contains(gated, f.Code) {
-			t.Errorf("feature %q is gated nowhere: declare it on a call, or list it as free", f.Code)
-		}
+		assert.Contains(t, gated, f.Code,
+			"feature %q is gated nowhere: declare it on a call, or list it as free", f.Code)
 	}
 	for _, f := range gated {
-		if !slices.ContainsFunc(entitlement.CatalogFeatures, func(c entitlement.Feature) bool { return c.Code == f }) {
-			t.Errorf("a call needs feature %q, which no plan has", f)
-		}
+		inCatalog := slices.ContainsFunc(entitlement.CatalogFeatures, func(c entitlement.Feature) bool {
+			return c.Code == f
+		})
+		assert.True(t, inCatalog, "a call needs feature %q, which no plan has", f)
 	}
 }
 
-// A call that hands out a credential takes a recent sign-in, so a stolen cookie cannot become a lasting secret.
+// Handing out a credential takes a recent sign-in, or a stolen cookie lasts.
 func TestEveryTokenCallIsFresh(t *testing.T) {
 	for _, procedure := range allProcedures(t) {
 		_, method, _ := strings.Cut(strings.TrimPrefix(procedure, "/"), "/")
-		if strings.HasPrefix(method, "Create") && strings.HasSuffix(method, "Token") &&
-			!procedureAccess[procedure].GetFresh() {
-			t.Errorf("%s hands out a credential, mark it fresh", procedure)
+		if strings.HasPrefix(method, "Create") && strings.HasSuffix(method, "Token") {
+			assert.True(t, procedureAccess[procedure].GetFresh(), "%s hands out a credential, mark it fresh", procedure)
 		}
 	}
 }
 
-// A stolen session must not quietly change who can sign in or where the audit log goes.
+// A stolen session must not quietly change who signs in or where audit goes.
 func TestSignInAndAuditChangesAreFresh(t *testing.T) {
 	for _, procedure := range []string{
 		nokkuv1connect.SSOServicePutSSOProviderProcedure,
@@ -112,21 +125,7 @@ func TestRequestedFresh(t *testing.T) {
 	assert.False(t, requestedFresh(&nokkuv1.GetVersionRequest{}), "another call")
 }
 
-// uncappedCreates have their bound somewhere else, with the place named.
-var uncappedCreates = map[string]string{
-	"/nokku.v1.WorkspaceService/CreateWorkspace":                "pre-tenant, bounded by the auth rate limit",
-	"/nokku.v1.DaemonService/CreateSession":                     "no lasting row, recording storage evicts",
-	"/nokku.v1.AccessRequestService/CreateAccessRequest":        "handler: maxDailyRequests per person",
-	"/nokku.v1.AuditStreamService/CreateAuditStream":            "handler: maxAuditStreams per workspace",
-	"/nokku.v1.BillingService/CreateCheckout":                   "a Stripe session, no row",
-	"/nokku.v1.BillingService/CreatePortal":                     "a Stripe session, no row",
-	"/nokku.v1.InvitationService/CreateInvitation":              "one row per address, gone in 7 days, the seat cap refuses it",
-	"/nokku.v1.JoinTokenService/CreateJoinToken":                "a token, enrolling counts against the cap",
-	"/nokku.v1.ServiceAccountService/CreateServiceAccountToken": "a token on a capped account",
-	"/nokku.v1.SCIMService/CreateSCIMToken":                     "a token, SCIM users count against seats",
-}
-
-// An uncapped create on the hosted service is an unbounded resource, so each one is capped or named here.
+// An uncapped create is unbounded when hosted, so each is capped or named here.
 func TestEveryCreateIsCapped(t *testing.T) {
 	for _, procedure := range allProcedures(t) {
 		_, method, _ := strings.Cut(strings.TrimPrefix(procedure, "/"), "/")
@@ -135,13 +134,9 @@ func TestEveryCreateIsCapped(t *testing.T) {
 		}
 		_, exempt := uncappedCreates[procedure]
 		capped := procedureAccess[procedure].GetCapped()
-		if capped == exempt {
-			t.Errorf("%s: capped=%t, exempt=%t, want exactly one", procedure, capped, exempt)
-		}
+		assert.NotEqual(t, exempt, capped, "%s: capped=%t, exempt=%t, want exactly one", procedure, capped, exempt)
 	}
 	for procedure := range uncappedCreates {
-		if procedureAccess[procedure] == nil {
-			t.Errorf("uncappedCreates names %s, which does not exist", procedure)
-		}
+		assert.NotNil(t, procedureAccess[procedure], "uncappedCreates names %s, which does not exist", procedure)
 	}
 }

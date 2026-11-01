@@ -47,7 +47,6 @@ type counts struct {
 	users, teams, serviceAccounts, targets, daemons int
 }
 
-// subjects is who can be granted an account on a server, by id.
 type subjects struct {
 	users, teams, serviceAccounts []string
 }
@@ -159,7 +158,6 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 	return nil
 }
 
-// grant gives a server a few accounts, each with some subjects that may sign in as it.
 func grant(ctx context.Context, q *db.Queries, targetID string, who subjects) error {
 	for _, username := range sample(usernames, 1+roll(3)) {
 		p, err := q.CreateTargetAccount(ctx, &db.CreateTargetAccountParams{TargetID: targetID, Username: username})

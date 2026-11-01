@@ -39,13 +39,31 @@ type inbox struct {
 	links map[string][]string
 }
 
+// login is a session as its client holds it: a cookie, or nk's key-bound token.
+type login struct {
+	token string
+	key   *ecdsa.PrivateKey
+}
+
+// reply is what a plain HTTP route answered. Redirects are not followed.
+type reply struct {
+	status   int
+	location string
+	body     map[string]any
+}
+
+type deviceGrant struct {
+	DeviceCode string `json:"device_code"`
+	UserCode   string `json:"user_code"`
+}
+
 func (b *inbox) put(to, link string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.links[to] = append(b.links[to], link)
 }
 
-// next waits for the first link mailed to to. Sign-in links are mailed from a goroutine.
+// next waits for a link to to, sign-in mails go out from a goroutine.
 func (b *inbox) next(t *testing.T, to string) string {
 	t.Helper()
 	var link string
@@ -61,7 +79,7 @@ func (b *inbox) next(t *testing.T, to string) string {
 	return link
 }
 
-// mailServer serves base with mail on. Links iam would mail land in the inbox, the API's own mails go nowhere.
+// mailServer turns mail on. iam's links land in inbox, the API's go nowhere.
 func mailServer(t *testing.T, base *config.Config) (*config.Config, *httptest.Server, *inbox) {
 	t.Helper()
 	box := &inbox{links: map[string][]string{}}
@@ -82,7 +100,7 @@ func mailServer(t *testing.T, base *config.Config) (*config.Config, *httptest.Se
 	return cfg, srv, box
 }
 
-// iamServer serves base with an iam of its own, whose seat cap is the one of base. mail holds the mail functions.
+// iamServer serves base with an iam of its own and base's seat cap.
 func iamServer(t *testing.T, base *config.Config, mail iam.Deps) (*config.Config, *httptest.Server) {
 	t.Helper()
 	mail.Conn = base.Conn
@@ -100,17 +118,11 @@ func iamServer(t *testing.T, base *config.Config, mail iam.Deps) (*config.Config
 	return &local, srv
 }
 
-// login is a session as its client holds it. The browser has a cookie, nk a token bound to its key.
-type login struct {
-	token string
-	key   *ecdsa.PrivateKey
-}
-
 // browserSession is a cookie session of u, signed in age ago.
 func browserSession(t *testing.T, cfg *config.Config, u *db.User, age time.Duration) login {
 	t.Helper()
 	tok, token, err := cfg.IAM.IssueSignIn(
-		wsCtx(t, cfg),
+		wsCtx(t),
 		u,
 		iam.TokenParams{Kind: actor.KindUser, Method: iam.MethodPasskey},
 	)
@@ -135,13 +147,13 @@ func ageSession(t *testing.T, id string, age time.Duration) {
 // sessionAfter tells whether the session still signs in.
 func sessionAfter(t *testing.T, cfg *config.Config, token string) string {
 	t.Helper()
-	if _, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), token, accessTokens...); err != nil {
+	if _, _, err := cfg.IAM.AuthenticateToken(wsCtx(t), token, accessTokens...); err != nil {
 		return "session ended"
 	}
 	return "session kept"
 }
 
-// signedIn sends s on every unary call the way its client does. Each call of nk carries a new proof.
+// signedIn sends s on every unary call, each call of nk with a new proof.
 func signedIn(t *testing.T, cfg *config.Config, s login) connect.ClientInterceptor {
 	t.Helper()
 	return func(next connect.ClientFunc) connect.ClientFunc {
@@ -168,13 +180,6 @@ func rpcAnswer(err error) string {
 		return ce.Code().String() + ": " + ce.Message()
 	}
 	return "error: " + err.Error()
-}
-
-// reply is what a plain HTTP route answered. Redirects are not followed.
-type reply struct {
-	status   int
-	location string
-	body     map[string]any
 }
 
 // String is the status and the message of the body, never a token it carries.
@@ -218,11 +223,6 @@ func withCookie(token string) func(http.Header) {
 	return func(h http.Header) { h.Set("Cookie", sessionCookie+"="+token) }
 }
 
-type deviceGrant struct {
-	DeviceCode string `json:"device_code"`
-	UserCode   string `json:"user_code"`
-}
-
 func startDevice(t *testing.T, srv *httptest.Server) deviceGrant {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL+"/auth/device", nil)
@@ -251,7 +251,7 @@ func pollDevice(
 	})
 }
 
-// deviceLogin signs nk in as u through the device flow, approved by a browser session of u.
+// deviceLogin signs nk in as u by the device flow, approved in u's browser.
 func deviceLogin(t *testing.T, cfg *config.Config, srv *httptest.Server, u *db.User) login {
 	t.Helper()
 	grant := startDevice(t, srv)

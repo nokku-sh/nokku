@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	emailverify "github.com/nokku-sh/nokku/core/internal/email"
 	"github.com/nokku-sh/nokku/core/internal/iam"
@@ -56,7 +55,7 @@ func (m *mailbox) empty(t *testing.T, msg string) {
 	t.Helper()
 	select {
 	case l := <-m.links:
-		t.Fatalf("%s, but got %s", msg, l)
+		require.FailNow(t, msg, "got %s", l)
 	case <-time.After(100 * time.Millisecond):
 	}
 }
@@ -91,7 +90,6 @@ func TestMagicLinkSignIn(t *testing.T) {
 	mail.empty(t, "an address of workspace a gets no mail from workspace b")
 }
 
-// The mail service holds back a second link inside its cooldown. A link nobody got must not stay valid.
 func TestFirstSignInClaimsTheWorkspace(t *testing.T) {
 	mail := newMailbox()
 	e := newTestEnvWith(t, mail.deps())
@@ -117,6 +115,8 @@ func TestFirstSignInClaimsTheWorkspace(t *testing.T) {
 	assert.Equal(t, first, claimed(), "a later sign-in moved the first one")
 }
 
+// The mail service holds back a second link inside its cooldown. A link nobody
+// got must not stay valid.
 func TestUnsentMagicLinkIsDropped(t *testing.T) {
 	mail := newMailbox()
 	e := newTestEnvWith(t, iam.Deps{SendMagicLink: func(_ context.Context, _, _, l string, _ time.Duration) error {
@@ -152,7 +152,7 @@ func TestMagicLinkHonorsEnforcedSSO(t *testing.T) {
 	require.ErrorIs(t, err, iam.ErrSSORequired)
 	assert.Zero(t, e.sessions(t, o.ws, member.ID))
 
-	// The owner keeps the link, or a broken provider locks the workspace for good.
+	// The owner keeps the link, or a broken provider locks the workspace out.
 	e.svc.RequestMagicLink(ctx, o.owner.Email)
 	_, _, err = e.svc.ConsumeMagicLink(ctx, linkToken(t, mail.link(t)))
 	require.NoError(t, err)
@@ -204,7 +204,7 @@ func TestLastCredentialStays(t *testing.T) {
 	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:b"), iam.ErrLastCredential)
 	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:a"), iam.ErrNotFound)
 
-	// With mail configured a sign-in link is a way in, so the last passkey may go.
+	// With mail a sign-in link is a way in, so the last passkey may go.
 	e = newTestEnvWith(t, newMailbox().deps())
 	require.NoError(t, e.svc.DeleteCredential(ctx, "passkey:b"))
 	assert.Zero(t, e.passkeys(t, o.ws, o.owner.ID))
@@ -218,10 +218,10 @@ func TestLastCredentialStays(t *testing.T) {
 		Data:    []byte{},
 	})
 	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:c"), iam.ErrNotFound, "deleted another user's passkey")
-	_ = actor.KindUser
 }
 
-// The environment names the issuer and the client. Whether the provider is on and who it lets in is the admin's.
+// The environment names the issuer and the client. Whether the provider is on
+// and who it lets in is the admin's.
 func TestBootstrapKeepsWhatTheAdminSet(t *testing.T) {
 	e := newTestEnv(t)
 	ws := e.workspace(t)
@@ -261,7 +261,8 @@ func TestBootstrapKeepsWhatTheAdminSet(t *testing.T) {
 	assert.Nil(t, e.oidcCredential(t, ws, "microsoft", "sub"), "an identity of the old tenant survived")
 }
 
-// sub is only unique per issuer. The identities go in the same step as the issuer, or a failure in between keeps them.
+// sub is only unique per issuer. The identities go in the same step as the
+// issuer, or a failure in between keeps them.
 func TestNewIssuerUnlinksIdentities(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

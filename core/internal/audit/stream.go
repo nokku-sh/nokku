@@ -26,7 +26,7 @@ const (
 	streamTick    = 5 * time.Second
 	streamBatch   = 500
 	streamTimeout = 10 * time.Second
-	// streamRetry is the wait after a failed delivery. The cursor stays, so nothing is lost meanwhile.
+	// Wait after a failed delivery. The cursor stays, so nothing is lost.
 	streamRetry = time.Minute
 )
 
@@ -37,8 +37,7 @@ const (
 	StreamDatadog = "datadog"
 )
 
-// streamLoop sends new events to every enabled stream until ctx ends. Each stream sends on its own, so a slow
-// destination or a long backlog holds up no other.
+// Each stream sends on its own, so a slow one holds up no other.
 func (s *Service) streamLoop(ctx context.Context) {
 	ticker := time.NewTicker(streamTick)
 	defer ticker.Stop()
@@ -53,7 +52,7 @@ func (s *Service) streamLoop(ctx context.Context) {
 			slog.Warn("audit streams not read", "error", err)
 			continue
 		}
-		// One plan lookup per workspace and tick. A lapsed plan keeps its streams, they wait until it comes back.
+		// A lapsed plan keeps its streams, they wait for it to come back.
 		allowed := make(map[string]bool)
 		for _, st := range streams {
 			ok, seen := allowed[st.WorkspaceID]
@@ -64,7 +63,7 @@ func (s *Service) streamLoop(ctx context.Context) {
 			if !ok {
 				continue
 			}
-			// A stream still busy from an earlier tick is skipped, two at once would send the same events twice.
+			// Skip a stream still busy, two at once would send events twice.
 			if _, busy := s.sending.LoadOrStore(st.ID, struct{}{}); busy {
 				continue
 			}
@@ -76,7 +75,6 @@ func (s *Service) streamLoop(ctx context.Context) {
 	}
 }
 
-// deliver sends what is new and records how it went.
 func (s *Service) deliver(ctx context.Context, st *db.AuditStream) {
 	err := s.sendNew(ctx, st)
 	switch {
@@ -96,8 +94,8 @@ func (s *Service) deliver(ctx context.Context, st *db.AuditStream) {
 	}
 }
 
-// sendNew sends in batches until the stream caught up or a send fails. Nothing is held open during a send. The
-// cursor moves only from where its batch was read, so a stream never skips what it did not send.
+// sendNew holds nothing open during a send. The cursor moves only from where
+// its batch was read, so a stream never skips what it did not send.
 func (s *Service) sendNew(ctx context.Context, st *db.AuditStream) error {
 	for {
 		rows, err := s.conn.Sys().ListAuditLogsAfter(ctx, &db.ListAuditLogsAfterParams{
@@ -133,7 +131,7 @@ func (s *Service) sendNew(ctx context.Context, st *db.AuditStream) error {
 	}
 }
 
-// TestStream sends one made up event, so an admin sees at once whether the destination takes it.
+// TestStream sends one made up event, to see if the destination takes it.
 func (s *Service) TestStream(ctx context.Context, st *db.AuditStream) error {
 	return s.send(ctx, st, []*Event{{
 		ID:          uuid.Nil().String(),
@@ -164,7 +162,7 @@ func (s *Service) send(ctx context.Context, st *db.AuditStream, events []*Event)
 	case StreamWebhook:
 		stamp := strconv.FormatInt(time.Now().Unix(), 10)
 		req.Header.Set("X-Nokku-Timestamp", stamp)
-		req.Header.Set("X-Nokku-Signature", "sha256="+Sign(secret, stamp, body))
+		req.Header.Set("X-Nokku-Signature", "sha256="+sign(secret, stamp, body))
 	case StreamSplunk:
 		req.Header.Set("Authorization", "Splunk "+secret)
 	case StreamDatadog:
@@ -183,26 +181,25 @@ func (s *Service) send(ctx context.Context, st *db.AuditStream, events []*Event)
 	return nil
 }
 
-// SecretAAD is where the secret of a stream is sealed. It opens only for the stream it was stored with, so a
-// ciphertext copied to another stream, whose URL someone else may pick, does not.
+// SecretAAD ties a secret to its stream, so a ciphertext copied to another
+// stream, whose URL someone else may pick, does not open.
 func SecretAAD(workspaceID, streamID string) crypto.AAD {
 	return crypto.AAD{Table: "audit_streams", Column: "secret", Workspace: workspaceID, Row: streamID}
 }
 
-// refuseRedirect keeps the API key or the signature from going to a host nobody chose.
+// refuseRedirect keeps the API key or signature off hosts nobody chose.
 func refuseRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-// Sign is the webhook signature, an HMAC-SHA256 over the timestamp, a dot and the body. Receivers check it so
-// nobody else can post events, and reject an old timestamp so a captured request is not replayed.
-func Sign(secret, stamp string, body []byte) string {
+// sign is the webhook signature, an HMAC-SHA256 over the timestamp, a dot and
+// the body. Receivers reject an old timestamp, which stops a replay.
+func sign(secret, stamp string, body []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(stamp + "."))
 	mac.Write(body)
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// streamBody shapes a batch the way each destination reads it. Every event keeps its id, so a receiver drops what
-// a retry sends twice.
+// Every event keeps its id, so a receiver drops what a retry sends twice.
 func streamBody(kind string, events []*Event) ([]byte, error) {
 	switch kind {
 	case StreamWebhook:

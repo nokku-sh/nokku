@@ -1,4 +1,4 @@
-// Package tenant puts the workspace on the context before anything authenticates, so nothing downstream guesses it.
+// Package tenant puts the workspace on the context before auth runs.
 package tenant
 
 import (
@@ -26,9 +26,17 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
+const (
+	slugCacheTTL     = time.Minute
+	slugCacheEntries = 10_000
+	// unclaimedAfter frees a squatted slug whose signup nobody signed in to.
+	unclaimedAfter = 24 * time.Hour
+	purgeEvery     = time.Hour
+)
+
 var ErrUnknownWorkspace = errors.New("no such workspace")
 
-// reserved slugs never resolve to a workspace, so nobody can sign up as app.nokku.sh.
+// reserved slugs never resolve, so nobody can sign up as app.nokku.sh.
 var reserved = map[string]bool{
 	"www":     true,
 	"app":     true,
@@ -47,7 +55,7 @@ var reserved = map[string]bool{
 //go:embed denylist.txt
 var denylistFile string
 
-// denylist holds brand names and phishing words. A slug containing one is refused at signup.
+// denylist holds brand and phishing words, refused in a slug at signup.
 var denylist = func() []string {
 	var out []string
 	for line := range strings.SplitSeq(denylistFile, "\n") {
@@ -58,14 +66,6 @@ var denylist = func() []string {
 	return out
 }()
 
-const (
-	slugCacheTTL     = time.Minute
-	slugCacheEntries = 10_000
-	// unclaimedAfter is how long a signup may sit without a sign-in, so a squatted slug frees itself.
-	unclaimedAfter = 24 * time.Hour
-	purgeEvery     = time.Hour
-)
-
 type envConfig struct {
 	WorkspaceName string `env:"NOKKU_WORKSPACE_NAME" envDefault:"Nokku"`
 }
@@ -74,13 +74,12 @@ type Resolver struct {
 	conn   *db.Connection
 	saas   bool
 	scheme string
-	host   string // the root host without port
+	host   string
 	port   string
 	single actor.Workspace
 	slugs  *cache.TTL[string, actor.Workspace]
 }
 
-// New in self-host mode makes sure the one workspace exists.
 func New(ctx context.Context, conn *db.Connection, keys *kms.Keyset, baseURL string, saas bool) (*Resolver, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil || u.Host == "" {
@@ -111,7 +110,6 @@ func New(ctx context.Context, conn *db.Connection, keys *kms.Keyset, baseURL str
 // Single is the self-host workspace, empty on the hosted service.
 func (r *Resolver) Single() actor.Workspace { return r.single }
 
-// BaseURL is where a workspace lives. Self-host ignores the slug.
 func (r *Resolver) BaseURL(slug string) string {
 	host := r.host
 	if r.saas {
@@ -123,7 +121,7 @@ func (r *Resolver) BaseURL(slug string) string {
 	return r.scheme + "://" + host
 }
 
-// FromHost returns an empty workspace for the hosted root host, the only host outside a workspace.
+// FromHost returns an empty workspace for the hosted root host, and only it.
 func (r *Resolver) FromHost(ctx context.Context, host string) (actor.Workspace, error) {
 	if !r.saas {
 		return r.single, nil
@@ -154,7 +152,7 @@ func (r *Resolver) FromHost(ctx context.Context, host string) (actor.Workspace, 
 	return ws, nil
 }
 
-// Middleware runs before every handler but the health check and provider webhooks.
+// Middleware runs before every handler but health and provider webhooks.
 func (r *Resolver) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ws, err := r.FromHost(req.Context(), req.Host)
@@ -177,14 +175,13 @@ func (r *Resolver) workspace(row *db.Workspace) actor.Workspace {
 	return actor.Workspace{ID: row.ID, Slug: row.Slug, BaseURL: r.BaseURL(row.Slug)}
 }
 
-// Forget drops a deleted workspace from the slug cache, so its name is free at once.
+// Forget uncaches a deleted workspace, so its name is free at once.
 func (r *Resolver) Forget(slug string) {
 	if r.slugs != nil {
 		r.slugs.Delete(slug)
 	}
 }
 
-// Forbidden reports a reserved host, or a slug with a brand or phishing word from denylist.txt.
 func Forbidden(slug string) bool {
 	if reserved[slug] {
 		return true
@@ -211,7 +208,6 @@ func (r *Resolver) purgeUnclaimed(ctx context.Context) {
 	}
 }
 
-// PurgeUnclaimed deletes every workspace from before cutoff that nobody ever signed in to.
 func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 	return r.conn.SysTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListUnclaimedWorkspaces(ctx, cutoff)
@@ -231,7 +227,7 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 	})
 }
 
-// Create pins the transaction to the id the workspace is about to get, so it runs under RLS with no system role.
+// Create pins the tx to the new id, so it runs under RLS with no system role.
 func Create(ctx context.Context, conn *db.Connection, keys *kms.Keyset, slug, name string) (*db.Workspace, error) {
 	id := uuid.NewV7().String()
 	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: id})

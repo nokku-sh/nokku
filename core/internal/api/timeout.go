@@ -7,7 +7,7 @@ import (
 	"connectrpc.com/connect/v2"
 )
 
-// newTimeoutInterceptor caps every unary call. A deadline the client asked for only counts when it is earlier.
+// newTimeoutInterceptor caps unary calls, an earlier client deadline holds.
 func newTimeoutInterceptor() connect.ServerInterceptor {
 	return func(next connect.ServerFunc) connect.ServerFunc {
 		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
@@ -21,7 +21,7 @@ func newTimeoutInterceptor() connect.ServerInterceptor {
 	}
 }
 
-// newStreamEndInterceptor ends every stream with the root ctx. Unary calls run on through the shutdown grace.
+// Streams end with the root ctx. Unary calls run on through the shutdown grace.
 func newStreamEndInterceptor(root context.Context) connect.ServerInterceptor {
 	return func(next connect.ServerFunc) connect.ServerFunc {
 		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {

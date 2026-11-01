@@ -1,7 +1,6 @@
 package iam
 
 import (
-	"bytes"
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
@@ -9,52 +8,40 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/chacha20poly1305"
 
 	"github.com/nokku-sh/nokku/core/internal/cache"
 )
 
-// newSealedTestService is enough of a Service to seal flow state, with a clock the test moves.
-func newSealedTestService(t *testing.T, secure bool) (*Service, *time.Time) {
-	t.Helper()
+// Only the cookie's browser continues, in the same flow, once, while fresh.
+func TestSealedFlowState(t *testing.T) {
 	aead, err := chacha20poly1305.NewX(make([]byte, chacha20poly1305.KeySize))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	now := time.Now()
-	return &Service{
-		secure:   secure,
+	svc := &Service{
 		flowAEAD: aead,
 		spent:    cache.New[string, struct{}](10, flowStateTTL),
 		now:      func() time.Time { return now },
-	}, &now
-}
-
-// Only the browser that got the cookie can continue, in the same flow, while it is fresh and not after a login.
-func TestSealedFlowState(t *testing.T) {
-	svc, now := newSealedTestService(t, false)
+	}
 	store := &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oidc", ttl: flowStateTTL}
 
 	const provider = "provider-kept-out-of-sight"
 	rec := httptest.NewRecorder()
 	id, err := store.put(rec, authorizeState{ProviderID: provider, LinkUserID: "u1"})
-	if err != nil || id == "" {
-		t.Fatalf("put = %q, %v", id, err)
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, id)
 	cookies := rec.Result().Cookies()
-	if len(cookies) != 1 || cookies[0].Name != flowCookieName {
-		t.Fatalf("cookies = %v, want the flow cookie", cookies)
-	}
+	require.Len(t, cookies, 1)
 	cookie := cookies[0]
-	if !cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Secure {
-		t.Errorf("flow cookie HttpOnly=%v SameSite=%v Secure=%v, want HttpOnly, Lax and no Secure on plain HTTP",
-			cookie.HttpOnly, cookie.SameSite, cookie.Secure)
-	}
-	if raw, err := base64.RawURLEncoding.DecodeString(
-		cookie.Value,
-	); err != nil ||
-		bytes.Contains(raw, []byte(provider)) {
-		t.Errorf("the state is readable in the cookie, decoding it gave %v", err)
+	require.Equal(t, flowCookieName, cookie.Name)
+	assert.True(t, cookie.HttpOnly, "the flow cookie must be HttpOnly")
+	assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
+	assert.False(t, cookie.Secure, "no Secure on plain HTTP")
+	raw, err := base64.RawURLEncoding.DecodeString(cookie.Value)
+	if assert.NoError(t, err, "the cookie is not base64") {
+		assert.NotContains(t, string(raw), provider, "the state is readable in the cookie")
 	}
 
 	reqWith := func(value string) *http.Request {
@@ -66,45 +53,38 @@ func TestSealedFlowState(t *testing.T) {
 	}
 
 	got, gotID, err := store.take(reqWith(cookie.Value))
-	if err != nil || gotID != id || got.ProviderID != provider || got.LinkUserID != "u1" {
-		t.Fatalf("take = %+v, %q, %v", got, gotID, err)
+	require.NoError(t, err)
+	require.Equal(t, id, gotID)
+	require.Equal(t, provider, got.ProviderID)
+	require.Equal(t, "u1", got.LinkUserID)
+
+	refused := func(s *sealed[authorizeState], value, why string) {
+		t.Helper()
+		_, _, err := s.take(reqWith(value))
+		assert.Error(t, err, why)
 	}
-	if _, _, err := store.take(reqWith("stolen")); err == nil {
-		t.Error("a made up cookie was accepted")
-	}
-	if _, _, err := store.take(reqWith("")); err == nil {
-		t.Error("a browser without the cookie was accepted")
-	}
+	refused(store, "stolen", "a made up cookie was accepted")
+	refused(store, "", "a browser without the cookie was accepted")
 	tampered := cookie.Value[:len(cookie.Value)-2] + "AA"
-	if _, _, err := store.take(reqWith(tampered)); err == nil {
-		t.Error("a tampered cookie was accepted")
-	}
+	refused(store, tampered, "a tampered cookie was accepted")
 	other := &sealed[authorizeState]{svc: svc, cookie: flowCookieName, use: "oauth2", ttl: flowStateTTL}
-	if _, _, err := other.take(reqWith(cookie.Value)); err == nil {
-		t.Error("the state of one flow opened in another")
-	}
+	refused(other, cookie.Value, "the state of one flow opened in another")
 
 	svc.spendFlow(id)
-	if _, _, err := store.take(reqWith(cookie.Value)); err == nil {
-		t.Error("the state of a finished login was accepted again")
-	}
+	refused(store, cookie.Value, "the state of a finished login was accepted again")
 
 	rec = httptest.NewRecorder()
-	if _, err := store.put(rec, authorizeState{ProviderID: "p2"}); err != nil {
-		t.Fatal(err)
-	}
+	_, err = store.put(rec, authorizeState{ProviderID: "p2"})
+	require.NoError(t, err)
 	fresh := rec.Result().Cookies()[0].Value
-	*now = now.Add(flowStateTTL + time.Second)
-	if _, _, err := store.take(reqWith(fresh)); err == nil {
-		t.Error("an expired state was accepted")
-	}
+	now = now.Add(flowStateTTL + time.Second)
+	refused(store, fresh, "an expired state was accepted")
 
-	if _, err := store.put(httptest.NewRecorder(), authorizeState{ReturnTo: strings.Repeat("x", 4096)}); err == nil {
-		t.Error("a state too large for a cookie was set anyway")
-	}
+	_, err = store.put(httptest.NewRecorder(), authorizeState{ReturnTo: strings.Repeat("x", 4096)})
+	assert.Error(t, err, "a state too large for a cookie was set anyway")
 }
 
-// A GET that adds a way in is taken only from the app itself, so a link on another site cannot end a session.
+// A GET that adds a way in must come from the app, not a link on another site.
 func TestRequireFreshRefusesForeignGets(t *testing.T) {
 	var svc Service
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("the route ran") })
@@ -115,25 +95,19 @@ func TestRequireFreshRefusesForeignGets(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 		svc.RequireFresh(next).ServeHTTP(rec, r)
-		if rec.Code != http.StatusForbidden || len(rec.Result().Cookies()) != 0 {
-			t.Errorf("Sec-Fetch-Site %q: code %d, cookies %v, want 403 and the session left alone",
-				site, rec.Code, rec.Result().Cookies())
-		}
+		assert.Equal(t, http.StatusForbidden, rec.Code, "Sec-Fetch-Site %q", site)
+		assert.Empty(t, rec.Result().Cookies(), "Sec-Fetch-Site %q: the session must be left alone", site)
 	}
 }
 
 func TestSafeReturnTo(t *testing.T) {
 	for _, ok := range []string{"/", "/secrets/42?tab=audit", "/a/b#c"} {
-		if got := safeReturnTo(ok); got != ok {
-			t.Errorf("safeReturnTo(%q) = %q, want it kept", ok, got)
-		}
+		assert.Equal(t, ok, safeReturnTo(ok))
 	}
 	for _, bad := range []string{
 		"", "https://evil.example", "//evil.example", "/\\evil.example",
 		"/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "/\x00x", "/" + strings.Repeat("x", maxReturnTo),
 	} {
-		if got := safeReturnTo(bad); got != "" {
-			t.Errorf("safeReturnTo(%q) = %q, want it dropped", bad, got)
-		}
+		assert.Empty(t, safeReturnTo(bad), "safeReturnTo(%q) must drop it", bad)
 	}
 }

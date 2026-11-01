@@ -22,7 +22,8 @@ const (
 	editor = nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR
 )
 
-// An invite makes one account, with its address and role. Looking at it spends nothing, a mail scanner may open it.
+// An invite makes one account, with its address and role. Looking at it spends
+// nothing, a mail scanner may open it.
 func TestInviteCreatesOneAccount(t *testing.T) {
 	mail := newMailbox()
 	e := newTestEnvWith(t, mail.deps())
@@ -65,7 +66,8 @@ func TestInviteCreatesOneAccount(t *testing.T) {
 	require.ErrorIs(t, err, iam.ErrInviteSpent)
 }
 
-// A new invite of the same address replaces the link, so a resend with another role leaves no second way in.
+// A new invite of an address replaces the link, so a resend with another role
+// leaves no second way in.
 func TestInviteReplacesTheEarlierLink(t *testing.T) {
 	mail := newMailbox()
 	e := newTestEnvWith(t, mail.deps())
@@ -87,7 +89,8 @@ func TestInviteReplacesTheEarlierLink(t *testing.T) {
 	assert.Equal(t, member, u.Role)
 }
 
-// A resend whose mail fails, on cooldown too, leaves the earlier link working and the new one dead.
+// A resend whose mail fails, on cooldown too, keeps the earlier link alive and
+// the new one dead.
 func TestUnsentInviteKeepsTheEarlierOne(t *testing.T) {
 	var link string
 	var sendErr error
@@ -128,7 +131,7 @@ func TestInviteWithoutMailReturnsTheLink(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// The seat cap holds at both ends. An accept it refuses keeps the invite for when a seat frees up.
+// The seat cap holds at both ends. A refused accept keeps the invite for later.
 func TestSeatCapHoldsForInvites(t *testing.T) {
 	deps := iam.Deps{CanJoin: func(_ context.Context, _ string, used int64) error {
 		if used >= 2 {
@@ -156,7 +159,8 @@ func TestSeatCapHoldsForInvites(t *testing.T) {
 	require.NoError(t, err, "the refused accept spent the invite")
 }
 
-// An invited account has no provider, so required SSO refuses both ends and keeps the invite.
+// An invited account has no provider. Required SSO refuses it, the invite
+// stays.
 func TestEnforcedSSOKeepsTheInvite(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

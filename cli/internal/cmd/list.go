@@ -26,7 +26,7 @@ func listCMD() *cli.Command {
 				return err
 			}
 			s := c.State
-			// The name ssh knows a server by carries a prefix when the bare one is taken.
+			// ssh's name for a server has a prefix when the bare one is taken.
 			aliases := ssh.HostAliases(s)
 			if cmd.Bool(jsonFlag.Name) {
 				return printJSON(listJSON(s, aliases))
@@ -54,7 +54,6 @@ func listCMD() *cli.Command {
 	}
 }
 
-// withUntil names when the accounts that end do, a time today or a date and time.
 func withUntil(t state.Target) []string {
 	out := make([]string, len(t.Usernames))
 	for i, username := range t.Usernames {
@@ -66,7 +65,6 @@ func withUntil(t state.Target) []string {
 	return out
 }
 
-// untilLabel is a time today, or a date and time.
 func untilLabel(end time.Time) string {
 	end = end.Local()
 	if end.Format(time.DateOnly) == time.Now().Format(time.DateOnly) {
@@ -78,7 +76,7 @@ func untilLabel(end time.Time) string {
 func listJSON(s *state.State, aliases map[string]string) any {
 	type listedTarget struct {
 		Name string `json:"name"`
-		// Host is what ssh knows the target by, empty when it stays out of ssh_config.
+		// Host is ssh's name for it, empty when it stays out of ssh_config.
 		Host   string               `json:"host,omitempty"`
 		Users  []string             `json:"users"`
 		Until  map[string]time.Time `json:"until,omitempty"`

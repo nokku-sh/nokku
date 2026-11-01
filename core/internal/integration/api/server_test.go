@@ -28,27 +28,32 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
+// logLines collects what the server logs from its own goroutine.
+type logLines struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
 // A public RPC must not buffer a body of any size before it is even validated.
 func TestRequestSizeLimit(t *testing.T) {
 	_, srv := newTestAPI(t)
-	_, err := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+	_, err := nokkuv1connect.NewAuthServiceClient(clientOn(srv)).
 		ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{
 			Token: new(strings.Repeat("x", maxMessageBytes+1)),
 		})
 	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "got %v", err)
 }
 
-// Settings that name no daemon defaults read as the built-in ones.
 func TestWorkspaceReadsBuiltInDaemonDefaults(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
 		_, err := q.UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{Settings: &nokkuv1.WorkspaceSettings{}})
 		return err
 	})
 
 	member := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	got, err := nokkuv1connect.NewWorkspaceServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+member))).
+	got, err := nokkuv1connect.NewWorkspaceServiceClient(clientOn(srv, header("Authorization", "Bearer "+member))).
 		GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 	require.NoError(t, err)
 	assert.True(t,
@@ -72,7 +77,7 @@ func TestPlainJSONCall(t *testing.T) {
 	assert.Contains(t, string(body), `"code":"unauthenticated"`)
 }
 
-// A newer client may call a service this build does not have. It must get a 404, not the SPA's index page.
+// A newer client's unknown service gets a 404, not the SPA's index page.
 func TestUnknownServiceIsNotFound(t *testing.T) {
 	_, srv := newTestAPI(t)
 	resp, err := srv.Client().Post(srv.URL+"/nokku.v1.FutureService/Do", "application/json", strings.NewReader(`{}`))
@@ -81,11 +86,11 @@ func TestUnknownServiceIsNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-// A deploy lets a request that is under way finish, and ends the streams at once.
+// A deploy lets a running request finish, and ends the streams at once.
 func TestShutdownLetsARequestFinish(t *testing.T) {
 	selfHostedOnly(t, "it dials the real listener, which reads no workspace host")
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	member := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 
@@ -111,7 +116,7 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 		return resp.StatusCode == http.StatusOK
 	}, 5*time.Second, 20*time.Millisecond, "the server never listened")
 
-	// A daemon's control stream lives as long as the daemon. The deadline only matters when the shutdown misses it.
+	// A control stream never ends alone, the deadline is for a missed shutdown.
 	streamCtx, giveUp := context.WithTimeout(t.Context(), 3*time.Second)
 	defer giveUp()
 	streamCtx, call := connect.NewClientContext(streamCtx)
@@ -129,7 +134,7 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
 	}))
 
-	// The body arrives after the shutdown began, so the handler runs inside the grace.
+	// The body comes after the shutdown began, so the handler runs in grace.
 	body, send := io.Pipe()
 	req, err := http.NewRequestWithContext(
 		t.Context(), http.MethodPost, base+nokkuv1connect.WorkspaceServiceGetWorkspaceProcedure, body,
@@ -164,7 +169,7 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 	assert.NoError(t, <-stopped)
 }
 
-// The core only speaks plain HTTP. Its proxy forwards in h2c, and a client that connects by itself goes to https.
+// The core speaks plain HTTP. Its proxy uses h2c, a lone client goes to https.
 func TestPlainHTTPIsForTheProxy(t *testing.T) {
 	selfHostedOnly(t, "it sets a base URL of its own")
 	cfg, _ := newTestAPI(t)
@@ -196,7 +201,7 @@ func TestPlainHTTPIsForTheProxy(t *testing.T) {
 	assert.Equal(t, "https://nokku.example.com/login?next=%2F", resp.Header.Get("Location"))
 }
 
-// startCore runs the real server of cfg on a free port, the way the binary does, and returns its address.
+// startCore runs cfg's real server on a free port and returns its address.
 func startCore(t *testing.T, cfg *config.Config) string {
 	t.Helper()
 	free, err := net.Listen("tcp", "127.0.0.1:0")
@@ -225,7 +230,7 @@ func startCore(t *testing.T, cfg *config.Config) string {
 	return base
 }
 
-// The owner's link is a way into the workspace, and a log line can travel to a telemetry backend.
+// The owner's link is a way in, and a log line can reach a telemetry backend.
 func TestOwnerLinkStaysOutOfTheLog(t *testing.T) {
 	selfHostedOnly(t, "the hosted service makes no owner at start")
 	var out logLines
@@ -240,12 +245,6 @@ func TestOwnerLinkStaysOutOfTheLog(t *testing.T) {
 
 	assert.Contains(t, out.String(), "run nokku admin-link")
 	assert.NotContains(t, out.String(), "/login/verify")
-}
-
-// logLines collects what the server logs from its own goroutine.
-type logLines struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
 }
 
 func (l *logLines) Write(p []byte) (int, error) {

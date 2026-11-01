@@ -4,26 +4,26 @@ package db_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/access"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// soleGrant leaves u with its direct grant only, ending at end. nil is for good.
+// soleGrant leaves u only its direct grant, ending at end. nil is for good.
 func soleGrant(t *testing.T, c *conn, f stateFixture, end *time.Time) {
 	t.Helper()
 	_, err := c.sysPool.Exec(t.Context(), `
 		DELETE FROM team_members WHERE user_id = $1;
 		UPDATE grants SET expires_at = $2 WHERE account_id = $3 AND subject_id = $1;
 	`, pgx.QueryExecModeSimpleProtocol, f.u, end, f.account)
-	if err != nil {
-		t.Fatalf("set the grant: %v", err)
-	}
+	require.NoError(t, err, "set the grant")
 }
 
 func usernames(t *testing.T, c *conn, f stateFixture) []*db.ListSubjectUsernamesForTargetsRow {
@@ -32,9 +32,7 @@ func usernames(t *testing.T, c *conn, f stateFixture) []*db.ListSubjectUsernames
 		TargetIds: []string{f.target},
 		SubjectID: f.u,
 	})
-	if err != nil {
-		t.Fatalf("list usernames: %v", err)
-	}
+	require.NoError(t, err, "list usernames")
 	return rows
 }
 
@@ -44,24 +42,22 @@ func grantEnd(t *testing.T, c *conn, f stateFixture) (*time.Time, bool) {
 	err := c.sysPool.QueryRow(t.Context(),
 		`SELECT expires_at FROM grants WHERE account_id = $1 AND subject_id = $2`, f.account, f.u,
 	).Scan(&end)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, false
 	}
+	require.NoError(t, err, "read the grant")
 	return end, true
 }
 
-// A grant past its end must not sign and must not be on a host, even before the job deletes it.
+// A grant past its end signs nothing and is on no host, before the job runs
+// too.
 func TestEndedGrantResolvesNowhere(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 	soleGrant(t, c, f, new(time.Now().Add(-time.Second)))
 
-	if got := usernames(t, c, f); len(got) != 0 {
-		t.Fatalf("an ended grant still signs: %v", got)
-	}
-	if got := grantedIDs(t, c, f.target); len(got) != 0 {
-		t.Fatalf("an ended grant is still on the host: %v", got)
-	}
+	require.Empty(t, usernames(t, c, f), "an ended grant still signs")
+	require.Empty(t, grantedIDs(t, c, f.target), "an ended grant is still on the host")
 }
 
 func TestGrantEndIsTheLatestThatApplies(t *testing.T) {
@@ -71,20 +67,18 @@ func TestGrantEndIsTheLatestThatApplies(t *testing.T) {
 	soleGrant(t, c, f, &end)
 
 	rows := usernames(t, c, f)
-	if len(rows) != 1 || rows[0].Until() == nil || !rows[0].Until().Equal(end) {
-		t.Fatalf("one grant ending at %v: got %+v", end, rows)
-	}
+	require.Len(t, rows, 1, "one grant")
+	require.NotNil(t, rows[0].Until(), "one grant ending at %v", end)
+	require.WithinDuration(t, end, *rows[0].Until(), 0)
 
 	// Back in the team, whose grant is for good, the access is for good.
-	if _, err := c.sysPool.Exec(t.Context(),
+	_, err := c.sysPool.Exec(t.Context(),
 		`INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $2, $3)`, f.ws, f.u, f.team,
-	); err != nil {
-		t.Fatalf("rejoin the team: %v", err)
-	}
+	)
+	require.NoError(t, err, "rejoin the team")
 	rows = usernames(t, c, f)
-	if len(rows) != 1 || rows[0].Until() != nil {
-		t.Fatalf("a grant for good through the team: got until %v", rows[0].Until())
-	}
+	require.Len(t, rows, 1, "a grant for good through the team")
+	require.Nil(t, rows[0].Until(), "a grant for good through the team")
 }
 
 func TestExpireDeletesBumpsAndAudits(t *testing.T) {
@@ -94,7 +88,7 @@ func TestExpireDeletesBumpsAndAudits(t *testing.T) {
 	conn := listen(t, c)
 	before := stateVersion(t, c, f.ws)
 
-	// The database is shared, other tests leave ended grants in their workspaces.
+	// The database is shared, other tests leave their ended grants in it.
 	var events []*audit.Event
 	write := func(_ context.Context, e *audit.Event) error {
 		if e.WorkspaceID == f.ws {
@@ -102,60 +96,55 @@ func TestExpireDeletesBumpsAndAudits(t *testing.T) {
 		}
 		return nil
 	}
-	if err := access.Expire(t.Context(), c.Connection, write); err != nil {
-		t.Fatalf("expire: %v", err)
-	}
+	require.NoError(t, access.Expire(t.Context(), c.Connection, write), "expire")
 
 	waitNotify(t, conn, f.ws)
-	if after := stateVersion(t, c, f.ws); after <= before {
-		t.Fatalf("expiry: version %d -> %d, want a bump so hosts drop the grant", before, after)
-	}
-	if _, ok := grantEnd(t, c, f); ok {
-		t.Fatal("the ended grant is still there")
-	}
-	if len(events) != 1 || events[0].Action != "GrantExpired" || events[0].Details["subject_id"] != f.u {
-		t.Fatalf("want one GrantExpired event for %s, got %+v", f.u, events)
-	}
+	require.Greater(t, stateVersion(t, c, f.ws), before, "no version bump, hosts keep the grant")
+	_, ok := grantEnd(t, c, f)
+	require.False(t, ok, "the ended grant is still there")
+	require.Len(t, events, 1, "want one GrantExpired event")
+	require.Equal(t, "GrantExpired", events[0].Action)
+	require.Equal(t, f.u, events[0].Details["subject_id"])
 
 	// The team grant of the fixture is for good and stays.
 	var left int
-	if err := c.sysPool.QueryRow(t.Context(),
+	require.NoError(t, c.sysPool.QueryRow(t.Context(),
 		`SELECT count(*) FROM grants WHERE account_id = $1`, f.account,
-	).Scan(&left); err != nil || left != 1 {
-		t.Fatalf("grants left = %d (%v), want the team grant", left, err)
-	}
+	).Scan(&left))
+	require.Equal(t, 1, left, "want the team grant")
 }
 
-// An approval never shortens a grant or ends one for good. An admin's grant sets the end as asked.
+// An approval never shortens a grant or ends one for good. An admin's grant
+// sets the end as asked.
 func TestGrantWritesKeepOrSetTheEnd(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 	soon := time.Now().Add(time.Hour).Truncate(time.Microsecond)
 	later := soon.Add(time.Hour)
 	ctx := t.Context()
+	wantEnd := func(want time.Time, msg string) {
+		t.Helper()
+		end, _ := grantEnd(t, c, f)
+		require.NotNil(t, end, msg)
+		require.WithinDuration(t, want, *end, 0, msg)
+	}
 
 	soleGrant(t, c, f, &soon)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.ExtendGrant(ctx, &db.ExtendGrantParams{AccountID: f.account, UserID: f.u, ExpiresAt: later})
 	})
-	if end, _ := grantEnd(t, c, f); end == nil || !end.Equal(later) {
-		t.Fatalf("an approval for longer: end %v, want %v", end, later)
-	}
+	wantEnd(later, "an approval for longer")
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.ExtendGrant(ctx, &db.ExtendGrantParams{AccountID: f.account, UserID: f.u, ExpiresAt: soon})
 	})
-	if end, _ := grantEnd(t, c, f); end == nil || !end.Equal(later) {
-		t.Fatalf("an approval for less shortened the grant to %v", end)
-	}
+	wantEnd(later, "an approval for less shortened the grant")
 
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.PutGrant(ctx, &db.PutGrantParams{
 			AccountID: f.account, SubjectKind: db.SubjectKindUser, SubjectID: f.u, ExpiresAt: &soon,
 		})
 	})
-	if end, _ := grantEnd(t, c, f); end == nil || !end.Equal(soon) {
-		t.Fatalf("an admin's shorter end: got %v, want %v", end, soon)
-	}
+	wantEnd(soon, "an admin's shorter end")
 
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.PutGrant(
@@ -163,13 +152,11 @@ func TestGrantWritesKeepOrSetTheEnd(t *testing.T) {
 			&db.PutGrantParams{AccountID: f.account, SubjectKind: db.SubjectKindUser, SubjectID: f.u},
 		)
 	})
-	if end, _ := grantEnd(t, c, f); end != nil {
-		t.Fatalf("an admin's grant for good still ends at %v", end)
-	}
+	end, _ := grantEnd(t, c, f)
+	require.Nil(t, end, "an admin's grant for good still ends")
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.ExtendGrant(ctx, &db.ExtendGrantParams{AccountID: f.account, UserID: f.u, ExpiresAt: soon})
 	})
-	if end, _ := grantEnd(t, c, f); end != nil {
-		t.Fatalf("an approval made a grant for good end at %v", end)
-	}
+	end, _ = grantEnd(t, c, f)
+	require.Nil(t, end, "an approval made a grant for good end")
 }

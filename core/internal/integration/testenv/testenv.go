@@ -1,6 +1,7 @@
 //go:build integration
 
-// Package testenv starts what the integration tests run against, each service a container on a random port.
+// Package testenv starts what the integration tests run against, each service a
+// container on a random port.
 package testenv
 
 import (
@@ -20,10 +21,12 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// Pinned, a new upstream release must not fail the tests on its own. compose.dev.yml runs the same versions.
+// Pinned, a new upstream release must not fail the tests on its own.
+// compose.dev.yml runs the same versions.
 const (
 	postgresImage = "docker.io/postgres:18-alpine"
 	keycloakImage = "quay.io/keycloak/keycloak:26.8.0"
@@ -35,26 +38,8 @@ const (
 	startAttempts = 4
 )
 
-// run starts a container, and starts another when the host port of the first was taken. Docker picks that port
-// without asking, and a rootless one cannot even see what the host has bound. The test binaries of the other
-// packages open sockets at the same time, so now and then it picks one of theirs.
-func run(
-	ctx context.Context,
-	image string,
-	opts ...testcontainers.ContainerCustomizer,
-) (*testcontainers.DockerContainer, error) {
-	for attempt := 1; ; attempt++ {
-		c, err := testcontainers.Run(ctx, image, opts...)
-		if err == nil || attempt == startAttempts || !strings.Contains(err.Error(), "address already in use") {
-			return c, err
-		}
-		// Run hands the container back even when it did not come up.
-		_ = testcontainers.TerminateContainer(c)
-	}
-}
-
-// Postgres starts a server, points the PG* environment at it and migrates it the way the server does on start.
-// Call it from TestMain, run stop after.
+// Postgres starts a server, points the PG* environment at it and migrates it
+// the way the server does on start. Call it from TestMain, run stop after.
 func Postgres() (stop func()) {
 	ctx := context.Background()
 	c, err := run(ctx, postgresImage,
@@ -66,7 +51,8 @@ func Postgres() (stop func()) {
 		}),
 		testcontainers.WithTmpfs(map[string]string{"/inmemory-db": "rw"}),
 		testcontainers.WithExposedPorts("5432/tcp"),
-		// The image starts the server twice, the first one only runs the init scripts.
+		// The image starts the server twice, the first one only runs the init
+		// scripts.
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
 			wait.ForListeningPort("5432/tcp"),
@@ -98,7 +84,8 @@ func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 	if err != nil {
 		return err
 	}
-	// Set, never defaulted. A developer's shell must not send the tests to another server.
+	// Set, never defaulted. A developer's shell must not send the tests to
+	// another server.
 	for key, value := range map[string]string{
 		"PGHOST":     host,
 		"PGPORT":     port,
@@ -138,7 +125,8 @@ func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 	return nil
 }
 
-// Keycloak starts a dev server for the test and returns its root URL. The admin is admin with the password admin.
+// Keycloak starts a dev server for the test and returns its root URL. The admin
+// is admin with the password admin.
 func Keycloak(t *testing.T) string {
 	t.Helper()
 	c, err := run(t.Context(), keycloakImage,
@@ -159,8 +147,8 @@ func Keycloak(t *testing.T) string {
 	return root
 }
 
-// Vault starts a dev server and returns its host and port, and the file of the CA its TLS certificate comes from.
-// nokku only talks https to Vault.
+// Vault starts a dev server and returns its host and port, and the file of the
+// CA its TLS certificate comes from. nokku only talks https to Vault.
 func Vault(t *testing.T) (addr, caFile string) {
 	t.Helper()
 	c, addr, caFile, err := startVault(t.Context(), t.TempDir())
@@ -201,8 +189,8 @@ func startVault(ctx context.Context, dir string) (*testcontainers.DockerContaine
 	return c, addr, caFile, os.WriteFile(caFile, ca, 0o600)
 }
 
-// KMS starts a Vault with one transit key and points the environment at it, the way a hosted server starts. Call it
-// from TestMain, run stop after.
+// KMS starts a Vault with one transit key and points the environment at it, the
+// way a hosted server starts. Call it from TestMain, run stop after.
 func KMS(dir string) (stop func()) {
 	ctx := context.Background()
 	c, addr, caFile, err := startVault(ctx, dir)
@@ -234,4 +222,29 @@ func KMS(dir string) (stop func()) {
 		os.Exit(1)
 	}
 	return stop
+}
+
+// Pinned is a context on one workspace, the way a request sees it.
+func Pinned(t *testing.T, workspaceID string) context.Context {
+	t.Helper()
+	return actor.WithWorkspace(t.Context(), actor.Workspace{ID: workspaceID})
+}
+
+// run starts a container, and starts another when the host port of the first
+// was taken. Docker picks that port without asking, and a rootless one cannot
+// even see what the host has bound. The test binaries of the other packages
+// open sockets at the same time, so now and then it picks one of theirs.
+func run(
+	ctx context.Context,
+	image string,
+	opts ...testcontainers.ContainerCustomizer,
+) (*testcontainers.DockerContainer, error) {
+	for attempt := 1; ; attempt++ {
+		c, err := testcontainers.Run(ctx, image, opts...)
+		if err == nil || attempt == startAttempts || !strings.Contains(err.Error(), "address already in use") {
+			return c, err
+		}
+		// Run hands the container back even when it did not come up.
+		_ = testcontainers.TerminateContainer(c)
+	}
 }

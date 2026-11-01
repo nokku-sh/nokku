@@ -19,8 +19,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-// The upload follows the file while the session writes it. Once the session ends, the core has the whole file and
-// the local copy goes.
+// Once the session ends, the core has the whole file and the local copy goes.
 func TestLiveUploadFollowsTheFile(t *testing.T) {
 	dir := newRecordsDir(t)
 	is := assert.New(t)
@@ -50,8 +49,7 @@ func TestLiveUploadFollowsTheFile(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond, "the uploaded recording stayed on disk")
 }
 
-// A daemon that dies mid-session leaves the file flushed up to the last tick, with no gzip footer, under its .part
-// name. The next start sends it as a cut recording.
+// A crash leaves a .part file flushed to the last tick, with no gzip footer.
 func TestDaemonCrashMidSessionSendsTheLeftoverCut(t *testing.T) {
 	dir := newRecordsDir(t)
 	is := assert.New(t)
@@ -94,7 +92,7 @@ func TestDaemonCrashMidSessionSendsTheLeftoverCut(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond, "the core holds all of the leftover, yet it stayed on disk")
 }
 
-// Not a test: the daemon TestDaemonCrashMidSessionSendsTheLeftoverCut kills mid-session.
+// Not a test: the daemon that the crash test above kills mid-session.
 func TestRecordingProcess(t *testing.T) {
 	url := os.Getenv("NOKKU_TEST_CORE")
 	if url == "" {
@@ -109,7 +107,7 @@ func TestRecordingProcess(t *testing.T) {
 	time.Sleep(time.Minute)
 }
 
-// A deploy breaks the live upload. The upload comes back while the session still runs and ends whole.
+// A deploy breaks the live upload. It returns while the session still runs.
 func TestCoreRestartMidSessionEndsWhole(t *testing.T) {
 	dir := newRecordsDir(t)
 	is := assert.New(t)
@@ -141,8 +139,7 @@ func TestCoreRestartMidSessionEndsWhole(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 }
 
-// The disk fills mid-session. The recording stops where the disk did, the session hears of it, and the core gets
-// what is on disk as a cut recording.
+// The recording stops where the disk did and the session hears of it.
 func TestFullDiskMidSessionSendsWhatIsOnDisk(t *testing.T) {
 	dir := newRecordsDir(t)
 	is := assert.New(t)
@@ -159,7 +156,7 @@ func TestFullDiskMidSessionSendsWhatIsOnDisk(t *testing.T) {
 	must.NoError(syscall.Getrlimit(syscall.RLIMIT_FSIZE, &limit))
 	lowered := limit
 	lowered.Cur = fileLimit
-	// A write past RLIMIT_FSIZE fails with EFBIG like on a full disk. Go ignores the SIGXFSZ that comes with it.
+	// Past RLIMIT_FSIZE writes fail like a full disk. Go ignores the SIGXFSZ.
 	must.NoError(syscall.Setrlimit(syscall.RLIMIT_FSIZE, &lowered))
 	for range 20 {
 		rec.RecordOutput(noiseLine(8 << 10))
@@ -191,7 +188,7 @@ func TestFullDiskMidSessionSendsWhatIsOnDisk(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 }
 
-// The daemon's own size cap closes the gzip stream, but the recording is still cut.
+// The size cap closes the gzip stream, but the recording is still cut.
 func TestSizeCapSendsTheRecordingCut(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -218,7 +215,7 @@ func TestSizeCapSendsTheRecordingCut(t *testing.T) {
 	is.Equal(ErrSizeLimit.Error(), up.final.GetCutReason())
 }
 
-// A core that stalls the live upload never costs the recording a byte, the upload reads the file at its own pace.
+// A stalled upload costs the recording nothing, it reads the file at its pace.
 func TestStalledCoreGetsTheWholeFile(t *testing.T) {
 	newRecordsDir(t)
 	is := assert.New(t)
@@ -249,7 +246,7 @@ func TestStalledCoreGetsTheWholeFile(t *testing.T) {
 	is.True(up.complete())
 }
 
-// A file without a readable header cannot be named to the core. It stays on disk for someone to look at.
+// Without a readable header a file cannot be named to the core, so it stays.
 func TestUnreadableLeftoverStaysOnDisk(t *testing.T) {
 	for name, content := range map[string][]byte{
 		"empty, a crash before the header": nil,
@@ -269,7 +266,7 @@ func TestUnreadableLeftoverStaysOnDisk(t *testing.T) {
 	}
 }
 
-// The last message says when the session ended, a late upload does not move that. A leftover has its last write.
+// The final message has the session's end, a leftover's is its last write.
 func TestFinalNamesWhenTheSessionEnded(t *testing.T) {
 	dir := newRecordsDir(t)
 	core := newFakeCore(t, nil)
@@ -289,7 +286,7 @@ func TestFinalNamesWhenTheSessionEnded(t *testing.T) {
 	assert.WithinDuration(t, before, live.final.GetEndedAt().AsTime(), 5*time.Second)
 }
 
-// A file the daemon cannot open now is tried again later, and never deleted for it.
+// A file that cannot be opened now is tried again later, and is not deleted.
 func TestLeftoverThatCannotBeOpenedIsTriedAgain(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root opens a file whatever its mode")
@@ -314,61 +311,69 @@ func TestLeftoverThatCannotBeOpenedIsTriedAgain(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 }
 
-// The answer decides, not where the stream broke: a big file gets the same answer as a small one.
+// The answer decides, not where the stream broke. Big files get the same one.
 func TestCoreAnswerDecidesWhatHappensToTheFile(t *testing.T) {
 	fastRetries(t)
 	big := make([][]byte, 200)
 	for i := range big {
 		big[i] = noiseLine(24 << 10)
 	}
+
+	refused := connect.NewError(connect.CodeInvalidArgument, "the principal does not match")
+	for name, lines := range map[string][][]byte{"refused small": nil, "refused big": big} {
+		t.Run(name, func(t *testing.T) {
+			newRecordsDir(t)
+			rec, calls := uploadAnswered(t, lines, []error{refused})
+			time.Sleep(200 * time.Millisecond)
+			assert.FileExists(t, rec.path, "a refused file was deleted, its only copy")
+			assert.EqualValues(t, 1, calls.Load(), "a refused file was sent again")
+		})
+	}
+
+	whole := connect.NewError(connect.CodeAlreadyExists, "recording is already finalized")
+	trouble := connect.NewError(connect.CodeInternal, "internal error")
+	full := connect.NewError(connect.CodeResourceExhausted, "the workspace is full")
+	nonce := connect.NewError(connect.CodeUnauthenticated, "dpop: nonce required")
 	for name, tc := range map[string]struct {
-		answer   error
-		size     [][]byte
-		keep     bool
-		attempts int
+		lines   [][]byte
+		answers []error
 	}{
-		"refused small":                {connect.NewError(connect.CodeInvalidArgument, "the principal does not match"), nil, true, 1},
-		"refused big":                  {connect.NewError(connect.CodeInvalidArgument, "the principal does not match"), big, true, 1},
-		"whole already, small":         {connect.NewError(connect.CodeAlreadyExists, "recording is already finalized"), nil, false, 1},
-		"whole already, big":           {connect.NewError(connect.CodeAlreadyExists, "recording is already finalized"), big, false, 1},
-		"core trouble is tried again":  {connect.NewError(connect.CodeInternal, "internal error"), nil, false, 3},
-		"a full workspace waits, then": {connect.NewError(connect.CodeResourceExhausted, "the workspace is full"), nil, false, 3},
-		"a stale nonce is tried again": {connect.NewError(connect.CodeUnauthenticated, "dpop: nonce required"), nil, false, 3},
+		"whole already, small":         {nil, []error{whole}},
+		"whole already, big":           {big, []error{whole}},
+		"core trouble is tried again":  {nil, []error{trouble, trouble, nil}},
+		"a full workspace waits, then": {nil, []error{full, full, nil}},
+		"a stale nonce is tried again": {nil, []error{nonce, nonce, nil}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := newRecordsDir(t)
-			rec := newRecorder(t, Options{})
-			for _, line := range tc.size {
-				rec.RecordOutput(line)
-			}
-			rec.RecordExit(0)
-			rec.Close()
-			var calls atomic.Int32
-			core := newFakeCore(t, func(context.Context, *nokkuv1.RecordingMeta) error {
-				if int(calls.Add(1)) < tc.attempts {
-					return tc.answer
-				}
-				if tc.attempts == 1 {
-					return tc.answer
-				}
-				return nil
-			})
-
-			startUploads(t, core)
-			require.Eventually(t, func() bool { return int(calls.Load()) >= tc.attempts },
-				5*time.Second, 10*time.Millisecond, "the core never got %d tries", tc.attempts)
-			if tc.keep {
-				time.Sleep(200 * time.Millisecond)
-				assert.FileExists(t, rec.path, "a refused file was deleted, its only copy")
-				assert.EqualValues(t, 1, calls.Load(), "a refused file was sent again")
-				return
-			}
+			uploadAnswered(t, tc.lines, tc.answers)
 			require.Eventually(t, func() bool {
 				left, _ := os.ReadDir(dir)
 				return len(left) == 0
 			}, 5*time.Second, 10*time.Millisecond, "the file stayed, the core holds it")
 		})
 	}
+}
+
+// uploadAnswered sends a closed recording to a core that answers each try from
+// answers, repeating the last, and waits for all of them.
+func uploadAnswered(t *testing.T, lines [][]byte, answers []error) (*Recorder, *atomic.Int32) {
+	t.Helper()
+	rec := newRecorder(t, Options{})
+	for _, line := range lines {
+		rec.RecordOutput(line)
+	}
+	rec.RecordExit(0)
+	rec.Close()
+	calls := new(atomic.Int32)
+	core := newFakeCore(t, func(context.Context, *nokkuv1.RecordingMeta) error {
+		return answers[min(int(calls.Add(1)), len(answers))-1]
+	})
+
+	startUploads(t, core)
+	require.Eventually(t, func() bool { return int(calls.Load()) >= len(answers) },
+		5*time.Second, 10*time.Millisecond, "the core never got %d tries", len(answers))
+	return rec, calls
 }
 
 // Stopping the daemon ends the retries. The file stays for the next start.

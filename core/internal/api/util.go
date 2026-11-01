@@ -22,6 +22,13 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
+var auditOutcomes = map[nokkuv1.AuditOutcome]string{
+	nokkuv1.AuditOutcome_AUDIT_OUTCOME_UNSPECIFIED: "",
+	nokkuv1.AuditOutcome_AUDIT_OUTCOME_SUCCEEDED:   "succeeded",
+	nokkuv1.AuditOutcome_AUDIT_OUTCOME_FAILED:      "failed",
+	nokkuv1.AuditOutcome_AUDIT_OUTCOME_DENIED:      "denied",
+}
+
 type utilService struct {
 	cfg *config.Config
 }
@@ -108,7 +115,7 @@ func (s *utilService) ExportAuditLogs(
 	params := auditParams(req.GetFilter())
 	data, err := s.cfg.Audit.Export(ctx, params, req.GetFormat())
 	if errors.Is(err, audit.ErrExportLimit) {
-		return nil, newError(connect.CodeFailedPrecondition, err.Error())
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	}
 	if err != nil {
 		return nil, err
@@ -149,14 +156,7 @@ func (s *utilService) ExportAccessReport(
 	}, nil
 }
 
-var auditOutcomes = map[nokkuv1.AuditOutcome]string{
-	nokkuv1.AuditOutcome_AUDIT_OUTCOME_UNSPECIFIED: "",
-	nokkuv1.AuditOutcome_AUDIT_OUTCOME_SUCCEEDED:   "succeeded",
-	nokkuv1.AuditOutcome_AUDIT_OUTCOME_FAILED:      "failed",
-	nokkuv1.AuditOutcome_AUDIT_OUTCOME_DENIED:      "denied",
-}
-
-// auditParams falls back to the last 14 days without dates. The audit service fills in the workspace.
+// auditParams defaults to 14 days. The audit service fills in the workspace.
 func auditParams(f *nokkuv1.AuditLogFilter) *db.ListAuditLogsParams {
 	p := &db.ListAuditLogsParams{}
 	if len(f.GetActorIds()) > 0 {

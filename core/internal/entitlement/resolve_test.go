@@ -14,7 +14,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// testSigner signs the keys of the tests, testPublicKey verifies them.
 var testSigner, testPublicKey = func() (ed25519.PrivateKey, string) {
 	privB64, pubHex, err := license.GenerateKey()
 	if err != nil {
@@ -39,7 +38,6 @@ func issue(t *testing.T, plan string, validFor time.Duration) string {
 	return key
 }
 
-// issueSeats signs a key that carries a seat count.
 func issueSeats(t *testing.T, plan string, validFor time.Duration, seats string) string {
 	t.Helper()
 	claims := license.Claims{
@@ -52,7 +50,7 @@ func issueSeats(t *testing.T, plan string, validFor time.Duration, seats string)
 	return key
 }
 
-// selfHosted is a server without a database, a self-hosted plan lookup never reads one.
+// selfHosted has no database, a self-hosted plan lookup never reads one.
 func selfHosted(t *testing.T, keys ...string) *Service {
 	t.Helper()
 	s := newService(nil, testPublicKey, false)
@@ -231,7 +229,7 @@ func TestSelfHosted_ExpiredLicenseKeepsItsDataLimits(t *testing.T) {
 	assert.EqualValues(t, 365, days, "an expired license must not purge data right away")
 }
 
-// The caps protect SaaS infrastructure only, on self-hosted the disk and the hosts are the customer's own.
+// The caps protect SaaS infrastructure, self-hosted disks are the customer's.
 func TestSelfHosted_IsNeverCapped(t *testing.T) {
 	ctx := t.Context()
 	for name, sut := range map[string]*Service{

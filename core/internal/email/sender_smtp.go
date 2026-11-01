@@ -12,7 +12,7 @@ type smtpSender struct {
 	client *mail.Client
 }
 
-// Port 465 uses implicit TLS, 587 requires STARTTLS, anything else upgrades when the server offers it.
+// 465 is implicit TLS, 587 must STARTTLS, any other port upgrades if it can.
 func newSMTPSender(host string, port int, username, password string, timeout time.Duration) (*smtpSender, error) {
 	opts := []mail.Option{mail.WithPort(port), mail.WithTimeout(timeout)}
 	if username != "" {
@@ -38,7 +38,6 @@ func newSMTPSender(host string, port int, username, password string, timeout tim
 	return &smtpSender{client: client}, nil
 }
 
-// checkLogin connects and signs in once, nothing is sent.
 func (s *smtpSender) checkLogin(ctx context.Context) error {
 	c, err := s.client.DialToSMTPClientWithContext(ctx)
 	if err != nil {

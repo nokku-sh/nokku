@@ -11,7 +11,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 )
 
-// CheckFeatures refuses a call whose plan lacks one of features. An unpinned call passes, authz owns that boundary.
+// CheckFeatures passes an unpinned call, authz owns that boundary.
 func (s *Service) CheckFeatures(ctx context.Context, features []string) error {
 	if len(features) == 0 {
 		return nil
@@ -24,13 +24,13 @@ func (s *Service) CheckFeatures(ctx context.Context, features []string) error {
 	for _, feature := range features {
 		if !plan.Has(feature) {
 			return connect.Errorf(connect.CodePermissionDenied,
-				"%s is not available on the %s plan", featureLabel(feature), displayName(plan.Name))
+				"%s is not available on the %s plan", featureLabel(feature), cmp.Or(PlanNames[plan.Name], plan.Name))
 		}
 	}
 	return nil
 }
 
-// CheckSigning refuses a user certificate to an inactive workspace. Its host certificates and daemon syncs carry on.
+// CheckSigning is for user certificates. Host certs and daemon syncs carry on.
 func (s *Service) CheckSigning(ctx context.Context) error {
 	workspaceID := actor.WorkspaceIDFromContext(ctx)
 	if workspaceID == "" || s.Resolve(ctx, workspaceID).Name != PlanInactive {
@@ -39,8 +39,7 @@ func (s *Service) CheckSigning(ctx context.Context) error {
 	return errInactive()
 }
 
-// RequestedFeatures lists every feature a request turns on. It never gates turning one off, a downgraded workspace
-// must be able to clean up.
+// RequestedFeatures never gates turning one off, a downgrade must clean up.
 func RequestedFeatures(msg any) []string {
 	var features []string
 	switch req := msg.(type) {
@@ -74,8 +73,4 @@ func featureLabel(code string) string {
 		}
 	}
 	return code
-}
-
-func displayName(plan string) string {
-	return cmp.Or(PlanNames[plan], plan)
 }

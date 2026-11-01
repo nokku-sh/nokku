@@ -1,4 +1,4 @@
-// Package sshtest is an in-process SSH server for tests. It authenticates like the daemon's sshd and echoes stdin.
+// Package sshtest is an in-process SSH server that echoes stdin, for tests.
 package sshtest
 
 import (
@@ -35,7 +35,7 @@ type Server struct {
 	windowChanges []struct{ Cols, Rows uint32 }
 	connUser      string
 
-	// ca signs the logins it lets in, hostCA its own host certificate, like the two keys of a real CA.
+	// ca signs logins, hostCA the host certificate, like a real CA's two keys.
 	ca        ssh.Signer
 	hostCA    ssh.Signer
 	hostKey   ssh.Signer
@@ -50,13 +50,11 @@ func NewServer(t testing.TB) *Server {
 	return NewServerFor(t, "target-1", "u1")
 }
 
-// NewServerFor is for tests that run against real target and user ids.
 func NewServerFor(t testing.TB, hostPrincipal, userPrincipal string) *Server {
 	t.Helper()
 	return NewServerSignedBy(t, hostPrincipal, userPrincipal, newSigner(t), newSigner(t))
 }
 
-// NewServerSignedBy trusts the logins ca signs and presents a host certificate hostCA signs, the two keys of a CA.
 func NewServerSignedBy(t testing.TB, hostPrincipal, userPrincipal string, ca, hostCA ssh.Signer) *Server {
 	t.Helper()
 	hostPub, hostPriv, err := ed25519.GenerateKey(crand.Reader)
@@ -105,15 +103,14 @@ func NewServerSignedBy(t testing.TB, hostPrincipal, userPrincipal string, ca, ho
 
 func (s *Server) Addr() string { return s.listener.Addr().String() }
 
-// HostCAKey is the key the server's host certificate comes from.
 func (s *Server) HostCAKey() ssh.PublicKey { return s.hostCA.PublicKey() }
 
-// CA is the row of the CA the server trusts. CASigner is its user key, the way ssh.CASigner returns it.
+// CA is the row of the CA the server trusts.
 func (s *Server) CA() *db.SSHCA { return caRow(s.ca, s.hostCA) }
 
 func (s *Server) CASigner() ssh.Signer { return s.ca }
 
-// NewCA is a CA no server trusts, for handshake-failure tests, with its user key.
+// NewCA is a CA no server trusts, with its user key.
 func NewCA(t testing.TB) (*db.SSHCA, ssh.Signer) {
 	t.Helper()
 	user := newSigner(t)
@@ -130,7 +127,6 @@ func caRow(user, host ssh.Signer) *db.SSHCA {
 	}
 }
 
-// UserSigner is a certificate for subject to log in as username, the way the core signs one.
 func (s *Server) UserSigner(t testing.TB, subject, username string) ssh.Signer {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(crand.Reader)
@@ -168,14 +164,12 @@ func (s *Server) UserSigner(t testing.TB, subject, username string) ssh.Signer {
 	return signer
 }
 
-// KeyID is the key id of the certificate the last login presented.
 func (s *Server) KeyID() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.keyID
 }
 
-// ShellStarted reports whether a session asked for its shell.
 func (s *Server) ShellStarted() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

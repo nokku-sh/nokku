@@ -12,8 +12,7 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 )
 
-// tpmSigner signs with a key the TPM wrapped to itself. The key stays loaded between signatures, a load needs the
-// storage root key and a salted session and costs most of a second on a real TPM.
+// The key stays loaded, a load costs most of a second on a real TPM.
 type tpmSigner struct {
 	dev transport.TPMCloser
 	key *keyfile.TPMKey
@@ -23,8 +22,7 @@ type tpmSigner struct {
 	hnd *tpm2.AuthHandle
 }
 
-// newTPMSigner loads key. One that another TPM wrapped fails with ErrIdentityChanged. On success the signer owns
-// dev and Close releases it.
+// On success the signer owns dev and Close releases it.
 func newTPMSigner(dev transport.TPMCloser, key *keyfile.TPMKey) (*tpmSigner, error) {
 	pub, err := key.PublicKey()
 	if err != nil {
@@ -39,7 +37,6 @@ func newTPMSigner(dev transport.TPMCloser, key *keyfile.TPMKey) (*tpmSigner, err
 
 func (s *tpmSigner) Public() crypto.PublicKey { return s.pub }
 
-// Sign signs a SHA-256 digest and returns the DER-encoded ECDSA signature.
 func (s *tpmSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	if opts.HashFunc() != crypto.SHA256 {
 		return nil, fmt.Errorf("tpm: unsupported hash %v, the identity signs SHA-256 only", opts.HashFunc())
@@ -50,7 +47,7 @@ func (s *tpmSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	if err == nil {
 		return sig, nil
 	}
-	// A TPM reset, such as a resume from hibernate, drops the loaded key. The key file brings it back.
+	// A TPM reset, like a resume from hibernate, drops the loaded key.
 	s.flush()
 	if lerr := s.load(); lerr != nil {
 		return nil, errors.Join(err, lerr)
@@ -69,8 +66,8 @@ func (s *tpmSigner) sign(digest []byte) ([]byte, error) {
 	return keyfile.EncodeSignatureASN1(rsp)
 }
 
-// load puts the key under the owner's storage root key. TPM_RC_INTEGRITY means another storage root key wrapped it,
-// the TPM was cleared or replaced since. Other failures may pass, so they never count as a changed identity.
+// TPM_RC_INTEGRITY means the TPM was cleared or replaced since. Other failures
+// may pass, so they never count as a changed identity.
 func (s *tpmSigner) load() error {
 	parent, _, err := keyfile.CreateSRK(keyfile.NewTPMSession(s.dev), tpm2.TPMRHOwner, nil)
 	if err != nil {
@@ -78,7 +75,7 @@ func (s *tpmSigner) load() error {
 	}
 	defer func() { _, _ = tpm2.FlushContext{FlushHandle: parent.Handle}.Execute(s.dev) }()
 
-	// No encrypted session: the private half is already encrypted to the storage root key, and one costs 300ms.
+	// No encrypted session, the private half is wrapped and one costs 300ms.
 	rsp, err := tpm2.Load{
 		ParentHandle: *parent,
 		InPrivate:    s.key.Privkey,
@@ -103,7 +100,6 @@ func (s *tpmSigner) flush() {
 
 func (s *tpmSigner) Method() string { return MethodTPM }
 
-// Close flushes the loaded key and closes the TPM transport.
 func (s *tpmSigner) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

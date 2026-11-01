@@ -6,7 +6,19 @@ import (
 	"connectrpc.com/connect/v2"
 )
 
-// callTimeout bounds every unary call. The relay is a stream and lives as long as the ssh session.
+// A unary call always closes its stream, so Close can end the timeout.
+type cancelOnClose struct {
+	connect.ClientStream
+
+	cancel context.CancelFunc
+}
+
+type bearerAuth struct {
+	token string
+	ua    string
+}
+
+// Streams skip it, the relay lives as long as the ssh session.
 func callTimeout(next connect.ClientFunc) connect.ClientFunc {
 	return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {
 		if _, ok := ctx.Deadline(); ok || spec.StreamType != connect.StreamTypeUnary {
@@ -22,21 +34,9 @@ func callTimeout(next connect.ClientFunc) connect.ClientFunc {
 	}
 }
 
-// cancelOnClose ends the call's timeout with the call. A unary call always closes its stream.
-type cancelOnClose struct {
-	connect.ClientStream
-
-	cancel context.CancelFunc
-}
-
 func (s *cancelOnClose) Close() error {
 	defer s.cancel()
 	return s.ClientStream.Close()
-}
-
-type bearerAuth struct {
-	token string
-	ua    string
 }
 
 func (a *bearerAuth) intercept(next connect.ClientFunc) connect.ClientFunc {

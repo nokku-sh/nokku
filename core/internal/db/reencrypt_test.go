@@ -22,7 +22,7 @@ var (
 	byteaColumn = regexp.MustCompile(`^\s+([a-z_]+) BYTEA\b`)
 )
 
-// A rotation drops old keys, so a sealed column missing from the list would lose its data.
+// A rotation drops old keys, so a column missing here would lose its data.
 func TestSealedColumnsMatchSqlc(t *testing.T) {
 	raw, err := os.ReadFile("../../sqlc.yaml")
 	require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestSealedColumnsMatchSqlc(t *testing.T) {
 	assert.ElementsMatch(t, want, sealed(), "sealedColumns and the Sealed overrides of sqlc.yaml differ")
 }
 
-// A secret stored in the clear fails here. A new BYTEA column is sealed, or named in clearBytea with a reason.
+// A new BYTEA column is sealed, or named in clearBytea with a reason.
 func TestEveryByteaColumnIsSealed(t *testing.T) {
 	schema, err := os.ReadFile("migrations/001_base.sql")
 	require.NoError(t, err)
@@ -51,7 +51,7 @@ func TestUnsealedFindsAPlantedColumn(t *testing.T) {
 	assert.Equal(t, []string{"webhooks.token"}, unsealed(planted))
 }
 
-// unsealed lists the BYTEA columns of schema that are neither in sealedColumns nor in clearBytea.
+// unsealed lists BYTEA columns in neither sealedColumns nor clearBytea.
 func unsealed(schema string) []string {
 	var table string
 	var out []string

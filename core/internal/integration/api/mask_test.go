@@ -8,8 +8,8 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
-// masked names every field req sets in its update_mask, the way the web app does. A mask that is already there
-// stays, for a case that names an empty list.
+// masked names every field req sets in update_mask, like the web app. A mask
+// already set stays, for a case that names an empty list.
 func masked[T proto.Message](req T) T {
 	m := req.ProtoReflect()
 	fd := m.Descriptor().Fields().ByName("update_mask")

@@ -1,7 +1,4 @@
-// Package trust lets a client trust a Nokku server whose certificate comes
-// from a private CA. The operator hands the client that CA as a PEM file, and
-// the client verifies the server against the system roots plus that CA.
-// Verification is never turned off.
+// Package trust adds a private CA to the system roots, verification stays on.
 package trust
 
 import (
@@ -12,16 +9,12 @@ import (
 	"fmt"
 )
 
-// Untrusted reports whether err is a TLS failure that a CA would fix: the
-// server's certificate comes from an issuer this machine does not know. A
-// wrong host name or an expired certificate is not.
+// Untrusted is a TLS failure a CA would fix, unlike a wrong host or an expiry.
 func Untrusted(err error) bool {
 	_, ok := errors.AsType[x509.UnknownAuthorityError](err)
 	return ok
 }
 
-// Pool returns the system roots plus the certificates in pemCAs, which may be
-// empty.
 func Pool(pemCAs []byte) (*x509.CertPool, error) {
 	pool, err := x509.SystemCertPool()
 	if err != nil {
@@ -33,8 +26,6 @@ func Pool(pemCAs []byte) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-// CheckBundle reports whether a PEM bundle holds at least one certificate and
-// every certificate in it parses.
 func CheckBundle(pemCAs []byte) error {
 	found := false
 	for block, rest := pem.Decode(pemCAs); block != nil; block, rest = pem.Decode(rest) {

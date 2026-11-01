@@ -7,8 +7,8 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// Rollover replaces both keys. The replaced ones stay trusted until their certificates expire, unless
-// revokePrevious drops them at once, for a key that leaked.
+// Rollover keeps the replaced keys trusted until their certificates expire,
+// unless revokePrevious drops them at once, for a key that leaked.
 func Rollover(
 	ctx context.Context,
 	q *db.Queries,

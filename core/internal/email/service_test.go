@@ -1,8 +1,10 @@
 package email
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRenderTemplates(t *testing.T) {
@@ -180,14 +182,10 @@ func TestRenderTemplates(t *testing.T) {
 			t.Parallel()
 
 			body, err := render(tt.name, tt.data)
-			if err != nil {
-				t.Fatalf("render(%q): %v", tt.name, err)
-			}
+			require.NoError(t, err)
 
 			for _, want := range tt.contains {
-				if !strings.Contains(body.html, want) {
-					t.Errorf("render(%q) does not contain %q", tt.name, want)
-				}
+				assert.Contains(t, body.html, want)
 			}
 		})
 	}
@@ -202,18 +200,12 @@ func TestRenderOperatorFooter(t *testing.T) {
 			"magic-link",
 			linkTemplateData{LinkURL: "https://x", Expiration: "15 minutes"},
 		)
-		if err != nil {
-			t.Fatalf("render: %v", err)
-		}
+		require.NoError(t, err)
 		for _, want := range []string{"this Nokku server", "tell your administrator"} {
-			if !strings.Contains(body.html, want) {
-				t.Errorf("footer does not contain %q", want)
-			}
+			assert.Contains(t, body.html, want)
 		}
 		for _, unwanted := range []string{"Imprint", "Privacy", "mailto:", "©"} {
-			if strings.Contains(body.html, unwanted) {
-				t.Errorf("footer without operator contains %q", unwanted)
-			}
+			assert.NotContains(t, body.html, unwanted, "footer without operator")
 		}
 	})
 
@@ -226,32 +218,20 @@ func TestRenderOperatorFooter(t *testing.T) {
 			ImprintURL:   "https://acme.test/imprint",
 		}
 		body, err := render("magic-link", linkTemplateData{Operator: op, LinkURL: "https://x"})
-		if err != nil {
-			t.Fatalf("render: %v", err)
-		}
+		require.NoError(t, err)
 		for _, want := range []string{"Acme GmbH", "Street 1, Vienna", "mailto:help@acme.test", "https://acme.test/imprint"} {
-			if !strings.Contains(body.html, want) {
-				t.Errorf("footer does not contain %q", want)
-			}
+			assert.Contains(t, body.html, want)
 		}
-		if strings.Contains(body.html, ">Terms<") {
-			t.Error("footer shows a Terms link without a terms URL")
-		}
+		assert.NotContains(t, body.html, ">Terms<", "footer shows a Terms link without a terms URL")
 	})
 }
 
 func TestRenderTrialEnding_LastReminderPromisesNoOther(t *testing.T) {
 	t.Parallel()
 	body, err := render("trial-ending", trialTemplateData{Workspace: "Acme", Left: inDays(1)})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, part := range []string{body.html, body.text} {
-		if strings.Contains(part, "One more reminder") {
-			t.Error("the 3 day reminder is the last one")
-		}
-		if !strings.Contains(part, "ends in 1 day.") {
-			t.Error("one day is singular")
-		}
+		assert.NotContains(t, part, "One more reminder", "the 3 day reminder is the last one")
+		assert.Contains(t, part, "ends in 1 day.", "one day is singular")
 	}
 }

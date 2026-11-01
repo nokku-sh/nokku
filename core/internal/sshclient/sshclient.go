@@ -23,14 +23,15 @@ const (
 	keepaliveInterval = 30 * time.Second
 )
 
-// Config HostPrincipal is the daemon's target id. HostCAs are the host CA keys its certificate may come from.
 type Config struct {
+	// HostPrincipal is the daemon's target id.
 	HostPrincipal string
 	Username      string
 	Signer        ssh.Signer
-	HostCAs       []ssh.PublicKey
-	Width         uint32
-	Height        uint32
+	// HostCAs are the keys the daemon's host certificate may come from.
+	HostCAs []ssh.PublicKey
+	Width   uint32
+	Height  uint32
 }
 
 // Terminal is safe to Resize concurrently with Write.
@@ -51,7 +52,7 @@ type Terminal struct {
 // Stdout is closed when the terminal ends.
 func (t *Terminal) Stdout() <-chan []byte { return t.stdout }
 
-// Exited reports whether the remote shell ended on its own. It is final once Stdout is closed.
+// Exited is whether the shell ended itself, final once Stdout is closed.
 func (t *Terminal) Exited() bool { return t.exited.Load() }
 
 func (t *Terminal) Write(p []byte) (int, error) { return t.ch.Write(p) }
@@ -72,11 +73,7 @@ func (t *Terminal) Close() {
 	})
 }
 
-func (t *Terminal) finish() {
-	t.doneOnce.Do(func() { close(t.done) })
-}
-
-// DialTerminal closes the transport when ctx ends, which wakes every blocked stage.
+// DialTerminal closes the transport when ctx ends, waking any blocked stage.
 func DialTerminal(ctx context.Context, conn net.Conn, cfg Config) (*Terminal, error) {
 	if cfg.Width == 0 {
 		cfg.Width = defaultWidth
@@ -129,7 +126,7 @@ func dial(conn net.Conn, cfg Config) (*Terminal, error) {
 		return fail("open session channel", err)
 	}
 
-	// The daemon labels the recording with the session id from the certificate's key id, so no env is sent.
+	// The daemon labels the recording from the key id, so no env is sent.
 	pty := struct {
 		Term     string
 		Columns  uint32
@@ -188,7 +185,11 @@ func (t *Terminal) pump() {
 	}
 }
 
-// drainRequests does not block. The exit status is queued by the time Read reports the end.
+func (t *Terminal) finish() {
+	t.doneOnce.Do(func() { close(t.done) })
+}
+
+// Does not block, the exit status is queued by the time Read reports the end.
 func (t *Terminal) drainRequests() {
 	for {
 		select {

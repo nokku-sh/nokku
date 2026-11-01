@@ -25,14 +25,6 @@ func mapUserError(err error) error {
 	return err
 }
 
-func mapNotFound(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNotFound
-	}
-	return err
-}
-
-// GetUser is the signed-in user.
 func (s *Service) GetUser(ctx context.Context) (*db.User, error) {
 	id := actor.UserIDFromContext(ctx)
 	if id == "" {
@@ -47,6 +39,13 @@ func (s *Service) getUser(ctx context.Context, id string) (*db.User, error) {
 		return nil, mapNotFound(err)
 	}
 	return u, nil
+}
+
+func mapNotFound(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	return err
 }
 
 func (s *Service) UpdateSelf(ctx context.Context, name *string) (*db.User, error) {
@@ -76,7 +75,7 @@ func (s *Service) DeleteSelf(ctx context.Context) error {
 	return nil
 }
 
-// SetUserActive takes a seat when it switches an account back on, like a join does.
+// SetUserActive takes a seat when it reactivates an account, like a join.
 func (s *Service) SetUserActive(ctx context.Context, q *db.Queries, userID string, active bool) (*db.User, error) {
 	u, err := q.GetUser(ctx, userID)
 	if err != nil || u.Active == active {

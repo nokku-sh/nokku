@@ -17,24 +17,11 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
-// Renewing at half the validity keeps the host verifiable through a core outage of that length.
+// Renewing at half the validity survives a core outage of that length.
 const renewFraction = 0.5
 
-// SignFunc signs the host public key. Key and certificate are in authorized_keys form.
+// SignFunc takes the key and returns the cert, both in authorized_keys form.
 type SignFunc func(ctx context.Context, pub []byte) (string, error)
-
-// ok is false when there is nothing to do, including when no host key exists yet.
-func needsRenewal(targetID string, ca ssh.PublicKey) (pub []byte, ok bool) {
-	pub, err := os.ReadFile(paths.HostKeyPub())
-	if err != nil {
-		return nil, false
-	}
-	cert, err := Load()
-	if err != nil || !isValid(cert, targetID) || !matchesKey(cert, pub) || !signedBy(cert, ca) {
-		return pub, true
-	}
-	return nil, false
-}
 
 // A cert for a previous key must be re-issued even inside its validity window.
 func matchesKey(cert *ssh.Certificate, pub []byte) bool {
@@ -46,7 +33,7 @@ func signedBy(cert *ssh.Certificate, ca ssh.PublicKey) bool {
 	return cert.SignatureKey != nil && bytes.Equal(cert.SignatureKey.Marshal(), ca.Marshal())
 }
 
-// RenewHostCerts reports whether a certificate was written. One from another CA than caKey is never stored.
+// RenewHostCerts never stores a cert signed by a CA other than caKey.
 func RenewHostCerts(ctx context.Context, targetID, caKey string, sign SignFunc) (bool, error) {
 	if caKey == "" {
 		return false, nil
@@ -67,6 +54,19 @@ func RenewHostCerts(ctx context.Context, targetID, caKey string, sign SignFunc) 
 		return false, err
 	}
 	return true, nil
+}
+
+// ok is false with nothing to do, also when no host key exists yet.
+func needsRenewal(targetID string, ca ssh.PublicKey) (pub []byte, ok bool) {
+	pub, err := os.ReadFile(paths.HostKeyPub())
+	if err != nil {
+		return nil, false
+	}
+	cert, err := Load()
+	if err != nil || !isValid(cert, targetID) || !matchesKey(cert, pub) || !signedBy(cert, ca) {
+		return pub, true
+	}
+	return nil, false
 }
 
 func NextRenewal(targetID, caKey string) time.Time {

@@ -13,6 +13,7 @@ import (
 	"strings"
 	texttemplate "text/template"
 	"time"
+	"unicode/utf8"
 
 	"github.com/caarlos0/env/v11"
 
@@ -20,27 +21,37 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/cache"
 )
 
-// The templates are built with react-email in the email repo, an .html and a .txt per mail.
+const (
+	cooldown        = 15 * time.Minute
+	cooldownEntries = 10_000
+	emailConfirm    = "email-confirm"
+	mailDate        = "2 Jan 2006"
+	mailTime        = "2 Jan 2006, 15:04 UTC"
+	magicLink       = "magic-link"
+)
+
+const sendTimeout = 10 * time.Second
+
+// Built with react-email in the email repo, an .html and a .txt per mail.
 //
 //go:embed templates
 var templates embed.FS
 
-// ErrCooldown means the same kind of mail went to this person a moment ago.
 var ErrCooldown = errors.New("email cooldown active")
 
-const (
-	// cooldown is the wait between two mails of the same kind to one person.
-	cooldown = 15 * time.Minute
-	// cooldownEntries bounds the cooldown store, one entry per user and template.
-	cooldownEntries = 10_000
-	emailConfirm    = "email-confirm"
-	// mailDate is how a mail names a day, mailTime a moment.
-	mailDate  = "2 Jan 2006"
-	mailTime  = "2 Jan 2006, 15:04 UTC"
-	magicLink = "magic-link"
+// relayCheckTimeout is a var so tests can shorten it.
+var relayCheckTimeout = 3 * time.Second
+
+var templateFuncs = map[string]any{"year": func() int { return time.Now().Year() }}
+
+// A broken template fails the tests and the start, never a send.
+var (
+	htmlTemplates = htmltemplate.Must(htmltemplate.New("").Funcs(templateFuncs).Option("missingkey=error").
+			ParseFS(templates, "templates/*.html"))
+	textTemplates = texttemplate.Must(texttemplate.New("").Funcs(templateFuncs).Option("missingkey=error").
+			ParseFS(templates, "templates/*.txt"))
 )
 
-// Service only delivers when an SMTP host is set.
 type Service struct {
 	sender sender
 	cache  *cache.TTL[string, struct{}]
@@ -56,7 +67,7 @@ type Service struct {
 	Operator Operator
 }
 
-// Operator is empty by default, so a self-hosted server never shows the Nokku company in its mails.
+// Operator is empty by default, so self-host never shows the Nokku company.
 type Operator struct {
 	Name         string `env:"NOKKU_OPERATOR_NAME"`
 	Address      string `env:"NOKKU_OPERATOR_ADDRESS"`
@@ -69,7 +80,7 @@ type Operator struct {
 
 type sendRequest struct {
 	userID string
-	// ref cools mails about one thing down on their own, like the requests of one person.
+	// ref gives mails about one thing their own cooldown.
 	ref      string
 	to       string
 	subject  string
@@ -77,10 +88,42 @@ type sendRequest struct {
 	data     any
 }
 
-const sendTimeout = 10 * time.Second
+type TrialEnding struct {
+	UserID, Email         string
+	Workspace, BillingURL string
+	Next                  int32 // next reminder, days before the end or 0
+	Ends, Deleted         time.Time
+}
 
-// relayCheckTimeout bounds the check at boot. Tests shorten it.
-var relayCheckTimeout = 3 * time.Second
+type DeletionWarning struct {
+	UserID, Email   string
+	Workspace, Slug string
+	BillingURL      string
+	Trial           bool
+	Next            int32 // next warning, days before the deletion or 0
+	Ended, Deleted  time.Time
+}
+
+type AccessRequest struct {
+	UserID, Email              string
+	RequesterID, RequestID     string
+	Requester, Target, Account string
+	Reason, URL                string
+	Duration                   time.Duration
+}
+
+// AccessDecision has Until set when the request was approved.
+type AccessDecision struct {
+	UserID, Email                       string
+	RequestID, Decider, Target, Account string
+	URL                                 string
+	Until                               *time.Time
+}
+
+type body struct {
+	text string
+	html string
+}
 
 func New(ctx context.Context, appURL string) (*Service, error) {
 	svc, err := env.ParseAs[Service]()
@@ -101,13 +144,13 @@ func New(ctx context.Context, appURL string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	// A client of its own, go-mail keeps to ctx only while it dials and a relay that hangs must not hold up the start.
+	// Own client with a short timeout, go-mail only honors ctx while dialing.
 	probe, err := newSMTPSender(svc.SMTPHost, svc.SMTPPort, svc.SMTPUsername, svc.SMTPPassword, relayCheckTimeout)
 	if err != nil {
 		return nil, err
 	}
 	if err := probe.checkLogin(ctx); err != nil {
-		// 535 is the relay refusing the credentials. Anything else may be an outage, the server still starts.
+		// 535 is bad credentials. Anything else may be an outage, so boot on.
 		if e, ok := errors.AsType[*textproto.Error](err); ok && e.Code == 535 {
 			return nil, fmt.Errorf(
 				"%s rejected NOKKU_SMTP_USERNAME and NOKKU_SMTP_PASSWORD: %w", svc.SMTPHost, err,
@@ -141,18 +184,18 @@ func (s *Service) SendMagicLinkEmail(
 	})
 }
 
-// SendOwnerLinkEmail keys the cooldown by the address, every hosted signup makes a new owner.
+// SendOwnerLinkEmail keys the cooldown by address, each signup is a new owner.
 func (s *Service) SendOwnerLinkEmail(ctx context.Context, email, link string, expiry time.Duration) error {
 	return s.SendMagicLinkEmail(ctx, email, email, link, expiry)
 }
 
-// OwnerLinkOnCooldown is asked before the next workspace is made, its mail would not go out.
+// OwnerLinkOnCooldown is asked first, or a new workspace would get no mail.
 func (s *Service) OwnerLinkOnCooldown(email string) bool {
 	_, on := s.cache.Get(cooldownKey(email, magicLink))
 	return on
 }
 
-// SendEmailChangeConfirm goes to the new address, the account only switches once the link is used.
+// SendEmailChangeConfirm goes to the new address, the link makes the switch.
 func (s *Service) SendEmailChangeConfirm(
 	ctx context.Context,
 	userID, email, link string,
@@ -177,8 +220,7 @@ func (s *Service) EmailChangeOnCooldown(userID string) bool {
 	return on
 }
 
-// SendInviteEmail goes to someone without an account yet, so the cooldown is keyed by the address. Each workspace
-// has its own, another one's invite is none of its business.
+// SendInviteEmail cools down per address and workspace, tenants don't share it.
 func (s *Service) SendInviteEmail(
 	ctx context.Context,
 	email, workspace, role, link string,
@@ -200,13 +242,14 @@ func (s *Service) SendInviteEmail(
 	})
 }
 
-// SendEmailChangeNotice only shows the new address masked, the reader may not be the one who asked.
+// SendEmailChangeNotice masks the new address, the reader may not have asked.
 func (s *Service) SendEmailChangeNotice(
 	ctx context.Context,
 	userID, email, newEmail, cancelURL string,
 	expiry time.Duration,
 ) error {
 	local, domain, _ := strings.Cut(newEmail, "@")
+	_, first := utf8.DecodeRuneInString(local)
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   userID,
 		to:       email,
@@ -214,14 +257,14 @@ func (s *Service) SendEmailChangeNotice(
 		template: "email-change",
 		data: changeNoticeTemplateData{
 			Operator:   s.Operator,
-			NewEmail:   local[:min(1, len(local))] + "***@" + domain,
+			NewEmail:   local[:first] + "***@" + domain,
 			CancelURL:  cancelURL,
 			Expiration: lifetime(expiry),
 		},
 	})
 }
 
-// SendNewLoginEmail goes out once per device, a second device signing in right after gets its own.
+// SendNewLoginEmail cools down per device, so a second device gets its own.
 func (s *Service) SendNewLoginEmail(
 	ctx context.Context,
 	userID, email, deviceID, deviceName, ip string,
@@ -243,7 +286,7 @@ func (s *Service) SendNewLoginEmail(
 	})
 }
 
-// SendNewWayInEmail tells the account about a passkey or provider it gained, one mail for each.
+// SendNewWayInEmail cools down per credential, so each new one gets a mail.
 func (s *Service) SendNewWayInEmail(ctx context.Context, userID, email, credentialID, what, ip string) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   userID,
@@ -259,14 +302,6 @@ func (s *Service) SendNewWayInEmail(ctx context.Context, userID, email, credenti
 			EventTime:  time.Now().UTC().Format(mailTime),
 		},
 	})
-}
-
-// TrialEnding is a mail to the owner of a hosted workspace whose trial runs out.
-type TrialEnding struct {
-	UserID, Email         string
-	Workspace, BillingURL string
-	Next                  int32 // days before the end of the next reminder, 0 for none
-	Ends, Deleted         time.Time
 }
 
 func (s *Service) SendTrialEndingEmail(ctx context.Context, t TrialEnding) error {
@@ -288,16 +323,6 @@ func (s *Service) SendTrialEndingEmail(ctx context.Context, t TrialEnding) error
 	})
 }
 
-// DeletionWarning is a mail to the owner of a hosted workspace that stopped paying and is about to be deleted.
-type DeletionWarning struct {
-	UserID, Email   string
-	Workspace, Slug string
-	BillingURL      string
-	Trial           bool  // the workspace never paid, its trial ended
-	Next            int32 // days before the deletion of the next warning, 0 for none
-	Ended, Deleted  time.Time
-}
-
 func (s *Service) SendDeletionWarningEmail(ctx context.Context, w DeletionWarning) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   w.UserID,
@@ -317,16 +342,7 @@ func (s *Service) SendDeletionWarningEmail(ctx context.Context, w DeletionWarnin
 	})
 }
 
-// AccessRequest is a mail to one approver about a request that waits for an answer.
-type AccessRequest struct {
-	UserID, Email              string
-	RequesterID, RequestID     string
-	Requester, Target, Account string
-	Reason, URL                string
-	Duration                   time.Duration
-}
-
-// SendAccessRequestEmail cools down per requester, so asking and cancelling over and over floods nobody.
+// SendAccessRequestEmail cools down per requester, so repeats flood nobody.
 func (s *Service) SendAccessRequestEmail(ctx context.Context, r AccessRequest) error {
 	return s.sendTemplate(ctx, sendRequest{
 		userID:   r.UserID,
@@ -345,14 +361,6 @@ func (s *Service) SendAccessRequestEmail(ctx context.Context, r AccessRequest) e
 			RequestID:  r.RequestID,
 		},
 	})
-}
-
-// AccessDecision is a mail to the one who asked. Until is set when the request was approved.
-type AccessDecision struct {
-	UserID, Email                       string
-	RequestID, Decider, Target, Account string
-	URL                                 string
-	Until                               *time.Time
 }
 
 func (s *Service) SendAccessDecisionEmail(ctx context.Context, d AccessDecision) error {
@@ -379,7 +387,7 @@ func (s *Service) SendAccessDecisionEmail(ctx context.Context, d AccessDecision)
 	})
 }
 
-// sendTemplate claims the cooldown slot before sending and releases it on failure, so nothing double-sends.
+// sendTemplate claims the cooldown before sending, so nothing double-sends.
 func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	if req.userID == "" {
 		return errors.New("email user id is required")
@@ -390,7 +398,7 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	}
 
 	key := cooldownKey(req.userID, req.template+req.ref)
-	// A full store drops its oldest entry, so a flood of signups cannot hold back a reset or an alert.
+	// A full store evicts the oldest, so a signup flood can't block an alert.
 	if !s.cache.SetNX(key, struct{}{}) {
 		return ErrCooldown
 	}
@@ -412,23 +420,7 @@ func cooldownKey(userID, template string) string {
 	return "email_cooldown:" + userID + ":" + template
 }
 
-// A year typed into the footer would be wrong every January.
-var templateFuncs = map[string]any{"year": func() int { return time.Now().Year() }}
-
-type body struct {
-	text string
-	html string
-}
-
-// Parsed once. The templates are embedded, so a broken one fails the tests and the start, never a send.
-var (
-	htmlTemplates = htmltemplate.Must(htmltemplate.New("").Funcs(templateFuncs).Option("missingkey=error").
-			ParseFS(templates, "templates/*.html"))
-	textTemplates = texttemplate.Must(texttemplate.New("").Funcs(templateFuncs).Option("missingkey=error").
-			ParseFS(templates, "templates/*.txt"))
-)
-
-// render fills both parts of a template. The text part goes through text/template, html escaping would break its URLs.
+// render uses text/template for the text part, html escaping breaks its URLs.
 func render(name string, data any) (body, error) {
 	var html, text bytes.Buffer
 	if err := htmlTemplates.ExecuteTemplate(&html, name+".html", data); err != nil {
@@ -440,8 +432,6 @@ func render(name string, data any) (body, error) {
 	return body{text: text.String(), html: html.String()}, nil
 }
 
-// lifetime words how long a link works in its largest whole unit, "24 hours" and not "24h0m0s".
-// inDays words a count of days, empty for 0.
 func inDays(n int) string {
 	switch n {
 	case 0:

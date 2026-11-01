@@ -12,12 +12,6 @@ func IsForeignKeyViolation(err error) bool {
 	return ok && pgErr.Code == pgerrcode.ForeignKeyViolation
 }
 
-// IsRestrictViolation is a delete of a row that an ON DELETE RESTRICT foreign key still points at.
-func IsRestrictViolation(err error) bool {
-	pgErr, ok := errors.AsType[*pgconn.PgError](err)
-	return ok && pgErr.Code == pgerrcode.RestrictViolation
-}
-
 // IsUniqueViolation also matches exclusion constraint violations.
 func IsUniqueViolation(err error) bool {
 	pgErr, ok := errors.AsType[*pgconn.PgError](err)

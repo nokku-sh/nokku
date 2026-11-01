@@ -29,6 +29,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/trust"
 )
 
+// Docker kills a container 10 s after stop, so shutdown must fit in stopGrace.
+const (
+	stopGrace       = 9 * time.Second
+	unenrollTimeout = 2 * time.Second
+)
+
+// errNotEnrolled exits with EX_CONFIG, which the unit file does not restart.
+var errNotEnrolled = cli.Exit("nokkud: this host is not enrolled, run: sudo nokkud enroll", 78)
+
 func main() {
 	cmd := &cli.Command{
 		EnableShellCompletion: true,
@@ -122,15 +131,6 @@ func helper(ctx context.Context, cmd *cli.Command) error {
 	return sshd.RunHelper(ctx, cmd.Name, cmd.Args().Slice())
 }
 
-// errNotEnrolled exits with EX_CONFIG, which the unit file does not restart.
-var errNotEnrolled = cli.Exit("nokkud: this host is not enrolled, run: sudo nokkud enroll", 78)
-
-// Docker kills a container 10 s after asking it to stop, so ending sessions, uploads and unenroll share stopGrace.
-const (
-	stopGrace       = 9 * time.Second
-	unenrollTimeout = 2 * time.Second
-)
-
 func run(ctx context.Context, cmd *cli.Command) error {
 	if err := sysutil.IsRoot(); err != nil {
 		return err
@@ -139,7 +139,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	// Only an unenrolled host reads the variable, so a persistent one cannot re-enroll or move a host.
+	// Only an unenrolled host reads it, so a leftover token can't move a host.
 	token := ""
 	if st.DaemonID == "" {
 		if token = os.Getenv("NOKKUD_ENROLL_TOKEN"); token == "" {
@@ -151,10 +151,10 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	// Serving and uploading stop with ctx, so a client exit (rejection) must cancel it too.
+	// Serving and uploads stop with ctx, so a client exit must cancel it too.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	// The stop counts from here, cl.Run already waits for the relayed sessions to end.
+	// The grace counts from here, cl.Run first waits for relayed sessions.
 	stopped := make(chan time.Time, 1)
 	context.AfterFunc(ctx, func() { stopped <- time.Now() })
 	uploads := cl.StartUploads(ctx)
@@ -179,20 +179,19 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	err = cl.Run(ctx, srv, addr)
 	cancel()
 	uploadsBy := (<-stopped).Add(stopGrace - unenrollTimeout)
-	// Serve returns once every session ended, so their recordings are closed and on their way to the core.
+	// Serve returns once every session ended, so all recordings are closed.
 	wg.Wait()
 	if !uploads.Wait(time.Until(uploadsBy)) {
 		slog.Warn("recordings still uploading at shutdown, the next start sends them")
 	}
-	// An ephemeral host is gone for good once it stops, so it takes its record with it.
+	// An ephemeral host never comes back, so it deletes its own record.
 	if err == nil && st.Access().DaemonConfig.GetEphemeral() {
 		unenroll(context.WithoutCancel(ctx), cl)
 	}
 	return err
 }
 
-// unenroll deletes the daemon from the core and wipes the local state. It has to fit in a container's
-// stop grace period, and the local state goes regardless, or a broken identity could never be reset.
+// The local state always goes, or a broken identity could never be reset.
 func unenroll(ctx context.Context, cl *client.Client) {
 	defer paths.Cleanup()
 	ctx, cancel := context.WithTimeout(ctx, unenrollTimeout)
@@ -260,7 +259,7 @@ func reset(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// The API URL and its CA are bound to the enrollment, so they are persisted and flags only win when given.
+// The API URL and CA persist with the enrollment. Flags win only when given.
 func loadState(cmd *cli.Command) (*state.State, error) {
 	if err := paths.Verify(); err != nil {
 		return nil, err
@@ -280,7 +279,8 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 		return nil, err
 	}
 	if path := cmd.String("ca-file"); path != "" {
-		ca, readErr := os.ReadFile(path) // #nosec G304 -- the operator names the file
+		// #nosec G304 -- the operator names the file
+		ca, readErr := os.ReadFile(path)
 		if readErr != nil {
 			return nil, fmt.Errorf("CA file: %w", readErr)
 		}
@@ -292,7 +292,7 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	return st, st.Save()
 }
 
-// A sync answer carries the CA the daemon trusts, so plain http would let anyone in transit log in as root.
+// A sync carries the trusted CA, so plain http would let a MITM log in as root.
 func checkAPIURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -308,7 +308,6 @@ func checkAPIURL(raw string) error {
 	return fmt.Errorf("the API URL %q must use https, plain http is only accepted for localhost", raw)
 }
 
-// checkEnrollToken catches an older "<id>_<secret>" token, a part of one or a typo before the core is asked.
 func checkEnrollToken(token string) error {
 	if !nktoken.Valid(token, nktoken.KindEnroll) {
 		return errors.New("this is not a whole enrollment token, those start with nk_" + nktoken.KindEnroll + "_. " +

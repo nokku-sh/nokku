@@ -1,6 +1,6 @@
 package iam
 
-// Attributes without a backing column are left out, so the library rejects them instead of dropping data.
+// Attributes with no column are left out, so the library rejects them.
 
 import (
 	scim "github.com/elimity-com/scim"
@@ -14,6 +14,25 @@ const (
 	scimUserEndpoint  = "/Users"
 	scimGroupEndpoint = "/Groups"
 )
+
+func scimResourceTypes(svc *Service, ws actor.Workspace) []scim.ResourceType {
+	return []scim.ResourceType{
+		{
+			ID:       optional.NewString("User"),
+			Name:     "User",
+			Endpoint: scimUserEndpoint,
+			Schema:   scimUserSchema(),
+			Handler:  scimUserHandler{svc: svc, ws: ws},
+		},
+		{
+			ID:       optional.NewString("Group"),
+			Name:     "Group",
+			Endpoint: scimGroupEndpoint,
+			Schema:   scimGroupSchema(),
+			Handler:  scimGroupHandler{svc: svc, ws: ws},
+		},
+	}
+}
 
 func scimUserSchema() schema.Schema {
 	return schema.Schema{
@@ -72,25 +91,6 @@ func scimGroupSchema() schema.Schema {
 					schema.SimpleStringParams(schema.StringParams{Name: "$ref"}),
 				},
 			}),
-		},
-	}
-}
-
-func scimResourceTypes(svc *Service, ws actor.Workspace) []scim.ResourceType {
-	return []scim.ResourceType{
-		{
-			ID:       optional.NewString("User"),
-			Name:     "User",
-			Endpoint: scimUserEndpoint,
-			Schema:   scimUserSchema(),
-			Handler:  scimUserHandler{svc: svc, ws: ws},
-		},
-		{
-			ID:       optional.NewString("Group"),
-			Name:     "Group",
-			Endpoint: scimGroupEndpoint,
-			Schema:   scimGroupSchema(),
-			Handler:  scimGroupHandler{svc: svc, ws: ws},
 		},
 	}
 }

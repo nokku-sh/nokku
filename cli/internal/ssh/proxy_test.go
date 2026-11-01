@@ -17,8 +17,16 @@ import (
 
 const blackhole = "127.0.0.1:1"
 
-// relayStubConn answers a half-close with EOF, like sshd does once it has seen the client's EOF.
+// relayStubConn answers a half-close with EOF, like sshd does.
 type relayStubConn struct{ halfClosed chan struct{} }
+
+type relayStub struct {
+	calls int
+	err   error
+}
+
+// brokenConn fails on read, like a relay stream that died.
+type brokenConn struct{}
 
 func (c *relayStubConn) Read([]byte) (int, error) {
 	<-c.halfClosed
@@ -27,11 +35,6 @@ func (c *relayStubConn) Read([]byte) (int, error) {
 func (c *relayStubConn) Write(p []byte) (int, error) { return len(p), nil }
 func (c *relayStubConn) CloseWrite() error           { close(c.halfClosed); return nil }
 func (c *relayStubConn) Close() error                { return nil }
-
-type relayStub struct {
-	calls int
-	err   error
-}
 
 func (s *relayStub) dial(context.Context, *state.Target) (io.ReadWriteCloser, error) {
 	s.calls++
@@ -71,7 +74,7 @@ func TestProxyDaemonFallsBackToRelay(t *testing.T) {
 	assert.Equal(t, 1, stub.calls)
 }
 
-// A daemon that only reports private addresses: the relay wins long before the direct dial times out.
+// A daemon with private addresses only: the relay beats the dial timeout.
 func TestProxyRelayDoesNotWaitForSlowEndpoint(t *testing.T) {
 	stdinEOF(t)
 	stub := &relayStub{}
@@ -143,9 +146,6 @@ func TestProxyDirectAndForcedRelay(t *testing.T) {
 	assert.Equal(t, 1, stub.calls)
 	assert.Empty(t, accepted, "forced relay must not dial endpoints")
 }
-
-// brokenConn fails on read, like a relay stream that died.
-type brokenConn struct{}
 
 func (brokenConn) Read([]byte) (int, error)    { return 0, io.ErrUnexpectedEOF }
 func (brokenConn) Write(p []byte) (int, error) { return len(p), nil }

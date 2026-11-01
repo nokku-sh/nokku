@@ -22,18 +22,23 @@ const (
 	keyHost = "host"
 )
 
-// NewCA returns the settings a new CA starts with. They are stated here and nowhere else. A workspace gets its one CA
-// from tenant.Create.
+// caKey is Ed25519: private in PKCS#8, public in authorized_keys form.
+type caKey struct {
+	private []byte
+	public  string
+}
+
+// NewCA is the only place that states a new CA's settings.
 func NewCA() *db.CreateCAParams {
 	return &db.CreateCAParams{
-		// A work day. nk renews at half-life, and it is also how long people keep working while the core is down.
+		// A work day, and how long people keep working while the core is down.
 		UserDefaultTtl: 16 * time.Hour,
 		UserMaxTtl:     7 * 24 * time.Hour,
 		HostTtl:        90 * 24 * time.Hour,
 	}
 }
 
-// CreateCA makes the CA with two new keys. Their private halves go to ssh_ca_keys in the caller's transaction.
+// CreateCA seals both private keys into ssh_ca_keys in the caller's tx.
 func CreateCA(ctx context.Context, q *db.Queries, keys *kms.Keyset, p *db.CreateCAParams) (*db.SSHCA, error) {
 	user, host, err := newKeys()
 	if err != nil {
@@ -50,8 +55,7 @@ func CreateCA(ctx context.Context, q *db.Queries, keys *kms.Keyset, p *db.Create
 	return ca, nil
 }
 
-// CASigner is the one way to a CA's private key. The user key signs login certificates, the host key host
-// certificates, and each must match the public key on the CA's row.
+// CASigner is the one way to a CA's key, which must match the row's public key.
 func CASigner(ctx context.Context, q *db.Queries, keys *kms.Keyset, caID string, certType uint32) (ssh.Signer, error) {
 	kind := keyUser
 	if certType == ssh.HostCert {
@@ -74,12 +78,6 @@ func CASigner(ctx context.Context, q *db.Queries, keys *kms.Keyset, caID string,
 		return nil, errors.New("the private key of the CA does not match its public key")
 	}
 	return signer, nil
-}
-
-// caKey is an Ed25519 key, the private half PKCS#8, the public half in authorized_keys form.
-type caKey struct {
-	private []byte
-	public  string
 }
 
 func newKeys() (user, host caKey, err error) {
@@ -119,7 +117,7 @@ func putKeys(ctx context.Context, q *db.Queries, keys *kms.Keyset, ca *db.SSHCA,
 	return nil
 }
 
-// caKeyAAD is the row of ssh_ca_keys, the kind included so the two keys of a CA cannot trade places.
+// caKeyAAD includes the kind, so the two keys of a CA cannot trade places.
 func caKeyAAD(workspaceID, caID, kind string) crypto.AAD {
 	return crypto.AAD{Table: "ssh_ca_keys", Column: "private_key", Workspace: workspaceID, Row: caID + "/" + kind}
 }

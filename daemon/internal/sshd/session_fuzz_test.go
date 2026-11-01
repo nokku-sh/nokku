@@ -1,8 +1,12 @@
 package sshd
 
 import (
+	"maps"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func FuzzSignalByName(f *testing.F) {
@@ -18,19 +22,9 @@ func FuzzSignalByName(f *testing.F) {
 		if !ok {
 			return
 		}
-		if sig == nil {
-			t.Fatalf("signalByName(%q) returned nil with ok=true", name)
-		}
-		mapped := false
-		for _, s := range sshSignals {
-			if s == sig {
-				mapped = true
-				break
-			}
-		}
-		if !mapped {
-			t.Fatalf("signalByName(%q) = %v, which maps to no RFC 4254 name", name, sig)
-		}
+		require.NotNil(t, sig, "signalByName(%q) returned nil with ok=true", name)
+		require.Contains(t, slices.Collect(maps.Values(sshSignals)), sig,
+			"signalByName(%q) maps to no RFC 4254 name", name)
 	})
 }
 
@@ -44,18 +38,12 @@ func FuzzExitCodeToU32(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, code int) {
 		got := exitCodeToU32(code)
-		if got > 255 {
-			t.Fatalf("exitCodeToU32(%d) = %d, exceeds 255", code, got)
-		}
+		require.LessOrEqual(t, got, uint32(255), "exitCodeToU32(%d)", code)
 		if code >= 0 && code <= 255 {
-			if got != uint32(code) {
-				t.Fatalf("exitCodeToU32(%d) = %d, want %d", code, got, code)
-			}
+			require.Equal(t, uint32(code), got, "exitCodeToU32(%d)", code)
 			return
 		}
-		if got != 1 {
-			t.Fatalf("exitCodeToU32(%d) = %d, want 1", code, got)
-		}
+		require.Equal(t, uint32(1), got, "exitCodeToU32(%d)", code)
 	})
 }
 
@@ -74,9 +62,7 @@ func FuzzAllowedEnv(f *testing.F) {
 		switch name {
 		case "TERM", "LANG", "TZ", "TERM_PROGRAM", "COLORTERM":
 		default:
-			if !strings.HasPrefix(name, "LC_") {
-				t.Fatalf("allowedEnv(%q) = true, but %q is not whitelisted", name, name)
-			}
+			require.True(t, strings.HasPrefix(name, "LC_"), "allowedEnv(%q) = true, but it is not whitelisted", name)
 		}
 	})
 }
@@ -98,12 +84,8 @@ func FuzzSetEnv(f *testing.F) {
 				continue
 			}
 			count++
-			if e != kv+value+"2" {
-				t.Fatalf("setEnv(%q) left stale entry %q", key, e)
-			}
+			require.Equal(t, kv+value+"2", e, "setEnv(%q) left a stale entry", key)
 		}
-		if count != 1 {
-			t.Fatalf("setEnv(%q) produced %d entries, want 1", key, count)
-		}
+		require.Equal(t, 1, count, "setEnv(%q) entries", key)
 	})
 }

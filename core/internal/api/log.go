@@ -29,7 +29,7 @@ func (rw *responseWriter) Flush() {
 	_ = rc.Flush()
 }
 
-// withLogger only writes a line for a request the server failed. It logs the path only, query strings carry tokens.
+// withLogger logs server failures only, never the query, it can carry tokens.
 func (s *Server) withLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -50,7 +50,7 @@ func (s *Server) withLogger(next http.Handler) http.Handler {
 	})
 }
 
-// withRecover covers the plain HTTP routes, connect handlers recover on their own.
+// withRecover covers plain HTTP routes, recoverRPC the connect handlers.
 func (s *Server) withRecover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {

@@ -27,6 +27,13 @@ const (
 
 type eventKey struct{}
 
+// targetStream reads the target at decode, before a handler can override it.
+type targetStream struct {
+	connect.ServerStream
+
+	e *Event
+}
+
 // SetTarget is for requests without an id yet, like a create.
 func SetTarget(ctx context.Context, target string) {
 	if e, ok := ctx.Value(eventKey{}).(*Event); ok {
@@ -41,7 +48,7 @@ func Set(ctx context.Context, key string, value any) {
 	}
 }
 
-// Intercept records every call that changes something. It sits outside authorization so denied calls are recorded too.
+// Intercept sits outside authorization, so denied calls are recorded too.
 func (s *Service) Intercept(next connect.ServerFunc) connect.ServerFunc {
 	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
 		if !Records(spec.Schema) {
@@ -50,7 +57,7 @@ func (s *Service) Intercept(next connect.ServerFunc) connect.ServerFunc {
 		_, method, _ := strings.Cut(strings.TrimPrefix(spec.Procedure, "/"), "/")
 		e := &Event{Action: method, Details: map[string]any{}}
 		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
-		// A stream may still receive after the handler returned, only a unary request names the target.
+		// A stream may receive past the handler, only unary names the target.
 		if spec.StreamType == connect.StreamTypeUnary {
 			stream = &targetStream{ServerStream: stream, e: e}
 		}
@@ -58,13 +65,6 @@ func (s *Service) Intercept(next connect.ServerFunc) connect.ServerFunc {
 		s.finish(ctx, e, err)
 		return err
 	}
-}
-
-// targetStream takes the target from the request as it is decoded, before the handler can override it.
-type targetStream struct {
-	connect.ServerStream
-
-	e *Event
 }
 
 func (t *targetStream) Receive(msg any) error {
@@ -77,8 +77,7 @@ func (t *targetStream) Receive(msg any) error {
 	return nil
 }
 
-// Records says whether the log keeps a call: all but the ones its proto marks read-only or quiet. A call without a
-// schema is kept.
+// Records is false for calls the proto marks read-only or quiet.
 func Records(schema any) bool {
 	md, ok := schema.(protoreflect.MethodDescriptor)
 	if !ok {
@@ -99,13 +98,12 @@ func (s *Service) Log(ctx context.Context, e *Event) {
 	s.finish(ctx, e, nil)
 }
 
-// Record is for the sign-in flows. They run before there is a principal, so the caller names the actor.
+// Record is for sign-in flows, which have no principal yet and name the actor.
 func (s *Service) Record(ctx context.Context, e *Event) {
 	e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
 	if e.WorkspaceID == "" {
 		return
 	}
-	e.Timestamp = time.Now().UTC()
 	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
 		e.IP = meta.ClientIP()
 		e.UserAgent = meta.UserAgent()
@@ -114,8 +112,8 @@ func (s *Service) Record(ctx context.Context, e *Event) {
 	s.write(ctx, e)
 }
 
-// Commit writes the call's event now, for what leaves no other trace, like an issued certificate. The caller refuses
-// on an error, so nothing goes out that the log doesn't have. The interceptor then adds no second row.
+// Commit writes the event now, for what leaves no other trace, like a
+// certificate. The caller refuses on an error, so nothing goes out unlogged.
 func (s *Service) Commit(ctx context.Context) error {
 	e, ok := ctx.Value(eventKey{}).(*Event)
 	if !ok {
@@ -139,7 +137,7 @@ func (s *Service) Confirm(ctx context.Context, e *Event) error {
 	return s.Append(ctx, e)
 }
 
-// finish skips unauthenticated calls and calls outside a workspace, the sign-in flows record their own.
+// finish skips calls with no principal or workspace, sign-in records its own.
 func (s *Service) finish(ctx context.Context, e *Event, err error) {
 	p, _ := actor.PrincipalFromContext(ctx)
 	if p.ID == "" || e.WorkspaceID == "" || e.written {
@@ -149,10 +147,9 @@ func (s *Service) finish(ctx context.Context, e *Event, err error) {
 	s.write(ctx, e)
 }
 
-// stamp fills in what the request knows. A call with no principal keeps the actor the caller named.
+// A call with no principal keeps the actor the caller named.
 func (s *Service) stamp(ctx context.Context, e *Event, err error) {
 	p, _ := actor.PrincipalFromContext(ctx)
-	e.Timestamp = time.Now().UTC()
 	if p.ID != "" {
 		e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), cmp.Or(p.Email, p.Name)
 	}
@@ -175,7 +172,7 @@ func (s *Service) stamp(ctx context.Context, e *Event, err error) {
 	}
 }
 
-// write runs before the answer goes out, so a shutdown loses no row and a client that hangs up does not stop it.
+// Runs before the answer, so neither shutdown nor a hang-up loses a row.
 func (s *Service) write(ctx context.Context, e *Event) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), auditWriteTimeout)
 	defer cancel()
@@ -184,7 +181,7 @@ func (s *Service) write(ctx context.Context, e *Event) {
 	}
 }
 
-// requestTarget reads only id, name and *_id fields, so no secret in the request can reach the log.
+// requestTarget reads only id, name and *_id, so no secret reaches the log.
 func requestTarget(msg protoreflect.Message) string {
 	fields := msg.Descriptor().Fields()
 	for _, name := range []protoreflect.Name{"id", "name"} {

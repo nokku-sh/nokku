@@ -23,13 +23,20 @@ import (
 )
 
 const (
-	// A real device flow answer is a few hundred bytes.
 	maxDeviceResponse = 64 << 10
-	// Failed polls on the network or the server before the sign-in gives up.
-	pollRetries = 3
+	pollRetries       = 3
 )
 
-// The stored expiry is trusted locally. A rejection shows up later as CodeUnauthenticated and Sync logs in again.
+// deviceTransport signs each request with a proof for its URL. A stale nonce is
+// retried at once, the rejection came with a fresh one (RFC 9449 section 8).
+type deviceTransport struct {
+	dpop *dpopclient.Client
+	// prefix is the path of the API URL, a proof names what follows it.
+	prefix string
+	next   http.RoundTripper
+}
+
+// Trusts the stored expiry. A later rejection makes Sync log in again.
 func (c *Client) ensureSession(ctx context.Context, interactive bool) error {
 	if c.State.IsServiceAccount() {
 		return nil
@@ -46,7 +53,7 @@ func (c *Client) ensureSession(ctx context.Context, interactive bool) error {
 	return c.deviceLogin(ctx)
 }
 
-// deviceLogin is the RFC 8628 device flow. The library polls and handles slow_down and the expiry of the code.
+// RFC 8628 device flow. The library handles slow_down and the code's expiry.
 func (c *Client) deviceLogin(ctx context.Context) error {
 	slog.Debug("starting device flow", "api", c.State.APIURL)
 	ctx, cfg, err := c.deviceFlow(ctx)
@@ -58,7 +65,7 @@ func (c *Client) deviceLogin(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// The link already carries the code, the code is shown to compare. Stderr keeps it out of --json.
+	// The link has the code, it is shown to compare. Stderr keeps --json clean.
 	fmt.Fprintf(os.Stderr, "\nSign in to Nokku in your browser. If it does not open, visit:\n  %s\n", d.VerificationURI)
 	fmt.Fprintf(os.Stderr, "Confirm the code %s there. Waiting...\n", d.UserCode)
 	_ = openBrowser(d.VerificationURI)
@@ -75,8 +82,7 @@ func (c *Client) deviceLogin(ctx context.Context) error {
 	return c.State.Save()
 }
 
-// deviceFlow hands the library a client that signs every request, so a core at another URL stops the login
-// before a code exists.
+// Signing every request stops a core at another URL before a code exists.
 func (c *Client) deviceFlow(ctx context.Context) (context.Context, *oauth2.Config, error) {
 	base := strings.TrimRight(c.State.APIURL, "/")
 	u, err := url.Parse(base)
@@ -90,7 +96,7 @@ func (c *Client) deviceFlow(ctx context.Context) (context.Context, *oauth2.Confi
 	cfg := &oauth2.Config{Endpoint: oauth2.Endpoint{
 		DeviceAuthURL: base + "/auth/device",
 		TokenURL:      base + "/auth/device/token",
-		// Unknown would send every poll twice, once per way to pass the client id.
+		// Auto-detect would send every poll twice, once per client id style.
 		AuthStyle: oauth2.AuthStyleInParams,
 	}}
 	return context.WithValue(ctx, oauth2.HTTPClient, httpc), cfg, nil
@@ -105,11 +111,11 @@ func beginDeviceAuth(ctx context.Context, cfg *oauth2.Config) (*oauth2.DeviceAut
 	if d.DeviceCode == "" || d.UserCode == "" || d.VerificationURI == "" {
 		return nil, errors.New("device authorization: incomplete response")
 	}
-	// Both are printed, and a control character there starts an escape sequence.
+	// Both are printed, and a control character can start an escape sequence.
 	if strings.ContainsFunc(d.UserCode+d.VerificationURI, unicode.IsControl) {
 		return nil, errors.New("device authorization: the response has control characters")
 	}
-	// The link goes to the OS opener, which also launches files and custom schemes.
+	// The OS opener also launches files and custom schemes.
 	u, err := url.Parse(d.VerificationURI)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
 		return nil, errors.New("device authorization: the sign-in link is not a web address")
@@ -117,7 +123,7 @@ func beginDeviceAuth(ctx context.Context, cfg *oauth2.Config) (*oauth2.DeviceAut
 	return d, nil
 }
 
-// pollDeviceToken starts the library's poll over after a blip, one in a wait of minutes is no reason to give up.
+// Restarts the library's poll after a blip, the wait takes minutes.
 func pollDeviceToken(ctx context.Context, cfg *oauth2.Config, d *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
 	for failures := 0; ; failures++ {
 		tok, err := cfg.DeviceAccessToken(ctx, d)
@@ -137,7 +143,6 @@ func pollDeviceToken(ctx context.Context, cfg *oauth2.Config, d *oauth2.DeviceAu
 	}
 }
 
-// transient is a failure of the network or the server, not an answer about the grant.
 func transient(err error) bool {
 	if re, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
 		return re.Response.StatusCode >= http.StatusInternalServerError
@@ -167,15 +172,6 @@ func deviceError(err error) error {
 	return errors.New("device authorization failed: " + re.ErrorCode)
 }
 
-// deviceTransport signs each request with a proof for its URL and learns the nonce every answer carries. A stale
-// nonce is retried at once, the rejection came with a fresh one (RFC 9449 section 8).
-type deviceTransport struct {
-	dpop *dpopclient.Client
-	// prefix is the path of the API URL, a proof names what follows it.
-	prefix string
-	next   http.RoundTripper
-}
-
 func (t *deviceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, data, err := t.send(req, req.Body)
 	if err != nil || req.GetBody == nil || !staleNonce(resp.StatusCode, data) {
@@ -189,8 +185,7 @@ func (t *deviceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-// send reads the whole answer within the timeout. The library has no context on its first request and leaves that
-// body open.
+// The library's first request has no context and leaves the body open.
 func (t *deviceTransport) send(req *http.Request, body io.ReadCloser) (*http.Response, []byte, error) {
 	ctx, cancel := context.WithTimeout(req.Context(), syncTimeout)
 	defer cancel()

@@ -19,7 +19,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// assertGolden compares lines with testdata/name. UPDATE_GOLDEN=1 writes the file instead.
+const (
+	base64urlAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+	base32Alphabet    = "abcdefghijklmnopqrstuvwxyz234567"
+	userCodeAlphabet  = "BCDFGHJKLMNPQRSTVWXZ23456789"
+	checksumLen       = 8
+)
+
+var (
+	// The lazy match stops at the first underscore, a random body has more.
+	keyPrefix = regexp.MustCompile(`^nk_[a-z]+?_`)
+	userCode  = regexp.MustCompile(`^[` + userCodeAlphabet + `]{4}-[` + userCodeAlphabet + `]{4}$`)
+)
+
+// assertGolden compares lines with testdata/name. UPDATE_GOLDEN=1 rewrites it.
 func assertGolden(t *testing.T, name string, lines []string) {
 	t.Helper()
 	path := filepath.Join("testdata", name)
@@ -34,20 +47,7 @@ func assertGolden(t *testing.T, name string, lines []string) {
 	assert.Equal(t, string(want), got, "rerun with UPDATE_GOLDEN=1 if the change is meant")
 }
 
-const (
-	base64urlAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-	base32Alphabet    = "abcdefghijklmnopqrstuvwxyz234567"
-	userCodeAlphabet  = "BCDFGHJKLMNPQRSTVWXZ23456789"
-	checksumLen       = 8
-)
-
-var (
-	// The lazy match stops at the first underscore, a random body may hold more.
-	keyPrefix = regexp.MustCompile(`^nk_[a-z]+?_`)
-	userCode  = regexp.MustCompile(`^[` + userCodeAlphabet + `]{4}-[` + userCodeAlphabet + `]{4}$`)
-)
-
-// shape describes a token or a link without its secret. The base URL of the workspace reads as <base>.
+// shape describes a token or link without its secret, the URL reads as <base>.
 func shape(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme == "" || u.Host == "" {
@@ -68,7 +68,7 @@ func shape(raw string) string {
 	return out
 }
 
-// tokenShape reads the structure off the token itself, so a new format shows up as a diff.
+// tokenShape reads the token itself, so a new format shows up as a diff.
 func tokenShape(raw string) string {
 	var b strings.Builder
 	rest := raw
@@ -84,7 +84,7 @@ func tokenShape(raw string) string {
 		}
 	}
 	if hasChecksum(raw) {
-		// The random part of a checksummed token is base32, which a base64url alphabet run would also match.
+		// base32 first, a base64url alphabet run would match it too.
 		random := rest[:len(rest)-checksumLen]
 		if within(random, base32Alphabet) {
 			fmt.Fprintf(&b, "<base32:%d>", len(random))
@@ -114,7 +114,7 @@ func within(s, alphabet string) bool {
 	return s != "" && strings.Trim(s, alphabet) == ""
 }
 
-// hasChecksum is true when the last eight characters are the crc32 of the rest, in hex.
+// hasChecksum is true when the last eight characters are the rest's crc32.
 func hasChecksum(raw string) bool {
 	if len(raw) <= checksumLen {
 		return false
@@ -123,8 +123,7 @@ func hasChecksum(raw string) bool {
 	return fmt.Sprintf("%08x", crc32.ChecksumIEEE([]byte(body))) == check
 }
 
-// tamper changes one character in the middle of the random part to another of its kind, so only the checksum or
-// the lookup can catch it.
+// tamper swaps a middle character, so only the checksum or lookup catches it.
 func tamper(raw string) string {
 	start := len(keyPrefix.FindString(raw))
 	if id, _, ok := strings.Cut(raw[start:], "_"); ok {
@@ -149,7 +148,7 @@ func tamper(raw string) string {
 	return raw[:i] + string(swap) + raw[i+1:]
 }
 
-// errText is the code and message of an RPC error, the way a golden file records it.
+// errText is the code and message of an RPC error, as a golden file has it.
 func errText(err error) string {
 	if ce, ok := errors.AsType[*connect.Error](err); ok {
 		return fmt.Sprintf("error %s %q", ce.Code(), ce.Message())

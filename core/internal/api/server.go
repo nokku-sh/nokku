@@ -19,12 +19,13 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/egress"
 	"github.com/nokku-sh/nokku/core/web"
 )
 
-// maxMessageBytes bounds one Connect message. The largest real ones are 32 KiB recording chunks and relay frames.
+// The largest real messages are 32 KiB recording chunks and relay frames.
 const maxMessageBytes = 4 << 20
 
 type Server struct {
@@ -41,7 +42,7 @@ func New(cfg *config.Config) *Server {
 
 func (s *Server) Start(ctx context.Context) error {
 	if s.cfg.SaaS {
-		// Here and not in config.New, the hosted API tests boot through that and reach their issuers on loopback.
+		// Not in config.New, the hosted tests boot through it on loopback.
 		if err := egress.CheckHosted(); err != nil {
 			return err
 		}
@@ -53,7 +54,7 @@ func (s *Server) Start(ctx context.Context) error {
 	proto.SetHTTP2(true)
 	proto.SetUnencryptedHTTP2(true)
 
-	// Requests outlive the root ctx by the shutdown grace. Streams, relays and web terminals end with it.
+	// Requests outlive ctx by the grace. Streams and terminals end with it.
 	base, stop := context.WithCancel(context.WithoutCancel(ctx))
 	defer stop()
 	server := &http.Server{
@@ -63,7 +64,7 @@ func (s *Server) Start(ctx context.Context) error {
 		Protocols:         proto,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
-		MaxHeaderBytes:    1 << 14, // 16 KiB
+		MaxHeaderBytes:    1 << 14,
 	}
 	var lc net.ListenConfig
 	listener, err := lc.Listen(ctx, "tcp", server.Addr)
@@ -100,25 +101,6 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 }
 
-func (s *Server) serverInterceptors(ctx context.Context) []connect.ServerInterceptor {
-	interceptors := []connect.ServerInterceptor{
-		newTimeoutInterceptor(),
-		newStreamEndInterceptor(ctx),
-		(&authNInterceptor{cfg: s.cfg}).intercept,
-		s.cfg.Audit.Intercept, // Audit wraps authorization so denied calls are recorded too.
-		s.recoverRPC,          // Inside audit, so a call that panicked is recorded with its code.
-		errorInterceptor,
-		(&authorizationInterceptor{cfg: s.cfg}).intercept,
-		validate.NewServerInterceptor(),
-	}
-	// Outermost, so it sees the mapped code and the calls turned down before the handler.
-	if telemetry := newTelemetry(ctx); telemetry != nil {
-		interceptors = append([]connect.ServerInterceptor{telemetry}, interceptors...)
-	}
-	return interceptors
-}
-
-// recoverRPC answers a panic in a handler or interceptor with an internal error, like the HTTP recover does for routes.
 func (s *Server) recoverRPC(next connect.ServerFunc) connect.ServerFunc {
 	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
 		defer func() {
@@ -143,13 +125,12 @@ func (s *Server) recoverRPC(next connect.ServerFunc) connect.ServerFunc {
 	}
 }
 
-// Handler registers every route. Call it once per Server, the mux takes a route only once.
+// Handler registers every route, so call it once per Server.
 func (s *Server) Handler(ctx context.Context) http.Handler {
 	s.registerServices(ctx)
 	return s.handler()
 }
 
-// handler is the mux behind the middleware every request passes through.
 func (s *Server) handler() http.Handler {
 	return chain(
 		s.withHTTPS,
@@ -163,7 +144,7 @@ func (s *Server) handler() http.Handler {
 	)(s.mux.ServeHTTP)
 }
 
-// printOwnerLink writes the owner's sign-in link to a terminal only. A log line can end up at a telemetry backend.
+// printOwnerLink writes to a terminal only, a log line can reach telemetry.
 func (s *Server) printOwnerLink(ctx context.Context) {
 	if fi, err := os.Stderr.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
 		return
@@ -176,7 +157,7 @@ func (s *Server) printOwnerLink(ctx context.Context) {
 	_, _ = fmt.Fprintf(os.Stderr, "\nSign in as %s within 24 hours:\n\n  %s\n\n", owner.Email, link)
 }
 
-// withRequestMeta is the one place that sets the address and headers session rows and audit events read.
+// withRequestMeta sets the address and headers that sessions and audit read.
 func (s *Server) withRequestMeta(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		meta := actor.RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr}
@@ -185,7 +166,7 @@ func (s *Server) withRequestMeta(h http.Handler) http.Handler {
 	})
 }
 
-// withTenant skips the health check and provider webhooks, they are not tied to a workspace host.
+// withTenant skips /healthz and webhooks, they have no workspace host.
 func (s *Server) withTenant(h http.Handler) http.Handler {
 	resolved := s.cfg.Tenant.Middleware(h)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +179,7 @@ func (s *Server) withTenant(h http.Handler) http.Handler {
 }
 
 func (s *Server) registerServices(ctx context.Context) {
-	tickets := newSessionTickets()
+	tickets := cache.New[string, sessionTicket](sessionTicketEntries, sessionTicketTTL)
 	server := connect.NewServer(s.serverInterceptors(ctx)...)
 	nokkuv1connect.RegisterWorkspaceServiceHandler(server, &workspaceService{cfg: s.cfg})
 	nokkuv1connect.RegisterDashboardServiceHandler(server, &dashboardService{cfg: s.cfg})
@@ -227,7 +208,7 @@ func (s *Server) registerServices(ctx context.Context) {
 
 	static := web.Handler()
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// A service this build does not have, from a newer client. The SPA fallback would answer it with HTML.
+		// A newer client's service, the SPA fallback would answer it in HTML.
 		if strings.HasPrefix(r.URL.Path, "/nokku.v1.") {
 			http.NotFound(w, r)
 			return
@@ -255,4 +236,24 @@ func (s *Server) registerServices(ctx context.Context) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+}
+
+func (s *Server) serverInterceptors(ctx context.Context) []connect.ServerInterceptor {
+	interceptors := []connect.ServerInterceptor{
+		newTimeoutInterceptor(),
+		newStreamEndInterceptor(ctx),
+		(&authNInterceptor{cfg: s.cfg}).intercept,
+		// Audit wraps authorization, so denied calls are recorded too.
+		s.cfg.Audit.Intercept,
+		// Inside audit, so a panicked call is recorded with its code.
+		s.recoverRPC,
+		errorInterceptor,
+		(&authorizationInterceptor{cfg: s.cfg}).intercept,
+		validate.NewServerInterceptor(),
+	}
+	// Outermost, so it sees the mapped code and the calls turned down early.
+	if telemetry := newTelemetry(ctx); telemetry != nil {
+		interceptors = append([]connect.ServerInterceptor{telemetry}, interceptors...)
+	}
+	return interceptors
 }

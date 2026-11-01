@@ -60,7 +60,7 @@ func (s *Service) runBackgroundJobs(ctx context.Context) {
 	}
 }
 
-// retentionCleanup gives each workspace a transaction of its own, so one that fails holds back no other.
+// One transaction per workspace, so one that fails holds back no other.
 func (s *Service) retentionCleanup(ctx context.Context) {
 	now := time.Now()
 	workspaceIDs, err := s.conn.Sys().ListWorkspaceAuditLogWorkspaceIDs(ctx)
@@ -87,7 +87,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 		}
 	}
 
-	// Nothing outlives the longest plan, the rows of a deleted workspace included.
+	// Nothing outlives the longest plan, a deleted workspace's rows included.
 	err = s.deleteAuditLogs(ctx, "audit-retention", func(q *db.Queries) error {
 		_, err := q.DeleteAuditLogsBefore(ctx, now.AddDate(0, 0, -maxRetentionDays))
 		return err
@@ -97,7 +97,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 	}
 }
 
-// deleteAuditLogs runs del alone in a transaction. The audit table refuses DELETE unless the transaction opts in.
+// The audit table refuses DELETE unless the transaction opts in.
 func (s *Service) deleteAuditLogs(ctx context.Context, lock string, del func(*db.Queries) error) error {
 	return s.conn.SysTx(ctx, func(q *db.Queries) error {
 		locked, err := q.TryAdvisoryXactLock(ctx, lock)

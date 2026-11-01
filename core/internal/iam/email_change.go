@@ -29,7 +29,7 @@ var emailTokenKinds = map[string]crypto.TokenKind{
 	tokenEmailRevert: crypto.TokenEmailRevert,
 }
 
-// RequestEmailChange replaces any pending change. The account keeps its address until confirm is used.
+// RequestEmailChange keeps the address until confirm is used.
 func (s *Service) RequestEmailChange(
 	ctx context.Context,
 	u *db.User,
@@ -65,7 +65,7 @@ func (s *Service) RequestEmailChange(
 		}); err != nil {
 			return err
 		}
-		// The cancel token goes first, a change must never exist without its undo.
+		// The cancel token goes first, a change never exists without its undo.
 		if cancel, err = s.putEmailToken(ctx, q, u.ID, tokenEmailRevert, u.Email, EmailRevertTTL); err != nil {
 			return err
 		}
@@ -100,7 +100,6 @@ func (s *Service) DropEmailChange(ctx context.Context, userID string) error {
 	})
 }
 
-// PendingEmail returns the address a change is waiting on, or "".
 func (s *Service) PendingEmail(ctx context.Context, userID string) string {
 	email, err := s.conn.Tenant().GetPendingTokenEmail(ctx, &db.GetPendingTokenEmailParams{
 		UserID: &userID, Purpose: tokenEmailChange,
@@ -111,7 +110,6 @@ func (s *Service) PendingEmail(ctx context.Context, userID string) string {
 	return email
 }
 
-// ConfirmEmailChange switches the account to the address the token carries.
 func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
@@ -129,7 +127,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 	return nil
 }
 
-// CancelEmailChange also undoes a finished change, and then leaves no session, credential or pending link behind.
+// CancelEmailChange also undoes a finished change, then ends every way in.
 func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
 	reverted := false
@@ -156,7 +154,7 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 			return mapUserError(err)
 		}
 		reverted = true
-		// Whoever made the change may hold a revert or sign-in link of their own.
+		// Whoever made the change may hold a revert or sign-in link.
 		if err := q.DeleteAllUserTokens(ctx, &u.ID); err != nil {
 			return err
 		}

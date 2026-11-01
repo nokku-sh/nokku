@@ -28,11 +28,39 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
-// licensePublicKey verifies license keys. Release builds set it with -X, a build without it takes no key.
+// Set with -X in release builds, a build without it takes no license key.
 var licensePublicKey string
 
-// BaseURL is NOKKU_BASE_URL, a host name with an optional port. There is no scheme, see FullURL.
+// BaseURL is a host name with an optional port and no scheme, see FullURL.
 type BaseURL string
+
+type EnvConfig struct {
+	BaseURL BaseURL `env:"NOKKU_BASE_URL"`
+	Port    string  `env:"NOKKU_PORT"     envDefault:"3000"`
+	SaaS    bool    `env:"NOKKU_SAAS"`
+	Debug   bool
+	// TrustedProxies may name the client, which source-address options match
+	// against. Unset, that is any peer on loopback or a private network.
+	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
+}
+
+type Config struct {
+	EnvConfig
+
+	Conn         *db.Connection
+	Keyset       *kms.Keyset
+	IAM          *iam.Service
+	Audit        *audit.Service
+	Email        *email.Service
+	Pool         *daemon.Pool
+	Record       *recording.Service
+	Billing      *billing.Stripe
+	Entitlements *entitlement.Service
+	Tenant       *tenant.Resolver
+
+	// OwnerNeedsLink is set while the owner has no passkey or provider yet.
+	OwnerNeedsLink bool
+}
 
 // UnmarshalText refuses an IP address too, a browser takes no passkey for it.
 func (b *BaseURL) UnmarshalText(text []byte) error {
@@ -56,34 +84,6 @@ func (b *BaseURL) UnmarshalText(text []byte) error {
 	}
 	*b = BaseURL(raw)
 	return nil
-}
-
-type EnvConfig struct {
-	BaseURL BaseURL `env:"NOKKU_BASE_URL"`
-	Port    string  `env:"NOKKU_PORT"     envDefault:"3000"`
-	SaaS    bool    `env:"NOKKU_SAAS"`
-	Debug   bool
-	// TrustedProxies may name the client, whose address a source-address option is matched against. Unset, that is
-	// any peer on loopback or a private network, see realip.
-	TrustedProxies []string `env:"NOKKU_TRUSTED_PROXIES"`
-}
-
-type Config struct {
-	EnvConfig
-
-	Conn         *db.Connection
-	Keyset       *kms.Keyset
-	IAM          *iam.Service
-	Audit        *audit.Service
-	Email        *email.Service
-	Pool         *daemon.Pool
-	Record       *recording.Service
-	Billing      *billing.Stripe
-	Entitlements *entitlement.Service
-	Tenant       *tenant.Resolver
-
-	// OwnerNeedsLink is set while the self-hosted owner has no passkey or linked provider yet.
-	OwnerNeedsLink bool
 }
 
 func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
@@ -112,7 +112,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// Wrapped by the KMS key or a key derived from NOKKU_SECRET.
 	cfg.Keyset, err = kms.New(ctx, cfg.Conn, cfg.SaaS)
 	if err != nil {
 		return nil, err
@@ -132,7 +131,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 
-	// Self-host makes its one workspace here, the hosted service reads it off the subdomain.
+	// Self-host makes its one workspace here, hosted reads the subdomain.
 	cfg.Tenant, err = tenant.New(ctx, cfg.Conn, cfg.Keyset, cfg.FullURL(), cfg.SaaS)
 	if err != nil {
 		return nil, err
@@ -157,7 +156,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		SendNewLogin: cfg.Email.SendNewLoginEmail,
 		SendNewWayIn: cfg.Email.SendNewWayInEmail,
 	}
-	// Without mail there are no links, the login page then offers passkeys and providers only.
+	// No mail, no links. The login page then offers passkeys and providers.
 	if cfg.Email.HasSMTP() {
 		deps.SendMagicLink = cfg.Email.SendMagicLinkEmail
 		deps.SendInvite = cfg.Email.SendInviteEmail
@@ -175,7 +174,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	return &cfg, nil
 }
 
-// Mode is the name the API reports for the mode, the UI switches on it.
+// Mode is what the API reports, the UI switches on it.
 func (c *EnvConfig) Mode() string {
 	if c.SaaS {
 		return "saas"
@@ -183,7 +182,7 @@ func (c *EnvConfig) Mode() string {
 	return "self_hosted"
 }
 
-// FullURL is the public address. The scheme is never configured, plain http only on localhost.
+// FullURL is the public address, plain http only on localhost.
 func (c *EnvConfig) FullURL() string {
 	if c.Hostname() == "localhost" {
 		return "http://" + c.hostPort()

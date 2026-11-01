@@ -20,12 +20,22 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-// captureTargetService records the requests and answers a create like the core would.
+// captureTargetService records requests, and answers a create like the core.
 type captureTargetService struct {
 	nokkuv1connect.UnimplementedTargetServiceHandler
 
 	got     *nokkuv1.CreateTargetRequest
 	deleted *nokkuv1.DeleteTargetRequest
+}
+
+type workspaceCAService struct {
+	nokkuv1connect.UnimplementedCertificateServiceHandler
+}
+
+type pagedTargetService struct {
+	nokkuv1connect.UnimplementedTargetServiceHandler
+
+	total int
 }
 
 func (s *captureTargetService) DeleteTarget(
@@ -101,10 +111,6 @@ func TestDeleteTarget(t *testing.T) {
 	assert.Equal(t, "target-1", svc.deleted.GetId())
 }
 
-type workspaceCAService struct {
-	nokkuv1connect.UnimplementedCertificateServiceHandler
-}
-
 func (workspaceCAService) GetCertificateAuthority(
 	context.Context,
 	*nokkuv1.GetCertificateAuthorityRequest,
@@ -118,7 +124,7 @@ func (workspaceCAService) GetCertificateAuthority(
 	}, nil
 }
 
-// nk sync asks the core, a subject with no targets has no CA in its access sync.
+// nk sync asks the core, a subject with no targets gets no CA in its sync.
 func TestWorkspaceCA(t *testing.T) {
 	t.Parallel()
 
@@ -137,12 +143,6 @@ func TestWorkspaceCA(t *testing.T) {
 	ca, err := c.WorkspaceCA(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ssh-ed25519 AAAA", "ssh-ed25519 BBBB"}, ca.TrustedKeys(), "nk sync writes both")
-}
-
-type pagedTargetService struct {
-	nokkuv1connect.UnimplementedTargetServiceHandler
-
-	total int
 }
 
 func (s pagedTargetService) ListTargets(

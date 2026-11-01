@@ -41,7 +41,7 @@ func TestToConnectErrorGroups(t *testing.T) {
 		{"query canceled", pg(pgerrcode.QueryCanceled), connect.CodeCanceled},
 		{"deadline", context.DeadlineExceeded, connect.CodeDeadlineExceeded},
 		{"no permission", db.ErrPermissionDenied, connect.CodePermissionDenied},
-		{"connect error passes", newError(connect.CodeNotFound, "gone"), connect.CodeNotFound},
+		{"connect error passes", connect.NewError(connect.CodeNotFound, "gone"), connect.CodeNotFound},
 		{"unknown postgres code", pg(pgerrcode.DiskFull), connect.CodeInternal},
 		{"plain error", errors.New("stripe said no"), connect.CodeInternal},
 	}
@@ -52,7 +52,7 @@ func TestToConnectErrorGroups(t *testing.T) {
 	}
 }
 
-// A seat refusal joins the plan's own connect error, the workspace's answer still wins over it.
+// A seat refusal joins the plan's connect error. The workspace's answer wins.
 func TestToConnectErrorIAMRefusals(t *testing.T) {
 	plan := connect.NewError(connect.CodeResourceExhausted, "your plan includes 5 members; upgrade to add more")
 	tests := []struct {
@@ -68,7 +68,7 @@ func TestToConnectErrorIAMRefusals(t *testing.T) {
 	}
 }
 
-// The handler returns the cause and the mapper logs it once, with what the client never sees.
+// The mapper logs the cause once, with what the client never sees.
 func TestInternalErrorIsLoggedOnce(t *testing.T) {
 	var out bytes.Buffer
 	prev := slog.Default()

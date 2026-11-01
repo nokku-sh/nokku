@@ -12,7 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 )
 
-// FromAccess drops ids that are no UUID, they end up in file paths and ssh files. Names lose their control characters.
+// FromAccess strips control characters from names, see Targets for ids.
 func FromAccess(res *nokkuv1.GetSubjectAccessResponse) Cache {
 	var c Cache
 	switch subject := res.GetSubject().(type) {
@@ -41,7 +41,7 @@ func Targets(targets []*nokkuv1.Target) []Target {
 	return out
 }
 
-// MapCA is nil for a response without a CA, a subject with no targets gets none.
+// MapCA is nil without a CA, a subject with no targets gets none.
 func MapCA(ca *nokkuv1.CertificateAuthority) *CA {
 	if ca == nil {
 		return nil

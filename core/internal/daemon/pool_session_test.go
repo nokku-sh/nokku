@@ -2,37 +2,31 @@ package daemon
 
 import (
 	"context"
-	"maps"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
 
-// A browser terminal is a person's login, so it takes the CA's source list and no forced command.
+// A browser terminal is a login: the CA's source list, no forced command.
 func TestSessionCertificateLimits(t *testing.T) {
 	ca, signer := sshtest.NewCA(t)
 	ca.SourceAddress = "10.0.0.0/8"
 
 	session, err := mintSessionCert(ca, signer, "user@target:root", "session")
-	if err != nil {
-		t.Fatalf("mintSessionCert() error: %v", err)
-	}
+	require.NoError(t, err)
 	cert, ok := session.PublicKey().(*ssh.Certificate)
-	if !ok {
-		t.Fatalf("the session signer holds a %T", session.PublicKey())
-	}
-	want := map[string]string{"source-address": "10.0.0.0/8"}
-	if !maps.Equal(cert.CriticalOptions, want) {
-		t.Errorf("critical options = %v, want %v", cert.CriticalOptions, want)
-	}
+	require.True(t, ok, "the session signer holds a %T", session.PublicKey())
+	assert.Equal(t, map[string]string{"source-address": "10.0.0.0/8"}, cert.CriticalOptions)
 }
 
-// bridgeToServer plays the daemon's DaemonRelay handler for one relay against the test SSH server.
+// bridgeToServer plays the daemon's DaemonRelay handler for one relay.
 func bridgeToServer(relay *Relay, addr string) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -80,21 +74,22 @@ func testConn(t *testing.T, p *Pool) *daemonConn {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	c := p.byID["d1"]
-	if c == nil {
-		t.Fatal("daemon d1 is not registered")
-	}
+	require.NotNil(t, c, "daemon d1 is not registered")
 	return c
 }
 
-// slotsHeld counts the index entries with the sessions, so a leak there fails the same checks.
-func slotsHeld(t *testing.T, p *Pool) (sessions, slots int) {
+// waitNothingHeld counts the index entries too, so a leak there fails here.
+func waitNothingHeld(t *testing.T, p *Pool, after string) {
 	t.Helper()
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return len(p.sessions) + len(p.owned), len(p.relayCounts)
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		p.mu.RLock()
+		defer p.mu.RUnlock()
+		assert.Zero(c, len(p.sessions)+len(p.owned), "sessions held")
+		assert.Empty(c, p.relayCounts, "slots held")
+	}, 2*time.Second, time.Millisecond, "leak after %s", after)
 }
 
-// serveRelayRequests registers every RelayOpen as the daemon's control stream would, until the test ends.
+// serveRelayRequests registers every RelayOpen as the control stream would.
 func serveRelayRequests(t *testing.T, p *Pool, c *daemonConn, addr string) {
 	t.Helper()
 	for {
@@ -138,9 +133,7 @@ func startTestSession(t *testing.T, p *Pool, srv *sshtest.Server, sessionID stri
 	for {
 		select {
 		case r := <-res:
-			if r.err != nil {
-				t.Fatalf("StartSession: %v", r.err)
-			}
+			require.NoError(t, r.err, "StartSession")
 			return r.s
 		case <-deadline:
 			t.Fatal("StartSession never completed")
@@ -163,7 +156,7 @@ func waitStdoutClosed(t *testing.T, s *Session, after string) {
 	}
 }
 
-// The session belongs to its caller, so the caller's ctx ending must tear it down without a Close.
+// The caller owns the session, so its ctx ending tears it down without Close.
 func TestPool_StartSession_EndsWithContext(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -182,31 +175,15 @@ func TestPool_StartSession_EndsWithContext(t *testing.T) {
 		CASigner:      srv.CASigner(),
 		HostPrincipal: srv.HostPrincipal,
 	})
-	if err != nil {
-		t.Fatalf("StartSession: %v", err)
-	}
-	if got := len(p.ListSessions("d1")); got != 1 {
-		t.Fatalf("ListSessions(d1) = %d, want 1", got)
-	}
+	require.NoError(t, err, "StartSession")
+	require.Len(t, p.ListSessions("d1"), 1)
 
 	cancel()
 	waitStdoutClosed(t, s, "the caller's ctx ended")
-	deadline := time.After(2 * time.Second)
-	for {
-		sessions, slots := slotsHeld(t, p)
-		if sessions == 0 && slots == 0 {
-			return
-		}
-		select {
-		case <-deadline:
-			t.Fatalf("leak after ctx end: %d sessions, %d slots held", sessions, slots)
-		default:
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitNothingHeld(t, p, "ctx end")
 }
 
-// A full web session over a real in-process SSH server: the cert, pty, stdin echo, resize and Close.
+// A full web session over a real SSH server: cert, pty, echo, resize, Close.
 func TestPool_StartSession(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -214,26 +191,13 @@ func TestPool_StartSession(t *testing.T) {
 
 	s := startTestSession(t, p, srv, "web-1")
 
-	deadline := time.After(2 * time.Second)
-	for !srv.ShellStarted() {
-		select {
-		case <-deadline:
-			t.Fatal("shell request never arrived")
-		default:
-		}
-		time.Sleep(time.Millisecond)
-	}
-	// The daemon reads the recording id from the key id, so the session id has to travel there.
-	if got := srv.KeyID(); got != "nokku:web:session:web-1" {
-		t.Errorf("certificate key id = %q, want nokku:web:session:web-1", got)
-	}
-	if _, cols, rows := srv.Pty(); cols != 80 || rows != 24 {
-		t.Errorf("pty size = %dx%d, want 80x24", cols, rows)
-	}
+	require.Eventually(t, srv.ShellStarted, 2*time.Second, time.Millisecond, "shell request never arrived")
+	assert.Equal(t, "nokku:web:session:web-1", srv.KeyID(), "the daemon reads the recording id from the key id")
+	_, cols, rows := srv.Pty()
+	assert.EqualValues(t, 80, cols)
+	assert.EqualValues(t, 24, rows)
 
-	if err := s.Write([]byte("ping\n")); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
+	require.NoError(t, s.Write([]byte("ping\n")))
 	var got []byte
 collect:
 	for {
@@ -248,44 +212,19 @@ collect:
 		}
 	}
 
-	if err := s.Resize(100, 40); err != nil {
-		t.Fatalf("Resize: %v", err)
-	}
-	deadline = time.After(2 * time.Second)
-	for {
-		select {
-		case <-deadline:
-			t.Fatal("window change never reached the server")
-		default:
-		}
-		if changes := srv.WindowChanges(); len(changes) > 0 {
-			if changes[0].Cols != 100 || changes[0].Rows != 40 {
-				t.Errorf("window change = %+v, want 100x40", changes[0])
-			}
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+	require.NoError(t, s.Resize(100, 40))
+	require.Eventually(t, func() bool { return len(srv.WindowChanges()) > 0 },
+		2*time.Second, time.Millisecond, "window change never reached the server")
+	change := srv.WindowChanges()[0]
+	assert.EqualValues(t, 100, change.Cols)
+	assert.EqualValues(t, 40, change.Rows)
 
-	// Close must end the session, clean the map and free the relay slot.
 	s.Close()
 	waitStdoutClosed(t, s, "Close")
-	deadline = time.After(2 * time.Second)
-	for {
-		sessions, slots := slotsHeld(t, p)
-		if sessions == 0 && slots == 0 {
-			return
-		}
-		select {
-		case <-deadline:
-			t.Fatalf("leak after Close: %d sessions, %d slots held", sessions, slots)
-		default:
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitNothingHeld(t, p, "Close")
 }
 
-// A CA the server does not trust fails the dial, and no slot or session is left behind.
+// An untrusted CA fails the dial, and no slot or session is left behind.
 func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -309,33 +248,18 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 		errCh <- err
 	}()
 
+	var err error
 	select {
-	case err := <-errCh:
-		if err == nil {
-			t.Fatal("StartSession must fail against a rogue CA")
-		}
-		if !strings.Contains(err.Error(), "ssh session") {
-			t.Errorf("error should wrap the ssh dial, got %v", err)
-		}
-		deadline := time.After(2 * time.Second)
-		for {
-			sessions, slots := slotsHeld(t, p)
-			if sessions == 0 && slots == 0 {
-				return
-			}
-			select {
-			case <-deadline:
-				t.Fatalf("leak after failed dial: %d sessions, %d slots held", sessions, slots)
-			default:
-			}
-			time.Sleep(time.Millisecond)
-		}
+	case err = <-errCh:
 	case <-time.After(3 * time.Second):
 		t.Fatal("StartSession did not fail in time")
 	}
+	require.Error(t, err, "StartSession must fail against a rogue CA")
+	waitNothingHeld(t, p, "failed dial")
+	assert.ErrorContains(t, err, "ssh session", "error should wrap the ssh dial")
 }
 
-// The sshd side dying mid-session must close Stdout, and the owner's Close then releases the slot.
+// sshd dying mid-session closes Stdout, and the owner's Close frees the slot.
 func TestPool_StartSession_ServerDeath(t *testing.T) {
 	p := newTestPool(t)
 	p.registerDaemon(t.Context(), "d1", "w1")
@@ -346,17 +270,5 @@ func TestPool_StartSession_ServerDeath(t *testing.T) {
 
 	waitStdoutClosed(t, s, "the ssh server died")
 	s.Close()
-	deadline := time.After(2 * time.Second)
-	for {
-		sessions, slots := slotsHeld(t, p)
-		if sessions == 0 && slots == 0 {
-			return
-		}
-		select {
-		case <-deadline:
-			t.Fatalf("leak after server death: %d sessions, %d slots held", sessions, slots)
-		default:
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitNothingHeld(t, p, "server death")
 }

@@ -72,7 +72,7 @@ func FuzzParseTTYModes(f *testing.F) {
 	})
 }
 
-// The modes a client sends in pty-req have to reach the pty, or backspace and UTF-8 handling go wrong.
+// Client pty-req modes must reach the pty, or backspace and UTF-8 go wrong.
 func TestServerPTYModes(t *testing.T) {
 	if _, err := exec.LookPath("stty"); err != nil {
 		t.Skip("stty not installed")

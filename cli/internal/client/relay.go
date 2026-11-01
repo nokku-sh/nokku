@@ -73,7 +73,6 @@ func (r *relayStream) Read(p []byte) (int, error) {
 	case *nokkuv1.RelayResponse_Closed:
 		return 0, io.EOF
 	case *nokkuv1.RelayResponse_Data:
-		// A message can be larger than p, keep the rest for the next Read.
 		n := copy(p, m.Data)
 		r.pending = m.Data[n:]
 		return n, nil
@@ -92,7 +91,7 @@ func (r *relayStream) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Half-closes the send side. The sshd side keeps streaming until it closes the session.
+// Half-closes. sshd keeps streaming until it closes the session.
 func (r *relayStream) CloseWrite() error {
 	return r.stream.CloseSend()
 }

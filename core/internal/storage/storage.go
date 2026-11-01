@@ -1,4 +1,4 @@
-// Package storage keeps the recordings, in a local directory or an S3 bucket, opened from one URL.
+// Package storage keeps recordings in a local directory or an S3 bucket.
 package storage
 
 import (
@@ -19,7 +19,7 @@ import (
 	"gocloud.dev/gcerrors"
 )
 
-// probeTimeout bounds the check at boot, a bucket that hangs must not hold up the start. Tests shorten it.
+// A bucket that hangs must not hold up the start. Tests shorten it.
 var probeTimeout = 5 * time.Second
 
 type Storage struct {
@@ -27,7 +27,7 @@ type Storage struct {
 }
 
 type config struct {
-	// URL is file:///dir, or s3://bucket?region=...&endpoint=...&use_path_style=true with credentials in AWS_*.
+	// URL is file:///dir or s3://bucket?region=..., credentials in AWS_*.
 	URL string `env:"NOKKU_STORAGE_URL" envDefault:"file://./data"`
 }
 
@@ -53,14 +53,14 @@ func New(ctx context.Context) (*Storage, error) {
 		_ = bucket.Close()
 		return nil, fmt.Errorf("storage refused the core: %w", err)
 	default:
-		// Maybe a passing outage. Daemons keep their recordings until it ends, and logins don't need storage.
+		// Maybe an outage. Daemons hold recordings, logins don't need storage.
 		slog.Warn("storage unreachable, recordings wait on the daemons until it is back", "error", err)
 	}
 	context.AfterFunc(ctx, func() { _ = bucket.Close() })
 	return &Storage{bucket: bucket}, nil
 }
 
-// refused is storage that answered and said no, a wrong setting fails on boot and not on the first upload.
+// refused is storage saying no, so a wrong setting fails at boot.
 func refused(err error) bool {
 	if errors.Is(err, fs.ErrPermission) {
 		return true
@@ -72,13 +72,12 @@ func refused(err error) bool {
 	if !ok {
 		return false
 	}
-	// 0 is a request that got no answer. A 5xx or a 429 is the bucket having trouble, not a verdict.
+	// 0 got no answer. A 5xx or a 429 is the bucket's trouble, not a verdict.
 	status := answer.HTTPStatusCode()
 	return status > 0 && status < http.StatusInternalServerError && status != http.StatusTooManyRequests
 }
 
-// bucketURL creates a missing directory and keeps its temp files inside it, a rename across volumes fails in a
-// container. A URL that says otherwise wins.
+// Keeps temp files in the dir, a rename across volumes fails in a container.
 func bucketURL(raw string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -119,7 +118,7 @@ func (s *Storage) Delete(ctx context.Context, name string) error {
 	return nil
 }
 
-// CreateWriter commits on Close, so a truncated upload leaves a partial object. Canceling ctx drops it.
+// CreateWriter commits on Close, even when truncated. Canceling ctx drops it.
 func (s *Storage) CreateWriter(ctx context.Context, name string) (io.WriteCloser, error) {
 	if name == "" {
 		return nil, errors.New("filename is empty")

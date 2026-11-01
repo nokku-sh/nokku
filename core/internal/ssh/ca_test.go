@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -24,14 +26,10 @@ func newTestCA(t *testing.T) testCA {
 	t.Helper()
 
 	user, host, err := newKeys()
-	if err != nil {
-		t.Fatalf("newKeys failed: %v", err)
-	}
+	require.NoError(t, err)
 	signer := func(k caKey) ssh.Signer {
 		s, err := getSigner(k.private)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		return s
 	}
 	return testCA{
@@ -51,27 +49,20 @@ func newTestKey(t *testing.T) string {
 	t.Helper()
 
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pubStr, err := MarshalPubKey(pub)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return pubStr
 }
 
 func parseKey(t *testing.T, line string) ssh.PublicKey {
 	t.Helper()
 	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
-	if err != nil {
-		t.Fatalf("failed to parse CA public key: %v", err)
-	}
+	require.NoError(t, err, "failed to parse CA public key")
 	return key
 }
 
-// checkCert verifies cert the way sshd and ssh do, a user certificate against the user key, a host one against the
-// host key.
+// checkCert verifies cert as sshd and ssh do, against the key of its kind.
 func checkCert(t *testing.T, ca *db.SSHCA, cert *ssh.Certificate, principal string) error {
 	t.Helper()
 	user, host := parseKey(t, ca.PublicKey), parseKey(t, ca.HostPublicKey)
@@ -86,7 +77,7 @@ func checkCert(t *testing.T, ca *db.SSHCA, cert *ssh.Certificate, principal stri
 	if cert.CertType == ssh.HostCert {
 		return checker.CheckHostKey(principal+":22", nil, cert)
 	}
-	// CheckCert checks the signature but not who made it, sshd asks IsUserAuthority first.
+	// CheckCert skips who signed, sshd asks IsUserAuthority first.
 	if !checker.IsUserAuthority(cert.SignatureKey) {
 		return errors.New("the certificate does not come from the user key")
 	}
@@ -99,22 +90,14 @@ func validity(cert *ssh.Certificate) time.Duration {
 
 func TestNewCA(t *testing.T) {
 	user, host, err := newKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, key := range map[string]caKey{"user": user, "host": host} {
-		if got := parseKey(t, key.public).Type(); got != ssh.KeyAlgoED25519 {
-			t.Errorf("%s key is %s, want Ed25519", name, got)
-		}
-		if _, err := x509.ParsePKCS8PrivateKey(key.private); err != nil {
-			t.Errorf("%s private key is not PKCS#8: %v", name, err)
-		}
-	}
-	if user.public == host.public {
-		t.Error("the user and the host key must differ")
-	}
+	require.NoError(t, err)
+	assert.NotEqual(t, user.public, host.public, "the user and the host key must differ")
 	info := NewCA()
-	if info.UserDefaultTtl != 16*time.Hour || info.UserMaxTtl != 7*24*time.Hour {
-		t.Errorf("user certificates default to %v, at most %v", info.UserDefaultTtl, info.UserMaxTtl)
+	assert.Equal(t, 16*time.Hour, info.UserDefaultTtl)
+	assert.Equal(t, 7*24*time.Hour, info.UserMaxTtl)
+	for name, key := range map[string]caKey{"user": user, "host": host} {
+		assert.Equal(t, ssh.KeyAlgoED25519, parseKey(t, key.public).Type(), "%s key", name)
+		_, err := x509.ParsePKCS8PrivateKey(key.private)
+		assert.NoError(t, err, "%s private key is not PKCS#8", name)
 	}
 }

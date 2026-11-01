@@ -29,11 +29,12 @@ var (
 	errIdentityRejected   = errors.New("iam: identity rejected")
 	errEmailUnverified    = errors.New("iam: the provider has not verified the email")
 	errOwnerLink          = errors.New("iam: the owner links an identity while signed in")
-	// ErrDPoPRequired is advertised with a DPoP-Nonce header so the client signs and retries (RFC 9449 section 8).
+	// ErrDPoPRequired comes with a DPoP-Nonce, so the client signs and retries.
 	ErrDPoPRequired = errors.New("iam: dpop proof required")
 )
 
-// IsCredentialError tells a refused credential from a failure to check one. Only the first may end a session.
+// IsCredentialError reports a refused credential, not a failed check.
+// Only a refusal may end a session.
 func IsCredentialError(err error) bool {
 	for _, target := range []error{
 		errNoSession, errSessionExpired, errInvalidCredentials, ErrInactive, ErrNotFound,

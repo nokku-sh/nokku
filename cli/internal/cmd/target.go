@@ -26,6 +26,27 @@ import (
 
 var portFlag = &cli.StringFlag{Name: "port", Usage: "SSH port of the server, defaults to your ssh config or 22"}
 
+type syncResult struct {
+	Target string        `json:"target"`
+	DryRun bool          `json:"dry_run"`
+	Files  []manual.File `json:"files"`
+	// Grants are the subjects a new target starts with, as they were typed.
+	Grants map[string][]string `json:"grants,omitempty"`
+}
+
+// Uses the system ssh as root, so the operator's keys and config apply.
+type remote struct {
+	host string
+	port string
+	// dir holds this run's pinned known_hosts and control socket.
+	dir    string
+	opts   []string
+	pinned bool
+}
+
+// plainWriter keeps escape sequences from the remote host off the terminal.
+type plainWriter struct{ w io.Writer }
+
 func syncCMD() *cli.Command {
 	return &cli.Command{
 		Name:  "sync",
@@ -67,7 +88,6 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	}
 	dryRun := cmd.Bool("dry-run")
 	asJSON := cmd.Bool(jsonFlag.Name)
-	// With --json stdout carries only the result, progress goes to stderr.
 	var progress io.Writer = os.Stdout
 	if asJSON {
 		progress = os.Stderr
@@ -91,7 +111,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 			return err
 		}
 	} else if cmd.IsSet("grant") || cmd.IsSet("tag") {
-		// The web app owns access from the first sync on, so a rerun never undoes a change made there.
+		// The web app owns access after the first sync, so a rerun leaves it.
 		warnf("%s is already a target, --grant and --tag only apply to a new one", target.Name)
 	}
 
@@ -134,7 +154,6 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// probe stops when the host key changed, or when a grant names an account the host does not have.
 func probe(
 	ctx context.Context,
 	dest remote,
@@ -180,7 +199,6 @@ func checkHostKey(pinned, seen, host string, accept bool) error {
 	return nil
 }
 
-// The grants of a new target are shown as typed, they become ids only when the target is created.
 func printPlan(plan manual.Plan, seeds []client.Grant) {
 	fmt.Println("Dry run, nothing was written. This sync would write:")
 	for _, f := range plan.Files {
@@ -192,14 +210,6 @@ func printPlan(plan manual.Plan, seeds []client.Grant) {
 	for _, g := range seeds {
 		fmt.Printf("  %s: %s\n", g.Account, strings.Join(g.Subjects, ", "))
 	}
-}
-
-type syncResult struct {
-	Target string        `json:"target"`
-	DryRun bool          `json:"dry_run"`
-	Files  []manual.File `json:"files"`
-	// Grants are the subjects a new target starts with, as they were typed.
-	Grants map[string][]string `json:"grants,omitempty"`
 }
 
 func newSyncResult(target *state.Target, plan manual.Plan, seeds []client.Grant, dryRun bool) syncResult {
@@ -235,14 +245,14 @@ func applyPlan(
 		if !created {
 			return fmt.Errorf("writing to %s failed, nothing was reported to Nokku: %w", dest.host, err)
 		}
-		// A new target exists before its host is written, so a failed write takes it back. Also after Ctrl-C.
+		// A failed write takes the new target back, even after Ctrl-C.
 		if delErr := c.DeleteTarget(context.WithoutCancel(ctx), target); delErr != nil {
 			return fmt.Errorf("writing to %s failed and the new target %s is still in Nokku, "+
 				"remove it with nk rm %s --keep-host: %w", dest.host, target.Name, target.Name, errors.Join(err, delErr))
 		}
 		return fmt.Errorf("writing to %s failed, the new target %s was removed again: %w", dest.host, target.Name, err)
 	}
-	// A report says the host has the current keys, a rollover in the meantime would clear the warning for nothing.
+	// A report clears the rollover warning, so the keys must still be current.
 	current, err := c.WorkspaceCA(ctx)
 	if err != nil {
 		return fmt.Errorf(
@@ -297,7 +307,7 @@ func rmCMD() *cli.Command {
 	}
 }
 
-// The host is cleaned first, so a target never disappears from Nokku while its server still trusts the CA.
+// Host first, so a target never leaves Nokku while its server trusts the CA.
 func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	host, err := rootHost(cmd)
 	if err != nil {
@@ -322,7 +332,7 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 		}
 		defer dest.close(ctx)
 		fmt.Printf("Connecting with: %s\n", dest)
-		// The address may lead to another machine by now, which must keep its own config.
+		// The address may reach another machine by now. Leave that one alone.
 		if _, err = probe(ctx, dest, target.HostPublicKey, nil, cmd.Bool("accept-host-key")); err != nil {
 			return err
 		}
@@ -364,7 +374,7 @@ func rootHost(cmd *cli.Command) (string, error) {
 	return host, nil
 }
 
-// findRemoteTarget also returns where to connect. The access snapshot misses targets the operator may not log in to.
+// Lists all targets, the snapshot misses those the operator can't log in to.
 func findRemoteTarget(ctx context.Context, c *client.Client, dest remote) (*state.Target, remote, error) {
 	targets, err := c.ListAllTargets(ctx)
 	if err != nil {
@@ -375,12 +385,12 @@ func findRemoteTarget(ctx context.Context, c *client.Client, dest remote) (*stat
 	if target != nil || err != nil {
 		return target, at, err
 	}
-	// An ssh alias never matches a stored address, so resolve it, but keep connecting through the alias.
+	// Resolve an ssh alias to match stored addresses, but connect through it.
 	target, _, err = findTarget(targets, aliases, dest.resolve(ctx))
 	return target, dest, err
 }
 
-// A name or an nk ls alias wins over an address. A name is reached at its first endpoint.
+// A name or nk ls alias wins over an address, and uses its first endpoint.
 func findTarget(targets []state.Target, aliases map[string]string, dest remote) (*state.Target, remote, error) {
 	type match struct {
 		t  *state.Target
@@ -416,7 +426,6 @@ func findTarget(targets []state.Target, aliases map[string]string, dest remote) 
 	return matches[0].t, matches[0].at, nil
 }
 
-// endpointMatch compares the port only when dest knows one. An endpoint without a port is on 22.
 func endpointMatch(t *state.Target, dest remote) (remote, bool) {
 	for _, ep := range t.Endpoints {
 		r := endpointRemote(ep, "")
@@ -429,7 +438,7 @@ func endpointMatch(t *state.Target, dest remote) (remote, bool) {
 
 // Created on the core only once the host key is read.
 func newTarget(ctx context.Context, cmd *cli.Command, dest remote) *state.Target {
-	// Users dial the endpoint directly, so store the real address behind an ssh config alias.
+	// Users dial the endpoint, so store the real address behind an ssh alias.
 	addr := dest.resolve(ctx)
 	endpoint := addr.host
 	if addr.port != "" && addr.port != "22" {
@@ -441,7 +450,6 @@ func newTarget(ctx context.Context, cmd *cli.Command, dest remote) *state.Target
 	}
 }
 
-// endpointRemote uses the endpoint's own port unless --port was set.
 func endpointRemote(ep, port string) remote {
 	r := remote{host: ep, port: port}
 	if h, p, err := net.SplitHostPort(ep); err == nil {
@@ -451,16 +459,6 @@ func endpointRemote(ep, port string) remote {
 	return r
 }
 
-// Runs as root with the system ssh, so the operator's own keys, agent and config apply.
-type remote struct {
-	host string
-	port string
-	// dir holds the pinned known_hosts and the socket of the shared connection, for one run only.
-	dir    string
-	opts   []string
-	pinned bool
-}
-
 func (r remote) String() string {
 	if r.port == "" || r.port == "22" {
 		return "ssh root@" + r.host
@@ -468,15 +466,7 @@ func (r remote) String() string {
 	return "ssh -p " + r.port + " root@" + r.host
 }
 
-// portArgs leaves the port to the operator's ssh config unless one was given.
-func (r remote) portArgs() []string {
-	if r.port == "" {
-		return nil
-	}
-	return []string{"-p", r.port}
-}
-
-// Asks ssh where an alias from the operator's config points, without connecting.
+// Asks ssh where an operator's alias points, without connecting.
 func (r remote) resolve(ctx context.Context) remote {
 	//nolint:gosec // argv, not a shell, and -- ends the options
 	out, err := exec.CommandContext(ctx, "ssh", append(r.portArgs(), "-G", "--", r.host)...).Output()
@@ -494,8 +484,15 @@ func (r remote) resolve(ctx context.Context) remote {
 	return r
 }
 
-// trust decides how this run checks the host. ssh accepts nothing but a pinned key, accept takes what the host
-// shows, and a new target is left to the operator's own known_hosts. close ends it.
+func (r remote) portArgs() []string {
+	if r.port == "" {
+		return nil
+	}
+	return []string{"-p", r.port}
+}
+
+// trust sets how this run checks the host: only the pinned key, whatever the
+// host shows with accept, or the operator's own known_hosts for a new target.
 func (r remote) trust(target *state.Target, accept bool) (remote, error) {
 	dir, err := os.MkdirTemp("", "nk-sync-")
 	if err != nil {
@@ -517,7 +514,7 @@ func (r remote) trust(target *state.Target, accept bool) (remote, error) {
 	return r, nil
 }
 
-// close ends the shared connection, which would otherwise outlive nk for ControlPersist.
+// Ends the shared connection, or it would outlive nk for ControlPersist.
 func (r remote) close(ctx context.Context) {
 	if r.dir == "" {
 		return
@@ -531,7 +528,7 @@ func (r remote) close(ctx context.Context) {
 	_ = os.RemoveAll(r.dir)
 }
 
-// A socket of this run only. A master from another run checked its host its own way and is never reused.
+// One socket per run, a master from another run checked its host differently.
 func (r remote) controlPath() string {
 	return `ControlPath="` + filepath.Join(r.dir, "cm") + `"`
 }
@@ -561,9 +558,6 @@ func (r remote) run(ctx context.Context, command, stdin string) (string, error) 
 	}
 	return out.String(), err
 }
-
-// plainWriter keeps escape sequences from the remote host off the terminal.
-type plainWriter struct{ w io.Writer }
 
 func (p plainWriter) Write(b []byte) (int, error) {
 	if _, err := io.WriteString(p.w, ui.Plain(string(b))); err != nil {

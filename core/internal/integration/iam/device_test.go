@@ -30,7 +30,12 @@ const (
 	deviceSessionTTL = 30 * 24 * time.Hour
 )
 
-// devicePost sends one form request of the device flow on the workspace's host, as u when given.
+type deviceGrantJSON struct {
+	DeviceCode string `json:"device_code"`
+	UserCode   string `json:"user_code"`
+}
+
+// devicePost sends a device flow form on the workspace's host, as u when given.
 func devicePost(
 	ws actor.Workspace,
 	handler http.HandlerFunc,
@@ -49,11 +54,6 @@ func devicePost(
 	w := httptest.NewRecorder()
 	handler(w, r.WithContext(ctx))
 	return w
-}
-
-type deviceGrantJSON struct {
-	DeviceCode string `json:"device_code"`
-	UserCode   string `json:"user_code"`
 }
 
 func beginDevice(t *testing.T, e *testEnv, ws actor.Workspace) deviceGrantJSON {
@@ -93,7 +93,7 @@ func pollDevice(
 	return polled
 }
 
-// terminalSignIn runs a whole device login for u from the machine that holds key, and returns the session length.
+// terminalSignIn logs u in from key's machine and returns the session length.
 func terminalSignIn(t *testing.T, e *testEnv, ws actor.Workspace, u *db.User, key *ecdsa.PrivateKey) time.Duration {
 	t.Helper()
 	grant := beginDevice(t, e, ws)
@@ -111,7 +111,7 @@ func terminalSignIn(t *testing.T, e *testEnv, ws actor.Workspace, u *db.User, ke
 	return time.Duration(token.ExpiresIn) * time.Second
 }
 
-// The approver sees who asked for the code before approving. That is what gives a phished device code away.
+// The approver sees who asked for the code. That gives a phished code away.
 func TestDeviceFlowShowsRequester(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -151,7 +151,7 @@ func TestDeviceFlowShowsRequester(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, status, "a decided code")
 }
 
-// A code started on one workspace cannot be approved or redeemed on another.
+// A code of one workspace cannot be approved or redeemed on another.
 func TestDeviceFlowStaysInItsWorkspace(t *testing.T) {
 	e := newTestEnv(t)
 	a, b := e.org(t), e.org(t)
@@ -178,7 +178,7 @@ func TestDeviceFlowStaysInItsWorkspace(t *testing.T) {
 	assert.Equal(t, http.StatusOK, polled.Code, polled.Body.String())
 }
 
-// A terminal is mailed once, when its key is new to the account, so the mail keeps meaning something.
+// A terminal is mailed once, when its key is new, so the mail means something.
 func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 	mailed := make(chan string, 4)
 	e := newTestEnvWith(t, iam.Deps{SendNewLogin: func(_ context.Context, userID, _, _, label, ip string) error {
@@ -219,7 +219,7 @@ func TestTerminalSignInMailsOnlyNewKeys(t *testing.T) {
 	wantMail(true, "a forgotten key is mailed again")
 }
 
-// Only a workspace's own host can approve a code, so the root host of the hosted service starts none.
+// Only a workspace's own host can approve a code, so the root host starts none.
 func TestDeviceFlowNeedsAWorkspace(t *testing.T) {
 	e := newTestEnv(t)
 	rec := httptest.NewRecorder()
@@ -251,7 +251,8 @@ func TestDeviceGrantIsSpent(t *testing.T) {
 	assert.Contains(t, again.Body.String(), "expired_token", "a grant gave two sessions")
 }
 
-// The CLI session signs in the way the browser session that approved it did. Enforcing single sign-on reads it.
+// The CLI session keeps the method of the browser session that approved it.
+// Enforcing single sign-on reads it.
 func TestCLISessionKeepsTheApproversMethod(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -281,7 +282,8 @@ func TestCLISessionKeepsTheApproversMethod(t *testing.T) {
 	assert.Equal(t, []string{string(iam.MethodPasskey)}, methods)
 }
 
-// The rules apply when the token is issued. Enforcing SSO after the approval must not leave a way past it.
+// The rules apply when the token is issued. Enforcing SSO after the approval
+// must not leave a way past it.
 func TestDevicePollHonorsSSOEnforcedAfterTheApproval(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -306,7 +308,7 @@ func TestDevicePollHonorsSSOEnforcedAfterTheApproval(t *testing.T) {
 	assert.Zero(t, e.sessions(t, o.ws, member.ID), "a poll under enforced SSO left a session")
 }
 
-// Signing someone out everywhere has to reach a login they approved a moment ago and have not collected yet.
+// Signing out everywhere reaches a login approved but not collected yet.
 func TestRevokeDropsAnApprovedDeviceGrant(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

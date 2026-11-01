@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Every ioctl on the master goes through ptyControl, so it stays non-blocking and a close interrupts a read.
+// Every master ioctl uses ptyControl, so a close can still interrupt a read.
 func openPTY() (ptmx, tty *os.File, err error) {
 	if ptmx, err = os.OpenFile("/dev/ptmx", os.O_RDWR, 0); err != nil {
 		return nil, nil, err

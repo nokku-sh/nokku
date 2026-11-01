@@ -52,7 +52,7 @@ func TestNewPlanBeforeTheTargetExists(t *testing.T) {
 	assert.Contains(t, p.Files[1].Content, "AuthorizedPrincipalsCommand /bin/echo <target-id>:%u\n")
 }
 
-// The id lands in sshd_config, so anything but a plain UUID could slip in a directive of its own.
+// The id lands in sshd_config, so anything but a UUID could add a directive.
 func TestNewPlanRefusesAnUnusableID(t *testing.T) {
 	t.Parallel()
 	for _, id := range []string{
@@ -80,8 +80,9 @@ func TestScriptIsValidShell(t *testing.T) {
 	require.NoError(t, err, "generated script must parse: %s", out)
 }
 
-// runPlan runs the script of p on a fake /etc/ssh holding existing. sshd -t accepts the host as it is, and the
-// result only when reject is false. The reload works only when reload is true.
+// runPlan runs p's script on a fake /etc/ssh holding existing. sshd -t takes
+// the host as it is, and the result unless reject is set. The reload works only
+// with reload set.
 func runPlan(t *testing.T, p Plan, existing map[string]string, reject, reload bool) (dir, out string, err error) {
 	t.Helper()
 	if _, lookErr := exec.LookPath("sh"); lookErr != nil {
@@ -149,7 +150,7 @@ func TestScriptWrites(t *testing.T) {
 	assert.True(t, ParseResult(out).Reloaded)
 }
 
-// A server set up with a file per account gets the drop-in in place of its old one, and the files go.
+// A server set up with a file per account gets the drop-in, and the files go.
 func TestScriptReplacesTheOldSetup(t *testing.T) {
 	t.Parallel()
 	p := testPlan(t)
@@ -168,7 +169,7 @@ func TestScriptReplacesTheOldSetup(t *testing.T) {
 	assert.Contains(t, out, "removed   "+dir+"/nokku_principals")
 }
 
-// The running sshd still reads the old files until it reloads, so they stay until then.
+// The running sshd reads the old files until it reloads, so they stay.
 func TestScriptKeepsTheOldFilesWithoutAReload(t *testing.T) {
 	t.Parallel()
 	dir, out, err := runPlan(t, testPlan(t), map[string]string{"nokku_principals/root": "p\n"}, false, false)
@@ -194,7 +195,7 @@ func TestScriptRollsBackWhenSSHDRejects(t *testing.T) {
 	assert.False(t, ParseResult(out).Reloaded)
 }
 
-// A write that fails halfway, like a full disk, rolls back the files written before it.
+// A write that fails halfway, like on a full disk, rolls back earlier files.
 func TestScriptRollsBackAFailedWrite(t *testing.T) {
 	t.Parallel()
 	dir, out, err := runPlan(t, testPlan(t), map[string]string{
@@ -221,7 +222,7 @@ func TestScriptDropsStaleBackups(t *testing.T) {
 	assert.Equal(t, "live-ca\n", readFile(t, filepath.Join(dir, "nokku_ca.pub")))
 }
 
-// runRemoveScript runs RemoveScript on a fake /etc/ssh with id, sshd and systemctl stubbed, and returns the dir.
+// runRemoveScript runs RemoveScript on a fake /etc/ssh with stubbed tools.
 func runRemoveScript(t *testing.T, sshdExit int) (dir, out string, err error) {
 	t.Helper()
 	if _, lookErr := exec.LookPath("sh"); lookErr != nil {

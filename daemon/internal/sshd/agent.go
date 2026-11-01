@@ -43,7 +43,7 @@ func (sess *session) agentRequest(req *ssh.Request) bool {
 	return true
 }
 
-// The MkdirTemp dir is root-owned and 0700, so both dir and socket get chowned to the session user.
+// The temp dir is root-owned 0700, so dir and socket get chowned to the user.
 func newAgentSock(sysUser *account) (ln net.Listener, sock string, err error) {
 	dir, err := os.MkdirTemp("", "auth-agent")
 	if err != nil {
@@ -66,7 +66,7 @@ func newAgentSock(sysUser *account) (ln net.Listener, sock string, err error) {
 		return ln, sock, nil
 	}
 	uid, gid := int(sysUser.UID), int(sysUser.GID)
-	// The socket goes first, while the dir is still root-only. A user owning the dir could swap in a symlink.
+	// Socket first, a user owning the dir could swap in a symlink.
 	if err = os.Lchown(sock, uid, gid); err != nil {
 		return nil, "", fmt.Errorf("chown agent socket: %w", err)
 	}

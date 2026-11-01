@@ -17,6 +17,13 @@ import (
 
 const testID = "0199aaaa-0000-7000-8000-0000000000a1"
 
+// eventLine is a decoded asciicast event: [interval, code, data].
+type eventLine struct {
+	Interval float64
+	Code     string
+	Data     []byte
+}
+
 func TestRecorderCorrelatesSessionID(t *testing.T) {
 	recordsDir := newRecordsDir(t)
 	is := assert.New(t)
@@ -90,14 +97,7 @@ func TestRecorderV3Schema(t *testing.T) {
 	is.Equal("7", exit[2])
 }
 
-// eventLine is a decoded asciicast event: [interval, code, data].
-type eventLine struct {
-	Interval float64
-	Code     string
-	Data     []byte
-}
-
-func recRecordAndReadEvents(
+func closeAndReadEvents(
 	t *testing.T,
 	recordsDir string,
 	rec *Recorder,
@@ -143,7 +143,7 @@ func TestRecorderKeepsSplitCharacters(t *testing.T) {
 	rec.RecordOutput(append([]byte{euro[2]}, 'b'))
 	rec.RecordOutput(euro[:1])
 
-	recRecordAndReadEvents(t, recordsDir, rec, func(events []eventLine) {
+	closeAndReadEvents(t, recordsDir, rec, func(events []eventLine) {
 		var out strings.Builder
 		for _, ev := range events {
 			if ev.Code == "o" {
@@ -182,7 +182,7 @@ func TestRecorderNoHTMLEscape(t *testing.T) {
 	is.NotContains(raw, `\u0026`)
 }
 
-// A previous HTML-unescape pass turned a literal < into invalid JSON and broke the whole cast.
+// An HTML-unescape pass once turned a literal < into JSON that broke the cast.
 func TestRecorderEscapedUnicodeRoundTrips(t *testing.T) {
 	recordsDir := newRecordsDir(t)
 	is := assert.New(t)
@@ -192,7 +192,7 @@ func TestRecorderEscapedUnicodeRoundTrips(t *testing.T) {
 	must.NoError(err, "new recorder")
 	input := `echo '\u003c \u003e \u0026'`
 	rec.RecordOutput([]byte(input))
-	recRecordAndReadEvents(t, recordsDir, rec, func(events []eventLine) {
+	closeAndReadEvents(t, recordsDir, rec, func(events []eventLine) {
 		var found bool
 		for _, e := range events {
 			if string(e.Data) == input {
@@ -222,8 +222,12 @@ func TestRecorderFlushesWithoutClose(t *testing.T) {
 	rec.RecordOutput([]byte("first"))
 	rec.RecordOutput([]byte("second"))
 
-	// Generous slack over the flush interval. The file must hold the events though Close never ran.
-	time.Sleep(3 * maxFlushInterval)
+	path := rec.path
+	must.Eventually(func() bool {
+		raw, _ := os.ReadFile(path)
+		text, _ := unzipCast(raw)
+		return strings.Contains(text, "second")
+	}, 3*maxFlushInterval, 10*time.Millisecond, "the flush loop never reached the file")
 
 	entries, err := os.ReadDir(recordsDir)
 	must.NoError(err)
@@ -237,7 +241,7 @@ func TestRecorderFlushesWithoutClose(t *testing.T) {
 	defer gz.Close()
 
 	data, err := io.ReadAll(gz)
-	// An unclosed recording has no gzip footer, so ErrUnexpectedEOF is the intended crash behavior.
+	// An unclosed recording has no gzip footer, so ErrUnexpectedEOF is fine.
 	is.True(err == nil || errors.Is(err, io.ErrUnexpectedEOF),
 		"read recording before close: %v", err)
 	body := string(data)
@@ -245,7 +249,7 @@ func TestRecorderFlushesWithoutClose(t *testing.T) {
 	is.Contains(body, "second")
 }
 
-// New returns a nil Recorder when recording is unavailable, and sessions rely on it being a safe no-op.
+// New returns nil when recording is unavailable, sessions rely on the no-op.
 func TestNilRecorderIsNoOp(t *testing.T) {
 	t.Parallel()
 
@@ -256,12 +260,12 @@ func TestNilRecorderIsNoOp(t *testing.T) {
 	rec.Close()
 	rec.Close()
 
-	// The typed-nil trap: this interface is non-nil though rec is, so the methods themselves must be nil-safe.
+	// A typed nil: the interface is non-nil, so the methods must be nil-safe.
 	var iface interface{ RecordResize(int, int) } = rec
 	iface.RecordResize(80, 24)
 }
 
-// A second session under the same id never touches the first one's recording, open or waiting for its upload.
+// A session reusing an id never touches the first recording, open or pending.
 func TestRecorderRefusesAnIDInUse(t *testing.T) {
 	newRecordsDir(t)
 	first, err := New(Options{Width: 80, Height: 24, SessionID: testID})

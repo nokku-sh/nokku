@@ -17,19 +17,16 @@ import (
 )
 
 const (
-	// Past the 10 seconds the core gives a call. Giving up first could lose a session a job token was spent on.
-	exchangeTimeout = 15 * time.Second
-	jobTokenTimeout = 10 * time.Second
-	// A real answer is a few KiB.
+	// Past the core's 10s limit, or a spent job token could lose its session.
+	exchangeTimeout     = 15 * time.Second
+	jobTokenTimeout     = 10 * time.Second
 	maxJobTokenResponse = 64 << 10
 )
 
-// ErrCISessionEnded stops a job that lost its session. A browser sign-in would wait on nobody until the job times out.
+// ErrCISessionEnded stops a job, a browser sign-in would wait on nobody.
 var ErrCISessionEnded = errors.New("the CI session ended, run nk login --ci <service account> again. " +
 	"To sign in as a person instead, run nk logout first")
 
-// LoginCI trades the job's token from its platform for a session of the account. The caller syncs next, so from here
-// on a job works like any other login.
 func (c *Client) LoginCI(ctx context.Context, account string) error {
 	if account == "" {
 		return errors.New("nk login --ci needs the name of a service account")
@@ -52,12 +49,11 @@ func (c *Client) LoginCI(ctx context.Context, account string) error {
 	}
 	c.State.SessionToken = res.GetAccessToken()
 	c.State.SessionExpiresAt = res.GetExpiresAt().AsTime()
-	// Here and not only in the sync, a job whose first sync fails must still never reach the device flow.
+	// A job whose first sync fails must still never reach the device flow.
 	c.State.Cache = state.Cache{Server: c.State.APIURL, ServiceAccount: &state.ServiceAccount{Name: account}}
 	return c.State.Save()
 }
 
-// jobToken asks GitHub Actions for a token for the core. Anywhere else the job sets it, GitLab through id_tokens.
 func jobToken(ctx context.Context, audience string) (string, error) {
 	requestURL, bearer := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL"), os.Getenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
 	if requestURL != "" && bearer != "" {
@@ -81,7 +77,7 @@ func githubJobToken(ctx context.Context, requestURL, bearer, audience string) (s
 	query := u.Query()
 	query.Set("audience", audience)
 	u.RawQuery = query.Encode()
-	// #nosec G704 -- the runner names this URL, it is where a job asks for its token.
+	// #nosec G704 -- the runner names this URL.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return "", err

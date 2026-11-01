@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A client picks its own User-Agent and an account its own name, and an admin opens the export in a spreadsheet.
+// Clients pick these values, and an admin opens the export in a spreadsheet.
 func TestExportDoesNotRunFormulas(t *testing.T) {
 	out, err := eventsCSV([]*Event{{
 		Timestamp: time.Now(),

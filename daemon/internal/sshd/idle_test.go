@@ -12,7 +12,7 @@ import (
 func idleSession(t *testing.T, idle time.Duration) *ssh.Session {
 	t.Helper()
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{IdleTimeout: idle}))
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{IdleTimeout: idle}))
 	t.Cleanup(closeFn)
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))

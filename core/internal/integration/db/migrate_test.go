@@ -14,7 +14,8 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// admin-link and rotate-secrets run next to the server. Opening must not migrate or reset the role passwords.
+// admin-link and rotate-secrets run next to the server. Opening must not
+// migrate or reset the role passwords.
 func TestNewConnectionChangesNothing(t *testing.T) {
 	ctx := t.Context()
 	owner, err := pgx.Connect(ctx, "")
@@ -50,7 +51,7 @@ func TestNewConnectionChangesNothing(t *testing.T) {
 	assert.Equal(t, before, password(), "opening a connection reset the role password")
 }
 
-// Only the owner migrates. A runtime role that could move the version would break the next start.
+// Only the owner migrates. A runtime role moving it breaks the next start.
 func TestRuntimeRolesCannotTouchTheSchemaVersion(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)

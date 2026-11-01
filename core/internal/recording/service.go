@@ -1,4 +1,4 @@
-// Package recording owns the recording lifecycle. It never sees a request or response type.
+// Package recording owns recordings, it never sees a request or response type.
 package recording
 
 import (

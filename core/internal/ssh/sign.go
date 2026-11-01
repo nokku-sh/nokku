@@ -18,19 +18,29 @@ import (
 // maxPrincipals is how many principals OpenSSH reads from one certificate.
 const maxPrincipals = 256
 
-// RefusedError is a certificate the request can't have, its reason is for the caller. Any other error is the server's.
+// What a session may really do is the host's call: the daemon config where
+// nokkud runs, sshd_config where it does not.
+var userExtensions = map[string]string{
+	"permit-pty":              "",
+	"permit-user-rc":          "",
+	"permit-port-forwarding":  "",
+	"permit-agent-forwarding": "",
+}
+
+// RefusedError has a reason for the caller, any other error is the server's.
 type RefusedError struct{ Reason string }
 
-func (e *RefusedError) Error() string { return e.Reason }
-
-// Limits are what a login certificate carries as critical options. An empty one adds nothing.
+// Limits are a login certificate's critical options.
 type Limits struct {
 	ForceCommand  string
 	SourceAddress string
 }
 
-// SignCertificate refuses an empty principal list, such a certificate is valid for anyone. signer is the key
-// CASigner returns for the same certType, the host key never signs a login and the user key never vouches for a server.
+func (e *RefusedError) Error() string { return e.Reason }
+
+// SignCertificate refuses an empty principal list, such a certificate is valid
+// for anyone. signer must come from CASigner for the same certType, the host
+// key never signs a login and the user key never vouches for a server.
 func SignCertificate(
 	ca *db.SSHCA,
 	signer ssh.Signer,
@@ -84,7 +94,7 @@ func SignCertificate(
 	return cert, nil
 }
 
-// UserTTL falls back to the CA's default when nothing is asked, or more than the CA allows.
+// UserTTL falls back to the CA's default, also when asked for over the max.
 func UserTTL(ca *db.SSHCA, ttl time.Duration) time.Duration {
 	return boundTTL(ttl, ca.UserDefaultTtl, ca.UserMaxTtl)
 }
@@ -96,20 +106,12 @@ func boundTTL(ttl, defaultTTL, maxTTL time.Duration) time.Duration {
 	return ttl
 }
 
-// userExtensions is what every user certificate permits. What a session may really do is the host's call: the
-// daemon config where nokkud runs, sshd_config where it does not.
-var userExtensions = map[string]string{
-	"permit-pty":              "",
-	"permit-user-rc":          "",
-	"permit-port-forwarding":  "",
-	"permit-agent-forwarding": "",
-}
-
 func userPermissions(limits Limits) ssh.Permissions {
 	perms := ssh.Permissions{Extensions: maps.Clone(userExtensions), CriticalOptions: map[string]string{}}
 	if limits.ForceCommand != "" {
 		perms.CriticalOptions["force-command"] = limits.ForceCommand
-		// ssh -N opens no session, so the command never runs and forwarding would be a free tunnel. A user rc runs first.
+		// ssh -N opens no session, so the command never runs and forwarding
+		// would be a free tunnel. A user rc runs first.
 		perms.Extensions = map[string]string{"permit-pty": ""}
 	}
 	if limits.SourceAddress != "" {
@@ -118,8 +120,8 @@ func userPermissions(limits Limits) ssh.Permissions {
 	return perms
 }
 
-// SourceAddresses tidies a list of addresses and CIDRs into the form a certificate carries. sshd and nokkud split
-// it on commas and trim nothing, so a space or a typo would refuse everyone the entries before it do not match.
+// SourceAddresses cleans the list: sshd and nokkud split on commas and trim
+// nothing, so a space or typo would refuse whoever the entries before it miss.
 func SourceAddresses(list string) (string, error) {
 	var entries []string
 	for entry := range strings.SplitSeq(list, ",") {
@@ -137,7 +139,7 @@ func SourceAddresses(list string) (string, error) {
 	return strings.Join(entries, ","), nil
 }
 
-// acceptedKey takes the key types nk and nokkud make, and hardware security keys. RSA and DSA are refused.
+// acceptedKey takes what nk and nokkud make and hardware keys, no RSA or DSA.
 func acceptedKey(key ssh.PublicKey) error {
 	switch key.Type() {
 	case ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521, ssh.KeyAlgoED25519,
@@ -147,7 +149,6 @@ func acceptedKey(key ssh.PublicKey) error {
 	return fmt.Errorf("public key type %q is not accepted, use ECDSA or Ed25519", key.Type())
 }
 
-// UnixUint64 is a certificate validity bound, never before the epoch.
 func UnixUint64(t int64) uint64 {
 	if t < 0 {
 		return 0
@@ -155,7 +156,6 @@ func UnixUint64(t int64) uint64 {
 	return uint64(t)
 }
 
-// TimeFromUnix reads a certificate validity bound.
 func TimeFromUnix(t uint64) time.Time {
 	if t > math.MaxInt64 {
 		return time.Unix(math.MaxInt64, 0)

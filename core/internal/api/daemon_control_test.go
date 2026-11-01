@@ -28,7 +28,7 @@ func TestUploadSlotsLimitOneDaemon(t *testing.T) {
 	assert.True(t, ok, "a released slot stayed taken")
 }
 
-// Memory is what runs out, so a quiet upload must cost nothing and a full one must be refused.
+// A quiet upload must cost no memory and a full one must be refused.
 func TestUploadMemoryIsBounded(t *testing.T) {
 	fill := func(s *daemonControlService, workspace string, total int64) {
 		t.Helper()

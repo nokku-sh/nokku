@@ -2,10 +2,12 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	"connectrpc.com/connect/v2"
+	"github.com/jackc/pgx/v5"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -30,11 +32,15 @@ func (p *Pool) Connect(
 	}
 
 	var daemon *db.Daemon
-	if err := p.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+	err := p.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, daemonID)
 		return err
-	}); err != nil {
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
 		return connect.NewError(connect.CodeNotFound, "daemon not found")
+	}
+	if err != nil {
+		return err
 	}
 	if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		return connect.NewError(connect.CodePermissionDenied, "daemon not accepted")
@@ -45,7 +51,7 @@ func (p *Pool) Connect(
 	defer p.markSeen(context.WithoutCancel(ctx), daemonID)
 	defer p.unregisterDaemon(daemonID, conn)
 
-	// The handler must join outDone, a Send after ServeHTTP returns panics and kills the process.
+	// Must be joined, a Send after ServeHTTP returns panics the process.
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
@@ -71,7 +77,7 @@ func (p *Pool) Connect(
 		}
 	}()
 
-	// Silence drops half-open connections. A heartbeat with a stale state version gets a StateUpdate.
+	// Silence drops half-open connections, a stale heartbeat gets an update.
 	silence := time.AfterFunc(heartbeatDeadline, conn.cancel)
 	defer silence.Stop()
 	recvErr := make(chan error, 1)
@@ -108,7 +114,7 @@ func (p *Pool) Connect(
 	case err := <-recvErr:
 		retErr = err
 	}
-	// Stop the pump before joining it. The receive goroutine may outlive the handler, it only reads the body.
+	// Stop the pump, then join. Receive may outlive the handler, it only reads.
 	conn.cancel()
 	<-outDone
 	return retErr
@@ -208,7 +214,7 @@ func (p *Pool) DaemonRelay(
 	}
 	cancel()
 	<-outDone
-	// Best effort, so the daemon tears down its sshd dial even if it stopped reading.
+	// Best effort, so the daemon drops its sshd dial even if it quit reading.
 	_ = stream.Send(&nokkuv1.DaemonRelayResponse{
 		Msg: &nokkuv1.DaemonRelayResponse_Closed{Closed: &nokkuv1.DaemonRelayClosed{}},
 	})

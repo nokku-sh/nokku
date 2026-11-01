@@ -14,13 +14,6 @@ const (
 	hostKeyName         = "ssh_host_ecdsa_key"
 )
 
-func dataDir() string {
-	if dir := os.Getenv("NOKKUD_DATA_DIR"); dir != "" {
-		return dir
-	}
-	return "/var/lib/nokkud"
-}
-
 func RecordsDir() string { return filepath.Join(dataDir(), recordsDir) }
 
 func StateFile() string { return filepath.Join(dataDir(), stateFilename) }
@@ -53,4 +46,11 @@ func Cleanup() {
 	if err := os.RemoveAll(dataDir()); err != nil {
 		slog.Error("remove data directory", "error", err)
 	}
+}
+
+func dataDir() string {
+	if dir := os.Getenv("NOKKUD_DATA_DIR"); dir != "" {
+		return dir
+	}
+	return "/var/lib/nokkud"
 }

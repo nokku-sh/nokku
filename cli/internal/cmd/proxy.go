@@ -19,13 +19,12 @@ import (
 )
 
 const (
-	// How long nk proxy trusts the cached access snapshot.
+	// Long enough that a fan-out of ssh runs syncs once.
 	proxyFreshFor = time.Minute
-	// After a failed sync nk under ssh leaves the core alone this long, or every connection waits for the timeout.
+	// Backoff after a failed sync, or every ssh would wait for the timeout.
 	syncRetryAfter = 30 * time.Second
 )
 
-// ssh runs this as the ProxyCommand of the generated ssh_config, users do not.
 func proxyCMD() *cli.Command {
 	return &cli.Command{
 		Name:      "proxy",
@@ -44,17 +43,17 @@ func proxyCMD() *cli.Command {
 			if err != nil {
 				return err
 			}
-			// Built on first use, so a fresh snapshot with a valid cert never touches the TPM or the core.
+			// Lazy, a fresh snapshot and valid cert skip the TPM and the core.
 			core := sync.OnceValues(func() (*client.Client, error) { return newClient(s) })
 
-			// The daemon enforces revocation, so a young snapshot only delays new grants and a fan-out syncs once.
+			// The daemon enforces revocation, staleness only delays grants.
 			stale := time.Since(s.SyncedAt) > proxyFreshFor && !s.SyncFailedWithin(syncRetryAfter)
 			if stale || s.TargetByID(id) == nil {
 				c, cerr := core()
 				if cerr != nil {
 					return cerr
 				}
-				// Never open a browser under ssh, a stale session uses the cache.
+				// No browser under ssh, a stale session uses the cache.
 				if err = c.SyncOrCache(ctx, false); err != nil {
 					return err
 				}
@@ -67,7 +66,7 @@ func proxyCMD() *cli.Command {
 				return fmt.Errorf("the certificate authority of %s is missing, run nk login", target.Name)
 			}
 
-			// Only when nk prepare failed, or this sync brought a new CA key or a newly granted account.
+			// nk prepare failed, or this sync brought a new CA key or account.
 			if !ssh.CertValid(*target, *s.CA, 0) {
 				c, cerr := core()
 				if cerr == nil {
@@ -98,7 +97,6 @@ func proxyCMD() *cli.Command {
 	}
 }
 
-// ssh runs this Match exec hook before it reads CertificateFile, so the certificate is renewed in time.
 func prepareCMD() *cli.Command {
 	return &cli.Command{
 		Name:      "prepare",
@@ -115,7 +113,7 @@ func prepareCMD() *cli.Command {
 	}
 }
 
-// noCertificate points at what helps. nk login can't work while the core is out of reach.
+// nk login can't work while the core is out of reach.
 func noCertificate(target string, err error) error {
 	if connectrpc.CodeOf(err) == connectrpc.CodeUnavailable {
 		return fmt.Errorf("no valid certificate for %s, and the core can't be reached to get one: %w", target, err)
@@ -138,7 +136,7 @@ func renewCert(ctx context.Context, cmd *cli.Command) error {
 	if s.CA == nil || ssh.CertFresh(*target, *s.CA) {
 		return nil
 	}
-	// A certificate that still works is not worth a timeout while the core is down.
+	// A working certificate is not worth a timeout while the core is down.
 	if ssh.CertValid(*target, *s.CA, 0) && s.SyncFailedWithin(syncRetryAfter) {
 		return nil
 	}

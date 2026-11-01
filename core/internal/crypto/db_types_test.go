@@ -1,34 +1,25 @@
 package crypto
 
 import (
-	"database/sql/driver"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// The stored form is lowercase hex of the sha256 digest. Any change silently invalidates stored tokens.
+// Stored as lowercase sha256 hex. Any change invalidates every stored token.
 func TestHashToken_Digest(t *testing.T) {
-	hash := HashToken("abc")
 	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-	if string(hash) != want {
-		t.Errorf("HashToken(abc) = %q, want %q", hash, want)
-	}
+	assert.Equal(t, want, string(HashToken("abc")))
 }
 
 func TestHashedToken_ScanAndValue(t *testing.T) {
 	var h HashedToken
-	if err := h.Scan(nil); err != nil {
-		t.Fatal(err)
-	}
-	if !h.IsZero() {
-		t.Error("Scan(nil) should zero the value")
-	}
+	require.NoError(t, h.Scan(nil))
+	assert.True(t, h.IsZero(), "Scan(nil) should zero the value")
 
 	h = "digest"
 	v, err := h.Value()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v != driver.Value("digest") {
-		t.Errorf("Value() = %v, want digest", v)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "digest", v)
 }

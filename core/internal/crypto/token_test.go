@@ -19,20 +19,20 @@ func TestNewTokenRoundTrips(t *testing.T) {
 		prefix := "nk_" + string(kind) + "_"
 		require.True(t, strings.HasPrefix(raw, prefix), "%q does not start with %q", raw, prefix)
 		assert.Equal(t, HashToken(raw), hash, "the hash is not of the plaintext")
-		assert.True(t, CheckToken(raw, kind), "%s does not pass its own check", kind)
-		assert.True(t, CheckToken(raw, TokenLogin, kind), "%s is refused among other kinds", kind)
+		assert.True(t, checkToken(raw, kind), "%s does not pass its own check", kind)
+		assert.True(t, checkToken(raw, TokenLogin, kind), "%s is refused among other kinds", kind)
 	}
 	first, _ := NewToken(TokenSession)
 	second, _ := NewToken(TokenSession)
 	assert.NotEqual(t, first, second)
 }
 
-// The format itself is tested in internal/nktoken, this is the choice among kinds.
+// internal/nktoken tests the format, this is the choice among kinds.
 func TestCheckTokenRefuses(t *testing.T) {
 	raw, _ := NewToken(TokenServiceAccount)
-	assert.False(t, CheckToken(raw), "no kind takes nothing")
-	assert.False(t, CheckToken(raw, TokenSCIM, TokenSession), "a service account key passes as another kind")
-	assert.False(t, CheckToken(RandomString(32), TokenServiceAccount), "an old session passes")
+	assert.False(t, checkToken(raw), "no kind takes nothing")
+	assert.False(t, checkToken(raw, TokenSCIM, TokenSession), "a service account key passes as another kind")
+	assert.False(t, checkToken(RandomString(32), TokenServiceAccount), "an old session passes")
 }
 
 func TestTokenHash(t *testing.T) {

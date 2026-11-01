@@ -17,6 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// wrongKey signs with another key than it shows, like a half-broken key store.
+type wrongKey struct {
+	crypto.Signer
+
+	shows crypto.PublicKey
+}
+
 func testOpts(t *testing.T, open func() (transport.TPMCloser, error)) SignerOptions {
 	t.Helper()
 	return SignerOptions{
@@ -25,17 +32,9 @@ func testOpts(t *testing.T, open func() (transport.TPMCloser, error)) SignerOpti
 	}
 }
 
-func newTestSigner(
-	t *testing.T,
-	open func() (transport.TPMCloser, error),
-	mutate func(*SignerOptions),
-) Signer {
+func newTestSigner(t *testing.T, open func() (transport.TPMCloser, error)) Signer {
 	t.Helper()
-	opts := testOpts(t, open)
-	if mutate != nil {
-		mutate(&opts)
-	}
-	s, err := NewSigner(opts)
+	s, err := NewSigner(testOpts(t, open))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close() })
 	return s
@@ -71,17 +70,16 @@ func TestSignerTPM(t *testing.T) {
 	assert.True(t, ecdsa.VerifyASN1(pub1, digest[:], sig), "signature verification failed")
 }
 
-// Two state files on one TPM are two identities, the daemon's DPoP and host keys or two users' nk keys.
+// Two state files on one TPM are two identities, like DPoP and host keys.
 func TestSignerStateFilesAreSeparate(t *testing.T) {
 	open := simOpen(openSimulator(t))
 
-	a := newTestSigner(t, open, nil)
-	b := newTestSigner(t, open, nil)
+	a := newTestSigner(t, open)
+	b := newTestSigner(t, open)
 	assert.False(t, testPub(t, a).Equal(b.Public()), "two state files must hold two keys")
 }
 
-// TestSignerIdentityChanged verifies a key the TPM no longer loads fails with
-// ErrIdentityChanged, unless Recreate is set.
+// A key the TPM no longer loads is a changed identity, unless Recreate is set.
 func TestSignerIdentityChanged(t *testing.T) {
 	sim := openSimulator(t)
 	opts := testOpts(t, simOpen(sim))
@@ -95,7 +93,6 @@ func TestSignerIdentityChanged(t *testing.T) {
 	_, err = NewSigner(opts)
 	require.ErrorIs(t, err, ErrIdentityChanged)
 
-	// With Recreate the signer replaces the key and persists it.
 	opts.Recreate = true
 	s2, err := NewSigner(opts)
 	require.NoError(t, err)
@@ -107,7 +104,7 @@ func TestSignerIdentityChanged(t *testing.T) {
 	assert.Equal(t, pemOf(t, s2), st2.PubKey, "recovered identity was not persisted")
 }
 
-// A TPM state without a key file, as the derived keys of older builds left it, is a changed identity.
+// Older builds derived keys and left no key file. That is a changed identity.
 func TestSignerTPMStateWithoutKeyFile(t *testing.T) {
 	opts := testOpts(t, simOpen(openSimulator(t)))
 	require.NoError(t, saveState(opts.StatePath, &state{Method: MethodTPM, PubKey: "pem"}))
@@ -122,7 +119,7 @@ func TestSignerTPMStateWithoutKeyFile(t *testing.T) {
 	assert.Equal(t, MethodTPM, s.Method())
 }
 
-// A machine with no TPM gets a software key, every Mac among them. Requiring a TPM refuses that before and after.
+// No TPM gets a software key, like a Mac. RequireTPM refuses one at any time.
 func TestSignerWithoutATPM(t *testing.T) {
 	opts := testOpts(t, noTPM)
 	opts.RequireTPM = true
@@ -142,16 +139,9 @@ func TestSignerWithoutATPM(t *testing.T) {
 	assert.ErrorContains(t, err, "require-tpm is set")
 }
 
-// wrongKey shows a public key it does not sign with, like a key store that half works.
-type wrongKey struct {
-	crypto.Signer
-
-	shows crypto.PublicKey
-}
-
 func (k wrongKey) Public() crypto.PublicKey { return k.shows }
 
-// A new key that can't sign must never become an identity nobody can log in with.
+// A key that can't sign must never become an identity nobody can log in with.
 func TestSelfTestRefusesAKeyThatDoesNotSign(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -181,9 +171,10 @@ func TestSoftSignerRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ecdsa.VerifyASN1(pub1, digest[:], sig), "signature verification failed")
 	assert.Equal(t, MethodSoft, s1.Method())
+	_, err = s1.Sign(rand.Reader, digest[:], crypto.SHA512)
+	require.Error(t, err, "a TPM refuses other hashes, software must act the same")
 	require.NoError(t, s1.Close())
 
-	// Reloading from disk must yield the same key.
 	st, err := loadState(opts.StatePath)
 	require.NoError(t, err)
 	s2, err := openSoft(opts, st)
@@ -191,8 +182,7 @@ func TestSoftSignerRoundTrip(t *testing.T) {
 	assert.True(t, pub1.Equal(s2.Public()), "public key changed after reload")
 }
 
-// TestSoftSignerWrongMachine verifies a changed machine identity fails
-// strictly, or is replaced when Recreate is set.
+// A changed machine identity fails, or is replaced when Recreate is set.
 func TestSoftSignerWrongMachine(t *testing.T) {
 	opts := SignerOptions{StatePath: filepath.Join(t.TempDir(), "signer.json")}
 
@@ -212,14 +202,12 @@ func TestSoftSignerWrongMachine(t *testing.T) {
 	s2, err := openSoft(opts, st)
 	require.NoError(t, err)
 
-	// The replacement key must be persisted.
 	st2, err := loadState(opts.StatePath)
 	require.NoError(t, err)
 	assert.Equal(t, pemOf(t, s2), st2.PubKey, "recovered key was not persisted")
 }
 
-// A state that lost part of its key is a changed identity. Where the key is registered, a silent new one
-// would only be rejected later.
+// A damaged state is a changed identity, a silent new key gets rejected later.
 func TestSoftSignerIncompleteState(t *testing.T) {
 	for name, damage := range map[string]func(*state){
 		"no salt":     func(st *state) { st.Salt = nil },
@@ -297,25 +285,22 @@ func TestSignerKeepsAnIdentityItCannotOpen(t *testing.T) {
 	}
 }
 
-// Software keys are random, so two callers that both find no state must not each make their own.
+// Software keys are random, so two callers with no state must share one.
 func TestSignerConcurrentCreation(t *testing.T) {
 	opts := testOpts(t, noTPM)
-	pems := make([]string, 8)
+	signers := make([]Signer, 8)
+	errs := make([]error, len(signers))
 	var wg sync.WaitGroup
-	for i := range pems {
-		wg.Go(func() {
-			s, err := NewSigner(opts)
-			if assert.NoError(t, err) {
-				pems[i] = pemOf(t, s)
-			}
-		})
+	for i := range signers {
+		wg.Go(func() { signers[i], errs[i] = NewSigner(opts) })
 	}
 	wg.Wait()
+	require.NoError(t, errors.Join(errs...))
 
 	st, err := loadState(opts.StatePath)
 	require.NoError(t, err)
-	for _, got := range pems {
-		assert.Equal(t, st.PubKey, got, "a caller holds a key that is not the one on disk")
+	for _, s := range signers {
+		assert.Equal(t, st.PubKey, pemOf(t, s), "a caller holds a key that is not the one on disk")
 	}
 }
 

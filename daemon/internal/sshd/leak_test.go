@@ -13,7 +13,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// The host's git config would sign the test commits, which asks a security key for a touch.
+	// The host's git config must not sign test commits with a security key.
 	_ = os.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	_ = os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	os.Exit(leaktest.Exit(m.Run()))
@@ -43,7 +43,6 @@ func TestSessionChannelNoCommandDoesNotLeak(t *testing.T) {
 		client.Close()
 	}
 
-	// Let the server-side connection teardown settle before counting.
 	is.Eventually(func() bool {
 		return runtime.NumGoroutine() <= baseline+5
 	}, 5*time.Second, 50*time.Millisecond)

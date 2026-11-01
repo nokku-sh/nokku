@@ -76,8 +76,7 @@ func TestMergeSetReplacesADurationWhole(t *testing.T) {
 	assert.False(t, stored.GetDefaultDaemonConfig().GetAllowForwarding())
 }
 
-// A mask may only reach into our own messages. Past a scalar, a list or a Duration there is nothing to name, and the
-// stored value would differ from what the plan gates saw.
+// A mask stops at our own messages, or the plan gates would see another value.
 func TestApplyMaskRefusesAPathPastAField(t *testing.T) {
 	for _, tt := range []struct {
 		req  proto.Message

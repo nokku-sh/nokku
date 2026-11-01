@@ -1,7 +1,6 @@
 package iam
 
-// SCIM Groups are workspace teams. The SCIM id is the team id, members reference user ids, externalId is on the row.
-// SCIM only sees the teams it made or took over, an IdP that syncs deletes every group it does not know.
+// SCIM sees only the teams it made or took over, IdPs delete unknown groups.
 
 import (
 	"context"
@@ -25,21 +24,6 @@ type scimGroupHandler struct {
 	ws  actor.Workspace
 }
 
-func (h scimGroupHandler) tx(ctx context.Context, id string, fn func(*db.Queries) error) error {
-	if _, err := uuid.Parse(id); id != "" && err != nil {
-		return scimerrors.ScimErrorResourceNotFound(id)
-	}
-	err := h.svc.conn.TenantTx(ctx, fn)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return scimerrors.ScimErrorResourceNotFound(id)
-	}
-	if db.IsUniqueViolation(err) {
-		// One displayName per workspace, per RFC 7643 and the unique index.
-		return scimerrors.ScimErrorUniqueness
-	}
-	return err
-}
-
 func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes) (scim.Resource, error) {
 	name := scimAttrString(attrs["displayName"])
 	if name == "" {
@@ -48,7 +32,8 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 	ctx := r.Context()
 	var res scim.Resource
 	err := h.tx(ctx, "", func(q *db.Queries) error {
-		// A team made by hand is taken over, it keeps its id and its grants. The members are the group's from now on.
+		// A hand-made team is taken over, keeping its id and grants. Its
+		// members are the group's from now on.
 		team, err := q.GetTeamByName(ctx, name)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -58,7 +43,7 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 		case err != nil:
 			return err
 		case team.ScimManaged:
-			// Another group of the provider holds it, adopting would let the two overwrite each other.
+			// Another group holds it, the two would overwrite each other.
 			return scimerrors.ScimErrorUniqueness
 		}
 		if team, err = q.AdoptTeamSCIM(ctx, team.ID); err != nil {
@@ -127,7 +112,6 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 		if team, err = linkTeamSCIM(ctx, q, team, scimAttrString(attrs["externalId"])); err != nil {
 			return err
 		}
-		// The PUT representation is authoritative for members.
 		if err := setTeamMembers(ctx, q, id, scimMemberRefs(attrs["members"])); err != nil {
 			return err
 		}
@@ -180,7 +164,7 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 					return setTeamMembers(ctx, q, id, nil)
 				}
 				if len(ids) == 0 {
-					// Okta puts the id in the path filter: members[value eq "id"].
+					// Okta puts the id in the filter: members[value eq "id"].
 					ids = scimFilterValues(expr)
 				}
 				for _, uid := range ids {
@@ -200,7 +184,6 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 	return res, err
 }
 
-// linkTeamSCIM stores the identity provider's id on the team, the way linkSCIM does on a user.
 func linkTeamSCIM(ctx context.Context, q *db.Queries, team *db.Team, externalID string) (*db.Team, error) {
 	if externalID == "" || (team.ScimExternalID != nil && *team.ScimExternalID == externalID) {
 		return team, nil
@@ -212,7 +195,6 @@ func linkTeamSCIM(ctx context.Context, q *db.Queries, team *db.Team, externalID 
 	return team, err
 }
 
-// setTeamMembers makes userIDs the whole membership.
 func setTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs []string) error {
 	current, err := q.ListTeamMembers(ctx, teamID)
 	if err != nil {
@@ -220,7 +202,7 @@ func setTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs [
 	}
 	for _, m := range current {
 		if i := slices.Index(userIDs, m.User.ID); i >= 0 {
-			// Already in, the full list of a sync would look every one of them up again.
+			// Already in, or a full sync would look every one up again.
 			userIDs = slices.Delete(userIDs, i, i+1)
 			continue
 		}
@@ -285,4 +267,19 @@ func scimFilterValues(expr filter.Expression) []string {
 		return []string{s}
 	}
 	return nil
+}
+
+func (h scimGroupHandler) tx(ctx context.Context, id string, fn func(*db.Queries) error) error {
+	if _, err := uuid.Parse(id); id != "" && err != nil {
+		return scimerrors.ScimErrorResourceNotFound(id)
+	}
+	err := h.svc.conn.TenantTx(ctx, fn)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return scimerrors.ScimErrorResourceNotFound(id)
+	}
+	if db.IsUniqueViolation(err) {
+		// One displayName per workspace, per RFC 7643 and the unique index.
+		return scimerrors.ScimErrorUniqueness
+	}
+	return err
 }

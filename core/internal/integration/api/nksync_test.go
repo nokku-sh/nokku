@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
@@ -33,7 +32,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// nkSync is one workspace with an admin who hands out grants and a key that asks for certificates.
+// nkSync is an admin who hands out grants and a key that asks for certificates.
 type nkSync struct {
 	cfg      *config.Config
 	srv      *httptest.Server
@@ -45,8 +44,8 @@ type nkSync struct {
 func newNKSync(t *testing.T) *nkSync {
 	t.Helper()
 	cfg, srv := newTestAPI(t)
-	admin := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
+	admin := clientOn(srv, header("Authorization",
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	return &nkSync{
@@ -61,7 +60,7 @@ func newNKSync(t *testing.T) *nkSync {
 // target is a server set up with nk sync, with one account.
 func (n *nkSync) target(t *testing.T, username string) (targetID, accountID string) {
 	t.Helper()
-	inWorkspace(t, n.cfg, seedWorkspace(t, n.cfg), func(q *db.Queries) error {
+	inWorkspace(t, n.cfg, testWorkspace.ID, func(q *db.Queries) error {
 		target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{Name: uniq("nk-sync")})
 		if err != nil {
 			return err
@@ -100,7 +99,7 @@ func (n *nkSync) revoke(t *testing.T, accountID, userID string) {
 // person is a member and the nk session that signs for them.
 func (n *nkSync) person(t *testing.T) (id, token string) {
 	t.Helper()
-	u := seedUser(t, n.cfg, seedWorkspace(t, n.cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	u := seedUser(t, n.cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	return u.ID, cliSessionFor(t, n.cfg, u)
 }
 
@@ -115,8 +114,8 @@ func (n *nkSync) sign(t *testing.T, token, targetID string, ttl time.Duration) (
 	if ttl > 0 {
 		req.Ttl = durationpb.New(ttl)
 	}
-	res, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(
-		connecthttp.NewTransport(n.srv.Client(), n.srv.URL), header("Authorization", "Bearer "+token),
+	res, err := nokkuv1connect.NewCertificateServiceClient(clientOn(
+		n.srv, header("Authorization", "Bearer "+token),
 	)).SignSSHCertificate(t.Context(), req)
 	if err != nil {
 		return nil, err
@@ -133,15 +132,14 @@ func lifetime(cert *gossh.Certificate) time.Duration {
 	return time.Unix(int64(cert.ValidBefore), 0).Sub(time.Unix(int64(cert.ValidAfter), 0)) - time.Minute
 }
 
-// A server set up with nk sync hears of no revoke, so its certificates run out within the hour. A CA that gives
-// less keeps its own default, and a server with a daemon keeps the CA's lifetimes.
+// An nk sync server hears of no revoke, so certificates end within the hour.
 func TestNKSyncCertificateLifetime(t *testing.T) {
 	n := newNKSync(t)
 	personID, token := n.person(t)
 
 	targetID, accountID := n.target(t, "root")
 	n.grant(t, accountID, personID)
-	_, enrolled := enrollTestDaemon(t, n.cfg, n.srv, seedWorkspace(t, n.cfg), true)
+	_, enrolled := enrollTestDaemon(t, n.cfg, n.srv, testWorkspace.ID, true)
 	daemonAccount, err := n.accounts.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
 		TargetId: new(enrolled.GetTargetId()),
 		Username: new("root"),
@@ -171,8 +169,8 @@ func TestNKSyncCertificateLifetime(t *testing.T) {
 	assert.InDelta(t, 20*time.Minute, lifetime(cert), float64(2*time.Second), "the cap made a short CA longer")
 }
 
-// The core signs, real OpenSSH checks with the rule nk sync writes. Access changes on the core alone: a new grant
-// works at once, and a revoke stops the core from signing again.
+// The core signs, real OpenSSH checks with the rule nk sync writes. Access
+// changes on the core alone, a revoke stops new certificates.
 func TestNKSyncServerWithOpenSSH(t *testing.T) {
 	sshd, err := exec.LookPath("sshd")
 	if err != nil {
@@ -254,8 +252,7 @@ func TestNKSyncServerWithOpenSSH(t *testing.T) {
 	)
 }
 
-// startNKSyncSSHD runs a same-user sshd with the rule nk sync writes for targetID and returns its port. Only root
-// can switch to nobody, so a test that is not root runs the command as itself.
+// startNKSyncSSHD runs sshd with nk sync's rule and returns its port.
 func startNKSyncSSHD(t *testing.T, sshd, dir, caKey, targetID string) string {
 	t.Helper()
 	hostKey := filepath.Join(dir, "host_key")
@@ -270,6 +267,7 @@ func startNKSyncSSHD(t *testing.T, sshd, dir, caKey, targetID string) string {
 	require.NoError(t, ln.Close())
 
 	rule := nklogin.PrincipalsCommand(targetID)
+	// Only root can switch to nobody.
 	if os.Geteuid() != 0 {
 		current, err := user.Current()
 		require.NoError(t, err)

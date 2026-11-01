@@ -33,8 +33,7 @@ func main() {
 			return ctx, nil
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			// The database and the jobs outlive the signal until the server is done, a request in its shutdown
-			// grace still reaches the database and writes its audit event.
+			// Outlives the signal, so draining requests can still audit.
 			running, stop := context.WithCancel(context.WithoutCancel(ctx))
 			defer stop()
 			cfg, err := config.New(running, cmd)
@@ -50,7 +49,7 @@ func main() {
 				Description: "The way back in when the owner lost every passkey and no mail " +
 					"goes out. The link works for 24 hours and replaces earlier ones. " +
 					"Run it on the server with the same environment the server has.",
-				// Only the database and iam, the server may be running next to this.
+				// Only db and iam, the server may be running next to this.
 				Action: func(ctx context.Context, _ *cli.Command) error {
 					ec, err := env.ParseAs[config.EnvConfig]()
 					if err != nil {
@@ -123,7 +122,7 @@ func main() {
 					if err != nil {
 						return fmt.Errorf("failed to connect to database: %w", err)
 					}
-					// False on the hosted service too, a move to a KMS opens a keyset the secret still wraps.
+					// False even when hosted, the secret may still wrap it.
 					enc, err := kms.New(ctx, conn, false)
 					if err != nil {
 						return fmt.Errorf("current keys: %w", err)

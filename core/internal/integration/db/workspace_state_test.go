@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -13,7 +14,8 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// Daemons read the idle timeout from the workspace settings, so a change there must reach them at once.
+// Daemons read the idle timeout from the settings, a change reaches them at
+// once.
 func TestStateVersionBumpsOnSettings(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -29,11 +31,9 @@ func TestStateVersionBumpsOnSettings(t *testing.T) {
 
 	waitNotify(t, conn, f.ws)
 	after := stateVersion(t, c, f.ws)
-	if after <= before {
-		t.Fatalf("idle timeout change: version %d -> %d, want a bump", before, after)
-	}
+	require.Greater(t, after, before, "an idle timeout change must bump the version")
 
-	// Daemons read nothing else from the settings, so nothing else makes them sync.
+	// Daemons read nothing else there, so nothing else makes them sync.
 	asOwner(t, c, f, func(q *db.Queries) error {
 		_, err := q.UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{
 			Settings: &nokkuv1.WorkspaceSettings{
@@ -43,7 +43,5 @@ func TestStateVersionBumpsOnSettings(t *testing.T) {
 		})
 		return err
 	})
-	if again := stateVersion(t, c, f.ws); again != after {
-		t.Fatalf("another settings change: version %d -> %d, want none", after, again)
-	}
+	require.Equal(t, after, stateVersion(t, c, f.ws), "another settings change moved the version")
 }

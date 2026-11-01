@@ -19,6 +19,17 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+type lockedWriter struct {
+	mu *sync.Mutex
+	w  io.Writer
+}
+
+// A valid cert signed with another key, like a copied cert without its key.
+type wrongKeySigner struct {
+	cert  ssh.PublicKey
+	other ssh.Signer
+}
+
 func TestServerAuditEvents(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -74,21 +85,10 @@ func auditLog() (*slog.Logger, func() []eventType) {
 	}
 }
 
-type lockedWriter struct {
-	mu *sync.Mutex
-	w  io.Writer
-}
-
 func (l lockedWriter) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.w.Write(p)
-}
-
-// A valid certificate signed with another key, like a client that copied a cert without the private key.
-type wrongKeySigner struct {
-	cert  ssh.PublicKey
-	other ssh.Signer
 }
 
 func (w wrongKeySigner) PublicKey() ssh.PublicKey { return w.cert }

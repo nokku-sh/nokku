@@ -12,20 +12,20 @@ import (
 	"github.com/nokku-sh/nokku/internal/login"
 )
 
-// The most the core lists at once. The query narrows a lookup by name, so this is plenty.
+// The most the core lists at once.
 const lookupLimit = 100
 
 // Grant is who may log in as one account of a new manual target.
 type Grant struct {
 	Account string
-	// Subjects are the subjects as the operator typed them, the rest is their ids.
+	// Subjects are as typed, for display. The rest holds their ids.
 	Subjects        []string
 	Users           []string
 	Teams           []string
 	ServiceAccounts []string
 }
 
-// ResolveGrants takes me, an email, team:<name> or sa:<name>. An id is taken as it is, so same-named teams work.
+// ResolveGrants takes ids as they are, so same-named teams still work.
 func (c *Client) ResolveGrants(ctx context.Context, specs []string) ([]Grant, error) {
 	seed, err := parseGrants(specs)
 	if err != nil {
@@ -42,7 +42,6 @@ func (c *Client) ResolveGrants(ctx context.Context, specs []string) ([]Grant, er
 	return grants, nil
 }
 
-// parseGrants gives an account that is named twice the subjects of both.
 func parseGrants(specs []string) (map[string][]string, error) {
 	seed := map[string][]string{}
 	for _, spec := range specs {
@@ -154,7 +153,7 @@ func (c *Client) serviceAccountID(ctx context.Context, name string) (string, err
 	return oneID(ids, "service account", name)
 }
 
-// oneID refuses a name that fits nothing or several. Team names are not unique on the core.
+// Team names are not unique on the core.
 func oneID(ids []string, kind, name string) (string, error) {
 	switch len(ids) {
 	case 0:

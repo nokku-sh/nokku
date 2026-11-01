@@ -138,8 +138,7 @@ func TestPrivateAddr(t *testing.T) {
 	}
 }
 
-// pinnedSSH runs the real ssh against addr with opts and returns what it printed. Login always fails, the server
-// lets nobody in, so the output tells a refused host key from a refused login.
+// pinnedSSH's output tells a refused host key from a refused login.
 func pinnedSSH(t *testing.T, addr string, opts []string) string {
 	t.Helper()
 	host, port, err := net.SplitHostPort(addr)

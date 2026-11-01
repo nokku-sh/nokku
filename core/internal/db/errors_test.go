@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsUniqueViolation(t *testing.T) {
@@ -24,9 +25,7 @@ func TestIsUniqueViolation(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if got := IsUniqueViolation(tc.err); got != tc.want {
-				t.Errorf("IsUniqueViolation(%v) = %v, want %v", tc.err, got, tc.want)
-			}
+			assert.Equal(t, tc.want, IsUniqueViolation(tc.err))
 		})
 	}
 }

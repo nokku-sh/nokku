@@ -14,16 +14,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// A TPM when one is usable, otherwise a software key wrapped to this machine.
-func newSSHSigner(requireTPM bool) (tpm.Signer, error) {
-	return tpm.NewSigner(tpm.SignerOptions{
-		StatePath:  paths.SSHSignerFile(),
-		RequireTPM: requireTPM,
-		Recreate:   true,
-	})
-}
-
-// SetupKey drops the cached certificates when the identity changed.
 func SetupKey(requireTPM bool) error {
 	signer, err := newSSHSigner(requireTPM)
 	if err != nil {
@@ -49,6 +39,15 @@ func SetupKey(requireTPM bool) error {
 		return CleanupCerts(nil)
 	}
 	return nil
+}
+
+// A TPM when one is usable, otherwise a software key wrapped to this machine.
+func newSSHSigner(requireTPM bool) (tpm.Signer, error) {
+	return tpm.NewSigner(tpm.SignerOptions{
+		StatePath:  paths.SSHSignerFile(),
+		RequireTPM: requireTPM,
+		Recreate:   true,
+	})
 }
 
 // The hostname is the comment, so an operator can tell where a key came from.

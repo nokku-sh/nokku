@@ -28,7 +28,7 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
-// fakeCore refuses to sign host certificates, like a core whose CA was deactivated.
+// fakeCore won't sign host certificates, like a core whose CA is deactivated.
 type fakeCore struct {
 	nokkuv1connect.UnimplementedDaemonControlServiceHandler
 
@@ -36,10 +36,9 @@ type fakeCore struct {
 	hostCA string
 	signs  atomic.Int32
 	// answer replaces the accepted sync answer when set.
-	answer atomic.Pointer[nokkuv1.SyncDaemonResponse]
-	// enrolled holds the last enroll request.
+	answer   atomic.Pointer[nokkuv1.SyncDaemonResponse]
 	enrolled atomic.Pointer[nokkuv1.EnrollDaemonRequest]
-	// heartbeats gets the state version of the first heartbeat on each control stream.
+	// heartbeats gets the state version of each stream's first heartbeat.
 	heartbeats chan int64
 }
 
@@ -87,7 +86,7 @@ func (b *fakeCore) SignHostCertificate(
 	return nil, connect.NewError(connect.CodeFailedPrecondition, "certificate authority is not active")
 }
 
-// Connect hangs up after the first heartbeat, so each stream reports one version.
+// Connect hangs up after one heartbeat, so each stream reports one version.
 func (b *fakeCore) Connect(_ context.Context, stream nokkuv1connect.DaemonControlServiceConnectServerStream) error {
 	req, err := stream.Receive()
 	if err != nil {
@@ -126,7 +125,7 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 	// Serve owns the host key, so it has to run for the key to be released.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	served := make(chan struct{})
 	go func() {
 		defer close(served)
@@ -148,7 +147,7 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 	}
 }
 
-// The revoke that must not get stuck: a new CA whose host certificate cannot be signed still replaces trust.
+// A revoke must not get stuck: a new CA applies even with no host certificate.
 func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -178,14 +177,13 @@ func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	default:
 	}
 
-	// The state survives a restart from disk.
 	loaded, err := state.Load()
 	must.NoError(err)
 	is.Equal(core.ca, loaded.Access().CA)
 	is.Equal([]string{"subject-1"}, loaded.Access().Principals["deploy"])
 }
 
-// An approval that is taken back must not leave the host serving what it synced while approved.
+// An approval taken back must not leave the host serving its old grants.
 func TestSyncPendingDropsTrust(t *testing.T) {
 	core := &fakeCore{ca: newTestCAKey(t)}
 	c := newSyncClient(t, core)
@@ -202,7 +200,7 @@ func TestSyncPendingDropsTrust(t *testing.T) {
 	assert.Empty(t, loaded.Access().Principals["deploy"], "the old grants are still on disk")
 }
 
-// The core names the daemon after the host when a person named it, so enroll has to say what it is called.
+// The core names the daemon after a host a person named, so enroll reports it.
 func TestEnrollReportsTheHost(t *testing.T) {
 	core := &fakeCore{ca: newTestCAKey(t)}
 	c := newSyncClient(t, core)
@@ -217,7 +215,7 @@ func TestEnrollReportsTheHost(t *testing.T) {
 	assert.True(t, c.state.Access().DaemonConfig.GetEphemeral(), "the enroll config is what the daemon keeps")
 }
 
-// Enrollment and access share one file, so a restart finds both and a new enrollment keeps nothing of the old.
+// Enrollment and access share a file: a restart finds both, re-enroll resets.
 func TestEnrollRestartReEnroll(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -247,7 +245,7 @@ func TestEnrollRestartReEnroll(t *testing.T) {
 	}
 }
 
-// A rejection drops the enrollment and the access in one write. Only where the core is stays.
+// One write drops enrollment and access. Only where the core is stays.
 func TestRejectionDropsEnrollmentAndAccess(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -267,7 +265,7 @@ func TestRejectionDropsEnrollmentAndAccess(t *testing.T) {
 	is.Empty(loaded.Access().Principals)
 }
 
-// The heartbeat reports what is on disk, so after a failed save the core keeps asking for a sync until one lands.
+// The heartbeat reports what is on disk, so a failed save gets synced again.
 func TestHeartbeatReportsTheSavedVersion(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -296,7 +294,7 @@ func TestHeartbeatReportsTheSavedVersion(t *testing.T) {
 	is.EqualValues(8, reported())
 }
 
-// Right after a sync whose CA key does not parse, the old CA opens nothing, the same as after a restart.
+// A sync with an unparsable CA key closes the old CA, just as a restart would.
 func TestSyncWithUnreadableCAClosesTheOldCA(t *testing.T) {
 	must := require.New(t)
 	cur, err := user.Current()
@@ -334,7 +332,7 @@ func TestSyncWithUnreadableCAClosesTheOldCA(t *testing.T) {
 		return ssh.Dial("tcp", c.sshAddr.String(), &ssh.ClientConfig{
 			User:            cur.Username,
 			Auth:            []ssh.AuthMethod{ssh.PublicKeys(certSigner)},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - test server
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 			Timeout:         10 * time.Second,
 		})
 	}

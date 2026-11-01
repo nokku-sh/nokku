@@ -23,7 +23,7 @@ const verifyTimeout = 2 * time.Second
 var (
 	cgnat = netip.MustParsePrefix("100.64.0.0/10")
 
-	// A daemon presents a host certificate, the generated known_hosts trusts nothing else for it.
+	// A daemon shows a host cert, known_hosts trusts nothing else for it.
 	hostCertAlgos = []string{
 		ssh.CertAlgoED25519v01, ssh.CertAlgoECDSA256v01, ssh.CertAlgoECDSA384v01, ssh.CertAlgoECDSA521v01,
 		ssh.CertAlgoRSASHA512v01, ssh.CertAlgoRSASHA256v01,
@@ -32,12 +32,12 @@ var (
 	errHostKeyChecked = errors.New("host key checked")
 )
 
-// needsVerify is a private address of a target that has another way in, the relay or a second endpoint.
+// A private address of a target with another way in: relay or second endpoint.
 func needsVerify(target *state.Target, addr string) bool {
 	return (!target.Manual() || len(target.Endpoints) > 1) && privateAddr(addr)
 }
 
-// privateAddr is an address another network can reuse, like the user's own NAS at home.
+// An address another network can reuse, like the user's own NAS at home.
 func privateAddr(addr string) bool {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -51,7 +51,7 @@ func privateAddr(addr string) bool {
 	return ip.IsPrivate() || ip.IsLinkLocalUnicast() || cgnat.Contains(ip)
 }
 
-// verifyHost runs a key exchange on a connection of its own against the known_hosts ssh is about to use.
+// Runs a key exchange on its own connection, against ssh's known_hosts.
 func verifyHost(ctx context.Context, addr string, target *state.Target) error {
 	check, err := knownhosts.New(paths.KnownHostsFile())
 	if err != nil {
@@ -86,7 +86,7 @@ func verifyHost(ctx context.Context, addr string, target *state.Target) error {
 	return nil
 }
 
-// hostKeyAlgos asks for the kind of key known_hosts has, or a host with several offers another one.
+// Asks for the key kind known_hosts has, or a host may offer another one.
 func hostKeyAlgos(target *state.Target) []string {
 	if !target.Manual() {
 		return hostCertAlgos
@@ -101,7 +101,7 @@ func hostKeyAlgos(target *state.Target) []string {
 	return []string{pinned.Type()}
 }
 
-// PinnedHostOptions has ssh accept nothing but the key a manual target was synced with. It writes knownHosts.
+// PinnedHostOptions writes knownHosts and has ssh accept only the synced key.
 func PinnedHostOptions(target *state.Target, knownHosts string) ([]string, error) {
 	key := strings.TrimSpace(target.HostPublicKey)
 	if !safeLine(key) {
@@ -117,12 +117,12 @@ func PinnedHostOptions(target *state.Target, knownHosts string) ([]string, error
 	return opts, nil
 }
 
-// AcceptHostOptions trusts whatever key the target shows. The user's known_hosts may still hold the replaced one.
+// AcceptHostOptions trusts any key, known_hosts may still hold the old one.
 func AcceptHostOptions(target *state.Target, knownHosts string) []string {
 	return append(knownHostsOptions(target.ID, knownHosts), "-o", "StrictHostKeyChecking=accept-new")
 }
 
-// knownHostsOptions leaves ssh no trust but the file, no DNS and no command from the user's config.
+// Leaves ssh no trust but the file: no DNS, no command from the user's config.
 func knownHostsOptions(alias, knownHosts string) []string {
 	file := configValue(knownHosts)
 	return []string{

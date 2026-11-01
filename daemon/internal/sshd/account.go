@@ -27,7 +27,7 @@ type account struct {
 	Expires time.Time
 }
 
-// Root is never blocked by nologin, so an operator can still get in to fix the machine.
+// Root is never blocked by nologin, so an operator can still fix the machine.
 func loginAllowed(a *account, nologinPath string) error {
 	if !a.Expires.IsZero() && !time.Now().Before(a.Expires) {
 		return fmt.Errorf("account %s expired on %s", a.Name, a.Expires.Format(time.DateOnly))
@@ -45,11 +45,11 @@ func loginAllowed(a *account, nologinPath string) error {
 	return fmt.Errorf("logins are disabled: %s", strings.TrimSpace(string(msg)))
 }
 
-// getent resolves NSS and LDAP users too, a static binary cannot see those on its own.
+// getent sees NSS and LDAP users too, which a static binary cannot.
 func lookupAccount(name string) (*account, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	// #nosec G204 - name passed the principals lookup, which only holds valid usernames.
+	// #nosec G204 - name passed the principals lookup, which holds valid names.
 	out, err := exec.CommandContext(ctx, "getent", "passwd", name).Output()
 	if err != nil {
 		return nil, fmt.Errorf("user %q not found", name)
@@ -69,15 +69,16 @@ func lookupAccount(name string) (*account, error) {
 		UID:  uint32(uid),
 		GID:  uint32(gid),
 		Home: parts[5],
-		// A lock shell (nologin, false) is used as is and fails the session. Only an empty field means /bin/sh.
+		// A lock shell fails the session. Only an empty field means /bin/sh.
 		Shell:   cmp.Or(parts[6], "/bin/sh"),
 		Expires: shadowExpiry(ctx, name),
 	}, nil
 }
 
-// The expiry day set by chage -E. OpenSSH denies it through pam_unix, so the daemon does too. No entry means none.
+// chage -E expiry, which OpenSSH denies through pam_unix. No entry means none.
 func shadowExpiry(ctx context.Context, name string) time.Time {
-	out, err := exec.CommandContext(ctx, "getent", "shadow", name).Output() // #nosec G204
+	// #nosec G204
+	out, err := exec.CommandContext(ctx, "getent", "shadow", name).Output()
 	if err != nil {
 		return time.Time{}
 	}
@@ -92,10 +93,43 @@ func shadowExpiry(ctx context.Context, name string) time.Time {
 	return time.Unix(days*24*60*60, 0)
 }
 
+func cmdEnv(a *account) []string {
+	env := []string{
+		"HOME=" + a.Home,
+		"USER=" + a.Name,
+		"LOGNAME=" + a.Name,
+		"SHELL=" + a.Shell,
+		"PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
+	}
+	// Only harmless locale vars pass, so the admin's agent socket cannot leak.
+	for _, key := range []string{"LANG", "LC_ALL", "LC_CTYPE", "TZ", "MAIL"} {
+		if val, exists := os.LookupEnv(key); exists {
+			env = append(env, key+"="+val)
+		}
+	}
+	return env
+}
+
+func sysProcAttr(a *account) (*syscall.SysProcAttr, error) {
+	attr := &syscall.SysProcAttr{Setsid: true}
+
+	// setgroups(2) gives non-root EPERM, so Credential would fail every exec.
+	if os.Geteuid() != 0 {
+		return attr, nil
+	}
+	groups, err := groupIDs(a)
+	if err != nil {
+		return nil, err
+	}
+	attr.Credential = &syscall.Credential{Uid: a.UID, Gid: a.GID, Groups: groups}
+	return attr, nil
+}
+
 func groupIDs(a *account) ([]uint32, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "id", "-G", a.Name).Output() // #nosec G204
+	// #nosec G204
+	out, err := exec.CommandContext(ctx, "id", "-G", a.Name).Output()
 	if err != nil {
 		return nil, fmt.Errorf("lookup groups for %s: %w", a.Name, err)
 	}
@@ -108,36 +142,4 @@ func groupIDs(a *account) ([]uint32, error) {
 		ids = append(ids, uint32(id))
 	}
 	return ids, nil
-}
-
-func cmdEnv(a *account) []string {
-	env := []string{
-		"HOME=" + a.Home,
-		"USER=" + a.Name,
-		"LOGNAME=" + a.Name,
-		"SHELL=" + a.Shell,
-		"PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
-	}
-	// Only harmless locale variables are inherited, so the admin's agent socket cannot leak.
-	for _, key := range []string{"LANG", "LC_ALL", "LC_CTYPE", "TZ", "MAIL"} {
-		if val, exists := os.LookupEnv(key); exists {
-			env = append(env, key+"="+val)
-		}
-	}
-	return env
-}
-
-func sysProcAttr(a *account) (*syscall.SysProcAttr, error) {
-	attr := &syscall.SysProcAttr{Setsid: true}
-
-	// Non-root gets EPERM from setgroups(2) even for its own groups, so Credential would fail every exec.
-	if os.Geteuid() != 0 {
-		return attr, nil
-	}
-	groups, err := groupIDs(a)
-	if err != nil {
-		return nil, err
-	}
-	attr.Credential = &syscall.Credential{Uid: a.UID, Gid: a.GID, Groups: groups}
-	return attr, nil
 }

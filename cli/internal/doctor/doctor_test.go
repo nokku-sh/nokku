@@ -14,16 +14,16 @@ import (
 func TestExitCode(t *testing.T) {
 	t.Parallel()
 	for want, checks := range [][]Check{
-		{{Status: StatusOK}, {Status: StatusInfo}},
-		{{Status: StatusOK}, {Status: StatusWarn}},
-		{{Status: StatusWarn}, {Status: StatusFail}},
+		{{Status: statusOK}, {Status: statusInfo}},
+		{{Status: statusOK}, {Status: statusWarn}},
+		{{Status: statusWarn}, {Status: statusFail}},
 	} {
 		r := Report{Checks: checks}
 		assert.Equal(t, want, r.ExitCode())
 	}
 }
 
-// A missing cache leaves no CA, which must not read as every certificate being stale.
+// A missing cache leaves no CA, which must not make every certificate stale.
 func TestRepairKeepsCertsWithoutCache(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

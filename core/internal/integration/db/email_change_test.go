@@ -3,7 +3,6 @@
 package db_test
 
 import (
-	"errors"
 	"testing"
 	"time"
 	"uuid"
@@ -11,6 +10,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -23,83 +23,68 @@ func TestEmailChangeTokens(t *testing.T) {
 	ctx := t.Context()
 	id := uuid.NewV7().String()
 	oldEmail, newEmail := id+"@old.test", id+"@new.test"
-	if _, err := q.CreateUserWithID(ctx, &db.CreateUserWithIDParams{
+	_, err := q.CreateUserWithID(ctx, &db.CreateUserWithIDParams{
 		ID: id, Email: oldEmail, Name: "u", Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
-	}); err != nil {
-		t.Fatalf("create user: %v", err)
-	}
+	})
+	require.NoError(t, err, "create user")
 	stale, confirm, revert := crypto.HashedToken(id+"-stale"), crypto.HashedToken(id+"-confirm"),
 		crypto.HashedToken(id+"-revert")
 	put := func(hash crypto.HashedToken, purpose, email string) {
 		t.Helper()
-		if err := q.PutToken(ctx, &db.PutTokenParams{
+		require.NoError(t, q.PutToken(ctx, &db.PutTokenParams{
 			TokenHash: hash, UserID: &id, Purpose: purpose,
 			ExpiresAt: time.Now().Add(time.Hour), Email: &email,
-		}); err != nil {
-			t.Fatalf("put %s token: %v", purpose, err)
-		}
+		}), "put %s token", purpose)
 	}
 	consume := func(hash crypto.HashedToken, purpose string) (*db.ConsumeEmailTokenRow, error) {
 		return q.ConsumeEmailToken(ctx, &db.ConsumeEmailTokenParams{TokenHash: hash, Purpose: purpose})
 	}
 	pendingParams := &db.GetPendingTokenEmailParams{UserID: &id, Purpose: "email_change"}
 
-	// Request: a second one replaces the first, so a stale link confirms nothing.
+	// A second request replaces the first, a stale link confirms nothing.
 	put(stale, "email_change", id+"@typo.test")
-	if err := q.DeleteUserTokens(
+	require.NoError(t, q.DeleteUserTokens(
 		ctx,
 		&db.DeleteUserTokensParams{UserID: &id, Purpose: "email_change"},
-	); err != nil {
-		t.Fatalf("delete tokens: %v", err)
-	}
+	), "delete tokens")
 	put(confirm, "email_change", newEmail)
 	put(revert, "email_revert", oldEmail)
 
 	pending, err := q.GetPendingTokenEmail(ctx, pendingParams)
-	if err != nil || pending != newEmail {
-		t.Fatalf("pending = %q, %v, want %s", pending, err, newEmail)
-	}
-	if _, err = consume(stale, "email_change"); !errors.Is(err, pgx.ErrNoRows) {
-		t.Fatalf("stale token: err = %v, want no rows", err)
-	}
-	if _, err = consume(confirm, "email_revert"); !errors.Is(err, pgx.ErrNoRows) {
-		t.Fatalf("wrong purpose: err = %v, want no rows", err)
-	}
+	require.NoError(t, err, "pending")
+	require.Equal(t, newEmail, pending)
+	_, err = consume(stale, "email_change")
+	require.ErrorIs(t, err, pgx.ErrNoRows, "stale token")
+	_, err = consume(confirm, "email_revert")
+	require.ErrorIs(t, err, pgx.ErrNoRows, "wrong purpose")
 
 	// Confirm: the token carries the new address and works once.
 	row, err := consume(confirm, "email_change")
-	if err != nil || row.UserID != id || row.Email != newEmail {
-		t.Fatalf("confirm = %+v, %v", row, err)
-	}
+	require.NoError(t, err, "confirm")
+	require.Equal(t, id, row.UserID)
+	require.Equal(t, newEmail, row.Email)
 	u, err := q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: id, Email: row.Email})
-	if err != nil || u.Email != newEmail {
-		t.Fatalf("set email = %+v, %v", u, err)
-	}
-	if _, err = consume(confirm, "email_change"); !errors.Is(err, pgx.ErrNoRows) {
-		t.Fatalf("second confirm: err = %v, want no rows", err)
-	}
-	if _, err = q.GetPendingTokenEmail(ctx, pendingParams); !errors.Is(err, pgx.ErrNoRows) {
-		t.Fatalf("pending after confirm: err = %v, want no rows", err)
-	}
+	require.NoError(t, err, "set email")
+	require.Equal(t, newEmail, u.Email)
+	_, err = consume(confirm, "email_change")
+	require.ErrorIs(t, err, pgx.ErrNoRows, "second confirm")
+	_, err = q.GetPendingTokenEmail(ctx, pendingParams)
+	require.ErrorIs(t, err, pgx.ErrNoRows, "pending after confirm")
 
 	// Revert: the token still knows the old address after the swap.
 	row, err = consume(revert, "email_revert")
-	if err != nil || row.Email != oldEmail {
-		t.Fatalf("revert = %+v, %v", row, err)
-	}
-	if u, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: id, Email: row.Email}); err != nil ||
-		u.Email != oldEmail {
-		t.Fatalf("restore email = %+v, %v", u, err)
-	}
+	require.NoError(t, err, "revert")
+	require.Equal(t, oldEmail, row.Email)
+	u, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: id, Email: row.Email})
+	require.NoError(t, err, "restore email")
+	require.Equal(t, oldEmail, u.Email)
 
 	// An address somebody else in the workspace holds is refused.
 	other := uuid.NewV7().String()
-	if _, err = q.CreateUserWithID(ctx, &db.CreateUserWithIDParams{
+	_, err = q.CreateUserWithID(ctx, &db.CreateUserWithIDParams{
 		ID: other, Email: newEmail, Name: "o", Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
-	}); err != nil {
-		t.Fatalf("create other user: %v", err)
-	}
-	if _, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: id, Email: newEmail}); err == nil {
-		t.Fatal("taking a used address succeeded")
-	}
+	})
+	require.NoError(t, err, "create other user")
+	_, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: id, Email: newEmail})
+	require.Error(t, err, "taking a used address succeeded")
 }

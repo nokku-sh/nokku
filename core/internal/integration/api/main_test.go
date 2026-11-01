@@ -18,6 +18,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/coder/websocket"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,7 @@ const (
 	wsShellExited websocket.StatusCode = 4000
 )
 
-// accessTokens are the kinds of every access token, for a test that takes whichever it got.
+// accessTokens is every kind, for a test that takes whichever it got.
 var accessTokens = []crypto.TokenKind{
 	crypto.TokenSession, crypto.TokenCLI, crypto.TokenDaemon, crypto.TokenServiceAccount, crypto.TokenSCIM,
 }
@@ -52,11 +53,10 @@ var (
 	testServer    *httptest.Server
 	testHandler   http.Handler
 	testWorkspace actor.Workspace
-	// storageDir is where the test server keeps recordings.
-	storageDir string
+	storageDir    string
 )
 
-// TestMain keeps a developer's shell env from pointing the test server at real Stripe, KMS, S3, SMTP or providers.
+// TestMain boots the one test server. testenv scrubs the developer's env.
 func TestMain(m *testing.M) {
 	storageDir, _ = os.MkdirTemp("", "nokku-api-test")
 	if err := trustHTTPTest(); err != nil {
@@ -77,9 +77,9 @@ func TestMain(m *testing.M) {
 		os.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
 	}
 	os.Setenv("NOKKU_STORAGE_URL", "file://"+storageDir)
-	// A test that holds a license key must not ask the real license worker for a new one.
+	// A test with a license key must not ask the real worker for a new one.
 	os.Setenv("NOKKU_LICENSE_OFFLINE", "true")
-	// Saving a provider fetches its discovery document, and the test issuers listen on loopback.
+	// Saving a provider fetches discovery from an issuer on loopback.
 	os.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -99,7 +99,7 @@ func TestMain(m *testing.M) {
 			os.Exit(1)
 		}
 	}
-	// Every request lands in the one workspace, self-hosted whatever the host, hosted by the host serving sets.
+	// Self-hosted ignores the host, hosted reads the one serving sets.
 	// Bidi streams need HTTP/2.
 	testHandler = api.New(testCfg).Handler(ctx)
 	testServer = httptest.NewUnstartedServer(serving(testHandler))
@@ -115,7 +115,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// trustHTTPTest runs before testenv. Go loads the system roots once, and a Docker client on TLS would do that first.
+// trustHTTPTest must beat a Docker client on TLS, Go loads the roots once.
 func trustHTTPTest() error {
 	srv := httptest.NewTLSServer(nil)
 	defer srv.Close()
@@ -127,7 +127,7 @@ func trustHTTPTest() error {
 	return os.Setenv("SSL_CERT_FILE", roots)
 }
 
-// newTestAPI returns the real config and a server with every route behind the production middleware.
+// newTestAPI is the real config and a server behind the real middleware.
 func newTestAPI(t *testing.T) (*config.Config, *httptest.Server) {
 	t.Helper()
 	return testCfg, testServer
@@ -141,13 +141,7 @@ func workspaceName(ctx context.Context, conn *db.Connection) (string, error) {
 	return ws.Name, nil
 }
 
-// seedWorkspace is the one workspace the test server serves. Tests tell their rows apart by fresh ids.
-func seedWorkspace(t *testing.T, _ *config.Config) string {
-	t.Helper()
-	return testWorkspace.ID
-}
-
-// seedOtherWorkspace makes a workspace no request can reach. What lives in it must never show up through the API.
+// seedOtherWorkspace makes a workspace no request can reach or see.
 func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 	t.Helper()
 	ws, err := tenant.Create(t.Context(), cfg.Conn, cfg.Keyset, uuid.NewV7().String(), "other")
@@ -155,18 +149,18 @@ func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 	return ws.ID
 }
 
-// workspaceCA reads the one CA of the test workspace. Every test shares it, a test that changes it uses setCA.
+// workspaceCA reads the shared CA. A test that changes it uses setCA.
 func workspaceCA(t *testing.T, cfg *config.Config) *nokkuv1.CertificateAuthority {
 	t.Helper()
 	var ca *db.SSHCA
-	inWorkspace(t, cfg, seedWorkspace(t, cfg), func(q *db.Queries) (err error) {
+	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) (err error) {
 		ca, err = q.GetWorkspaceCA(t.Context())
 		return err
 	})
 	return ca.ToProto()
 }
 
-// inWorkspace runs fn the way a request does: nokku_app, pinned to the workspace.
+// inWorkspace runs fn like a request does: nokku_app, pinned to the workspace.
 func inWorkspace(t *testing.T, cfg *config.Config, workspaceID string, fn func(q *db.Queries) error) {
 	t.Helper()
 	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: workspaceID})
@@ -174,7 +168,7 @@ func inWorkspace(t *testing.T, cfg *config.Config, workspaceID string, fn func(q
 }
 
 // wsCtx is a request context on the host of the test workspace.
-func wsCtx(t *testing.T, _ *config.Config) context.Context {
+func wsCtx(t *testing.T) context.Context {
 	t.Helper()
 	return actor.WithWorkspace(t.Context(), testWorkspace)
 }
@@ -197,7 +191,7 @@ func seedUser(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1
 func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 	t.Helper()
 	var owner *db.User
-	err := cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+	err := cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
 		owner, err = q.GetOwner(t.Context())
 		return err
 	})
@@ -211,7 +205,7 @@ func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	t.Helper()
 	_, token, err := cfg.IAM.IssueSignIn(
-		wsCtx(t, cfg),
+		wsCtx(t),
 		u,
 		iam.TokenParams{Kind: actor.KindUser, Method: iam.MethodPasskey},
 	)
@@ -219,11 +213,11 @@ func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	return token
 }
 
-// cliSessionFor is an nk session for u, unbound. nk binds it to its key, the server skips the proof without one.
+// cliSessionFor is an nk session with no key bound, so no proof is asked.
 func cliSessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	t.Helper()
 	_, token, err := cfg.IAM.IssueSignIn(
-		wsCtx(t, cfg),
+		wsCtx(t),
 		u,
 		iam.TokenParams{Kind: actor.KindCLI, Method: iam.MethodPasskey},
 	)
@@ -245,7 +239,11 @@ func uniq(prefix string) string {
 	return prefix + "-" + uuid.New().String()[:8]
 }
 
-// header sets a request header on unary calls. Stream tests set theirs on the client context.
+func clientOn(srv *httptest.Server, auth ...connect.ClientInterceptor) *connect.Client {
+	return connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), auth...)
+}
+
+// header applies to unary calls, stream tests set theirs on the client context.
 func header(key, value string) connect.ClientInterceptor {
 	return func(next connect.ClientFunc) connect.ClientFunc {
 		return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {

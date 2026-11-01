@@ -12,11 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// syncInputs are the tables server sync reads besides effective_access: the CA keys and the idle timeout.
+// syncInputs hold the CA keys and idle timeout a sync reads as well.
 var syncInputs = []string{"ssh_cas", "workspaces"}
 
-// A change to who may log in where reaches the daemons only through a bump_state_version trigger. Every table the
-// answer is made of needs one, found from the database's own dependency records.
+type querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// A change to who may log in where reaches daemons only through a
+// bump_state_version trigger. Every table the answer is made of needs one.
 func TestEveryAccessTableNotifies(t *testing.T) {
 	ctx := t.Context()
 	owner, err := pgx.Connect(ctx, "")
@@ -25,7 +30,7 @@ func TestEveryAccessTableNotifies(t *testing.T) {
 
 	tables := viewTables(t, owner, "effective_access")
 	require.Contains(t, tables, "grants", "the walk found nothing, the view moved or was renamed")
-	// A target's daemon never changes, and deleting a target deletes its accounts, which notify.
+	// A target's daemon never changes, deleting a target deletes its accounts.
 	tables = slices.DeleteFunc(tables, func(name string) bool { return name == "targets" })
 	assert.NotContains(t, tables, "teams", "teams have no trigger, the view must reach them through team_members")
 	assert.NotContains(t, tables, "service_accounts", "service accounts have no trigger")
@@ -35,18 +40,13 @@ func TestEveryAccessTableNotifies(t *testing.T) {
 		"these tables change access without telling a daemon",
 	)
 
-	// The check has teeth: without the trigger on users, a deactivated person keeps logging in until the next change.
+	// Without the trigger on users, a deactivated person keeps logging in.
 	tx, err := owner.Begin(ctx)
 	require.NoError(t, err)
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	_, err = tx.Exec(ctx, "DROP TRIGGER bump_state_version ON users")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"users"}, silent(t, tx, tables))
-}
-
-type querier interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 // viewTables lists the tables a view reads, through the views it reads.

@@ -13,38 +13,34 @@ import (
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
 )
 
 // Tenant queries carry no workspace filter. These tests are what that rests on.
 
-// unscoped has a workspace_id but no policy, on purpose. Only definer triggers write these, the app role cannot:
-// the sync counter, and the objects of deleted recordings.
-var unscoped = []string{"workspace_state", "recording_deletes"}
-
 const tenantPolicy = "(workspace_id = current_workspace_id())"
 
-func pinned(t *testing.T, ws string) context.Context {
-	t.Helper()
-	return actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws})
-}
+// unscoped has a workspace_id but no policy, on purpose. Only definer triggers
+// write these, the app role cannot.
+var unscoped = []string{"workspace_state", "recording_deletes"}
 
-// pinnedConn runs single statements the way a request does: nokku_app, pinned to ws.
+// pinnedConn runs statements the way a request does: nokku_app, pinned to ws.
 func pinnedConn(t *testing.T, c *conn, ws string) *pgx.Conn {
 	t.Helper()
 	// Leaving the pool pins it, see pinWorkspace.
-	pooled, err := c.Pool.Acquire(pinned(t, ws))
-	if err != nil {
-		t.Fatalf("acquire: %v", err)
-	}
+	pooled, err := c.Pool.Acquire(testenv.Pinned(t, ws))
+	require.NoError(t, err, "acquire")
 	conn := pooled.Hijack()
 	t.Cleanup(func() { _ = conn.Close(context.Background()) })
 	return conn
 }
 
-// seedEveryTable puts a row into each tenant table the fixture itself leaves empty.
+// seedEveryTable puts a row into each tenant table the fixture leaves empty.
 func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 	t.Helper()
 	_, err := c.sysPool.Exec(t.Context(), `
@@ -80,12 +76,10 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		VALUES ($1, $2, $4, '1 hour', 'fix');
 		INSERT INTO audit_streams (workspace_id, kind, url, secret) VALUES ($1, 'webhook', 'https://siem.test', 'key');
 	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.u, f.target, f.account)
-	if err != nil {
-		t.Fatalf("seed every table: %v", err)
-	}
+	require.NoError(t, err, "seed every table")
 }
 
-// tenantTables reads the catalog, so a table added later is covered without a change here.
+// tenantTables reads the catalog, so a table added later is covered too.
 func tenantTables(t *testing.T, c *conn) []string {
 	t.Helper()
 	rows, err := c.sysPool.Query(t.Context(), `
@@ -95,26 +89,18 @@ func tenantTables(t *testing.T, c *conn) []string {
 		JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'workspace_id' AND NOT a.attisdropped
 		WHERE n.nspname = 'public' AND c.relkind = 'r'
 		ORDER BY 1`)
-	if err != nil {
-		t.Fatalf("list tenant tables: %v", err)
-	}
+	require.NoError(t, err, "list tenant tables")
 	tables, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		t.Fatalf("list tenant tables: %v", err)
-	}
+	require.NoError(t, err, "list tenant tables")
 	tables = slices.DeleteFunc(tables, func(name string) bool { return slices.Contains(unscoped, name) })
-	if len(tables) == 0 {
-		t.Fatal("found no tenant tables")
-	}
+	require.NotEmpty(t, tables, "found no tenant tables")
 	return tables
 }
 
 func count(t *testing.T, q db.DBTX, sql string, args ...any) int64 {
 	t.Helper()
 	var n int64
-	if err := q.QueryRow(t.Context(), sql, args...).Scan(&n); err != nil {
-		t.Fatalf("%s: %v", sql, err)
-	}
+	require.NoError(t, q.QueryRow(t.Context(), sql, args...).Scan(&n), sql)
 	return n
 }
 
@@ -125,19 +111,16 @@ func pgCode(err error) string {
 	return ""
 }
 
-// A new tenant table that misses the policy or the default fails here, not in production.
+// A new tenant table without the policy or the default fails here, not in prod.
 func TestEveryTenantTableHasThePolicy(t *testing.T) {
 	c := testConnection(t)
 	for _, table := range tenantTables(t, c) {
 		var enabled, forced bool
-		if err := c.sysPool.QueryRow(t.Context(),
+		require.NoError(t, c.sysPool.QueryRow(t.Context(),
 			`SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = ('public.' || $1)::regclass`,
-			table).Scan(&enabled, &forced); err != nil {
-			t.Fatalf("%s: %v", table, err)
-		}
-		if !enabled || !forced {
-			t.Errorf("%s: row security enabled=%v forced=%v, want both", table, enabled, forced)
-		}
+			table).Scan(&enabled, &forced), table)
+		assert.True(t, enabled, "%s: row security is not enabled", table)
+		assert.True(t, forced, "%s: row security is not forced", table)
 
 		type policy struct {
 			Name      string
@@ -149,57 +132,47 @@ func TestEveryTenantTableHasThePolicy(t *testing.T) {
 		rows, err := c.sysPool.Query(t.Context(), `
 			SELECT policyname::TEXT, roles::TEXT[], cmd, qual, with_check
 			FROM pg_policies WHERE schemaname = 'public' AND tablename = $1`, table)
-		if err != nil {
-			t.Fatalf("%s: %v", table, err)
-		}
+		require.NoError(t, err, table)
 		policies, err := pgx.CollectRows(rows, pgx.RowToStructByPos[policy])
-		if err != nil {
-			t.Fatalf("%s: %v", table, err)
-		}
+		require.NoError(t, err, table)
 		// One policy only. A second one would be OR-ed in and widen access.
-		if len(policies) != 1 {
-			t.Errorf("%s: %d policies, want the one tenant_isolation", table, len(policies))
+		if !assert.Len(t, policies, 1, "%s: want the one tenant_isolation", table) {
 			continue
 		}
 		p := policies[0]
-		if p.Name != "tenant_isolation" || p.Cmd != "ALL" || !slices.Equal(p.Roles, []string{"nokku_app"}) {
-			t.Errorf("%s: policy %s for %v on %s, want tenant_isolation for nokku_app on ALL",
-				table, p.Name, p.Roles, p.Cmd)
-		}
-		if p.Qual == nil || *p.Qual != tenantPolicy || p.WithCheck == nil || *p.WithCheck != tenantPolicy {
-			t.Errorf("%s: policy does not compare workspace_id with the pinned workspace", table)
-		}
+		assert.Equal(t, "tenant_isolation", p.Name, table)
+		assert.Equal(t, "ALL", p.Cmd, table)
+		assert.Equal(t, []string{"nokku_app"}, p.Roles, table)
+		const notThePin = "%s: policy does not compare workspace_id with the pinned workspace"
+		assert.Equal(t, new(tenantPolicy), p.Qual, notThePin, table)
+		assert.Equal(t, new(tenantPolicy), p.WithCheck, notThePin, table)
 
 		var def *string
 		var nullable string
-		if err := c.sysPool.QueryRow(t.Context(), `
+		require.NoError(t, c.sysPool.QueryRow(t.Context(), `
 			SELECT column_default, is_nullable FROM information_schema.columns
 			WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'workspace_id'`,
-			table).Scan(&def, &nullable); err != nil {
-			t.Fatalf("%s: %v", table, err)
-		}
-		if def == nil || *def != "current_workspace_id()" || nullable != "NO" {
-			t.Errorf("%s: workspace_id must be NOT NULL DEFAULT current_workspace_id()", table)
-		}
+			table).Scan(&def, &nullable), table)
+		const wantColumn = "%s: workspace_id must be NOT NULL DEFAULT current_workspace_id()"
+		assert.Equal(t, new("current_workspace_id()"), def, wantColumn, table)
+		assert.Equal(t, "NO", nullable, wantColumn, table)
 	}
 }
 
-// The app role cannot bypass row security on its own, and it cannot become the role that does.
+// The app role cannot bypass row security, or become the role that does.
 func TestAppRoleIsSubjectToRowSecurity(t *testing.T) {
 	c := testConnection(t)
 	var name string
 	var super, bypass, system bool
 	f := newStateFixture(t, c)
-	if err := c.Pool.QueryRow(pinned(t, f.ws), `
+	require.NoError(t, c.Pool.QueryRow(testenv.Pinned(t, f.ws), `
 		SELECT rolname::TEXT, rolsuper, rolbypassrls, pg_has_role(rolname, 'nokku_system', 'MEMBER')
 		FROM pg_roles WHERE rolname = current_user`,
-	).Scan(&name, &super, &bypass, &system); err != nil {
-		t.Fatalf("read role: %v", err)
-	}
-	if name != "nokku_app" || super || bypass || system {
-		t.Fatalf("request pool runs as %s (super=%v, bypassrls=%v, member of nokku_system=%v), want plain nokku_app",
-			name, super, bypass, system)
-	}
+	).Scan(&name, &super, &bypass, &system), "read role")
+	require.Equal(t, "nokku_app", name, "the request pool runs as another role")
+	require.False(t, super, "the request pool is a superuser")
+	require.False(t, bypass, "the request pool has bypassrls")
+	require.False(t, system, "the request pool is a member of nokku_system")
 }
 
 func TestWorkspaceReachesOnlyItsOwnRows(t *testing.T) {
@@ -213,36 +186,32 @@ func TestWorkspaceReachesOnlyItsOwnRows(t *testing.T) {
 		name := pgx.Identifier{table}.Sanitize()
 		own := count(t, c.sysPool, "SELECT COUNT(*) FROM "+name+" WHERE workspace_id = $1", a.ws)
 		foreign := count(t, c.sysPool, "SELECT COUNT(*) FROM "+name+" WHERE workspace_id = $1", b.ws)
-		if own == 0 || foreign == 0 {
-			t.Errorf("%s: no rows to test with, seed one in seedEveryTable", table)
+		const noRows = "%s: no rows to test with, seed one in seedEveryTable"
+		if !assert.NotZero(t, own, noRows, table) || !assert.NotZero(t, foreign, noRows, table) {
 			continue
 		}
-		if got := count(t, asA, "SELECT COUNT(*) FROM "+name); got != own {
-			t.Errorf("%s: an unfiltered read sees %d rows, want its own %d", table, got, own)
-		}
-		if got := count(t, asA, "SELECT COUNT(*) FROM "+name+" WHERE workspace_id = $1", b.ws); got != 0 {
-			t.Errorf("%s: read %d rows of another workspace", table, got)
-		}
+		assert.Equal(t, own, count(t, asA, "SELECT COUNT(*) FROM "+name), "%s: an unfiltered read", table)
+		assert.Zero(t,
+			count(t, asA, "SELECT COUNT(*) FROM "+name+" WHERE workspace_id = $1", b.ws),
+			"%s: read rows of another workspace", table)
 		tag, err := asA.Exec(
 			t.Context(),
 			"UPDATE "+name+" SET workspace_id = workspace_id WHERE workspace_id = $1",
 			b.ws,
 		)
-		if err != nil || tag.RowsAffected() != 0 {
-			t.Errorf("%s: updated %d rows of another workspace, err %v", table, tag.RowsAffected(), err)
+		if assert.NoError(t, err, "%s: update", table) {
+			assert.Zero(t, tag.RowsAffected(), "%s: updated rows of another workspace", table)
 		}
 		tag, err = asA.Exec(t.Context(), "DELETE FROM "+name+" WHERE workspace_id = $1", b.ws)
-		if err != nil || tag.RowsAffected() != 0 {
-			t.Errorf("%s: deleted %d rows of another workspace, err %v", table, tag.RowsAffected(), err)
+		if assert.NoError(t, err, "%s: delete", table) {
+			assert.Zero(t, tag.RowsAffected(), "%s: deleted rows of another workspace", table)
 		}
-		if got := count(t, c.sysPool, "SELECT COUNT(*) FROM "+name+" WHERE workspace_id = $1", b.ws); got != foreign {
-			t.Errorf("%s: the other workspace went from %d to %d rows", table, foreign, got)
-		}
+		assert.Equal(t, foreign,
+			count(t, c.sysPool, "SELECT COUNT(*) FROM "+name+" WHERE workspace_id = $1", b.ws),
+			"%s: the other workspace changed", table)
 	}
 
-	if got := count(t, asA, "SELECT COUNT(*) FROM workspaces"); got != 1 {
-		t.Errorf("workspaces: sees %d, want only its own", got)
-	}
+	assert.EqualValues(t, 1, count(t, asA, "SELECT COUNT(*) FROM workspaces"), "workspaces: want only its own")
 }
 
 // The queries the handlers call, which no longer name the workspace.
@@ -254,42 +223,47 @@ func TestQueriesAreScopedByThePin(t *testing.T) {
 
 	asOwner(t, c, a, func(q *db.Queries) error {
 		ctx := t.Context()
-		if ws, err := q.GetWorkspace(ctx); err != nil || ws.ID != a.ws {
-			t.Errorf("GetWorkspace = %v, %v, want the pinned one", ws, err)
+		ws, err := q.GetWorkspace(ctx)
+		if assert.NoError(t, err, "GetWorkspace") {
+			assert.Equal(t, a.ws, ws.ID, "GetWorkspace, want the pinned one")
 		}
-		if owner, err := q.GetOwner(ctx); err != nil || owner.ID != a.owner {
-			t.Errorf("GetOwner = %v, %v, want the pinned workspace's", owner, err)
+		owner, err := q.GetOwner(ctx)
+		if assert.NoError(t, err, "GetOwner") {
+			assert.Equal(t, a.owner, owner.ID, "GetOwner, want the pinned workspace's")
 		}
-		if _, err := q.GetUser(ctx, a.u); err != nil {
-			t.Errorf("own user not visible: %v", err)
-		}
-		if _, err := q.GetUser(ctx, b.u); !errors.Is(err, pgx.ErrNoRows) {
-			t.Errorf("foreign user visible: %v", err)
-		}
-		if _, err := q.GetTarget(ctx, b.target); !errors.Is(err, pgx.ErrNoRows) {
-			t.Errorf("foreign target visible: %v", err)
-		}
-		if _, err := q.GetAccessToken(ctx, "nope"); !errors.Is(err, pgx.ErrNoRows) {
-			t.Errorf("unknown session: %v", err)
+		user, err := q.GetUser(ctx, a.u)
+		if assert.NoError(t, err, "own user not visible") {
+			assert.Equal(t, a.u, user.ID)
 		}
 		own, err := q.ListUserSessions(ctx, a.u)
-		if err != nil || len(own) != 1 {
-			t.Errorf("own sessions: %d rows, err %v", len(own), err)
+		if assert.NoError(t, err, "own sessions") {
+			assert.Len(t, own, 1, "own sessions")
 		}
 		foreign, err := q.ListUserSessions(ctx, b.u)
-		if err != nil || len(foreign) != 0 {
-			t.Errorf("read a foreign session: %d rows, err %v", len(foreign), err)
+		if assert.NoError(t, err, "foreign sessions") {
+			assert.Empty(t, foreign, "read a foreign session")
 		}
 		creds, err := q.ListUserCredentials(ctx, b.u)
-		if err != nil || len(creds) != 0 {
-			t.Errorf("read a foreign credential: %d rows, err %v", len(creds), err)
+		if assert.NoError(t, err, "foreign credentials") {
+			assert.Empty(t, creds, "read a foreign credential")
 		}
 		providers, err := q.ListSSOProviders(ctx)
-		if err != nil || len(providers) != 1 || providers[0].WorkspaceID != a.ws {
-			t.Errorf("ListSSOProviders: %d rows, err %v, want the one of this workspace", len(providers), err)
+		if assert.NoError(t, err, "ListSSOProviders") && assert.Len(t, providers, 1, "ListSSOProviders") {
+			assert.Equal(t, a.ws, providers[0].WorkspaceID, "ListSSOProviders, want the one of this workspace")
 		}
-		if n, err := q.DeleteSubjectTokens(ctx, b.u); err != nil || n != 0 {
-			t.Errorf("deleted %d foreign sessions, err %v", n, err)
+		n, err := q.DeleteSubjectTokens(ctx, b.u)
+		if assert.NoError(t, err, "DeleteSubjectTokens") {
+			assert.Zero(t, n, "deleted foreign sessions")
+		}
+		_, foreignUser := q.GetUser(ctx, b.u)
+		_, foreignTarget := q.GetTarget(ctx, b.target)
+		_, unknownSession := q.GetAccessToken(ctx, "nope")
+		for what, err := range map[string]error{
+			"foreign user visible":   foreignUser,
+			"foreign target visible": foreignTarget,
+			"unknown session":        unknownSession,
+		} {
+			assert.ErrorIs(t, err, pgx.ErrNoRows, what)
 		}
 		return nil
 	})
@@ -301,66 +275,46 @@ func TestInsertTakesThePinnedWorkspace(t *testing.T) {
 	asA := pinnedConn(t, c, a.ws)
 
 	team, err := db.New(asA).CreateTeam(t.Context(), &db.CreateTeamParams{Name: "ops"})
-	if err != nil || team.WorkspaceID != a.ws {
-		t.Fatalf("CreateTeam = %+v, %v, want a team of the pinned workspace", team, err)
-	}
+	require.NoError(t, err, "CreateTeam")
+	require.Equal(t, a.ws, team.WorkspaceID, "want a team of the pinned workspace")
 
 	// Naming another workspace, or moving a row there, is refused.
 	_, err = asA.Exec(t.Context(), `INSERT INTO teams (workspace_id, name) VALUES ($1, 'smuggled')`, b.ws)
-	if pgCode(err) != pgerrcode.InsufficientPrivilege {
-		t.Errorf("insert into another workspace: %v, want a row security violation", err)
-	}
+	assert.Equal(t, pgerrcode.InsufficientPrivilege, pgCode(err), "insert into another workspace: %v", err)
 	_, err = asA.Exec(t.Context(), `UPDATE teams SET workspace_id = $1 WHERE id = $2`, b.ws, team.ID)
-	if pgCode(err) != pgerrcode.InsufficientPrivilege {
-		t.Errorf("move into another workspace: %v, want a row security violation", err)
-	}
+	assert.Equal(t, pgerrcode.InsufficientPrivilege, pgCode(err), "move into another workspace: %v", err)
 
 	// The composite keys keep a row from pointing across workspaces.
 	_, err = asA.Exec(t.Context(), `INSERT INTO team_members (user_id, team_id) VALUES ($1, $2)`, b.u, team.ID)
-	if pgCode(err) != pgerrcode.ForeignKeyViolation {
-		t.Errorf("team member of another workspace: %v, want a foreign key violation", err)
-	}
+	assert.Equal(t, pgerrcode.ForeignKeyViolation, pgCode(err), "team member of another workspace: %v", err)
 
 	// A workspace row is only created under its own pin.
 	second := uuid.NewV7().String()
 	_, err = asA.Exec(t.Context(), `INSERT INTO workspaces (id, slug, name) VALUES ($1, $2, 'second')`, second, second)
-	if pgCode(err) != pgerrcode.InsufficientPrivilege {
-		t.Errorf("second workspace from a pinned one: %v, want a row security violation", err)
-	}
+	assert.Equal(t, pgerrcode.InsufficientPrivilege, pgCode(err), "second workspace from a pinned one: %v", err)
 
 	// Without a pin the default is NULL. System code has to name the workspace.
-	if _, err := c.Sys().CreateTeam(t.Context(), &db.CreateTeamParams{Name: "nowhere"}); pgCode(
-		err,
-	) != pgerrcode.NotNullViolation {
-		t.Errorf("unpinned insert: %v, want a not null violation", err)
-	}
-	if _, err := db.New(c.Pool).CreateTeam(t.Context(), &db.CreateTeamParams{Name: "nowhere"}); err == nil {
-		t.Error("the app role inserted a row without a pin")
-	}
+	_, err = c.Sys().CreateTeam(t.Context(), &db.CreateTeamParams{Name: "nowhere"})
+	assert.Equal(t, pgerrcode.NotNullViolation, pgCode(err), "unpinned insert: %v", err)
+	_, err = db.New(c.Pool).CreateTeam(t.Context(), &db.CreateTeamParams{Name: "nowhere"})
+	assert.Error(t, err, "the app role inserted a row without a pin")
 }
 
 // Nothing leaves the request pool without a workspace on the context.
 func TestUnpinnedRequestFailsClosed(t *testing.T) {
 	c := testConnection(t)
-	if err := c.TenantTx(
-		t.Context(),
-		func(*db.Queries) error { return nil },
-	); !errors.Is(
-		err,
-		db.ErrWorkspaceNotPinned,
-	) {
-		t.Errorf("transaction: err = %v, want ErrWorkspaceNotPinned", err)
-	}
-	if _, err := c.Tenant().GetOwner(t.Context()); !errors.Is(err, db.ErrWorkspaceNotPinned) {
-		t.Errorf("single statement: err = %v, want ErrWorkspaceNotPinned", err)
-	}
-	var n int
-	if err := c.Pool.QueryRow(t.Context(), "SELECT 1").Scan(&n); !errors.Is(err, db.ErrWorkspaceNotPinned) {
-		t.Errorf("raw query: err = %v, want ErrWorkspaceNotPinned", err)
+	_, statement := c.Tenant().GetOwner(t.Context())
+	for what, err := range map[string]error{
+		"transaction":      c.TenantTx(t.Context(), func(*db.Queries) error { return nil }),
+		"single statement": statement,
+		"raw query":        c.Pool.QueryRow(t.Context(), "SELECT 1").Scan(new(int)),
+	} {
+		assert.ErrorIs(t, err, db.ErrWorkspaceNotPinned, what)
 	}
 }
 
-// The pin is set each time a connection leaves the pool. A pool of one forces every call onto the same connection.
+// The pin is set each time a connection leaves the pool. A pool of one forces
+// every call onto the same connection.
 func TestPinFollowsTheContext(t *testing.T) {
 	t.Setenv("NOKKU_DB_MAX_CONNS", "1")
 	c := testConnection(t)
@@ -368,31 +322,29 @@ func TestPinFollowsTheContext(t *testing.T) {
 
 	for round := range 3 {
 		for _, f := range []stateFixture{a, b} {
-			ws, err := c.Tenant().GetWorkspace(pinned(t, f.ws))
-			if err != nil || ws.ID != f.ws {
-				t.Fatalf("round %d: GetWorkspace = %v, %v, want %s", round, ws, err, f.ws)
-			}
-			owner, err := c.Tenant().GetOwner(pinned(t, f.ws))
-			if err != nil || owner.ID != f.owner {
-				t.Fatalf("round %d: GetOwner = %v, %v, want %s", round, owner, err, f.owner)
-			}
+			ws, err := c.Tenant().GetWorkspace(testenv.Pinned(t, f.ws))
+			require.NoError(t, err, "round %d: GetWorkspace", round)
+			require.Equal(t, f.ws, ws.ID, "round %d: GetWorkspace", round)
+			owner, err := c.Tenant().GetOwner(testenv.Pinned(t, f.ws))
+			require.NoError(t, err, "round %d: GetOwner", round)
+			require.Equal(t, f.owner, owner.ID, "round %d: GetOwner", round)
 		}
 		// The connection still carries b's pin here. It must not be usable.
-		if _, err := c.Tenant().GetOwner(t.Context()); !errors.Is(err, db.ErrWorkspaceNotPinned) {
-			t.Fatalf("round %d: unpinned read after a pinned one: %v", round, err)
-		}
+		_, err := c.Tenant().GetOwner(t.Context())
+		require.ErrorIs(t, err, db.ErrWorkspaceNotPinned, "round %d: unpinned read after a pinned one", round)
 	}
 	// A transaction is pinned the same way.
 	asOwner(t, c, a, func(q *db.Queries) error {
 		owner, err := q.GetOwner(t.Context())
-		if err == nil && owner.ID != a.owner {
-			t.Errorf("transaction saw the owner of another workspace")
+		if err != nil {
+			return err
 		}
-		return err
+		assert.Equal(t, a.owner, owner.ID, "transaction saw the owner of another workspace")
+		return nil
 	})
 }
 
-// Many requests of two workspaces share a small pool. Each only ever sees its own workspace.
+// Requests of two workspaces share a small pool. Each sees only its own.
 func TestPinHoldsUnderConcurrency(t *testing.T) {
 	t.Setenv("NOKKU_DB_MAX_CONNS", "3")
 	c := testConnection(t)
@@ -402,7 +354,7 @@ func TestPinHoldsUnderConcurrency(t *testing.T) {
 	for worker := range 16 {
 		wg.Go(func() {
 			f := fixtures[worker%2]
-			ctx := pinned(t, f.ws)
+			ctx := testenv.Pinned(t, f.ws)
 			for range 40 {
 				owner, err := c.Tenant().GetOwner(ctx)
 				if err != nil || owner.ID != f.owner {
@@ -426,47 +378,39 @@ func TestPinHoldsUnderConcurrency(t *testing.T) {
 	wg.Wait()
 }
 
-// A system connection is never pinned, so an insert that names no workspace fails even right after pinned traffic.
+// A system connection is never pinned, so an insert that names no workspace
+// fails even right after pinned traffic.
 func TestSystemConnectionsStayUnpinned(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	if _, err := c.Tenant().GetOwner(pinned(t, f.ws)); err != nil {
-		t.Fatalf("pinned read: %v", err)
-	}
+	_, err := c.Tenant().GetOwner(testenv.Pinned(t, f.ws))
+	require.NoError(t, err, "pinned read")
 	for range 8 {
-		if _, err := c.Sys().CreateTeam(pinned(t, f.ws), &db.CreateTeamParams{Name: "nowhere"}); pgCode(
-			err,
-		) != pgerrcode.NotNullViolation {
-			t.Fatalf("system insert without a workspace: %v, want a not null violation", err)
-		}
+		_, err := c.Sys().CreateTeam(testenv.Pinned(t, f.ws), &db.CreateTeamParams{Name: "nowhere"})
+		require.Equal(t, pgerrcode.NotNullViolation, pgCode(err), "system insert without a workspace: %v", err)
 	}
 }
 
-// One read of the pinned workspace, the way a handler does it today and the way it would with the pool hook.
+// One read of the pinned workspace, in a transaction and off the pool hook.
 func BenchmarkSingleRead(b *testing.B) {
 	c := testConnection(b)
 	id := uuid.NewV7().String()
-	if _, err := c.sysPool.Exec(b.Context(), `INSERT INTO workspaces (id, slug, name) VALUES ($1, $2, 'bench')`,
-		id, id); err != nil {
-		b.Fatalf("seed: %v", err)
-	}
+	_, err := c.sysPool.Exec(b.Context(), `INSERT INTO workspaces (id, slug, name) VALUES ($1, $2, 'bench')`, id, id)
+	require.NoError(b, err, "seed")
 	ctx := actor.WithWorkspace(b.Context(), actor.Workspace{ID: id})
 
 	b.Run("transaction", func(b *testing.B) {
 		for b.Loop() {
-			if err := c.TenantTx(ctx, func(q *db.Queries) error {
+			require.NoError(b, c.TenantTx(ctx, func(q *db.Queries) error {
 				_, err := q.GetWorkspace(ctx)
 				return err
-			}); err != nil {
-				b.Fatal(err)
-			}
+			}))
 		}
 	})
 	b.Run("direct", func(b *testing.B) {
 		for b.Loop() {
-			if _, err := c.Tenant().GetWorkspace(ctx); err != nil {
-				b.Fatal(err)
-			}
+			_, err := c.Tenant().GetWorkspace(ctx)
+			require.NoError(b, err)
 		}
 	})
 }
@@ -475,32 +419,29 @@ func BenchmarkSingleRead(b *testing.B) {
 func TestSystemRoleSeesEveryWorkspace(t *testing.T) {
 	c := testConnection(t)
 	a, b := newStateFixture(t, c), newStateFixture(t, c)
-	if got := count(t, c.sysPool, "SELECT COUNT(*) FROM users WHERE workspace_id = ANY ($1)",
-		[]string{a.ws, b.ws}); got != 4 {
-		t.Fatalf("system role sees %d users of the two fixtures, want 4", got)
-	}
+	require.EqualValues(t, 4,
+		count(t, c.sysPool, "SELECT COUNT(*) FROM users WHERE workspace_id = ANY ($1)", []string{a.ws, b.ws}),
+		"the users of the two fixtures")
 }
 
-// The app role holds no DELETE on the audit table. The trigger refuses the system role outside the retention job.
+// The app role holds no DELETE on the audit table. The trigger refuses the
+// system role outside the retention job.
 func TestAuditLogIsAppendOnly(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	if err := c.Tenant().InsertAuditLog(pinned(t, f.ws), &db.InsertAuditLogParams{
+	require.NoError(t, c.Tenant().InsertAuditLog(testenv.Pinned(t, f.ws), &db.InsertAuditLogParams{
 		WorkspaceID: f.ws, Action: "Test", Ok: true, Details: []byte("{}"),
-	}); err != nil {
-		t.Fatalf("insert: %v", err)
-	}
+	}), "insert")
 
 	const del = "DELETE FROM audit.audit_logs WHERE workspace_id = $1"
-	if _, err := c.Pool.Exec(pinned(t, f.ws), del, f.ws); pgCode(err) != pgerrcode.InsufficientPrivilege {
-		t.Errorf("app role delete: err = %v, want insufficient privilege", err)
-	}
-	if _, err := c.sysPool.Exec(t.Context(), del, f.ws); err == nil {
-		t.Error("system role deleted an audit row without opting in")
-	}
+	_, err := c.Pool.Exec(testenv.Pinned(t, f.ws), del, f.ws)
+	assert.Equal(t, pgerrcode.InsufficientPrivilege, pgCode(err), "app role delete: %v", err)
+	_, err = c.sysPool.Exec(t.Context(), del, f.ws)
+	assert.Error(t, err, "system role deleted an audit row without opting in")
 }
 
-// Events are written by the app role into the pinned workspace, and only there. No path writes them past RLS.
+// The app role writes events into the pinned workspace, and only there. No
+// path writes them past RLS.
 func TestAuditWritesStayInTheirWorkspace(t *testing.T) {
 	c := testConnection(t)
 	a, b := newStateFixture(t, c), newStateFixture(t, c)
@@ -510,47 +451,35 @@ func TestAuditWritesStayInTheirWorkspace(t *testing.T) {
 		})
 	}
 
-	if err := write(pinned(t, a.ws), c.Tenant(), a.ws); err != nil {
-		t.Fatalf("the app role could not write its own workspace's event: %v", err)
-	}
-	if err := write(pinned(t, a.ws), c.Tenant(), b.ws); pgCode(err) != pgerrcode.InsufficientPrivilege {
-		t.Errorf("an event for another workspace: err = %v, want a row security violation", err)
-	}
-	if err := write(t.Context(), c.Sys(), a.ws); pgCode(err) != pgerrcode.InsufficientPrivilege {
-		t.Errorf("the system role wrote an event: err = %v, want insufficient privilege", err)
-	}
+	require.NoError(t, write(testenv.Pinned(t, a.ws), c.Tenant(), a.ws),
+		"the app role could not write its own workspace's event")
+	err := write(testenv.Pinned(t, a.ws), c.Tenant(), b.ws)
+	assert.Equal(t, pgerrcode.InsufficientPrivilege, pgCode(err), "an event for another workspace: %v", err)
+	err = write(t.Context(), c.Sys(), a.ws)
+	assert.Equal(t, pgerrcode.InsufficientPrivilege, pgCode(err), "the system role wrote an event: %v", err)
 }
 
 func TestAuditLogScopes(t *testing.T) {
 	c := testConnection(t)
 	a, b := newStateFixture(t, c), newStateFixture(t, c)
 	for _, row := range []struct{ ws, actor string }{{a.ws, a.u}, {b.ws, b.u}, {b.ws, b.owner}} {
-		if err := c.Tenant().InsertAuditLog(pinned(t, row.ws), &db.InsertAuditLogParams{
+		require.NoError(t, c.Tenant().InsertAuditLog(testenv.Pinned(t, row.ws), &db.InsertAuditLogParams{
 			WorkspaceID: row.ws, ActorID: row.actor, Action: "Test", Ok: true, Details: []byte("{}"),
-		}); err != nil {
-			t.Fatalf("insert: %v", err)
-		}
+		}), "insert")
 	}
 
 	list := func(ws string) int {
 		t.Helper()
 		var rows []*db.ListAuditLogsRow
-		if err := c.TenantTx(pinned(t, ws), func(q *db.Queries) (err error) {
+		require.NoError(t, c.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) (err error) {
 			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{Limit: 100})
 			return err
-		}); err != nil {
-			t.Fatalf("list: %v", err)
-		}
+		}), "list")
 		return len(rows)
 	}
-	if n := list(a.ws); n != 1 {
-		t.Errorf("workspace a has %d rows, want 1", n)
-	}
-	if n := list(b.ws); n != 2 {
-		t.Errorf("workspace b has %d rows, want 2", n)
-	}
+	assert.Equal(t, 1, list(a.ws), "workspace a")
+	assert.Equal(t, 2, list(b.ws), "workspace b")
 
-	if _, err := c.sysPool.Exec(t.Context(), "DELETE FROM workspaces WHERE id = $1", a.ws); err != nil {
-		t.Fatalf("delete workspace with audit rows: %v", err)
-	}
+	_, err := c.sysPool.Exec(t.Context(), "DELETE FROM workspaces WHERE id = $1", a.ws)
+	require.NoError(t, err, "delete workspace with audit rows")
 }

@@ -22,21 +22,19 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
-// fixture is a connection plus a context pinned to a fresh workspace, like the tenant middleware pins a request.
+// fixture is a connection plus a context pinned to a fresh workspace.
 type fixture struct {
 	conn *db.Connection
 	ctx  context.Context
 }
 
-// enrollToken mints an enroll token in a fresh workspace. tweak adjusts the token row.
+// enrollToken mints a token in a fresh workspace. tweak adjusts the row.
 func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, string) {
 	t.Helper()
 	// The connection lives as long as its context, so it gets the test's.
 	ctx := t.Context()
 	conn, err := db.NewConnection(ctx)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
+	require.NoError(t, err, "connect")
 
 	var plaintext string
 	workspaceID := uuid.NewV7().String()
@@ -47,7 +45,7 @@ func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, 
 		}); err != nil {
 			return err
 		}
-		// Like tenant.Create, every workspace has its CA. Enroll and sync only read its public keys.
+		// Every workspace has its CA. Enroll and sync read its public keys.
 		ca := ssh.NewCA()
 		ca.PublicKey, ca.HostPublicKey = "pub", "host-pub"
 		if _, err := q.CreateCA(ctx, ca); err != nil {
@@ -61,9 +59,7 @@ func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, 
 		_, err = q.CreateJoinToken(ctx, params)
 		return err
 	})
-	if err != nil {
-		t.Fatalf("seed token: %v", err)
-	}
+	require.NoError(t, err, "seed token")
 	return fixture{conn: conn, ctx: pinned}, plaintext
 }
 
@@ -75,7 +71,7 @@ func enroll(t *testing.T, f fixture, in daemon.EnrollInput) (*daemon.Enrolled, e
 	return daemon.Enroll(f.ctx, f.conn, in)
 }
 
-// Parallel enrollments of one machine, as a retrying installer produces, must converge on one daemon.
+// Parallel enrollments of one machine, a retrying installer, make one daemon.
 func TestEnrollSameKeyConcurrently(t *testing.T) {
 	f, token := enrollToken(t, nil)
 	in := daemon.EnrollInput{Token: token, Binding: uuid.NewV7().String()}
@@ -96,12 +92,8 @@ func TestEnrollSameKeyConcurrently(t *testing.T) {
 	wg.Wait()
 
 	for i := range n {
-		if errs[i] != nil {
-			t.Fatalf("enroll %d: %v", i, errs[i])
-		}
-		if ids[i] != ids[0] {
-			t.Fatalf("enroll %d got daemon %s, want %s", i, ids[i], ids[0])
-		}
+		require.NoError(t, errs[i], "enroll %d", i)
+		require.Equal(t, ids[0], ids[i], "enroll %d", i)
 	}
 }
 
@@ -118,62 +110,52 @@ func TestEnrollQuotaOnlyForNewMachines(t *testing.T) {
 			return nil
 		},
 	}
-	if _, err := enroll(t, f, in); err != nil {
-		t.Fatalf("first enroll: %v", err)
-	}
+	_, err := enroll(t, f, in)
+	require.NoError(t, err, "first enroll")
 
 	in.CanCreate = func(context.Context, string) error { return full }
-	if _, err := enroll(t, f, in); err != nil {
-		t.Fatalf("re-enroll at cap: %v", err)
-	}
+	_, err = enroll(t, f, in)
+	require.NoError(t, err, "re-enroll at cap")
 
 	in.Binding = ""
-	if _, err := enroll(t, f, in); !errors.Is(err, full) {
-		t.Fatalf("new machine at cap: err = %v, want the quota error", err)
-	}
-	if calls != 1 {
-		t.Fatalf("quota consulted %d times on the first enroll, want 1", calls)
-	}
+	_, err = enroll(t, f, in)
+	require.ErrorIs(t, err, full, "new machine at cap")
+	require.Equal(t, 1, calls, "quota calls on the first enroll")
 }
 
-// Only new daemons spend uses, so a one-use token lets its machine re-enroll but turns the next one away.
+// Only new daemons spend uses. A one-use token lets its machine re-enroll and
+// turns the next one away.
 func TestEnrollMaxUses(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
 		p.MaxUses = new(int32(1))
 	})
 	first := daemon.EnrollInput{Token: token, Binding: uuid.NewV7().String()}
-	if _, err := enroll(t, f, first); err != nil {
-		t.Fatalf("first enroll: %v", err)
-	}
-	if _, err := enroll(t, f, first); err != nil {
-		t.Fatalf("re-enroll with a spent token: %v", err)
-	}
-	if _, err := enroll(t, f, daemon.EnrollInput{Token: token}); !errors.Is(err, daemon.ErrEnrollToken) {
-		t.Fatalf("second machine: err = %v, want ErrEnrollToken", err)
-	}
+	_, err := enroll(t, f, first)
+	require.NoError(t, err, "first enroll")
+	_, err = enroll(t, f, first)
+	require.NoError(t, err, "re-enroll with a spent token")
+	_, err = enroll(t, f, daemon.EnrollInput{Token: token})
+	require.ErrorIs(t, err, daemon.ErrEnrollToken, "second machine")
 }
 
 func TestEnrollExpiredToken(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
 		p.ExpiresAt = new(time.Now().Add(-time.Minute))
 	})
-	if _, err := enroll(t, f, daemon.EnrollInput{Token: token}); !errors.Is(err, daemon.ErrEnrollToken) {
-		t.Fatalf("err = %v, want ErrEnrollToken", err)
-	}
+	_, err := enroll(t, f, daemon.EnrollInput{Token: token})
+	require.ErrorIs(t, err, daemon.ErrEnrollToken)
 }
 
 func TestEnrollAutoApprove(t *testing.T) {
 	f, pending := enrollToken(t, nil)
 	out, err := enroll(t, f, daemon.EnrollInput{Token: pending})
-	if err != nil || out.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING {
-		t.Fatalf("plain token: status %v, err %v, want pending", out.Status, err)
-	}
+	require.NoError(t, err, "plain token")
+	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, out.Status, "plain token")
 
 	f, approved := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.AutoApprove = true })
 	out, err = enroll(t, f, daemon.EnrollInput{Token: approved})
-	if err != nil || out.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-		t.Fatalf("auto-approve token: status %v, err %v, want accepted", out.Status, err)
-	}
+	require.NoError(t, err, "auto-approve token")
+	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, out.Status, "auto-approve token")
 }
 
 func TestEnrollRejectsBadToken(t *testing.T) {
@@ -186,15 +168,11 @@ func TestEnrollRejectsBadToken(t *testing.T) {
 			return nil
 		},
 	})
-	if !errors.Is(err, daemon.ErrEnrollToken) {
-		t.Fatalf("err = %v, want ErrEnrollToken", err)
-	}
-	if quota {
-		t.Fatal("quota checked before the token verified")
-	}
+	require.ErrorIs(t, err, daemon.ErrEnrollToken)
+	require.False(t, quota, "quota checked before the token verified")
 }
 
-// A server with a daemon is one resource toward the plan's cap. The daemon is part of its target.
+// A server with a daemon is one resource toward the cap.
 func TestEnrolledServerCountsOnce(t *testing.T) {
 	f, token := enrollToken(t, nil)
 	ws, _ := actor.WorkspaceFromContext(f.ctx)

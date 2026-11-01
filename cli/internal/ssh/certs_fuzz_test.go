@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 )
 
-// FuzzCheckCert never panics, and what it accepts is a certificate from the CA that is valid now.
+// FuzzCheckCert never panics, and what it accepts parses and is valid now.
 func FuzzCheckCert(f *testing.F) {
 	signer := newSigner(f)
 	caKey := string(ssh.MarshalAuthorizedKey(signer.PublicKey()))
@@ -27,12 +28,9 @@ func FuzzCheckCert(f *testing.F) {
 			return
 		}
 		cert, err := ParseCert(data)
-		if err != nil {
-			t.Fatalf("CheckCert accepted unparseable data: %v", err)
-		}
+		require.NoError(t, err, "CheckCert accepted unparseable data")
 		after, before := CertWindow(cert)
-		if time.Now().Before(after) || time.Now().After(before) {
-			t.Fatal("CheckCert accepted a certificate outside its validity window")
-		}
+		require.WithinRange(t, time.Now(), after, before,
+			"CheckCert accepted a certificate outside its validity window")
 	})
 }

@@ -25,7 +25,7 @@ func TestTTLExpires(t *testing.T) {
 	})
 }
 
-// A full cache drops its oldest entry and keeps taking new ones. Refusing would let a flood lock everyone out.
+// A full cache drops its oldest, or a flood would lock everyone out.
 func TestTTLDropsTheOldestWhenFull(t *testing.T) {
 	c := New[int, struct{}](3, time.Hour)
 	for i := range 5 {

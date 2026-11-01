@@ -84,7 +84,7 @@ func (c *recordingsCore) UploadRecording(
 	}
 }
 
-// Stopping the daemon ends a live session like a hangup, and its recording still reaches the core whole.
+// A stop hangs up a live session, its recording still reaches the core whole.
 func TestShutdownWithALiveSessionUploadsTheRecording(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -98,7 +98,7 @@ func TestShutdownWithALiveSessionUploadsTheRecording(t *testing.T) {
 	srv, err := New(uploads)
 	must.NoError(err)
 	srv.SetAccess(testAccess(t, ca))
-	withPolicy(Policy{Record: true})(srv)
+	withPolicy(policy{Record: true})(srv)
 	var lc net.ListenConfig
 	l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	must.NoError(err)

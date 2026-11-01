@@ -54,7 +54,7 @@ func storedObject(t *testing.T, s *Service, rec *db.Recording) []byte {
 	return raw
 }
 
-// storeObject overwrites rec's object, the way someone with write access to the bucket could.
+// storeObject overwrites rec's object, as bucket write access could.
 func storeObject(t *testing.T, s *Service, rec *db.Recording, raw []byte) {
 	t.Helper()
 	w, err := s.store.CreateWriter(t.Context(), storage.RecordingPath(rec.WorkspaceID, *rec.ObjectID))
@@ -86,7 +86,7 @@ func TestRecordingRoundTrip(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-// Someone with write access to the bucket must not change what a recording shows without the reader noticing.
+// Bucket write access must not change what a recording shows unnoticed.
 func TestRecordingIsBoundToItsObject(t *testing.T) {
 	s := newTestService(t)
 	key := NewKey()

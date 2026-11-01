@@ -12,11 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The image the daemon ships on, so the accounts and tools are the ones a container user has.
+// The image the daemon ships on, with the accounts and tools users have.
 const asRootImage = "debian:13.7-slim"
 
-// Docker is rootful here and in CI, so the root-only test of asuser_test.go runs as root inside a throwaway container.
-// The binary goes in with docker cp, a bind mount finds nothing when the daemon has its own filesystem, as in dind.
+// Docker is rootful here and in CI, so the root-only test of asuser_test.go
+// runs in a throwaway container. The binary goes in with docker cp, a bind
+// mount finds nothing under dind.
 func TestSessionsRunAsTheUserInAContainer(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "sshd.test")
 	build := exec.CommandContext(t.Context(), "go", "test", "-c", "-tags", "asroot", "-o", bin, ".")

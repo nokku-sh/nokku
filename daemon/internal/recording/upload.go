@@ -28,11 +28,10 @@ import (
 
 const (
 	chunkSize = 32 << 10
-	// Proxies close a stream idle for 60 s. An empty chunk, which the core skips, keeps a quiet session's open.
+	// Empty chunks, which the core skips, beat the 60 s proxy idle cut.
 	keepAliveInterval = 30 * time.Second
 	// The core takes a cut reason up to this long.
-	maxCutReason = 200
-	// A .part file nobody writes any more lost its writer before the recording closed.
+	maxCutReason   = 200
 	leftoverReason = "the daemon stopped before the recording was closed"
 )
 
@@ -40,34 +39,32 @@ const (
 var (
 	firstRetry = time.Second
 	lastRetry  = 5 * time.Minute
-	// A full workspace refuses every upload, and each one is a failed call in its audit log.
+	// Each refused upload is a failed call in a full workspace's audit log.
 	retryWhenFull = time.Hour
 )
 
-// errUnreadable marks a file with no recording header to name it by. Trying again cannot help.
+// No recording header to name the file by. Retrying cannot help.
 var errUnreadable = errors.New("no readable recording header")
 
-// Uploads sends every recording to the core, always from its file. One goroutine per recording follows the file
-// while its session writes it, tries again until the core holds all of it, and then deletes it.
+// Uploads runs one goroutine per recording. It follows the file while written,
+// retries until the core holds all of it, then deletes it.
 type Uploads struct {
-	// ctx ends the retries. An upload already under way runs on, Wait bounds it.
+	// ctx ends the retries. A running upload goes on, Wait bounds it.
 	ctx    context.Context
 	client nokkuv1connect.DaemonControlServiceClient
 	wg     sync.WaitGroup
 }
 
-// upload is one recording on its way to the core.
 type upload struct {
 	path string
 	meta *nokkuv1.RecordingMeta
-	// rec is the recorder that writes the file, nil for a file an earlier run left.
+	// rec writes the file, nil for one an earlier run left.
 	rec *Recorder
-	// f stays open while a recorder writes, so its rename never gets in the way of a read.
+	// f stays open while rec writes, so its rename can't break a read.
 	f *os.File
 }
 
-// NewUploads also picks up the recordings an earlier run left. Call it before the first session starts, every file
-// in the directory is a leftover then.
+// NewUploads treats all files as leftovers. Call it before the first session.
 func NewUploads(ctx context.Context, client nokkuv1connect.DaemonControlServiceClient) *Uploads {
 	u := &Uploads{ctx: ctx, client: client}
 	entries, err := os.ReadDir(paths.RecordsDir())
@@ -82,7 +79,7 @@ func NewUploads(ctx context.Context, client nokkuv1connect.DaemonControlServiceC
 	return u
 }
 
-// Wait waits up to grace for the uploads under way. What is left stays on disk for the next start.
+// Wait waits up to grace. What is left stays on disk for the next start.
 func (u *Uploads) Wait(grace time.Duration) bool {
 	done := make(chan struct{})
 	go func() {
@@ -97,7 +94,6 @@ func (u *Uploads) Wait(grace time.Duration) bool {
 	}
 }
 
-// follow starts the upload of a recording New just made, with the header already in the file.
 func (u *Uploads) follow(rec *Recorder) {
 	f, err := os.Open(rec.path)
 	if err != nil {
@@ -119,7 +115,7 @@ func (u *Uploads) run(up *upload) {
 		err := u.send(up)
 		code := connect.CodeOf(err)
 		switch {
-		// AlreadyExists: an earlier try got the whole file through and its answer was lost.
+		// AlreadyExists: an earlier try got through and its answer was lost.
 		case err == nil, code == connect.CodeAlreadyExists && up.written():
 			if up.rec != nil {
 				up.path = up.rec.path
@@ -152,7 +148,6 @@ func (u *Uploads) run(up *upload) {
 	}
 }
 
-// written reports whether the file is final, its recorder is done with it.
 func (up *upload) written() bool {
 	if up.rec == nil {
 		return true
@@ -165,8 +160,7 @@ func (up *upload) written() bool {
 	}
 }
 
-// send streams the file from its first byte, the core keeps the larger copy. While the recorder writes, it waits at
-// the end of the file for more. A nil error means the core holds all of it.
+// Every try starts at byte 0, the core keeps the larger copy.
 func (u *Uploads) send(up *upload) error {
 	f := up.f
 	if f == nil {
@@ -185,7 +179,7 @@ func (u *Uploads) send(up *upload) error {
 		return err
 	}
 
-	// The last try of a session that ends at shutdown still has to get through. Wait bounds it.
+	// The last try at shutdown still has to get through. Wait bounds it.
 	ctx, cancel := context.WithCancel(context.WithoutCancel(u.ctx))
 	defer cancel()
 	stream, err := u.client.UploadRecording(ctx)
@@ -223,7 +217,7 @@ func (u *Uploads) send(up *upload) error {
 		if !live {
 			break
 		}
-		// While the session runs, the end of the file only means the recorder has not flushed more yet.
+		// EOF on a live file only means the recorder has not flushed more yet.
 		select {
 		case <-up.rec.flushed:
 		case <-up.rec.done:
@@ -252,8 +246,7 @@ func (u *Uploads) send(up *upload) error {
 	return nil
 }
 
-// final names the size the file has, when the session ended and why it was cut. The recorder knows all three, for a
-// leftover the file tells.
+// The recorder knows size, end and cut reason. For a leftover the file tells.
 func (up *upload) final(f *os.File) *nokkuv1.RecordingFinal {
 	var size int64
 	var reason string
@@ -277,7 +270,7 @@ func (up *upload) final(f *os.File) *nokkuv1.RecordingFinal {
 	return &nokkuv1.RecordingFinal{SizeBytes: &size, CutReason: &reason, EndedAt: timestamppb.New(ended)}
 }
 
-// answer is why the core ended the stream. A failed Send only says that it did.
+// answer gets why the core ended the stream, a failed Send only says it did.
 func answer(stream nokkuv1connect.DaemonControlServiceUploadRecordingClientStream, sendErr error) error {
 	if _, err := stream.CloseAndReceive(); err != nil {
 		return err
@@ -293,7 +286,6 @@ func (h header) meta() *nokkuv1.RecordingMeta {
 	return meta
 }
 
-// readMeta reads the header the recorder wrote first. A file that has none wraps errUnreadable.
 func readMeta(f *os.File) (*nokkuv1.RecordingMeta, error) {
 	gz, err := gzip.NewReader(f)
 	if err != nil {

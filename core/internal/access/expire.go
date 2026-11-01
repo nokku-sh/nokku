@@ -1,4 +1,4 @@
-// Package access ends what was only granted for a while.
+// Package access expires grants and reports who can log in where.
 package access
 
 import (
@@ -12,9 +12,9 @@ import (
 
 const expireTick = time.Minute
 
-// ExpireLoop deletes grants past their end and ends requests nobody answered. Resolvers skip ended grants already,
-// the delete is what makes hosts drop them and close the sessions that use them. Each is written to the audit log
-// through write, one at a time, so a big batch never floods the pool.
+// ExpireLoop deletes ended grants and ends unanswered requests. Resolvers skip
+// ended grants already, the delete makes hosts drop them and close their
+// sessions. Audit writes go one at a time, so a batch never floods the pool.
 func ExpireLoop(ctx context.Context, conn *db.Connection, write func(context.Context, *audit.Event) error) {
 	ticker := time.NewTicker(expireTick)
 	defer ticker.Stop()
@@ -33,15 +33,14 @@ func ExpireLoop(ctx context.Context, conn *db.Connection, write func(context.Con
 	}
 }
 
-// Expire is one pass over the grants, on its own for tests. It needs no lock, a row is only returned to the one
-// delete that removed it.
+// Expire needs no lock, a row is only returned to the delete that removed it.
 func Expire(ctx context.Context, conn *db.Connection, write func(context.Context, *audit.Event) error) error {
 	workspaces, err := conn.Sys().ListWorkspacesWithExpiredGrants(ctx)
 	if err != nil {
 		return err
 	}
 	for _, workspaceID := range workspaces {
-		// A transaction per workspace, the state version is bumped once per transaction and workspace.
+		// One tx per workspace, the version bumps once per tx and workspace.
 		var gone []*db.DeleteExpiredGrantsRow
 		if err := conn.SysTx(ctx, func(q *db.Queries) error {
 			gone, err = q.DeleteExpiredGrants(ctx, workspaceID)

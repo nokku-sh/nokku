@@ -72,7 +72,7 @@ func TestRecorderSessionIDFromKeyID(t *testing.T) {
 			t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 			require.NoError(t, os.MkdirAll(paths.RecordsDir(), 0o700))
 			srv := &Server{}
-			srv.access.Store(&access{policy: Policy{Record: true}})
+			srv.access.Store(&access{policy: policy{Record: true}})
 			sess := &session{
 				server:    srv,
 				sessionID: generated,

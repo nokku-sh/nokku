@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/sftp"
 )
 
-// Runs as the target user in its working directory, so the OS permissions bound what it can touch.
+// Runs as the target user, so OS permissions bound what it can touch.
 func serveSFTP() error {
 	rw := struct {
 		io.Reader
@@ -30,7 +30,7 @@ func (sess *session) runSFTP() {
 		sess.exit(1)
 		return
 	}
-	// Like sshd, the subsystem goes through the login shell, so a lock shell or a restricted one refuses it.
+	// Like sshd, the login shell runs it, so a lock shell can refuse it.
 	sess.rawCmd = shellJoin(argv)
 
 	var stdin io.WriteCloser

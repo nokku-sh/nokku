@@ -14,7 +14,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/email"
 )
 
-// Refused before a workspace is made. The config has no database, getting that far would panic.
+// Refused before a workspace is made. With no database, going on would panic.
 func TestCreateWorkspaceRefusesAnAddressOnCooldown(t *testing.T) {
 	t.Setenv("NOKKU_SMTP_HOST", "")
 	mail, err := email.New(t.Context(), "https://nokku.test")

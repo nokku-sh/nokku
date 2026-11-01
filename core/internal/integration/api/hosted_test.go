@@ -13,7 +13,6 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,7 +32,7 @@ const (
 	hostedSlug = "acme"
 )
 
-// hosted runs the suite the way the hosted service runs: NOKKU_SAAS, a KMS, and a workspace found by its host.
+// hosted runs like the service: NOKKU_SAAS, a KMS, a workspace found by host.
 var hosted = os.Getenv("NOKKU_TEST_HOSTED") != ""
 
 // cookieNamed is what a browser gets, https cookies carry __Host-.
@@ -44,7 +43,7 @@ func cookieNamed(name string) string {
 	return name
 }
 
-// newMailAddress passes the check of the hosted service, which needs DNS. Only localhost resolves without any.
+// newMailAddress passes the hosted check, only localhost resolves without DNS.
 func newMailAddress() string {
 	return uuid.New().String() + "@localhost"
 }
@@ -64,8 +63,7 @@ func selfHostedOnly(t *testing.T, why string) {
 	}
 }
 
-// withoutAPlan leaves the test workspace without paid features until restore runs. A self-hosted server without a
-// license is there already, the hosted service has no free plan and gets there when a trial ends.
+// withoutAPlan ends a hosted trial until restore, self-hosted has no plan.
 func withoutAPlan(t *testing.T, cfg *config.Config) (restore func()) {
 	t.Helper()
 	if !hosted {
@@ -86,7 +84,7 @@ func withoutAPlan(t *testing.T, cfg *config.Config) (restore func()) {
 	return func() { put(context.WithoutCancel(t.Context()), sub.Source, sub.CurrentPeriodEnd) }
 }
 
-// hostedWorkspace is the workspace the suite shares, on the plan with no limits a self-hosted server has.
+// hostedWorkspace is the shared workspace, on a plan with no limits.
 func hostedWorkspace(ctx context.Context, cfg *config.Config) (actor.Workspace, error) {
 	ws, err := tenant.Create(ctx, cfg.Conn, cfg.Keyset, hostedSlug, "test")
 	if err != nil {
@@ -105,8 +103,7 @@ func hostedWorkspace(ctx context.Context, cfg *config.Config) (actor.Workspace, 
 	return cfg.Tenant.FromHost(ctx, hostedSlug+"."+hostedBase)
 }
 
-// serving puts a request on the https host of the test workspace, the tests dial loopback. Only the hosted service
-// reads the host.
+// serving puts a loopback request on the workspace's https host, if hosted.
 func serving(next http.Handler) http.Handler {
 	if !hosted {
 		return next
@@ -149,7 +146,7 @@ func newHostedWorkspace(t *testing.T, cfg *config.Config) actor.Workspace {
 
 func workspacesOn(srv *httptest.Server, auth ...connect.ClientInterceptor) nokkuv1connect.WorkspaceServiceClient {
 	return nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), auth...),
+		clientOn(srv, auth...),
 	)
 }
 
@@ -163,7 +160,7 @@ func instanceInfoStatus(t *testing.T, srv *httptest.Server) int {
 	return res.StatusCode
 }
 
-// Only the root host and a workspace that exists answer. A health check comes from no workspace at all.
+// Only the root host and real workspaces answer, a health check needs none.
 func TestHostedHostPicksTheWorkspace(t *testing.T) {
 	hostedOnly(t)
 	for host, want := range map[string]int{
@@ -187,7 +184,7 @@ func TestHostedHostPicksTheWorkspace(t *testing.T) {
 	info := func(host string) *nokkuv1.GetInstanceInfoResponse {
 		srv := onHost(t, host)
 		res, err := nokkuv1connect.NewUtilServiceClient(
-			connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
+			clientOn(srv),
 		).GetInstanceInfo(t.Context(), &nokkuv1.GetInstanceInfoRequest{})
 		require.NoError(t, err)
 		return res
@@ -196,12 +193,12 @@ func TestHostedHostPicksTheWorkspace(t *testing.T) {
 	assert.False(t, info(hostedSlug+"."+hostedBase).GetSignup(), "a workspace host signs nobody up")
 }
 
-// A token belongs to its workspace. Row security hides it from every other host, in a header and in a cookie.
+// Row security hides a token from every other host, in a header and a cookie.
 func TestHostedSessionWorksOnItsOwnHostOnly(t *testing.T) {
 	hostedOnly(t)
 	cfg, own := newTestAPI(t)
 	foreign := onHost(t, newHostedWorkspace(t, cfg).Slug+"."+hostedBase)
-	token := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+	token := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 
 	for name, auth := range map[string]connect.ClientInterceptor{
 		"header": header("Authorization", "Bearer "+token),
@@ -214,7 +211,7 @@ func TestHostedSessionWorksOnItsOwnHostOnly(t *testing.T) {
 	}
 }
 
-// A signup makes a workspace on a host of its own, and the owner's link is what keeps it from the purge.
+// A signup gets its own host, the first sign-in keeps it from the purge.
 func TestHostedSignup(t *testing.T) {
 	hostedOnly(t)
 	cfg, shared := newTestAPI(t)
@@ -258,7 +255,7 @@ func TestHostedSignup(t *testing.T) {
 	_, token, _ := strings.Cut(link, "token=")
 
 	srv := onHost(t, host)
-	_, err = nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+	_, err = nokkuv1connect.NewAuthServiceClient(clientOn(srv)).
 		ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{Token: &token})
 	require.NoError(t, err)
 	row, err = cfg.Conn.Sys().GetWorkspaceBySlug(t.Context(), slug)
@@ -266,7 +263,7 @@ func TestHostedSignup(t *testing.T) {
 	assert.NotNil(t, row.ClaimedAt, "the first sign-in claims the workspace")
 }
 
-// A deleted workspace is gone from its host at once, the cache of hosts must not keep it. Others stay.
+// A deleted workspace leaves its host at once, the host cache must not keep it.
 func TestHostedDeleteWorkspace(t *testing.T) {
 	hostedOnly(t)
 	cfg, shared := newTestAPI(t)

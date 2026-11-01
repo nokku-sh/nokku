@@ -54,7 +54,7 @@ func TestSessionValid(t *testing.T) {
 	assert.False(t, (&State{SessionToken: "tok", SessionExpiresAt: time.Now().Add(-time.Minute)}).SessionValid())
 }
 
-// The fallback after a failed sync reads the disk again, and by then the state may name another server.
+// A failed sync falls back to the disk, which may name another server by then.
 func TestLoadCacheLeavesOutAnotherServer(t *testing.T) {
 	setHome(t)
 	snapshot := Cache{Server: "https://a.example", Targets: []Target{{ID: "t", Name: "web"}}, User: &User{ID: "u"}}
@@ -75,7 +75,7 @@ func TestLoadCacheLeavesOutAnotherServer(t *testing.T) {
 	assert.True(t, old.HasCachedData(), "a snapshot from before the field existed keeps ssh working offline")
 }
 
-// Only a session from nk login --ci counts. A snapshot NK_TOKEN left behind must not lock a person out of the browser.
+// Only an nk login --ci session counts, not what NK_TOKEN left behind.
 func TestCIJob(t *testing.T) {
 	account := &ServiceAccount{ID: "sa", Name: "deploy"}
 	tests := []struct {
@@ -99,9 +99,7 @@ func TestCIJob(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.state.CIJob(); got != tt.want {
-				t.Errorf("CIJob() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.state.CIJob())
 		})
 	}
 }

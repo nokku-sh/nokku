@@ -18,15 +18,17 @@ import (
 	"github.com/nokku-sh/nokku/internal/id"
 )
 
-// softSigner keeps a plain key in memory. Its wrap at rest stops a copied state file, not root on the machine.
+// The wrap at rest stops a copied state file, not root on the machine.
 type softSigner struct {
 	key *ecdsa.PrivateKey
 }
 
 func (s *softSigner) Public() crypto.PublicKey { return &s.key.PublicKey }
 
-// Sign signs a SHA-256 digest with the software key.
-func (s *softSigner) Sign(_ io.Reader, digest []byte, _ crypto.SignerOpts) ([]byte, error) {
+func (s *softSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	if opts.HashFunc() != crypto.SHA256 {
+		return nil, fmt.Errorf("tpm: unsupported hash %v, the identity signs SHA-256 only", opts.HashFunc())
+	}
 	return ecdsa.SignASN1(rand.Reader, s.key, digest)
 }
 
@@ -34,9 +36,9 @@ func (s *softSigner) Method() string { return MethodSoft }
 
 func (s *softSigner) Close() error { return nil }
 
-// A key that no longer unwraps (the machine identity changed, the state is incomplete) is a changed identity.
+// A key that no longer unwraps is a changed identity.
 func openSoft(opts SignerOptions, st *state) (Signer, error) {
-	// A machine ID that cannot be read right now is not a changed identity, so it never replaces the key.
+	// A failed read is not a changed identity, so it never replaces the key.
 	machine, err := id.MachineID()
 	if err != nil {
 		return nil, fmt.Errorf("tpm: %w", err)
@@ -102,9 +104,9 @@ func storeSoftKey(path string, key *ecdsa.PrivateKey, machine string) error {
 	})
 }
 
-// The machine fingerprint is public, so a slow KDF would protect nothing and a plain HKDF derives the wrap key.
+// The fingerprint is public, so a slow KDF would protect nothing.
 func newSoftGCM(machine string, salt []byte) (cipher.AEAD, error) {
-	key, err := hkdf.Key(sha256.New, []byte(machine), salt, "mon software key wrap", 32)
+	key, err := hkdf.Key(sha256.New, []byte(machine), salt, "nokku software key wrap v1", 32)
 	if err != nil {
 		return nil, fmt.Errorf("tpm: derive wrap key: %w", err)
 	}

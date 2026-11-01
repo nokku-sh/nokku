@@ -12,13 +12,13 @@ const (
 	verifyMarker = "#nk verified"
 )
 
-// A signal ends the script through its EXIT trap. PIPE matters: a dropped connection kills the shell at its next echo.
+// Signals run the EXIT trap. A dropped connection hits PIPE at the next echo.
 const (
 	exitOnSignal = "trap 'exit 1' HUP INT TERM PIPE"
 	clearTraps   = "trap - EXIT HUP INT TERM PIPE"
 )
 
-// systemd calls the unit sshd on RHEL and ssh on Debian, the pid file covers hosts without systemd.
+// sshd on RHEL, ssh on Debian, and the pid file for hosts without systemd.
 const reloadSSHD = `nk_reloaded=''
 if systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null ||
   { [ -f /run/sshd.pid ] && kill -HUP "$(cat /run/sshd.pid)"; } ||
@@ -28,7 +28,7 @@ if systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null ||
 fi
 `
 
-// RemoveScript puts the drop-in back when sshd rejects the config without it, or the run dies before sshd -t.
+// RemoveScript restores the drop-in if sshd -t fails or the run dies first.
 const RemoveScript = "set -e\n" + requireRoot +
 	`if [ -f ` + dropInPath + ` ]; then
   rm -f ` + dropInPath + `.nokku-bak
@@ -61,16 +61,20 @@ type File struct {
 
 type Plan struct {
 	Files []File
-	// targetID is what the drop-in names, a placeholder before the target exists.
+	// targetID is a placeholder before the target exists.
 	targetID string
 }
 
-// NewPlan writes the CA and a drop-in that takes the certificates the core signs for this server. An empty
-// targetID is a server Nokku does not know yet, which only a dry run shows.
+type Result struct {
+	Reloaded bool
+	Verified bool
+}
+
+// NewPlan takes an empty targetID for a new server, which only a dry run shows.
 func NewPlan(caKey, targetID string) (Plan, error) {
 	shown := "<target-id>"
 	if targetID != "" {
-		// The id lands in sshd_config, where a line break would add a directive.
+		// The id lands in sshd_config, a line break would add a directive.
 		if !login.ValidID(targetID) {
 			return Plan{}, fmt.Errorf("the core sent an unusable target id %q, nothing was written", targetID)
 		}
@@ -82,7 +86,6 @@ func NewPlan(caKey, targetID string) (Plan, error) {
 	}}, nil
 }
 
-// Script refuses a host with a broken sshd config, rolls back on any exit before sshd accepts the result, then reloads.
 func (p Plan) Script() string {
 	var b strings.Builder
 	b.WriteString("set -e\n" + requireRoot)
@@ -93,13 +96,13 @@ func (p Plan) Script() string {
 	for i, f := range p.Files {
 		paths[i] = q(f.Path)
 	}
-	// A backup left by a run that died before its trap existed would restore a stale file.
+	// A backup from a run that died early would restore a stale file.
 	fmt.Fprintf(&b, "for f in %s; do rm -f \"$f.nokku-bak\"; done\n", strings.Join(paths, " "))
 	b.WriteString("nk_new=''\nnk_restore() {\n  set +e\n")
 	fmt.Fprintf(&b, "  for f in %s; do\n", strings.Join(paths, " "))
 	b.WriteString("    if [ -f \"$f.nokku-bak\" ]; then mv -f \"$f.nokku-bak\" \"$f\"; fi\n  done\n")
 	b.WriteString("  for f in $nk_new; do rm -f \"$f\"; done\n}\n")
-	// Any exit before sshd accepts the result rolls back, a failed write and Ctrl-C included.
+	// Any exit before sshd accepts the result rolls back, Ctrl-C included.
 	b.WriteString("trap nk_restore EXIT\n" + exitOnSignal + "\n")
 
 	for _, f := range p.Files {
@@ -125,7 +128,7 @@ func (p Plan) Script() string {
 	fmt.Fprintf(&b, "for f in %s; do rm -f \"$f.nokku-bak\"; done\n", strings.Join(paths, " "))
 
 	b.WriteString(reloadSSHD)
-	// A running sshd may still read the old files, so they go once it has reloaded without them.
+	// A running sshd may still read the old files until it reloads.
 	fmt.Fprintf(
 		&b,
 		"if [ -n \"$nk_reloaded\" ] && [ -d %[1]s ]; then\n  rm -rf %[1]s\n  echo \"removed   %[2]s\"\nfi\n",
@@ -133,8 +136,8 @@ func (p Plan) Script() string {
 		oldPrincipalsDir,
 	)
 
-	// A reload does not prove sshd read the drop-in. A config without the Include line ignores it. sshd -T prints
-	// each setting as a lowercase keyword and its value.
+	// A config without the Include line reloads fine and ignores the drop-in.
+	// sshd -T prints lowercase keywords.
 	command, _, _ := strings.Cut(login.PrincipalsCommand(p.targetID), "\n")
 	keyword, value, _ := strings.Cut(command, " ")
 	fmt.Fprintf(&b, "nk_cfg=$(sshd -T 2>/dev/null || true)\n")
@@ -144,11 +147,6 @@ func (p Plan) Script() string {
 	return b.String()
 }
 
-type Result struct {
-	Reloaded bool
-	Verified bool
-}
-
 func ParseResult(out string) Result {
 	return Result{
 		Reloaded: strings.Contains(out, reloadMarker),
@@ -156,7 +154,6 @@ func ParseResult(out string) Result {
 	}
 }
 
-// Output drops the markers, leaving what the operator should see.
 func Output(out string) string {
 	var b strings.Builder
 	for line := range strings.SplitSeq(out, "\n") {

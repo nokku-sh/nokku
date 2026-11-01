@@ -1,8 +1,7 @@
 package iam
 
-// SCIM Users are the workspace's users: id is the user id, userName the email, externalId is on the row.
-// Inbound, the primary emails entry wins over userName. Authentik sends a plain username there.
-// The IdP owns the address of the accounts it created, so a changed one renames the login. Never an admin's.
+// The primary emails entry wins over userName, Authentik puts a username there.
+// The IdP owns the address of accounts it made, but never an admin's.
 
 import (
 	"context"
@@ -107,7 +106,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 	err = eachScimOp(operations, func(opName, attr string, expr filter.Expression, value any) error {
 		switch attr {
 		case "emails":
-			// userName is left out here. Where it is no address, the two would rename the login back and forth.
+			// userName is skipped, a non-address would rename the login back.
 			if s := scimPatchedLogin(opName, expr, value); s != "" {
 				email = s
 				changed = true
@@ -133,7 +132,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 	if err != nil {
 		return scim.Resource{}, err
 	}
-	// One name is stored, so half of one changes nothing. displayName wins over the parts.
+	// One name is stored, so half of one changes nothing.
 	whole := scimAttrString(nameParts["formatted"]) != "" ||
 		(scimAttrString(nameParts["givenName"]) != "" && scimAttrString(nameParts["familyName"]) != "")
 	if name == nil && whole {
@@ -141,7 +140,7 @@ func (h scimUserHandler) Patch(r *http.Request, id string, operations []scim.Pat
 		changed = true
 	}
 	if !changed {
-		// RFC 7644 3.5.2 wants no content for a no-op, which the library renders from an empty resource.
+		// RFC 7644 3.5.2 wants no content, which an empty resource renders.
 		return scim.Resource{}, nil
 	}
 	return h.apply(r.Context(), u, email, name, active, externalID)
@@ -162,7 +161,6 @@ func (h scimUserHandler) user(ctx context.Context, id string) (*db.User, error) 
 	return rows[0], nil
 }
 
-// apply takes "" for an email the request did not carry.
 func (h scimUserHandler) apply(
 	ctx context.Context,
 	before *db.User,
@@ -172,7 +170,8 @@ func (h scimUserHandler) apply(
 	externalID string,
 ) (scim.Resource, error) {
 	id := before.ID
-	// Only an account SCIM created and still links is renamed. Linking one by its address hands over no sign-in links.
+	// Only an account SCIM created and still links is renamed. Linking one by
+	// its address hands over no sign-in links.
 	rename := email != "" && email != before.Email && before.ScimManaged && before.ScimExternalID != nil
 	err := h.svc.conn.TenantTx(ctx, func(q *db.Queries) error {
 		if rename || (active != nil && !*active) {
@@ -186,7 +185,8 @@ func (h scimUserHandler) apply(
 				Detail: "the address of an admin is changed in Nokku, not by the identity provider",
 			}
 		}
-		// First, it locks the workspace row and every other path takes that before a user row.
+		// First, a reactivation locks the workspace row, and every path takes
+		// that before a user row.
 		if active != nil {
 			if _, err := h.svc.SetUserActive(ctx, q, id, *active); err != nil {
 				return err
@@ -276,12 +276,12 @@ func scimEmail(attrs scim.ResourceAttributes) string {
 	return ""
 }
 
-// scimPatchedLogin picks the login address out of a PATCH on emails, "" for a removal or a second address.
+// scimPatchedLogin is "" for a removal or a second address.
 func scimPatchedLogin(opName string, expr filter.Expression, value any) string {
 	if opName == "remove" {
 		return ""
 	}
-	// A path filter names one entry. The one userResource reports is type eq "work" or primary eq true.
+	// A path filter names one entry, ours is type "work" or primary.
 	byFilter := expr != nil
 	if byFilter {
 		ae, ok := expr.(*filter.AttributeExpression)
@@ -310,7 +310,6 @@ func scimPatchedLogin(opName string, expr filter.Expression, value any) string {
 	return ""
 }
 
-// scimEmailValue takes the primary entry of a list, or the first one when none is marked.
 func scimEmailValue(v any) string {
 	switch emails := v.(type) {
 	case []any:

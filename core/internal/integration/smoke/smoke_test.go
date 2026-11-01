@@ -1,7 +1,8 @@
 //go:build integration && smoke
 
-// Package smoke_test runs the real nokku, nk and nokkud against a throwaway Postgres, Mailpit and daemon container.
-// Every container, port and HOME is its own, so the dev stack and the real ~/.ssh stay out of it.
+// Package smoke_test runs the real nokku, nk and nokkud against a throwaway
+// Postgres, Mailpit and daemon container. Every container, port and HOME is its
+// own, so the dev stack and the real ~/.ssh stay out of it.
 package smoke_test
 
 import (
@@ -48,12 +49,12 @@ const (
 	smokeLabel   = "sh.nokku.smoke=true"
 
 	ownerEmail = "owner@smoke.test"
-	// The container enrolls under its hostname, and dev is the one account its image ships.
+	// The container enrolls under its hostname, dev is its one account.
 	serverName = "smoke-box"
 	account    = "dev"
 	login      = account + "@" + serverName
 
-	// What the web terminal types. It prints smoke-web, which its own echo does not contain.
+	// What the web terminal types. It prints smoke-web, its own echo does not.
 	webCommand = "echo smoke-''web"
 	// The close code of the terminal websocket when the shell ended on its own.
 	shellExited websocket.StatusCode = 4000
@@ -64,6 +65,56 @@ var (
 	userCode  = regexp.MustCompile(`the code (\S+) there`)
 )
 
+// smoke is what the phases share. Each phase fills in what the later ones need.
+type smoke struct {
+	core     core
+	home     nkHome
+	platform *jobPlatform
+	// The daemon container, removed when the test ends.
+	container string
+	sshPort   string
+
+	// The owner's browser. Its cookie jar holds the session.
+	browser        *http.Client
+	client         *connect.Client
+	auth           nokkuv1connect.AuthServiceClient
+	joinTokens     nokkuv1connect.JoinTokenServiceClient
+	daemons        nokkuv1connect.DaemonServiceClient
+	targets        nokkuv1connect.TargetServiceClient
+	targetAccounts nokkuv1connect.TargetAccountServiceClient
+	recordings     nokkuv1connect.RecordingServiceClient
+	util           nokkuv1connect.UtilServiceClient
+
+	owner      *nokkuv1.User
+	daemon     *nokkuv1.Daemon
+	target     *nokkuv1.Target
+	devAccount *nokkuv1.TargetAccount
+	webSession string
+}
+
+// core is the nokku binary, on plain HTTP and localhost like a dev setup.
+type core struct {
+	binary string
+	url    string
+	// admin-link runs with the server's environment.
+	env []string
+}
+
+// nkHome is where nk and ssh run. Its own HOME keeps the real ~/.ssh,
+// ~/.config/nk and ssh agent out of it.
+type nkHome struct {
+	dir       string
+	nkBinary  string
+	sshBinary string
+	env       []string
+}
+
+// lockedBuffer collects a process's output while the test reads it.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
 func TestMain(m *testing.M) {
 	stop := testenv.Postgres()
 	code := m.Run()
@@ -71,7 +122,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// TestSmoke takes one owner from the first sign-in to a revoked session. Each phase builds on the ones before it.
+// TestSmoke takes one owner from the first sign-in to a revoked session.
 func TestSmoke(t *testing.T) {
 	s := setUp(t)
 	for _, phase := range []struct {
@@ -94,34 +145,7 @@ func TestSmoke(t *testing.T) {
 	}
 }
 
-// smoke is what the phases share. Each phase fills in what the later ones need.
-type smoke struct {
-	core     core
-	home     nkHome
-	platform *jobPlatform
-	// The daemon container, removed when the test ends.
-	container string
-	sshPort   string
-
-	// The owner's browser. Its cookie jar holds the session the web app calls the API with.
-	browser        *http.Client
-	client         *connect.Client
-	auth           nokkuv1connect.AuthServiceClient
-	joinTokens     nokkuv1connect.JoinTokenServiceClient
-	daemons        nokkuv1connect.DaemonServiceClient
-	targets        nokkuv1connect.TargetServiceClient
-	targetAccounts nokkuv1connect.TargetAccountServiceClient
-	recordings     nokkuv1connect.RecordingServiceClient
-	util           nokkuv1connect.UtilServiceClient
-
-	owner      *nokkuv1.User
-	daemon     *nokkuv1.Daemon
-	target     *nokkuv1.Target
-	devAccount *nokkuv1.TargetAccount
-	webSession string
-}
-
-// setUp builds the binaries and starts what every phase runs against. All of it ends with the test.
+// setUp builds the binaries and starts what every phase runs against.
 func setUp(t *testing.T) *smoke {
 	sshBinary, err := exec.LookPath("ssh")
 	require.NoError(t, err, "the smoke test drives OpenSSH")
@@ -131,7 +155,7 @@ func setUp(t *testing.T) *smoke {
 	bin, imageDir := t.TempDir(), t.TempDir()
 	goBuild(t, repo, bin, "./core/cmd/nokku", "./cli/cmd/nk")
 	goBuild(t, repo, imageDir, "./daemon/cmd/nokkud")
-	// The local build of daemon/Dockerfile, from a context that holds the binary alone.
+	// The local daemon/Dockerfile build, from a context of the binary alone.
 	run(t, exec.CommandContext(t.Context(), "docker", "build", "--quiet",
 		"--file", filepath.Join(repo, "daemon", "Dockerfile"),
 		"--build-arg", "BINARY=nokkud",
@@ -139,7 +163,7 @@ func setUp(t *testing.T) *smoke {
 		"--tag", daemonImage,
 		imageDir,
 	))
-	// A new binary moves the tag, so the image of the run before is left dangling.
+	// A new binary moves the tag, the image of the run before is left dangling.
 	run(t, exec.CommandContext(t.Context(), "docker", "image", "prune", "--force", "--filter", "label="+smokeLabel))
 
 	smtpHost, smtpPort := startMailpit(t)
@@ -174,7 +198,7 @@ func (s *smoke) signInOwner(t *testing.T) {
 	link := adminLink.FindStringSubmatch(out)
 	require.NotNil(t, link, "admin-link printed no sign-in link: %s", out)
 
-	// The link opens the SPA, which trades the token for the session cookie with this call.
+	// The link opens the SPA, which trades the token for the cookie here.
 	res, err := s.auth.ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{Token: &link[1]})
 	require.NoError(t, err)
 	s.owner = res.GetUser()
@@ -196,8 +220,9 @@ func (s *smoke) enrollDaemon(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Host networking, the daemon takes plain HTTP from localhost only. It listens on every interface because it
-	// advertises the host's own addresses, and those are what nk dials directly.
+	// Host networking, the daemon takes plain HTTP from localhost only. It
+	// listens on every interface because nk dials the host addresses it
+	// advertises.
 	docker := exec.CommandContext(bounded(t), "docker", "run", "--detach",
 		"--name", s.container,
 		"--label", smokeLabel,
@@ -208,7 +233,7 @@ func (s *smoke) enrollDaemon(t *testing.T) {
 		"--env", "NOKKUD_ENROLL_TOKEN",
 		daemonImage,
 	)
-	// From the environment, any local user can read a token off the command line.
+	// Not on the command line, any local user can read the token there.
 	docker.Env = append(os.Environ(), "NOKKUD_ENROLL_TOKEN="+created.GetSecret())
 	run(t, docker)
 
@@ -226,7 +251,7 @@ func (s *smoke) enrollDaemon(t *testing.T) {
 	}, "%s never showed as accepted and online", serverName)
 	assert.NotEmpty(t, s.daemon.GetVersion(), "the version comes from nokkud's user agent")
 
-	// Online means connected, the filter and the server list say the same as the daemon itself.
+	// Online means connected, the filter says the same as the daemon itself.
 	online, err := s.daemons.ListDaemons(t.Context(), &nokkuv1.ListDaemonsRequest{Online: new(true)})
 	require.NoError(t, err)
 	assert.True(t, slices.ContainsFunc(online.GetDaemons(), func(d *nokkuv1.Daemon) bool {
@@ -245,7 +270,7 @@ func (s *smoke) enrollDaemon(t *testing.T) {
 }
 
 func (s *smoke) grantAccount(t *testing.T) {
-	// Accounts come from the daemon's sync, the grant goes on the one it reported.
+	// Accounts come from the daemon's sync, the grant goes on the reported one.
 	waitFor(t, time.Minute, func() bool {
 		res, err := s.targetAccounts.ListTargetAccounts(t.Context(), &nokkuv1.ListTargetAccountsRequest{
 			TargetId: new(s.target.GetId()),
@@ -267,7 +292,7 @@ func (s *smoke) grantAccount(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// ssh checks the host certificate, which the daemon asks for after its first sync.
+	// ssh checks the host certificate, the daemon gets it after its first sync.
 	waitFor(t, time.Minute, func() bool { return len(s.auditLogs(t, "SignHostCertificate")) > 0 },
 		"the daemon never got a host certificate")
 }
@@ -318,7 +343,8 @@ func (s *smoke) sshDirect(t *testing.T) {
 
 func (s *smoke) sshRelay(t *testing.T) {
 	relays := s.relayOpens(t)
-	// ssh takes the first value it gets, so this goes before the ProxyCommand of nk's config.
+	// ssh takes the first value it gets, so this goes before the ProxyCommand
+	// of nk's config.
 	proxy := "ProxyCommand=" + s.home.nkBinary + " proxy --relay " + s.target.GetId() + " %p"
 
 	out, err := s.home.ssh(t, "-o", proxy, login, "echo smoke-relay").CombinedOutput()
@@ -363,7 +389,8 @@ func (s *smoke) webTerminal(t *testing.T) {
 }
 
 func (s *smoke) checkRecordings(t *testing.T) {
-	// Each session uploads its recording when it ends: ssh direct, ssh through the relay and the web terminal.
+	// A session uploads its recording when it ends: direct, relay, web
+	// terminal.
 	var recordings []*nokkuv1.Recording
 	waitFor(t, time.Minute, func() bool {
 		res, err := s.recordings.ListRecordings(t.Context(), &nokkuv1.ListRecordingsRequest{
@@ -455,7 +482,7 @@ func (s *smoke) auditLogs(t *testing.T, actions ...string) []*nokkuv1.EventLog {
 	return res.GetLogs()
 }
 
-// cast fetches a recording like the web player does, gzipped asciicast in chunks.
+// cast fetches a recording like the web player, gzipped asciicast in chunks.
 func (s *smoke) cast(t *testing.T, id string) string {
 	stream, err := s.recordings.GetRecording(t.Context(), &nokkuv1.GetRecordingRequest{RecordingId: &id})
 	require.NoError(t, err)
@@ -476,20 +503,13 @@ func (s *smoke) cast(t *testing.T, id string) string {
 	return string(cast)
 }
 
-// core is the nokku binary, on plain HTTP and localhost like a dev setup.
-type core struct {
-	binary string
-	url    string
-	// admin-link runs with the server's environment.
-	env []string
-}
-
 func startCore(t *testing.T, bin, smtpHost, smtpPort, platformCert string) core {
 	port := freePort(t)
 	c := core{
 		binary: filepath.Join(bin, "nokku"),
 		url:    "http://localhost:" + port,
-		// Nothing comes from the developer's shell, so it cannot point the core at real mail, Stripe, KMS or SSO.
+		// Nothing comes from the developer's shell, so it cannot point the core
+		// at real mail, Stripe, KMS or SSO.
 		env: []string{
 			"HOME=" + t.TempDir(),
 			"NOKKU_BASE_URL=localhost:" + port,
@@ -501,7 +521,7 @@ func startCore(t *testing.T, bin, smtpHost, smtpPort, platformCert string) core 
 			"NOKKU_EMAIL_SENDER=nokku@smoke.test",
 			"NOKKU_STORAGE_URL=file://" + t.TempDir(),
 			"NOKKU_LICENSE_OFFLINE=true",
-			// The job platform of this test listens on loopback, behind a certificate of its own.
+			// The job platform listens on loopback, behind its own certificate.
 			"NOKKU_ALLOW_PRIVATE_NETWORKS=true",
 			"SSL_CERT_FILE=" + platformCert,
 		},
@@ -527,14 +547,6 @@ func (c core) command(ctx context.Context, args ...string) *exec.Cmd {
 	return cmd
 }
 
-// nkHome is where nk and ssh run. A HOME of its own keeps the real ~/.ssh, ~/.config/nk and ssh agent out of it.
-type nkHome struct {
-	dir       string
-	nkBinary  string
-	sshBinary string
-	env       []string
-}
-
 func newNKHome(t *testing.T, bin, sshBinary string) nkHome {
 	dir := t.TempDir()
 	runtimeDir := filepath.Join(dir, "run")
@@ -543,7 +555,7 @@ func newNKHome(t *testing.T, bin, sshBinary string) nkHome {
 		"HOME=" + dir,
 		"XDG_CONFIG_HOME=" + filepath.Join(dir, ".config"),
 		"XDG_RUNTIME_DIR=" + runtimeDir,
-		// The built binaries alone. nk login runs xdg-open from PATH, which would open a real browser.
+		// The binaries alone. xdg-open from PATH would open a real browser.
 		"PATH=" + bin,
 		// ssh runs ProxyCommand and Match exec through it.
 		"SHELL=/bin/sh",
@@ -556,7 +568,8 @@ func (h nkHome) nk(t *testing.T, args ...string) *exec.Cmd {
 	return h.command(t, h.nkBinary, args...)
 }
 
-// ssh runs OpenSSH on nk's config alone. ssh finds ~ in the passwd entry and not in HOME, so -F keeps ~/.ssh out.
+// ssh runs OpenSSH on nk's config alone. ssh finds ~ in the passwd entry, not
+// in HOME, so -F keeps ~/.ssh out.
 func (h nkHome) ssh(t *testing.T, args ...string) *exec.Cmd {
 	args = append([]string{"-F", filepath.Join(h.dir, ".ssh", "config"), "-o", "BatchMode=yes"}, args...)
 	return h.command(t, h.sshBinary, args...)
@@ -565,12 +578,12 @@ func (h nkHome) ssh(t *testing.T, args ...string) *exec.Cmd {
 func (h nkHome) command(t *testing.T, binary string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(bounded(t), binary, args...)
 	cmd.Env = h.env
-	// ssh hands its output to nk proxy, a child left holding it must not stall the test.
+	// ssh hands its output to nk proxy, a child holding it must not stall us.
 	cmd.WaitDelay = 5 * time.Second
 	return cmd
 }
 
-// stopAgent ends the agent nk proxy started. It runs detached and would outlive the test by 30 minutes.
+// stopAgent ends the agent nk proxy started, which would outlive the test.
 func stopAgent(socket string) {
 	conn, err := net.Dial("unix", socket)
 	if err != nil {
@@ -580,7 +593,7 @@ func stopAgent(socket string) {
 	_, _ = agent.NewClient(conn).Extension("shutdown@nokku.sh", nil)
 }
 
-// startMailpit returns the SMTP address of a Mailpit, the relay the core sends its mail to.
+// startMailpit returns the SMTP address of the relay the core sends mail to.
 func startMailpit(t *testing.T) (host, port string) {
 	c, err := testcontainers.Run(t.Context(), mailpitImage,
 		testcontainers.WithExposedPorts("1025/tcp"),
@@ -613,7 +626,7 @@ func goBuild(t *testing.T, repo, dir string, pkgs ...string) {
 	run(t, cmd)
 }
 
-// run runs cmd to its end and returns its output. A failure fails the test and shows the output.
+// run runs cmd to its end and returns its output. A failure fails the test.
 func run(t *testing.T, cmd *exec.Cmd) string {
 	t.Helper()
 	out, err := cmd.CombinedOutput()
@@ -621,13 +634,13 @@ func run(t *testing.T, cmd *exec.Cmd) string {
 	return string(out)
 }
 
-// startLogged runs cmd until the test ends. Its output goes to a file that is printed when the test failed.
+// startLogged runs cmd until the test ends. A failed test prints its log.
 func startLogged(t *testing.T, cmd *exec.Cmd) (exited <-chan struct{}) {
 	t.Helper()
 	log, err := os.Create(filepath.Join(t.TempDir(), "output.log"))
 	require.NoError(t, err)
 	cmd.Stdout, cmd.Stderr = log, log
-	// The context ends with the test. An interrupt shuts the binary down the way a stop would.
+	// The context ends with the test. An interrupt shuts the binary down.
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
 	cmd.WaitDelay = 10 * time.Second
 	require.NoError(t, cmd.Start())
@@ -640,10 +653,10 @@ func startLogged(t *testing.T, cmd *exec.Cmd) (exited <-chan struct{}) {
 	t.Cleanup(func() {
 		<-done
 		out, _ := os.ReadFile(log.Name())
-		// The database must outlive a shutdown, or the last requests lose their audit events.
-		if strings.Contains(string(out), "closed pool") {
-			t.Errorf("%s used the database after it closed", filepath.Base(cmd.Path))
-		}
+		// The database outlives a shutdown, or the last requests lose audit
+		// events.
+		assert.NotContains(t, string(out), "closed pool",
+			"%s used the database after it closed", filepath.Base(cmd.Path))
 		if t.Failed() {
 			t.Logf("%s log:\n%s", filepath.Base(cmd.Path), out)
 		}
@@ -652,14 +665,16 @@ func startLogged(t *testing.T, cmd *exec.Cmd) (exited <-chan struct{}) {
 	return done
 }
 
-// bounded is the test's context with a deadline. A hang must fail its phase, the go test timeout skips the cleanups.
+// bounded is the test's context with a deadline. A hang must fail its phase,
+// the go test timeout skips the cleanups.
 func bounded(t *testing.T) context.Context {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	t.Cleanup(cancel)
 	return ctx
 }
 
-// waitFor polls cond on the test's goroutine, so cond may fail the test and set what the test reads after.
+// waitFor polls cond on the test's goroutine, so cond may fail the test and set
+// what the test reads after.
 func waitFor(t *testing.T, timeout time.Duration, cond func() bool, msgAndArgs ...any) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -698,12 +713,6 @@ func freePort(t *testing.T) string {
 	_, port, err := net.SplitHostPort(l.Addr().String())
 	require.NoError(t, err)
 	return port
-}
-
-// lockedBuffer collects a process's output while the test reads it.
-type lockedBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
 }
 
 func (b *lockedBuffer) Write(p []byte) (int, error) {

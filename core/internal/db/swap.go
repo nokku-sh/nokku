@@ -2,8 +2,8 @@ package db
 
 import "context"
 
-// TransferOwnership is false when the new owner does not exist or is not active. Call it in a transaction,
-// the old owner has lost the role by then and only the rollback gives it back.
+// TransferOwnership is false for an unknown or inactive new owner. Call it in a
+// transaction, only a rollback gives the old owner the role back.
 func (q *Queries) TransferOwnership(ctx context.Context, newOwnerID string) (bool, error) {
 	demoted, err := q.DemoteOwner(ctx)
 	if err != nil {

@@ -22,36 +22,36 @@ import (
 
 const (
 	maxConns = 100
-	// Relayed connections get half the slots at most, so people on the relay cannot crowd out direct logins.
+	// At most half the slots, so the relay cannot crowd out direct logins.
 	maxRelayedConns = maxConns / 2
 	maxStartups     = 10
 	// One remote address cannot hold every pre-auth slot.
 	maxSourceStartups = 3
 	// Per connection, sessions and forwards alike.
 	maxChannels = 50
-	// Covers the account lookup too, which may wait on a slow directory. OpenSSH allows 120s.
+	// Covers the account lookup, which may wait on a slow directory.
 	handshakeTimeout = 30 * time.Second
-	// A probe left unanswered for three intervals drops the client, like OpenSSH.
+	// Three unanswered intervals drop the client, like OpenSSH.
 	aliveInterval = time.Minute
-	// Under fd exhaustion the accept loop would otherwise spin a core and flood the log.
+	// Under fd exhaustion the accept loop would spin a core and flood the log.
 	acceptBackoff = 10 * time.Millisecond
 )
 
 var errBusy = errors.New("too many unauthenticated connections")
 
-// Policy is the core-controlled part of the config. It applies to new sessions without a restart.
-type Policy struct {
+// defaultPolicy also fills any field the core leaves unset.
+var defaultPolicy = policy{Record: true, AllowForwarding: true, AllowAgentForwarding: true}
+
+// policy is set by the core and applies to new sessions without a restart.
+type policy struct {
 	Record               bool
 	AllowForwarding      bool
 	AllowAgentForwarding bool
 	// GatewayPorts lets -R forwards bind non-loopback addresses.
 	GatewayPorts bool
-	// IdleTimeout closes an interactive session after that long without input. Zero never does.
+	// IdleTimeout ends an interactive session without input. Zero never does.
 	IdleTimeout time.Duration
 }
-
-// defaultPolicy also fills any field the core leaves unset.
-var defaultPolicy = Policy{Record: true, AllowForwarding: true, AllowAgentForwarding: true}
 
 type Server struct {
 	// log gets the audit events. Tests point it at a buffer.
@@ -66,7 +66,7 @@ type Server struct {
 	// Limits live on the server so tests can shrink them.
 	conns   chan struct{}
 	relayed chan struct{}
-	// Loopback has its own pre-auth budget, a local proxy puts every client behind that one address.
+	// Loopback has its own budget, a local proxy puts all clients behind it.
 	startups      chan struct{}
 	localStartups chan struct{}
 	maxChannels   int
@@ -85,8 +85,7 @@ type Server struct {
 	cfg *ssh.ServerConfig
 }
 
-// New trusts no CA. Those come from SetAccess, and until then every login is refused. uploads sends the recordings
-// to the core, nil keeps them on disk.
+// New trusts no CA. Every login is refused until SetAccess.
 func New(uploads *recording.Uploads) (*Server, error) {
 	s := &Server{
 		log:            slog.Default(),
@@ -111,12 +110,12 @@ func New(uploads *recording.Uploads) (*Server, error) {
 	return s, nil
 }
 
-func policyFrom(cfg *nokkuv1.DaemonConfig) Policy {
+func policyFrom(cfg *nokkuv1.DaemonConfig) policy {
 	p := defaultPolicy
 	if cfg == nil {
 		return p
 	}
-	// The raw pointers carry presence, the getters would flatten unset to false.
+	// The raw pointers carry presence, getters would flatten unset to false.
 	set := func(dst *bool, v *bool) {
 		if v != nil {
 			*dst = *v
@@ -130,9 +129,9 @@ func policyFrom(cfg *nokkuv1.DaemonConfig) Policy {
 	return p
 }
 
-// Reload rereads the host certificate. Established connections keep the one they handshook with.
+// Reload rereads the host cert. Open connections keep the old one.
 func (s *Server) Reload() {
-	// The library defaults still offer SHA-1 key exchange, hmac-sha1-96, ssh-rsa and ssh-dss. OpenSSH dropped them.
+	// Library defaults still offer SHA-1 kex, hmac-sha1-96, ssh-rsa, ssh-dss.
 	algos := ssh.SupportedAlgorithms()
 	cfg := &ssh.ServerConfig{
 		KeyExchanges: algos.KeyExchanges, MACs: algos.MACs,
@@ -149,7 +148,7 @@ func (s *Server) Reload() {
 	s.cfg = cfg
 }
 
-// Serve returns once ctx is done and every connection it accepted is closed, with its sessions torn down.
+// Serve returns once ctx is done and every connection and session is gone.
 func (s *Server) Serve(ctx context.Context, l net.Listener) {
 	stop := context.AfterFunc(ctx, func() { _ = l.Close() })
 	defer stop()
@@ -184,8 +183,7 @@ func (s *Server) Serve(ctx context.Context, l net.Listener) {
 	}
 }
 
-// ServeConn takes no pre-auth slot, the core already authenticated the user. It takes a relay slot and a
-// connection slot.
+// ServeConn takes no pre-auth slot, the core already authenticated the user.
 func (s *Server) ServeConn(ctx context.Context, nc net.Conn) {
 	select {
 	case s.relayed <- struct{}{}:
@@ -206,7 +204,7 @@ func (s *Server) ServeConn(ctx context.Context, nc net.Conn) {
 	s.handleConn(ctx, nc, true)
 }
 
-// DropRevoked makes a revoke end open sessions too. SetAccess alone only gates new logins.
+// DropRevoked ends open sessions on a revoke, SetAccess only gates new logins.
 func (s *Server) DropRevoked() {
 	a := s.access.Load()
 	s.liveMu.Lock()
@@ -221,7 +219,7 @@ func (s *Server) DropRevoked() {
 	}
 }
 
-// The connection closes when ctx ends, which ends its sessions the way a client that hangs up does.
+// ctx closes the connection, which ends its sessions like a client hanging up.
 func (s *Server) handleConn(ctx context.Context, nc net.Conn, relayed bool) {
 	defer nc.Close()
 	defer recoverPanic("connection")
@@ -258,7 +256,7 @@ func (s *Server) handleConn(ctx context.Context, nc net.Conn, relayed bool) {
 	go s.keepAlive(conn, done)
 	go s.handleGlobalRequests(st, reqs)
 
-	// A session's context is its connection's, canceled before the wait so a closed connection ends them all.
+	// Canceled before the wait, so a closed connection ends all its sessions.
 	ctx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -286,7 +284,6 @@ func (s *Server) handleConn(ctx context.Context, nc net.Conn, relayed bool) {
 	}
 }
 
-// A pre-auth slot is held only while the handshake runs. A relayed connection takes none.
 func (s *Server) handshake(
 	nc net.Conn,
 	relayed bool,

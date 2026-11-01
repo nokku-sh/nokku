@@ -9,7 +9,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 )
 
-// A ciphertext opens only in the row it was sealed for. Copied anywhere else, it is refused.
+// A ciphertext opens only in the row it was sealed for, anywhere else it fails.
 func TestSealedSecretOpensOnlyInItsRow(t *testing.T) {
 	keys, err := Ephemeral()
 	require.NoError(t, err)

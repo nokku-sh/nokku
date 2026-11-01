@@ -12,7 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
-// NOKKU_BASE_URL names the public host. The listen port is not part of it, the scheme is never configured.
+// NOKKU_BASE_URL names the public host. Listen port and scheme are not in it.
 func TestFullURL(t *testing.T) {
 	tests := []struct {
 		name, baseURL, want string
@@ -52,7 +52,7 @@ func TestBaseURLAccepts(t *testing.T) {
 	}
 }
 
-// A scheme and an IP address both fail the start instead of failing in a browser later.
+// A scheme or an IP address fails the start, not a browser later.
 func TestBaseURLRefuses(t *testing.T) {
 	for in, want := range map[string]string{
 		"https://nokku.example.com": "Leave out the scheme",
@@ -72,7 +72,7 @@ func TestBaseURLRefuses(t *testing.T) {
 	}
 }
 
-// The check runs where the environment is read, so the server and the subcommands refuse the same values.
+// Checked on read, so the server and the subcommands refuse the same values.
 func TestBaseURLIsCheckedOnParse(t *testing.T) {
 	t.Setenv("NOKKU_BASE_URL", "http://nokku.example.com")
 	_, err := env.ParseAs[EnvConfig]()
@@ -92,7 +92,7 @@ func TestUnsetEnvironmentIsTheLocalListener(t *testing.T) {
 	assert.Equal(t, "http://localhost:3000", ec.FullURL())
 }
 
-// With nothing set, a proxy on this machine or a private network names the client, so docker and k8s just work.
+// With nothing set, a local or private proxy names the client, so docker works.
 func TestProxiesTrustedByDefault(t *testing.T) {
 	t.Setenv("NOKKU_TRUSTED_PROXIES", "")
 	ec, err := env.ParseAs[EnvConfig]()

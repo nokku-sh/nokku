@@ -1,4 +1,4 @@
-// Command testserver is built by internal/sshd/interop_test.go for the interop tests. It is not shipped.
+// Command testserver runs the server for the interop tests. It is not shipped.
 package main
 
 import (
@@ -28,7 +28,7 @@ func main() {
 	allowNonRoot := flag.Bool("allow-nonroot", false, "run as non-root, sessions restricted to this account")
 	flag.Parse()
 
-	// The embedded server re-execs this entrypoint as the target user for its helpers.
+	// The server re-execs this entrypoint as the target user for its helpers.
 	if flag.NArg() > 0 {
 		if err := sshd.RunHelper(context.Background(), flag.Arg(0), flag.Args()[1:]); err != nil {
 			fail(err.Error())
@@ -58,7 +58,7 @@ func main() {
 	access := *st.Access()
 	access.DaemonConfig = &nokkuv1.DaemonConfig{RecordSessions: new(false)}
 	if *allowNonRoot {
-		// Without privilege dropping every session runs as this account, so only this account may log in.
+		// Nothing drops privileges here, so only this account may log in.
 		self, userErr := user.Current()
 		if userErr != nil {
 			fail(userErr.Error())

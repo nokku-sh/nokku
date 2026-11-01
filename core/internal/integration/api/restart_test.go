@@ -21,12 +21,11 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// A restart gives the core a new nonce key. A daemon holding a nonce of the old boot syncs and connects by itself, wired
-// the way nokkud wires its client, and people stay signed in.
+// A restart means a new nonce key. A daemon with an old nonce recovers alone.
 func TestClientsOutliveACoreRestart(t *testing.T) {
 	selfHostedOnly(t, "it dials the real listener, which reads no workspace host")
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	member := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 
@@ -55,7 +54,7 @@ func TestClientsOutliveACoreRestart(t *testing.T) {
 	require.NoError(t, err, "a sync with a nonce of the old boot did not retry by itself")
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, sync.GetStatus())
 
-	// A stream is signed once, so the first dial fails and tells the next one the nonce.
+	// A stream is signed once, so the first dial fails and teaches the nonce.
 	daemon.Learn(oldNonce)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -74,7 +73,7 @@ func TestClientsOutliveACoreRestart(t *testing.T) {
 	require.Eventually(t, func() bool { return restarted.Pool.IsConnected(enrolled.GetId()) },
 		5*time.Second, 20*time.Millisecond, "the daemon's second dial did not connect")
 
-	// An upload is a stream too. Its first try fails the same way, and the daemon's next try has the nonce.
+	// An upload is a stream too, so its first try fails the same way.
 	id := uuid.NewV7().String()
 	upload := func() error {
 		stream, err := ctl.UploadRecording(t.Context())

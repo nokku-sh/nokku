@@ -22,7 +22,7 @@ import (
 
 const header = "# Managed by Nokku. nk regenerates this file, do not edit it.\n\n"
 
-// Held to what the core itself allows. Anything wider could claim a real host like github.com or reach the shell.
+// What the core allows. Anything wider could claim github.com or reach a shell.
 var targetName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 func WriteConfigs(s *state.State) error {
@@ -41,9 +41,9 @@ func HostAliases(s *state.State) map[string]string {
 	return hostAliases(s, readOwnHosts())
 }
 
-// nk's Include sits on top of the user's config, so a bare name there would take over a host of their own.
+// nk's Include comes first, so a bare name could take over a user's own host.
 func hostAliases(s *state.State, own ownHosts) map[string]string {
-	// Case is folded. ssh's Match does not tell Web from web, and neither does a person.
+	// Case folded, ssh's Match can't tell Web from web. Neither can people.
 	names := make(map[string]int)
 	for _, t := range s.Targets {
 		if usable(t) {
@@ -77,7 +77,8 @@ func renderSSHConfig(s *state.State, aliases map[string]string, nk string) []byt
 			continue
 		}
 
-		// ssh loads CertificateFile before ProxyCommand, so Match exec renews first. It lowercases %h, hence the id.
+		// ssh loads CertificateFile before ProxyCommand, so Match exec renews
+		// first. It lowercases %h, hence the id.
 		fmt.Fprintf(&b, `Match originalhost %s exec %s
 
 Host %s
@@ -103,7 +104,7 @@ Host %s
 	return b.Bytes()
 }
 
-// Trust is scoped to the target id, the HostKeyAlias in ssh_config, never a global "*".
+// Trust is scoped to the target id, the HostKeyAlias, never a global "*".
 func renderKnownHosts(s *state.State) []byte {
 	var b bytes.Buffer
 	b.WriteString(header)
@@ -118,7 +119,7 @@ func renderKnownHosts(s *state.State) []byte {
 		if s.CA == nil {
 			continue
 		}
-		// A daemon that missed a rollover still shows a host certificate from the replaced key.
+		// A daemon that missed a rollover still shows the replaced key's cert.
 		for _, key := range s.CA.TrustedHostKeys() {
 			if safeLine(key) {
 				fmt.Fprintf(&b, "@cert-authority %s %s\n", t.ID, key)
@@ -128,7 +129,7 @@ func renderKnownHosts(s *state.State) []byte {
 	return b.Bytes()
 }
 
-// An absolute path, so ssh started without nk on its PATH (IDEs, cron, git GUIs) still finds this nk.
+// An absolute path, for ssh started without nk on its PATH (IDEs, cron).
 func nkCommand() string {
 	self, err := os.Executable()
 	if err != nil {
@@ -138,10 +139,10 @@ func nkCommand() string {
 	if found, lookErr := exec.LookPath("nk"); lookErr == nil && filepath.IsAbs(found) && sameFile(found, self) {
 		bin = found
 	}
-	// ssh expands % tokens and hands the line to a shell, so what a quoted path cannot carry falls back to PATH.
+	// ssh expands % and runs a shell, so unsafe paths fall back to PATH.
 	unsafe := "\"$`%\\\n"
 	if runtime.GOOS == "windows" {
-		// Every Windows path has a backslash, and no shell reads the line there.
+		// Windows paths have backslashes, and no shell reads the line there.
 		unsafe = "\"$`%\n"
 	}
 	if strings.ContainsAny(bin, unsafe) {
@@ -168,13 +169,9 @@ func safeLine(s string) bool {
 	return s != "" && !strings.ContainsFunc(s, func(r rune) bool { return r < 0x20 || r == 0x7f })
 }
 
-// Quotes cover spaces, and ssh unescapes \\ and \", which Windows paths and quoted commands need.
+// ssh unescapes \\ and \", which Windows paths and quoted commands need.
 func configValue(v string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v) + `"`
-}
-
-func includeLine() string {
-	return "Include " + configValue(paths.SSHConfigFile())
 }
 
 // On top, because an Include after a Host line would be scoped to it.
@@ -192,6 +189,10 @@ func ensureInclude() error {
 		return fmt.Errorf("cannot update %s (%w), add this line at its top yourself:\n  %s", path, err, includeLine())
 	}
 	return nil
+}
+
+func includeLine() string {
+	return "Include " + configValue(paths.SSHConfigFile())
 }
 
 func RemoveInclude() error {
@@ -230,7 +231,7 @@ func isInclude(line string) bool {
 		strings.ReplaceAll(includeLine(), `"`, "")
 }
 
-// Resolved through symlinks, so dotfile managers keep their link and nk edits the real file.
+// Resolves symlinks, so dotfile managers keep their link.
 func userConfig() string {
 	path := paths.SSHUserConfig()
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {

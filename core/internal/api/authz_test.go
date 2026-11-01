@@ -2,13 +2,14 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
 
 	"connectrpc.com/connect/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
@@ -69,19 +70,17 @@ func TestProcedureRoles(t *testing.T) {
 		{nokkuv1connect.BillingServiceCreatePortalProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.BillingServiceCancelSubscriptionProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.SSOServicePutSSOProviderProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
-		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.SSOServiceDeleteSSOProviderProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 	}
 
 	for _, test := range tests {
-		if got := procedureAccess[test.procedure].GetRole(); got != test.want {
-			t.Errorf("%s role = %s, want %s", test.procedure, got, test.want)
-		}
+		assert.Equal(t, test.want, procedureAccess[test.procedure].GetRole(), test.procedure)
 	}
 }
 
-// allProcedures reads the generated descriptors, so a new RPC shows up here without anyone listing it.
+// allProcedures reads the descriptors, so a new RPC shows up here by itself.
 func allProcedures(t *testing.T) []string {
 	t.Helper()
 	_ = nokkuv1.File_nokku_v1_daemon_proto
@@ -95,9 +94,7 @@ func allProcedures(t *testing.T) []string {
 		}
 		return true
 	})
-	if len(out) == 0 {
-		t.Fatal("no nokku.v1 procedures registered")
-	}
+	require.NotEmpty(t, out, "no nokku.v1 procedures registered")
 	return out
 }
 
@@ -110,8 +107,7 @@ func daemonOnly(a *nokkuv1.Access) bool {
 func TestEveryProcedureIsClassified(t *testing.T) {
 	for _, procedure := range allProcedures(t) {
 		access := procedureAccess[procedure]
-		if access == nil {
-			t.Errorf("%s has no (access) option", procedure)
+		if !assert.NotNil(t, access, "%s has no (access) option", procedure) {
 			continue
 		}
 		classes := 0
@@ -122,19 +118,17 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 			classes++
 		}
 		if access.GetRole() != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
-			if _, ok := nokkuv1.WorkspaceRole_name[int32(access.GetRole())]; !ok {
-				t.Errorf("%s has an undefined role %d", procedure, access.GetRole())
-			}
+			assert.Contains(t, nokkuv1.WorkspaceRole_name, int32(access.GetRole()),
+				"%s has an undefined role", procedure)
 			classes++
 		}
 		if daemonOnly(access) {
 			classes++
 		}
-		if classes != 1 {
-			t.Errorf("%s is in %d authorization classes, want exactly 1", procedure, classes)
-		}
-		if access.GetPeopleOnly() && access.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
-			t.Errorf("%s is people_only without a role", procedure)
+		assert.Equal(t, 1, classes, "%s must be in exactly one authorization class", procedure)
+		if access.GetPeopleOnly() {
+			assert.NotEqual(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, access.GetRole(),
+				"%s is people_only without a role", procedure)
 		}
 	}
 }
@@ -144,12 +138,9 @@ func TestRequestsCarryNoWorkspace(t *testing.T) {
 	for _, procedure := range allProcedures(t) {
 		name := protoreflect.FullName(strings.ReplaceAll(strings.TrimPrefix(procedure, "/"), "/", "."))
 		desc, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
-		if err != nil {
-			t.Errorf("%s: %v", procedure, err)
-			continue
-		}
-		if desc.(protoreflect.MethodDescriptor).Input().Fields().ByName("workspace_id") != nil {
-			t.Errorf("%s names a workspace in its request", procedure)
+		if assert.NoError(t, err, procedure) {
+			workspace := desc.(protoreflect.MethodDescriptor).Input().Fields().ByName("workspace_id")
+			assert.Nil(t, workspace, "%s names a workspace in its request", procedure)
 		}
 	}
 }
@@ -157,7 +148,7 @@ func TestRequestsCarryNoWorkspace(t *testing.T) {
 func TestAuthorizeDaemon(t *testing.T) {
 	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "d1", Kind: actor.KindDaemon})
-	// These answer a daemon in any state. The rest look the daemon up, see TestPendingDaemonIsDenied.
+	// Any daemon state passes these. The rest: TestPendingDaemonIsDenied.
 	anyState := []string{
 		nokkuv1connect.DaemonControlServiceSyncDaemonProcedure,
 		nokkuv1connect.DaemonControlServiceConnectProcedure,
@@ -165,30 +156,27 @@ func TestAuthorizeDaemon(t *testing.T) {
 	}
 
 	for _, procedure := range allProcedures(t) {
-		switch {
-		case procedureAccess[procedure].GetPublic():
-		case !procedureAccess[procedure].GetDaemon():
-			if err := a.authorize(ctx, procedure, nil); !errors.Is(err, db.ErrPermissionDenied) {
-				t.Errorf("daemon allowed %s, want permission denied", procedure)
-			}
-		case slices.Contains(anyState, procedure):
-			if err := a.authorize(ctx, procedure, nil); err != nil {
-				t.Errorf("daemon denied %s: %v", procedure, err)
-			}
+		access := procedureAccess[procedure]
+		if access.GetPublic() {
+			continue
+		}
+		if !access.GetDaemon() {
+			assert.ErrorIs(t, a.authorize(ctx, procedure, nil), db.ErrPermissionDenied, "daemon allowed %s", procedure)
+		} else if slices.Contains(anyState, procedure) {
+			assert.NoError(t, a.authorize(ctx, procedure, nil), "daemon denied %s", procedure)
 		}
 	}
 }
 
-// A daemon's whole surface is one service, and nothing else lives there but the public enrollment.
+// A daemon's whole surface is one service, shared only with enrollment.
 func TestDaemonProceduresLiveInControlService(t *testing.T) {
 	for procedure, access := range procedureAccess {
 		inService := strings.HasPrefix(procedure, "/nokku.v1.DaemonControlService/")
 		if procedure == nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure {
 			continue
 		}
-		if inService != daemonOnly(access) || inService != access.GetDaemon() {
-			t.Errorf("%s: daemon procedures and DaemonControlService must be the same set", procedure)
-		}
+		same := inService == daemonOnly(access) && inService == access.GetDaemon()
+		assert.True(t, same, "%s: daemon procedures and DaemonControlService must be the same set", procedure)
 	}
 }
 
@@ -202,9 +190,7 @@ func TestAuthorizeUserOnDaemonProcedures(t *testing.T) {
 		if !daemonOnly(access) {
 			continue
 		}
-		if err := a.authorize(ctx, procedure, nil); !errors.Is(err, db.ErrPermissionDenied) {
-			t.Errorf("user allowed %s, want permission denied", procedure)
-		}
+		assert.ErrorIs(t, a.authorize(ctx, procedure, nil), db.ErrPermissionDenied, "user allowed %s", procedure)
 	}
 }
 
@@ -231,9 +217,7 @@ func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		err := a.authorize(as(tt.role), tt.procedure, nil)
-		if (err == nil) != tt.allowed {
-			t.Errorf("%s on %s: err = %v, want allowed=%v", tt.role, tt.procedure, err, tt.allowed)
-		}
+		assert.Equal(t, tt.allowed, err == nil, "%s on %s: err = %v", tt.role, tt.procedure, err)
 	}
 }
 
@@ -265,9 +249,7 @@ func TestAuthorizePeopleOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		err := a.authorize(as(tt.kind), tt.procedure, nil)
-		if (err == nil) != tt.allowed {
-			t.Errorf("%s on %s: err = %v, want allowed=%v", tt.kind, tt.procedure, err, tt.allowed)
-		}
+		assert.Equal(t, tt.allowed, err == nil, "%s on %s: err = %v", tt.kind, tt.procedure, err)
 	}
 }
 
@@ -277,12 +259,10 @@ func TestAuthorizeUnknownProcedure(t *testing.T) {
 		t.Context(),
 		actor.Principal{ID: "u1", Kind: actor.KindUser, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 	)
-	if err := a.authorize(ctx, "/nokku.v1.UnknownService/Unknown", nil); !errors.Is(err, db.ErrPermissionDenied) {
-		t.Fatalf("unknown procedure: err = %v, want permission denied", err)
-	}
+	require.ErrorIs(t, a.authorize(ctx, "/nokku.v1.UnknownService/Unknown", nil), db.ErrPermissionDenied)
 }
 
-// nk must not add a way in, a stolen state file would otherwise mint credentials for good.
+// nk adds no way in, or a stolen state file mints credentials for good.
 func TestAuthorizeFreshRefusesNk(t *testing.T) {
 	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(
@@ -295,11 +275,8 @@ func TestAuthorizeFreshRefusesNk(t *testing.T) {
 			continue
 		}
 		fresh++
-		if err := a.authorize(ctx, procedure, nil); connect.CodeOf(err) != connect.CodePermissionDenied {
-			t.Errorf("nk on %s: err = %v, want permission denied", procedure, err)
-		}
+		err := a.authorize(ctx, procedure, nil)
+		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "nk on %s: err = %v", procedure, err)
 	}
-	if fresh == 0 {
-		t.Fatal("no procedure asks for a fresh sign-in")
-	}
+	require.NotZero(t, fresh, "no procedure asks for a fresh sign-in")
 }

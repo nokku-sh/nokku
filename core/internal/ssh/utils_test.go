@@ -8,102 +8,65 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 )
 
 func TestGetSigner(t *testing.T) {
 	_, ed, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	der, err := x509.MarshalPKCS8PrivateKey(ed)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	signer, err := getSigner(der)
-	if err != nil {
-		t.Fatalf("getSigner() error: %v", err)
-	}
-	if signer.PublicKey().Type() != ssh.KeyAlgoED25519 {
-		t.Errorf("signer is %s, want Ed25519", signer.PublicKey().Type())
-	}
+	require.NoError(t, err)
+	assert.Equal(t, ssh.KeyAlgoED25519, signer.PublicKey().Type())
 }
 
-// The core stores CA keys as PKCS#8 DER and nothing else, so anything else is not one of its keys.
+// The core stores CA keys as PKCS#8 DER, anything else is not one of its keys.
 func TestGetSigner_RejectsOtherForms(t *testing.T) {
 	_, ed, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	der, err := x509.MarshalPKCS8PrivateKey(ed)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	openssh, err := ssh.MarshalPrivateKey(ed, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for name, raw := range map[string][]byte{
 		"nil":         nil,
 		"garbage":     []byte("not a key"),
 		"pkcs8 pem":   pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}),
 		"openssh pem": pem.EncodeToMemory(openssh),
 	} {
-		if _, err := getSigner(raw); err == nil {
-			t.Errorf("getSigner(%s): want error", name)
-		}
+		_, err := getSigner(raw)
+		assert.Error(t, err, "getSigner(%s)", name)
 	}
 }
 
 func TestMarshalPubKey_RoundTrip(t *testing.T) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	line, err := MarshalPubKey(priv.Public())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if line == "" {
-		t.Fatal("MarshalPubKey() = empty")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, line)
 
 	// The output must parse back as an authorized key matching the original.
 	pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
-	if err != nil {
-		t.Fatalf("output %q does not parse as authorized key: %v", line, err)
-	}
+	require.NoError(t, err, "output %q does not parse as authorized key", line)
 	want, err := ssh.NewPublicKey(priv.Public())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(pub.Marshal()) != string(want.Marshal()) {
-		t.Error("round-tripped key does not match original")
-	}
-}
-
-func keyLine(t *testing.T, comment string) string {
-	t.Helper()
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	pub, err := ssh.NewPublicKey(priv.Public())
-	if err != nil {
-		t.Fatalf("new public key: %v", err)
-	}
-	line := strings.TrimRight(string(ssh.MarshalAuthorizedKey(pub)), "\n")
-	return line + " " + comment
+	require.NoError(t, err)
+	assert.Equal(t, want.Marshal(), pub.Marshal(), "round-tripped key does not match original")
 }
 
 func TestParsePublicKey(t *testing.T) {
-	line := keyLine(t, "x")
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	pub, err := ssh.NewPublicKey(priv.Public())
+	require.NoError(t, err)
+	line := strings.TrimRight(string(ssh.MarshalAuthorizedKey(pub)), "\n") + " x"
 
-	if _, err := ParsePublicKey(line); err != nil {
-		t.Fatalf("parse valid key: %v", err)
-	}
-	if _, err := ParsePublicKey("garbage"); err == nil {
-		t.Fatal("parse garbage should fail")
-	}
+	_, err = ParsePublicKey(line)
+	require.NoError(t, err, "parse valid key")
+	_, err = ParsePublicKey("garbage")
+	require.Error(t, err, "parse garbage should fail")
 }

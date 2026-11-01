@@ -45,7 +45,7 @@ func TestAccessFromDropsInvalidAccounts(t *testing.T) {
 	is.EqualValues(7, a.StateVersion)
 }
 
-// Enrollment and access are one file, so a restart sees both halves of the same moment.
+// Enrollment and access share a file, so a restart sees both from one moment.
 func TestSaveLoadRoundTrip(t *testing.T) {
 	newTestDataDir(t)
 	is := assert.New(t)
@@ -163,7 +163,6 @@ func TestStateFileNeverContainsPaths(t *testing.T) {
 	data, err := os.ReadFile(paths.StateFile())
 	must.NoError(err)
 
-	// The enrollment state is shared with the control plane, the data dir must not leak into it.
 	assert.NotContains(t, string(data), os.Getenv("NOKKUD_DATA_DIR"))
 }
 
@@ -195,8 +194,7 @@ func TestStateConcurrentAccess(t *testing.T) {
 	assert.EqualValues(t, 49, s.SavedVersion())
 }
 
-// nokkud enroll while the service runs writes a new enrollment. The running service must not write its old one back
-// over it, the new one takes over at the next start.
+// An enroll during a run writes a new enrollment, the service must not undo it.
 func TestSaveKeepsANewerEnrollment(t *testing.T) {
 	newTestDataDir(t)
 	first := New(Config{DaemonID: "daemon-a", SessionToken: "token-a"})
@@ -209,8 +207,8 @@ func TestSaveKeepsANewerEnrollment(t *testing.T) {
 	enrolling.DaemonID, enrolling.SessionToken = "daemon-b", "token-b"
 	require.NoError(t, enrolling.Save(), "the enroll writes over the enrollment it read")
 
-	require.ErrorIs(t, running.Save(), ErrReplaced)
-	require.ErrorIs(t, running.Dropped().Save(), ErrReplaced, "a rejection of the old one wiped the new one")
+	require.ErrorIs(t, running.Save(), errReplaced)
+	require.ErrorIs(t, running.Dropped().Save(), errReplaced, "a rejection of the old one wiped the new one")
 	onDisk, err := Load()
 	require.NoError(t, err)
 	assert.Equal(t, "daemon-b", onDisk.DaemonID)

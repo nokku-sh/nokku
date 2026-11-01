@@ -1,7 +1,7 @@
 package iam
 
-// A CI job proves who it is with a token its platform signed, and trades it for a short session of a service account.
-// The core is the relying party, as for SSO. What may sign in is decided by rules an admin stored, never by the token.
+// A CI job trades a token its platform signed for a short service account
+// session. Rules an admin stored decide what may sign in, never the token.
 
 import (
 	"cmp"
@@ -27,19 +27,19 @@ import (
 const (
 	workloadSessionTTL = time.Hour
 	workloadSkew       = time.Minute
-	// workloadMaxAge stays under the session by the skew. A session row can end before an iat a minute ahead turns an
-	// hour old, and a job token must not work again in that gap.
+	// workloadMaxAge stays under the session by the skew, so a job token with a
+	// future iat can't work again once its session row is gone.
 	workloadMaxAge = workloadSessionTTL - workloadSkew
-	// A unique index takes a little over 2 KiB per row. No platform comes near this.
+	// A unique index takes about 2 KiB per row, no platform comes near this.
 	maxWorkloadJTI = 256
-	// maxRefusalReason bounds what a refused exchange writes, a provider's error can quote a whole answer.
+	// A provider's error can quote a whole answer, this bounds what is logged.
 	maxRefusalReason = 256
 
 	githubActionsHost = "token.actions.githubusercontent.com"
 	gitlabHost        = "gitlab.com"
 )
 
-// checkedClaims are what the core checks on every job token itself, a rule has no say in them.
+// checkedClaims are the core's own, a rule has no say in them.
 var checkedClaims = []string{"aud", "iss", "exp", "iat", "nbf", "jti"}
 
 // Workload is a job token that passed every check.
@@ -51,18 +51,16 @@ type Workload struct {
 	Expiry  time.Time
 }
 
-// WorkloadRefusedError says why an exchange was turned down, for the audit log and the log. The caller answers one
-// generic error for every refusal.
+// WorkloadRefusedError is for the logs, the caller answers one generic error.
 type WorkloadRefusedError struct {
 	Account *db.ServiceAccount // nil when the name found none
 	Reason  string
-	// Signed says the issuer of a stored rule vouched for the token. Anyone can send one that isn't, at the rate limit.
+	// Signed: a stored rule's issuer vouched. Anyone can send one that isn't.
 	Signed bool
 }
 
 func (r *WorkloadRefusedError) Error() string { return "iam: workload token refused: " + r.Reason }
 
-// ValidateFederation checks a rule before it is stored. Its errors are for the admin who wrote it.
 func ValidateFederation(issuer string, claims map[string]string) error {
 	u, err := url.Parse(issuer)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.RawQuery != "" || u.ForceQuery ||
@@ -106,8 +104,7 @@ func ValidateFederation(issuer string, claims map[string]string) error {
 	return nil
 }
 
-// VerifyWorkload runs every check of an exchange on raw, in this order. A *WorkloadRefusedError is the answer about the
-// job, any other error means the check could not run.
+// VerifyWorkload refuses with *WorkloadRefusedError, any other error is ours.
 func (s *Service) VerifyWorkload(ctx context.Context, name, raw string) (*Workload, error) {
 	account, err := s.conn.Tenant().GetServiceAccountByName(ctx, name)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -129,7 +126,7 @@ func (s *Service) VerifyWorkload(ctx context.Context, name, raw string) (*Worklo
 	if len(rules) == 0 {
 		return reject("the account has no rules")
 	}
-	// Only picks rules. Everything after this trusts the issuer of a stored rule, so a job can't name its own.
+	// Only picks rules. A stored rule's issuer is trusted, never the job's.
 	iss, err := unverifiedIssuer(raw)
 	if err != nil {
 		return reject("the token is no JWT with an issuer")
@@ -144,7 +141,7 @@ func (s *Service) VerifyWorkload(ctx context.Context, name, raw string) (*Worklo
 	if err != nil {
 		return reject("the issuer did not answer: %v", err)
 	}
-	// The audience is checked below, so a job with the wrong one still leaves a row. go-oidc checks the signature first.
+	// go-oidc checks the signature first, a wrong audience below leaves a row.
 	verifier := provider.Verifier(&oidc.Config{SkipClientIDCheck: true, Now: s.now})
 	token, err := verifier.Verify(s.providerContext(ctx), raw)
 	if _, expired := errors.AsType[*oidc.TokenExpiredError](err); expired {
@@ -187,8 +184,7 @@ func (s *Service) VerifyWorkload(ctx context.Context, name, raw string) (*Worklo
 	return &Workload{Account: account, Rule: rules[i], Subject: token.Subject, JTI: jti, Expiry: token.Expiry}, nil
 }
 
-// IssueWorkloadSession ends an exchange. The row also spends the job token, a second exchange of it hits the unique
-// index. It lasts an hour at most and never past the job token.
+// IssueWorkloadSession spends the job token, a reuse hits the unique index.
 func (s *Service) IssueWorkloadSession(
 	ctx context.Context,
 	job *Workload,
@@ -214,7 +210,7 @@ func (s *Service) IssueWorkloadSession(
 	return tok, secret, err
 }
 
-// ruleMatches takes every claim of the rule, as strings. An empty rule can't be stored and matches nothing.
+// ruleMatches takes an empty rule as no match, though it can't be stored.
 func ruleMatches(want map[string]string, got map[string]any) bool {
 	for name, value := range want {
 		if s, ok := got[name].(string); !ok || s != value {
@@ -224,7 +220,7 @@ func ruleMatches(want map[string]string, got map[string]any) bool {
 	return len(want) > 0
 }
 
-// unverifiedIssuer reads iss without checking anything, go-oidc does that with the issuer of the rule it picks.
+// unverifiedIssuer checks nothing, go-oidc does with the rule's issuer.
 func unverifiedIssuer(raw string) (string, error) {
 	_, rest, ok := strings.Cut(raw, ".")
 	if !ok {

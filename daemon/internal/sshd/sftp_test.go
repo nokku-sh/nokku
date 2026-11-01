@@ -28,12 +28,12 @@ func init() {
 	}
 }
 
-// helperCmd clears the env, so GORACE goes in through env(1). A race build otherwise sleeps 1s on every exit.
+// helperCmd clears the env, and a race build sleeps 1s on exit without GORACE.
 func testHelperArgv(bin, name string) []string {
 	return []string{"/usr/bin/env", "GORACE=atexit_sleep_ms=0", bin, "-test.run=^TestHelperProcess$", "--", name}
 }
 
-// Not a test: the binary re-entered as a helper, see the helperArgv override in init.
+// Not a test: the binary re-entered as a helper, see init.
 func TestHelperProcess(t *testing.T) {
 	i := slices.Index(os.Args, "--")
 	if i < 0 || i+1 >= len(os.Args) {
@@ -46,7 +46,7 @@ func TestHelperProcess(t *testing.T) {
 	os.Exit(0)
 }
 
-// The SFTP server roots at the user's real home like sshd, so tests use a scratch dir under it.
+// The SFTP server roots at the real home like sshd, so tests use a scratch dir.
 func sftpClient(t *testing.T, ca testCA) (*sftp.Client, func()) {
 	t.Helper()
 	must := require.New(t)
@@ -162,7 +162,7 @@ func TestServerSCPModern(t *testing.T) {
 		t.Skip("scp not installed")
 	}
 	if !isTestBinary() {
-		t.Fatal("TestServerSCPModern requires running under the test binary")
+		t.Skip("requires the test binary on PATH")
 	}
 
 	is := assert.New(t)
@@ -205,7 +205,7 @@ func TestServerRsync(t *testing.T) {
 		t.Skip("rsync not installed")
 	}
 	if !isTestBinary() {
-		t.Fatal("TestServerRsync requires running under the test binary")
+		t.Skip("requires the test binary on PATH")
 	}
 
 	is := assert.New(t)
@@ -248,7 +248,7 @@ func TestServerGit(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	if !isTestBinary() {
-		t.Fatal("TestServerGit requires running under the test binary")
+		t.Skip("requires the test binary on PATH")
 	}
 
 	is := assert.New(t)
@@ -367,7 +367,7 @@ func isTestBinary() bool {
 	return filepath.Base(os.Args[0]) == "sshd.test"
 }
 
-// Like under sshd, a lock shell stops SFTP too. The subsystem must not start beside the shell.
+// Like under sshd, a lock shell stops SFTP too.
 func TestServerSFTPRefusedByLockShell(t *testing.T) {
 	ca := newTestCA(t)
 	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) {

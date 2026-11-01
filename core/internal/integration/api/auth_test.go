@@ -3,27 +3,30 @@
 package api_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+
+	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// The name used to be kept from boot, so the login page showed the old one until a restart.
+// The name was once kept from boot, the login page showed the old one.
 func TestLoginPageFollowsARename(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
-	before, err := workspaceName(wsCtx(t, cfg), cfg.Conn)
+	workspaceID := testWorkspace.ID
+	before, err := workspaceName(wsCtx(t), cfg.Conn)
 	require.NoError(t, err)
 	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
+		clientOn(
+			srv,
 			header(
 				"Authorization",
 				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
@@ -40,31 +43,31 @@ func TestLoginPageFollowsARename(t *testing.T) {
 
 	renamed := uniq("renamed")
 	rename(renamed)
-	auth := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)))
+	auth := nokkuv1connect.NewAuthServiceClient(clientOn(srv))
 	options, err := auth.GetLoginOptions(t.Context(), &nokkuv1.GetLoginOptionsRequest{})
 	require.NoError(t, err)
 	assert.Equal(t, renamed, options.GetWorkspaceName())
 }
 
-// A sign-in link works once, on the host it was made for. No mail is sent here, so the link comes from iam.
+// A sign-in link works once. No mail goes out, so the link comes from iam.
 func TestMagicLinkSignIn(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
-	auth := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)))
+	u := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	auth := nokkuv1connect.NewAuthServiceClient(clientOn(srv))
 
 	options, err := auth.GetLoginOptions(t.Context(), &nokkuv1.GetLoginOptionsRequest{})
 	require.NoError(t, err)
 	assert.False(t, options.GetMagicLink(), "no mail, no links on the login page")
 	assert.False(t, options.GetEmailConfigured())
 	assert.True(t, options.GetPasskey())
-	name, err := workspaceName(wsCtx(t, cfg), cfg.Conn)
+	name, err := workspaceName(wsCtx(t), cfg.Conn)
 	require.NoError(t, err)
 	assert.Equal(t, name, options.GetWorkspaceName())
 
 	_, err = auth.RequestMagicLink(t.Context(), &nokkuv1.RequestMagicLinkRequest{Email: &u.Email})
 	require.NoError(t, err, "a request without mail still answers OK")
 
-	link, err := cfg.IAM.IssueBootstrapLink(wsCtx(t, cfg), u)
+	link, err := cfg.IAM.IssueBootstrapLink(wsCtx(t), u)
 	require.NoError(t, err)
 	_, token, _ := strings.Cut(link, "token=")
 	ctx, info := connect.NewClientContext(t.Context())
@@ -81,12 +84,12 @@ func TestMagicLinkSignIn(t *testing.T) {
 // Removing a remembered device forgets it, and its cookie never signs in.
 func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
-	link, err := cfg.IAM.IssueBootstrapLink(wsCtx(t, cfg), u)
+	u := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	link, err := cfg.IAM.IssueBootstrapLink(wsCtx(t), u)
 	require.NoError(t, err)
 	_, token, _ := strings.Cut(link, "token=")
 
-	auth := nokkuv1connect.NewAuthServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)))
+	auth := nokkuv1connect.NewAuthServiceClient(clientOn(srv))
 	ctx, info := connect.NewClientContext(t.Context())
 	_, err = auth.ConsumeMagicLink(ctx, &nokkuv1.ConsumeMagicLinkRequest{Token: &token})
 	require.NoError(t, err)
@@ -106,10 +109,7 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 
 	account := func(bearer string) nokkuv1connect.AccountServiceClient {
 		return nokkuv1connect.NewAccountServiceClient(
-			connect.NewClient(
-				connecthttp.NewTransport(srv.Client(), srv.URL),
-				header("Authorization", "Bearer "+bearer),
-			),
+			clientOn(srv, header("Authorization", "Bearer "+bearer)),
 		)
 	}
 	kinds := func() map[string]string {
@@ -138,4 +138,30 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	listed = kinds()
 	assert.Contains(t, listed, "user", "forgetting a device ended the session")
 	assert.NotContains(t, listed, "device")
+}
+
+// The audit log tells a deactivated account from an address nobody has.
+func TestMagicLinkToAnInactiveAccountIsAudited(t *testing.T) {
+	base, _ := newTestAPI(t)
+	cfg, _, _ := mailServer(t, base)
+	u := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
+		return q.SetUserActive(t.Context(), &db.SetUserActiveParams{ID: u.ID, Active: false})
+	})
+
+	cfg.IAM.RequestMagicLink(wsCtx(t), u.Email)
+
+	assert.Eventually(t, func() bool {
+		var rows []*db.ListAuditLogsRow
+		err := cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
+			rows, err = q.ListAuditLogs(
+				t.Context(),
+				&db.ListAuditLogsParams{Actions: []string{"LoginDenied"}, Limit: 1000},
+			)
+			return err
+		})
+		return err == nil && slices.ContainsFunc(rows, func(r *db.ListAuditLogsRow) bool {
+			return r.ActorName == u.Email && strings.Contains(string(r.Details), "inactive account")
+		})
+	}, 5*time.Second, 20*time.Millisecond, "no denied login names the inactive account")
 }

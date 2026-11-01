@@ -12,7 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// Clients end their session on Unauthenticated, so only a refused credential may answer with it.
+// Clients sign out on Unauthenticated, so only a refused credential gets it.
 func TestAuthFailureCodes(t *testing.T) {
 	a := &authNInterceptor{}
 

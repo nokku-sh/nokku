@@ -11,7 +11,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/config"
 )
 
-// Refused before anything is stored. The config has no iam, getting that far would panic.
+// Refused before anything is stored. With no iam, getting that far panics.
 func TestHostedSSOProviderNeedsTLS(t *testing.T) {
 	svc := &ssoService{cfg: &config.Config{SaaS: true}}
 	_, err := svc.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{

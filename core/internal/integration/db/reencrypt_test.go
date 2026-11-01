@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -17,7 +18,7 @@ import (
 // errRollback keeps what the test did out of the shared test database.
 var errRollback = errors.New("rollback")
 
-// Each value is converted once, with the associated data of its row, the same the code that sealed it built.
+// Each value is converted once, with the AAD the code that sealed it built.
 func TestReencrypt(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -26,7 +27,7 @@ func TestReencrypt(t *testing.T) {
 
 	err := pgx.BeginFunc(t.Context(), c.sysPool, func(tx pgx.Tx) error {
 		q := db.New(tx)
-		// The seed rows take their workspace from the pin. Reencrypt itself runs across every workspace.
+		// The seed rows take the pin's workspace. Reencrypt runs across all.
 		if _, err := tx.Exec(t.Context(), `SELECT set_config('nokku.workspace_id', $1, true)`, f.ws); err != nil {
 			return err
 		}
@@ -86,7 +87,5 @@ func TestReencrypt(t *testing.T) {
 		assert.Error(t, q.Reencrypt(t.Context(), []byte("next"), keep), "a value that kept its old key was accepted")
 		return errRollback
 	})
-	if !errors.Is(err, errRollback) {
-		t.Fatalf("reencrypt: %v", err)
-	}
+	require.ErrorIs(t, err, errRollback, "reencrypt")
 }

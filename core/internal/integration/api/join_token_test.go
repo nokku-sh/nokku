@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -17,18 +16,17 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
 
-// An enroll token carries grants and tags for the targets it makes. An ephemeral one is approved on enroll
-// and retires after a default when no interval is given.
+// An enroll token carries grants and tags. An ephemeral one approves on enroll.
 func TestCreateJoinTokenWithGrants(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	member := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	adminAuth := header(
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	tokens := nokkuv1connect.NewJoinTokenServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+		clientOn(srv, adminAuth),
 	)
 
 	created, err := tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{

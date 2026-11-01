@@ -6,9 +6,8 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-// A role is the WorkspaceRole of the protos. The values are ordered, so "at least" is >= and zero passes nothing.
+// Roles are ordered, so "at least" is >= and zero passes nothing.
 
-// RoleLabel is the role as people read it, like "admin".
 func RoleLabel(r nokkuv1.WorkspaceRole) string {
 	return strings.ToLower(strings.TrimPrefix(r.String(), "WORKSPACE_ROLE_"))
 }
@@ -30,7 +29,7 @@ func RoleDescription(r nokkuv1.WorkspaceRole) string {
 	return ""
 }
 
-// CanAssign never allows managing above your own role, and ownership only moves through a transfer.
+// CanAssign stops at your own role, ownership only moves through a transfer.
 func CanAssign(caller, target nokkuv1.WorkspaceRole) bool {
 	return target > nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED &&
 		target < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER &&

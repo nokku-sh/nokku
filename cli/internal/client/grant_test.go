@@ -24,9 +24,17 @@ const (
 	otherID = "0199a0a0-0000-7000-8000-00000000000d"
 )
 
-// The fakes answer like the core's substring search, so a lookup must pick the exact match.
+// The fakes search by substring like the core, so a lookup must match exactly.
 type fakeUsers struct {
 	nokkuv1connect.UnimplementedWorkspaceServiceHandler
+}
+
+type fakeTeams struct {
+	nokkuv1connect.UnimplementedTeamServiceHandler
+}
+
+type fakeServiceAccounts struct {
+	nokkuv1connect.UnimplementedServiceAccountServiceHandler
 }
 
 func (fakeUsers) ListUsers(context.Context, *nokkuv1.ListUsersRequest) (*nokkuv1.ListUsersResponse, error) {
@@ -36,10 +44,6 @@ func (fakeUsers) ListUsers(context.Context, *nokkuv1.ListUsersRequest) (*nokkuv1
 	}}, nil
 }
 
-type fakeTeams struct {
-	nokkuv1connect.UnimplementedTeamServiceHandler
-}
-
 func (fakeTeams) ListTeams(context.Context, *nokkuv1.ListTeamsRequest) (*nokkuv1.ListTeamsResponse, error) {
 	return &nokkuv1.ListTeamsResponse{Teams: []*nokkuv1.Team{
 		{Id: new(opsID), Name: new("ops")},
@@ -47,10 +51,6 @@ func (fakeTeams) ListTeams(context.Context, *nokkuv1.ListTeamsRequest) (*nokkuv1
 		{Id: new(aliceID), Name: new("twins")},
 		{Id: new(otherID), Name: new("twins")},
 	}}, nil
-}
-
-type fakeServiceAccounts struct {
-	nokkuv1connect.UnimplementedServiceAccountServiceHandler
 }
 
 func (fakeServiceAccounts) ListServiceAccounts(

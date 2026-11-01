@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gocloud.dev/gcerrors"
 )
 
@@ -18,27 +20,11 @@ func newLocal(t *testing.T) *Storage {
 	t.Helper()
 	t.Setenv("NOKKU_STORAGE_URL", "file://"+filepath.Join(t.TempDir(), "data"))
 	s, err := New(t.Context())
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	require.NoError(t, err)
 	return s
 }
 
-func write(t *testing.T, s *Storage, key string) {
-	t.Helper()
-	w, err := s.CreateWriter(t.Context(), key)
-	if err != nil {
-		t.Fatalf("CreateWriter %s: %v", key, err)
-	}
-	if _, err := w.Write([]byte("x")); err != nil {
-		t.Fatalf("write %s: %v", key, err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("close %s: %v", key, err)
-	}
-}
-
-// A local directory is created, and its temp files stay in it so a rename never crosses volumes.
+// A local directory is created. Temp files stay in it, renames cross no volume.
 func TestBucketURL(t *testing.T) {
 	for in, want := range map[string]string{
 		"file://./data":                 "file://./data?create_dir=true&dir_file_mode=0750&no_tmp_dir=true",
@@ -47,8 +33,8 @@ func TestBucketURL(t *testing.T) {
 		"file:///d?dir_file_mode=0700":  "file:///d?create_dir=true&dir_file_mode=0700&no_tmp_dir=true",
 	} {
 		got, err := bucketURL(in)
-		if err != nil || got != want {
-			t.Errorf("bucketURL(%q) = %q, %v, want %q", in, got, err, want)
+		if assert.NoError(t, err, "bucketURL(%q)", in) {
+			assert.Equal(t, want, got, "bucketURL(%q)", in)
 		}
 	}
 }
@@ -56,57 +42,50 @@ func TestBucketURL(t *testing.T) {
 func TestNewCreatesTheDirectory(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "not", "there")
 	t.Setenv("NOKKU_STORAGE_URL", "file://"+dir)
-	if _, err := New(t.Context()); err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-		t.Fatalf("the directory was not created: %v", err)
-	}
+	_, err := New(t.Context())
+	require.NoError(t, err)
+	require.DirExists(t, dir)
 }
 
 func TestNewRefusesAnUnknownScheme(t *testing.T) {
 	t.Setenv("NOKKU_STORAGE_URL", "ftp://example.com/x")
-	if _, err := New(t.Context()); err == nil {
-		t.Fatal("an unknown scheme was accepted")
-	}
+	_, err := New(t.Context())
+	require.Error(t, err, "an unknown scheme was accepted")
 }
 
-// fileblob escapes path separators and ".." in object names, nothing may land outside the bucket root.
+// fileblob escapes separators and "..", so nothing lands outside the bucket.
 func TestCreateWriterConfinesTraversalNames(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "data")
 	t.Setenv("NOKKU_STORAGE_URL", "file://"+root)
 	s, err := New(t.Context())
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	require.NoError(t, err)
 	for _, name := range []string{"../evil", "a/../../evil", "/etc/passwd"} {
-		write(t, s, name)
+		w, err := s.CreateWriter(t.Context(), name)
+		require.NoError(t, err, name)
+		_, err = w.Write([]byte("x"))
+		require.NoError(t, err, name)
+		require.NoError(t, w.Close(), name)
 	}
 	err = filepath.WalkDir(filepath.Dir(root), func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() && !strings.HasPrefix(p, root+string(filepath.Separator)) {
-			t.Errorf("object escaped bucket root: %q", p)
+		if !d.IsDir() {
+			assert.True(t, strings.HasPrefix(p, root+string(filepath.Separator)), "object escaped bucket root: %q", p)
 		}
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 }
 
 func TestCreateWriterEmptyName(t *testing.T) {
-	if _, err := newLocal(t).CreateWriter(t.Context(), ""); err == nil {
-		t.Error("CreateWriter with an empty name: expected error")
-	}
+	_, err := newLocal(t).CreateWriter(t.Context(), "")
+	assert.Error(t, err, "CreateWriter with an empty name")
 }
 
 func TestReaderMissingObject(t *testing.T) {
 	_, err := newLocal(t).Reader(t.Context(), "nope/missing.bin")
-	if err == nil || gcerrors.Code(err) != gcerrors.NotFound {
-		t.Errorf("Reader(missing) error = %v, want NotFound", err)
-	}
+	assert.Equal(t, gcerrors.NotFound, gcerrors.Code(err), "Reader(missing): %v", err)
 }
 
 func useBucketAt(t *testing.T, endpoint string) {
@@ -118,12 +97,10 @@ func useBucketAt(t *testing.T, endpoint string) {
 	t.Cleanup(func() { probeTimeout = 5 * time.Second })
 }
 
-// A bucket that takes the connection and then says nothing must not hold up the start.
+// A bucket that connects and then says nothing must not hold up the start.
 func TestNewDoesNotWaitForABucketThatHangs(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = ln.Close() })
 	go func() {
 		for {
@@ -137,30 +114,25 @@ func TestNewDoesNotWaitForABucketThatHangs(t *testing.T) {
 	useBucketAt(t, "http://"+ln.Addr().String())
 
 	start := time.Now()
-	if _, err := New(t.Context()); err != nil {
-		t.Fatalf("a bucket that hangs stopped the start: %v", err)
-	}
-	if took := time.Since(start); took > 2*time.Second {
-		t.Errorf("the check waited out the bucket, %s", took)
-	}
+	_, err = New(t.Context())
+	require.NoError(t, err, "a bucket that hangs stopped the start")
+	assert.LessOrEqual(t, time.Since(start), 2*time.Second, "the check waited out the bucket")
 }
 
-// An outage of the bucket is no reason to refuse logins, daemons keep their recordings until it ends.
+// A bucket outage must not refuse logins, daemons keep recordings until it
+// ends.
 func TestNewStartsWithABucketThatIsDown(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	addr := ln.Addr().String()
 	_ = ln.Close()
 	useBucketAt(t, "http://"+addr)
 
-	if _, err := New(t.Context()); err != nil {
-		t.Fatalf("a bucket that is down stopped the start: %v", err)
-	}
+	_, err = New(t.Context())
+	require.NoError(t, err, "a bucket that is down stopped the start")
 }
 
-// A bucket that says no is a wrong setting and stops the start. One having trouble is an outage and does not.
+// A bucket's no is a wrong setting and stops the start. An outage does not.
 func TestNewSortsWhatTheBucketAnswers(t *testing.T) {
 	for status, starts := range map[int]bool{
 		http.StatusBadRequest:          false,
@@ -178,12 +150,11 @@ func TestNewSortsWhatTheBucketAnswers(t *testing.T) {
 			useBucketAt(t, srv.URL)
 
 			_, err := New(t.Context())
-			if starts && err != nil {
-				t.Errorf("an outage stopped the start: %v", err)
+			if starts {
+				assert.NoError(t, err, "an outage stopped the start")
+				return
 			}
-			if !starts && (err == nil || !strings.Contains(err.Error(), "storage refused the core")) {
-				t.Errorf("a wrong setting let the core start, err = %v", err)
-			}
+			assert.ErrorContains(t, err, "storage refused the core", "a wrong setting let the core start")
 		})
 	}
 }
@@ -193,13 +164,10 @@ func TestNewRefusesAFolderItCannotRead(t *testing.T) {
 		t.Skip("root reads every folder")
 	}
 	dir := t.TempDir()
-	if err := os.Chmod(dir, 0); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Chmod(dir, 0))
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 	t.Setenv("NOKKU_STORAGE_URL", "file://"+dir)
 
-	if _, err := New(t.Context()); err == nil {
-		t.Fatal("a folder the core can't read let it start")
-	}
+	_, err := New(t.Context())
+	require.Error(t, err, "a folder the core can't read let it start")
 }

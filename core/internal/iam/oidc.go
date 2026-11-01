@@ -41,7 +41,6 @@ type authorizeState struct {
 	LinkUserID   string `json:"link_user_id,omitempty"`
 }
 
-// oidcIdentity is what the provider said about the person.
 type oidcIdentity struct {
 	ProviderID      string
 	Subject         string
@@ -49,10 +48,10 @@ type oidcIdentity struct {
 	Name            string
 	Picture         string
 	JITProvisioning bool
-	// EmailVerified and EmailUnverified are what the provider said. Entra says neither.
+	// Both are what the provider said. Entra says neither.
 	EmailVerified   bool
 	EmailUnverified bool
-	// TrustUnverifiedEmail takes an address the provider said nothing about as good enough to link an account.
+	// TrustUnverifiedEmail links on an address the provider said nothing about.
 	TrustUnverifiedEmail bool
 	// LinkUserID skips the email lookup and links to that signed-in user.
 	LinkUserID string
@@ -71,7 +70,7 @@ func (h *oidcFlow) Login(w http.ResponseWriter, r *http.Request) {
 	h.begin(w, r, "")
 }
 
-// Link adds the identity to the signed-in user. Its route takes only a fresh session from the app itself.
+// Link runs on a route that takes only a fresh session from the app itself.
 func (h *oidcFlow) Link(w http.ResponseWriter, r *http.Request) {
 	userID := actor.UserIDFromContext(r.Context())
 	if userID == "" {
@@ -100,7 +99,6 @@ func (h *oidcFlow) begin(w http.ResponseWriter, r *http.Request, linkUserID stri
 	})
 }
 
-// start seals the flow state and sends the browser to the provider.
 func (h *oidcFlow) start(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -117,7 +115,7 @@ func (h *oidcFlow) start(
 		return
 	}
 	conf := h.oauth2Config(r.Context(), &cfg.OIDC, provider)
-	// #nosec G710 -- redirects to the provider authorization endpoint from its configuration.
+	// #nosec G710 -- the provider's own authorization endpoint.
 	http.Redirect(
 		w, r,
 		conf.AuthCodeURL(key, oidc.Nonce(st.Nonce), oauth2.S256ChallengeOption(st.PKCEVerifier)),
@@ -125,7 +123,7 @@ func (h *oidcFlow) start(
 	)
 }
 
-// Callback checks that the state names the flow this browser started, or the answer belongs to someone else.
+// Callback only takes an answer to the flow this browser started.
 func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	st, flowID, err := h.state.take(r)
@@ -177,7 +175,7 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		h.svc.credentialAdded(r.Context(), r, u, MethodOIDC, cfg.ProviderID+":"+id.Subject,
 			"Your "+cmp.Or(cfg.Name, cfg.ProviderID)+" account")
 	}
-	// A link keeps the session that asked for it. A second session would pass the fresh sign-in checks.
+	// A link keeps its session, a new one would pass the fresh sign-in checks.
 	if st.LinkUserID == "" {
 		cookie, err := h.svc.completeLogin(r.Context(), u, MethodOIDC)
 		if err != nil {
@@ -200,7 +198,6 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, returnTo, http.StatusSeeOther)
 }
 
-// verify checks the provider's answer to an authorization that went through.
 func (h *oidcFlow) verify(
 	ctx context.Context,
 	q url.Values,
@@ -261,9 +258,9 @@ func identityFrom(cfg *SSOProvider, idToken *oidc.IDToken, claims map[string]any
 	}
 }
 
-// resolve trusts a matching email and may create the account, the workspace owner configured the provider.
-// The owner is never matched by email. A provider user who can pick their address would take the workspace.
-// resolve reports whether it linked an identity an existing account did not have before.
+// resolve trusts a matching email, as the workspace owner set up the provider.
+// The owner is never matched, a provider user could pick that address and take
+// the workspace. It reports if an existing account gained an identity.
 func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool, error) {
 	var u *db.User
 	var created, linked bool
@@ -282,8 +279,7 @@ func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool
 	return u, linked && !created, nil
 }
 
-// resolveIn finds or creates the user in the caller's tx and links the identity to it. It reports whether it created
-// the user and whether it linked the identity.
+// resolveIn returns the user, whether it created it, and whether it linked it.
 func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity) (*db.User, bool, bool, error) {
 	cred, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
 		Type: string(MethodOIDC), Provider: id.ProviderID, Subject: id.Subject,
@@ -319,7 +315,7 @@ func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity
 			if !id.JITProvisioning {
 				return nil, false, false, errIdentityRejected
 			}
-			// A new account takes an address only on the provider's word, the same rule as linking one.
+			// A new account needs the provider's word too, like a link.
 			if !id.EmailVerified && !id.TrustUnverifiedEmail {
 				return nil, false, false, errEmailUnverified
 			}
@@ -329,7 +325,7 @@ func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity
 			created = err == nil
 		case err == nil && u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER:
 			return nil, false, false, errOwnerLink
-		// Whoever sets this address at the provider would get the account, unless the provider vouches for it.
+		// Unvouched, whoever sets this address would get the account.
 		case err == nil && !id.EmailVerified && !id.TrustUnverifiedEmail:
 			return nil, false, false, errEmailUnverified
 		case err == nil && id.Name != "" && u.Name != id.Name:
@@ -387,7 +383,6 @@ func (h *oidcFlow) oauth2Config(ctx context.Context, cfg *OIDCProvider, provider
 	}
 }
 
-// RedirectURI is what the owner registers with every provider of the workspace.
 func RedirectURI(ctx context.Context) string {
 	return baseURL(ctx) + oidcCallbackPath
 }

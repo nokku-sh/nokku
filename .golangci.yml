@@ -30,6 +30,7 @@ linters:
     - canonicalheader
     - copyloopvar
     - cyclop
+    - decorder
     - depguard
     - dupl
     - durationcheck
@@ -92,6 +93,11 @@ linters:
     cyclop:
       max-complexity: 30
       package-average: 10.0
+
+    decorder:
+      dec-order: [const, var, type, func]
+      disable-dec-order-check: false
+      disable-init-func-first-check: true
 
     depguard:
       rules:

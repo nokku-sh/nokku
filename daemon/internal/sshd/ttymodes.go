@@ -7,12 +7,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// RFC 4254 section 8 opcodes that map to one termios bit. Baud rates (128, 129) mean nothing on a pty.
-type ttyFlag struct {
-	field func(*unix.Termios) *uint32
-	bit   uint32
-}
-
 var (
 	iflag = func(t *unix.Termios) *uint32 { return &t.Iflag }
 	oflag = func(t *unix.Termios) *uint32 { return &t.Oflag }
@@ -57,7 +51,9 @@ var ttyFlags = map[byte]ttyFlag{
 	93: {cflag, unix.PARODD},
 }
 
-// Control characters by opcode. VDSUSP, VFLUSH and VSTATUS do not exist on Linux.
+var ttyCharSizes = map[byte]uint32{90: unix.CS7, 91: unix.CS8}
+
+// By opcode. VDSUSP, VFLUSH and VSTATUS do not exist on Linux.
 var ttyChars = map[byte]int{
 	1:  unix.VINTR,
 	2:  unix.VQUIT,
@@ -76,6 +72,12 @@ var ttyChars = map[byte]int{
 	18: unix.VDISCARD,
 }
 
+// An RFC 4254 section 8 opcode's termios bit. Baud rates mean nothing on a pty.
+type ttyFlag struct {
+	field func(*unix.Termios) *uint32
+	bit   uint32
+}
+
 func applyTTYModes(tty *os.File, modes []byte) error {
 	if len(modes) == 0 {
 		return nil
@@ -90,17 +92,13 @@ func applyTTYModes(tty *os.File, modes []byte) error {
 	})
 }
 
-// Opcodes 1 to 159 carry a uint32. 0 ends the list, 160 and up are undefined and end it too, like sshd.
+// Opcodes 1 to 159 carry a uint32. 0 and 160 up end the list, like sshd.
 func parseTTYModes(t *unix.Termios, modes []byte) {
 	for len(modes) >= 5 && modes[0] != 0 && modes[0] < 160 {
 		op, arg := modes[0], binary.BigEndian.Uint32(modes[1:5])
 		modes = modes[5:]
-		if op == 90 || op == 91 {
+		if size, ok := ttyCharSizes[op]; ok {
 			if arg != 0 {
-				size := uint32(unix.CS7)
-				if op == 91 {
-					size = unix.CS8
-				}
 				t.Cflag = t.Cflag&^unix.CSIZE | size
 			}
 			continue

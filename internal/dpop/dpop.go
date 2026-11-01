@@ -1,8 +1,6 @@
-// Package dpop signs and verifies DPoP (RFC 9449) proofs. nk and nokkud sign
-// with the machine's signing key, TPM-backed or the software fallback. Every
-// proof embeds the public JWK, so the core verifies the signature and binds
-// the session to the key's thumbprint (jkt) without any pre-registration
-// step.
+// Package dpop signs and verifies DPoP (RFC 9449) proofs. Every proof embeds
+// the public JWK, so the core binds the session to the key's thumbprint (jkt)
+// with no pre-registration.
 package dpop
 
 import (
@@ -21,13 +19,11 @@ import (
 	"github.com/go-jose/go-jose/v4/cryptosigner"
 )
 
-// Proofer signs DPoP proofs with an ECDSA P-256 [crypto.Signer]. The signer
-// must sign digests directly (both the TPM and software signers do).
+// Proofer needs a P-256 [crypto.Signer] that signs digests directly.
 type Proofer struct {
 	signer jose.Signer
 }
 
-// NewProofer builds a proofer around key.
 func NewProofer(key crypto.Signer) (*Proofer, error) {
 	pub, ok := key.Public().(*ecdsa.PublicKey)
 	if !ok || pub.Curve != elliptic.P256() {
@@ -51,9 +47,7 @@ func ATH(token string) string {
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
-// Sign builds a compact DPoP proof for htm/htu. ath is the access token hash
-// from ATH, or "" when no token exists yet (enrollment, device-flow token
-// polls). nonce is the server nonce once one has been learned.
+// Sign takes "" for ath or nonce when there is none yet, as in enrollment.
 func (p *Proofer) Sign(htm, htu, ath, nonce string) (string, error) {
 	jti, err := newJTI()
 	if err != nil {

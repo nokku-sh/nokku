@@ -1,6 +1,6 @@
 package entitlement
 
-// Licenses verify offline against a compiled-in Ed25519 public key, so activation works air-gapped.
+// Licenses verify against a compiled-in Ed25519 key, so air-gapped works.
 
 import (
 	"context"
@@ -17,10 +17,9 @@ import (
 )
 
 const (
-	licenseApp = "NOKKU"
-	// A renewal reminder starts this long before the key expires.
+	licenseApp      = "NOKKU"
 	licenseWarnDays = 30
-	// The license worker trades a held key for the current one. The key is all that is sent.
+	// Trades a held key for the current one. Only the key is sent.
 	licenseRefreshURL = "https://license.nokku.sh/refresh"
 )
 
@@ -37,14 +36,12 @@ type licenseConfig struct {
 	Offline bool   `env:"NOKKU_LICENSE_OFFLINE"`
 }
 
-// loadLicense takes the key from the environment and the one activated in the UI, then keeps the held one renewed.
 func (s *Service) loadLicense(ctx context.Context) error {
 	cfg, err := env.ParseAs[licenseConfig]()
 	if err != nil {
 		return err
 	}
 	if cfg.Key != "" {
-		// A rejected key never stops the core from starting.
 		if err := s.takeLicense(cfg.Key); err != nil {
 			slog.Error("NOKKU_LICENSE_KEY rejected, running without it", "error", err)
 		}
@@ -76,6 +73,31 @@ func (s *Service) loadLicense(ctx context.Context) error {
 	return nil
 }
 
+func licenseSeats(c *license.Claims) (int64, error) {
+	raw, ok := c.Meta["seats"]
+	if !ok {
+		return 0, nil
+	}
+	seats, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || seats <= 0 {
+		return 0, fmt.Errorf("license seats %q are no count", raw)
+	}
+	return seats, nil
+}
+
+// takeLicense refuses a shorter key, so an old one cannot undo a renewal.
+func (s *Service) takeLicense(key string) error {
+	claims, err := s.verifyLicense(key)
+	if err != nil {
+		return err
+	}
+	if s.shorterLicense(claims) {
+		return ErrLicenseShorter
+	}
+	_, _ = s.license.Set(key)
+	return nil
+}
+
 // verifyLicense keeps expired keys, they still carry the retention hold.
 func (s *Service) verifyLicense(key string) (*license.Claims, error) {
 	claims, err := license.Verify(key, licenseApp, s.publicKey, "")
@@ -93,32 +115,6 @@ func (s *Service) verifyLicense(key string) (*license.Claims, error) {
 		return nil, errors.New("a Pro license must name its seats")
 	}
 	return claims, nil
-}
-
-// licenseSeats is the seat cap the key was bought with, 0 for none.
-func licenseSeats(c *license.Claims) (int64, error) {
-	raw, ok := c.Meta["seats"]
-	if !ok {
-		return 0, nil
-	}
-	seats, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || seats <= 0 {
-		return 0, fmt.Errorf("license seats %q are no count", raw)
-	}
-	return seats, nil
-}
-
-// takeLicense refuses a key that would shorten the held license, so an old key cannot undo a renewal.
-func (s *Service) takeLicense(key string) error {
-	claims, err := s.verifyLicense(key)
-	if err != nil {
-		return err
-	}
-	if s.shorterLicense(claims) {
-		return ErrLicenseShorter
-	}
-	_, _ = s.license.Set(key)
-	return nil
 }
 
 func (s *Service) shorterLicense(claims *license.Claims) bool {
@@ -160,7 +156,7 @@ func (s *Service) storeLicense(ctx context.Context, key string) error {
 	return s.conn.Sys().SetInstanceLicense(ctx, key)
 }
 
-// remindLicense repeats the expiry warning once a day, a server can run for longer than its key lasts.
+// remindLicense repeats daily, a server can outlive its key.
 func (s *Service) remindLicense(ctx context.Context) {
 	reportLicense(s.License())
 	tick := time.Tick(24 * time.Hour)

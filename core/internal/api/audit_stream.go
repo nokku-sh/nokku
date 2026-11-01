@@ -54,7 +54,7 @@ func (s *auditStreamService) CreateAuditStream(
 			return err
 		}
 		if n >= maxAuditStreams {
-			return newError(connect.CodeResourceExhausted,
+			return connect.NewError(connect.CodeResourceExhausted,
 				fmt.Sprintf("a workspace has at most %d streams", maxAuditStreams))
 		}
 		row, err = q.CreateAuditStream(ctx, &db.CreateAuditStreamParams{
@@ -86,11 +86,12 @@ func (s *auditStreamService) UpdateAuditStream(
 		if err != nil {
 			return err
 		}
-		// The secret goes out as a header or a signature to the URL, so a new URL must not inherit it.
+		// The secret goes to the URL, so a new URL must not inherit it.
 		if req.Url != nil && req.GetUrl() != prev.URL && req.Secret == nil {
-			return newError(connect.CodeInvalidArgument, "enter the secret again when the URL changes")
+			return connect.NewError(connect.CodeInvalidArgument, "enter the secret again when the URL changes")
 		}
-		// Nil keeps the stored secret. The ids come from the row, a request may spell a UUID in capitals.
+		// Nil keeps the stored secret. The AAD ids come from the row, a request
+		// may spell a UUID in capitals.
 		var secret []byte
 		if req.Secret != nil {
 			if secret, err = s.cfg.Keyset.Seal(
@@ -129,7 +130,7 @@ func (s *auditStreamService) DeleteAuditStream(
 		return nil, err
 	}
 	if deleted == 0 {
-		return nil, newError(connect.CodeNotFound, "no such stream")
+		return nil, connect.NewError(connect.CodeNotFound, "no such stream")
 	}
 	return &nokkuv1.DeleteAuditStreamResponse{}, nil
 }
@@ -143,7 +144,7 @@ func (s *auditStreamService) TestAuditStream(
 		return nil, err
 	}
 	if err := s.cfg.Audit.TestStream(ctx, st); err != nil {
-		return nil, newError(connect.CodeFailedPrecondition, err.Error())
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	}
 	return &nokkuv1.TestAuditStreamResponse{}, nil
 }

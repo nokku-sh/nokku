@@ -1,4 +1,4 @@
-// Package namegen produces display names like "sunny-otter". Callers enforce uniqueness.
+// Package namegen makes names like "sunny-otter". Callers enforce uniqueness.
 package namegen
 
 import (
@@ -8,6 +8,9 @@ import (
 	"strings"
 	"unicode"
 )
+
+// The DNS label limit, a longer name was not typed by a person.
+const maxHostnameLen = 63
 
 var adjectives = []string{
 	"amber", "ancient", "autumn", "azure", "bold", "brave", "bright", "calm",
@@ -45,24 +48,9 @@ var nouns = []string{
 	"violet", "warbler", "willow", "wolf", "wren", "yarrow", "zephyr",
 }
 
-func Generate() string {
-	return word(adjectives) + "-" + word(nouns)
-}
-
-func word(list []string) string {
-	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(list))))
-	if err != nil {
-		return list[0] // degrade to the first entry
-	}
-	return list[n.Int64()]
-}
-
-// maxHostnameLen is the DNS label limit, so a longer name was not typed by a person.
-const maxHostnameLen = 63
-
 var (
 	hostnameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
-	// defaultHostRE matches what cloud images and container runtimes hand out when nobody picked a name.
+	// defaultHostRE matches names cloud images and runtimes hand out.
 	defaultHostRE = regexp.MustCompile(`^(` +
 		`ip-\d+-\d+-\d+-\d+` + // AWS
 		`|[0-9a-f]{12}` + // Docker
@@ -72,8 +60,20 @@ var (
 		`)$`)
 )
 
-// FromHostname turns a hostname into a target name when a person chose it. Image and cloud defaults, and names
-// that are mostly digits, are left to Generate. Kubernetes pod names pass, they are what kubectl shows.
+func Generate() string {
+	return word(adjectives) + "-" + word(nouns)
+}
+
+func word(list []string) string {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(list))))
+	if err != nil {
+		return list[0]
+	}
+	return list[n.Int64()]
+}
+
+// FromHostname takes a hostname a person chose. Image and cloud defaults and
+// mostly-digit names go to Generate. Pod names pass, kubectl shows them.
 func FromHostname(host string) (string, bool) {
 	name, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(host)), ".")
 	name = strings.Trim(strings.ReplaceAll(name, "_", "-"), "-")

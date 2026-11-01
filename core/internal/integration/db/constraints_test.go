@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A row like these is a bug in some writer, and the database is the one place every writer passes through.
+// Such a row is a bug in some writer. Every writer passes the database.
 func TestInvalidRowsAreRefused(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)

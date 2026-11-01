@@ -8,9 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestIsBlankMachineID verifies placeholder machine IDs written by systemd
-// in containers and VMs are rejected: they are not unique, so they must
-// never derive a signing key.
+// Placeholder IDs aren't unique, so they must never derive a signing key.
 func TestIsBlankMachineID(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -32,15 +30,12 @@ func TestIsBlankMachineID(t *testing.T) {
 	}
 }
 
-// TestDeriveMachineID verifies the fingerprint is deterministic, a
-// fixed-length hex digest, and does not contain the raw identifier.
 func TestDeriveMachineID(t *testing.T) {
 	raw := "3d6e2c41f0c94a8f9b1d77e2a0c4b5e6"
 
 	a := deriveMachineID(raw)
 	assert.Equal(t, a, deriveMachineID(raw), "deriveMachineID is not deterministic")
 	assert.Regexp(t, `^[0-9a-f]{64}$`, a)
-	assert.NotEqual(t, raw, a, "derived fingerprint must not be the raw identifier")
 	assert.NotEqual(t, a, deriveMachineID("other-machine"), "distinct machines derived the same fingerprint")
 }
 
@@ -63,7 +58,7 @@ func TestRawMachineID(t *testing.T) {
 	}
 }
 
-// A guessed value would wrap the key with something every such machine shares, or swap it on a bad day.
+// A guess would wrap the key with something machines share, or swap it later.
 func TestRawMachineIDFailsInsteadOfGuessing(t *testing.T) {
 	readFailed := errors.New("ioreg timed out")
 	_, err := rawMachineID("", readFailed, "box")

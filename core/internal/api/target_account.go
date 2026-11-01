@@ -11,6 +11,12 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
+var subjectKinds = map[string]nokkuv1.SubjectKind{
+	db.SubjectKindUser:           nokkuv1.SubjectKind_SUBJECT_KIND_USER,
+	db.SubjectKindTeam:           nokkuv1.SubjectKind_SUBJECT_KIND_TEAM,
+	db.SubjectKindServiceAccount: nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT,
+}
+
 type targetAccountService struct {
 	cfg *config.Config
 }
@@ -96,7 +102,8 @@ func (s *targetAccountService) RemoveSubjects(
 				return err
 			}
 		}
-		// Grant removal is the whole lockout. The next sync drops the subject, so an issued cert matches no account.
+		// Grant removal is the whole lockout. The next sync drops the subject,
+		// so an issued cert matches no account.
 		return nil
 	}); err != nil {
 		return nil, err
@@ -123,7 +130,7 @@ func (s *targetAccountService) RevokeAllAccess(
 	return &nokkuv1.RevokeAllAccessResponse{}, nil
 }
 
-// AddTargetAccount is for manual targets, which have no daemon to report accounts.
+// AddTargetAccount is for manual targets, no daemon reports their accounts.
 func (s *targetAccountService) AddTargetAccount(
 	ctx context.Context,
 	req *nokkuv1.AddTargetAccountRequest,
@@ -148,12 +155,6 @@ func (s *targetAccountService) RemoveTargetAccount(
 	}
 
 	return &nokkuv1.RemoveTargetAccountResponse{}, nil
-}
-
-var subjectKinds = map[string]nokkuv1.SubjectKind{
-	db.SubjectKindUser:           nokkuv1.SubjectKind_SUBJECT_KIND_USER,
-	db.SubjectKindTeam:           nokkuv1.SubjectKind_SUBJECT_KIND_TEAM,
-	db.SubjectKindServiceAccount: nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT,
 }
 
 func subjectKind(k nokkuv1.SubjectKind) (string, bool) {

@@ -28,26 +28,14 @@ var stateUpdate = &nokkuv1.ConnectResponse{
 type daemonConn struct {
 	daemonID    string
 	workspaceID string
-	// state holds at most one pending StateUpdate, apart from send so coalescing never drops a control message.
+	// state coalesces to one StateUpdate, apart so send never loses a message.
 	send   chan *nokkuv1.ConnectResponse
 	state  chan *nokkuv1.ConnectResponse
 	ctx    context.Context
 	cancel context.CancelFunc
-	// wanted is the version the core had at the last heartbeat, behindSince when the daemon stopped reaching it.
+	// wanted is the core's version at the last heartbeat.
 	wanted      int64
 	behindSince atomic.Pointer[time.Time]
-}
-
-// heartbeat compares what the daemon applied with what the core had a heartbeat ago, which it had time to reach, so a
-// daemon busy with the latest change never counts. It reports the moment the daemon falls behind.
-func (c *daemonConn) heartbeat(applied, current int64) (fell bool) {
-	behind := applied < c.wanted
-	c.wanted = current
-	if !behind {
-		c.behindSince.Store(nil)
-		return false
-	}
-	return c.behindSince.CompareAndSwap(nil, new(time.Now()))
 }
 
 // connection lets tests stub db.Connection without Postgres.
@@ -56,7 +44,7 @@ type connection interface {
 	TenantTx(ctx context.Context, fn func(*db.Queries) error) error
 }
 
-// owned lets a disconnect tear down a daemon's sessions without scanning the pool.
+// owned lets a disconnect find a daemon's sessions without a scan.
 type owned struct {
 	sessions map[string]*Session
 	relays   map[string]struct{}
@@ -76,6 +64,18 @@ type Pool struct {
 	Record func(context.Context, *audit.Event)
 }
 
+// heartbeat checks against the core's version one heartbeat ago, so a daemon
+// busy with the latest change never counts.
+func (c *daemonConn) heartbeat(applied, current int64) (fell bool) {
+	behind := applied < c.wanted
+	c.wanted = current
+	if !behind {
+		c.behindSince.Store(nil)
+		return false
+	}
+	return c.behindSince.CompareAndSwap(nil, new(time.Now()))
+}
+
 func New(conn connection) *Pool {
 	return &Pool{
 		byID:          make(map[string]*daemonConn),
@@ -89,21 +89,19 @@ func New(conn connection) *Pool {
 	}
 }
 
-// Connected lists the daemons connected right now, which is what online means. The core runs as one instance.
+// Connected is what online means. The core runs as one instance.
 func (p *Pool) Connected() []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return slices.Collect(maps.Keys(p.byID))
 }
 
-// ConnectedIn is Connected for one workspace.
 func (p *Pool) ConnectedIn(workspaceID string) []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return slices.Collect(maps.Keys(p.byWksp[workspaceID]))
 }
 
-// IsConnected is Connected for one daemon.
 func (p *Pool) IsConnected(daemonID string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -111,8 +109,8 @@ func (p *Pool) IsConnected(daemonID string) bool {
 	return ok
 }
 
-// BehindSince is when a connected daemon stopped keeping up with access changes, zero while it keeps up. It may be
-// enforcing access that was revoked, and a failed sync only shows in that host's log.
+// BehindSince is when a daemon stopped keeping up, zero while it does. It may
+// be enforcing revoked access, and a failed sync only shows in that host's log.
 func (p *Pool) BehindSince(daemonID string) time.Time {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -124,7 +122,6 @@ func (p *Pool) BehindSince(daemonID string) time.Time {
 	return time.Time{}
 }
 
-// BehindIn counts the daemons of a workspace that fell behind.
 func (p *Pool) BehindIn(workspaceID string) int32 {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -150,28 +147,12 @@ func (p *Pool) reportBehind(c *daemonConn, name string, applied, current int64) 
 	})
 }
 
-// markSeen stamps the moment a daemon connects or goes, so an offline one shows when it was last there.
 func (p *Pool) markSeen(ctx context.Context, daemonID string) {
 	if err := p.conn.TenantTx(ctx, func(q *db.Queries) error {
 		return q.MarkDaemonSeen(ctx, daemonID)
 	}); err != nil {
 		slog.Warn("mark daemon seen", "daemon_id", daemonID, "error", err)
 	}
-}
-
-// dropOwnedLocked returns what to tear down outside the lock.
-func (p *Pool) dropOwnedLocked(daemonID string) ([]*Session, []string) {
-	o := p.owned[daemonID]
-	if o == nil {
-		return nil, nil
-	}
-	sessions := slices.Collect(maps.Values(o.sessions))
-	relays := slices.Collect(maps.Keys(o.relays))
-	for _, s := range sessions {
-		delete(p.sessions, s.sessionID)
-	}
-	delete(p.owned, daemonID)
-	return sessions, relays
 }
 
 func (p *Pool) ownLocked(daemonID string) *owned {
@@ -228,6 +209,21 @@ func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string)
 	return c
 }
 
+// dropOwnedLocked returns what to tear down outside the lock.
+func (p *Pool) dropOwnedLocked(daemonID string) ([]*Session, []string) {
+	o := p.owned[daemonID]
+	if o == nil {
+		return nil, nil
+	}
+	sessions := slices.Collect(maps.Values(o.sessions))
+	relays := slices.Collect(maps.Keys(o.relays))
+	for _, s := range sessions {
+		delete(p.sessions, s.sessionID)
+	}
+	delete(p.owned, daemonID)
+	return sessions, relays
+}
+
 func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 	p.mu.Lock()
 	cur, ok := p.byID[daemonID]
@@ -261,21 +257,6 @@ func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 	c.cancel()
 }
 
-func (p *Pool) poke(workspaceID string) {
-	p.mu.RLock()
-	daemons := make([]*daemonConn, 0, len(p.byWksp[workspaceID]))
-	for daemonID := range p.byWksp[workspaceID] {
-		if c := p.byID[daemonID]; c != nil {
-			daemons = append(daemons, c)
-		}
-	}
-	p.mu.RUnlock()
-	for _, c := range daemons {
-		c.poke()
-	}
-}
-
-// Listen pokes a workspace's daemons on every trigger notification.
 func (p *Pool) Listen(ctx context.Context, cfg *pgx.ConnConfig) {
 	for ctx.Err() == nil {
 		if err := p.listen(ctx, cfg); err != nil && ctx.Err() == nil {
@@ -308,8 +289,21 @@ func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 	}
 }
 
-// stateVersion is what a heartbeat is checked against. It reads the database every time, so a lost notification
-// still reaches the daemon at its next heartbeat.
+func (p *Pool) poke(workspaceID string) {
+	p.mu.RLock()
+	daemons := make([]*daemonConn, 0, len(p.byWksp[workspaceID]))
+	for daemonID := range p.byWksp[workspaceID] {
+		if c := p.byID[daemonID]; c != nil {
+			daemons = append(daemons, c)
+		}
+	}
+	p.mu.RUnlock()
+	for _, c := range daemons {
+		c.poke()
+	}
+}
+
+// Read every time, so a lost notification only waits for the next heartbeat.
 func (p *Pool) stateVersion(ctx context.Context, workspaceID string) (int64, error) {
 	var v int64
 	if err := p.conn.SysTx(ctx, func(q *db.Queries) (err error) {
@@ -338,7 +332,7 @@ func (c *daemonConn) poke() {
 	}
 }
 
-// sendToDaemonWait gives up with ctx, a caller that is gone must not wait behind a daemon that reads nothing.
+// A caller that is gone must not wait behind a daemon that reads nothing.
 func (p *Pool) sendToDaemonWait(
 	ctx context.Context,
 	daemonID string,

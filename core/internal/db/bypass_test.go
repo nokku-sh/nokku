@@ -17,8 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Every query that runs past workspace isolation, as nokku_system, in one reviewed list. A new one fails here until
-// someone looked at it. UPDATE_GOLDEN=1 writes the file.
+// Every query past workspace isolation, as nokku_system, in one reviewed list.
+// A new one fails here until someone looked at it. UPDATE_GOLDEN=1 writes the
+// file.
 func TestEveryIsolationBypassIsReviewed(t *testing.T) {
 	var lines, loose []string
 	for _, root := range []string{"..", "../../cmd"} {
@@ -64,8 +65,9 @@ func bypasses(t *testing.T, path string) (lines, loose []string) {
 	return lines, loose
 }
 
-// scanBypasses lists the Sys() queries of file, and for each SysTx the queries its closure runs. Any other use of Sys or
-// SysTx comes back as loose, a handle that is kept or passed on would run queries this list can't see.
+// scanBypasses lists the Sys() queries of file, and for each SysTx the queries
+// its closure runs. Any other use of Sys or SysTx comes back as loose, a handle
+// that is kept or passed on would run queries this list can't see.
 func scanBypasses(file *ast.File, name string) (lines, loose []string) {
 	for _, decl := range file.Decls {
 		where := name
@@ -99,7 +101,8 @@ func scanBypasses(file *ast.File, name string) (lines, loose []string) {
 	return lines, loose
 }
 
-// The scan is a security gate, so it is tested too. Each loose form runs a real bypass the list above would not show.
+// The scan is a security gate, so it is tested too. Each loose form runs a real
+// bypass the list above would not show.
 func TestBypassScan(t *testing.T) {
 	for name, tc := range map[string]struct {
 		src   string
@@ -178,8 +181,9 @@ func selectorName(e ast.Expr) string {
 	return ""
 }
 
-// txQueries is what a SysTx closure calls on its *Queries, or "?" for a function passed by name. A helper the closure
-// hands its *Queries to shows as helper(q), its queries are the reviewer's to look up.
+// txQueries is what a SysTx closure calls on its *Queries, or "?" for a
+// function passed by name. A helper the closure hands its *Queries to shows as
+// helper(q), its queries are the reviewer's to look up.
 func txQueries(arg ast.Expr) []string {
 	lit, ok := arg.(*ast.FuncLit)
 	if !ok || len(lit.Type.Params.List) == 0 || len(lit.Type.Params.List[0].Names) == 0 {

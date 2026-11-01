@@ -8,11 +8,12 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// The cursor reads in a stable order, skips what was sent, and leaves the newest seconds for later.
+// The cursor reads in order, skips what was sent, leaves the newest for later.
 func TestAuditLogsAfterTheCursor(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -21,26 +22,21 @@ func TestAuditLogsAfterTheCursor(t *testing.T) {
 		INSERT INTO audit.audit_logs (workspace_id, action, ok, timestamp) VALUES
 			($1, 'First', TRUE, $2), ($1, 'Second', TRUE, $3), ($1, 'Fresh', TRUE, NOW());
 	`, pgx.QueryExecModeSimpleProtocol, f.ws, old, old.Add(time.Second))
-	if err != nil {
-		t.Fatalf("seed: %v", err)
-	}
+	require.NoError(t, err, "seed")
 
 	after := func(ts time.Time, id string) []*db.AuditAuditLog {
 		rows, err := c.Sys().ListAuditLogsAfter(t.Context(), &db.ListAuditLogsAfterParams{
 			WorkspaceID: f.ws, CursorTs: ts, CursorID: id, MaxRows: 10,
 		})
-		if err != nil {
-			t.Fatalf("list after: %v", err)
-		}
+		require.NoError(t, err, "list after")
 		return rows
 	}
 
 	rows := after(old.Add(-time.Hour), uuid.Nil().String())
-	if len(rows) != 2 || rows[0].Action != "First" || rows[1].Action != "Second" {
-		t.Fatalf("want First and Second in order, the fresh row waits: got %d rows", len(rows))
-	}
+	require.Len(t, rows, 2, "the fresh row waits")
+	require.Equal(t, "First", rows[0].Action)
+	require.Equal(t, "Second", rows[1].Action)
 	rows = after(rows[0].Timestamp, rows[0].ID)
-	if len(rows) != 1 || rows[0].Action != "Second" {
-		t.Fatalf("after the first cursor: want Second only, got %d rows", len(rows))
-	}
+	require.Len(t, rows, 1, "after the first cursor")
+	require.Equal(t, "Second", rows[0].Action)
 }

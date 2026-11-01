@@ -21,10 +21,10 @@ func TestEgressClientRefusesPrivateAddresses(t *testing.T) {
 	client, err := NewClient(time.Second)
 	require.NoError(t, err)
 	_, err = client.Get(srv.URL)
-	assert.ErrorIs(t, err, ssrf.ErrProhibitedIP, "loopback must be refused, got %v", err)
+	assert.ErrorIs(t, err, ssrf.ErrProhibitedIP, "loopback must be refused")
 }
 
-// An issuer a workspace picked must not fill the memory of the core, go-oidc reads an answer whole.
+// A workspace's issuer must not fill the core's memory, go-oidc reads it whole.
 func TestEgressClientStopsAtTheCap(t *testing.T) {
 	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -62,7 +62,7 @@ func TestEgressClientAllowsPrivateWhenConfigured(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
-// The ranges a hand-rolled check missed. On a NAT64 network the first reaches the cloud metadata service.
+// A hand-rolled check missed these. Over NAT64 the first is cloud metadata.
 func TestEgressGuardRefusesSpecialRanges(t *testing.T) {
 	guard := ssrf.New(ssrf.WithAnyPort())
 	for _, addr := range []string{

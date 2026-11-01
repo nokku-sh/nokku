@@ -1,4 +1,4 @@
-// Package entitlement is the only place plan logic is enforced. Quotas fail open, features fail closed.
+// Package entitlement alone enforces plans. Quotas fail open, features closed.
 package entitlement
 
 import "slices"
@@ -18,21 +18,15 @@ const (
 	PlanCommunity  = "community"
 	PlanPro        = "pro"
 	PlanEnterprise = "enterprise"
-	// PlanInactive is a hosted workspace whose trial or subscription is over. Hosted has no free plan.
+	// PlanInactive is a lapsed hosted workspace. Hosted has no free plan.
 	PlanInactive = "inactive"
 )
 
-// TrialDays is how long a new hosted workspace runs on Pro before it needs a subscription.
 const TrialDays = 30
 
-type Feature struct {
-	Code  string
-	Label string
-	// Plan is the smallest plan that has the feature, every larger one has it too.
-	Plan string
-}
+const unlimited int64 = -1
 
-// CatalogFeatures is the one list of what a plan has. The console reads it through GetWorkspace.
+// CatalogFeatures is the one list of what a plan has, the console reads it too.
 var CatalogFeatures = []Feature{
 	{FeatureEnforceSSO, "Enforced single sign-on", PlanPro},
 	{FeatureAuditExport, "Audit log export", PlanPro},
@@ -44,25 +38,11 @@ var CatalogFeatures = []Feature{
 	{FeatureAuditStreaming, "Audit log streaming", PlanEnterprise},
 }
 
-// PlanNames are the names people see, by plan code.
 var PlanNames = map[string]string{
 	PlanCommunity:  "Community",
 	PlanPro:        "Pro",
 	PlanEnterprise: "Enterprise",
 	PlanInactive:   "inactive",
-}
-
-const unlimited int64 = -1
-
-type Plan struct {
-	Name        string
-	SeatCap     int64 // maximum members, unlimited means per-seat billing
-	ResourceCap int64 // pooled cap on managed resources
-	// Audit rows are small, recordings are what costs storage.
-	AuditRetentionDays     int64
-	RecordingRetentionDays int64
-	// RecordingStorageBytes is a stop for abuse, sized so that normal use runs into the retention first.
-	RecordingStorageBytes int64
 }
 
 // plans go from the smallest to the largest, Has depends on the order.
@@ -93,13 +73,31 @@ var plans = []Plan{
 	},
 }
 
-// inactive keeps the free features and data limits of Community, so the owner can still sign in with SSO to
-// subscribe. It signs no user certificates and takes nothing new.
+// inactive keeps Community's features and data limits, so the owner can SSO in
+// to subscribe. It signs no user certificates and takes nothing new.
 var inactive = func() Plan {
 	p := resolvePlan(PlanCommunity)
 	p.Name, p.SeatCap, p.ResourceCap = PlanInactive, 0, 0
 	return p
 }()
+
+type Feature struct {
+	Code  string
+	Label string
+	// Plan is the smallest plan with the feature, larger ones have it too.
+	Plan string
+}
+
+type Plan struct {
+	Name        string
+	SeatCap     int64 // maximum members, unlimited means per-seat billing
+	ResourceCap int64
+	// Audit rows are small, recordings are what costs storage.
+	AuditRetentionDays     int64
+	RecordingRetentionDays int64
+	// RecordingStorageBytes stops abuse, normal use hits the retention first.
+	RecordingStorageBytes int64
+}
 
 func (p Plan) Has(feature string) bool {
 	for _, f := range CatalogFeatures {
@@ -110,7 +108,7 @@ func (p Plan) Has(feature string) bool {
 	return false
 }
 
-// planRank is -1 for a name that is no plan, so a zero Plan has nothing. Inactive ranks as Community.
+// planRank is -1 for no plan, so a zero Plan has nothing.
 func planRank(name string) int {
 	if name == PlanInactive {
 		name = PlanCommunity

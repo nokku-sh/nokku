@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/audit"
+	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// minEvictAge keeps a recording whatever the cap says, so nobody can push out what they just did.
+// minEvictAge stops anyone pushing out what they just did, whatever the cap.
 const minEvictAge = 24 * time.Hour
 
-// MakeRoom evicts the oldest recordings over the cap, but nothing under minEvictAge. A failed lookup never refuses. It
-// runs when an upload starts and counts what is stored, so a workspace can pass the cap by what its open uploads hold.
-// The cap is a stop for abuse, that much over it does no harm.
+// MakeRoom evicts the oldest recordings over the cap, and a failed lookup never
+// refuses. Open uploads can pass the cap, which is only a stop for abuse.
 func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string) bool {
 	capBytes, err := s.limits.RecordingStorageBytes(ctx, workspaceID)
 	if err != nil {
@@ -54,30 +54,34 @@ func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string)
 			}
 			over -= v.SizeBytes
 			evicted++
-			// Audit it, an eviction removes evidence before its retention is up.
-			if s.events != nil {
-				if err := s.events.Append(ctx, &audit.Event{
-					Timestamp:   time.Now().UTC(),
-					WorkspaceID: workspaceID,
-					Action:      "RecordingEvicted",
-					ActorKind:   "system",
-					Target:      v.ID,
-					OK:          true,
-					Details: map[string]any{
-						"daemon_id":  v.DaemonID,
-						"username":   v.Username,
-						"started_at": v.StartedAt,
-						"size_bytes": v.SizeBytes,
-						"upload":     recordingID,
-					},
-				}); err != nil {
-					slog.Warn("failed to write eviction audit log", "recording_id", v.ID, "error", err)
-				}
-			}
+			s.auditEviction(ctx, workspaceID, recordingID, v)
 		}
 		if evicted == 0 {
 			return false
 		}
 	}
 	return true
+}
+
+// An eviction removes evidence before its retention is up.
+func (s *Service) auditEviction(ctx context.Context, workspaceID, upload string, v *db.Recording) {
+	if s.events == nil {
+		return
+	}
+	if err := s.events.Append(ctx, &audit.Event{
+		WorkspaceID: workspaceID,
+		Action:      "RecordingEvicted",
+		ActorKind:   "system",
+		Target:      v.ID,
+		OK:          true,
+		Details: map[string]any{
+			"daemon_id":  v.DaemonID,
+			"username":   v.Username,
+			"started_at": v.StartedAt,
+			"size_bytes": v.SizeBytes,
+			"upload":     upload,
+		},
+	}); err != nil {
+		slog.Warn("failed to write eviction audit log", "recording_id", v.ID, "error", err)
+	}
 }

@@ -44,7 +44,7 @@ func (s *invitationService) GetInvitation(
 	}, nil
 }
 
-// AcceptInvitation creates the account and signs it in, the way ConsumeMagicLink signs in.
+// AcceptInvitation creates the account and signs it in, like ConsumeMagicLink.
 func (s *invitationService) AcceptInvitation(
 	ctx context.Context,
 	req *nokkuv1.AcceptInvitationRequest,
@@ -56,7 +56,10 @@ func (s *invitationService) AcceptInvitation(
 	u, cookie, err := s.cfg.IAM.AcceptInvite(ctx, req.GetToken(), req.GetName())
 	switch {
 	case errors.Is(err, iam.ErrEmailTaken):
-		return nil, newError(connect.CodeAlreadyExists, "an account with this email already exists, sign in instead")
+		return nil, connect.NewError(
+			connect.CodeAlreadyExists,
+			"an account with this email already exists, sign in instead",
+		)
 	case err != nil:
 		return nil, err
 	}
@@ -69,14 +72,14 @@ func (s *invitationService) AcceptInvitation(
 	return &nokkuv1.AcceptInvitationResponse{User: u.ToProto()}, nil
 }
 
-// CreateInvitation replaces an earlier invite of the address. The link comes back only when no mail goes out.
+// CreateInvitation replaces any old invite. With no mail it returns the link.
 func (s *invitationService) CreateInvitation(
 	ctx context.Context,
 	req *nokkuv1.CreateInvitationRequest,
 ) (*nokkuv1.CreateInvitationResponse, error) {
 	role := cmp.Or(req.GetRole(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	if !db.CanAssign(callerRole(ctx), role) {
-		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
+		return nil, connect.NewError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
 	address := iam.NormalizeEmail(req.GetEmail())
 	audit.SetTarget(ctx, address)
@@ -85,11 +88,11 @@ func (s *invitationService) CreateInvitation(
 	link, err := s.cfg.IAM.Invite(ctx, address, role)
 	switch {
 	case errors.Is(err, iam.ErrEmailTaken):
-		return nil, newError(connect.CodeAlreadyExists, "this address already has an account here")
+		return nil, connect.NewError(connect.CodeAlreadyExists, "this address already has an account here")
 	case errors.Is(err, iam.ErrEmailRejected):
-		return nil, newError(connect.CodeInvalidArgument, "this email address cannot receive mail")
+		return nil, connect.NewError(connect.CodeInvalidArgument, "this email address cannot receive mail")
 	case errors.Is(err, email.ErrCooldown):
-		return nil, newError(connect.CodeResourceExhausted,
+		return nil, connect.NewError(connect.CodeResourceExhausted,
 			"an invite went to this address in the last 15 minutes, try again later")
 	case errors.Is(err, iam.ErrMailNotSent):
 		return nil, errMailNotSent
@@ -132,7 +135,7 @@ func (s *invitationService) DeleteInvitation(
 		return nil, err
 	}
 	if n == 0 {
-		return nil, newError(connect.CodeNotFound, "no pending invite for this address")
+		return nil, connect.NewError(connect.CodeNotFound, "no pending invite for this address")
 	}
 	return &nokkuv1.DeleteInvitationResponse{}, nil
 }

@@ -3,12 +3,12 @@
 package api_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,16 +19,16 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/audit"
 )
 
-// A UUID in capitals passes validation and Postgres finds the row, but it hands the id back in small letters. A
-// secret sealed with the capital one would never open again, and rotate-secrets would fail for every workspace.
+// Postgres hands a capital UUID back in small letters. A secret sealed with the
+// capitals would never open, and rotate-secrets would fail for every workspace.
 func TestASecretSealedThroughACapitalIDStillOpens(t *testing.T) {
 	cfg, srv := enterprise(t)
 	owner := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
 	streams := nokkuv1connect.NewAuditStreamServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner),
+		clientOn(srv, owner),
 	)
 	created, err := streams.CreateAuditStream(t.Context(), &nokkuv1.CreateAuditStreamRequest{
 		Kind:   nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK.Enum(),
@@ -37,6 +37,9 @@ func TestASecretSealedThroughACapitalIDStillOpens(t *testing.T) {
 	})
 	require.NoError(t, err)
 	id := created.GetStream().GetId()
+	t.Cleanup(func() {
+		_, _ = streams.DeleteAuditStream(context.WithoutCancel(t.Context()), &nokkuv1.DeleteAuditStreamRequest{Id: &id})
+	})
 
 	_, err = streams.UpdateAuditStream(t.Context(),
 		masked(&nokkuv1.UpdateAuditStreamRequest{Id: new(strings.ToUpper(id)), Secret: new("hec-token-2")}))
@@ -49,10 +52,10 @@ func TestASecretSealedThroughACapitalIDStillOpens(t *testing.T) {
 	assert.Equal(t, "hec-token-2", string(secret))
 }
 
-// A daemon names its recording. Only the spelling the database gives back can be sealed into its key.
+// Only the database's spelling of the id can be sealed into a recording's key.
 func TestUploadRefusesARecordingIDInCapitals(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	key, enrolled := enrollTestDaemon(t, cfg, srv, seedWorkspace(t, cfg), true)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, testWorkspace.ID, true)
 	id := uuid.NewV7().String()
 
 	stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), strings.ToUpper(id))

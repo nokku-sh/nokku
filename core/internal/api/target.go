@@ -51,7 +51,6 @@ func (s *targetService) GetTarget(
 	return &nokkuv1.GetTargetResponse{Target: target}, nil
 }
 
-// accountsByTarget groups the login accounts of the targets, each with its grants.
 func accountsByTarget(
 	ctx context.Context,
 	q *db.Queries,
@@ -86,7 +85,6 @@ func (s *targetService) CreateTarget(
 		return created, nil
 	}
 
-	// Generated names retry with a numeric suffix on collision.
 	for attempt := 0; ; attempt++ {
 		generated := namegen.Generate()
 		if attempt > 0 {
@@ -129,7 +127,7 @@ func (s *targetService) insertTarget(
 			return err
 		}
 		if err = seedTargetGrants(ctx, q, result.ID, req.GetGrants()); db.IsForeignKeyViolation(err) {
-			return newError(connect.CodeInvalidArgument, "a grant names a subject that does not exist")
+			return connect.NewError(connect.CodeInvalidArgument, "a grant names a subject that does not exist")
 		}
 		return err
 	}); err != nil {
@@ -140,7 +138,7 @@ func (s *targetService) insertTarget(
 	}, nil
 }
 
-// seedTargetGrants runs once, with the new target. Like a token's grants, nothing reapplies them later.
+// seedTargetGrants runs once. Like a token's grants, nothing reapplies them.
 func seedTargetGrants(ctx context.Context, q *db.Queries, targetID string, grants []*nokkuv1.JoinTokenGrant) error {
 	for _, g := range grants {
 		account, err := q.CreateTargetAccount(ctx, &db.CreateTargetAccountParams{
@@ -203,7 +201,7 @@ func (s *targetService) DeleteTarget(
 	ctx context.Context,
 	req *nokkuv1.DeleteTargetRequest,
 ) (*nokkuv1.DeleteTargetResponse, error) {
-	// A server that runs nokkud goes with its daemon, deleting the daemon cascades to it.
+	// A nokkud server goes with its daemon, the delete cascades to it.
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		target, err := q.GetTarget(ctx, req.GetId())
 		if err != nil {
@@ -266,7 +264,7 @@ func (s *targetService) ListTargets(
 	}, nil
 }
 
-// SyncTargetUsers is the daemonless report. It never deletes accounts, so a failed report cannot lock anyone out.
+// SyncTargetUsers never deletes accounts, a bad report can't lock anyone out.
 func (s *targetService) SyncTargetUsers(
 	ctx context.Context,
 	req *nokkuv1.SyncTargetUsersRequest,
@@ -389,9 +387,9 @@ func (s *targetService) GetSubjectAccess(
 	return res, nil
 }
 
-// setSubject names the person or service account asked about. Nothing else is one, a team is left out.
+// setSubject finds a person or service account. A team is left out.
 func setSubject(ctx context.Context, q *db.Queries, res *nokkuv1.GetSubjectAccessResponse, subjectID string) error {
-	// A service account asking about itself is no user, so it skips that lookup.
+	// A service account asking about itself skips the user lookup.
 	caller, _ := actor.PrincipalFromContext(ctx)
 	if caller.ID != subjectID || caller.Kind != actor.KindServiceAccount {
 		u, err := q.GetUser(ctx, subjectID)
@@ -414,8 +412,7 @@ func setSubject(ctx context.Context, q *db.Queries, res *nokkuv1.GetSubjectAcces
 	return err
 }
 
-// setUsernames fills in the accounts the subject holds on each target, when the ones that end do, and why they let
-// nobody in today when they don't.
+// setUsernames also sets when accounts end, and why they let nobody in today.
 func setUsernames(targets []*nokkuv1.Target, rows []*db.ListSubjectUsernamesForTargetsRow) {
 	byID := make(map[string]*nokkuv1.Target, len(targets))
 	for _, t := range targets {
@@ -467,7 +464,7 @@ func (s *targetService) GetTargetFilters(
 	}, nil
 }
 
-// GetAccessGraph counts everything in one grouped query, so the response stays small whatever the workspace size.
+// GetAccessGraph counts in one grouped query, so the response stays small.
 func (s *targetService) GetAccessGraph(
 	ctx context.Context,
 	req *nokkuv1.GetAccessGraphRequest,
@@ -516,7 +513,7 @@ func (s *targetService) GetAccessGraph(
 			}
 		}
 
-		// A user who only has access through teams holds nothing, but the caller still needs their name.
+		// A team-only user holds nothing, the caller still needs the name.
 		if id := filter.GetSubjectId(); id != "" {
 			held[id] += 0
 		}
@@ -589,7 +586,7 @@ func validateHostPublicKey(key string) error {
 		return nil
 	}
 	if _, err := ssh.ParsePublicKey(key); err != nil {
-		return newError(connect.CodeInvalidArgument, "invalid host public key")
+		return connect.NewError(connect.CodeInvalidArgument, "invalid host public key")
 	}
 	return nil
 }

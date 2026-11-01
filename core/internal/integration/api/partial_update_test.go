@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
@@ -32,33 +31,32 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// partialField is one field of a resource as read back, by dotted name. An empty value is unset or empty.
+// partialField is a field as read back, by dotted name. "" is unset or empty.
 type partialField struct {
 	name, value string
 }
 
-// partialCase sends an update that sets one field, or only the id for "nothing".
+// partialCase updates one field, or sends only the id for "nothing".
 type partialCase struct {
 	field  string
 	update func(id string) error
 }
 
-// partialResource makes a fresh resource for every case, so each case starts from the same baseline.
+// partialResource makes a fresh resource per case, for the same baseline.
 type partialResource struct {
 	rpc    string
 	create func() string
 	read   func(id string) []partialField
-	// drop removes a resource right after its case, for resources the workspace holds only a few of.
+	// drop removes it after its case, where the workspace holds only a few.
 	drop  func(id string)
 	cases []partialCase
 }
 
-// TestPartialUpdates pins what each update does to the fields it was not sent. Every field starts out set, the
-// update sets one, and every field is compared with what it was before.
+// TestPartialUpdates pins what each update does to the fields it was not sent.
 func TestPartialUpdates(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	admin := partialConn(srv, seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
-	// The idle timeout and audit streams are paid features, the shared test server runs on Community.
+	admin := partialConn(srv, seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
+	// Idle timeout and audit streams are paid, the shared server has neither.
 	_, paid := enterprise(t)
 
 	var lines []string
@@ -118,7 +116,7 @@ func partialStatus(before, after string) string {
 	return "changed"
 }
 
-// partialFields flattens m, nested messages by dotted name. Timestamps and durations stay one field.
+// partialFields flattens m by dotted name, timestamps and durations stay whole.
 func partialFields(m proto.Message, skip ...string) []partialField {
 	return flattenPartial("", m.ProtoReflect(), skip)
 }
@@ -176,7 +174,7 @@ func encodePartial(fd protoreflect.FieldDescriptor, v protoreflect.Value) string
 }
 
 func partialConn(srv *httptest.Server, token string) *connect.Client {
-	return connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))
+	return clientOn(srv, header("Authorization", "Bearer "+token))
 }
 
 func partialAccount(t *testing.T, cfg *config.Config, srv *httptest.Server) partialResource {
@@ -194,7 +192,7 @@ func partialAccount(t *testing.T, cfg *config.Config, srv *httptest.Server) part
 	return partialResource{
 		rpc: "AccountService.UpdateAccount",
 		create: func() string {
-			ws := seedWorkspace(t, cfg)
+			ws := testWorkspace.ID
 			u := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 			tokens[u.ID] = sessionFor(t, cfg, u)
 			inWorkspace(t, cfg, ws, func(q *db.Queries) error {
@@ -226,7 +224,7 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 		require.NoError(t, err)
 		return res.GetCertificateAuthority()
 	}
-	// The workspace has one CA, so every case starts by setting the baseline, and the test puts it back.
+	// One CA, so each case sets the baseline and the test restores it.
 	before := read()
 	t.Cleanup(func() {
 		_, err := certs.UpdateCertificateAuthority(context.WithoutCancel(t.Context()),
@@ -273,8 +271,8 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 	}
 }
 
-// partialDaemon starts pending with every switch away from its default. Ephemeral comes from the join token and
-// idle_timeout from the workspace, an update ignores both.
+// partialDaemon starts pending with every switch away from its default. An
+// update ignores ephemeral and idle_timeout.
 func partialDaemon(t *testing.T, cfg *config.Config, srv *httptest.Server, admin *connect.Client) partialResource {
 	t.Helper()
 	daemons := nokkuv1connect.NewDaemonServiceClient(admin)
@@ -288,8 +286,7 @@ func partialDaemon(t *testing.T, cfg *config.Config, srv *httptest.Server, admin
 	return partialResource{
 		rpc: "DaemonService.UpdateDaemon",
 		create: func() string {
-			_, enrolled := enrollTestDaemon(t, cfg, srv, seedWorkspace(t, cfg), false)
-			// Its server is on partialCA's default, which goes at the end. A CA in use cannot be deleted.
+			_, enrolled := enrollTestDaemon(t, cfg, srv, testWorkspace.ID, false)
 			t.Cleanup(func() {
 				_, err := daemons.DeleteDaemon(context.WithoutCancel(t.Context()),
 					&nokkuv1.DeleteDaemonRequest{Id: enrolled.Id})
@@ -324,11 +321,10 @@ func partialDaemon(t *testing.T, cfg *config.Config, srv *httptest.Server, admin
 	}
 }
 
-// partialWorkspace works on the one shared workspace, every case starts from the same baseline and the workspace
-// gets back what it had. enforce_sso stays off, turning it on ends every session that did not come from SSO.
+// partialWorkspace leaves enforce_sso off, it ends every non-SSO session.
 func partialWorkspace(t *testing.T, cfg *config.Config, srv *httptest.Server) partialResource {
 	t.Helper()
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	owner := nokkuv1connect.NewWorkspaceServiceClient(
 		partialConn(srv, seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)),
 	)
@@ -412,7 +408,7 @@ func restoreWorkspace(ctx context.Context, t *testing.T, cfg *config.Config, w *
 	if w.Description != nil {
 		return
 	}
-	// The query keeps a description it is not given, only the owner role puts the NULL back.
+	// The query can't set NULL, the owner role can.
 	owner, err := pgx.Connect(ctx, "")
 	require.NoError(t, err)
 	_, err = owner.Exec(ctx, "UPDATE workspaces SET description = NULL WHERE id = $1", w.ID)
@@ -440,8 +436,8 @@ func partialTeam(t *testing.T, cfg *config.Config, admin *connect.Client) partia
 			})
 			require.NoError(t, err)
 			id := res.GetTeam().GetId()
-			member := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-			inWorkspace(t, cfg, seedWorkspace(t, cfg), func(q *db.Queries) error {
+			member := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+			inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
 				return q.AddTeamMember(t.Context(), &db.AddTeamMemberParams{UserID: member.ID, TeamID: id})
 			})
 			return id
@@ -520,18 +516,17 @@ func partialHostKey(t *testing.T) string {
 	return strings.TrimSpace(string(gossh.MarshalAuthorizedKey(sshPub)))
 }
 
-// partialAuditStream leaves out the delivery state, it changes on its own. The secret is read from the row since the
-// API never shows it.
+// partialAuditStream skips delivery state. The secret comes from the row.
 func partialAuditStream(t *testing.T, cfg *config.Config, srv *httptest.Server) partialResource {
 	t.Helper()
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	streams := nokkuv1connect.NewAuditStreamServiceClient(
 		partialConn(srv, seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)),
 	)
 	drop := func(id string) {
 		_, _ = streams.DeleteAuditStream(context.WithoutCancel(t.Context()), &nokkuv1.DeleteAuditStreamRequest{Id: &id})
 	}
-	// The stream tests clean up with t.Context(), which is cancelled by then, so their streams stay and fill the cap.
+	// A stream another test left would count against the cap.
 	leftover, err := streams.ListAuditStreams(t.Context(), &nokkuv1.ListAuditStreamsRequest{})
 	require.NoError(t, err)
 	for _, s := range leftover.GetStreams() {
@@ -634,11 +629,11 @@ func partialServiceAccount(t *testing.T, admin *connect.Client) partialResource 
 	}
 }
 
-// Two tabs saving different settings at once keep both, the update reads the row under a lock.
+// Two tabs saving at once keep both, the update reads the row under a lock.
 func TestConcurrentSettingsKeepBoth(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	_, srv := enterprise(t)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	owner := nokkuv1connect.NewWorkspaceServiceClient(
 		partialConn(srv, seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)),
 	)

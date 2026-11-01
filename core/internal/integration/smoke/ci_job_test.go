@@ -29,10 +29,11 @@ const (
 	runnerSecret = "runner-request-token"
 )
 
-// jobPlatform is what GitHub Actions is to a job: it signs tokens, and a runner asks it for one over a URL it was given.
+// jobPlatform is what GitHub Actions is to a job: it signs tokens, and a runner
+// asks it for one over a URL it was given.
 type jobPlatform struct {
 	srv *httptest.Server
-	// certFile lets the core trust the issuer, the core only takes one over https.
+	// certFile lets the core trust the issuer, it only takes one over https.
 	certFile string
 }
 
@@ -107,7 +108,8 @@ func signJobToken(key *rsa.PrivateKey, claims map[string]any) (string, error) {
 	return signed.CompactSerialize()
 }
 
-// ciJob is a job on a runner: it holds no secret, signs in with what its platform gives it and reaches the server.
+// ciJob is a job on a runner: it holds no secret, signs in with what its
+// platform gives it and reaches the server.
 func (s *smoke) ciJob(t *testing.T) {
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(s.client)
 	created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
@@ -140,7 +142,8 @@ func (s *smoke) ciJob(t *testing.T) {
 	out, err := job.nk(t, "login", "--ci", ciAccount).CombinedOutput()
 	require.NoError(t, err, "nk login --ci: %s", out)
 
-	// The daemon learns the new grant from a sync, so the first tries may come too early.
+	// The daemon learns the grant from a sync, the first tries may be too
+	// early.
 	var last []byte
 	waitFor(t, time.Minute, func() bool {
 		last, err = job.ssh(t, login, "echo smoke-ci").CombinedOutput()
@@ -154,7 +157,7 @@ func (s *smoke) ciJob(t *testing.T) {
 
 	_, err = accounts.DeleteServiceAccount(t.Context(), &nokkuv1.DeleteServiceAccountRequest{Id: new(id)})
 	require.NoError(t, err)
-	// A job with no session fails and says so, nobody is there to approve a browser sign-in.
+	// A job with no session fails and says so, nobody can approve a sign-in.
 	out, err = job.nk(t, "ls").CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(out), "run nk login --ci")

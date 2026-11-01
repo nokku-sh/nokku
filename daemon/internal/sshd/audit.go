@@ -2,9 +2,6 @@ package sshd
 
 import "golang.org/x/crypto/ssh"
 
-// Operators filter the "audit" log lines on the type, keep the names stable.
-type eventType string
-
 const (
 	eventAuthSuccess       eventType = "auth_success"
 	eventAuthFailure       eventType = "auth_failure"
@@ -17,6 +14,9 @@ const (
 	eventRecordingDegraded eventType = "recording_degraded"
 	eventSessionIdle       eventType = "session_idle"
 )
+
+// Operators filter the "audit" log lines on the type, keep the names stable.
+type eventType string
 
 type auditEvent struct {
 	Type      eventType

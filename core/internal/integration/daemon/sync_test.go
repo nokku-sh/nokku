@@ -19,7 +19,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
-// reportFails runs the first transaction and refuses every one after, like a database that cannot take the report.
+// reportFails runs the first transaction and refuses the rest.
 type reportFails struct {
 	*db.Connection
 
@@ -33,8 +33,8 @@ func (c *reportFails) TenantTx(ctx context.Context, fn func(*db.Queries) error) 
 	return c.Connection.TenantTx(ctx, fn)
 }
 
-// One rollover reaches every daemon of the workspace at its next sync. A routine one keeps the old key trusted for a
-// while, an emergency one drops it at once.
+// One rollover reaches every daemon at its next sync. A routine one keeps the
+// old key trusted for a while, an emergency one drops it at once.
 func TestRolloverReachesTheNextSync(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.AutoApprove = true })
 	daemons := make([]string, 0, 2)
@@ -82,8 +82,8 @@ func TestRolloverReachesTheNextSync(t *testing.T) {
 	})
 }
 
-// A server always gets its principal list. What it reports about itself is saved after, and a failed save never
-// stands in the way.
+// A server always gets its principals. Its report is saved after, a failed save
+// never stands in the way.
 func TestSyncAnswersWhenTheReportCannotBeSaved(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.AutoApprove = true })
 	teamID := seedTeamGrant(t, f, "dev")

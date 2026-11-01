@@ -2,9 +2,11 @@ package entitlement
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// Changing a cell here is a pricing decision. It comes with a docs, pricing page and Stripe update.
+// A cell here is a pricing decision. Update docs, pricing page and Stripe too.
 func TestPlanMatrix(t *testing.T) {
 	tests := []struct {
 		plan            string
@@ -71,38 +73,20 @@ func TestPlanMatrix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.plan, func(t *testing.T) {
 			plan := resolvePlan(tt.plan)
-			if plan.Name != tt.plan {
-				t.Errorf("Name = %q, want %q", plan.Name, tt.plan)
-			}
-			if plan.SeatCap != tt.wantSeatCap {
-				t.Errorf("SeatCap = %d, want %d", plan.SeatCap, tt.wantSeatCap)
-			}
-			if plan.ResourceCap != tt.wantResourceCap {
-				t.Errorf("ResourceCap = %d, want %d", plan.ResourceCap, tt.wantResourceCap)
-			}
-			if plan.AuditRetentionDays != tt.wantAudit {
-				t.Errorf("AuditRetentionDays = %d, want %d", plan.AuditRetentionDays, tt.wantAudit)
-			}
-			if plan.RecordingRetentionDays != tt.wantRecordings {
-				t.Errorf("RecordingRetentionDays = %d, want %d", plan.RecordingRetentionDays, tt.wantRecordings)
-			}
-			if plan.RecordingStorageBytes != tt.wantStorageCap {
-				t.Errorf(
-					"RecordingStorageBytes = %d, want %d",
-					plan.RecordingStorageBytes,
-					tt.wantStorageCap,
-				)
-			}
+			assert.Equal(t, tt.plan, plan.Name)
+			assert.Equal(t, tt.wantSeatCap, plan.SeatCap, "SeatCap")
+			assert.Equal(t, tt.wantResourceCap, plan.ResourceCap, "ResourceCap")
+			assert.Equal(t, tt.wantAudit, plan.AuditRetentionDays, "AuditRetentionDays")
+			assert.Equal(t, tt.wantRecordings, plan.RecordingRetentionDays, "RecordingRetentionDays")
+			assert.Equal(t, tt.wantStorageCap, plan.RecordingStorageBytes, "RecordingStorageBytes")
 			for feature, want := range tt.wantFeatures {
-				if got := plan.Has(feature); got != want {
-					t.Errorf("Has(%q) = %v, want %v", feature, got, want)
-				}
+				assert.Equal(t, want, plan.Has(feature), "Has(%q)", feature)
 			}
 		})
 	}
 }
 
-func TestResolvePlan_LegacyAndUnknown(t *testing.T) {
+func TestResolvePlan_Unknown(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
@@ -114,9 +98,7 @@ func TestResolvePlan_LegacyAndUnknown(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := resolvePlan(tt.input).Name; got != tt.want {
-				t.Errorf("resolvePlan(%q).Name = %q, want %q", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, resolvePlan(tt.input).Name)
 		})
 	}
 }
@@ -124,30 +106,22 @@ func TestResolvePlan_LegacyAndUnknown(t *testing.T) {
 // A plan that was never resolved has nothing, not even what Community has.
 func TestZeroPlanHasNoFeature(t *testing.T) {
 	for _, feature := range CatalogFeatures {
-		if (Plan{}).Has(feature.Code) {
-			t.Errorf("a zero Plan has %q", feature.Code)
-		}
+		assert.False(t, (Plan{}).Has(feature.Code), "a zero Plan has %q", feature.Code)
 	}
-	if resolvePlan(PlanEnterprise).Has("no_such_feature") {
-		t.Error("Enterprise has a feature that is not in the catalog")
-	}
+	assert.False(t, resolvePlan(PlanEnterprise).Has("no_such_feature"),
+		"Enterprise has a feature that is not in the catalog")
 }
 
 func TestInactive_KeepsTheFreeFeaturesAndLimits(t *testing.T) {
 	community := resolvePlan(PlanCommunity)
-	if inactive.AuditRetentionDays != community.AuditRetentionDays ||
-		inactive.RecordingRetentionDays != community.RecordingRetentionDays {
-		t.Error("an inactive workspace keeps its data like Community")
-	}
-	if inactive.SeatCap != 0 || inactive.ResourceCap != 0 {
-		t.Error("an inactive workspace takes nothing new")
-	}
+	const keeps = "an inactive workspace keeps its data like Community"
+	assert.Equal(t, community.AuditRetentionDays, inactive.AuditRetentionDays, keeps)
+	assert.Equal(t, community.RecordingRetentionDays, inactive.RecordingRetentionDays, keeps)
+	assert.Zero(t, inactive.SeatCap, "an inactive workspace takes no new seats")
+	assert.Zero(t, inactive.ResourceCap, "an inactive workspace takes no new resources")
 	for _, f := range CatalogFeatures {
-		if want := f.Plan == PlanCommunity; inactive.Has(f.Code) != want {
-			t.Errorf("inactive.Has(%q) = %v, want %v", f.Code, !want, want)
-		}
+		assert.Equal(t, f.Plan == PlanCommunity, inactive.Has(f.Code), "inactive.Has(%q)", f.Code)
 	}
-	if resolvePlan(PlanInactive).Name != PlanCommunity {
-		t.Error("inactive must never come out of resolvePlan, a self-hosted server has no such plan")
-	}
+	assert.Equal(t, PlanCommunity, resolvePlan(PlanInactive).Name,
+		"inactive must never come out of resolvePlan, a self-hosted server has no such plan")
 }

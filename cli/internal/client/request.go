@@ -9,7 +9,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-// RequestAccess asks the admins for username on target, named by id or name, for d.
+// RequestAccess takes the target by id or name.
 func (c *Client) RequestAccess(
 	ctx context.Context,
 	target, username string,

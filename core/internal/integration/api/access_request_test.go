@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -22,14 +21,14 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
 
-// enterpriseServer serves the test workspace on an Enterprise license of its own, the shared server stays unlicensed.
+// enterpriseServer has an Enterprise license, the shared server stays without.
 func enterpriseServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	_, srv := enterprise(t)
 	return srv
 }
 
-// enterprise is enterpriseServer with the config it runs on, for what runs beside the server.
+// enterprise is enterpriseServer with its config, for what runs beside it.
 func enterprise(t *testing.T) (*config.Config, *httptest.Server) {
 	t.Helper()
 	cfg, _ := newTestAPI(t)
@@ -42,8 +41,8 @@ func enterprise(t *testing.T) (*config.Config, *httptest.Server) {
 	srv := httptest.NewServer(serving(api.New(&local).Handler(t.Context())))
 	t.Cleanup(srv.Close)
 
-	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
-	_, err = nokkuv1connect.NewBillingServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner))).
+	owner := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
+	_, err = nokkuv1connect.NewBillingServiceClient(clientOn(srv, header("Authorization", "Bearer "+owner))).
 		ActivateLicense(t.Context(), &nokkuv1.ActivateLicenseRequest{Key: &key})
 	require.NoError(t, err)
 	return &local, srv
@@ -52,7 +51,7 @@ func enterprise(t *testing.T) (*config.Config, *httptest.Server) {
 func TestAccessRequestFlow(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	srv := enterpriseServer(t)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 	ctx := t.Context()
 
 	tag := uniq("prod")
@@ -68,14 +67,18 @@ func TestAccessRequestFlow(t *testing.T) {
 		return err
 	})
 	hidden := seedTarget(t, cfg, ws)
+	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+		_, err := q.CreateTargetAccount(
+			t.Context(),
+			&db.CreateTargetAccountParams{TargetID: hidden, Username: "postgres"},
+		)
+		return err
+	})
 
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	as := func(u *db.User) nokkuv1connect.AccessRequestServiceClient {
 		return nokkuv1connect.NewAccessRequestServiceClient(
-			connect.NewClient(
-				connecthttp.NewTransport(srv.Client(), srv.URL),
-				header("Authorization", "Bearer "+sessionFor(t, cfg, u)),
-			),
+			clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, u))),
 		)
 	}
 	asMember := as(member)
@@ -162,13 +165,13 @@ func TestAccessRequestFlow(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// A zero timeout must replace a stored one. A merge would keep the old one, and nobody could turn it off.
+// A zero timeout replaces a stored one, a merge would keep it on for good.
 func TestIdleTimeoutTurnsOff(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	srv := enterpriseServer(t)
-	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
+	owner := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
 	client := nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+owner)),
+		clientOn(srv, header("Authorization", "Bearer "+owner)),
 	)
 	set := func(d time.Duration) *nokkuv1.WorkspaceSettings {
 		res, err := client.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{

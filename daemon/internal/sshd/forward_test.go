@@ -42,7 +42,7 @@ func TestServerDirectTCPIP(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}))
 	defer closeFn()
 
 	echo := testEchoServer(t)
@@ -69,7 +69,7 @@ func TestServerDirectTCPIP(t *testing.T) {
 func TestServerMaxChannelsHeldForRelay(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}),
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}),
 		func(s *Server) { s.maxChannels = 1 })
 	defer closeFn()
 
@@ -120,7 +120,7 @@ func TestServerRemoteForward(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}))
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -161,7 +161,7 @@ func TestServerRemoteForwardPortZero(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}))
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -180,13 +180,13 @@ func TestServerRemoteForwardPortZero(t *testing.T) {
 	is.Error(err, "the cancelled forward still listens")
 }
 
-// The cancel names the address the client asked for, so a policy change in between must not strand the listener.
+// A cancel names the address asked for, so a policy change must not strand it.
 func TestServerRemoteForwardCancelAfterPolicyChange(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
 	var srv *Server
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}),
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}),
 		func(s *Server) { srv = s })
 	defer closeFn()
 
@@ -196,7 +196,7 @@ func TestServerRemoteForwardCancelAfterPolicyChange(t *testing.T) {
 
 	ln, err := client.Listen("tcp", "0.0.0.0:0")
 	must.NoError(err, "forward")
-	withPolicy(Policy{AllowForwarding: true, GatewayPorts: true})(srv)
+	withPolicy(policy{AllowForwarding: true, GatewayPorts: true})(srv)
 	must.NoError(ln.Close(), "cancel the forward")
 
 	_, port, err := net.SplitHostPort(ln.Addr().String())
@@ -208,7 +208,7 @@ func TestServerRemoteForwardCancelAfterPolicyChange(t *testing.T) {
 func TestServerRemoteForwardListenersCapped(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}),
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}),
 		func(s *Server) { s.maxChannels = 2 })
 	defer closeFn()
 
@@ -236,12 +236,12 @@ func TestServerRemoteForwardListenersCapped(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond, "a cancelled forward never released its slot")
 }
 
-// Clients key a forward by the address they asked for, so the server must report "localhost" back verbatim.
+// Clients key a forward by its address, so "localhost" must come back as is.
 func TestServerRemoteForwardLocalhost(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}))
 	defer closeFn()
 
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
@@ -290,7 +290,7 @@ func TestServerRemoteForwardInterop(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}))
 	defer closeFn()
 	host, port := hostPort(t, addr)
 
@@ -298,16 +298,10 @@ func TestServerRemoteForwardInterop(t *testing.T) {
 	defer echo.Close()
 	_, echoPortStr, _ := net.SplitHostPort(echo.Addr().String())
 
-	// Picks a free port for -R to bind on the server side.
-	bound, err := net.Listen("tcp", "127.0.0.1:0")
-	must.NoError(err)
-	_, boundPortStr, _ := net.SplitHostPort(bound.Addr().String())
-	_ = bound.Close()
-
+	boundPortStr := freePort(t)
 	user := currentUser(t)
 	identity := userCertFile(t, ca)
 
-	// ssh -R <boundPort>:<echoHost>:<echoPort> -N
 	cmd := exec.Command(
 		sshBin,
 		"-F", "/dev/null",
@@ -326,12 +320,15 @@ func TestServerRemoteForwardInterop(t *testing.T) {
 		_ = cmd.Process.Kill()
 		_, _ = cmd.Process.Wait()
 	}()
-	// Give the forward a moment to be established.
-	time.Sleep(500 * time.Millisecond)
 
-	sconn, err := net.Dial("tcp", "127.0.0.1:"+boundPortStr)
-	if err != nil {
-		must.NoError(err, "dial server-side forward\n%s", slurpAfterKill(cmd, stderr))
+	var sconn net.Conn
+	forwarded := is.Eventually(func() bool {
+		var dialErr error
+		sconn, dialErr = net.Dial("tcp", "127.0.0.1:"+boundPortStr)
+		return dialErr == nil
+	}, 10*time.Second, 50*time.Millisecond, "the forward never came up")
+	if !forwarded {
+		must.FailNow("dial server-side forward", slurpAfterKill(cmd, stderr))
 	}
 	defer sconn.Close()
 
@@ -346,7 +343,7 @@ func TestServerRemoteForwardInterop(t *testing.T) {
 	is.Equal("interop", string(buf))
 }
 
-// ssh -N never exits on its own, so reading its stderr blocks forever unless it is killed first.
+// ssh -N never exits by itself, so kill it or reading stderr blocks forever.
 func slurpAfterKill(cmd *exec.Cmd, stderr io.Reader) string {
 	_ = cmd.Process.Kill()
 	b, _ := io.ReadAll(stderr)
@@ -379,22 +376,25 @@ func TestForwardAddr(t *testing.T) {
 func TestServerForwardingLargeTransfer(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
-	addr, closeFn := startTestServerOpts(t, ca, withPolicy(Policy{AllowForwarding: true}))
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}))
 	defer closeFn()
 
 	payload := bytes.Repeat([]byte("0123456789abcdef"), 512*1024) // 8 MiB
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	must.NoError(err, "listen")
 	defer ln.Close()
+	var received int64
+	read := make(chan error, 1)
 	go func() {
 		c, aerr := ln.Accept()
 		if aerr != nil {
+			read <- aerr
 			return
 		}
 		defer c.Close()
-		if _, copyErr := io.Copy(io.Discard, c); copyErr != nil {
-			t.Errorf("server read: %v", copyErr)
-		}
+		var copyErr error
+		received, copyErr = io.Copy(io.Discard, c)
+		read <- copyErr
 	}()
 	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
 
@@ -408,11 +408,14 @@ func TestServerForwardingLargeTransfer(t *testing.T) {
 
 	_, err = conn.Write(payload)
 	must.NoError(err, "write")
-	if tc, ok := conn.(*net.TCPConn); ok {
-		_ = tc.CloseWrite()
+	must.NoError(conn.Close(), "close the forward")
+	select {
+	case err = <-read:
+		must.NoError(err, "server read")
+		assert.EqualValues(t, len(payload), received, "the far end lost part of the transfer")
+	case <-time.After(10 * time.Second):
+		t.Fatal("the far end never saw the transfer end")
 	}
-	// The server side discards. Give it a moment, then confirm no error.
-	time.Sleep(200 * time.Millisecond)
 }
 
 // A forward request racing connection teardown must not leak a listener.
@@ -420,7 +423,7 @@ func TestTCPIPForwardAfterClose(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 	srv, err := New(nil)
 	require.NoError(t, err)
-	withPolicy(Policy{AllowForwarding: true})(srv)
+	withPolicy(policy{AllowForwarding: true})(srv)
 
 	conn := &ssh.ServerConn{Permissions: &ssh.Permissions{
 		Extensions: map[string]string{"permit-port-forwarding": ""},
@@ -447,7 +450,7 @@ func TestDialAsReportsTheDialError(t *testing.T) {
 	require.ErrorContains(t, err, "too long")
 }
 
-// The point of the helper: to the kernel a forward is the user's socket, not the daemon's.
+// To the kernel a forward is the user's socket, not the daemon's.
 func TestForwardSocketsBelongToTheUser(t *testing.T) {
 	if os.Geteuid() != 0 {
 		t.Skip("test must run as root")
@@ -467,7 +470,7 @@ func TestForwardSocketsBelongToTheUser(t *testing.T) {
 	assert.Equal(t, nobody, tcpSocketUID(t, c.LocalAddr()), "connection of a direct forward")
 }
 
-// The go tool builds the test binary in a directory only its own user can enter. nokkud itself is in /usr/bin.
+// go test builds the binary in a directory only its user can enter.
 func helperForEveryone(t *testing.T) {
 	t.Helper()
 	//nolint:usetesting // t.TempDir() sits under a 0700 directory

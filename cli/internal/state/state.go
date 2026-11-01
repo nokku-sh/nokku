@@ -22,33 +22,14 @@ type ServiceAccount struct {
 	Name string `json:"name"`
 }
 
-// CA is the one certificate authority of the workspace.
 type CA struct {
-	// PublicKey signs login certificates, HostPublicKey the host certificates daemons present.
+	// PublicKey signs logins, HostPublicKey the host certificates of daemons.
 	PublicKey     string `json:"public_key"`
 	HostPublicKey string `json:"host_public_key,omitempty"`
-	// The keys before the last rollover. Their certificates stay trusted until PreviousTrustedUntil.
+	// The keys before the last rollover, trusted until PreviousTrustedUntil.
 	PreviousPublicKey     string    `json:"previous_public_key,omitempty"`
 	PreviousHostPublicKey string    `json:"previous_host_public_key,omitempty"`
 	PreviousTrustedUntil  time.Time `json:"previous_trusted_until,omitzero"`
-}
-
-// TrustedKeys returns the current user key and, while it is still trusted, the one it replaced.
-func (ca CA) TrustedKeys() []string {
-	return ca.trusted(ca.PublicKey, ca.PreviousPublicKey)
-}
-
-// TrustedHostKeys returns the current host key and, while it is still trusted, the one it replaced.
-func (ca CA) TrustedHostKeys() []string {
-	return ca.trusted(ca.HostPublicKey, ca.PreviousHostPublicKey)
-}
-
-func (ca CA) trusted(current, previous string) []string {
-	keys := []string{strings.TrimSpace(current)}
-	if prev := strings.TrimSpace(previous); prev != "" && time.Now().Before(ca.PreviousTrustedUntil) {
-		keys = append(keys, prev)
-	}
-	return keys
 }
 
 type Target struct {
@@ -64,13 +45,10 @@ type Target struct {
 	HostPublicKey string `json:"host_public_key,omitempty"`
 }
 
-// Manual reports whether the target has no daemon and is synced by hand.
-func (t Target) Manual() bool { return t.DaemonID == "" }
-
-// Config lives in config.json. A session belongs to the API that issued it, so both are kept together.
+// Config keeps a session with the API that issued it.
 type Config struct {
 	APIURL string `json:"api_url,omitempty"`
-	// PEM of the private CA the API is trusted through, empty when the system roots know its certificate.
+	// PEM of the API's private CA, empty when the system roots know it.
 	APICA            string    `json:"api_ca,omitempty"`
 	SessionToken     string    `json:"session_token,omitempty"`
 	SessionExpiresAt time.Time `json:"session_expires_at,omitzero"`
@@ -80,7 +58,7 @@ type Config struct {
 
 // Cache is the last access snapshot, kept in cache.json for offline use.
 type Cache struct {
-	// The API this snapshot came from. One written before this field existed has none.
+	// Server is empty in a snapshot older than this field.
 	Server   string    `json:"server,omitempty"`
 	SyncedAt time.Time `json:"synced_at,omitzero"`
 	// FailedAt is when a sync or a renewal last failed. A sync clears it.
@@ -91,17 +69,37 @@ type Cache struct {
 	Targets        []Target        `json:"targets,omitempty"`
 }
 
-// State is in memory. Everything outside Config and Cache comes from flags and is never written to disk.
+// State outside Config and Cache is never written to disk.
 type State struct {
 	Config
 	Cache
 
-	// Read from NK_TOKEN only, never argv, so it stays out of shell history and the process list.
+	// NK_TOKEN only, never argv, so it stays out of history and process lists.
 	Token      string
 	RequireTPM bool
 }
 
-// Load reads config and cache. A missing or corrupt file starts empty.
+// TrustedKeys is the user key and, while still trusted, the one it replaced.
+func (ca CA) TrustedKeys() []string {
+	return ca.trusted(ca.PublicKey, ca.PreviousPublicKey)
+}
+
+// TrustedHostKeys is [CA.TrustedKeys] for the host key.
+func (ca CA) TrustedHostKeys() []string {
+	return ca.trusted(ca.HostPublicKey, ca.PreviousHostPublicKey)
+}
+
+func (ca CA) trusted(current, previous string) []string {
+	keys := []string{strings.TrimSpace(current)}
+	if prev := strings.TrimSpace(previous); prev != "" && time.Now().Before(ca.PreviousTrustedUntil) {
+		keys = append(keys, prev)
+	}
+	return keys
+}
+
+func (t Target) Manual() bool { return t.DaemonID == "" }
+
+// Load starts empty on a missing or corrupt file.
 func Load() *State {
 	s := &State{}
 	if err := fsutil.LoadJSON(paths.ConfigFile(), &s.Config); err != nil {
@@ -135,7 +133,7 @@ func (s *State) Save() error {
 	return nil
 }
 
-// MarkSyncFailed makes nk under ssh leave the core alone for a while, so an outage costs one attempt in total.
+// MarkSyncFailed backs nk off the core, so an outage costs one attempt.
 func (s *State) MarkSyncFailed() {
 	s.FailedAt = time.Now()
 	if err := fsutil.SaveJSON(paths.CacheFile(), s.Cache, 0o600); err != nil {
@@ -149,11 +147,9 @@ func (s *State) SyncFailedWithin(d time.Duration) bool {
 
 func (s *State) IsServiceAccount() bool { return s.Token != "" }
 
-// CIJob reports a session nk login --ci got. No person is around to approve a browser sign-in for it. A snapshot left
-// by NK_TOKEN names an account too, but holds no session.
+// CIJob is an nk login --ci session. An NK_TOKEN snapshot has no session.
 func (s *State) CIJob() bool { return s.Token == "" && s.ServiceAccount != nil && s.SessionToken != "" }
 
-// SubjectID is empty when the snapshot names no subject.
 func (c Cache) SubjectID() string {
 	switch {
 	case c.User != nil:

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,7 @@ func agentForwardedSession(t *testing.T, ca testCA) *ssh.Session {
 	addr, closeFn := startTestServerOpts(
 		t,
 		ca,
-		withPolicy(Policy{AllowAgentForwarding: true}),
+		withPolicy(policy{AllowAgentForwarding: true}),
 	)
 	t.Cleanup(closeFn)
 
@@ -30,7 +31,7 @@ func agentForwardedSession(t *testing.T, ca testCA) *ssh.Session {
 	must.NoError(err)
 	t.Cleanup(func() { _ = client.Close() })
 
-	// Client side: an in-memory agent that holds one key serves the auth-agent@openssh.com channels.
+	// An in-memory agent with one key serves the auth-agent channels.
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	must.NoError(err)
 	keyring := agent.NewKeyring()
@@ -52,7 +53,7 @@ func TestServerAgentForwarding(t *testing.T) {
 
 	out, err := sess.Output("echo $SSH_AUTH_SOCK")
 	must.NoError(err)
-	is.NotEmpty(out, "SSH_AUTH_SOCK not set in session")
+	is.NotEmpty(strings.TrimSpace(string(out)), "SSH_AUTH_SOCK not set in session")
 	t.Logf("SSH_AUTH_SOCK=%s", out)
 }
 
@@ -62,27 +63,17 @@ func TestServerAgentForwardingKeyList(t *testing.T) {
 	ca := newTestCA(t)
 	sess := agentForwardedSession(t, ca)
 
-	// The helper flag goes through the shell, the daemon's env whitelist refuses GO_* from clients.
-	helper := "GO_WANT_AGENT_HELPER_PROCESS=1 GORACE=atexit_sleep_ms=0 " + helperProcessCommand(t, "agent")
+	bin := os.Args[0]
+	must.Equal("sshd.test", filepath.Base(bin), "the helper re-enters the test binary")
+	// The flag goes through the shell, the env whitelist refuses GO_*.
+	helper := "GO_WANT_AGENT_HELPER_PROCESS=1 GORACE=atexit_sleep_ms=0 " + bin +
+		" -test.run=TestAgentHelperProcess -- agent"
 	out, err := sess.Output(helper)
 	must.NoError(err, "agent helper: %s", out)
 	is.Equal("keys=1\n", string(out))
 }
 
-func helperProcessCommand(t *testing.T, name string) string {
-	t.Helper()
-	return fmt.Sprintf("%s -test.run=TestAgentHelperProcess -- %s", sshdTestBinary(t), name)
-}
-
-func sshdTestBinary(t *testing.T) string {
-	t.Helper()
-	must := require.New(t)
-	bin := os.Args[0]
-	must.Equal("sshd.test", filepath.Base(bin), "expected test binary named sshd.test, got %q", bin)
-	return bin
-}
-
-// Not a test: the binary re-entered as an agent client that prints the key count.
+// Not a test: the binary re-entered as an agent client printing the key count.
 func TestAgentHelperProcess(_ *testing.T) {
 	if os.Getenv("GO_WANT_AGENT_HELPER_PROCESS") != "1" {
 		return
@@ -144,7 +135,7 @@ func TestServerAgentForwardingInterop(t *testing.T) {
 	addr, closeFn := startTestServerOpts(
 		t,
 		ca,
-		withPolicy(Policy{AllowAgentForwarding: true}),
+		withPolicy(policy{AllowAgentForwarding: true}),
 	)
 	defer closeFn()
 	host, port := hostPort(t, addr)
@@ -160,7 +151,7 @@ func TestServerAgentForwardingInterop(t *testing.T) {
 	must.NoError(keyring.Add(agent.AddedKey{PrivateKey: priv}))
 	must.NoError(agent.ForwardToAgent(client, keyring))
 
-	// ssh forwards its own agent, so one is started here. CI runners have none and would silently drop -A.
+	// ssh forwards its own agent. CI runners have none and would drop -A.
 	sock, stopAgent := testAgent(t)
 	defer stopAgent()
 	agentEnv := append(os.Environ(), "SSH_AUTH_SOCK="+sock)

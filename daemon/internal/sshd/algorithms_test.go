@@ -8,7 +8,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// OpenSSH dropped these from its defaults, so a client that offers nothing else is refused.
+// OpenSSH dropped these defaults, so a client offering only them is refused.
 func TestServerRefusesLegacyAlgorithms(t *testing.T) {
 	ca := newTestCA(t)
 	addr, closeFn := startTestServer(t, ca)
@@ -17,7 +17,7 @@ func TestServerRefusesLegacyAlgorithms(t *testing.T) {
 
 	for name, config := range map[string]ssh.Config{
 		"sha1 key exchange": {KeyExchanges: []string{ssh.InsecureKeyExchangeDH14SHA1}},
-		// An AEAD cipher skips the MAC negotiation, so the client has to ask for a CTR one.
+		// An AEAD cipher skips MAC negotiation, so the client asks for CTR.
 		"truncated sha1 mac": {Ciphers: []string{ssh.CipherAES128CTR}, MACs: []string{ssh.InsecureHMACSHA196}},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -25,7 +25,7 @@ func TestServerRefusesLegacyAlgorithms(t *testing.T) {
 				Config:          config,
 				User:            currentUser(t),
 				Auth:            []ssh.AuthMethod{auth},
-				HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - test server
+				HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 				Timeout:         10 * time.Second,
 			}
 			client, err := ssh.Dial("tcp", addr, cfg)

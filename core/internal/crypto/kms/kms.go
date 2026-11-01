@@ -1,4 +1,4 @@
-// Package kms does envelope encryption. One Tink keyset encrypts everything, a KMS key or NOKKU_SECRET wraps it.
+// Package kms wraps the one Tink keyset with a KMS key or NOKKU_SECRET.
 package kms
 
 import (
@@ -26,13 +26,13 @@ import (
 
 const minSecretLen = 32
 
-// Keyset holds the keys as they were at start. Only rotate-secrets changes them, with the server stopped.
+// Keyset is fixed at start. Only rotate-secrets changes it, server stopped.
 type Keyset struct {
 	db *db.Connection
 
 	kek       tink.AEAD
 	primitive tink.AEAD
-	// vault is the Vault VAULT_TOKEN belongs to, nil without one. VaultTokenLoop keeps the token alive on it.
+	// vault is nil without a Vault. VaultTokenLoop renews the token on it.
 	vault *api.Client
 
 	KMSURI     string `env:"KMS_URI"`
@@ -40,7 +40,7 @@ type Keyset struct {
 	VaultToken string `env:"VAULT_TOKEN"`
 }
 
-// New loads the keyset or creates it on first boot. KMS_URI wraps it, without one NOKKU_SECRET does.
+// New loads the keyset or creates it on first boot.
 func New(ctx context.Context, conn *db.Connection, hosted bool) (*Keyset, error) {
 	k, err := env.ParseAs[Keyset]()
 	if err != nil {
@@ -54,7 +54,7 @@ func New(ctx context.Context, conn *db.Connection, hosted bool) (*Keyset, error)
 		}
 		k.kek, err = k.kmsKEK(k.KMSURI)
 	case hosted:
-		// It holds the CA keys of every workspace, a dump plus a secret must not be enough. Refused before a first write.
+		// It holds every CA key, a dump plus a secret must not be enough.
 		return nil, errors.New("NOKKU_SAAS needs KMS_URI")
 	case k.Secret == "":
 		return nil, errors.New("set KMS_URI or NOKKU_SECRET, one of them wraps the keyset")
@@ -70,7 +70,7 @@ func New(ctx context.Context, conn *db.Connection, hosted bool) (*Keyset, error)
 	return &k, nil
 }
 
-// Ephemeral is a keyset in memory only, for tests. Nothing it seals outlives the process.
+// Ephemeral is a keyset in memory only, for tests.
 func Ephemeral() (*Keyset, error) {
 	handle, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
 	if err != nil {
@@ -81,20 +81,6 @@ func Ephemeral() (*Keyset, error) {
 		return nil, err
 	}
 	return &Keyset{primitive: primitive}, nil
-}
-
-// validSecret refuses a short or placeholder NOKKU_SECRET, the keyset is only as safe as the key from it.
-func validSecret(secret string) error {
-	if len(secret) < minSecretLen {
-		return fmt.Errorf(
-			"NOKKU_SECRET must be at least %d characters, generate one with: openssl rand -hex 32",
-			minSecretLen,
-		)
-	}
-	if strings.HasPrefix(secret, "CHANGE_ME") || secret == "0123456789abcdefghijklmnopqrstuv" {
-		return errors.New("NOKKU_SECRET is still a placeholder, generate one with: openssl rand -hex 32")
-	}
-	return nil
 }
 
 func secretKEK(secret string) (tink.AEAD, error) {
@@ -108,12 +94,26 @@ func secretKEK(secret string) (tink.AEAD, error) {
 	return subtle.NewAESGCM(key)
 }
 
-// Seal encrypts a secret for the row aad names. db.Reencrypt builds the same aad for every sealed column.
+// The keyset is only as safe as the key from NOKKU_SECRET.
+func validSecret(secret string) error {
+	if len(secret) < minSecretLen {
+		return fmt.Errorf(
+			"NOKKU_SECRET must be at least %d characters, generate one with: openssl rand -hex 32",
+			minSecretLen,
+		)
+	}
+	if strings.HasPrefix(secret, "CHANGE_ME") || secret == "0123456789abcdefghijklmnopqrstuv" {
+		return errors.New("NOKKU_SECRET is still a placeholder, generate one with: openssl rand -hex 32")
+	}
+	return nil
+}
+
+// Seal encrypts for the row aad names. db.Reencrypt must build the same aad.
 func (k *Keyset) Seal(aad crypto.AAD, plaintext []byte) (crypto.Sealed, error) {
 	return k.primitive.Encrypt(plaintext, aad.Bytes())
 }
 
-// Open is the one way back to a secret. It fails for a ciphertext stored anywhere but the row aad names.
+// Open is the one way back to a secret, only for the row aad names.
 func (k *Keyset) Open(aad crypto.AAD, sealed crypto.Sealed) ([]byte, error) {
 	plaintext, err := k.primitive.Decrypt(sealed, aad.Bytes())
 	if err != nil {
@@ -122,8 +122,8 @@ func (k *Keyset) Open(aad crypto.AAD, sealed crypto.Sealed) ([]byte, error) {
 	return plaintext, nil
 }
 
-// Rotate makes a new data key, re-encrypts every secret with it and wraps the keyset under target, which is
-// secret:<value> or kms:<uri>. The same kms URI moves the keyset onto the newest version of that KMS key.
+// Rotate makes a new data key, re-encrypts every secret and wraps the keyset
+// under target. The same kms URI moves it onto the KMS key's newest version.
 func (k *Keyset) Rotate(ctx context.Context, target string) error {
 	var kek tink.AEAD
 	var err error
@@ -169,7 +169,7 @@ func (k *Keyset) Rotate(ctx context.Context, target string) error {
 	return nil
 }
 
-// rotateKeys keeps two keys: the new one, and the one it replaced, which this process may still write with.
+// Keeps the new key and the one it replaced, which this process may write with.
 func rotateKeys(ctx context.Context, q *db.Queries, handle *keyset.Handle) (*keyset.Handle, error) {
 	outgoing, err := handle.Primary()
 	if err != nil {
@@ -222,7 +222,6 @@ func rotateKeys(ctx context.Context, q *db.Queries, handle *keyset.Handle) (*key
 	return manager.Handle()
 }
 
-// load reads the keyset or creates it. ON CONFLICT DO NOTHING makes concurrent first boots safe.
 func (k *Keyset) load(ctx context.Context) error {
 	data, err := k.db.Sys().GetKeysetData(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {

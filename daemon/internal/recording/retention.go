@@ -19,7 +19,7 @@ const (
 	maxAge        = 30 * 24 * time.Hour
 )
 
-// Uploaded recordings are gone already, so whatever this removes never reached the core.
+// Uploaded recordings are gone, so whatever this drops never reached the core.
 func enforceRetention() error {
 	recordsDir := paths.RecordsDir()
 	entries, err := os.ReadDir(recordsDir)
@@ -37,7 +37,7 @@ func enforceRetention() error {
 		if e.IsDir() || !isRecording(e.Name()) {
 			continue
 		}
-		// Unlinking a file a session still writes frees no space, it would only lose the recording.
+		// Unlinking a file in use frees no space, it only loses the recording.
 		if beingWritten(filepath.Join(recordsDir, e.Name())) {
 			continue
 		}

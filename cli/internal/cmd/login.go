@@ -37,7 +37,7 @@ func loginCMD() *cli.Command {
 					return err
 				}
 			}
-			// Never a browser for a job, whatever became of its session a moment ago.
+			// Never a browser for a job, even if its session just ended.
 			if err = c.Sync(ctx, !cmd.IsSet("ci")); err != nil {
 				return err
 			}

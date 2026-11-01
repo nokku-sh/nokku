@@ -17,7 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 )
 
-// A request may wait a day, so the poll slows down from the first to the last interval.
+// A request may wait a day, so the poll slows down.
 const (
 	requestPollFirst = 3 * time.Second
 	requestPollLast  = 30 * time.Second
@@ -75,7 +75,7 @@ func waitForAnswer(ctx context.Context, c *client.Client, id string) error {
 		case nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_PENDING:
 			continue
 		case nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED:
-			// The account comes with the next sync, and a cached certificate without it is signed again.
+			// The sync brings the account. A cert without it gets signed again.
 			if err = c.Sync(ctx, false); err != nil {
 				return err
 			}

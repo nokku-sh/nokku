@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Container, VM, bridge and Kubernetes CNI plumbing never makes a useful SSH endpoint.
+// Container, VM, bridge and CNI plumbing never makes a useful SSH endpoint.
 var noisePrefixes = []string{
 	"docker", "veth", "br-", "virbr", "vmnet",
 	"vboxnet", "vnic", "vethernet",
@@ -21,7 +21,7 @@ var noisePrefixes = []string{
 }
 
 // A WireGuard or Tailscale address is often the best way to reach the server.
-var tunnelPrefixes = []string{"wg", "tun", "tap", "utun", "ppp"}
+var tunnelPrefixes = []string{"wg", "tun", "tap", "utun", "ppp", "tailscale"}
 
 func Metadata() map[string]string {
 	hostname, _ := os.Hostname()
@@ -44,7 +44,7 @@ func PrivateIPs() []string {
 			continue
 		}
 
-		// Point-to-point links are usually VPN tunnels, so only known mesh interfaces make useful endpoints.
+		// Point-to-point links are usually VPNs, only known mesh ones help.
 		if i.Flags&net.FlagPointToPoint != 0 && !hasAnyPrefix(i.Name, tunnelPrefixes) {
 			continue
 		}

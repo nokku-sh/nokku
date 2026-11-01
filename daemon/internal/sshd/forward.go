@@ -12,7 +12,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// The payload of a direct-tcpip (RFC 4254 7.2) or forwarded-tcpip (7.3) channel open.
+// Payload of a direct-tcpip (RFC 4254 7.2) or forwarded-tcpip (7.3) open.
 type tcpipChannelData struct {
 	DestAddr   string
 	DestPort   uint32
@@ -68,10 +68,6 @@ func (st *connState) close() {
 	st.forwards = nil
 }
 
-func (s *Server) forwardingAllowed(conn *ssh.ServerConn) bool {
-	return s.access.Load().policy.AllowForwarding && certExt(conn, "permit-port-forwarding")
-}
-
 func (s *Server) serveDirectTCPIP(_ context.Context, st *connState, newCh ssh.NewChannel) {
 	var d tcpipChannelData
 	if err := ssh.Unmarshal(newCh.ExtraData(), &d); err != nil {
@@ -104,6 +100,10 @@ func (s *Server) serveDirectTCPIP(_ context.Context, st *connState, newCh ssh.Ne
 	proxy(ch, dconn)
 }
 
+func (s *Server) forwardingAllowed(conn *ssh.ServerConn) bool {
+	return s.access.Load().policy.AllowForwarding && certExt(conn, "permit-port-forwarding")
+}
+
 func (s *Server) handleGlobalRequests(st *connState, reqs <-chan *ssh.Request) {
 	for req := range reqs {
 		switch req.Type {
@@ -124,13 +124,13 @@ func (s *Server) tcpipForward(st *connState, payload []byte) (bool, []byte) {
 	if !s.forwardingAllowed(st.conn) || ssh.Unmarshal(payload, &f) != nil || f.BindPort > 65535 {
 		return false, nil
 	}
-	// Like OpenSSH, only root may bind a privileged port, whatever the kernel would let the user do.
+	// Like OpenSSH, only root binds below 1024, whatever the kernel allows.
 	if f.BindPort != 0 && f.BindPort < 1024 && st.user.UID != 0 {
 		return false, nil
 	}
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	// A nil map means teardown. The listener holds a channel slot, or one connection could exhaust descriptors.
+	// Nil means teardown. The slot stops one connection exhausting descriptors.
 	if st.forwards == nil || st.forwards[forwardKey(f)] != nil || !st.acquireChannel() {
 		return false, nil
 	}
@@ -139,7 +139,7 @@ func (s *Server) tcpipForward(st *connState, payload []byte) (bool, []byte) {
 		st.releaseChannel()
 		return false, nil
 	}
-	// A port 0 forward is kept under the port it got, the client cancels it by that one.
+	// The client cancels a port 0 forward by the port it got.
 	f.BindPort = uint32(addrPort(ln.Addr()).Port())
 	st.forwards[forwardKey(f)] = ln
 	ev := connEvent(st.conn, eventRemoteForward)
@@ -164,12 +164,12 @@ func (s *Server) cancelTCPIPForward(st *connState, payload []byte) bool {
 	return ok
 }
 
-// Forwards are keyed on what the client asked for, so a policy change between -R and its cancel cannot strand one.
+// Keyed on the client's request, so a policy change can't strand a forward.
 func forwardKey(f tcpipForwardData) string {
 	return net.JoinHostPort(f.BindAddr, strconv.FormatUint(uint64(f.BindPort), 10))
 }
 
-// Loopback unless gateway ports are on, so a user cannot expose a service on the host's interfaces.
+// Loopback by default, so a user cannot expose a service on the host's network.
 func forwardAddr(f tcpipForwardData, gateway bool) string {
 	host := "127.0.0.1"
 	if gateway {

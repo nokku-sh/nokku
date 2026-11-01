@@ -1,6 +1,6 @@
 package iam
 
-// SCIM 2.0 at /scim/v2 of the workspace host, under RLS. Only a SCIM token of that workspace gets in.
+// SCIM 2.0 under RLS. Only a SCIM token of the host's workspace gets in.
 
 import (
 	"bytes"
@@ -24,22 +24,20 @@ import (
 
 const (
 	scimMountPath = "/scim/v2"
-	// Each user is a request of its own, about 1 KiB. Only a group with its members gets big, and this fits tens of
-	// thousands of them.
+	// Only a group with its members gets big, this fits tens of thousands.
 	maxSCIMBody = 4 << 20
-	// A server per workspace that syncs, kept a while so a sync does not build one per request.
+	// A server per syncing workspace, so a sync doesn't build one per request.
 	scimServerTTL     = time.Hour
 	scimServerEntries = 10_000
 )
 
-// SCIMBaseURL is where the workspace's identity provider sends users and groups.
-func SCIMBaseURL(ctx context.Context) string {
-	return baseURL(ctx) + scimMountPath
-}
-
 type SCIMFlow struct {
 	svc     *Service
 	servers *cache.TTL[string, scim.Server]
+}
+
+func SCIMBaseURL(ctx context.Context) string {
+	return baseURL(ctx) + scimMountPath
 }
 
 func newSCIMFlow(svc *Service) *SCIMFlow {
@@ -54,13 +52,13 @@ func (s *Service) SCIMHandler() http.Handler {
 
 func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 	ws, ok := actor.WorkspaceFromContext(r.Context())
-	raw, hasToken := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if !ok || !hasToken {
+	scheme, raw, _ := strings.Cut(r.Header.Get("Authorization"), " ")
+	if !ok || !strings.EqualFold(scheme, "Bearer") {
 		writeScimError(w, scimerrors.ScimError{Status: http.StatusUnauthorized, Detail: "authentication required"})
 		return
 	}
 	p, tok, err := f.svc.AuthenticateToken(r.Context(), raw, crypto.TokenSCIM)
-	// A provider reads 401 as a broken token. A lookup that failed is ours to answer for, and it retries a 500.
+	// A provider reads 401 as a broken token, but retries a 500.
 	if err != nil && !IsCredentialError(err) {
 		writeScimError(w, scimerrors.ScimErrorInternal)
 		return
@@ -70,7 +68,7 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.svc.noteSeen(r.Context(), tok)
-	// Read here, the library drops a read error on a create, and the provider would hear bad JSON instead of too large.
+	// Read here, the library drops a read error and reports bad JSON.
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxSCIMBody))
 	if _, tooBig := errors.AsType[*http.MaxBytesError](err); tooBig {
 		writeScimError(w, scimerrors.ScimError{
@@ -118,7 +116,7 @@ func (f *SCIMFlow) serverFor(ws actor.Workspace) (scim.Server, error) {
 	return s, nil
 }
 
-// scimProvisionUser applies active to existing accounts too, the IdP is the source of truth.
+// scimProvisionUser sets active on existing accounts too, the IdP owns it.
 func (s *Service) scimProvisionUser(
 	ctx context.Context,
 	email, name string,
@@ -178,7 +176,6 @@ func (s *Service) scimProvisionUser(
 	return u, nil
 }
 
-// scimUserError maps what the IdP's admin can act on. The seat detail is shown as is.
 func scimUserError(err error) error {
 	switch {
 	case errors.Is(err, ErrSeatLimit):
@@ -197,7 +194,7 @@ func (s *Service) recordActive(ctx context.Context, u *db.User) {
 	s.record(ctx, event{Action: a, Kind: actor.KindUser, Method: MethodSCIM, UserID: u.ID, Email: u.Email})
 }
 
-// linkSCIM stores the identity provider's id on the account. A new id replaces the old one, IdP migrations change it.
+// linkSCIM replaces the stored id, IdP migrations change it.
 func linkSCIM(ctx context.Context, q *db.Queries, userID, externalID string) error {
 	if externalID == "" {
 		return nil
@@ -209,7 +206,7 @@ func linkSCIM(ctx context.Context, q *db.Queries, userID, externalID string) err
 	return err
 }
 
-// keepOwner refuses to switch off, remove or rename the owner. Nobody else can hand the workspace on.
+// keepOwner protects the owner, nobody else can hand the workspace on.
 func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 	owner, err := q.GetOwner(ctx)
 	if err != nil {
@@ -224,7 +221,7 @@ func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 	return nil
 }
 
-// scimDeprovisionUser deactivates the account and drops its IdP link. The data survives for a re-assignment.
+// scimDeprovisionUser keeps the data for a re-assignment.
 func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
 	var after *db.User
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -243,7 +240,7 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
 	if err != nil {
 		return err
 	}
-	// IdPs switch an account off with PATCH and delete it later, which is one deactivation.
+	// IdPs PATCH an account off and delete it later, one deactivation.
 	if after.Active != u.Active {
 		s.recordActive(ctx, after)
 	}
@@ -256,11 +253,6 @@ func writeScimError(w http.ResponseWriter, e scimerrors.ScimError) {
 	if body, err := e.MarshalJSON(); err == nil {
 		_, _ = w.Write(body)
 	}
-}
-
-func scimAttrString(v any) string {
-	s, _ := v.(string)
-	return s
 }
 
 func scimAttrBool(v any, def bool) bool {
@@ -282,6 +274,11 @@ func scimDisplayName(displayName, name any) string {
 		return s
 	}
 	return strings.TrimSpace(scimAttrString(m["givenName"]) + " " + scimAttrString(m["familyName"]))
+}
+
+func scimAttrString(v any) string {
+	s, _ := v.(string)
+	return s
 }
 
 func scimMemberRefs(v any) []string {

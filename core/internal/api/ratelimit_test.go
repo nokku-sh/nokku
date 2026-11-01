@@ -43,9 +43,7 @@ func TestRateLimited(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			if got := rateLimited(tt.path); got != tt.want {
-				t.Errorf("rateLimited(%q) = %v, want %v", tt.path, got, tt.want)
-			}
+			assert.Equal(t, tt.want, rateLimited(tt.path))
 		})
 	}
 }
@@ -110,7 +108,7 @@ func TestWithRateLimitDeviceStart(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, call("/auth/device/verify", flood), "and can still be approved")
 }
 
-// Anyone can sign up on the hosted service, and every signup makes a workspace and a mail.
+// Anyone can sign up when hosted, and each signup makes a workspace and a mail.
 func TestWithRateLimitSignup(t *testing.T) {
 	s := &Server{cfg: &config.Config{}}
 	h := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -159,9 +157,7 @@ func TestIsAuthRoute(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			if got := isAuthRoute(tt.path); got != tt.want {
-				t.Errorf("isAuthRoute(%q) = %v, want %v", tt.path, got, tt.want)
-			}
+			assert.Equal(t, tt.want, isAuthRoute(tt.path))
 		})
 	}
 }

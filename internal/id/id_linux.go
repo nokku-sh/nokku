@@ -17,8 +17,8 @@ func machineID() (string, error) {
 	})
 }
 
-// readMachineID takes the first real ID. A file that is missing, or root's own like product_uuid, is no ID. Any
-// other failure is an error, the next source would change every key wrapped with this one.
+// Missing and root-only files like product_uuid are no ID. Other failures stop,
+// the next source would change every wrapped key.
 func readMachineID(paths []string) (string, error) {
 	for _, p := range paths {
 		data, err := os.ReadFile(p)

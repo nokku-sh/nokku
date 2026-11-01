@@ -7,7 +7,7 @@ import (
 	"runtime/pprof"
 )
 
-// Exit returns 1 when goroutines leaked. Wire it to m.Run()'s result in TestMain, after teardown.
+// Exit returns 1 on a leak. Wrap m.Run's result in TestMain, after teardown.
 func Exit(code int) int {
 	p := pprof.Lookup("goroutineleak")
 	if p == nil {

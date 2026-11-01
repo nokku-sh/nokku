@@ -19,13 +19,11 @@ import (
 )
 
 const (
-	// InviteTTL is how long an invite works, the mail says so.
 	InviteTTL = 7 * 24 * time.Hour
 	inviteURL = "/invite?token="
 )
 
-// Invite makes the one link that creates the account of email with role, in place of an earlier invite of the
-// address. With mail the link goes out and is not returned. Without mail the admin gets it to hand over.
+// Invite returns the link only without mail, the admin then hands it over.
 func (s *Service) Invite(ctx context.Context, email string, role nokkuv1.WorkspaceRole) (string, error) {
 	email = NormalizeEmail(email)
 	if err := emailverify.Verify(ctx, email, s.strict); err != nil {
@@ -53,7 +51,7 @@ func (s *Service) Invite(ctx context.Context, email string, role nokkuv1.Workspa
 	}
 	raw, hash := crypto.NewToken(crypto.TokenInvite)
 	link := baseURL(ctx) + inviteURL + raw
-	// Mailed before it is stored, so a mail that fails or waits out its cooldown leaves the earlier invite working.
+	// Mailed first, so a failed mail leaves the earlier invite working.
 	if s.sendInvite != nil {
 		if err := s.sendInvite(ctx, email, workspace, db.RoleLabel(role), link, InviteTTL); err != nil {
 			if !errors.Is(err, emailverify.ErrCooldown) {
@@ -83,7 +81,7 @@ func (s *Service) Invite(ctx context.Context, email string, role nokkuv1.Workspa
 	return link, nil
 }
 
-// LookupInvite reads an invite without spending it, so the page can show what it grants.
+// LookupInvite does not spend the invite, the page shows what it grants.
 func (s *Service) LookupInvite(ctx context.Context, raw string) (*db.GetInviteRow, error) {
 	hash, ok := crypto.TokenHash(raw, crypto.TokenInvite)
 	if !ok {
@@ -96,8 +94,7 @@ func (s *Service) LookupInvite(ctx context.Context, raw string) (*db.GetInviteRo
 	return inv, err
 }
 
-// AcceptInvite spends the invite, creates its account and signs it in. Nothing else spends it, so a mail scanner
-// that opens every link burns no invite.
+// AcceptInvite alone spends an invite, so a mail scanner burns none.
 func (s *Service) AcceptInvite(ctx context.Context, raw, name string) (*db.User, *http.Cookie, error) {
 	hash, ok := crypto.TokenHash(raw, crypto.TokenInvite)
 	if !ok {
@@ -112,7 +109,7 @@ func (s *Service) AcceptInvite(ctx context.Context, raw, name string) (*db.User,
 		if err != nil {
 			return err
 		}
-		// SSO may be required since the invite went out, and an invited account has no provider.
+		// SSO may be required by now, and an invited account has no provider.
 		ws, err := q.GetWorkspace(ctx)
 		if err != nil {
 			return err

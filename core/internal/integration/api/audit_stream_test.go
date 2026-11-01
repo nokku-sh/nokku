@@ -13,7 +13,6 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,15 +24,15 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// The secret goes out as a header or a signature, so it stays with the URL it was entered for.
+// The secret is sent to the URL, so it stays with the URL it was entered for.
 func TestAuditStreamSecretStaysWithItsURL(t *testing.T) {
 	cfg, srv := enterprise(t)
 	owner := header(
 		"Authorization",
-		"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
 	streams := nokkuv1connect.NewAuditStreamServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), owner),
+		clientOn(srv, owner),
 	)
 	created, err := streams.CreateAuditStream(t.Context(), &nokkuv1.CreateAuditStreamRequest{
 		Kind:   nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK.Enum(),
@@ -64,7 +63,7 @@ func TestAuditStreamSecretStaysWithItsURL(t *testing.T) {
 // A destination that hangs must not hold back the streams behind it.
 func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	cfg, _ := enterprise(t)
-	ws := seedWorkspace(t, cfg)
+	ws := testWorkspace.ID
 
 	slowDone := make(chan struct{})
 	release := make(chan struct{})
@@ -81,7 +80,7 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	t.Cleanup(slow.Close)
 	t.Cleanup(func() { close(release) })
 
-	// true when the event arrived while the slow destination still held its request.
+	// true when the event came while the slow stream still held its request.
 	got := make(chan bool, 1)
 	fast := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		open := true
@@ -98,7 +97,7 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	}))
 	t.Cleanup(fast.Close)
 
-	// The slow stream is made first, so a loop that sends one stream after another reaches it first.
+	// Made first, so a loop over the streams reaches the slow one first.
 	var ids []string
 	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
 		for _, url := range []string{slow.URL, fast.URL} {
@@ -127,7 +126,7 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 		_, _ = owner.Exec(ctx, "DELETE FROM audit_streams WHERE id = ANY($1)", ids)
 		_ = owner.Close(ctx)
 	})
-	// An event old enough to pass the stream's settle window, and cursors from before it.
+	// An event past the stream's settle window, and cursors from before it.
 	_, err = owner.Exec(t.Context(), `
 		UPDATE audit_streams SET cursor_ts = NOW() - INTERVAL '1 minute' WHERE id = ANY($1);
 		INSERT INTO audit.audit_logs (workspace_id, action, ok, timestamp)
@@ -146,10 +145,10 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	}
 }
 
-// A stream whose secret does not open fails on its own. The streams of every other workspace keep sending.
+// A secret that does not open fails its own stream, no other workspace's.
 func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
 	cfg, _ := enterprise(t)
-	broken, good := seedOtherWorkspace(t, cfg), seedWorkspace(t, cfg)
+	broken, good := seedOtherWorkspace(t, cfg), testWorkspace.ID
 
 	got := make(chan struct{}, 1)
 	siem := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -160,7 +159,7 @@ func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
 	}))
 	t.Cleanup(siem.Close)
 
-	// The broken stream is made first, so it comes first in every list of streams.
+	// Made first, so the broken stream comes first in every list.
 	var ids []string
 	for _, ws := range []string{broken, good} {
 		id := uuid.NewV7().String()
@@ -182,7 +181,6 @@ func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		// t.Context is already canceled when cleanups run.
 		ctx := context.WithoutCancel(t.Context())
 		_, _ = owner.Exec(ctx, "DELETE FROM audit_streams WHERE id = ANY($1)", ids)
 		_ = owner.Close(ctx)

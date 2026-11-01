@@ -1,4 +1,4 @@
-// Command seed fills the first workspace of a dev database with fake data, or with users who can sign in.
+// Command seed fills a dev database with fake data or sign-in users.
 package main
 
 import (
@@ -82,8 +82,8 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// open takes only the database and the keys, the server may be running next to this. The ctx carries the first
-// workspace. Keys and provider secrets are sealed with the keyset on their way into the database.
+// open takes only the database and keys, the server may be running. The ctx
+// carries the first workspace, the keyset seals provider secrets.
 func open(
 	ctx context.Context,
 	ec config.EnvConfig,

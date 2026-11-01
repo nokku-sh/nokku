@@ -15,19 +15,26 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
 
-// lapsedKeepDays is how long a hosted workspace whose paid plan ended waits for its owner to come back.
+// lapsedKeepDays is how long a lapsed hosted workspace waits for its owner.
 const lapsedKeepDays = 180
+
+const (
+	lapseWait lapseAction = iota
+	lapseWarn
+	lapseDelete
+)
 
 // The days before an event that its owner gets a mail, the earliest first.
 var (
 	trialReminders = []int32{7, 3}
-	// A trial already named its deletion date in the reminders, so one warning is enough.
+	// The trial reminders name the deletion date, so one warning is enough.
 	trialDeletionWarnings = []int32{7}
 	paidDeletionWarnings  = []int32{30, 7}
 )
 
-// runLifecycle mails owners before a trial ends or a lapsed workspace goes, and deletes the workspaces that
-// never came back, so they free their names. Hosted only.
+type lapseAction int
+
+// runLifecycle mails owners and deletes lapsed workspaces to free their names.
 func runLifecycle(ctx context.Context, cfg *config.Config) {
 	tick := time.Tick(time.Hour)
 	for {
@@ -41,9 +48,9 @@ func runLifecycle(ctx context.Context, cfg *config.Config) {
 	}
 }
 
-// remindTrials marks a reminder only once it went out, so a mail server that is down gets it on the next run.
+// A reminder is marked only once it went out, so a mail outage retries it.
 func remindTrials(ctx context.Context, cfg *config.Config) {
-	// Without SMTP the mail goes nowhere, and marking it sent would skip it for good.
+	// Without SMTP a mail goes nowhere, and marking it would skip it for good.
 	if !cfg.Email.HasSMTP() {
 		return
 	}
@@ -105,16 +112,7 @@ func purgeLapsed(ctx context.Context, cfg *config.Config) {
 	}
 }
 
-type lapseAction int
-
-const (
-	lapseWait lapseAction = iota
-	lapseWarn
-	lapseDelete
-)
-
-// lapseStep decides what a lapsed workspace needs at now, and the date its warning names. With mail, nobody is
-// deleted before the last warning went out, and a late last warning still gives its full days.
+// With mail, nobody goes before the last warning, which gets its full days.
 func lapseStep(sub *db.WorkspaceSubscription, mails bool, now time.Time) (lapseAction, int32, time.Time) {
 	ends := deletionDate(sub)
 	if ends == nil {
@@ -135,8 +133,8 @@ func lapseStep(sub *db.WorkspaceSubscription, mails bool, now time.Time) (lapseA
 	return lapseDelete, 0, deleteAt
 }
 
-// deletionDate is when a hosted workspace that stopped paying is deleted, nil while it runs and for a manual plan,
-// which the operator ends by hand. A late last warning moves the date back, so it always gives its full days.
+// deletionDate is nil while the workspace runs and for a manual plan, which the
+// operator ends by hand. A late last warning pushes it out.
 func deletionDate(sub *db.WorkspaceSubscription) *time.Time {
 	ended := entitlement.Ended(sub)
 	if ended == nil || (sub.Source != entitlement.SourceTrial && sub.Source != entitlement.SourceStripe) {
@@ -149,8 +147,7 @@ func deletionDate(sub *db.WorkspaceSubscription) *time.Time {
 	return &ends
 }
 
-// deleteAfter is when a plan from source that ended at ended is deleted, before a late warning moves it. A trial
-// that never paid goes once its hold ends.
+// deleteAfter is the date before a late warning moves it.
 func deleteAfter(source string, ended time.Time) time.Time {
 	if source == entitlement.SourceTrial {
 		return entitlement.HoldEnd(ended)
@@ -201,7 +198,7 @@ func warnDeletion(
 	}
 }
 
-// reminderDue is the mail an event in left needs, 0 for none. A late run sends only the latest one.
+// reminderDue is the mail due, 0 for none. A late run sends only the latest.
 func reminderDue(left time.Duration, sent int32, schedule []int32) int32 {
 	var due int32
 	for _, d := range schedule {
@@ -215,7 +212,6 @@ func reminderDue(left time.Duration, sent int32, schedule []int32) int32 {
 	return due
 }
 
-// nextReminder is the mail that follows due in schedule, 0 for none.
 func nextReminder(due int32, schedule []int32) int32 {
 	i := slices.Index(schedule, due)
 	if i < 0 || i == len(schedule)-1 {

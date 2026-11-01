@@ -43,7 +43,7 @@ func TestSetAccessTrust(t *testing.T) {
 	is.False(trustsCA(srv, second), "a target without a CA still trusts one")
 }
 
-// A restart trusts no CA when the active key on disk does not parse, so a sync that brings one must not either.
+// A restart trusts no CA if the active key does not parse, nor may a sync.
 func TestUnreadableActiveCATrustsNone(t *testing.T) {
 	is := assert.New(t)
 	active, retired := newTestCA(t), newTestCA(t)
@@ -63,7 +63,7 @@ func TestUnreadableActiveCATrustsNone(t *testing.T) {
 	is.False(trustsCA(srv, retired), "an unreadable CA still trusts the retired ones")
 }
 
-// An empty retired list, as sent after an emergency rollover, drops the old CA at once.
+// An empty retired list, sent after an emergency rollover, drops the old CA.
 func TestRetiredCATrustedUntilDeadline(t *testing.T) {
 	is := assert.New(t)
 	active := newTestCA(t)
@@ -108,7 +108,7 @@ func TestServerReloadRefreshesHostCerts(t *testing.T) {
 	must.NoError(err, "new server")
 	srv.SetAccess(testAccess(t, ca))
 
-	// Sign the host key New generated and write the cert next to it, as RenewHostCerts would.
+	// Write a cert for the host key New generated, as RenewHostCerts would.
 	pubData, err := os.ReadFile(paths.HostKeyPub())
 	must.NoError(err)
 	hostPub, _, _, _, err := ssh.ParseAuthorizedKey(pubData)
@@ -162,7 +162,7 @@ func hostPublicKey(t *testing.T, cfg *ssh.ServerConfig) ssh.PublicKey {
 	return got
 }
 
-// Every key exchange signs with the host key again, so a rekey after a reload still needs it.
+// Every key exchange signs with the host key, so a rekey still needs it.
 func TestRekeyAfterReload(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
@@ -174,7 +174,7 @@ func TestRekeyAfterReload(t *testing.T) {
 		RekeyThreshold:  1024,
 		User:            currentUser(t),
 		Auth:            []ssh.AuthMethod{userCert(t, ca, testPrincipal)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 - test server
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 	})
 	must.NoError(err, "dial")

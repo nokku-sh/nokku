@@ -3,7 +3,6 @@
 package ssh_test
 
 import (
-	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
@@ -20,7 +19,6 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -48,22 +46,17 @@ func rotationConn(t *testing.T) (*db.Connection, *kms.Keyset) {
 func seedCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, workspaceID string) *db.SSHCA {
 	t.Helper()
 	var ca *db.SSHCA
-	require.NoError(t, conn.TenantTx(pinned(t, workspaceID), func(q *db.Queries) (err error) {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, workspaceID), func(q *db.Queries) (err error) {
 		ca, err = ssh.CreateCA(t.Context(), q, keys, ssh.NewCA())
 		return err
 	}))
 	return ca
 }
 
-func pinned(t *testing.T, workspaceID string) context.Context {
-	t.Helper()
-	return actor.WithWorkspace(t.Context(), actor.Workspace{ID: workspaceID})
-}
-
 func seedWorkspace(t *testing.T, conn *db.Connection) string {
 	t.Helper()
 	workspaceID := uuid.NewV7().String()
-	require.NoError(t, conn.TenantTx(pinned(t, workspaceID), func(q *db.Queries) error {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, workspaceID), func(q *db.Queries) error {
 		_, err := q.CreateWorkspace(t.Context(), &db.CreateWorkspaceParams{
 			ID: workspaceID, Slug: uuid.NewV7().String(), Name: "rotate",
 			Settings: &nokkuv1.WorkspaceSettings{},
@@ -76,7 +69,7 @@ func seedWorkspace(t *testing.T, conn *db.Connection) string {
 func signer(t *testing.T, conn *db.Connection, keys *kms.Keyset, ca *db.SSHCA, certType uint32) (gossh.Signer, error) {
 	t.Helper()
 	var s gossh.Signer
-	err := conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
+	err := conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
 		s, err = ssh.CASigner(t.Context(), q, keys, ca.ID, certType)
 		return err
 	})
@@ -98,7 +91,7 @@ func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
 
 	rollover := func(revoke bool) *db.SSHCA {
 		var next *db.SSHCA
-		require.NoError(t, conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
+		require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
 			current, err := q.GetWorkspaceCAForUpdate(t.Context())
 			if err != nil {
 				return err
@@ -135,7 +128,8 @@ func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
 	assert.Nil(t, emergency.PreviousTrustedUntil)
 }
 
-// The user key signs logins and the host key servers, and ssh-keygen reads what they sign as OpenSSH would.
+// The user key signs logins, the host key servers. ssh-keygen reads what they
+// sign as OpenSSH would.
 func TestCASignerSignsWithTheKeyOfItsKind(t *testing.T) {
 	conn, keys := rotationConn(t)
 	ca := seedCA(t, conn, keys, seedWorkspace(t, conn))
@@ -170,19 +164,19 @@ func TestCASignerSignsWithTheKeyOfItsKind(t *testing.T) {
 	}
 }
 
-// A key row that does not belong to its CA signs nothing, whether it was swapped in or replaced.
+// A key row that is not its CA's signs nothing, swapped in or replaced.
 func TestCASignerRefusesAKeyThatIsNotTheCAs(t *testing.T) {
 	conn, keys := rotationConn(t)
 	ca := seedCA(t, conn, keys, seedWorkspace(t, conn))
 	put := func(kind string, sealed []byte) {
 		t.Helper()
-		require.NoError(t, conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) error {
+		require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) error {
 			return q.PutCAKey(t.Context(), &db.PutCAKeyParams{CaID: ca.ID, Kind: kind, PrivateKey: sealed})
 		}))
 	}
 
 	var host *db.GetCASigningKeyRow
-	require.NoError(t, conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
 		host, err = q.GetCASigningKey(t.Context(), &db.GetCASigningKeyParams{CaID: ca.ID, Kind: "host"})
 		return err
 	}))

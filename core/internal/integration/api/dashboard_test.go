@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,10 +16,10 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// The dashboard counts in SQL and reads two short lists, however many daemons the workspace has.
+// The count covers every daemon, the two lists stay short.
 func TestDashboardDaemons(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	_, accepted := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	_, pending := enrollTestDaemon(t, cfg, srv, workspaceID, false)
 
@@ -32,8 +30,8 @@ func TestDashboardDaemons(t *testing.T) {
 	})
 
 	viewer := nokkuv1connect.NewDashboardServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
+		clientOn(
+			srv,
 			header(
 				"Authorization",
 				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER),
@@ -57,22 +55,21 @@ func TestDashboardDaemons(t *testing.T) {
 	}), "an accepted daemon waits for nobody")
 }
 
-// Sign-ins and sessions happen all day, they must not push the real changes out of the short list.
+// Sign-ins happen all day, they must not push real changes off the short list.
 func TestDashboardRecentChangesSkipRoutine(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
+	workspaceID := testWorkspace.ID
 	editorAuth := header("Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR))
 
 	name := uniq("changes")
-	_, err := nokkuv1connect.NewTeamServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editorAuth)).
+	_, err := nokkuv1connect.NewTeamServiceClient(clientOn(srv, editorAuth)).
 		CreateTeam(t.Context(), &nokkuv1.CreateTeamRequest{Name: &name})
 	require.NoError(t, err)
 
 	dashboard := nokkuv1connect.NewDashboardServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), editorAuth),
+		clientOn(srv, editorAuth),
 	)
-	// The audit write is detached from the request, so the row shows up a moment later.
 	var changes []*nokkuv1.EventLog
 	require.Eventually(t, func() bool {
 		res, err := dashboard.GetDashboard(t.Context(), &nokkuv1.GetDashboardRequest{})

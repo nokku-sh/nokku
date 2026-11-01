@@ -14,20 +14,31 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/storage"
 )
 
-// A recording is stored in Tink's AES-GCM-HKDF streaming format, under a key of its own and with its id and object id
-// as the associated data. Every segment is authenticated, the last one is marked as last, so a cut, a swap, an object
-// from another recording or an older upload of this one fails to read. These are the parameters of Tink's
-// AES256_GCM_HKDF_4KB template.
+// A recording uses Tink's AES-GCM-HKDF streaming format, under a key of its own
+// with its id and object id as associated data. Segments are authenticated and
+// the last is marked, so a cut, a swap, an object from another recording or an
+// older upload fails to read. The parameters are Tink's AES256_GCM_HKDF_4KB.
 const (
 	hkdfHash       = "SHA256"
 	derivedKeySize = 32
 	segmentSize    = 4096
 )
 
-// ErrNotStored is a recording no upload got an object for yet.
 var ErrNotStored = errors.New("nothing of this recording is stored yet")
 
-// NewKey makes the key for one recording. It is stored on the row, sealed to KeyAAD like every other secret.
+// Writer commits on Close, so a dead daemon leaves a partial recording.
+type Writer struct {
+	enc io.WriteCloser
+	obj io.WriteCloser
+}
+
+type Reader struct {
+	io.Reader
+
+	obj io.ReadCloser
+}
+
+// NewKey makes the key for one recording, stored on the row sealed to KeyAAD.
 func NewKey() []byte {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
@@ -39,8 +50,22 @@ func KeyAAD(workspaceID, recordingID string) crypto.AAD {
 	return crypto.AAD{Table: "recordings", Column: "key", Workspace: workspaceID, Row: recordingID}
 }
 
-func objectAAD(recordingID, objectID string) []byte {
-	return []byte(recordingID + "/" + objectID)
+// NewWriter gives one upload try its own object, the row names the largest try.
+func (s *Service) NewWriter(ctx context.Context, rec *db.Recording, objectID string) (*Writer, error) {
+	aead, err := s.streamingAEAD(rec)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := s.store.CreateWriter(ctx, storage.RecordingPath(rec.WorkspaceID, objectID))
+	if err != nil {
+		return nil, fmt.Errorf("open recording object: %w", err)
+	}
+	// On an error the caller cancels ctx, which drops the object.
+	enc, err := aead.NewEncryptingWriter(obj, objectAAD(rec.ID, objectID))
+	if err != nil {
+		return nil, fmt.Errorf("encrypt recording: %w", err)
+	}
+	return &Writer{enc: enc, obj: obj}, nil
 }
 
 func (s *Service) streamingAEAD(rec *db.Recording) (*subtle.AESGCMHKDF, error) {
@@ -55,28 +80,8 @@ func (s *Service) streamingAEAD(rec *db.Recording) (*subtle.AESGCMHKDF, error) {
 	return aead, nil
 }
 
-// Writer commits on Close, so a dead daemon still leaves a partial recording. A canceled ctx drops the object.
-type Writer struct {
-	enc io.WriteCloser
-	obj io.WriteCloser
-}
-
-// NewWriter writes one upload try to an object of its own. The row names it once the try turns out to be the largest.
-func (s *Service) NewWriter(ctx context.Context, rec *db.Recording, objectID string) (*Writer, error) {
-	aead, err := s.streamingAEAD(rec)
-	if err != nil {
-		return nil, err
-	}
-	obj, err := s.store.CreateWriter(ctx, storage.RecordingPath(rec.WorkspaceID, objectID))
-	if err != nil {
-		return nil, fmt.Errorf("open recording object: %w", err)
-	}
-	// On an error the caller cancels ctx, which drops the object instead of committing a header.
-	enc, err := aead.NewEncryptingWriter(obj, objectAAD(rec.ID, objectID))
-	if err != nil {
-		return nil, fmt.Errorf("encrypt recording: %w", err)
-	}
-	return &Writer{enc: enc, obj: obj}, nil
+func objectAAD(recordingID, objectID string) []byte {
+	return []byte(recordingID + "/" + objectID)
 }
 
 func (w *Writer) WriteChunk(plaintext []byte) error {
@@ -86,16 +91,9 @@ func (w *Writer) WriteChunk(plaintext []byte) error {
 	return nil
 }
 
-// Close seals the last segment, then commits the object. Tink leaves the object to its owner.
+// Close seals the last segment, then commits. Tink leaves the object to us.
 func (w *Writer) Close() error {
 	return errors.Join(w.enc.Close(), w.obj.Close())
-}
-
-// Reader decrypts a recording into its plaintext stream.
-type Reader struct {
-	io.Reader
-
-	obj io.ReadCloser
 }
 
 func (s *Service) OpenReader(ctx context.Context, rec *db.Recording) (*Reader, error) {

@@ -29,7 +29,7 @@ import (
 // What compose.dev.yml sets up for Pocket ID.
 const (
 	pocketID     = "http://localhost:1411"
-	pocketIDKey  = "dev-static-api-key" // STATIC_API_KEY of compose.dev.yml
+	pocketIDKey  = "dev-static-api-key"
 	providerID   = "pocket-id"
 	clientID     = "nokku"
 	clientSecret = "nokku-dev-secret" //nolint:gosec // dev only
@@ -38,11 +38,11 @@ const (
 
 var groups = []string{"Platform", "SRE"}
 
-// users exist in Pocket ID with a fixed id. It is the sub and the SCIM externalId nokku sees.
-// Pocket ID owns the directory, SCIM deletes a user here whose externalId it does not know.
+// Fixed ids, they are the sub and the SCIM externalId nokku sees. SCIM deletes
+// any user here whose externalId it does not know.
 var users = []struct {
 	id, email, first, last string
-	// role is set before SCIM arrives, members need nothing. The first one is the owner, with its email and name.
+	// role is set before SCIM arrives, members need nothing.
 	role     nokkuv1.WorkspaceRole
 	admin    bool
 	disabled bool
@@ -100,6 +100,8 @@ var users = []struct {
 	},
 }
 
+var errNotFound = errors.New("not found")
+
 func runIDP(ctx context.Context, _ *cli.Command) error {
 	ec, err := env.ParseAs[config.EnvConfig]()
 	if err != nil {
@@ -130,7 +132,7 @@ func runIDP(ctx context.Context, _ *cli.Command) error {
 	return nil
 }
 
-// waitForServer returns once the server listens. By then it has made the workspace and the owner.
+// Once the server listens it has made the workspace and the owner.
 func waitForServer(ctx context.Context, port string) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
@@ -148,9 +150,9 @@ func waitForServer(ctx context.Context, port string) error {
 	}
 }
 
-// seedIDP may run again, what is there stays as it is. It returns a new SCIM token for Pocket ID and the owner.
+// seedIDP may run again, what is there stays as it is.
 func seedIDP(ctx context.Context, q *db.Queries, keys *kms.Keyset, workspaceID string) (string, *db.User, error) {
-	// SCIM brings everyone, so the provider has no JIT. Settings changed in nokku stay.
+	// SCIM brings everyone, so no JIT. Settings changed in nokku stay.
 	_, err := q.GetSSOProvider(ctx, providerID)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
@@ -197,7 +199,7 @@ func seedIDP(ctx context.Context, q *db.Queries, keys *kms.Keyset, workspaceID s
 		}
 	}
 
-	// A sign-in never matches the owner by email, so the link is made here, the way the profile page does it.
+	// A sign-in never matches the owner by email, so link it here.
 	owner, err := q.GetOwner(ctx)
 	switch {
 	case err == nil:
@@ -250,8 +252,8 @@ func seedIDP(ctx context.Context, q *db.Queries, keys *kms.Keyset, workspaceID s
 	return token, owner, nil
 }
 
-// setupPocketID fills an empty Pocket ID. One that has the client only gets the new SCIM token. Then it syncs.
-// The first user takes the owner's email and name, SCIM may neither change the owner's email nor drop them.
+// An existing client only gets the new SCIM token. The first user takes the
+// owner's email and name, SCIM can't change the email or drop the owner.
 func setupPocketID(ctx context.Context, owner *db.User, redirectURI, scimURL, scimToken string) error {
 	exists, err := waitForPocketID(ctx)
 	if err != nil {
@@ -316,7 +318,7 @@ func setupPocketID(ctx context.Context, owner *db.User, redirectURI, scimURL, sc
 			return err
 		}
 	}
-	// Only the groups may use it, so SCIM leaves out the user behind the static API key.
+	// Group-restricted, so SCIM leaves out the static API key's user.
 	if err := pocketIDCall(ctx, http.MethodPost, "/api/oidc/clients", map[string]any{
 		"id":                clientID,
 		"name":              "nokku",
@@ -360,8 +362,6 @@ func waitForPocketID(ctx context.Context) (bool, error) {
 		}
 	}
 }
-
-var errNotFound = errors.New("not found")
 
 func pocketIDCall(ctx context.Context, method, path string, body, out any) error {
 	var payload []byte

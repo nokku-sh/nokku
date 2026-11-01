@@ -1,19 +1,19 @@
 package kms
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/tink"
 )
 
-// fakeKEK tags the blob with its key byte, so unwrapping with a different KEK fails loudly.
-type fakeKEK struct{ id byte }
-
 var _ tink.AEAD = fakeKEK{}
+
+// fakeKEK tags the blob with its key byte, so a wrong KEK fails loudly.
+type fakeKEK struct{ id byte }
 
 func (f fakeKEK) Encrypt(plaintext, _ []byte) ([]byte, error) {
 	return append([]byte{f.id}, plaintext...), nil
@@ -28,57 +28,36 @@ func (f fakeKEK) Decrypt(ciphertext, _ []byte) ([]byte, error) {
 
 func TestWrapUnwrapRoundtrip(t *testing.T) {
 	handle, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf("create keyset: %v", err)
-	}
+	require.NoError(t, err)
 
 	data, err := wrap(handle, fakeKEK{id: 1})
-	if err != nil {
-		t.Fatalf("wrap: %v", err)
-	}
+	require.NoError(t, err)
 
 	loaded, err := unwrap(data, fakeKEK{id: 1})
-	if err != nil {
-		t.Fatalf("unwrap: %v", err)
-	}
+	require.NoError(t, err)
 
 	// The persisted bytes must be sufficient to reconstruct a working cipher.
 	primitive, err := aead.New(loaded)
-	if err != nil {
-		t.Fatalf("create primitive: %v", err)
-	}
+	require.NoError(t, err)
 	plaintext := []byte("ca private key")
 	ciphertext, err := primitive.Encrypt(plaintext, nil)
-	if err != nil {
-		t.Fatalf("encrypt: %v", err)
-	}
+	require.NoError(t, err)
 	decrypted, err := primitive.Decrypt(ciphertext, nil)
-	if err != nil {
-		t.Fatalf("decrypt: %v", err)
-	}
-	if !bytes.Equal(decrypted, plaintext) {
-		t.Fatalf("roundtrip mismatch: got %q, want %q", decrypted, plaintext)
-	}
+	require.NoError(t, err)
+	require.Equal(t, plaintext, decrypted)
 }
 
 func TestUnwrapWrongKEKFails(t *testing.T) {
 	handle, err := keyset.NewHandle(aead.AES256GCMKeyTemplate())
-	if err != nil {
-		t.Fatalf("create keyset: %v", err)
-	}
+	require.NoError(t, err)
 	data, err := wrap(handle, fakeKEK{id: 1})
-	if err != nil {
-		t.Fatalf("wrap: %v", err)
-	}
+	require.NoError(t, err)
 
-	// A wrong KEK must fail loudly at boot instead of running with a broken encryptor.
-	if _, err := unwrap(data, fakeKEK{id: 2}); err == nil {
-		t.Fatal("expected unwrap with wrong KEK to fail")
-	}
+	_, err = unwrap(data, fakeKEK{id: 2})
+	require.Error(t, err, "a wrong KEK must fail at boot, not run with a broken encryptor")
 }
 
 func TestUnwrapCorruptDataFails(t *testing.T) {
-	if _, err := unwrap([]byte("not a keyset"), fakeKEK{id: 1}); err == nil {
-		t.Fatal("expected unwrap of corrupt data to fail")
-	}
+	_, err := unwrap([]byte("not a keyset"), fakeKEK{id: 1})
+	require.Error(t, err)
 }

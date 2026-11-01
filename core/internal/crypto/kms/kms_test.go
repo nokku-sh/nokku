@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Neither a KMS nor a secret leaves nothing to wrap the keyset with. The database is not touched before that.
+// Without a KMS or a secret nothing wraps the keyset, before any database call.
 func TestNewNeedsAKMSOrASecret(t *testing.T) {
 	t.Setenv("KMS_URI", "")
 	t.Setenv("NOKKU_SECRET", "")
@@ -15,7 +15,7 @@ func TestNewNeedsAKMSOrASecret(t *testing.T) {
 	assert.ErrorContains(t, err, "KMS_URI or NOKKU_SECRET")
 }
 
-// Hosted refuses a secret before it touches the database, so a refused boot leaves no keyset to move later.
+// Hosted refuses a secret before the database, so no keyset is left to move.
 func TestHostedServiceNeedsAKMS(t *testing.T) {
 	t.Setenv("KMS_URI", "")
 	t.Setenv("NOKKU_SECRET", "secret-a-0123456789-0123456789-01")

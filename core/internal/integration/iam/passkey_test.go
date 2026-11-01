@@ -22,7 +22,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// passkeyDevice is a browser with a software authenticator, answering the real handlers the way a device would.
+// passkeyDevice is a browser with a software authenticator.
 type passkeyDevice struct {
 	rp   virtualwebauthn.RelyingParty
 	auth virtualwebauthn.Authenticator
@@ -64,7 +64,7 @@ func (d *passkeyDevice) attest(t *testing.T, begin *httptest.ResponseRecorder) s
 	return virtualwebauthn.CreateAttestationResponse(d.rp, d.auth, d.cred, *options)
 }
 
-// assertion starts a sign-in on ws and answers it. The cookies carry the ceremony.
+// assertion starts a sign-in on ws and answers it. Cookies carry the ceremony.
 func (d *passkeyDevice) assertion(t *testing.T, svc *iam.Service, ws actor.Workspace) (string, []*http.Cookie) {
 	t.Helper()
 	begin := post(anon(t.Context(), ws), svc.Passkey.BeginLogin, "", nil)
@@ -74,7 +74,7 @@ func (d *passkeyDevice) assertion(t *testing.T, svc *iam.Service, ws actor.Works
 	return virtualwebauthn.CreateAssertionResponse(d.rp, d.auth, d.cred, *options), begin.Result().Cookies()
 }
 
-// enroll makes a member and adds the device's passkey to it, the way the profile page does.
+// enroll makes a member and adds the device's passkey, like the profile page.
 func (d *passkeyDevice) enroll(t *testing.T, e *testEnv, ws actor.Workspace, email string) *db.User {
 	t.Helper()
 	u := e.user(t, ws, email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
@@ -85,7 +85,7 @@ func (d *passkeyDevice) enroll(t *testing.T, e *testEnv, ws actor.Workspace, ema
 	return u
 }
 
-// A passkey made for one workspace is unknown on another, even when both answer on the same host in tests.
+// A passkey of one workspace is unknown on another, even on the same test host.
 func TestPasskeyStaysInItsWorkspace(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
@@ -98,7 +98,8 @@ func TestPasskeyStaysInItsWorkspace(t *testing.T) {
 	assert.Zero(t, e.sessions(t, b.ws, u.ID))
 }
 
-// What a phishing page, another ceremony or a guessed key hands in is refused, and the real device still gets in.
+// What a phishing page, another ceremony or a guessed key hands in is refused,
+// and the real device still gets in.
 func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
@@ -140,8 +141,9 @@ func TestPasskeyLoginRefusesForgedAnswers(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code, "the real device: %s", rec.Body.String())
 }
 
-// A stolen cookie must not become a passkey. A session from more than a few minutes ago signs in again first, and
-// ends, so the sign-in page lets the browser in.
+// A stolen cookie must not become a passkey. A session from more than a few
+// minutes ago signs in again first, and ends, so the sign-in page lets the
+// browser in.
 func TestPasskeyRegistrationNeedsARecentSignIn(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
@@ -158,7 +160,8 @@ func TestPasskeyRegistrationNeedsARecentSignIn(t *testing.T) {
 	assert.Zero(t, e.sessions(t, o.ws, alice.ID), "the old session lives on")
 }
 
-// A ceremony belongs to the account that started it, and neither it nor the sign-in can be played twice.
+// A ceremony belongs to the account that started it, and neither it nor the
+// sign-in can be played twice.
 func TestPasskeyRegistrationBelongsToItsAccount(t *testing.T) {
 	e := newTestEnv(t)
 	d := newPasskeyDevice()
@@ -218,7 +221,7 @@ func TestPasskeyRegistrationBelongsToItsAccount(t *testing.T) {
 	assert.Equal(t, 1, e.sessions(t, o.ws, alice.ID), "the replay opened a session")
 }
 
-// Enforced SSO leaves the owner the passkey, the way in to fix a broken provider.
+// Enforced SSO leaves the owner the passkey, to fix a broken provider.
 func TestEnforcedSSOLeavesTheOwnerThePasskey(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

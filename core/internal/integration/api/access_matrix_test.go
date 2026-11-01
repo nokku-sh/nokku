@@ -19,7 +19,6 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
-	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -30,12 +29,12 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// matrixAccounts are the accounts on every fixture target. A web session is asked for the first three.
+// matrixAccounts are on every target. A web session asks for the first three.
 var matrixAccounts = []string{"root", "deploy", "ops", "backup"}
 
 var matrixUUID = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
 
-// token is a browser session, signToken what signs certificates: nk for people, the key for a service account.
+// token is a browser session, signToken nk's session or a service account key.
 type matrixCaller struct {
 	label, token, signToken string
 }
@@ -71,7 +70,7 @@ type matrixFixture struct {
 	srv       *httptest.Server
 	admin     connect.ClientInterceptor
 	publicKey string
-	// labels maps every id, name and key the fixture made to the name the golden file shows.
+	// labels maps each id, name and key made here to its golden file name.
 	labels   map[string]string
 	replacer *strings.Replacer
 	callers  []matrixCaller
@@ -79,12 +78,11 @@ type matrixFixture struct {
 	subjects []matrixSubject
 }
 
-// TestAccessMatrix pins who gets what from every access decision, on one fixture that has each kind of
-// subject and daemon state. It records today's answers, known gaps included.
+// TestAccessMatrix pins every access decision as it is, known gaps included.
 func TestAccessMatrix(t *testing.T) {
 	f := seedMatrix(t)
 
-	// Signing runs first, the report at the end shows who got a certificate where.
+	// Signing goes first, the report at the end shows who got a certificate.
 	var lines []string
 	lines = append(lines, f.signLines(t)...)
 	lines = append(lines, f.sessionLines(t)...)
@@ -109,11 +107,14 @@ func seedMatrix(t *testing.T) *matrixFixture {
 		cfg: cfg,
 		srv: srv,
 		admin: header("Authorization",
-			"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)),
+			"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)),
 		labels: map[string]string{},
 	}
 
-	f.labelCA(t, "ca-active")
+	ca := workspaceCA(t, cfg)
+	f.labels[ca.GetId()] = "ca-active"
+	f.labels[strings.TrimSpace(ca.GetPublicKey())] = "ca-active.user-key"
+	f.labels[strings.TrimSpace(ca.GetHostPublicKey())] = "ca-active.host-key"
 	f.seedDaemonTarget(t, "accepted", nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED)
 	f.seedDaemonTarget(t, "pending", nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING)
 	f.seedDaemonTarget(t, "rejected", nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)
@@ -135,22 +136,13 @@ func seedMatrix(t *testing.T) *matrixFixture {
 	return f
 }
 
-// labelCA names the workspace CA, the one every target is under.
-func (f *matrixFixture) labelCA(t *testing.T, label string) {
-	t.Helper()
-	ca := workspaceCA(t, f.cfg)
-	f.labels[ca.GetId()] = label
-	f.labels[strings.TrimSpace(ca.GetPublicKey())] = label + ".user-key"
-	f.labels[strings.TrimSpace(ca.GetHostPublicKey())] = label + ".host-key"
-}
-
 func (f *matrixFixture) seedDaemonTarget(
 	t *testing.T,
 	label string,
 	status nokkuv1.DaemonStatus,
 ) {
 	t.Helper()
-	ws := seedWorkspace(t, f.cfg)
+	ws := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, f.cfg, f.srv, ws, status != nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING)
 	if status == nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED {
 		_, err := nokkuv1connect.NewDaemonServiceClient(f.adminClient()).UpdateDaemon(t.Context(),
@@ -171,7 +163,7 @@ func (f *matrixFixture) seedDaemonTarget(
 func (f *matrixFixture) seedDaemonlessTarget(t *testing.T, label string) {
 	t.Helper()
 	var id string
-	inWorkspace(t, f.cfg, seedWorkspace(t, f.cfg), func(q *db.Queries) error {
+	inWorkspace(t, f.cfg, testWorkspace.ID, func(q *db.Queries) error {
 		target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{Name: uniq("mx-" + label)})
 		if err != nil {
 			return err
@@ -191,7 +183,7 @@ func (f *matrixFixture) addTarget(t *testing.T, tg matrixTarget) {
 	f.targets = append(f.targets, tg)
 }
 
-// seedSubjects grants the same accounts on every target, so the targets differ only in their daemon.
+// seedSubjects grants alike on every target, only the daemon differs.
 //
 //	root    alice for good, dave for good, carol until an hour ago
 //	deploy  team staff (bob, dave), service account ci
@@ -201,7 +193,7 @@ func (f *matrixFixture) addTarget(t *testing.T, tg matrixTarget) {
 // eve holds nothing, dave is deactivated after his session was issued.
 func (f *matrixFixture) seedSubjects(t *testing.T) {
 	t.Helper()
-	ws := seedWorkspace(t, f.cfg)
+	ws := testWorkspace.ID
 	now := time.Now()
 	var alice, bob, carol, dave, eve, staff, nobody, ci string
 	inWorkspace(t, f.cfg, ws, func(q *db.Queries) error {
@@ -324,7 +316,6 @@ func (f *matrixFixture) sessionLines(t *testing.T) []string {
 	for _, c := range f.callers {
 		for _, tg := range f.daemonTargets() {
 			for _, username := range matrixAccounts[:3] {
-				// Known gap: CreateSession never reads the daemon status, a pending (and a rejected) daemon gets a ticket.
 				_, err := nokkuv1connect.NewDaemonServiceClient(f.as(c.token)).CreateSession(t.Context(),
 					&nokkuv1.CreateSessionRequest{DaemonId: &tg.daemonID, Username: &username})
 				got := "ticket"
@@ -338,8 +329,7 @@ func (f *matrixFixture) sessionLines(t *testing.T) []string {
 	return lines
 }
 
-// relayLines opens each relay as TestCreateSession does. No daemon holds a control stream, so a relay that gets
-// past the grant check ends unavailable.
+// With no control stream, a relay past the grant check ends unavailable.
 func (f *matrixFixture) relayLines(t *testing.T) []string {
 	t.Helper()
 	var lines []string
@@ -360,7 +350,7 @@ func (f *matrixFixture) relay(t *testing.T, token, daemonID string) string {
 		return errText(err)
 	}
 	defer func() { _ = stream.Close() }()
-	// A refused stream fails the send or the receive, the receive carries the error either way.
+	// A refused stream fails send or receive, and receive has the error.
 	_ = stream.Send(&nokkuv1.RelayRequest{Msg: &nokkuv1.RelayRequest_Start{
 		Start: &nokkuv1.RelayStart{DaemonId: &daemonID},
 	}})
@@ -374,8 +364,8 @@ func (f *matrixFixture) syncLines(t *testing.T) []string {
 	t.Helper()
 	var lines []string
 	for _, tg := range f.daemonTargets() {
-		res, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(
-			connecthttp.NewTransport(f.srv.Client(), f.srv.URL),
+		res, err := nokkuv1connect.NewDaemonControlServiceClient(clientOn(
+			f.srv,
 			daemonAuth(t, f.cfg, tg.key, tg.token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure),
 		)).SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 		prefix := "SyncDaemon " + tg.label
@@ -490,22 +480,21 @@ func (f *matrixFixture) targetAccessLines(prefix string, targets []*nokkuv1.Targ
 	return lines
 }
 
-// reportLines keeps the rows of the fixture targets, the report covers the whole shared workspace. The plan of the
-// shared test server has no report, so the rows come from a server on an enterprise license.
+// reportLines asks an enterprise server, the shared one's plan has no report.
 func (f *matrixFixture) reportLines(t *testing.T) []string {
 	t.Helper()
 	req := &nokkuv1.ExportAccessReportRequest{Format: nokkuv1.ExportAuditLogsRequest_FORMAT_JSON.Enum()}
 	var lines []string
 	restore := withoutAPlan(t, f.cfg)
 	if _, err := nokkuv1connect.NewUtilServiceClient(f.adminClient()).ExportAccessReport(t.Context(), req); err != nil {
-		// The hosted service has no free plan, the same refusal names the plan that ran out.
+		// Hosted has no free plan, its refusal names the plan that ran out.
 		refused := strings.ReplaceAll(errText(err), "inactive", "Community")
 		lines = append(lines, "ExportAccessReport on community: "+refused)
 	}
 	restore()
 	_, srv := enterprise(t)
 	res, err := nokkuv1connect.NewUtilServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), f.admin),
+		clientOn(srv, f.admin),
 	).ExportAccessReport(t.Context(), req)
 	if err != nil {
 		return append(lines, "ExportAccessReport: "+errText(err))
@@ -552,7 +541,7 @@ func (f *matrixFixture) key(key string) string {
 }
 
 func (f *matrixFixture) conn(interceptors ...connect.ClientInterceptor) *connect.Client {
-	return connect.NewClient(connecthttp.NewTransport(f.srv.Client(), f.srv.URL), interceptors...)
+	return clientOn(f.srv, interceptors...)
 }
 
 func (f *matrixFixture) as(token string) *connect.Client {

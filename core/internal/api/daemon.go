@@ -58,7 +58,7 @@ func (s *daemonService) UpdateDaemon(
 	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
 		return nil, err
 	}
-	// The row lock keeps two updates from writing each other's old config back.
+	// The row lock stops two updates writing each other's old config back.
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		var config *nokkuv1.DaemonConfig
 		if req.GetConfig() != nil {
@@ -120,12 +120,12 @@ func (s *daemonService) DeleteDaemon(
 	return &nokkuv1.DeleteDaemonResponse{}, nil
 }
 
-// CreateSession only hands out a ticket. The shell starts and ends with the terminal websocket.
+// CreateSession only hands out a ticket, the terminal websocket runs the shell.
 func (s *daemonService) CreateSession(
 	ctx context.Context,
 	req *nokkuv1.CreateSessionRequest,
 ) (*nokkuv1.CreateSessionResponse, error) {
-	// The cert principal is the person's id. The call is people only, so there is one.
+	// People only, so there is a person's id for the cert principal.
 	userID := actor.UserIDFromContext(ctx)
 
 	var daemon *db.Daemon
@@ -134,7 +134,7 @@ func (s *daemonService) CreateSession(
 		if err != nil {
 			return err
 		}
-		// The same grant sshd will ask for, so nobody gets a shell ticket for an account they cannot use.
+		// Same grant sshd asks for, so no ticket for an account they can't use.
 		accounts, err := grantedAccounts(ctx, q, daemon.ID, userID)
 		if err != nil {
 			return err
@@ -168,7 +168,7 @@ func (s *daemonService) CreateSession(
 	}, nil
 }
 
-// grantedAccounts lists the accounts on the daemon's host that subject may log in to today, the ones sshd would let in.
+// grantedAccounts lists the accounts sshd would let subject log in to today.
 func grantedAccounts(ctx context.Context, q *db.Queries, daemonID, subject string) ([]string, error) {
 	target, err := q.GetTargetByDaemon(ctx, &daemonID)
 	if err != nil {
@@ -211,7 +211,7 @@ func (s *daemonService) Relay(
 		return connect.NewError(connect.CodeInvalidArgument, "daemon_id required")
 	}
 
-	// sshd is the real gate, but the pipe reaches hosts behind NAT and holds a pre-auth slot. It needs a grant.
+	// This pipe passes NAT and holds a pre-auth slot, so it needs a grant too.
 	caller, _ := actor.PrincipalFromContext(ctx)
 	var d *db.Daemon
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -234,9 +234,9 @@ func (s *daemonService) Relay(
 	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, caller.ID, clientAddr(ctx))
 	if err != nil {
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
-			return newError(connect.CodeResourceExhausted, "too many concurrent relays")
+			return connect.NewError(connect.CodeResourceExhausted, "too many concurrent relays")
 		}
-		return newError(connect.CodeUnavailable, "daemon did not accept relay")
+		return connect.NewError(connect.CodeUnavailable, "daemon did not accept relay")
 	}
 	defer s.cfg.Pool.UnregisterRelay(relayID)
 
@@ -255,7 +255,7 @@ func (s *daemonService) Relay(
 	return nokkudaemon.BridgeRelay(ctx, stream, relay)
 }
 
-// clientAddr is the exact address, a source-address option on the certificate is matched against it.
+// clientAddr is exact, a cert's source-address option is matched against it.
 func clientAddr(ctx context.Context) string {
 	meta, ok := actor.RequestMetaFromContext(ctx)
 	if !ok {

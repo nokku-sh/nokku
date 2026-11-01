@@ -24,11 +24,11 @@ type EnrollInput struct {
 	// Binding is the DPoP key thumbprint.
 	Binding string
 	Version string
-	// ReqMetadata is the host's own report. Its hostname may become the daemon's name.
+	// ReqMetadata is the host's own report, its hostname may name the daemon.
 	ReqMetadata map[string]string
 	// CanCreate only runs for new machines, so re-enrolling works at the cap.
 	CanCreate func(ctx context.Context, workspaceID string) error
-	// Connected lists the daemons online right now. An ephemeral enrollment never takes the name of one of them.
+	// An ephemeral enrollment never takes the name of a Connected daemon.
 	Connected []string
 }
 
@@ -40,7 +40,7 @@ type Enrolled struct {
 	Config   *nokkuv1.DaemonConfig
 }
 
-// Enroll checks the quota between its two transactions. Nested, parallel enrollments could exhaust the pool.
+// Enroll checks quota outside its transactions, nesting can exhaust the pool.
 func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, error) {
 	hash, ok := crypto.TokenHash(in.Token, crypto.TokenEnroll)
 	if !ok {
@@ -71,13 +71,12 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		return out, err
 	}
 
-	// A spent token still names the daemons it enrolled, that is the lookup above. It makes and replaces nothing.
+	// A spent token still finds its daemons, it makes and replaces nothing.
 	if token.MaxUses != nil && token.Uses >= *token.MaxUses {
 		return nil, ErrEnrollToken
 	}
 
-	// An ephemeral box that comes back under its name takes over from the one that went away. Before the
-	// quota, since the old one frees what the new one takes.
+	// A returning ephemeral box replaces its old self, which frees quota first.
 	wanted, named := namegen.FromHostname(in.ReqMetadata["hostname"])
 	if token.RetireAfter != nil && named {
 		if err := replaceOffline(ctx, conn, token.ID, wanted, in.Connected); err != nil {
@@ -112,7 +111,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 			if out, err = enrolledDaemon(ctx, q, in.Binding); err != nil || out != nil {
 				return err
 			}
-			// The hostname gets one try, a taken name returns no row and the generator takes over.
+			// A taken name returns no row, then the generator takes over.
 			name := namegen.Generate()
 			if attempt == 0 && named {
 				name = wanted
@@ -161,7 +160,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	return out, nil
 }
 
-// seedTarget is the only place a token's tags and grants reach a target. A re-enroll never gets here.
+// A token's tags and grants only reach a target here, never on a re-enroll.
 func seedTarget(ctx context.Context, q *db.Queries, token *db.JoinToken, targetID string, report []byte) error {
 	if err := q.UpdateTargetReport(ctx, &db.UpdateTargetReportParams{
 		TargetID: targetID,
@@ -180,8 +179,7 @@ func seedTarget(ctx context.Context, q *db.Queries, token *db.JoinToken, targetI
 	})
 }
 
-// replaceOffline deletes the daemon an ephemeral token enrolled under this name, if it is gone. A live one
-// keeps its name and the newcomer gets a generated one.
+// A live daemon keeps its name, the newcomer then gets a generated one.
 func replaceOffline(ctx context.Context, conn connection, tokenID, name string, connected []string) error {
 	return conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := q.QuietStateChange(ctx); err != nil {
@@ -203,7 +201,7 @@ func replaceOffline(ctx context.Context, conn connection, tokenID, name string, 
 	})
 }
 
-// enrolledDaemon returns nil for an unknown key. The key is the machine's identity.
+// enrolledDaemon returns nil for an unknown key, the machine's identity.
 func enrolledDaemon(ctx context.Context, q *db.Queries, binding string) (*Enrolled, error) {
 	d, err := q.GetDaemonByKeyThumbprint(ctx, &binding)
 	if errors.Is(err, pgx.ErrNoRows) {

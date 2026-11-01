@@ -81,42 +81,7 @@ func Root() *cli.Command {
 	}
 }
 
-func loadState(cmd *cli.Command) (*state.State, error) {
-	s := state.Load()
-	s.Token = os.Getenv("NK_TOKEN")
-	s.RequireTPM = cmd.Bool("require-tpm")
-
-	// A cut or mistyped key, or one of the older format, gets a clear answer before any call.
-	if s.Token != "" && !nktoken.Valid(s.Token, nktoken.KindServiceAccount) {
-		return nil, errors.New("NK_TOKEN is not a whole service account key, those start with nk_" +
-			nktoken.KindServiceAccount + "_. A key of the older format no longer works, create a new one")
-	}
-	if api := cmd.String("api"); s.APIURL != api && (s.APIURL == "" || cmd.IsSet("api")) {
-		// Another server never gets this session or shows its targets.
-		s.Config = state.Config{APIURL: api}
-		s.Cache = state.Cache{}
-	}
-	if cmd.IsSet("ttl") {
-		// Saved with the next sync. 0 goes back to the default of the CA.
-		s.TTL = cmd.Duration("ttl")
-	}
-	if plainHTTP(s.APIURL) {
-		return nil, fmt.Errorf("%s is not encrypted, Nokku is only reached over https", s.APIURL)
-	}
-	if path := cmd.String("ca-file"); path != "" {
-		ca, err := os.ReadFile(path) // #nosec G304 -- the user names the file
-		if err != nil {
-			return nil, fmt.Errorf("CA file: %w", err)
-		}
-		if err = trust.CheckBundle(ca); err != nil {
-			return nil, fmt.Errorf("CA file %s: %w", path, err)
-		}
-		s.APICA = string(ca)
-	}
-	return s, nil
-}
-
-// Plain http would carry the session or a token in the clear. This machine itself is fine.
+// Plain http carries a session or token in the clear. Loopback is fine.
 func plainHTTP(api string) bool {
 	u, err := url.Parse(api)
 	if err != nil || u.Scheme != "http" {
@@ -126,7 +91,7 @@ func plainHTTP(api string) bool {
 	return u.Hostname() != "localhost" && (ip == nil || !ip.IsLoopback())
 }
 
-// Signs in through the browser when needed and falls back to the cached snapshot when the core is unreachable.
+// Signs in through the browser if needed, uses the cache if the core is down.
 func connect(ctx context.Context, cmd *cli.Command) (*client.Client, error) {
 	s, err := loadState(cmd)
 	if err != nil {
@@ -142,7 +107,42 @@ func connect(ctx context.Context, cmd *cli.Command) (*client.Client, error) {
 	return c, nil
 }
 
-// newClient sets up the ssh identity first. nk logout uses client.New, it has no use for one.
+func loadState(cmd *cli.Command) (*state.State, error) {
+	s := state.Load()
+	s.Token = os.Getenv("NK_TOKEN")
+	s.RequireTPM = cmd.Bool("require-tpm")
+
+	// A cut, mistyped or old key gets a clear answer before any call.
+	if s.Token != "" && !nktoken.Valid(s.Token, nktoken.KindServiceAccount) {
+		return nil, errors.New("NK_TOKEN is not a whole service account key, those start with nk_" +
+			nktoken.KindServiceAccount + "_. A key of the older format no longer works, create a new one")
+	}
+	if api := cmd.String("api"); s.APIURL != api && (s.APIURL == "" || cmd.IsSet("api")) {
+		// Another server never gets this session or shows its targets.
+		s.Config = state.Config{APIURL: api}
+		s.Cache = state.Cache{}
+	}
+	if cmd.IsSet("ttl") {
+		// Saved with the next sync.
+		s.TTL = cmd.Duration("ttl")
+	}
+	if plainHTTP(s.APIURL) {
+		return nil, fmt.Errorf("%s is not encrypted, Nokku is only reached over https", s.APIURL)
+	}
+	if path := cmd.String("ca-file"); path != "" {
+		ca, err := os.ReadFile(path) // #nosec G304 -- the user named it
+		if err != nil {
+			return nil, fmt.Errorf("CA file: %w", err)
+		}
+		if err = trust.CheckBundle(ca); err != nil {
+			return nil, fmt.Errorf("CA file %s: %w", path, err)
+		}
+		s.APICA = string(ca)
+	}
+	return s, nil
+}
+
+// nk logout uses client.New, it has no use for an ssh identity.
 func newClient(s *state.State) (*client.Client, error) {
 	if err := ssh.SetupKey(s.RequireTPM); err != nil {
 		return nil, err

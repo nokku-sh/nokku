@@ -36,13 +36,8 @@ type coreUpload struct {
 	err error
 }
 
-// complete is what the real core decides: nothing cut it and every byte of the file arrived.
-func (up coreUpload) complete() bool {
-	return up.final != nil && up.final.GetCutReason() == "" && up.final.GetSizeBytes() == int64(len(up.data))
-}
-
-// fakeCore keeps every upload stream apart. It speaks HTTP/2 without TLS, like the core behind its proxy, so a
-// child process reaches it too. answer runs once the meta is in, an error ends the stream with it.
+// fakeCore speaks HTTP/2 without TLS, like the core behind its proxy, so a
+// child process reaches it too. answer runs after the meta, an error ends it.
 type fakeCore struct {
 	url    string
 	client nokkuv1connect.DaemonControlServiceClient
@@ -58,6 +53,11 @@ type uploadHandler struct {
 	nokkuv1connect.UnimplementedDaemonControlServiceHandler
 
 	core *fakeCore
+}
+
+// complete is what the real core decides: no cut and every byte arrived.
+func (up coreUpload) complete() bool {
+	return up.final != nil && up.final.GetCutReason() == "" && up.final.GetSizeBytes() == int64(len(up.data))
 }
 
 func newFakeCore(t *testing.T, answer func(context.Context, *nokkuv1.RecordingMeta) error) *fakeCore {
@@ -92,7 +92,7 @@ func (c *fakeCore) serve(l net.Listener) {
 
 func (c *fakeCore) stop() { _ = c.srv.Close() }
 
-// restart is a deploy: every stream breaks, and a new core takes the same address a moment later.
+// restart is a deploy: streams break, a new core takes the same address.
 func (c *fakeCore) restart(t *testing.T) {
 	t.Helper()
 	c.stop()
@@ -159,7 +159,7 @@ func (c *fakeCore) snapshot() []coreUpload {
 	return out
 }
 
-// waitUploads waits until the core saw n streams and the last one ended with its final message.
+// waitFinal waits for n streams, the last one ended with its final message.
 func (c *fakeCore) waitFinal(t *testing.T, n int) []coreUpload {
 	t.Helper()
 	var uploads []coreUpload
@@ -178,7 +178,7 @@ func newRecordsDir(t *testing.T) string {
 	return dir
 }
 
-// fastRetries makes a failed upload try again at once, and a full workspace wait that little too.
+// fastRetries makes failed uploads and full workspaces retry almost at once.
 func fastRetries(t *testing.T) {
 	t.Helper()
 	first, last, full := firstRetry, lastRetry, retryWhenFull
@@ -186,7 +186,7 @@ func fastRetries(t *testing.T) {
 	t.Cleanup(func() { firstRetry, lastRetry, retryWhenFull = first, last, full })
 }
 
-// startUploads runs the uploads for one test. Its end stops their retries and waits for them.
+// startUploads runs uploads for one test, whose end stops and awaits them.
 func startUploads(t *testing.T, core *fakeCore) *Uploads {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
@@ -210,7 +210,7 @@ func newRecorder(t *testing.T, opts Options) *Recorder {
 	return rec
 }
 
-// unzipCast returns what a gzip cast holds and the error that ended the read, ErrUnexpectedEOF for a cut one.
+// unzipCast returns the text and read error, ErrUnexpectedEOF for a cut cast.
 func unzipCast(data []byte) (string, error) {
 	zr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {

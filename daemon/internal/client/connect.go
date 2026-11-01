@@ -10,10 +10,9 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
 
-// Proxies close a stream idle for 60s, and the core drops one silent for 2 minutes.
+// Proxies close streams idle for 60s, the core drops ones silent for 2 minutes.
 const heartbeatInterval = 30 * time.Second
 
-// Only a daemon rejection is fatal to the caller.
 func (c *Client) runControlStream(ctx context.Context) error {
 	streamCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -38,7 +37,7 @@ func (c *Client) runControlStream(ctx context.Context) error {
 				slog.Warn("sync after state update failed", "error", err)
 			}
 		case *nokkuv1.ConnectResponse_RelayOpen:
-			// Relays get ctx, not streamCtx, so a stream reconnect does not cut live web sessions.
+			// Not streamCtx, a stream reconnect must not cut live sessions.
 			c.relays.Go(func() { c.runRelay(ctx, m.RelayOpen) })
 		}
 	}

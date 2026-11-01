@@ -29,8 +29,7 @@ const (
 	maxPendingSignals = 8
 	// How long an interactive shell gets after the hangup before it is killed.
 	hangupGrace = 5 * time.Second
-	// A tenth of a shell's cap. Over exec, pg_dump, tar and git are binary noise in a recording, and at the full cap a
-	// nightly job would push people's sessions out of a workspace's storage.
+	// A tenth of a shell's cap, so nightly dumps can't fill a workspace.
 	maxExecRecording = 5 << 20
 )
 
@@ -45,7 +44,7 @@ type session struct {
 	// The certificate principal auth matched, reported with the recording.
 	principal string
 
-	// Exec'd commands use ctx, so a disconnect reaps them even if the request stream misbehaves.
+	// Commands use ctx, so a disconnect reaps them even if requests misbehave.
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -58,11 +57,9 @@ type session struct {
 
 	sessionID string
 
-	// The agent forwarding listener, exported to the child as SSH_AUTH_SOCK.
 	agentLn   net.Listener
 	agentSock string
 
-	// The pty master and its slave end, opened by pty-req.
 	ptmx, tty *os.File
 
 	rec *recording.Recorder
@@ -73,11 +70,11 @@ type session struct {
 	procMu sync.Mutex
 	proc   *os.Process
 
-	// Names of the signals that arrived before the command started, flushed by setProc. Guarded by procMu.
+	// Sent before the command started, flushed by setProc. Guarded by procMu.
 	pendingSignals []string
 }
 
-// Recorder methods swallow their errors, so a failing recording never disturbs the stream.
+// A failing recording never disturbs the stream, Recorder swallows its errors.
 type recOut struct {
 	w   io.Writer
 	rec *recording.Recorder
@@ -156,7 +153,7 @@ func (sess *session) handleRequests() {
 		}
 	}
 
-	// The client is gone. Canceling hangs up the command and stops waiting on output a background process holds.
+	// Canceling hangs up the command and stops waiting on background output.
 	sess.cancel()
 	if handlerDone != nil {
 		<-handlerDone
@@ -183,7 +180,7 @@ func (sess *session) handleCommand(req *ssh.Request) bool {
 		}
 		sess.rawCmd = e.Command
 	}
-	// A force-command replaces whatever the client asked for, like sshd. The original goes to the environment.
+	// Like sshd, a force-command replaces what the client asked for.
 	if fc := sess.forceCommand(); fc != "" {
 		sess.originalCmd, sess.rawCmd = sess.rawCmd, fc
 	}
@@ -201,7 +198,7 @@ func (sess *session) forceCommand() string {
 	return sess.conn.Permissions.Extensions["force-command"]
 }
 
-// A force-command refuses all client env, so BASH_ENV or LD_PRELOAD cannot bend a restricted command.
+// A force-command refuses all client env, so nothing can bend the command.
 func (sess *session) setClientEnv(payload []byte) bool {
 	var e struct{ Name, Value string }
 	if sess.handled || len(sess.env) >= maxClientEnv || sess.forceCommand() != "" ||
@@ -212,22 +209,13 @@ func (sess *session) setClientEnv(payload []byte) bool {
 	return true
 }
 
-// PATH, LD_*, BASH_ENV, ENV and SSH_* could steer program loading or shell startup.
+// PATH, LD_*, BASH_ENV, ENV and SSH_* could steer loading or shell startup.
 func allowedEnv(name string) bool {
 	switch name {
 	case "TERM", "LANG", "TZ", "TERM_PROGRAM", "COLORTERM":
 		return true
 	}
 	return strings.HasPrefix(name, "LC_")
-}
-
-func (sess *session) envValue(key string) (string, bool) {
-	for _, e := range sess.env {
-		if v, ok := strings.CutPrefix(e, key+"="); ok {
-			return v, true
-		}
-	}
-	return "", false
 }
 
 func (sess *session) setEnv(key, value string) {
@@ -283,11 +271,11 @@ func (sess *session) ptyReq(req *ssh.Request) {
 		_ = req.Reply(false, nil)
 		return
 	}
-	// Like sshd, the client's terminal modes shape the pty. A failure leaves the kernel defaults.
+	// The client's modes shape the pty, like sshd. Failure keeps the defaults.
 	if err = applyTTYModes(tty, r.Modes); err != nil {
 		slog.Debug("apply tty modes failed", "error", err)
 	}
-	// The daemon opened the pty as root. The user has to own it, or opening the tty by its path is denied.
+	// The user has to own the pty, or opening the tty by path is denied.
 	if os.Geteuid() == 0 {
 		if err = tty.Chown(int(sess.sysUser.UID), -1); err != nil {
 			slog.Debug("chown pty failed", "error", err)
@@ -316,7 +304,7 @@ func (sess *session) windowChange(req *ssh.Request) {
 
 func (sess *session) signal(req *ssh.Request) {
 	var sg struct{ Signal string }
-	// Like sshd, a forced command or a subsystem takes no signals from the client.
+	// Like sshd, a forced command or subsystem takes no client signals.
 	if sess.forceCommand() != "" || sess.subsystem || ssh.Unmarshal(req.Payload, &sg) != nil {
 		_ = req.Reply(false, nil)
 		return
@@ -335,49 +323,6 @@ func (sess *session) signal(req *ssh.Request) {
 		sess.signalProc(p.Pid, sg.Signal)
 	}
 	_ = req.Reply(true, nil)
-}
-
-func (sess *session) setProc(p *os.Process) {
-	sess.procMu.Lock()
-	sess.proc = p
-	pending := sess.pendingSignals
-	sess.pendingSignals = nil
-	sess.procMu.Unlock()
-	for _, name := range pending {
-		sess.signalProc(p.Pid, name)
-	}
-}
-
-// Idempotent, only the first call has an effect.
-func (sess *session) exit(code int) {
-	sess.finish(code, func() {
-		status := struct{ Status uint32 }{exitCodeToU32(code)}
-		_, _ = sess.SendRequest("exit-status", false, ssh.Marshal(status))
-	})
-}
-
-// Like OpenSSH: exit-status normally, exit-signal when killed by a signal, so clients surface 128+signal.
-func (sess *session) exitProcess(st *os.ProcessState) {
-	// The pid is reaped and may be reused, so no later signal goes to it.
-	sess.procMu.Lock()
-	sess.proc = nil
-	sess.procMu.Unlock()
-
-	name, code, signaled := processSignal(st)
-	if !signaled {
-		status := 1
-		if st != nil && st.Exited() {
-			status = st.ExitCode()
-		}
-		sess.exit(status)
-		return
-	}
-	if name == "" {
-		// Signal outside the RFC 4254 name table: still surface 128+n.
-		sess.exit(code)
-		return
-	}
-	sess.exitSignal(name, code)
 }
 
 // RFC 4254 section 6.10.
@@ -422,64 +367,12 @@ func (sess *session) run() {
 	sess.runPlain()
 }
 
-// Like OpenSSH, a shell request gets a login shell, argv[0] with a dash, so the profile is read.
-func (sess *session) shellCmd() (*exec.Cmd, error) {
-	shell := sess.sysUser.Shell
-	// #nosec G204 - running the authenticated user's shell is the SSH server's purpose.
-	cmd := exec.CommandContext(sess.ctx, shell)
-	// An ended session hangs up its command, so a shell saves its history and runs its traps. WaitDelay then kills.
-	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGHUP) }
-	cmd.Args = []string{"-" + filepath.Base(shell)}
-	if sess.rawCmd != "" {
-		cmd.Args = []string{filepath.Base(shell), "-c", sess.rawCmd}
-	}
-	cmd.Dir = sess.sysUser.Home
-	cmd.Env = sess.buildEnv()
-	attr, err := sysProcAttr(sess.sysUser)
-	if err != nil {
-		return nil, err
-	}
-	cmd.SysProcAttr = attr
-	return cmd, nil
-}
-
-// The chdir runs in the child after the credential drop. If it fails the process runs in /, like sshd.
-func (sess *session) startInHome(
-	build func() (*exec.Cmd, error),
-	start func(*exec.Cmd) error,
-) (cmd *exec.Cmd, notice string, err error) {
-	if cmd, err = build(); err != nil {
-		return nil, "", err
-	}
-	if err = start(cmd); err == nil {
-		return cmd, "", nil
-	}
-	errno, ok := errors.AsType[syscall.Errno](err)
-	if !ok {
-		return nil, "", err
-	}
-	retry, retryErr := build()
-	if retryErr != nil {
-		return nil, "", err
-	}
-	retry.Dir = "/"
-	if start(retry) != nil {
-		return nil, "", err
-	}
-	reason := errno.Error()
-	return retry, fmt.Sprintf(
-		"Could not chdir to home directory %s: %s%s",
-		sess.sysUser.Home, strings.ToUpper(reason[:1]), reason[1:],
-	), nil
-}
-
 func (sess *session) runPTY() {
 	defer sess.ptmx.Close()
 	defer sess.tty.Close()
 
 	cmd, notice, err := sess.startInHome(sess.shellCmd, func(cmd *exec.Cmd) error {
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = sess.tty, sess.tty, sess.tty
-		// The pty becomes the controlling terminal of the new session.
 		cmd.SysProcAttr.Setctty = true
 		cmd.WaitDelay = hangupGrace
 		return cmd.Start()
@@ -492,11 +385,11 @@ func (sess *session) runPTY() {
 	sess.setProc(cmd.Process)
 	// Drop our slave end, so the master reports EOF once the child exits.
 	_ = sess.tty.Close()
-	// A background process can keep the slave open. Closing the master hangs it up, as sshd does.
+	// A background process can hold the slave. Closing the master hangs it up.
 	stop := context.AfterFunc(sess.ctx, func() { _ = sess.ptmx.Close() })
 	defer stop()
 
-	// Read once, a running session keeps the rule it started with. Only keystrokes count, output does not.
+	// Read once, a running session keeps its rule. Only keystrokes count.
 	touch := func() {}
 	if idle := sess.server.access.Load().policy.IdleTimeout; idle > 0 {
 		timer := time.AfterFunc(idle, sess.idleOut)
@@ -538,14 +431,100 @@ func (sess *session) runPTY() {
 	input.Wait()
 }
 
+// The chdir runs as the user. If it fails the process runs in /, like sshd.
+func (sess *session) startInHome(
+	build func() (*exec.Cmd, error),
+	start func(*exec.Cmd) error,
+) (cmd *exec.Cmd, notice string, err error) {
+	if cmd, err = build(); err != nil {
+		return nil, "", err
+	}
+	if err = start(cmd); err == nil {
+		return cmd, "", nil
+	}
+	errno, ok := errors.AsType[syscall.Errno](err)
+	if !ok {
+		return nil, "", err
+	}
+	retry, retryErr := build()
+	if retryErr != nil {
+		return nil, "", err
+	}
+	retry.Dir = "/"
+	if start(retry) != nil {
+		return nil, "", err
+	}
+	reason := errno.Error()
+	return retry, fmt.Sprintf(
+		"Could not chdir to home directory %s: %s%s",
+		sess.sysUser.Home, strings.ToUpper(reason[:1]), reason[1:],
+	), nil
+}
+
+// Like OpenSSH, a shell gets a dash in argv[0], so the profile is read.
+func (sess *session) shellCmd() (*exec.Cmd, error) {
+	shell := sess.sysUser.Shell
+	// #nosec G204 - running the authenticated user's shell is the whole point.
+	cmd := exec.CommandContext(sess.ctx, shell)
+	// A hangup lets a shell save history and run traps. WaitDelay then kills.
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGHUP) }
+	cmd.Args = []string{"-" + filepath.Base(shell)}
+	if sess.rawCmd != "" {
+		cmd.Args = []string{filepath.Base(shell), "-c", sess.rawCmd}
+	}
+	cmd.Dir = sess.sysUser.Home
+	cmd.Env = sess.buildEnv()
+	attr, err := sysProcAttr(sess.sysUser)
+	if err != nil {
+		return nil, err
+	}
+	cmd.SysProcAttr = attr
+	return cmd, nil
+}
+
+func (sess *session) setProc(p *os.Process) {
+	sess.procMu.Lock()
+	sess.proc = p
+	pending := sess.pendingSignals
+	sess.pendingSignals = nil
+	sess.procMu.Unlock()
+	for _, name := range pending {
+		sess.signalProc(p.Pid, name)
+	}
+}
+
+// Like OpenSSH, exit-signal when killed, so clients surface 128+signal.
+func (sess *session) exitProcess(st *os.ProcessState) {
+	// The pid is reaped and may be reused, so no later signal goes to it.
+	sess.procMu.Lock()
+	sess.proc = nil
+	sess.procMu.Unlock()
+
+	name, code, signaled := processSignal(st)
+	if !signaled {
+		status := 1
+		if st != nil && st.Exited() {
+			status = st.ExitCode()
+		}
+		sess.exit(status)
+		return
+	}
+	if name == "" {
+		// Signal outside the RFC 4254 name table: still surface 128+n.
+		sess.exit(code)
+		return
+	}
+	sess.exitSignal(name, code)
+}
+
 func (sess *session) runPlain() {
-	// Plain sessions record too, exec is exactly where sensitive output (cat, curl, git) leaves the machine.
+	// Exec records too, it is where sensitive output leaves the machine.
 	sess.startRecorder(80, 24)
 
 	var stdin io.WriteCloser
 	var stdout io.ReadCloser
 	cmd, notice, err := sess.startInHome(sess.shellCmd, func(cmd *exec.Cmd) (err error) {
-		// Stderr goes to extended data like sshd. Length-prefixed protocols break if it interleaves with stdout.
+		// Extended data, as interleaving breaks length-prefixed protocols.
 		cmd.Stderr = recOut{w: sess.Stderr(), rec: sess.rec}
 		stdin, stdout, err = startPiped(cmd)
 		return err
@@ -561,13 +540,12 @@ func (sess *session) runPlain() {
 	sess.relay(cmd, stdin, stdout)
 }
 
-// No-op when recording is off or pty-req already built one.
 func (sess *session) startRecorder(width, height int) {
 	if sess.rec != nil || !sess.server.access.Load().policy.Record {
 		return
 	}
-	// The key id is signed by the CA, so a web session may label its recording with the core's session id. That id
-	// names the recording file, so even a signed one passes only in canonical form.
+	// The CA signs the key id, so a web recording may use the core's session
+	// id. It names a file, so even a signed one must be canonical.
 	recSessionID := sess.sessionID
 	keyID := sess.conn.Permissions.Extensions["nokku-cert-key-id"]
 	if id, ok := strings.CutPrefix(keyID, login.WebSessionKeyIDPrefix); ok && login.ValidID(id) {
@@ -591,7 +569,7 @@ func (sess *session) startRecorder(width, height int) {
 		Uploads:   sess.server.uploads,
 	})
 	if err != nil {
-		// Recording fails open so a full disk never locks admins out, but the gap is always on the audit trail.
+		// Fails open so a full disk can't lock admins out. The gap is audited.
 		slog.Warn("session not recorded", "session_id", sess.sessionID, "error", err)
 		sess.recordingDegraded("not recorded: " + err.Error())
 		return
@@ -599,7 +577,16 @@ func (sess *session) startRecorder(width, height int) {
 	sess.rec = rec
 }
 
-// A write error leaves the session running unrecorded, like a recording that cannot start.
+func (sess *session) envValue(key string) (string, bool) {
+	for _, e := range sess.env {
+		if v, ok := strings.CutPrefix(e, key+"="); ok {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+// A write error leaves the session running unrecorded, like a failed start.
 func (sess *session) recordingCut(err error) {
 	if errors.Is(err, recording.ErrSizeLimit) {
 		sess.recordingFull()
@@ -608,9 +595,9 @@ func (sess *session) recordingCut(err error) {
 	sess.recordingDegraded("recording stopped: " + err.Error())
 }
 
-// An interactive session ends at the size limit, so a flood cannot switch recording off for what is typed next. An
-// exec session runs on unrecorded, its command line is already in the audit log and transfers like git clone or
-// rsync must not die halfway.
+// An interactive session ends at the limit, so a flood cannot hide what is
+// typed next. An exec session runs on unrecorded, its command is in the audit
+// log and transfers like git clone must not die halfway.
 func (sess *session) recordingFull() {
 	if sess.ptmx == nil {
 		sess.recordingDegraded("size limit reached, the rest of the output is not recorded")
@@ -621,7 +608,6 @@ func (sess *session) recordingFull() {
 	sess.exit(1)
 }
 
-// idleOut ends an interactive session nobody typed into for the idle timeout.
 func (sess *session) idleOut() {
 	sess.server.emit(sess.event(eventSessionIdle))
 	_, _ = io.WriteString(sess, "\r\nnokkud: no input for too long, closing this session\r\n")
@@ -648,7 +634,7 @@ func startPiped(cmd *exec.Cmd) (stdin io.WriteCloser, stdout io.ReadCloser, err 
 		_ = stdin.Close()
 		return nil, nil, err
 	}
-	// Bounds Wait when a background process keeps stderr open, and the grace after a hangup.
+	// Bounds Wait if a background process holds stderr, and the hangup grace.
 	cmd.WaitDelay = time.Second
 	return stdin, stdout, cmd.Start()
 }
@@ -660,7 +646,7 @@ func (sess *session) relay(cmd *exec.Cmd, stdin io.WriteCloser, stdout io.ReadCl
 
 	var relay sync.WaitGroup
 
-	// Only output is recorded here. Without a pty there is no echo signal to tell typed secrets apart.
+	// Only output is recorded, without a pty no echo tells typed secrets apart.
 	outW := recOut{w: sess, rec: sess.rec}
 
 	relay.Go(func() {
@@ -668,20 +654,19 @@ func (sess *session) relay(cmd *exec.Cmd, stdin io.WriteCloser, stdout io.ReadCl
 		_, _ = io.Copy(stdin, sess)
 	})
 
-	// Only stdout here, length-prefixed protocols read stderr as extended data.
 	stdoutDone := make(chan struct{})
 	relay.Go(func() {
 		defer close(stdoutDone)
 		_, _ = io.Copy(outW, stdout)
 	})
 
-	// Drain stdout before reaping. cmd.Wait closes the pipe, which would truncate what is not copied yet.
+	// Drain stdout first, cmd.Wait closes the pipe and would truncate the rest.
 	<-stdoutDone
 	if waitErr := cmd.Wait(); waitErr != nil {
 		slog.Debug("command exited", "error", waitErr)
 	}
 
-	// The client-side relay is still blocked reading the channel. exitProcess closes it, then the relays join.
+	// exitProcess closes the channel, which unblocks the stdin relay.
 	sess.exitProcess(cmd.ProcessState)
 	relay.Wait()
 }
@@ -690,7 +675,7 @@ func (sess *session) buildEnv() []string {
 	env := cmdEnv(sess.sysUser)
 	env = append(env, sess.env...)
 	if sess.conn != nil {
-		// The same two variables sshd sets. bash only reads ~/.bashrc for a remote command when it sees SSH_CLIENT.
+		// bash only reads ~/.bashrc for a remote command if SSH_CLIENT is set.
 		rHost, rPort := splitHostPort(sess.conn.RemoteAddr())
 		lHost, lPort := splitHostPort(sess.conn.LocalAddr())
 		env = append(
@@ -723,10 +708,17 @@ func splitHostPort(a net.Addr) (string, string) {
 	return host, port
 }
 
-// POSIX exit codes are 0-255, anything out of range maps to 1.
 func exitCodeToU32(code int) uint32 {
 	if code < 0 || code > 255 {
 		return 1
 	}
 	return uint32(code)
+}
+
+// Idempotent, only the first call has an effect.
+func (sess *session) exit(code int) {
+	sess.finish(code, func() {
+		status := struct{ Status uint32 }{exitCodeToU32(code)}
+		_, _ = sess.SendRequest("exit-status", false, ssh.Marshal(status))
+	})
 }

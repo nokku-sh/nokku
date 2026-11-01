@@ -12,9 +12,7 @@ import (
 )
 
 func TestPeriodEnd(t *testing.T) {
-	if got := periodEnd(&stripe.Subscription{}); got != nil {
-		t.Fatalf("expected nil period end for empty subscription, got %v", got)
-	}
+	require.Nil(t, periodEnd(&stripe.Subscription{}), "an empty subscription has no period end")
 
 	now := time.Now().UTC().Truncate(time.Second)
 	sub := &stripe.Subscription{
@@ -23,12 +21,11 @@ func TestPeriodEnd(t *testing.T) {
 		},
 	}
 	got := periodEnd(sub)
-	if got == nil || !got.Equal(now) {
-		t.Fatalf("periodEnd = %v, want %v", got, now)
-	}
+	require.NotNil(t, got)
+	require.WithinDuration(t, now, *got, 0)
 }
 
-// Settings that do not fit NOKKU_SAAS fail the start, a hosted service must never come up self-hosted.
+// A hosted service must never come up self-hosted, so a misfit fails the start.
 func TestNewStripeNeverGuessesTheMode(t *testing.T) {
 	all := map[string]string{
 		"STRIPE_SECRET_KEY":           "sk_test",

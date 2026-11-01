@@ -20,33 +20,28 @@ import (
 
 const (
 	flowStateTTL = 10 * time.Minute
-	// flowCookieName holds the state of an SSO login. Only the browser that started the flow has it, so no login CSRF.
+	// Only the browser that started the flow has it, so no login CSRF.
 	flowCookieName = "nokku_flow"
 	// Browsers drop a cookie past 4096 bytes, name and attributes included.
 	maxFlowCookie = 3800
 	// A longer return path would not fit the cookie next to the rest.
 	maxReturnTo = 1024
-	// One marker per login in the last flowStateTTL.
+	// One marker per finished flow in the last flowStateTTL.
 	spentFlowEntries    = 10_000
 	ssoErrorPath        = "/sso-error"
 	providerHTTPTimeout = 15 * time.Second
 	providerCacheTTL    = 10 * time.Minute
-	// One discovered provider per issuer, every workspace on the hosted service may bring its own.
+	// One provider per issuer, each hosted workspace may bring its own.
 	providerCacheEntries = 10_000
 )
 
 var errFlowState = errors.New("iam: invalid or expired flow state")
 
-// providerContext is how oauth2 and go-oidc pick up the guarded client.
-func (s *Service) providerContext(ctx context.Context) context.Context {
-	return context.WithValue(ctx, oauth2.HTTPClient, s.idp)
-}
-
-// sealed keeps the state of a browser flow in an encrypted cookie, so starting a flow stores nothing on the server.
+// sealed keeps flow state in an encrypted cookie, starting one stores nothing.
 type sealed[T any] struct {
 	svc    *Service
 	cookie string
-	// use is bound into the seal, so the state of one flow never opens as another's.
+	// use is bound into the seal, so one flow's state never opens as another's.
 	use string
 	ttl time.Duration
 }
@@ -57,7 +52,12 @@ type envelope[T any] struct {
 	State   T      `json:"state"`
 }
 
-// put seals v into the cookie. The returned id is for the value that travels through the provider and back.
+// providerContext is how oauth2 and go-oidc pick up the guarded client.
+func (s *Service) providerContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, oauth2.HTTPClient, s.idp)
+}
+
+// put returns the id that travels through the provider and back.
 func (s *sealed[T]) put(w http.ResponseWriter, v T) (string, error) {
 	id := crypto.RandomString(32)
 	expires := s.svc.now().Add(s.ttl)
@@ -77,7 +77,7 @@ func (s *sealed[T]) put(w http.ResponseWriter, v T) (string, error) {
 	return id, nil
 }
 
-// take refuses a state of another flow, an expired one, and one whose flow already ended in a login.
+// take refuses another flow's state, an expired one, and one already spent.
 func (s *sealed[T]) take(r *http.Request) (T, string, error) {
 	var e envelope[T]
 	raw, err := base64.RawURLEncoding.DecodeString(s.svc.cookieValue(r.Header, s.cookie))
@@ -140,7 +140,8 @@ func claimIsTrue(v any) bool {
 	return false
 }
 
-// safeReturnTo only lets same-origin absolute paths through. Browsers drop tabs and newlines, which turns "/\t/host" into "//host".
+// safeReturnTo only passes same-origin paths. Browsers drop tabs and newlines,
+// which turns "/\t/host" into "//host".
 func safeReturnTo(p string) string {
 	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || len(p) > maxReturnTo ||
 		strings.HasPrefix(p, "/\\") || strings.ContainsFunc(p, unicode.IsControl) {

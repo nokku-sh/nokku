@@ -14,18 +14,18 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
-// Limits count per client IP and minute, sized for an office behind one address. A real DDoS is the proxy's job.
+// Per client IP, sized for an office behind one IP. DDoS is the proxy's job.
 const (
 	generalPerMinute = 6000
 
-	// Auth endpoints are the spraying and enumeration surface. Sign-in mails also wait out a cooldown per address.
+	// Spraying and enumeration surface, sign-in mails also have a cooldown.
 	authPerMinute = 300
 
-	// Anyone can start a device login and it parks a grant until it expires. This is how many one address can hold.
+	// Anyone can start a device login. This caps the grants one IP can park.
 	deviceStartsPerWindow = 30
 	deviceStartWindow     = 15 * time.Minute
 
-	// A hosted signup makes a workspace and a mail. A person needs one, plus a few tries until a name is free.
+	// A signup makes a workspace and a mail. One person needs a few tries.
 	signupsPerWindow = 10
 	signupWindow     = time.Hour
 )
@@ -34,11 +34,11 @@ func (s *Server) withRateLimit(next http.Handler) http.Handler {
 	general := httprate.LimitBy(generalPerMinute, time.Minute, clientIP)(next)
 	auth := httprate.LimitBy(authPerMinute, time.Minute, clientIP)(next)
 	deviceStart := httprate.LimitBy(deviceStartsPerWindow, deviceStartWindow, clientIP)(next)
-	// Answered as an RPC error, the signup form reads a bare 429 as the server being gone.
+	// An RPC error, the signup form reads a bare 429 as the server gone.
 	rpcErrors := connecthttp.NewErrorWriter()
 	signup := httprate.LimitBy(signupsPerWindow, signupWindow, clientIP,
 		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
-			_ = rpcErrors.Write(w, r, newError(
+			_ = rpcErrors.Write(w, r, connect.NewError(
 				connect.CodeResourceExhausted, "too many signups from this network, try again later",
 			))
 		}),
@@ -63,7 +63,7 @@ func clientIP(r *http.Request) (string, error) {
 	return realip.Bucket(r.Header, r.RemoteAddr), nil
 }
 
-// Enrolling a daemon is open to anyone with a token, so it is guessed at like a sign-in.
+// Enrolling a daemon takes only a token, so it is guessed at like a sign-in.
 func isAuthRoute(path string) bool {
 	return path == nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure ||
 		strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
@@ -73,7 +73,7 @@ func isAuthRoute(path string) bool {
 		strings.HasPrefix(path, "/passkey/")
 }
 
-// rateLimited leaves out the daemon streams, where a limit would block reconnect storms, and the hashed assets.
+// A limit would block daemon reconnect storms. Hashed assets are left out too.
 func rateLimited(path string) bool {
 	return path != nokkuv1connect.DaemonControlServiceConnectProcedure &&
 		path != nokkuv1connect.DaemonControlServiceDaemonRelayProcedure &&

@@ -8,31 +8,31 @@ import (
 	filter "github.com/scim2/filter-parser/v2"
 )
 
-// eachScimOp fans a path-less add or replace out to one call per attribute. expr is the path's value filter.
+// eachScimOp fans a path-less op out to one call per attribute.
 func eachScimOp(
 	ops []scim.PatchOperation,
 	apply func(opName, attr string, expr filter.Expression, value any) error,
 ) error {
 	for _, op := range ops {
-		if op.Path == nil {
-			m, ok := op.Value.(map[string]any)
-			if !ok {
-				return scimerrors.ScimErrorBadRequest("missing attribute path")
+		if op.Path != nil {
+			// Give a sub-attribute the path-less shape, handlers read one form.
+			value := op.Value
+			if sub := cmp.Or(op.Path.SubAttributeName(), op.Path.AttributePath.SubAttributeName()); sub != "" {
+				value = map[string]any{sub: value}
 			}
-			for attr, value := range m {
-				if err := apply(op.Op, attr, nil, value); err != nil {
-					return err
-				}
+			if err := apply(op.Op, op.Path.AttributePath.AttributeName, op.Path.ValueExpression, value); err != nil {
+				return err
 			}
 			continue
 		}
-		// A sub-attribute gets the shape a path-less op gives it, so the handlers read one form.
-		value := op.Value
-		if sub := cmp.Or(op.Path.SubAttributeName(), op.Path.AttributePath.SubAttributeName()); sub != "" {
-			value = map[string]any{sub: value}
+		m, ok := op.Value.(map[string]any)
+		if !ok {
+			return scimerrors.ScimErrorBadRequest("missing attribute path")
 		}
-		if err := apply(op.Op, op.Path.AttributePath.AttributeName, op.Path.ValueExpression, value); err != nil {
-			return err
+		for attr, value := range m {
+			if err := apply(op.Op, attr, nil, value); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

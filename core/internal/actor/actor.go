@@ -1,5 +1,5 @@
-// Package actor carries the request identity through contexts. Its one sibling import, realip, imports none, so
-// db can use it.
+// Package actor carries the request identity through contexts. Its one sibling
+// import, realip, imports none, so db can use it.
 package actor
 
 import (
@@ -15,8 +15,6 @@ import (
 // maxUserAgent keeps a hostile header from bloating the rows that store it.
 const maxUserAgent = 512
 
-type Kind string
-
 const (
 	KindUser           Kind = "user"
 	KindCLI            Kind = "cli"
@@ -25,13 +23,15 @@ const (
 	KindSCIM           Kind = "scim"
 )
 
+type Kind string
+
 type Principal struct {
 	ID    string
 	Kind  Kind
 	Email string
 	// Name is set for a service account, the audit log keeps it.
 	Name string
-	// Role is the user's or service account's role, unset for daemons and SCIM.
+	// Role is unset for daemons and SCIM.
 	Role nokkuv1.WorkspaceRole
 }
 
@@ -39,11 +39,21 @@ type Principal struct {
 type Workspace struct {
 	ID   string
 	Slug string
-	// BaseURL is scheme and host. Cookies, links, the passkey RP ID and the DPoP htu derive from it.
+	// BaseURL is scheme and host. Cookies, RP ID and DPoP htu derive from it.
 	BaseURL string
 }
 
 type principalKey struct{}
+
+// RequestMeta is what audit events and session rows take from the transport.
+type RequestMeta struct {
+	Header     http.Header
+	RemoteAddr string
+}
+
+type requestMetaKey struct{}
+
+type workspaceKey struct{}
 
 func ContextWithPrincipal(ctx context.Context, p Principal) context.Context {
 	return context.WithValue(ctx, principalKey{}, p)
@@ -81,18 +91,10 @@ func SubjectFromContext(ctx context.Context) string {
 	return ""
 }
 
-// RequestMeta is what audit events and session rows take from the transport.
-type RequestMeta struct {
-	Header     http.Header
-	RemoteAddr string
-}
-
-// ClientIP is the client's address as stored, see [realip.Client].
 func (m RequestMeta) ClientIP() string {
 	return strings.ToValidUTF8(realip.Client(m.Header, m.RemoteAddr), "")
 }
 
-// UserAgent is the header as stored, valid UTF-8 and cut to 512 bytes.
 func (m RequestMeta) UserAgent() string {
 	ua := strings.ToValidUTF8(m.Header.Get("User-Agent"), "")
 	if len(ua) <= maxUserAgent {
@@ -100,8 +102,6 @@ func (m RequestMeta) UserAgent() string {
 	}
 	return strings.ToValidUTF8(ua[:maxUserAgent], "")
 }
-
-type requestMetaKey struct{}
 
 func ContextWithRequestMeta(ctx context.Context, meta RequestMeta) context.Context {
 	return context.WithValue(ctx, requestMetaKey{}, meta)
@@ -111,8 +111,6 @@ func RequestMetaFromContext(ctx context.Context) (RequestMeta, bool) {
 	m, ok := ctx.Value(requestMetaKey{}).(RequestMeta)
 	return m, ok
 }
-
-type workspaceKey struct{}
 
 func WithWorkspace(ctx context.Context, ws Workspace) context.Context {
 	return context.WithValue(ctx, workspaceKey{}, ws)

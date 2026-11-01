@@ -15,7 +15,6 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 )
 
-// lockedListener holds the agent lock for as long as it listens.
 type lockedListener struct {
 	net.Listener
 
@@ -30,7 +29,7 @@ func (l lockedListener) Close() error {
 
 func listenAgent(ctx context.Context) (net.Listener, error) {
 	path := paths.AgentSocket()
-	// Without the lock two agents starting at once both treat the socket as stale, and the loser unlinks the winner's.
+	// Two agents starting together would unlink each other's socket as stale.
 	lock, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
@@ -50,7 +49,7 @@ func listenAgent(ctx context.Context) (net.Listener, error) {
 		_ = lock.Close()
 		return nil, err
 	}
-	// The config dir is 0700 already, this keeps the socket private if it is not.
+	// The config dir is 0700, this keeps the socket private if it is not.
 	if err = os.Chmod(path, 0o600); err != nil {
 		_ = ln.Close()
 		_ = lock.Close()
@@ -64,7 +63,7 @@ func dialAgent(ctx context.Context) (net.Conn, error) {
 	return d.DialContext(ctx, "unix", paths.AgentSocket())
 }
 
-// Its own session, so the SIGHUP ssh sends its ProxyCommand on exit never reaches the agent.
+// Its own session, so ssh's SIGHUP to its ProxyCommand misses the agent.
 func detach(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 }
