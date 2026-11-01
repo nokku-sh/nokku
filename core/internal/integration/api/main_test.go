@@ -58,8 +58,12 @@ var (
 
 // TestMain keeps a developer's shell env from pointing the test server at real Stripe, KMS, S3, SMTP or providers.
 func TestMain(m *testing.M) {
-	stop := testenv.Postgres()
 	storageDir, _ = os.MkdirTemp("", "nokku-api-test")
+	if err := trustHTTPTest(); err != nil {
+		fmt.Fprintf(os.Stderr, "write the test roots: %v\n", err)
+		os.Exit(1)
+	}
+	stop := testenv.Postgres()
 	stopKMS := func() {}
 	if hosted {
 		stopKMS = testenv.KMS(storageDir)
@@ -101,15 +105,6 @@ func TestMain(m *testing.M) {
 	testServer = httptest.NewUnstartedServer(serving(testHandler))
 	testServer.EnableHTTP2 = true
 	testServer.StartTLS()
-	// A federation rule only takes https, and the egress client reads the system roots. httptest has one certificate.
-	roots := filepath.Join(storageDir, "httptest-roots.pem")
-	block := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: testServer.Certificate().Raw})
-	if err := os.WriteFile(roots, block, 0o600); err != nil {
-		fmt.Fprintf(os.Stderr, "write the test roots: %v\n", err)
-		stop()
-		os.Exit(1)
-	}
-	os.Setenv("SSL_CERT_FILE", roots)
 
 	code := m.Run()
 	cancel()
@@ -118,6 +113,18 @@ func TestMain(m *testing.M) {
 	stopKMS()
 	stop()
 	os.Exit(code)
+}
+
+// trustHTTPTest runs before testenv. Go loads the system roots once, and a Docker client on TLS would do that first.
+func trustHTTPTest() error {
+	srv := httptest.NewTLSServer(nil)
+	defer srv.Close()
+	roots := filepath.Join(storageDir, "httptest-roots.pem")
+	block := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
+	if err := os.WriteFile(roots, block, 0o600); err != nil {
+		return err
+	}
+	return os.Setenv("SSL_CERT_FILE", roots)
 }
 
 // newTestAPI returns the real config and a server with every route behind the production middleware.
