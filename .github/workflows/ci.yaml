@@ -49,7 +49,7 @@ jobs:
           buf generate
           git diff --exit-code -- gen core/web/src/lib/gen
 
-      - uses: sqlc-dev/setup-sqlc@v3
+      - uses: sqlc-dev/setup-sqlc@bac53b7fb28c039a6c7f5736fd1e89744021bdd6 # v5
         with:
           sqlc-version: "1.31.1"
 
