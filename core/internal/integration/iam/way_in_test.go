@@ -39,13 +39,11 @@ func TestNewWaysInAreMailed(t *testing.T) {
 	u := newPasskeyDevice().enroll(t, e, h.org.ws, "bob@"+testDomain())
 	assert.Contains(t, next(), u.ID+" The passkey ")
 
-	h.user()
 	f := h.startOIDCFlowFrom(t, svc, linkRequest(as(t.Context(), h.org.ws, u)))
 	wantSSOSuccess(t, f.callback(t, svc, ""))
 	assert.Equal(t, u.ID+" Your Test OIDC account", next())
 
 	// Linking the same identity again adds no way in.
-	h.user()
 	f = h.startOIDCFlowFrom(t, svc, linkRequest(as(t.Context(), h.org.ws, u)))
 	wantSSOSuccess(t, f.callback(t, svc, ""))
 
@@ -67,7 +65,6 @@ func TestFirstSSOSignInMailsAnExistingAccount(t *testing.T) {
 		},
 	})
 
-	h.user()
 	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
 	select {
 	case got := <-mailed:
@@ -79,7 +76,6 @@ func TestFirstSSOSignInMailsAnExistingAccount(t *testing.T) {
 	require.NoError(t, e.conn.Sys().DeleteUser(t.Context(), created.ID))
 
 	u := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	h.user()
 	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
 	select {
 	case got := <-mailed:

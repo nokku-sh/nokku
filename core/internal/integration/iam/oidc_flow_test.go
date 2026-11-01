@@ -2,17 +2,18 @@
 
 package iam_test
 
-// End-to-end OIDC against mockoidc. Discovery is hand-served so attacks can swap in a crafted id_token.
+// End-to-end OIDC against a small provider of its own, so attacks can swap in a crafted id_token.
 
 import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
+	"encoding/json/v2"
 	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -22,16 +23,18 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/go-jose/go-jose/v4"
-	"github.com/oauth2-proxy/mockoidc"
+	"golang.org/x/oauth2"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
 type oidcIDPHarness struct {
-	m      *mockoidc.MockOIDC
+	key    *rsa.PrivateKey
 	ts     *httptest.Server
 	issuer string
+	// The last authorize handed these out. A redeemed code is empty, so it works once.
+	code, challenge string
 	// lastNonce must be carried by crafted tokens unless they break it on purpose.
 	lastNonce string
 	mint      func() string
@@ -46,67 +49,81 @@ func newOIDCIdP(t *testing.T) *oidcIDPHarness {
 	if err != nil {
 		t.Fatalf("generate idp key: %v", err)
 	}
-	m, err := mockoidc.NewServer(key)
-	if err != nil {
-		t.Fatalf("build mockoidc: %v", err)
-	}
 
-	h := &oidcIDPHarness{m: m}
+	h := &oidcIDPHarness{key: key}
+	h.mint = func() string { return signIDToken(t, key, oidcKeyID, h.tokenClaims(t, nil)) }
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /oidc/authorize", m.Authorize)
+	mux.HandleFunc("GET /oidc/authorize", h.authorize)
 	mux.HandleFunc("POST /oidc/token", h.token)
-	mux.HandleFunc("GET /oidc/userinfo", m.Userinfo)
-	mux.HandleFunc("GET /oidc/jwks", m.JWKS)
+	mux.HandleFunc("GET /oidc/jwks", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, jose.JSONWebKeySet{Keys: []jose.JSONWebKey{
+			{Key: key.Public(), KeyID: oidcKeyID, Algorithm: string(jose.RS256), Use: "sig"},
+		}})
+	})
 	mux.HandleFunc("GET /oidc/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		writeJSON(w, map[string]any{
 			"issuer":                                h.issuer,
 			"authorization_endpoint":                h.ts.URL + "/oidc/authorize",
 			"token_endpoint":                        h.ts.URL + "/oidc/token",
-			"userinfo_endpoint":                     h.ts.URL + "/oidc/userinfo",
 			"jwks_uri":                              h.ts.URL + "/oidc/jwks",
 			"id_token_signing_alg_values_supported": []string{"RS256"},
 			"code_challenge_methods_supported":      []string{"S256"},
 		})
 	})
 
-	// Set before the first mint so iss claims and discovery agree.
-	ts := httptest.NewServer(mux)
-	m.Server = &http.Server{Addr: strings.TrimPrefix(ts.URL, "http://")}
-	h.ts = ts
-	h.issuer = ts.URL + "/oidc"
-
-	t.Cleanup(ts.Close)
+	h.ts = httptest.NewServer(mux)
+	h.issuer = h.ts.URL + "/oidc"
+	t.Cleanup(h.ts.Close)
 	return h
 }
 
-func (h *oidcIDPHarness) token(w http.ResponseWriter, r *http.Request) {
-	rec := httptest.NewRecorder()
-	h.m.Token(rec, r)
-	for k, vs := range rec.Header() {
-		for _, v := range vs {
-			w.Header().Add(k, v)
-		}
+// authorize signs the user straight in, like a provider that already has a session for them.
+func (h *oidcIDPHarness) authorize(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	back, err := url.Parse(q.Get("redirect_uri"))
+	if err != nil || q.Get("redirect_uri") == "" || q.Get("state") == "" || q.Get("nonce") == "" ||
+		q.Get("client_id") != oidcClientID || q.Get("response_type") != "code" ||
+		q.Get("code_challenge") == "" || q.Get("code_challenge_method") != "S256" ||
+		!slices.Contains(strings.Fields(q.Get("scope")), "openid") {
+		http.Error(w, "invalid authorize request", http.StatusBadRequest)
+		return
 	}
-	body := rec.Body.Bytes()
-	if h.mint != nil && rec.Code == http.StatusOK {
-		// The rest of the answer stays, or the exchange fails before the id_token is looked at.
-		var tr map[string]any
-		if json.Unmarshal(body, &tr) == nil && tr["id_token"] != nil {
-			tr["id_token"] = h.mint()
-			body, _ = json.Marshal(tr)
-		}
-	}
-	w.WriteHeader(rec.Code)
-	_, _ = w.Write(body)
+	h.code, h.challenge = rand.Text(), q.Get("code_challenge")
+	query := back.Query()
+	query.Set("code", h.code)
+	query.Set("state", q.Get("state"))
+	back.RawQuery = query.Encode()
+	http.Redirect(w, r, back.String(), http.StatusFound)
 }
 
-func (h *oidcIDPHarness) user() {
-	h.m.QueueUser(&mockoidc.MockUser{
-		Subject:       oidcTestSubject,
-		Email:         h.email,
-		EmailVerified: true,
+func (h *oidcIDPHarness) token(w http.ResponseWriter, r *http.Request) {
+	id, secret, ok := r.BasicAuth()
+	if !ok {
+		id, secret = r.PostFormValue("client_id"), r.PostFormValue("client_secret")
+	}
+	if id != oidcClientID || secret != oidcClientSecret {
+		http.Error(w, "invalid_client", http.StatusUnauthorized)
+		return
+	}
+	code := r.PostFormValue("code")
+	redeemed := code != "" && code == h.code
+	h.code = ""
+	if !redeemed || r.PostFormValue("grant_type") != "authorization_code" ||
+		oauth2.S256ChallengeFromVerifier(r.PostFormValue("code_verifier")) != h.challenge {
+		http.Error(w, "invalid_grant", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"access_token": "idp-access-token",
+		"token_type":   "Bearer",
+		"expires_in":   600,
+		"id_token":     h.mint(),
 	})
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.MarshalWrite(w, v)
 }
 
 func noRedirectClient() *http.Client {
@@ -199,7 +216,7 @@ func (h *oidcIDPHarness) setupWith(t *testing.T, p iam.OIDCProvider, deps iam.De
 	e := newTestEnvWith(t, deps)
 	h.org = e.org(t)
 	h.email = "alice@" + testDomain()
-	p.IssuerURL, p.ClientID, p.ClientSecret = h.issuer, h.m.ClientID, h.m.ClientSecret
+	p.IssuerURL, p.ClientID, p.ClientSecret = h.issuer, oidcClientID, oidcClientSecret
 	e.provider(t, h.org.ws, iam.SSOProvider{ProviderID: testProviderID, Name: "Test OIDC", OIDC: p})
 	return e, e.svc
 }
@@ -207,7 +224,6 @@ func (h *oidcIDPHarness) setupWith(t *testing.T, p iam.OIDCProvider, deps iam.De
 func TestOIDCFlowHappyPath(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
-	h.user()
 
 	rec := h.runOIDCFlow(t, svc, "")
 	wantSSOSuccess(t, rec)
@@ -230,7 +246,6 @@ func TestOIDCFlowHappyPath(t *testing.T) {
 func TestOIDCFlowJITDisabledRejectsUnknownIdentity(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, false)
-	h.user()
 
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, ""))
 	if e.userByEmail(t, h.org.ws, h.email) != nil {
@@ -271,7 +286,6 @@ func TestOIDCFlowDisabledProvider(t *testing.T) {
 func TestOIDCFlowStateReplay(t *testing.T) {
 	h := newOIDCIdP(t)
 	_, svc := h.setup(t, true)
-	h.user()
 
 	f := h.startOIDCFlow(t, svc)
 	wantSSOSuccess(t, f.callback(t, svc, ""))
@@ -282,7 +296,6 @@ func TestOIDCFlowStateReplay(t *testing.T) {
 func TestOIDCFlowFlowCookieMismatch(t *testing.T) {
 	h := newOIDCIdP(t)
 	_, svc := h.setup(t, true)
-	h.user()
 
 	f := h.startOIDCFlow(t, svc)
 	// A callback URL relayed to a different browser.
@@ -296,7 +309,6 @@ func TestOIDCFlowFlowCookieMismatch(t *testing.T) {
 func TestOIDCFlowIssParameterMismatch(t *testing.T) {
 	h := newOIDCIdP(t)
 	_, svc := h.setup(t, true)
-	h.user()
 
 	wantSSOFailure(t, h.runOIDCFlow(t, svc, "iss="+url.QueryEscape("http://evil.example/oidc")))
 }
@@ -305,7 +317,6 @@ func TestOIDCFlowIssParameterMismatch(t *testing.T) {
 
 func TestOIDCFlowIDTokenWrongNonce(t *testing.T) {
 	h := newOIDCIdP(t)
-	h.user()
 	h.mintBadToken(t, map[string]any{"nonce": "replayed"})
 	_, svc := h.setup(t, true)
 
@@ -314,7 +325,6 @@ func TestOIDCFlowIDTokenWrongNonce(t *testing.T) {
 
 func TestOIDCFlowIDTokenWrongAudience(t *testing.T) {
 	h := newOIDCIdP(t)
-	h.user()
 	h.mintBadToken(t, map[string]any{"aud": "another-client"})
 	_, svc := h.setup(t, true)
 
@@ -323,15 +333,13 @@ func TestOIDCFlowIDTokenWrongAudience(t *testing.T) {
 
 func TestOIDCFlowIDTokenBadSignature(t *testing.T) {
 	h := newOIDCIdP(t)
-	h.user()
 	// Signed with another key but the advertised kid, so the failure is the signature check itself.
 	attackerKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("generate attacker key: %v", err)
 	}
 	h.mint = func() string {
-		kid, _ := h.m.Keypair.KeyID()
-		return signIDToken(t, attackerKey, kid, h.tokenClaims(t, nil))
+		return signIDToken(t, attackerKey, oidcKeyID, h.tokenClaims(t, nil))
 	}
 	_, svc := h.setup(t, true)
 
@@ -341,7 +349,6 @@ func TestOIDCFlowIDTokenBadSignature(t *testing.T) {
 // A provider that calls the address unverified can neither claim an account with it nor create one.
 func TestOIDCFlowUnverifiedEmail(t *testing.T) {
 	h := newOIDCIdP(t)
-	h.user()
 	h.mintBadToken(t, map[string]any{"email_verified": false})
 	e, svc := h.setup(t, true)
 
@@ -361,7 +368,6 @@ func TestOIDCFlowMissingEmailVerified(t *testing.T) {
 	for name, trust := range map[string]bool{"refused": false, "trusted": true} {
 		t.Run(name, func(t *testing.T) {
 			h := newOIDCIdP(t)
-			h.user()
 			h.mintBadToken(t, map[string]any{"email_verified": nil})
 			e, svc := h.setupProvider(t, iam.OIDCProvider{JITProvisioning: true, TrustUnverifiedEmail: trust})
 
@@ -388,7 +394,6 @@ func TestOIDCFlowMissingEmailVerifiedLinksOnlyWhenTrusted(t *testing.T) {
 	for name, trust := range map[string]bool{"refused": false, "trusted": true} {
 		t.Run(name, func(t *testing.T) {
 			h := newOIDCIdP(t)
-			h.user()
 			h.mintBadToken(t, map[string]any{"email_verified": nil})
 			e, svc := h.setupProvider(t, iam.OIDCProvider{TrustUnverifiedEmail: trust})
 			member := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
@@ -414,7 +419,6 @@ func TestOIDCFlowMissingEmailVerifiedLinksOnlyWhenTrusted(t *testing.T) {
 func TestOIDCFlowRefusesASecondSubjectOnAnAccount(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
-	h.user()
 	leaver := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	e.putCredential(t, h.org.ws, db.UpsertCredentialParams{
 		ID:       "old",
@@ -442,7 +446,6 @@ func TestOIDCFlowNeverMatchesTheOwnerByEmail(t *testing.T) {
 	e, svc := h.setup(t, true)
 	owner := h.org.owner
 	h.email = owner.Email
-	h.user()
 
 	rec := h.runOIDCFlow(t, svc, "")
 	wantSSOFailure(t, rec)
@@ -457,7 +460,6 @@ func TestOIDCFlowNeverMatchesTheOwnerByEmail(t *testing.T) {
 	}
 
 	// Signed in, the owner links it themselves.
-	h.user()
 	f := h.startOIDCFlowFrom(t, svc, linkRequest(as(t.Context(), h.org.ws, owner)))
 	wantSSOSuccess(t, f.callback(t, svc, ""))
 	if c := e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject); c == nil ||
@@ -469,17 +471,16 @@ func TestOIDCFlowNeverMatchesTheOwnerByEmail(t *testing.T) {
 func (h *oidcIDPHarness) mintBadToken(t *testing.T, override map[string]any) {
 	t.Helper()
 	h.mint = func() string {
-		kid, err := h.m.Keypair.KeyID()
-		if err != nil {
-			t.Fatalf("key id: %v", err)
-		}
-		return signIDToken(t, h.m.Keypair.PrivateKey, kid, h.tokenClaims(t, override))
+		return signIDToken(t, h.key, oidcKeyID, h.tokenClaims(t, override))
 	}
 }
 
 const (
-	oidcTestSubject = "sub-1"
-	testProviderID  = "test"
+	oidcTestSubject  = "sub-1"
+	oidcClientID     = "nokku"
+	oidcClientSecret = "idp-client-secret"
+	oidcKeyID        = "idp"
+	testProviderID   = "test"
 )
 
 func (h *oidcIDPHarness) tokenClaims(t *testing.T, override map[string]any) map[string]any {
@@ -487,7 +488,7 @@ func (h *oidcIDPHarness) tokenClaims(t *testing.T, override map[string]any) map[
 	claims := map[string]any{
 		"iss":            h.issuer,
 		"sub":            oidcTestSubject,
-		"aud":            h.m.ClientID,
+		"aud":            oidcClientID,
 		"nonce":          h.lastNonce,
 		"email":          h.email,
 		"email_verified": true,
@@ -539,7 +540,6 @@ func TestOIDCFlowLinksExistingSignedInUser(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
 	existing := e.user(t, h.org.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	h.user()
 
 	f := h.startOIDCFlowFrom(t, svc, linkRequest(as(t.Context(), h.org.ws, existing)))
 	rec := f.callback(t, svc, "")
@@ -589,7 +589,6 @@ func TestOIDCFlowPlainLoginNeverLinks(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
 	bob := e.user(t, h.org.ws, "bob@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	h.user()
 
 	login := httptest.NewRequest(http.MethodGet, "/oidc/login?provider="+testProviderID, nil)
 	f := h.startOIDCFlowFrom(t, svc, login.WithContext(as(t.Context(), h.org.ws, bob)))

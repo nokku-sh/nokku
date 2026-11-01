@@ -27,7 +27,6 @@ require (
 	github.com/mizuchilabs/inkan/license v0.1.0
 	github.com/mizuchilabs/kata v0.2.0
 	github.com/moby/moby/api v1.56.1
-	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
 	github.com/pkg/sftp v1.13.12
 	github.com/scaleway/scaleway-sdk-go v1.39.0
 	github.com/scaleway/tink-go-scwkms v0.1.2
@@ -104,7 +103,6 @@ require (
 	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.10.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.5 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
