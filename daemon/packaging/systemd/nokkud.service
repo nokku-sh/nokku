@@ -7,7 +7,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/nokkud
+# A reload says a new binary is in place. nokkud exits 75 once its sessions end.
+ExecReload=/bin/kill -USR1 $MAINPID
 Restart=on-failure
+SuccessExitStatus=75
+RestartForceExitStatus=75
 # 78 means not enrolled, restarting cannot fix that.
 RestartPreventExitStatus=78
 RestartSec=5s

@@ -148,6 +148,14 @@ func (s *Server) Reload() {
 	s.cfg = cfg
 }
 
+// Idle is true with no connection past its handshake, so a port scan can't hold
+// off a restart.
+func (s *Server) Idle() bool {
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
+	return len(s.live) == 0
+}
+
 // Serve returns once ctx is done and every connection and session is gone.
 func (s *Server) Serve(ctx context.Context, l net.Listener) {
 	stop := context.AfterFunc(ctx, func() { _ = l.Close() })

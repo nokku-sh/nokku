@@ -6,6 +6,7 @@
 package smoke_test
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -137,6 +138,7 @@ func TestSmoke(t *testing.T) {
 		{"ssh connects through the relay", s.sshRelay},
 		{"web terminal runs a shell", s.webTerminal},
 		{"sessions are recorded", s.checkRecordings},
+		{"an upgrade waits for the open session", s.upgradeWaitsForSessions},
 		{"revoking the grant ends the session", s.revokeGrant},
 		{"audit log holds the flows", s.checkAuditLog},
 		{"a CI job reaches the server with no stored secret", s.ciJob},
@@ -416,6 +418,60 @@ func (s *smoke) checkRecordings(t *testing.T) {
 	all := strings.Join(slices.Collect(maps.Values(casts)), "\n")
 	assert.Contains(t, all, "smoke-direct")
 	assert.Contains(t, all, "smoke-relay")
+}
+
+// An upgrade renames a new binary over the running one, and postinstall.sh then
+// sends USR1. The open session runs on, helpers start from the new binary, and
+// the daemon restarts after the session with its enrollment.
+func (s *smoke) upgradeWaitsForSessions(t *testing.T) {
+	docker := func(args ...string) string {
+		out, err := exec.CommandContext(bounded(t), "docker", args...).CombinedOutput()
+		require.NoError(t, err, "docker %v: %s", args, out)
+		return strings.TrimSpace(string(out))
+	}
+
+	// Past a tick of the wait, so a restart would cut it.
+	session := s.home.ssh(t, login, "echo smoke-open && sleep 8 && echo smoke-survived")
+	stdout, err := session.StdoutPipe()
+	require.NoError(t, err)
+	require.NoError(t, session.Start())
+	lines := bufio.NewScanner(stdout)
+	require.True(t, lines.Scan(), "the session never started")
+	require.Equal(t, "smoke-open", lines.Text())
+
+	docker("exec", s.container, "sh", "-c",
+		"cp /usr/bin/nokkud /usr/bin/nokkud.new && mv /usr/bin/nokkud.new /usr/bin/nokkud")
+	docker("kill", "--signal", "USR1", s.container)
+
+	// SFTP runs in a helper, on the binary the upgrade put there.
+	scp, err := exec.LookPath("scp")
+	require.NoError(t, err)
+	file := filepath.Join(s.home.dir, "upgrade")
+	require.NoError(t, os.WriteFile(file, []byte("smoke-sftp"), 0o600))
+	copied, err := s.home.command(t, scp,
+		"-F", filepath.Join(s.home.dir, ".ssh", "config"), "-o", "BatchMode=yes", "-S", s.home.sshBinary,
+		file, login+":/tmp/smoke-upgrade",
+	).CombinedOutput()
+	require.NoError(t, err, "scp during the wait: %s", copied)
+	assert.Equal(t, "smoke-sftp", docker("exec", s.container, "cat", "/tmp/smoke-upgrade"))
+
+	require.True(t, lines.Scan(), "the upgrade cut the open session")
+	assert.Equal(t, "smoke-survived", lines.Text())
+	require.NoError(t, session.Wait())
+
+	assert.Equal(t, "75", docker("wait", s.container), "the unit file restarts on 75")
+	docker("start", s.container)
+	waitFor(t, time.Minute, func() bool {
+		out, err := s.home.ssh(t, login, "echo smoke-back").CombinedOutput()
+		return err == nil && strings.Contains(string(out), "smoke-back")
+	}, "the server never came back")
+	waitFor(t, time.Minute, func() bool {
+		res, err := s.daemons.ListDaemons(t.Context(), &nokkuv1.ListDaemonsRequest{Online: new(true)})
+		require.NoError(t, err)
+		return slices.ContainsFunc(res.GetDaemons(), func(d *nokkuv1.Daemon) bool {
+			return d.GetId() == s.daemon.GetId()
+		})
+	}, "the daemon came back as another enrollment")
 }
 
 func (s *smoke) revokeGrant(t *testing.T) {

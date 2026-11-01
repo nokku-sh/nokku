@@ -9,8 +9,9 @@ if [ -d /usr/lib/systemd/system ] && have systemctl; then
 	install -m 0644 $share/systemd/nokkud.service /usr/lib/systemd/system/nokkud.service
 	systemctl daemon-reload >/dev/null 2>&1 || true
 	systemctl enable nokkud.service >/dev/null 2>&1 || true
-	# An upgrade picks up the new binary. Live connections end with the restart.
-	systemctl try-restart nokkud.service >/dev/null 2>&1 || true
+	# Not a restart, that would hang up a session running this upgrade. nokkud
+	# picks up the new binary once its sessions end, an hour later at most.
+	systemctl try-reload-or-restart nokkud.service >/dev/null 2>&1 || true
 fi
 
 if have rc-update; then

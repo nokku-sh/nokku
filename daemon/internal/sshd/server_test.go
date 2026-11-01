@@ -474,3 +474,24 @@ func TestRelayCapLeavesRoomForDirectLogins(t *testing.T) {
 	require.ErrorIs(t, err, io.EOF, "a relayed connection past the relay cap was served")
 	assert.Empty(t, srv.conns, "a refused relay kept a connection slot")
 }
+
+// A restart waits for connections past their handshake, not for a port scan.
+func TestIdleCountsLoggedInConnections(t *testing.T) {
+	ca := newTestCA(t)
+	var srv *Server
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { srv = s })
+	defer closeFn()
+	assert.True(t, srv.Idle())
+
+	scan, err := net.Dial("tcp", addr)
+	require.NoError(t, err)
+	defer scan.Close()
+	assert.True(t, srv.Idle(), "an open socket with no login held off the restart")
+
+	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { return !srv.Idle() }, 2*time.Second, time.Millisecond,
+		"a login did not count")
+	require.NoError(t, client.Close())
+	require.Eventually(t, srv.Idle, 2*time.Second, time.Millisecond, "the connection stayed counted")
+}

@@ -24,7 +24,7 @@ What to expect:
 
 ### Supported versions
 
-Only the latest release gets security fixes. Older releases are not patched, so upgrade to the newest release.
+Only the latest release gets security fixes. Older releases are not patched, so upgrade to the newest release. An upgrade goes live once the last session on the server ends, an hour later at most, so restart `nokkud` by hand when a fix can't wait.
 
 ### In scope
 

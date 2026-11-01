@@ -44,6 +44,9 @@ func (c *Client) runControlStream(ctx context.Context) error {
 }
 
 func (c *Client) sendHeartbeats(ctx context.Context, stream nokkuv1connect.DaemonControlServiceConnectClientStream) {
+	// HTTP/2 only sees a cancel once the body ends. Until then the read waits,
+	// and the core takes two minutes to drop a silent daemon.
+	defer func() { _ = stream.CloseSend() }()
 	t := time.NewTicker(heartbeatInterval)
 	defer t.Stop()
 	for {

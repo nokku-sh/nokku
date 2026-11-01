@@ -35,7 +35,8 @@ const (
 	maxForwardAddr = 512
 )
 
-// Tests swap it to re-enter the test binary.
+// Tests swap it to re-enter the test binary. After an upgrade this is the new
+// binary while the old daemon waits to restart, so the helpers stay compatible.
 var helperArgv = func(name string, args ...string) ([]string, error) {
 	// Not argv[0]: the child runs as the user, argv must never pick the binary.
 	bin, err := os.Executable()

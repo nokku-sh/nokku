@@ -141,7 +141,9 @@ When the core is unreachable, logins keep working from the last synced access li
 
 A workspace has one CA and every daemon trusts it. A rollover reaches a daemon at its next sync, there is nothing to do on the server. A forced command or a source list on a certificate comes from its subject: people take the workspace's source list, a service account its own limits.
 
-A restart or a package upgrade ends the sessions that are open on the daemon, like a hangup. Their recordings still go to the core, the ones it could not send in time at the next start.
+A restart ends the sessions that are open on the daemon, like a hangup. Their recordings still go to the core, the ones it could not send in time at the next start.
+
+A package upgrade waits for them. Under systemd the daemon keeps serving and restarts on the new binary once the last connection ends, so an upgrade can run in a session of its own. After an hour it restarts anyway and ends what is left. For a security fix that can't wait, run `sudo systemctl restart nokkud`. Under OpenRC an upgrade does not restart the daemon, run `sudo rc-service nokkud restart`.
 
 ## Uninstall
 

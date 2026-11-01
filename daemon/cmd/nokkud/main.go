@@ -9,8 +9,11 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/mizuchilabs/kata/buildinfo"
@@ -29,14 +32,22 @@ import (
 	"github.com/nokku-sh/nokku/internal/trust"
 )
 
-// Docker kills a container 10 s after stop, so shutdown must fit in stopGrace.
 const (
+	// Docker kills a container 10 s after stop, so shutdown must fit in stopGrace.
 	stopGrace       = 9 * time.Second
 	unenrollTimeout = 2 * time.Second
+
+	// A restart waits this long for sessions, so a fix can't wait on them forever.
+	upgradeWait = time.Hour
+	upgradeTick = 5 * time.Second
 )
 
-// errNotEnrolled exits with EX_CONFIG, which the unit file does not restart.
-var errNotEnrolled = cli.Exit("nokkud: this host is not enrolled, run: sudo nokkud enroll", 78)
+var (
+	// errNotEnrolled exits with EX_CONFIG, which the unit file does not restart.
+	errNotEnrolled = cli.Exit("nokkud: this host is not enrolled, run: sudo nokkud enroll", 78)
+	// errRestart exits with EX_TEMPFAIL, which the unit file restarts.
+	errRestart = cli.Exit("nokkud: restarting for the new binary", 75)
+)
 
 func main() {
 	cmd := &cli.Command{
@@ -135,6 +146,10 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	if err := sysutil.IsRoot(); err != nil {
 		return err
 	}
+	// Never stopped, USR1 would kill us by default.
+	upgraded := make(chan os.Signal, 1)
+	signal.Notify(upgraded, syscall.SIGUSR1)
+
 	st, err := loadState(cmd)
 	if err != nil {
 		return err
@@ -172,6 +187,13 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 	var wg sync.WaitGroup
 	wg.Go(func() { srv.Serve(ctx, l) })
+	var restart atomic.Bool
+	wg.Go(func() {
+		if awaitIdle(ctx, upgraded, srv.Idle) {
+			restart.Store(true)
+			cancel()
+		}
+	})
 	addr, err := netip.ParseAddrPort(l.Addr().String())
 	if err != nil {
 		return err
@@ -185,12 +207,43 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	if !uploaded {
 		slog.Warn("recordings still uploading at shutdown, the next start sends them")
 	}
+	// Before the unenroll below, a host that restarts comes back.
+	if restart.Load() {
+		return errRestart
+	}
 	// An ephemeral host never comes back, so it deletes its own record. With
 	// recordings left it keeps its files, and the core retires it later.
 	if err == nil && uploaded && st.Access().DaemonConfig.GetEphemeral() {
 		unenroll(context.WithoutCancel(ctx), cl)
 	}
 	return err
+}
+
+// awaitIdle takes an upgrade's USR1, then waits for the last connection to end.
+// The upgrade may run in one of them, a restart right away would hang it up.
+// False means ctx ended first.
+func awaitIdle(ctx context.Context, upgraded <-chan os.Signal, idle func() bool) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-upgraded:
+	}
+	slog.Info("new binary installed, restarting once the last session ends", "at_most", upgradeWait)
+	deadline := time.After(upgradeWait)
+	ticker := time.NewTicker(upgradeTick)
+	defer ticker.Stop()
+	for !idle() {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-deadline:
+			slog.Warn("sessions outlasted the wait, ending them to restart")
+			return true
+		case <-ticker.C:
+		}
+	}
+	slog.Info("the last session ended, restarting")
+	return true
 }
 
 // The local state always goes, or a broken identity could never be reset.
