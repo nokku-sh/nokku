@@ -100,7 +100,7 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Content-Security-Policy", csp)
 
-		// No API response may be cached. The static handler and the avatars set their own policy.
+		// No API response may be cached. The static handler sets its own policy.
 		if r.Method == http.MethodGet {
 			w.Header().Set("Cache-Control", "no-store")
 		}

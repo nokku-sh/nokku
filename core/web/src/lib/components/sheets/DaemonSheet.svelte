@@ -145,7 +145,10 @@
 		<span class="flex items-center gap-1.5">
 			<!-- The same word and tone as the Online column in the table. -->
 			<StatusDot tone={entity?.online ? 'success' : 'warning'} live={entity?.online} />
-			{#if entity?.online}
+			{#if entity?.behindSince}
+				Behind since {formatTs(entity.behindSince, 'relative')}, it may still enforce access you
+				revoked
+			{:else if entity?.online}
 				Online
 			{:else}
 				Offline, {entity?.lastSeenAt

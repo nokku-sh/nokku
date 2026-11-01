@@ -18,13 +18,12 @@ func TestRateLimited(t *testing.T) {
 		path string
 		want bool
 	}{
-		{"/nokku.v1.UtilService/Whoami", true},
+		{"/nokku.v1.UtilService/GetVersion", true},
 		{"/nokku.v1.AuthService/RequestMagicLink", true},
 		{"/oidc/callback", true},
 		{"/scim/v2/ws/Users", true},
 		{"/passkey/login/begin", true},
 		{"/auth/device", true},
-		{"/avatars/user-1", true},
 		{"/terminal/ws", true},
 		{"/webhooks/stripe", true},
 		{"/", true},
@@ -146,6 +145,7 @@ func TestIsAuthRoute(t *testing.T) {
 		// Everything that mints or spends a link gets the strict limit.
 		{"/nokku.v1.AuthService/RequestMagicLink", true},
 		{"/nokku.v1.AuthService/ConsumeMagicLink", true},
+		{"/nokku.v1.AuthService/ExchangeWorkloadToken", true},
 		{"/nokku.v1.InvitationService/AcceptInvitation", true},
 
 		// Other RPCs stay on the general limit.

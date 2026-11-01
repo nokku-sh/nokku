@@ -59,6 +59,7 @@ type AccessToken struct {
 	UserAgent        string             `json:"userAgent"`
 	ExpiresAt        *time.Time         `json:"expiresAt"`
 	LastSeenAt       *time.Time         `json:"lastSeenAt"`
+	WorkloadJti      *string            `json:"workloadJti"`
 	CreatedAt        time.Time          `json:"createdAt"`
 }
 
@@ -178,7 +179,6 @@ type InstanceLicense struct {
 type JoinToken struct {
 	ID          string             `json:"id"`
 	WorkspaceID string             `json:"workspaceId"`
-	CaID        *string            `json:"caId"`
 	TokenHash   crypto.HashedToken `json:"tokenHash"`
 	Label       string             `json:"label"`
 	Tags        []string           `json:"tags"`
@@ -274,9 +274,6 @@ type RecordingDelete struct {
 type SSHCA struct {
 	ID                    string        `json:"id"`
 	WorkspaceID           string        `json:"workspaceId"`
-	Name                  string        `json:"name"`
-	Description           *string       `json:"description"`
-	IsDefault             bool          `json:"isDefault"`
 	PublicKey             string        `json:"publicKey"`
 	HostPublicKey         string        `json:"hostPublicKey"`
 	PreviousPublicKey     *string       `json:"previousPublicKey"`
@@ -286,7 +283,6 @@ type SSHCA struct {
 	UserDefaultTtl        time.Duration `json:"userDefaultTtl"`
 	UserMaxTtl            time.Duration `json:"userMaxTtl"`
 	HostTtl               time.Duration `json:"hostTtl"`
-	ForceCommand          string        `json:"forceCommand"`
 	SourceAddress         string        `json:"sourceAddress"`
 	CreatedAt             time.Time     `json:"createdAt"`
 	UpdatedAt             time.Time     `json:"updatedAt"`
@@ -300,15 +296,26 @@ type SSHCAKey struct {
 }
 
 type ServiceAccount struct {
-	ID          string              `json:"id"`
-	WorkspaceID string              `json:"workspaceId"`
-	Name        string              `json:"name"`
-	Description *string             `json:"description"`
-	Role        nokku.WorkspaceRole `json:"role"`
-	Tags        []string            `json:"tags"`
-	LastUsedAt  *time.Time          `json:"lastUsedAt"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
+	ID            string              `json:"id"`
+	WorkspaceID   string              `json:"workspaceId"`
+	Name          string              `json:"name"`
+	Description   *string             `json:"description"`
+	Role          nokku.WorkspaceRole `json:"role"`
+	Tags          []string            `json:"tags"`
+	ForceCommand  string              `json:"forceCommand"`
+	SourceAddress string              `json:"sourceAddress"`
+	LastUsedAt    *time.Time          `json:"lastUsedAt"`
+	CreatedAt     time.Time           `json:"createdAt"`
+	UpdatedAt     time.Time           `json:"updatedAt"`
+}
+
+type ServiceAccountFederation struct {
+	ID               string            `json:"id"`
+	WorkspaceID      string            `json:"workspaceId"`
+	ServiceAccountID string            `json:"serviceAccountId"`
+	Issuer           string            `json:"issuer"`
+	Claims           map[string]string `json:"claims"`
+	CreatedAt        time.Time         `json:"createdAt"`
 }
 
 type SsoProvider struct {
@@ -324,7 +331,6 @@ type SsoProvider struct {
 type Target struct {
 	ID            string     `json:"id"`
 	WorkspaceID   string     `json:"workspaceId"`
-	CaID          string     `json:"caId"`
 	DaemonID      *string    `json:"daemonId"`
 	Name          string     `json:"name"`
 	Description   *string    `json:"description"`
@@ -379,14 +385,6 @@ type User struct {
 	UpdatedAt      time.Time           `json:"updatedAt"`
 }
 
-type UserAvatar struct {
-	UserID      string    `json:"userId"`
-	WorkspaceID string    `json:"workspaceId"`
-	Image       []byte    `json:"image"`
-	Etag        string    `json:"etag"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-}
-
 type Workspace struct {
 	ID              string                   `json:"id"`
 	Slug            string                   `json:"slug"`
@@ -394,6 +392,7 @@ type Workspace struct {
 	Description     *string                  `json:"description"`
 	Settings        *nokku.WorkspaceSettings `json:"settings"`
 	RequestableTags []string                 `json:"requestableTags"`
+	ClaimedAt       *time.Time               `json:"claimedAt"`
 	CreatedAt       time.Time                `json:"createdAt"`
 	UpdatedAt       time.Time                `json:"updatedAt"`
 }

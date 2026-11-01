@@ -18,60 +18,9 @@ AccountService.UpdateAccount sets nothing: created_at kept
 AccountService.UpdateAccount sets nothing: updated_at changed
 AccountService.UpdateAccount sets nothing: scim_managed kept
 CertificateService.UpdateCertificateAuthority baseline: empty [previous_public_key previous_host_public_key previous_trusted_until]
-CertificateService.UpdateCertificateAuthority sets name: name changed
-CertificateService.UpdateCertificateAuthority sets name: description kept
-CertificateService.UpdateCertificateAuthority sets name: public_key kept
-CertificateService.UpdateCertificateAuthority sets name: host_public_key kept
-CertificateService.UpdateCertificateAuthority sets name: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets name: is_default kept
-CertificateService.UpdateCertificateAuthority sets name: user_default_ttl kept
-CertificateService.UpdateCertificateAuthority sets name: user_max_ttl kept
-CertificateService.UpdateCertificateAuthority sets name: host_ttl kept
-CertificateService.UpdateCertificateAuthority sets name: created_at kept
-CertificateService.UpdateCertificateAuthority sets name: updated_at changed
-CertificateService.UpdateCertificateAuthority sets name: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets name: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets name: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets name: force_command kept
-CertificateService.UpdateCertificateAuthority sets name: source_address kept
-CertificateService.UpdateCertificateAuthority sets description: name kept
-CertificateService.UpdateCertificateAuthority sets description: description changed
-CertificateService.UpdateCertificateAuthority sets description: public_key kept
-CertificateService.UpdateCertificateAuthority sets description: host_public_key kept
-CertificateService.UpdateCertificateAuthority sets description: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets description: is_default kept
-CertificateService.UpdateCertificateAuthority sets description: user_default_ttl kept
-CertificateService.UpdateCertificateAuthority sets description: user_max_ttl kept
-CertificateService.UpdateCertificateAuthority sets description: host_ttl kept
-CertificateService.UpdateCertificateAuthority sets description: created_at kept
-CertificateService.UpdateCertificateAuthority sets description: updated_at changed
-CertificateService.UpdateCertificateAuthority sets description: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets description: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets description: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets description: force_command kept
-CertificateService.UpdateCertificateAuthority sets description: source_address kept
-CertificateService.UpdateCertificateAuthority sets is_default: name kept
-CertificateService.UpdateCertificateAuthority sets is_default: description kept
-CertificateService.UpdateCertificateAuthority sets is_default: public_key kept
-CertificateService.UpdateCertificateAuthority sets is_default: host_public_key kept
-CertificateService.UpdateCertificateAuthority sets is_default: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets is_default: is_default kept
-CertificateService.UpdateCertificateAuthority sets is_default: user_default_ttl kept
-CertificateService.UpdateCertificateAuthority sets is_default: user_max_ttl kept
-CertificateService.UpdateCertificateAuthority sets is_default: host_ttl kept
-CertificateService.UpdateCertificateAuthority sets is_default: created_at kept
-CertificateService.UpdateCertificateAuthority sets is_default: updated_at changed
-CertificateService.UpdateCertificateAuthority sets is_default: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets is_default: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets is_default: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets is_default: force_command kept
-CertificateService.UpdateCertificateAuthority sets is_default: source_address kept
-CertificateService.UpdateCertificateAuthority sets user_default_ttl: name kept
-CertificateService.UpdateCertificateAuthority sets user_default_ttl: description kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: public_key kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets user_default_ttl: is_default kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: user_default_ttl changed
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: user_max_ttl kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: host_ttl kept
@@ -80,14 +29,10 @@ CertificateService.UpdateCertificateAuthority sets user_default_ttl: updated_at 
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: previous_public_key kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: previous_host_public_key kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets user_default_ttl: force_command kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: source_address kept
-CertificateService.UpdateCertificateAuthority sets user_max_ttl: name kept
-CertificateService.UpdateCertificateAuthority sets user_max_ttl: description kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: public_key kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets user_max_ttl: is_default kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: user_default_ttl kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: user_max_ttl changed
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: host_ttl kept
@@ -96,14 +41,10 @@ CertificateService.UpdateCertificateAuthority sets user_max_ttl: updated_at chan
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: previous_public_key kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: previous_host_public_key kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets user_max_ttl: force_command kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: source_address kept
-CertificateService.UpdateCertificateAuthority sets host_ttl: name kept
-CertificateService.UpdateCertificateAuthority sets host_ttl: description kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: public_key kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets host_ttl: is_default kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: user_default_ttl kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: user_max_ttl kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: host_ttl changed
@@ -112,30 +53,10 @@ CertificateService.UpdateCertificateAuthority sets host_ttl: updated_at changed
 CertificateService.UpdateCertificateAuthority sets host_ttl: previous_public_key kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: previous_host_public_key kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets host_ttl: force_command kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: source_address kept
-CertificateService.UpdateCertificateAuthority sets force_command: name kept
-CertificateService.UpdateCertificateAuthority sets force_command: description kept
-CertificateService.UpdateCertificateAuthority sets force_command: public_key kept
-CertificateService.UpdateCertificateAuthority sets force_command: host_public_key kept
-CertificateService.UpdateCertificateAuthority sets force_command: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets force_command: is_default kept
-CertificateService.UpdateCertificateAuthority sets force_command: user_default_ttl kept
-CertificateService.UpdateCertificateAuthority sets force_command: user_max_ttl kept
-CertificateService.UpdateCertificateAuthority sets force_command: host_ttl kept
-CertificateService.UpdateCertificateAuthority sets force_command: created_at kept
-CertificateService.UpdateCertificateAuthority sets force_command: updated_at changed
-CertificateService.UpdateCertificateAuthority sets force_command: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets force_command: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets force_command: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets force_command: force_command changed
-CertificateService.UpdateCertificateAuthority sets force_command: source_address kept
-CertificateService.UpdateCertificateAuthority sets source_address: name kept
-CertificateService.UpdateCertificateAuthority sets source_address: description kept
 CertificateService.UpdateCertificateAuthority sets source_address: public_key kept
 CertificateService.UpdateCertificateAuthority sets source_address: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets source_address: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets source_address: is_default kept
 CertificateService.UpdateCertificateAuthority sets source_address: user_default_ttl kept
 CertificateService.UpdateCertificateAuthority sets source_address: user_max_ttl kept
 CertificateService.UpdateCertificateAuthority sets source_address: host_ttl kept
@@ -144,14 +65,10 @@ CertificateService.UpdateCertificateAuthority sets source_address: updated_at ch
 CertificateService.UpdateCertificateAuthority sets source_address: previous_public_key kept
 CertificateService.UpdateCertificateAuthority sets source_address: previous_host_public_key kept
 CertificateService.UpdateCertificateAuthority sets source_address: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets source_address: force_command kept
 CertificateService.UpdateCertificateAuthority sets source_address: source_address changed
-CertificateService.UpdateCertificateAuthority sets nothing: name kept
-CertificateService.UpdateCertificateAuthority sets nothing: description kept
 CertificateService.UpdateCertificateAuthority sets nothing: public_key kept
 CertificateService.UpdateCertificateAuthority sets nothing: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets nothing: rotated_at kept
-CertificateService.UpdateCertificateAuthority sets nothing: is_default kept
 CertificateService.UpdateCertificateAuthority sets nothing: user_default_ttl kept
 CertificateService.UpdateCertificateAuthority sets nothing: user_max_ttl kept
 CertificateService.UpdateCertificateAuthority sets nothing: host_ttl kept
@@ -160,9 +77,8 @@ CertificateService.UpdateCertificateAuthority sets nothing: updated_at changed
 CertificateService.UpdateCertificateAuthority sets nothing: previous_public_key kept
 CertificateService.UpdateCertificateAuthority sets nothing: previous_host_public_key kept
 CertificateService.UpdateCertificateAuthority sets nothing: previous_trusted_until kept
-CertificateService.UpdateCertificateAuthority sets nothing: force_command kept
 CertificateService.UpdateCertificateAuthority sets nothing: source_address kept
-DaemonService.UpdateDaemon baseline: empty [config.idle_timeout last_seen_at version]
+DaemonService.UpdateDaemon baseline: empty [config.idle_timeout last_seen_at version behind_since]
 DaemonService.UpdateDaemon sets status: name kept
 DaemonService.UpdateDaemon sets status: online kept
 DaemonService.UpdateDaemon sets status: status changed
@@ -176,6 +92,7 @@ DaemonService.UpdateDaemon sets status: updated_at changed
 DaemonService.UpdateDaemon sets status: created_at kept
 DaemonService.UpdateDaemon sets status: last_seen_at kept
 DaemonService.UpdateDaemon sets status: version kept
+DaemonService.UpdateDaemon sets status: behind_since kept
 DaemonService.UpdateDaemon sets config.allow_forwarding: name kept
 DaemonService.UpdateDaemon sets config.allow_forwarding: online kept
 DaemonService.UpdateDaemon sets config.allow_forwarding: status kept
@@ -189,6 +106,7 @@ DaemonService.UpdateDaemon sets config.allow_forwarding: updated_at changed
 DaemonService.UpdateDaemon sets config.allow_forwarding: created_at kept
 DaemonService.UpdateDaemon sets config.allow_forwarding: last_seen_at kept
 DaemonService.UpdateDaemon sets config.allow_forwarding: version kept
+DaemonService.UpdateDaemon sets config.allow_forwarding: behind_since kept
 DaemonService.UpdateDaemon sets nothing: name kept
 DaemonService.UpdateDaemon sets nothing: online kept
 DaemonService.UpdateDaemon sets nothing: status kept
@@ -202,6 +120,7 @@ DaemonService.UpdateDaemon sets nothing: updated_at changed
 DaemonService.UpdateDaemon sets nothing: created_at kept
 DaemonService.UpdateDaemon sets nothing: last_seen_at kept
 DaemonService.UpdateDaemon sets nothing: version kept
+DaemonService.UpdateDaemon sets nothing: behind_since kept
 WorkspaceService.UpdateWorkspace baseline: empty [settings.default_daemon_config.idle_timeout settings.enforce_sso]
 WorkspaceService.UpdateWorkspace sets name: slug kept
 WorkspaceService.UpdateWorkspace sets name: name changed
@@ -305,22 +224,6 @@ TeamService.UpdateTeam sets nothing: member_count kept
 TeamService.UpdateTeam sets nothing: created_at kept
 TeamService.UpdateTeam sets nothing: updated_at changed
 TargetService.UpdateTarget baseline: empty [daemon_id usernames metadata last_sync_at username_expires_at blocked]
-TargetService.UpdateTarget sets ca_id: ca_id changed
-TargetService.UpdateTarget sets ca_id: daemon_id kept
-TargetService.UpdateTarget sets ca_id: name kept
-TargetService.UpdateTarget sets ca_id: description kept
-TargetService.UpdateTarget sets ca_id: host_public_key kept
-TargetService.UpdateTarget sets ca_id: tags kept
-TargetService.UpdateTarget sets ca_id: endpoints kept
-TargetService.UpdateTarget sets ca_id: usernames kept
-TargetService.UpdateTarget sets ca_id: accounts kept
-TargetService.UpdateTarget sets ca_id: metadata kept
-TargetService.UpdateTarget sets ca_id: created_at kept
-TargetService.UpdateTarget sets ca_id: updated_at changed
-TargetService.UpdateTarget sets ca_id: last_sync_at kept
-TargetService.UpdateTarget sets ca_id: username_expires_at kept
-TargetService.UpdateTarget sets ca_id: blocked kept
-TargetService.UpdateTarget sets name: ca_id kept
 TargetService.UpdateTarget sets name: daemon_id kept
 TargetService.UpdateTarget sets name: name changed
 TargetService.UpdateTarget sets name: description kept
@@ -335,7 +238,6 @@ TargetService.UpdateTarget sets name: updated_at changed
 TargetService.UpdateTarget sets name: last_sync_at kept
 TargetService.UpdateTarget sets name: username_expires_at kept
 TargetService.UpdateTarget sets name: blocked kept
-TargetService.UpdateTarget sets description: ca_id kept
 TargetService.UpdateTarget sets description: daemon_id kept
 TargetService.UpdateTarget sets description: name kept
 TargetService.UpdateTarget sets description: description changed
@@ -350,7 +252,6 @@ TargetService.UpdateTarget sets description: updated_at changed
 TargetService.UpdateTarget sets description: last_sync_at kept
 TargetService.UpdateTarget sets description: username_expires_at kept
 TargetService.UpdateTarget sets description: blocked kept
-TargetService.UpdateTarget sets host_public_key: ca_id kept
 TargetService.UpdateTarget sets host_public_key: daemon_id kept
 TargetService.UpdateTarget sets host_public_key: name kept
 TargetService.UpdateTarget sets host_public_key: description kept
@@ -365,7 +266,6 @@ TargetService.UpdateTarget sets host_public_key: updated_at changed
 TargetService.UpdateTarget sets host_public_key: last_sync_at kept
 TargetService.UpdateTarget sets host_public_key: username_expires_at kept
 TargetService.UpdateTarget sets host_public_key: blocked kept
-TargetService.UpdateTarget sets endpoints: ca_id kept
 TargetService.UpdateTarget sets endpoints: daemon_id kept
 TargetService.UpdateTarget sets endpoints: name kept
 TargetService.UpdateTarget sets endpoints: description kept
@@ -380,7 +280,6 @@ TargetService.UpdateTarget sets endpoints: updated_at changed
 TargetService.UpdateTarget sets endpoints: last_sync_at kept
 TargetService.UpdateTarget sets endpoints: username_expires_at kept
 TargetService.UpdateTarget sets endpoints: blocked kept
-TargetService.UpdateTarget sets tags: ca_id kept
 TargetService.UpdateTarget sets tags: daemon_id kept
 TargetService.UpdateTarget sets tags: name kept
 TargetService.UpdateTarget sets tags: description kept
@@ -395,7 +294,6 @@ TargetService.UpdateTarget sets tags: updated_at changed
 TargetService.UpdateTarget sets tags: last_sync_at kept
 TargetService.UpdateTarget sets tags: username_expires_at kept
 TargetService.UpdateTarget sets tags: blocked kept
-TargetService.UpdateTarget sets tags to none: ca_id kept
 TargetService.UpdateTarget sets tags to none: daemon_id kept
 TargetService.UpdateTarget sets tags to none: name kept
 TargetService.UpdateTarget sets tags to none: description kept
@@ -410,7 +308,6 @@ TargetService.UpdateTarget sets tags to none: updated_at changed
 TargetService.UpdateTarget sets tags to none: last_sync_at kept
 TargetService.UpdateTarget sets tags to none: username_expires_at kept
 TargetService.UpdateTarget sets tags to none: blocked kept
-TargetService.UpdateTarget sets endpoints to none: ca_id kept
 TargetService.UpdateTarget sets endpoints to none: daemon_id kept
 TargetService.UpdateTarget sets endpoints to none: name kept
 TargetService.UpdateTarget sets endpoints to none: description kept
@@ -425,7 +322,6 @@ TargetService.UpdateTarget sets endpoints to none: updated_at changed
 TargetService.UpdateTarget sets endpoints to none: last_sync_at kept
 TargetService.UpdateTarget sets endpoints to none: username_expires_at kept
 TargetService.UpdateTarget sets endpoints to none: blocked kept
-TargetService.UpdateTarget sets nothing: ca_id kept
 TargetService.UpdateTarget sets nothing: daemon_id kept
 TargetService.UpdateTarget sets nothing: name kept
 TargetService.UpdateTarget sets nothing: description kept
@@ -470,6 +366,8 @@ ServiceAccountService.UpdateServiceAccount sets name: tags kept
 ServiceAccountService.UpdateServiceAccount sets name: last_used_at kept
 ServiceAccountService.UpdateServiceAccount sets name: created_at kept
 ServiceAccountService.UpdateServiceAccount sets name: updated_at changed
+ServiceAccountService.UpdateServiceAccount sets name: force_command kept
+ServiceAccountService.UpdateServiceAccount sets name: source_address kept
 ServiceAccountService.UpdateServiceAccount sets description: name kept
 ServiceAccountService.UpdateServiceAccount sets description: description changed
 ServiceAccountService.UpdateServiceAccount sets description: role kept
@@ -477,6 +375,8 @@ ServiceAccountService.UpdateServiceAccount sets description: tags kept
 ServiceAccountService.UpdateServiceAccount sets description: last_used_at kept
 ServiceAccountService.UpdateServiceAccount sets description: created_at kept
 ServiceAccountService.UpdateServiceAccount sets description: updated_at changed
+ServiceAccountService.UpdateServiceAccount sets description: force_command kept
+ServiceAccountService.UpdateServiceAccount sets description: source_address kept
 ServiceAccountService.UpdateServiceAccount sets role: name kept
 ServiceAccountService.UpdateServiceAccount sets role: description kept
 ServiceAccountService.UpdateServiceAccount sets role: role changed
@@ -484,6 +384,8 @@ ServiceAccountService.UpdateServiceAccount sets role: tags kept
 ServiceAccountService.UpdateServiceAccount sets role: last_used_at kept
 ServiceAccountService.UpdateServiceAccount sets role: created_at kept
 ServiceAccountService.UpdateServiceAccount sets role: updated_at changed
+ServiceAccountService.UpdateServiceAccount sets role: force_command kept
+ServiceAccountService.UpdateServiceAccount sets role: source_address kept
 ServiceAccountService.UpdateServiceAccount sets tags: name kept
 ServiceAccountService.UpdateServiceAccount sets tags: description kept
 ServiceAccountService.UpdateServiceAccount sets tags: role kept
@@ -491,6 +393,8 @@ ServiceAccountService.UpdateServiceAccount sets tags: tags changed
 ServiceAccountService.UpdateServiceAccount sets tags: last_used_at kept
 ServiceAccountService.UpdateServiceAccount sets tags: created_at kept
 ServiceAccountService.UpdateServiceAccount sets tags: updated_at changed
+ServiceAccountService.UpdateServiceAccount sets tags: force_command kept
+ServiceAccountService.UpdateServiceAccount sets tags: source_address kept
 ServiceAccountService.UpdateServiceAccount sets tags to none: name kept
 ServiceAccountService.UpdateServiceAccount sets tags to none: description kept
 ServiceAccountService.UpdateServiceAccount sets tags to none: role kept
@@ -498,6 +402,26 @@ ServiceAccountService.UpdateServiceAccount sets tags to none: tags cleared
 ServiceAccountService.UpdateServiceAccount sets tags to none: last_used_at kept
 ServiceAccountService.UpdateServiceAccount sets tags to none: created_at kept
 ServiceAccountService.UpdateServiceAccount sets tags to none: updated_at changed
+ServiceAccountService.UpdateServiceAccount sets tags to none: force_command kept
+ServiceAccountService.UpdateServiceAccount sets tags to none: source_address kept
+ServiceAccountService.UpdateServiceAccount sets force_command: name kept
+ServiceAccountService.UpdateServiceAccount sets force_command: description kept
+ServiceAccountService.UpdateServiceAccount sets force_command: role kept
+ServiceAccountService.UpdateServiceAccount sets force_command: tags kept
+ServiceAccountService.UpdateServiceAccount sets force_command: last_used_at kept
+ServiceAccountService.UpdateServiceAccount sets force_command: created_at kept
+ServiceAccountService.UpdateServiceAccount sets force_command: updated_at changed
+ServiceAccountService.UpdateServiceAccount sets force_command: force_command changed
+ServiceAccountService.UpdateServiceAccount sets force_command: source_address kept
+ServiceAccountService.UpdateServiceAccount sets source_address: name kept
+ServiceAccountService.UpdateServiceAccount sets source_address: description kept
+ServiceAccountService.UpdateServiceAccount sets source_address: role kept
+ServiceAccountService.UpdateServiceAccount sets source_address: tags kept
+ServiceAccountService.UpdateServiceAccount sets source_address: last_used_at kept
+ServiceAccountService.UpdateServiceAccount sets source_address: created_at kept
+ServiceAccountService.UpdateServiceAccount sets source_address: updated_at changed
+ServiceAccountService.UpdateServiceAccount sets source_address: force_command kept
+ServiceAccountService.UpdateServiceAccount sets source_address: source_address changed
 ServiceAccountService.UpdateServiceAccount sets nothing: name kept
 ServiceAccountService.UpdateServiceAccount sets nothing: description kept
 ServiceAccountService.UpdateServiceAccount sets nothing: role kept
@@ -505,3 +429,5 @@ ServiceAccountService.UpdateServiceAccount sets nothing: tags kept
 ServiceAccountService.UpdateServiceAccount sets nothing: last_used_at kept
 ServiceAccountService.UpdateServiceAccount sets nothing: created_at kept
 ServiceAccountService.UpdateServiceAccount sets nothing: updated_at changed
+ServiceAccountService.UpdateServiceAccount sets nothing: force_command kept
+ServiceAccountService.UpdateServiceAccount sets nothing: source_address kept

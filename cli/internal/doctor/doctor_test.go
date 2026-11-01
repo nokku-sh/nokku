@@ -23,7 +23,7 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
-// A missing cache leaves no CAs, which must not read as every certificate being stale.
+// A missing cache leaves no CA, which must not read as every certificate being stale.
 func TestRepairKeepsCertsWithoutCache(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -38,7 +38,7 @@ func TestRepairKeepsCertsWithoutCache(t *testing.T) {
 
 	fixed = repair(&state.State{
 		User:    &state.User{ID: "u"},
-		Targets: []state.Target{{ID: "t", Name: "prod", CAID: "other"}},
+		Targets: []state.Target{{ID: "t", Name: "prod"}},
 	})
 	assert.NoFileExists(t, cert)
 	assert.Contains(t, fixed, "removed 1 stale certificates")

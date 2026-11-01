@@ -17,7 +17,7 @@ var (
 	errBadState = errors.New("tpm: the signer state does not parse")
 )
 
-// Data is the TPM key file, the enclave blob, or the wrapped private key of a software key. PubKey only shows which
+// Data is the TPM key file or the wrapped private key of a software key. PubKey only shows which
 // key a state file holds, nothing reads it to sign.
 type state struct {
 	Method string `json:"method"`

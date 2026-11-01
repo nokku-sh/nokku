@@ -177,6 +177,7 @@ func openUploadAt(
 // A deploy lands in the middle of a live upload. The old core stores what arrived and leaves the session open, the
 // daemon's next try stores the whole recording, and a repeat of it is told the core holds it already.
 func TestCoreRestartMidUploadEndsWithTheWholeRecordingOnce(t *testing.T) {
+	selfHostedOnly(t, "it dials the real listener, which reads no workspace host")
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)

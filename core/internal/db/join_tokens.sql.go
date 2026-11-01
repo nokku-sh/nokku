@@ -58,7 +58,6 @@ INSERT INTO
     expires_at,
     max_uses,
     auto_approve,
-    ca_id,
     tags,
     retire_after
   )
@@ -69,12 +68,11 @@ VALUES
     $3,
     $4,
     $5,
-    $6,
-    COALESCE($7::TEXT[], '{}'),
-    $8
+    COALESCE($6::TEXT[], '{}'),
+    $7
   )
 RETURNING
-  id, workspace_id, ca_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
+  id, workspace_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
 `
 
 type CreateJoinTokenParams struct {
@@ -83,7 +81,6 @@ type CreateJoinTokenParams struct {
 	ExpiresAt   *time.Time         `json:"expiresAt"`
 	MaxUses     *int32             `json:"maxUses"`
 	AutoApprove bool               `json:"autoApprove"`
-	CaID        *string            `json:"caId"`
 	Tags        []string           `json:"tags"`
 	RetireAfter *time.Duration     `json:"retireAfter"`
 }
@@ -95,7 +92,6 @@ func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParam
 		arg.ExpiresAt,
 		arg.MaxUses,
 		arg.AutoApprove,
-		arg.CaID,
 		arg.Tags,
 		arg.RetireAfter,
 	)
@@ -103,7 +99,6 @@ func (q *Queries) CreateJoinToken(ctx context.Context, arg *CreateJoinTokenParam
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.CaID,
 		&i.TokenHash,
 		&i.Label,
 		&i.Tags,
@@ -131,7 +126,7 @@ func (q *Queries) DeleteJoinToken(ctx context.Context, id string) error {
 
 const getLiveJoinToken = `-- name: GetLiveJoinToken :one
 SELECT
-  id, workspace_id, ca_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
+  id, workspace_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
 FROM
   join_tokens
 WHERE
@@ -149,7 +144,6 @@ func (q *Queries) GetLiveJoinToken(ctx context.Context, tokenHash crypto.HashedT
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.CaID,
 		&i.TokenHash,
 		&i.Label,
 		&i.Tags,
@@ -213,7 +207,7 @@ func (q *Queries) ListJoinTokenGrants(ctx context.Context) ([]*ListJoinTokenGran
 
 const listJoinTokens = `-- name: ListJoinTokens :many
 SELECT
-  id, workspace_id, ca_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
+  id, workspace_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
 FROM
   join_tokens
 ORDER BY
@@ -232,7 +226,6 @@ func (q *Queries) ListJoinTokens(ctx context.Context) ([]*JoinToken, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
-			&i.CaID,
 			&i.TokenHash,
 			&i.Label,
 			&i.Tags,
@@ -270,7 +263,7 @@ WHERE
     OR uses < max_uses
   )
 RETURNING
-  id, workspace_id, ca_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
+  id, workspace_id, token_hash, label, tags, auto_approve, retire_after, max_uses, uses, expires_at, last_used_at, created_at
 `
 
 // One statement, so two redemptions can never both take the last use.
@@ -280,7 +273,6 @@ func (q *Queries) RedeemJoinToken(ctx context.Context, tokenHash crypto.HashedTo
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.CaID,
 		&i.TokenHash,
 		&i.Label,
 		&i.Tags,

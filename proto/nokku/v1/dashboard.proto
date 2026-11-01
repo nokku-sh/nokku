@@ -41,4 +41,5 @@ message GetDashboardResponse {
   repeated int32 activity = 12;
   repeated int32 failures = 13;
   repeated EventLog recent_changes = 14;
+  int32 daemons_behind = 15;
 }

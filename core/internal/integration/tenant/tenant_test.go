@@ -17,6 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
@@ -64,7 +65,7 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 
 	var cas int
 	require.ErrorIs(t, c.Pool.QueryRow(t.Context(),
-		`SELECT COUNT(*) FROM ssh_cas WHERE workspace_id = $1 AND is_default`, ws.ID).Scan(&cas),
+		`SELECT COUNT(*) FROM ssh_cas WHERE workspace_id = $1`, ws.ID).Scan(&cas),
 		db.ErrWorkspaceNotPinned, "nokku_app reaches nothing unpinned")
 	require.NoError(t, c.TenantTx(actor.WithWorkspace(t.Context(), ws), func(q *db.Queries) error {
 		row, err := q.GetWorkspace(t.Context())
@@ -72,13 +73,23 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 			return err
 		}
 		assert.Equal(t, "Lab", row.Name)
-		rows, err := q.ListCAs(t.Context())
-		if err != nil {
-			return err
-		}
-		assert.Len(t, rows, 1, "boot made the default CA")
+		_, err = q.GetWorkspaceCA(t.Context())
+		assert.NoError(t, err, "boot made the CA")
 		return nil
 	}))
+}
+
+// The CA comes with the workspace and stays the only one.
+func TestWorkspaceHasOneCA(t *testing.T) {
+	c, keys := testConnection(t)
+	ws, err := tenant.Create(t.Context(), c, keys, "w"+uuid.New().String()[:8], "Acme")
+	require.NoError(t, err)
+
+	err = c.TenantTx(actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws.ID}), func(q *db.Queries) error {
+		_, err := ssh.CreateCA(t.Context(), q, keys, ssh.NewCA())
+		return err
+	})
+	assert.True(t, db.IsUniqueViolation(err), "a second CA went in: %v", err)
 }
 
 func TestSaaSResolvesBySlug(t *testing.T) {
@@ -118,4 +129,20 @@ func TestPurgeUnclaimed(t *testing.T) {
 	require.NoError(t, r.PurgeUnclaimed(t.Context(), time.Now().Add(time.Second)))
 	_, err = r.FromHost(t.Context(), slug+".nokku.test")
 	assert.ErrorIs(t, err, tenant.ErrUnknownWorkspace, "purged, and gone from the cache too")
+}
+
+// Nothing but the stored first sign-in keeps it. Sessions and devices end, and an email revert deletes them all.
+func TestPurgeKeepsAClaimedWorkspace(t *testing.T) {
+	c, keys := testConnection(t)
+	r, err := tenant.New(t.Context(), c, keys, "https://nokku.test", true)
+	require.NoError(t, err)
+
+	slug := "w" + uuid.New().String()[:8]
+	ws, err := tenant.Create(t.Context(), c, keys, slug, "Claimed")
+	require.NoError(t, err)
+	require.NoError(t, c.Tenant().ClaimWorkspace(actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws.ID})))
+
+	require.NoError(t, r.PurgeUnclaimed(t.Context(), time.Now().Add(time.Second)))
+	_, err = r.FromHost(t.Context(), slug+".nokku.test")
+	assert.NoError(t, err, "a workspace somebody signed in to was purged")
 }

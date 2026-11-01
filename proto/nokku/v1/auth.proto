@@ -3,6 +3,7 @@ edition = "2023";
 package nokku.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 import "nokku/v1/account.proto";
 
@@ -24,6 +25,11 @@ service AuthService {
     option (access) = {public: true};
   }
   rpc CancelEmailChange(CancelEmailChangeRequest) returns (CancelEmailChangeResponse) {
+    option (access) = {public: true};
+  }
+  // ExchangeWorkloadToken trades the signed token of a CI job for a short session of a service account. The workspace
+  // comes from the host. The call carries a DPoP proof and the session is bound to its key.
+  rpc ExchangeWorkloadToken(ExchangeWorkloadTokenRequest) returns (ExchangeWorkloadTokenResponse) {
     option (access) = {public: true};
   }
 }
@@ -66,3 +72,20 @@ message CancelEmailChangeRequest {
   string token = 1 [(buf.validate.field).string.min_len = 1];
 }
 message CancelEmailChangeResponse {}
+
+message ExchangeWorkloadTokenRequest {
+  // The name of the account, what a job can know without a call.
+  string service_account = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
+  }];
+  string token = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message ExchangeWorkloadTokenResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}

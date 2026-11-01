@@ -24,7 +24,16 @@
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { BotOff, CircleCheckBig, Clock, Rocket, Video, Wifi, WifiOff } from '@lucide/svelte';
+	import {
+		BotOff,
+		CircleCheckBig,
+		Clock,
+		Rocket,
+		TriangleAlert,
+		Video,
+		Wifi,
+		WifiOff
+	} from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const statusOptions = [
@@ -91,8 +100,8 @@
 			header: 'Online',
 			cell: ({ row }) =>
 				renderComponent(StateCell, {
-					label: row.original.online ? 'Online' : 'Offline',
-					icon: row.original.online ? Wifi : WifiOff
+					label: row.original.behindSince ? 'Behind' : row.original.online ? 'Online' : 'Offline',
+					icon: row.original.behindSince ? TriangleAlert : row.original.online ? Wifi : WifiOff
 				})
 		}),
 		columnHelper.accessor('lastSeenAt', {

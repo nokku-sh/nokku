@@ -9,6 +9,17 @@ import (
 	"context"
 )
 
+const quietStateChange = `-- name: QuietStateChange :exec
+SELECT
+  set_config('nokku.quiet', 'on', TRUE)
+`
+
+// This transaction only concerns one server, so no other daemon is woken. Ends with the transaction.
+func (q *Queries) QuietStateChange(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, quietStateChange)
+	return err
+}
+
 const tryAdvisoryXactLock = `-- name: TryAdvisoryXactLock :one
 SELECT
   pg_try_advisory_xact_lock(hashtext($1::TEXT))

@@ -47,14 +47,10 @@ func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, 
 		}); err != nil {
 			return err
 		}
-		// Like tenant.Create, every workspace has a default CA. Enroll and sync only read its public keys.
+		// Like tenant.Create, every workspace has its CA. Enroll and sync only read its public keys.
 		ca := ssh.NewCA()
-		ca.Name, ca.PublicKey, ca.HostPublicKey = "default", "pub", "host-pub"
-		created, err := q.CreateCA(ctx, ca)
-		if err != nil {
-			return err
-		}
-		if err := q.SetDefaultCA(ctx, created.ID); err != nil {
+		ca.PublicKey, ca.HostPublicKey = "pub", "host-pub"
+		if _, err := q.CreateCA(ctx, ca); err != nil {
 			return err
 		}
 		params := &db.CreateJoinTokenParams{}

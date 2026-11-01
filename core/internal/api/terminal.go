@@ -87,7 +87,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	var signer gossh.Signer
 	var targetID string
 	if err := t.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		ca, err = q.GetCAByDaemonID(ctx, &ticket.DaemonID)
+		ca, err = q.GetWorkspaceCA(ctx)
 		if err != nil {
 			return err
 		}

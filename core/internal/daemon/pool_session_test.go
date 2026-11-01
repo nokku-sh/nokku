@@ -2,13 +2,35 @@ package daemon
 
 import (
 	"context"
+	"maps"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
+
+// A browser terminal is a person's login, so it takes the CA's source list and no forced command.
+func TestSessionCertificateLimits(t *testing.T) {
+	ca, signer := sshtest.NewCA(t)
+	ca.SourceAddress = "10.0.0.0/8"
+
+	session, err := mintSessionCert(ca, signer, "user@target:root", "session")
+	if err != nil {
+		t.Fatalf("mintSessionCert() error: %v", err)
+	}
+	cert, ok := session.PublicKey().(*ssh.Certificate)
+	if !ok {
+		t.Fatalf("the session signer holds a %T", session.PublicKey())
+	}
+	want := map[string]string{"source-address": "10.0.0.0/8"}
+	if !maps.Equal(cert.CriticalOptions, want) {
+		t.Errorf("critical options = %v, want %v", cert.CriticalOptions, want)
+	}
+}
 
 // bridgeToServer plays the daemon's DaemonRelay handler for one relay against the test SSH server.
 func bridgeToServer(relay *Relay, addr string) {

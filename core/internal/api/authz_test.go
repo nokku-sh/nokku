@@ -25,7 +25,7 @@ func TestProcedureRoles(t *testing.T) {
 		want      nokkuv1.WorkspaceRole
 	}{
 		{
-			nokkuv1connect.CertificateServiceListCertificateAuthoritiesProcedure,
+			nokkuv1connect.CertificateServiceGetCertificateAuthorityProcedure,
 			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
 		},
 		{nokkuv1connect.DaemonServiceCreateSessionProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER},
@@ -69,7 +69,7 @@ func TestProcedureRoles(t *testing.T) {
 		{nokkuv1connect.BillingServiceCreatePortalProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.BillingServiceCancelSubscriptionProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.SSOServicePutSSOProviderProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
-		{nokkuv1connect.SSOServiceDeleteSSOProviderProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.SCIMServiceCreateSCIMTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.SCIMServiceDeleteSCIMTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 	}
@@ -225,7 +225,7 @@ func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, nokkuv1connect.TargetServiceDeleteTargetProcedure, false},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN, nokkuv1connect.SSOServicePutSSOProviderProcedure, false},
-		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, nokkuv1connect.SSOServiceDeleteSSOProviderProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, true},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.TargetServiceListTargetsProcedure, false},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.AccountServiceGetAccountProcedure, true},
 	}

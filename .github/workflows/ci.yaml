@@ -42,16 +42,97 @@ jobs:
           buf format -d --exit-code
           buf lint
 
-      - name: Generated Go code is up to date
+      - name: Generated API code is up to date
         run: |
           go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
           npm install -g @bufbuild/protoc-gen-es@2
           buf generate
-          git diff --exit-code -- gen
+          git diff --exit-code -- gen core/web/src/lib/gen
 
-  # The Secure Enclave bridge is Swift linked through cgo and only builds on
-  # a Mac. Runners are VMs without an enclave, so the tests drive the bridge
-  # with a software key.
+      - uses: sqlc-dev/setup-sqlc@v3
+        with:
+          sqlc-version: "1.31.1"
+
+      - name: Generated SQL code is up to date
+        working-directory: core
+        run: sqlc diff
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: core/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: lts/*
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: latest
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Types, lint and format
+        run: |
+          pnpm check
+          pnpm lint
+          pnpm fmt:check
+
+  # The one test that walks a revoke from the grant to the closed session.
+  smoke:
+    name: Smoke
+    if: github.event_name == 'push'
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: nokku-sh/.github/actions/go-cache@main
+
+      - name: Real binaries against throwaway containers
+        working-directory: core
+        run: go test -tags integration,smoke -count=1 -timeout 20m ./internal/integration/smoke/...
+
+  # The API tests again the way the hosted service runs: NOKKU_SAAS, a KMS and workspace hosts.
+  hosted:
+    name: Hosted mode
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: nokku-sh/.github/actions/go-cache@main
+
+      - name: API tests in hosted mode
+        working-directory: core
+        env:
+          NOKKU_TEST_HOSTED: "1"
+        run: go test -tags integration -race -count=1 -timeout 15m ./internal/integration/api/...
+
+  # nk cross-compiles from Linux, this is the one run on a real Mac.
   macos:
     name: macOS
     runs-on: macos-latest
@@ -70,22 +151,11 @@ jobs:
 
       - uses: ./.github/actions/prepare
 
-      - name: Build the Secure Enclave bridge
-        run: ./cli/internal/enclave/build.sh
-
       - name: Test
-        run: |
-          CGO_ENABLED=1 go test -race -count=1 -v -tags enclave ./cli/internal/enclave/
-          CGO_ENABLED=1 go test -race -count=1 -tags enclave ./cli/...
-
-      - name: Build
-        run: |
-          for arch in arm64 amd64; do
-            CGO_ENABLED=1 GOARCH="$arch" go build -tags enclave -ldflags="-s -w" -o "bin/nk_darwin_$arch" ./cli/cmd/nk
-          done
+        run: go test -race -count=1 ./cli/...
 
       - name: Doctor
-        run: NK_SECURE_ENCLAVE=1 ./bin/nk_darwin_arm64 doctor || true
+        run: go run ./cli/cmd/nk doctor || true
 
   # Runs on main only, a pull request must never overwrite the nightly image.
   nightly:

@@ -24,7 +24,7 @@ func FromAccess(res *nokkuv1.GetSubjectAccessResponse) Cache {
 		c.ServiceAccount = &ServiceAccount{ID: sa.GetId(), Name: ui.PlainLine(sa.GetName())}
 	}
 
-	c.CAs = SSHCAs(res.GetCertificateAuthorities())
+	c.CA = MapCA(res.GetCertificateAuthority())
 	c.Targets = Targets(res.GetTargets())
 	return c
 }
@@ -33,7 +33,7 @@ func FromAccess(res *nokkuv1.GetSubjectAccessResponse) Cache {
 func Targets(targets []*nokkuv1.Target) []Target {
 	var out []Target
 	for _, t := range targets {
-		if !validIDs(t.GetId(), t.GetCaId()) || t.GetDaemonId() != "" && !validIDs(t.GetDaemonId()) {
+		if !validIDs(t.GetId()) || t.GetDaemonId() != "" && !validIDs(t.GetDaemonId()) {
 			continue
 		}
 		out = append(out, MapTarget(t))
@@ -41,26 +41,17 @@ func Targets(targets []*nokkuv1.Target) []Target {
 	return out
 }
 
-func SSHCAs(cas []*nokkuv1.CertificateAuthority) []CA {
-	var out []CA
-	for _, ca := range cas {
-		if !validIDs(ca.GetId()) {
-			continue
-		}
-		entry := CA{
-			ID:            ca.GetId(),
-			Name:          ui.PlainLine(ca.GetName()),
-			PublicKey:     ca.GetPublicKey(),
-			HostPublicKey: ca.GetHostPublicKey(),
-			Default:       ca.GetIsDefault(),
-		}
-		// AsTime turns an unset timestamp into 1970, not the zero time.
-		if ca.GetPreviousTrustedUntil() != nil {
-			entry.PreviousPublicKey = ca.GetPreviousPublicKey()
-			entry.PreviousHostPublicKey = ca.GetPreviousHostPublicKey()
-			entry.PreviousTrustedUntil = ca.GetPreviousTrustedUntil().AsTime()
-		}
-		out = append(out, entry)
+// MapCA is nil for a response without a CA, a subject with no targets gets none.
+func MapCA(ca *nokkuv1.CertificateAuthority) *CA {
+	if ca == nil {
+		return nil
+	}
+	out := &CA{PublicKey: ca.GetPublicKey(), HostPublicKey: ca.GetHostPublicKey()}
+	// AsTime turns an unset timestamp into 1970, not the zero time.
+	if ca.GetPreviousTrustedUntil() != nil {
+		out.PreviousPublicKey = ca.GetPreviousPublicKey()
+		out.PreviousHostPublicKey = ca.GetPreviousHostPublicKey()
+		out.PreviousTrustedUntil = ca.GetPreviousTrustedUntil().AsTime()
 	}
 	return out
 }
@@ -68,7 +59,6 @@ func SSHCAs(cas []*nokkuv1.CertificateAuthority) []CA {
 func MapTarget(t *nokkuv1.Target) Target {
 	return Target{
 		ID:            t.GetId(),
-		CAID:          t.GetCaId(),
 		DaemonID:      t.GetDaemonId(),
 		Name:          ui.PlainLine(t.GetName()),
 		Endpoints:     plainAll(t.GetEndpoints()),

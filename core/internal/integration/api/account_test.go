@@ -4,7 +4,6 @@ package api_test
 
 import (
 	"testing"
-	"uuid"
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
@@ -36,7 +35,7 @@ func TestRequestEmailChangeNeedsMail(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	_, account := seedAccount(t, cfg)
 	_, err := account.RequestEmailChange(t.Context(), &nokkuv1.RequestEmailChangeRequest{
-		NewEmail: new(uuid.New().String() + "@api.test"),
+		NewEmail: new(newMailAddress()),
 	})
 	assert.Equal(t, connect.CodeUnimplemented, connect.CodeOf(err), "got %v", err)
 }
@@ -52,7 +51,7 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 
 	t.Run("cancel before confirm", func(t *testing.T) {
 		u, account := seedAccount(t, cfg)
-		confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t, cfg), u, uuid.New().String()+"@api.test")
+		confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t, cfg), u, newMailAddress())
 		require.NoError(t, err)
 
 		_, err = auth.CancelEmailChange(t.Context(), &nokkuv1.CancelEmailChangeRequest{Token: &cancel})
@@ -67,7 +66,7 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 
 	t.Run("confirm then revert", func(t *testing.T) {
 		u, account := seedAccount(t, cfg)
-		newEmail := uuid.New().String() + "@api.test"
+		newEmail := newMailAddress()
 		confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t, cfg), u, newEmail)
 		require.NoError(t, err)
 
@@ -83,7 +82,7 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 		require.NoError(t, err)
 		_, err = email(account)
 		assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the revert signs everyone out: %v", err)
-		reverted, err := cfg.IAM.GetUserByEmail(wsCtx(t, cfg), u.Email)
+		reverted, err := cfg.Conn.Tenant().GetUserByEmail(wsCtx(t, cfg), u.Email)
 		require.NoError(t, err)
 		assert.Equal(t, u.ID, reverted.ID)
 	})
@@ -104,6 +103,6 @@ func TestDeleteAccount(t *testing.T) {
 	u, member := seedAccount(t, cfg)
 	_, err = member.DeleteAccount(t.Context(), &nokkuv1.DeleteAccountRequest{})
 	require.NoError(t, err)
-	_, err = cfg.IAM.GetUserByEmail(wsCtx(t, cfg), u.Email)
+	_, err = cfg.Conn.Tenant().GetUserByEmail(wsCtx(t, cfg), u.Email)
 	assert.Error(t, err, "the account is still there")
 }

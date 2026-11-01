@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -91,6 +92,11 @@ func (s *Service) putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvid
 	case !errors.Is(err, pgx.ErrNoRows):
 		return nil, err
 	}
+	if prev != nil && prev.Enabled && !p.Enabled {
+		if err := keepSSOProvider(ctx, q, p.ProviderID); err != nil {
+			return nil, err
+		}
+	}
 	issuerChanged := prev != nil && prev.OIDC.IssuerURL != p.OIDC.IssuerURL
 	if p.OIDC.ClientSecret == "" && prev != nil {
 		// The secret goes to the issuer's token endpoint, so a new issuer must not inherit it.
@@ -130,6 +136,9 @@ func (s *Service) putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvid
 // DeleteSSOProvider also unlinks every identity the provider vouched for.
 func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) error {
 	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
+		if err := keepSSOProvider(ctx, q, providerID); err != nil {
+			return err
+		}
 		n, err := q.DeleteSSOProvider(ctx, providerID)
 		if err != nil {
 			return err
@@ -142,6 +151,35 @@ func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) erro
 		})
 		return err
 	})
+}
+
+// HasSSOProvider reports whether a provider can sign people in. Enforced SSO takes one, only the owner gets in without.
+func HasSSOProvider(ctx context.Context, q *db.Queries) (bool, error) {
+	return hasSSOProviderBesides(ctx, q, "")
+}
+
+func hasSSOProviderBesides(ctx context.Context, q *db.Queries, providerID string) (bool, error) {
+	rows, err := q.ListSSOProviders(ctx)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(rows, func(r *db.SsoProvider) bool {
+		return r.Enabled && r.ProviderID != providerID
+	}), nil
+}
+
+// keepSSOProvider refuses to take the last provider away from a workspace that enforces SSO. The lock keeps a save
+// that turns enforcement on from slipping past.
+func keepSSOProvider(ctx context.Context, q *db.Queries, providerID string) error {
+	ws, err := q.GetWorkspaceForUpdate(ctx)
+	if err != nil || !ws.Settings.GetEnforceSso() {
+		return err
+	}
+	has, err := hasSSOProviderBesides(ctx, q, providerID)
+	if err == nil && !has {
+		return ErrLastSSOProvider
+	}
+	return err
 }
 
 func (s *Service) ssoProviderFromRow(row *db.SsoProvider) (*SSOProvider, error) {

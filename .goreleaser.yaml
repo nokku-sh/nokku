@@ -54,23 +54,7 @@ builds:
     goos:
       - linux
       - windows
-
-  # The Secure Enclave bridge is Swift linked through cgo, so the darwin
-  # binaries only build on a Mac.
-  - <<: *client
-    id: nk-darwin
-    main: ./cli/cmd/nk
-    binary: nk
-    env: [CGO_ENABLED=1]
-    tags: [enclave]
-    goos:
       - darwin
-    goarch:
-      - amd64
-      - arm64
-    hooks:
-      pre: ./cli/internal/enclave/build.sh
-    skip: '{{ or (ne .Runtime.Goos "darwin") (and (isEnvSet "NOKKU_ONLY") (ne .Env.NOKKU_ONLY "cli")) }}'
 
 kos:
   - build: nokku
@@ -140,7 +124,7 @@ sboms:
 
 archives:
   - id: binaries
-    ids: [nokku, nk, nk-darwin]
+    ids: [nokku, nk]
     formats: [binary]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
 

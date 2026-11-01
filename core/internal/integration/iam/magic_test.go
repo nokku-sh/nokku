@@ -92,6 +92,31 @@ func TestMagicLinkSignIn(t *testing.T) {
 }
 
 // The mail service holds back a second link inside its cooldown. A link nobody got must not stay valid.
+func TestFirstSignInClaimsTheWorkspace(t *testing.T) {
+	mail := newMailbox()
+	e := newTestEnvWith(t, mail.deps())
+	o := e.org(t)
+	ctx := anon(t.Context(), o.ws)
+	claimed := func() *time.Time {
+		ws, err := e.conn.Tenant().GetWorkspace(ctx)
+		require.NoError(t, err)
+		return ws.ClaimedAt
+	}
+	require.Nil(t, claimed(), "a workspace nobody signed in to is claimed")
+
+	signIn := func() {
+		e.svc.RequestMagicLink(ctx, o.owner.Email)
+		_, _, err := e.svc.ConsumeMagicLink(ctx, linkToken(t, mail.link(t)))
+		require.NoError(t, err)
+	}
+	signIn()
+	first := claimed()
+	require.NotNil(t, first, "the first sign-in left no mark")
+
+	signIn()
+	assert.Equal(t, first, claimed(), "a later sign-in moved the first one")
+}
+
 func TestUnsentMagicLinkIsDropped(t *testing.T) {
 	mail := newMailbox()
 	e := newTestEnvWith(t, iam.Deps{SendMagicLink: func(_ context.Context, _, _, l string, _ time.Duration) error {

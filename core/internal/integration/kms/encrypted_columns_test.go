@@ -273,15 +273,10 @@ func seedEverySealedColumn(t *testing.T, conn *db.Connection, keys *kms.Keyset) 
 // seedSSHCA reads each key back by signing with it, a login certificate and a host certificate.
 func seedSSHCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) map[string]sealedValue {
 	t.Helper()
-	params := ssh.NewCA()
-	params.Name = "rotation"
 	var ca *db.SSHCA
-	// The default, like tenant.Create makes one. seedRecording's daemon puts its server on it.
 	require.NoError(t, conn.TenantTx(pinned(t, ws), func(q *db.Queries) (err error) {
-		if ca, err = ssh.CreateCA(t.Context(), q, keys, params); err != nil {
-			return err
-		}
-		return q.SetDefaultCA(t.Context(), ca.ID)
+		ca, err = ssh.CreateCA(t.Context(), q, keys, ssh.NewCA())
+		return err
 	}))
 
 	public, _, err := ed25519.GenerateKey(rand.Reader)
@@ -296,7 +291,9 @@ func seedSSHCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) m
 				signer, err = ssh.CASigner(t.Context(), q, keys, ca.ID, certType)
 				return err
 			}), "the CA does not sign")
-			cert, err := ssh.SignCertificate(ca, signer, login, []string{principal}, "rotation", time.Hour, certType)
+			cert, err := ssh.SignCertificate(
+				ca, signer, login, []string{principal}, "rotation", time.Hour, certType, ssh.Limits{},
+			)
 			require.NoError(t, err)
 			assert.Equal(t, authority, ssh.MarshalKey(cert.SignatureKey), "signed with the wrong key")
 			require.NoError(t, new(gossh.CertChecker).CheckCert(principal, cert), "the certificate does not verify")

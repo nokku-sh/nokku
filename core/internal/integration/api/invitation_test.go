@@ -29,7 +29,7 @@ func TestInvitationWithoutMail(t *testing.T) {
 	admin := browserSession(t, cfg, inviter, 0)
 	invitations := nokkuv1connect.NewInvitationServiceClient(connect.NewClient(transport, signedIn(t, cfg, admin)))
 	public := nokkuv1connect.NewInvitationServiceClient(connect.NewClient(transport))
-	email := uniq("invited") + "@api.test"
+	email := newMailAddress()
 
 	created, err := invitations.CreateInvitation(ctx, &nokkuv1.CreateInvitationRequest{
 		Email: new(strings.ToUpper(email)),
@@ -52,7 +52,7 @@ func TestInvitationWithoutMail(t *testing.T) {
 	}), "the invite is not listed")
 
 	_, err = invitations.CreateInvitation(ctx, &nokkuv1.CreateInvitationRequest{
-		Email: new(uniq("boss") + "@api.test"),
+		Email: new(newMailAddress()),
 		Role:  nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER.Enum(),
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an invite to own the workspace, got %v", err)

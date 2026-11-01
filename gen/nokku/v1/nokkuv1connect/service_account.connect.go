@@ -48,6 +48,15 @@ const (
 	// ServiceAccountServiceRevokeServiceAccountTokenProcedure is the procedure name of the
 	// ServiceAccountService's RevokeServiceAccountToken RPC.
 	ServiceAccountServiceRevokeServiceAccountTokenProcedure = "/nokku.v1.ServiceAccountService/RevokeServiceAccountToken"
+	// ServiceAccountServiceAddServiceAccountFederationProcedure is the procedure name of the
+	// ServiceAccountService's AddServiceAccountFederation RPC.
+	ServiceAccountServiceAddServiceAccountFederationProcedure = "/nokku.v1.ServiceAccountService/AddServiceAccountFederation"
+	// ServiceAccountServiceListServiceAccountFederationsProcedure is the procedure name of the
+	// ServiceAccountService's ListServiceAccountFederations RPC.
+	ServiceAccountServiceListServiceAccountFederationsProcedure = "/nokku.v1.ServiceAccountService/ListServiceAccountFederations"
+	// ServiceAccountServiceRemoveServiceAccountFederationProcedure is the procedure name of the
+	// ServiceAccountService's RemoveServiceAccountFederation RPC.
+	ServiceAccountServiceRemoveServiceAccountFederationProcedure = "/nokku.v1.ServiceAccountService/RemoveServiceAccountFederation"
 )
 
 var (
@@ -110,6 +119,28 @@ var (
 			Procedure:  ServiceAccountServiceRevokeServiceAccountTokenProcedure,
 		}
 	})
+	serviceAccountServiceAddServiceAccountFederationSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("AddServiceAccountFederation"),
+			Procedure:  ServiceAccountServiceAddServiceAccountFederationProcedure,
+		}
+	})
+	serviceAccountServiceListServiceAccountFederationsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("ListServiceAccountFederations"),
+			Procedure:        ServiceAccountServiceListServiceAccountFederationsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	serviceAccountServiceRemoveServiceAccountFederationSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("RemoveServiceAccountFederation"),
+			Procedure:  ServiceAccountServiceRemoveServiceAccountFederationProcedure,
+		}
+	})
 )
 
 // ServiceAccountServiceClient is a client for the nokku.v1.ServiceAccountService service.
@@ -122,6 +153,9 @@ type ServiceAccountServiceClient interface {
 	CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error)
 	ListServiceAccountTokens(context.Context, *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error)
 	RevokeServiceAccountToken(context.Context, *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error)
+	AddServiceAccountFederation(context.Context, *v1.AddServiceAccountFederationRequest) (*v1.AddServiceAccountFederationResponse, error)
+	ListServiceAccountFederations(context.Context, *v1.ListServiceAccountFederationsRequest) (*v1.ListServiceAccountFederationsResponse, error)
+	RemoveServiceAccountFederation(context.Context, *v1.RemoveServiceAccountFederationRequest) (*v1.RemoveServiceAccountFederationResponse, error)
 }
 
 // NewServiceAccountServiceClient constructs a client for the nokku.v1.ServiceAccountService
@@ -140,6 +174,9 @@ type ServiceAccountServiceHandler interface {
 	CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error)
 	ListServiceAccountTokens(context.Context, *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error)
 	RevokeServiceAccountToken(context.Context, *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error)
+	AddServiceAccountFederation(context.Context, *v1.AddServiceAccountFederationRequest) (*v1.AddServiceAccountFederationResponse, error)
+	ListServiceAccountFederations(context.Context, *v1.ListServiceAccountFederationsRequest) (*v1.ListServiceAccountFederationsResponse, error)
+	RemoveServiceAccountFederation(context.Context, *v1.RemoveServiceAccountFederationRequest) (*v1.RemoveServiceAccountFederationResponse, error)
 }
 
 // RegisterServiceAccountServiceHandler registers svc as the nokku.v1.ServiceAccountService
@@ -155,6 +192,9 @@ func RegisterServiceAccountServiceHandler(server *connect.Server, svc ServiceAcc
 		connect.Method{Spec: serviceAccountServiceCreateServiceAccountTokenSpec(), Handler: adapter.createServiceAccountToken},
 		connect.Method{Spec: serviceAccountServiceListServiceAccountTokensSpec(), Handler: adapter.listServiceAccountTokens},
 		connect.Method{Spec: serviceAccountServiceRevokeServiceAccountTokenSpec(), Handler: adapter.revokeServiceAccountToken},
+		connect.Method{Spec: serviceAccountServiceAddServiceAccountFederationSpec(), Handler: adapter.addServiceAccountFederation},
+		connect.Method{Spec: serviceAccountServiceListServiceAccountFederationsSpec(), Handler: adapter.listServiceAccountFederations},
+		connect.Method{Spec: serviceAccountServiceRemoveServiceAccountFederationSpec(), Handler: adapter.removeServiceAccountFederation},
 	)
 }
 
@@ -191,6 +231,18 @@ func (UnimplementedServiceAccountServiceHandler) ListServiceAccountTokens(contex
 
 func (UnimplementedServiceAccountServiceHandler) RevokeServiceAccountToken(context.Context, *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.RevokeServiceAccountToken is not implemented")
+}
+
+func (UnimplementedServiceAccountServiceHandler) AddServiceAccountFederation(context.Context, *v1.AddServiceAccountFederationRequest) (*v1.AddServiceAccountFederationResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.AddServiceAccountFederation is not implemented")
+}
+
+func (UnimplementedServiceAccountServiceHandler) ListServiceAccountFederations(context.Context, *v1.ListServiceAccountFederationsRequest) (*v1.ListServiceAccountFederationsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.ListServiceAccountFederations is not implemented")
+}
+
+func (UnimplementedServiceAccountServiceHandler) RemoveServiceAccountFederation(context.Context, *v1.RemoveServiceAccountFederationRequest) (*v1.RemoveServiceAccountFederationResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.RemoveServiceAccountFederation is not implemented")
 }
 
 type serviceAccountServiceClient struct {
@@ -256,6 +308,30 @@ func (c *serviceAccountServiceClient) ListServiceAccountTokens(ctx context.Conte
 func (c *serviceAccountServiceClient) RevokeServiceAccountToken(ctx context.Context, req *v1.RevokeServiceAccountTokenRequest) (*v1.RevokeServiceAccountTokenResponse, error) {
 	var res v1.RevokeServiceAccountTokenResponse
 	if err := c.client.CallUnary(ctx, serviceAccountServiceRevokeServiceAccountTokenSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) AddServiceAccountFederation(ctx context.Context, req *v1.AddServiceAccountFederationRequest) (*v1.AddServiceAccountFederationResponse, error) {
+	var res v1.AddServiceAccountFederationResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceAddServiceAccountFederationSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) ListServiceAccountFederations(ctx context.Context, req *v1.ListServiceAccountFederationsRequest) (*v1.ListServiceAccountFederationsResponse, error) {
+	var res v1.ListServiceAccountFederationsResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceListServiceAccountFederationsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) RemoveServiceAccountFederation(ctx context.Context, req *v1.RemoveServiceAccountFederationRequest) (*v1.RemoveServiceAccountFederationResponse, error) {
+	var res v1.RemoveServiceAccountFederationResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceRemoveServiceAccountFederationSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -353,6 +429,42 @@ func (h serviceAccountServiceHandler) revokeServiceAccountToken(ctx context.Cont
 		return err
 	}
 	res, err := h.svc.RevokeServiceAccountToken(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) addServiceAccountFederation(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.AddServiceAccountFederationRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.AddServiceAccountFederation(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) listServiceAccountFederations(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ListServiceAccountFederationsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ListServiceAccountFederations(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) removeServiceAccountFederation(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RemoveServiceAccountFederationRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RemoveServiceAccountFederation(ctx, &req)
 	if err != nil {
 		return err
 	}

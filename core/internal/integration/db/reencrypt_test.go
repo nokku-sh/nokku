@@ -35,12 +35,8 @@ func TestReencrypt(t *testing.T) {
 		}); err != nil {
 			return err
 		}
-		ca, err := q.CreateCA(t.Context(), &db.CreateCAParams{Name: "ca", PublicKey: "pub", HostPublicKey: "host-pub"})
-		if err != nil {
-			return err
-		}
 		if err := q.PutCAKey(t.Context(), &db.PutCAKeyParams{
-			CaID: ca.ID, Kind: "host", PrivateKey: []byte("host-key"),
+			CaID: f.ca, Kind: "host", PrivateKey: []byte("host-key"),
 		}); err != nil {
 			return err
 		}
@@ -62,7 +58,7 @@ func TestReencrypt(t *testing.T) {
 			return err
 		}
 		assert.ElementsMatch(t, []crypto.AAD{
-			{Table: "ssh_ca_keys", Column: "private_key", Workspace: f.ws, Row: ca.ID + "/host"},
+			{Table: "ssh_ca_keys", Column: "private_key", Workspace: f.ws, Row: f.ca + "/host"},
 			{Table: "recordings", Column: "key", Workspace: f.ws, Row: recording},
 		}, seen, "the values of this workspace, each with its row")
 

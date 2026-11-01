@@ -10,6 +10,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -586,11 +587,116 @@ func (*CancelEmailChangeResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_auth_proto_rawDescGZIP(), []int{12}
 }
 
+type ExchangeWorkloadTokenRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The name of the account, what a job can know without a call.
+	ServiceAccount *string `protobuf:"bytes,1,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
+	Token          *string `protobuf:"bytes,2,opt,name=token" json:"token,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ExchangeWorkloadTokenRequest) Reset() {
+	*x = ExchangeWorkloadTokenRequest{}
+	mi := &file_nokku_v1_auth_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeWorkloadTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeWorkloadTokenRequest) ProtoMessage() {}
+
+func (x *ExchangeWorkloadTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_auth_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeWorkloadTokenRequest.ProtoReflect.Descriptor instead.
+func (*ExchangeWorkloadTokenRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_auth_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ExchangeWorkloadTokenRequest) GetServiceAccount() string {
+	if x != nil && x.ServiceAccount != nil {
+		return *x.ServiceAccount
+	}
+	return ""
+}
+
+func (x *ExchangeWorkloadTokenRequest) GetToken() string {
+	if x != nil && x.Token != nil {
+		return *x.Token
+	}
+	return ""
+}
+
+type ExchangeWorkloadTokenResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   *string                `protobuf:"bytes,1,opt,name=access_token,json=accessToken" json:"access_token,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExchangeWorkloadTokenResponse) Reset() {
+	*x = ExchangeWorkloadTokenResponse{}
+	mi := &file_nokku_v1_auth_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeWorkloadTokenResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeWorkloadTokenResponse) ProtoMessage() {}
+
+func (x *ExchangeWorkloadTokenResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_auth_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeWorkloadTokenResponse.ProtoReflect.Descriptor instead.
+func (*ExchangeWorkloadTokenResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_auth_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ExchangeWorkloadTokenResponse) GetAccessToken() string {
+	if x != nil && x.AccessToken != nil {
+		return *x.AccessToken
+	}
+	return ""
+}
+
+func (x *ExchangeWorkloadTokenResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
 var File_nokku_v1_auth_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/auth.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"8\n" +
+	"\x13nokku/v1/auth.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"8\n" +
 	"\x17RequestMagicLinkRequest\x12\x1d\n" +
 	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"\x1a\n" +
 	"\x18RequestMagicLinkResponse\"8\n" +
@@ -617,14 +723,22 @@ const file_nokku_v1_auth_proto_rawDesc = "" +
 	"\x1aConfirmEmailChangeResponse\"9\n" +
 	"\x18CancelEmailChangeRequest\x12\x1d\n" +
 	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\"\x1b\n" +
-	"\x19CancelEmailChangeResponse2\xca\x04\n" +
+	"\x19CancelEmailChangeResponse\"\x93\x01\n" +
+	"\x1cExchangeWorkloadTokenRequest\x12P\n" +
+	"\x0fservice_account\x18\x01 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x0eserviceAccount\x12!\n" +
+	"\x05token\x18\x02 \x01(\tB\v\xbaH\br\x06\x10\x01\x18\x80\x80\x01R\x05token\"}\n" +
+	"\x1dExchangeWorkloadTokenResponse\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x129\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\xbc\x05\n" +
 	"\vAuthService\x12a\n" +
 	"\x10RequestMagicLink\x12!.nokku.v1.RequestMagicLinkRequest\x1a\".nokku.v1.RequestMagicLinkResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12a\n" +
 	"\x10ConsumeMagicLink\x12!.nokku.v1.ConsumeMagicLinkRequest\x1a\".nokku.v1.ConsumeMagicLinkResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12C\n" +
 	"\x06Logout\x12\x17.nokku.v1.LogoutRequest\x1a\x18.nokku.v1.LogoutResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12a\n" +
 	"\x0fGetLoginOptions\x12 .nokku.v1.GetLoginOptionsRequest\x1a!.nokku.v1.GetLoginOptionsResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12g\n" +
 	"\x12ConfirmEmailChange\x12#.nokku.v1.ConfirmEmailChangeRequest\x1a$.nokku.v1.ConfirmEmailChangeResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12d\n" +
-	"\x11CancelEmailChange\x12\".nokku.v1.CancelEmailChangeRequest\x1a#.nokku.v1.CancelEmailChangeResponse\"\x06\xc2\xf3\x18\x02\b\x01B\x8a\x01\n" +
+	"\x11CancelEmailChange\x12\".nokku.v1.CancelEmailChangeRequest\x1a#.nokku.v1.CancelEmailChangeResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12p\n" +
+	"\x15ExchangeWorkloadToken\x12&.nokku.v1.ExchangeWorkloadTokenRequest\x1a'.nokku.v1.ExchangeWorkloadTokenResponse\"\x06\xc2\xf3\x18\x02\b\x01B\x8a\x01\n" +
 	"\fcom.nokku.v1B\tAuthProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -639,43 +753,49 @@ func file_nokku_v1_auth_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_auth_proto_rawDescData
 }
 
-var file_nokku_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_nokku_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_nokku_v1_auth_proto_goTypes = []any{
-	(*RequestMagicLinkRequest)(nil),    // 0: nokku.v1.RequestMagicLinkRequest
-	(*RequestMagicLinkResponse)(nil),   // 1: nokku.v1.RequestMagicLinkResponse
-	(*ConsumeMagicLinkRequest)(nil),    // 2: nokku.v1.ConsumeMagicLinkRequest
-	(*ConsumeMagicLinkResponse)(nil),   // 3: nokku.v1.ConsumeMagicLinkResponse
-	(*LogoutRequest)(nil),              // 4: nokku.v1.LogoutRequest
-	(*LogoutResponse)(nil),             // 5: nokku.v1.LogoutResponse
-	(*GetLoginOptionsRequest)(nil),     // 6: nokku.v1.GetLoginOptionsRequest
-	(*GetLoginOptionsResponse)(nil),    // 7: nokku.v1.GetLoginOptionsResponse
-	(*SSOProviderInfo)(nil),            // 8: nokku.v1.SSOProviderInfo
-	(*ConfirmEmailChangeRequest)(nil),  // 9: nokku.v1.ConfirmEmailChangeRequest
-	(*ConfirmEmailChangeResponse)(nil), // 10: nokku.v1.ConfirmEmailChangeResponse
-	(*CancelEmailChangeRequest)(nil),   // 11: nokku.v1.CancelEmailChangeRequest
-	(*CancelEmailChangeResponse)(nil),  // 12: nokku.v1.CancelEmailChangeResponse
-	(*User)(nil),                       // 13: nokku.v1.User
+	(*RequestMagicLinkRequest)(nil),       // 0: nokku.v1.RequestMagicLinkRequest
+	(*RequestMagicLinkResponse)(nil),      // 1: nokku.v1.RequestMagicLinkResponse
+	(*ConsumeMagicLinkRequest)(nil),       // 2: nokku.v1.ConsumeMagicLinkRequest
+	(*ConsumeMagicLinkResponse)(nil),      // 3: nokku.v1.ConsumeMagicLinkResponse
+	(*LogoutRequest)(nil),                 // 4: nokku.v1.LogoutRequest
+	(*LogoutResponse)(nil),                // 5: nokku.v1.LogoutResponse
+	(*GetLoginOptionsRequest)(nil),        // 6: nokku.v1.GetLoginOptionsRequest
+	(*GetLoginOptionsResponse)(nil),       // 7: nokku.v1.GetLoginOptionsResponse
+	(*SSOProviderInfo)(nil),               // 8: nokku.v1.SSOProviderInfo
+	(*ConfirmEmailChangeRequest)(nil),     // 9: nokku.v1.ConfirmEmailChangeRequest
+	(*ConfirmEmailChangeResponse)(nil),    // 10: nokku.v1.ConfirmEmailChangeResponse
+	(*CancelEmailChangeRequest)(nil),      // 11: nokku.v1.CancelEmailChangeRequest
+	(*CancelEmailChangeResponse)(nil),     // 12: nokku.v1.CancelEmailChangeResponse
+	(*ExchangeWorkloadTokenRequest)(nil),  // 13: nokku.v1.ExchangeWorkloadTokenRequest
+	(*ExchangeWorkloadTokenResponse)(nil), // 14: nokku.v1.ExchangeWorkloadTokenResponse
+	(*User)(nil),                          // 15: nokku.v1.User
+	(*timestamppb.Timestamp)(nil),         // 16: google.protobuf.Timestamp
 }
 var file_nokku_v1_auth_proto_depIdxs = []int32{
-	13, // 0: nokku.v1.ConsumeMagicLinkResponse.user:type_name -> nokku.v1.User
+	15, // 0: nokku.v1.ConsumeMagicLinkResponse.user:type_name -> nokku.v1.User
 	8,  // 1: nokku.v1.GetLoginOptionsResponse.providers:type_name -> nokku.v1.SSOProviderInfo
-	0,  // 2: nokku.v1.AuthService.RequestMagicLink:input_type -> nokku.v1.RequestMagicLinkRequest
-	2,  // 3: nokku.v1.AuthService.ConsumeMagicLink:input_type -> nokku.v1.ConsumeMagicLinkRequest
-	4,  // 4: nokku.v1.AuthService.Logout:input_type -> nokku.v1.LogoutRequest
-	6,  // 5: nokku.v1.AuthService.GetLoginOptions:input_type -> nokku.v1.GetLoginOptionsRequest
-	9,  // 6: nokku.v1.AuthService.ConfirmEmailChange:input_type -> nokku.v1.ConfirmEmailChangeRequest
-	11, // 7: nokku.v1.AuthService.CancelEmailChange:input_type -> nokku.v1.CancelEmailChangeRequest
-	1,  // 8: nokku.v1.AuthService.RequestMagicLink:output_type -> nokku.v1.RequestMagicLinkResponse
-	3,  // 9: nokku.v1.AuthService.ConsumeMagicLink:output_type -> nokku.v1.ConsumeMagicLinkResponse
-	5,  // 10: nokku.v1.AuthService.Logout:output_type -> nokku.v1.LogoutResponse
-	7,  // 11: nokku.v1.AuthService.GetLoginOptions:output_type -> nokku.v1.GetLoginOptionsResponse
-	10, // 12: nokku.v1.AuthService.ConfirmEmailChange:output_type -> nokku.v1.ConfirmEmailChangeResponse
-	12, // 13: nokku.v1.AuthService.CancelEmailChange:output_type -> nokku.v1.CancelEmailChangeResponse
-	8,  // [8:14] is the sub-list for method output_type
-	2,  // [2:8] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	16, // 2: nokku.v1.ExchangeWorkloadTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 3: nokku.v1.AuthService.RequestMagicLink:input_type -> nokku.v1.RequestMagicLinkRequest
+	2,  // 4: nokku.v1.AuthService.ConsumeMagicLink:input_type -> nokku.v1.ConsumeMagicLinkRequest
+	4,  // 5: nokku.v1.AuthService.Logout:input_type -> nokku.v1.LogoutRequest
+	6,  // 6: nokku.v1.AuthService.GetLoginOptions:input_type -> nokku.v1.GetLoginOptionsRequest
+	9,  // 7: nokku.v1.AuthService.ConfirmEmailChange:input_type -> nokku.v1.ConfirmEmailChangeRequest
+	11, // 8: nokku.v1.AuthService.CancelEmailChange:input_type -> nokku.v1.CancelEmailChangeRequest
+	13, // 9: nokku.v1.AuthService.ExchangeWorkloadToken:input_type -> nokku.v1.ExchangeWorkloadTokenRequest
+	1,  // 10: nokku.v1.AuthService.RequestMagicLink:output_type -> nokku.v1.RequestMagicLinkResponse
+	3,  // 11: nokku.v1.AuthService.ConsumeMagicLink:output_type -> nokku.v1.ConsumeMagicLinkResponse
+	5,  // 12: nokku.v1.AuthService.Logout:output_type -> nokku.v1.LogoutResponse
+	7,  // 13: nokku.v1.AuthService.GetLoginOptions:output_type -> nokku.v1.GetLoginOptionsResponse
+	10, // 14: nokku.v1.AuthService.ConfirmEmailChange:output_type -> nokku.v1.ConfirmEmailChangeResponse
+	12, // 15: nokku.v1.AuthService.CancelEmailChange:output_type -> nokku.v1.CancelEmailChangeResponse
+	14, // 16: nokku.v1.AuthService.ExchangeWorkloadToken:output_type -> nokku.v1.ExchangeWorkloadTokenResponse
+	10, // [10:17] is the sub-list for method output_type
+	3,  // [3:10] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_auth_proto_init() }
@@ -691,7 +811,7 @@ func file_nokku_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_auth_proto_rawDesc), len(file_nokku_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

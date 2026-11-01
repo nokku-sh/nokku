@@ -34,7 +34,6 @@ func (s *joinTokenService) CreateJoinToken(
 		Label:       req.GetLabel(),
 		MaxUses:     req.MaxUses,
 		AutoApprove: req.GetAutoApprove(),
-		CaID:        req.CaId,
 		Tags:        req.GetTags(),
 	}
 	if req.GetTtl() != nil {
@@ -54,10 +53,7 @@ func (s *joinTokenService) CreateJoinToken(
 
 	var created *db.JoinToken
 	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if created, err = q.CreateJoinToken(ctx, params); db.IsForeignKeyViolation(err) {
-			return newError(connect.CodeInvalidArgument, "the certificate authority does not exist")
-		}
-		if err != nil {
+		if created, err = q.CreateJoinToken(ctx, params); err != nil {
 			return err
 		}
 		if err = addJoinTokenGrants(ctx, q, created.ID, req.GetGrants()); db.IsForeignKeyViolation(err) {

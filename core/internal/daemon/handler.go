@@ -92,6 +92,9 @@ func (p *Pool) Connect(
 				slog.Warn("read workspace state version", "daemon_id", daemonID, "error", err)
 				continue
 			}
+			if conn.heartbeat(hb.GetStateVersion(), version) {
+				p.reportBehind(conn, daemon.Name, hb.GetStateVersion(), version)
+			}
 			if version != hb.GetStateVersion() {
 				conn.poke()
 			}

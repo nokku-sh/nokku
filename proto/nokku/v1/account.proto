@@ -16,9 +16,6 @@ service AccountService {
   rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
     option (access) = {self: true};
   }
-  rpc SetAvatar(SetAvatarRequest) returns (SetAvatarResponse) {
-    option (access) = {self: true};
-  }
   rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse) {
     option (access) = {
       self: true
@@ -99,13 +96,6 @@ message UpdateAccountRequest {
   ];
 }
 message UpdateAccountResponse {
-  User user = 1;
-}
-
-message SetAvatarRequest {
-  bytes image = 1 [(buf.validate.field).bytes.max_len = 2097152];
-}
-message SetAvatarResponse {
   User user = 1;
 }
 

@@ -49,7 +49,6 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 	t.Helper()
 	_, err := c.sysPool.Exec(t.Context(), `
 		INSERT INTO credentials (id, workspace_id, user_id, type, data) VALUES ($2 || '-pk', $1, $2, 'passkey', 'x');
-		INSERT INTO user_avatars (workspace_id, user_id, image, etag) VALUES ($1, $2, 'jpeg', 'etag');
 		INSERT INTO access_tokens (token_hash, workspace_id, user_id, kind, method)
 		VALUES ($2 || '-s', $1, $2, 'user', 'passkey');
 		INSERT INTO known_devices (workspace_id, user_id, key, expires_at)
@@ -61,11 +60,13 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		INSERT INTO device_grants (device_code_hash, workspace_id, user_code, expires_at)
 		VALUES ($2 || '-dg', $1, 'BCDF-GHJK', NOW() + INTERVAL '1 hour');
 		INSERT INTO sso_providers (workspace_id, provider_id, config) VALUES ($1, 'idp', 'sealed');
-		INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci');
+		WITH sa AS (
+			INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci') RETURNING id
+		)
+		INSERT INTO service_account_federations (workspace_id, service_account_id, issuer, claims)
+		SELECT $1, id, 'https://ci.test', '{"sub": "job"}' FROM sa;
 		WITH ca AS (
-			INSERT INTO ssh_cas (workspace_id, name, public_key, host_public_key,
-				user_default_ttl, user_max_ttl, host_ttl)
-			VALUES ($1, 'ca', 'pub', 'host-pub', '1 hour', '1 hour', '1 hour') RETURNING id
+			SELECT id FROM ssh_cas WHERE workspace_id = $1
 		)
 		INSERT INTO ssh_ca_keys (ca_id, workspace_id, kind, private_key) SELECT id, $1, 'user', 'sealed' FROM ca;
 		WITH t AS (
@@ -73,7 +74,7 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		)
 		INSERT INTO join_token_grants (workspace_id, token_id, username, user_id) SELECT $1, id, 'dev', $2 FROM t;
 		INSERT INTO recordings (workspace_id, daemon_name, username, key) VALUES ($1, 'd', 'deploy', 'key');
-		INSERT INTO workspace_subscriptions (workspace_id) VALUES ($1);
+		INSERT INTO workspace_subscriptions (workspace_id, source, plan) VALUES ($1, 'stripe', 'pro');
 		INSERT INTO access_usage (workspace_id, target_id, subject_id) VALUES ($1, $3, $2);
 		INSERT INTO access_requests (workspace_id, requester_id, account_id, duration, reason)
 		VALUES ($1, $2, $4, '1 hour', 'fix');

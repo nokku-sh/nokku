@@ -9,10 +9,12 @@ import (
 	"connectrpc.com/otelconnect"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
-	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/contrib/processors/minsev"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
@@ -21,22 +23,22 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
-// newTelemetry turns OTel on when an OTLP endpoint is set. Everything else follows the OTEL_* environment.
+// newTelemetry turns OTel on when an OTLP endpoint is set. It speaks OTLP over HTTP, and the rest follows OTEL_*.
 func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return nil
 	}
-	traceExporter, err := autoexport.NewSpanExporter(ctx)
+	traceExporter, err := otlptracehttp.New(ctx)
 	if err != nil {
 		slog.Error("failed to init otel exporter", "exporter", "trace", "error", err)
 		return nil
 	}
-	metricReader, err := autoexport.NewMetricReader(ctx)
+	metricExporter, err := otlpmetrichttp.New(ctx)
 	if err != nil {
 		slog.Error("failed to init otel exporter", "exporter", "metric", "error", err)
 		return nil
 	}
-	logExporter, err := autoexport.NewLogExporter(ctx)
+	logExporter, err := otlploghttp.New(ctx)
 	if err != nil {
 		slog.Error("failed to init otel exporter", "exporter", "log", "error", err)
 		return nil
@@ -64,7 +66,7 @@ func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 	otel.SetTracerProvider(tp)
 
 	mp := metric.NewMeterProvider(
-		metric.WithReader(metricReader),
+		metric.WithReader(metric.NewPeriodicReader(metricExporter)),
 		metric.WithResource(res),
 	)
 	otel.SetMeterProvider(mp)

@@ -8,29 +8,25 @@ import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
+// A workspace has one CA, made with it. A server has no tie to it, so every call here is about that one.
 service CertificateService {
   rpc GetCertificateAuthority(GetCertificateAuthorityRequest) returns (GetCertificateAuthorityResponse) {
     option (access) = {role: WORKSPACE_ROLE_MEMBER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  rpc CreateCertificateAuthority(CreateCertificateAuthorityRequest) returns (CreateCertificateAuthorityResponse) {
+  rpc UpdateCertificateAuthority(UpdateCertificateAuthorityRequest) returns (UpdateCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      capped: true
+      people_only: true
+      fresh: true
     };
   }
-  rpc UpdateCertificateAuthority(UpdateCertificateAuthorityRequest) returns (UpdateCertificateAuthorityResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
-  }
-  rpc ListCertificateAuthorities(ListCertificateAuthoritiesRequest) returns (ListCertificateAuthoritiesResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc DeleteCertificateAuthority(DeleteCertificateAuthorityRequest) returns (DeleteCertificateAuthorityResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
-  }
   rpc RolloverCertificateAuthority(RolloverCertificateAuthorityRequest) returns (RolloverCertificateAuthorityResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+      fresh: true
+    };
   }
   rpc SignSSHCertificate(SignSSHCertificateRequest) returns (SignSSHCertificateResponse) {
     option (access) = {
@@ -41,15 +37,12 @@ service CertificateService {
 }
 
 message CertificateAuthority {
-  reserved 11;
+  reserved 2, 3, 7, 11, 17;
 
   string id = 1;
-  string name = 2;
-  string description = 3;
   string public_key = 4;
   string host_public_key = 5;
   google.protobuf.Timestamp rotated_at = 6;
-  bool is_default = 7;
   google.protobuf.Duration user_default_ttl = 8;
   google.protobuf.Duration user_max_ttl = 9;
   google.protobuf.Duration host_ttl = 10;
@@ -58,63 +51,23 @@ message CertificateAuthority {
   string previous_public_key = 14;
   string previous_host_public_key = 15;
   google.protobuf.Timestamp previous_trusted_until = 16;
-  string force_command = 17;
+  // source_address lists where people log in from. A service account has a list of its own.
   string source_address = 18;
 }
 
-message CreateCertificateAuthorityRequest {
-  reserved 7;
-
-  string name = 1 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 256
-  }];
-  string description = 2 [(buf.validate.field).string.max_len = 1000];
-  bool is_default = 3;
-  google.protobuf.Duration user_default_ttl = 4 [(buf.validate.field).duration = {
-    gte: {seconds: 60} /* Min 1 minute */
-    lte: {seconds: 31536000} /* Max 1 year */
-  }];
-  google.protobuf.Duration user_max_ttl = 5 [(buf.validate.field).duration = {
-    gte: {seconds: 60}
-    lte: {seconds: 31536000}
-  }];
-  google.protobuf.Duration host_ttl = 6 [(buf.validate.field).duration = {
-    gte: {seconds: 60}
-    lte: {seconds: 31536000}
-  }];
-  string force_command = 8 [(buf.validate.field).string.max_len = 1024];
-  string source_address = 9 [(buf.validate.field).string.max_len = 1024];
-}
-message CreateCertificateAuthorityResponse {
-  CertificateAuthority certificate_authority = 1;
-}
-
 message GetCertificateAuthorityRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  reserved 1;
 }
 message GetCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;
 }
 
-message ListCertificateAuthoritiesRequest {}
-message ListCertificateAuthoritiesResponse {
-  repeated CertificateAuthority certificate_authorities = 1;
-}
-
 message UpdateCertificateAuthorityRequest {
-  reserved 8;
+  reserved 1, 2, 3, 4, 8, 9;
 
-  string id = 1 [(buf.validate.field).string.uuid = true];
-  string name = 2 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 256
-  }];
-  string description = 3 [(buf.validate.field).string.max_len = 1000];
-  bool is_default = 4;
   google.protobuf.Duration user_default_ttl = 5 [(buf.validate.field).duration = {
-    gte: {seconds: 60}
-    lte: {seconds: 31536000}
+    gte: {seconds: 60} /* Min 1 minute */
+    lte: {seconds: 31536000} /* Max 1 year */
   }];
   google.protobuf.Duration user_max_ttl = 6 [(buf.validate.field).duration = {
     gte: {seconds: 60}
@@ -124,19 +77,14 @@ message UpdateCertificateAuthorityRequest {
     gte: {seconds: 60}
     lte: {seconds: 31536000}
   }];
-  string force_command = 9 [(buf.validate.field).string.max_len = 1024];
   string source_address = 10 [(buf.validate.field).string.max_len = 1024];
   google.protobuf.FieldMask update_mask = 11 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
-        "name",
-        "description",
-        "is_default",
         "user_default_ttl",
         "user_max_ttl",
         "host_ttl",
-        "force_command",
         "source_address"
       ]
     }
@@ -146,13 +94,9 @@ message UpdateCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;
 }
 
-message DeleteCertificateAuthorityRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
-}
-message DeleteCertificateAuthorityResponse {}
-
 message RolloverCertificateAuthorityRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  reserved 1;
+
   // Distrusts the previous keys at once, for a key that leaked. Otherwise they stay trusted for user_max_ttl.
   bool revoke_previous = 2;
 }
@@ -177,8 +121,8 @@ message SignSSHCertificateRequest {
   ];
 }
 message SignSSHCertificateResponse {
-  string ca_id = 1;
-  string ca_name = 2;
+  reserved 1, 2;
+
   string ca_public_key = 3;
   string signed_certificate = 4;
   google.protobuf.Timestamp expires_at = 5;

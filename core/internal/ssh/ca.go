@@ -22,8 +22,8 @@ const (
 	keyHost = "host"
 )
 
-// NewCA returns the settings every new CA starts with. They are stated here and nowhere else. The caller names the
-// CA, overrides what a request asks for, and makes it with CreateCA.
+// NewCA returns the settings a new CA starts with. They are stated here and nowhere else. A workspace gets its one CA
+// from tenant.Create.
 func NewCA() *db.CreateCAParams {
 	return &db.CreateCAParams{
 		// A work day. nk renews at half-life, and it is also how long people keep working while the core is down.

@@ -42,10 +42,11 @@
 	bind:open
 	title={secret ? 'Copy the token now' : `New token for ${name}`}
 	description={secret
-		? 'Store it in your CI secrets. Other tokens of the account keep working.'
+		? 'Store it where your script runs. Other tokens of the account keep working.'
 		: 'Roll it out first, then revoke the one it replaces.'}
 	icon={KeyRound}
 	submitLabel="Create and show token"
+	submitDisabled={!expiry.date}
 	{onSubmit}
 	onOpenChange={(v) => !v && (secret = '')}
 	footer={secret ? saved : undefined}
@@ -57,7 +58,7 @@
 	{:else}
 		<Field.Field>
 			<Field.Label for="new-token-label">Label</Field.Label>
-			<Input id="new-token-label" bind:value={label} placeholder="github-actions" maxlength={100} />
+			<Input id="new-token-label" bind:value={label} placeholder="ansible" maxlength={100} />
 			<Field.Description>Where the token lives, so you know which one to revoke.</Field.Description>
 		</Field.Field>
 		<TokenExpiryField {expiry} />

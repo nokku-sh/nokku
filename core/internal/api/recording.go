@@ -76,6 +76,13 @@ func (s *recordingService) GetRecording(
 		return err
 	}
 
+	// A playback leaves no other trace, so it starts once the log has it.
+	if err := s.cfg.Audit.Confirm(ctx, &audit.Event{
+		Action: "GetRecording", Target: rec.ID, Details: map[string]any{"daemon_id": rec.DaemonID},
+	}); err != nil {
+		return err
+	}
+
 	if err := stream.Send(&nokkuv1.GetRecordingResponse{
 		Msg: &nokkuv1.GetRecordingResponse_Meta{
 			Meta: &nokkuv1.RecordingMeta{
@@ -87,10 +94,6 @@ func (s *recordingService) GetRecording(
 	}); err != nil {
 		return err
 	}
-
-	s.cfg.Audit.Log(ctx, &audit.Event{
-		Action: "GetRecording", Target: rec.ID, Details: map[string]any{"daemon_id": rec.DaemonID},
-	})
 
 	fr, err := s.cfg.Record.OpenReader(ctx, rec)
 	if errors.Is(err, recording.ErrNotStored) {

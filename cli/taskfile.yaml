@@ -9,16 +9,6 @@ tasks:
       - mkdir -p ~/.local/bin
       - go build -ldflags="-s -w" -trimpath -o ~/.local/bin/ ./cmd/nk
 
-  enclave:
-    desc: Build nk with the Secure Enclave bridge (macOS only)
-    platforms: [darwin]
-    env:
-      CGO_ENABLED: 1
-    cmds:
-      - ./internal/enclave/build.sh
-      - mkdir -p ~/.local/bin
-      - go build -tags enclave -ldflags="-s -w" -trimpath -o ~/.local/bin/ ./cmd/nk
-
   lint:
     desc: Run go vet & lint
     cmds:
@@ -42,7 +32,7 @@ tasks:
         done
 
   snapshot:bin:
-    desc: Build snapshot binaries of nk only, the darwin ones only build on a Mac
+    desc: Build snapshot binaries of nk only
     env:
       NOKKU_ONLY: cli
     dir: ..

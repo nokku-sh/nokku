@@ -77,6 +77,10 @@ export const users = {
 		useMutation(WorkspaceService.method.deleteUser, {
 			onSuccess: () => toast.success('Account deleted')
 		}),
+	clearIdentities: () =>
+		useMutation(WorkspaceService.method.clearUserIdentities, {
+			onSuccess: () => toast.success('Sign-in providers unlinked')
+		}),
 	deleteMany: () =>
 		useBulkMutation(WorkspaceService.method.deleteUser, (n) => `${plural(n, 'account')} deleted`),
 	transferOwnership: () =>

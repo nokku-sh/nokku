@@ -41,6 +41,9 @@ const (
 	// AuthServiceCancelEmailChangeProcedure is the procedure name of the AuthService's
 	// CancelEmailChange RPC.
 	AuthServiceCancelEmailChangeProcedure = "/nokku.v1.AuthService/CancelEmailChange"
+	// AuthServiceExchangeWorkloadTokenProcedure is the procedure name of the AuthService's
+	// ExchangeWorkloadToken RPC.
+	AuthServiceExchangeWorkloadTokenProcedure = "/nokku.v1.AuthService/ExchangeWorkloadToken"
 )
 
 var (
@@ -87,6 +90,13 @@ var (
 			Procedure:  AuthServiceCancelEmailChangeProcedure,
 		}
 	})
+	authServiceExchangeWorkloadTokenSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_auth_proto.Services().ByName("AuthService").Methods().ByName("ExchangeWorkloadToken"),
+			Procedure:  AuthServiceExchangeWorkloadTokenProcedure,
+		}
+	})
 )
 
 // AuthServiceClient is a client for the nokku.v1.AuthService service.
@@ -97,6 +107,9 @@ type AuthServiceClient interface {
 	GetLoginOptions(context.Context, *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error)
 	ConfirmEmailChange(context.Context, *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error)
 	CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error)
+	// ExchangeWorkloadToken trades the signed token of a CI job for a short session of a service account. The workspace
+	// comes from the host. The call carries a DPoP proof and the session is bound to its key.
+	ExchangeWorkloadToken(context.Context, *v1.ExchangeWorkloadTokenRequest) (*v1.ExchangeWorkloadTokenResponse, error)
 }
 
 // NewAuthServiceClient constructs a client for the nokku.v1.AuthService service. Multiple service
@@ -113,6 +126,9 @@ type AuthServiceHandler interface {
 	GetLoginOptions(context.Context, *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error)
 	ConfirmEmailChange(context.Context, *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error)
 	CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error)
+	// ExchangeWorkloadToken trades the signed token of a CI job for a short session of a service account. The workspace
+	// comes from the host. The call carries a DPoP proof and the session is bound to its key.
+	ExchangeWorkloadToken(context.Context, *v1.ExchangeWorkloadTokenRequest) (*v1.ExchangeWorkloadTokenResponse, error)
 }
 
 // RegisterAuthServiceHandler registers svc as the nokku.v1.AuthService implementation on server.
@@ -125,6 +141,7 @@ func RegisterAuthServiceHandler(server *connect.Server, svc AuthServiceHandler) 
 		connect.Method{Spec: authServiceGetLoginOptionsSpec(), Handler: adapter.getLoginOptions},
 		connect.Method{Spec: authServiceConfirmEmailChangeSpec(), Handler: adapter.confirmEmailChange},
 		connect.Method{Spec: authServiceCancelEmailChangeSpec(), Handler: adapter.cancelEmailChange},
+		connect.Method{Spec: authServiceExchangeWorkloadTokenSpec(), Handler: adapter.exchangeWorkloadToken},
 	)
 }
 
@@ -153,6 +170,10 @@ func (UnimplementedAuthServiceHandler) ConfirmEmailChange(context.Context, *v1.C
 
 func (UnimplementedAuthServiceHandler) CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuthService.CancelEmailChange is not implemented")
+}
+
+func (UnimplementedAuthServiceHandler) ExchangeWorkloadToken(context.Context, *v1.ExchangeWorkloadTokenRequest) (*v1.ExchangeWorkloadTokenResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AuthService.ExchangeWorkloadToken is not implemented")
 }
 
 type authServiceClient struct {
@@ -202,6 +223,14 @@ func (c *authServiceClient) ConfirmEmailChange(ctx context.Context, req *v1.Conf
 func (c *authServiceClient) CancelEmailChange(ctx context.Context, req *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error) {
 	var res v1.CancelEmailChangeResponse
 	if err := c.client.CallUnary(ctx, authServiceCancelEmailChangeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *authServiceClient) ExchangeWorkloadToken(ctx context.Context, req *v1.ExchangeWorkloadTokenRequest) (*v1.ExchangeWorkloadTokenResponse, error) {
+	var res v1.ExchangeWorkloadTokenResponse
+	if err := c.client.CallUnary(ctx, authServiceExchangeWorkloadTokenSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -275,6 +304,18 @@ func (h authServiceHandler) cancelEmailChange(ctx context.Context, _ connect.Spe
 		return err
 	}
 	res, err := h.svc.CancelEmailChange(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h authServiceHandler) exchangeWorkloadToken(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ExchangeWorkloadTokenRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ExchangeWorkloadToken(ctx, &req)
 	if err != nil {
 		return err
 	}

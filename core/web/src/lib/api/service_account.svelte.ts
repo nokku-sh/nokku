@@ -58,5 +58,25 @@ export const serviceAccount = {
 			useMutation(ServiceAccountService.method.revokeServiceAccountToken, {
 				onSuccess: () => toast.success('Token revoked')
 			})
+	},
+
+	federations: {
+		list: (serviceAccountId: MaybeGetter<string | undefined>) =>
+			useQuery(
+				ServiceAccountService.method.listServiceAccountFederations,
+				() => ({ serviceAccountId: extract(serviceAccountId) }),
+				() => ({
+					enabled: !!extract(serviceAccountId),
+					select: (res) => res.federations ?? []
+				})
+			),
+		add: () =>
+			useMutation(ServiceAccountService.method.addServiceAccountFederation, {
+				onSuccess: () => toast.success('Rule added')
+			}),
+		remove: () =>
+			useMutation(ServiceAccountService.method.removeServiceAccountFederation, {
+				onSuccess: () => toast.success('Rule removed')
+			})
 	}
 };

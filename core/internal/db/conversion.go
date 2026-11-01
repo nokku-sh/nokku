@@ -114,14 +114,16 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 		return nil
 	}
 	return &nokkuv1.ServiceAccount{
-		Id:          &s.ID,
-		Name:        &s.Name,
-		Description: s.Description,
-		Role:        &s.Role,
-		Tags:        s.Tags,
-		LastUsedAt:  SafeTimestamp(s.LastUsedAt),
-		CreatedAt:   SafeTimestamp(&s.CreatedAt),
-		UpdatedAt:   SafeTimestamp(&s.UpdatedAt),
+		Id:            &s.ID,
+		Name:          &s.Name,
+		Description:   s.Description,
+		Role:          &s.Role,
+		Tags:          s.Tags,
+		ForceCommand:  &s.ForceCommand,
+		SourceAddress: &s.SourceAddress,
+		LastUsedAt:    SafeTimestamp(s.LastUsedAt),
+		CreatedAt:     SafeTimestamp(&s.CreatedAt),
+		UpdatedAt:     SafeTimestamp(&s.UpdatedAt),
 	}
 }
 
@@ -145,6 +147,20 @@ func ServiceAccountTokensToProto(ts []*AccessToken) []*nokkuv1.ServiceAccountTok
 	return mapSlice(ts, func(t *AccessToken) *nokkuv1.ServiceAccountToken { return t.ToServiceAccountToken() })
 }
 
+func (f *ServiceAccountFederation) ToProto() *nokkuv1.ServiceAccountFederation {
+	return &nokkuv1.ServiceAccountFederation{
+		Id:               &f.ID,
+		ServiceAccountId: &f.ServiceAccountID,
+		Issuer:           &f.Issuer,
+		Claims:           f.Claims,
+		CreatedAt:        SafeTimestamp(&f.CreatedAt),
+	}
+}
+
+func ServiceAccountFederationsToProto(fs []*ServiceAccountFederation) []*nokkuv1.ServiceAccountFederation {
+	return mapSlice(fs, func(f *ServiceAccountFederation) *nokkuv1.ServiceAccountFederation { return f.ToProto() })
+}
+
 func (t *Target) ToProto() *nokkuv1.Target {
 	if t == nil {
 		return nil
@@ -154,7 +170,6 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	return &nokkuv1.Target{
 		Id:            &t.ID,
 		DaemonId:      t.DaemonID,
-		CaId:          &t.CaID,
 		Description:   t.Description,
 		Name:          &t.Name,
 		Endpoints:     t.Endpoints,
@@ -296,43 +311,15 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 
 	return &nokkuv1.CertificateAuthority{
 		Id:                    &r.ID,
-		Name:                  &r.Name,
-		Description:           r.Description,
 		PublicKey:             &r.PublicKey,
 		HostPublicKey:         &r.HostPublicKey,
 		RotatedAt:             SafeTimestamp(&r.RotatedAt),
-		IsDefault:             &r.IsDefault,
 		CreatedAt:             SafeTimestamp(&r.CreatedAt),
 		UpdatedAt:             SafeTimestamp(&r.UpdatedAt),
 		UserDefaultTtl:        durationpb.New(r.UserDefaultTtl),
 		UserMaxTtl:            durationpb.New(r.UserMaxTtl),
-		ForceCommand:          &r.ForceCommand,
 		SourceAddress:         &r.SourceAddress,
 		HostTtl:               durationpb.New(r.HostTtl),
-		PreviousPublicKey:     r.PreviousPublicKey,
-		PreviousHostPublicKey: r.PreviousHostPublicKey,
-		PreviousTrustedUntil:  SafeTimestamp(r.PreviousTrustedUntil),
-	}
-}
-
-func CAsToProto(cas []*SSHCA) []*nokkuv1.CertificateAuthority {
-	return mapSlice(cas, func(ca *SSHCA) *nokkuv1.CertificateAuthority { return ca.ToProto() })
-}
-
-// ToProto leaves out the private fields.
-func (r *GetCAsByIDsRow) ToProto() *nokkuv1.CertificateAuthority {
-	if r == nil {
-		return nil
-	}
-	return &nokkuv1.CertificateAuthority{
-		Id:                    &r.ID,
-		Name:                  &r.Name,
-		PublicKey:             &r.PublicKey,
-		HostPublicKey:         &r.HostPublicKey,
-		RotatedAt:             SafeTimestamp(&r.RotatedAt),
-		IsDefault:             &r.IsDefault,
-		UserDefaultTtl:        durationpb.New(r.UserDefaultTtl),
-		UserMaxTtl:            durationpb.New(r.UserMaxTtl),
 		PreviousPublicKey:     r.PreviousPublicKey,
 		PreviousHostPublicKey: r.PreviousHostPublicKey,
 		PreviousTrustedUntil:  SafeTimestamp(r.PreviousTrustedUntil),
@@ -445,7 +432,6 @@ func (t *JoinToken) ToProto() *nokkuv1.JoinToken {
 		MaxUses:     t.MaxUses,
 		Uses:        &t.Uses,
 		AutoApprove: &t.AutoApprove,
-		CaId:        t.CaID,
 		Tags:        t.Tags,
 		Ephemeral:   new(t.RetireAfter != nil),
 		CreatedAt:   SafeTimestamp(&t.CreatedAt),

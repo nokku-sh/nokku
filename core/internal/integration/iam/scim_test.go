@@ -109,6 +109,40 @@ func TestSCIMAuth(t *testing.T) {
 }
 
 // A lookup that fails is no bad token. A provider that gets a 401 takes its credentials for broken, a 500 it retries.
+// A big group is a real request, past that the provider hears why it was refused. Nothing without a token gets read.
+func TestSCIMBodyLimit(t *testing.T) {
+	const limit = 4 << 20
+	e := newTestEnv(t)
+	c := e.scim(t, e.org(t))
+	post := func(token, email string, size int) (int, string) {
+		t.Helper()
+		body, err := json.Marshal(scimUser(email, email))
+		require.NoError(t, err)
+		body = append(body, bytes.Repeat([]byte(" "), size-len(body))...)
+		req := httptest.NewRequest(http.MethodPost, "/scim/v2/Users", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/scim+json")
+		rec := httptest.NewRecorder()
+		c.svc.SCIMHandler().ServeHTTP(rec, req.WithContext(anon(req.Context(), c.ws)))
+		return rec.Code, rec.Body.String()
+	}
+
+	code, answer := post(c.token, "fits@acme.test", limit)
+	assert.Equal(t, http.StatusCreated, code, answer)
+
+	code, answer = post(c.token, "over@acme.test", limit+1)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, code, answer)
+	assert.Contains(t, answer, "urn:ietf:params:scim:api:messages:2.0:Error", "a provider reads SCIM errors")
+	assert.Contains(t, answer, "smaller batches")
+	var listed scimList
+	filter := url.QueryEscape(`userName eq "over@acme.test"`)
+	require.Equal(t, http.StatusOK, c.do(http.MethodGet, "/Users?filter="+filter, nil, &listed))
+	assert.Zero(t, listed.TotalResults, "a refused request made a user")
+
+	code, _ = post("nk_scim_wrong", "guess@acme.test", limit+1)
+	assert.Equal(t, http.StatusUnauthorized, code)
+}
+
 func TestSCIMAnswers500WhenTheLookupFails(t *testing.T) {
 	e := newTestEnv(t)
 	c := e.scim(t, e.org(t))

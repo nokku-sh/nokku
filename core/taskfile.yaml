@@ -46,6 +46,13 @@ tasks:
     cmds:
       - go test -tags integration -race -count=1 -cover -coverpkg=./internal/... ./internal/integration/...
 
+  test:hosted:
+    desc: Run the API tests the way the hosted service runs, with NOKKU_SAAS, a KMS and workspace hosts, needs Docker
+    env:
+      NOKKU_TEST_HOSTED: "1"
+    cmds:
+      - go test -tags integration -race -count=1 -timeout 15m ./internal/integration/api/...
+
   lint:
     desc: Run go vet & lint
     ignore_error: true

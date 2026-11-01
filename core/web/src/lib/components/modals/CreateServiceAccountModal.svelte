@@ -63,6 +63,7 @@
 	description="An API identity for CI, Ansible and other automation."
 	icon={Bot}
 	submitLabel="Create and show token"
+	submitDisabled={!expiry.date}
 	{onSubmit}
 >
 	<Field.Field>
@@ -91,12 +92,7 @@
 
 	<Field.Field>
 		<Field.Label for="new-sa-token-label">First token</Field.Label>
-		<Input
-			id="new-sa-token-label"
-			bind:value={tokenLabel}
-			placeholder="github-actions"
-			maxlength={100}
-		/>
+		<Input id="new-sa-token-label" bind:value={tokenLabel} placeholder="ansible" maxlength={100} />
 		<Field.Description>Where it will live. More tokens can be added later.</Field.Description>
 	</Field.Field>
 
@@ -110,7 +106,7 @@
 				<KeyRound class="size-4" />
 				Copy the token now
 			</Dialog.Title>
-			<Dialog.Description>Store it in your CI secrets.</Dialog.Description>
+			<Dialog.Description>Store it where your script runs.</Dialog.Description>
 		</Dialog.Header>
 		<SecretReveal
 			values={[{ value: token }, { label: 'As an env var', value: `export NK_TOKEN=${token}` }]}

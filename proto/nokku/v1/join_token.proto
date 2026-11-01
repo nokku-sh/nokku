@@ -24,13 +24,14 @@ service JoinTokenService {
 }
 
 message JoinToken {
+  reserved 7;
+
   string id = 1;
   string label = 2;
   google.protobuf.Timestamp expires_at = 3;
   int32 max_uses = 4;
   int32 uses = 5;
   bool auto_approve = 6;
-  string ca_id = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp last_used_at = 9;
   repeated string tags = 10;
@@ -66,11 +67,12 @@ message JoinTokenGrant {
 }
 
 message CreateJoinTokenRequest {
+  reserved 5;
+
   string label = 1 [(buf.validate.field).string.max_len = 100];
   google.protobuf.Duration ttl = 2 [(buf.validate.field).duration.gt = {seconds: 0}];
   int32 max_uses = 3 [(buf.validate.field).int32.gt = 0];
   bool auto_approve = 4;
-  string ca_id = 5 [(buf.validate.field).string.uuid = true];
   repeated string tags = 6 [(buf.validate.field).repeated = {
     max_items: 32
     items: {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { sso } from '#lib/api/sso.svelte.js';
 	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import { OIDCIcon } from '#lib/assets/index.js';
@@ -41,7 +42,9 @@
 
 	// Only the switch is sent. A downgraded workspace may turn it off, and nothing else rides along to be refused.
 	function setEnforced(on: boolean) {
-		update.mutate({ settings: createMessage(WorkspaceSettingsSchema, { enforceSso: on }) });
+		void whenFresh(() =>
+			update.mutate({ settings: createMessage(WorkspaceSettingsSchema, { enforceSso: on }) })
+		);
 	}
 </script>
 

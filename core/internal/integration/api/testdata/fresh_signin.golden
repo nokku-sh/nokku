@@ -16,12 +16,27 @@ AccountService.RequestEmailChange | cli | refused | permission_denied: do this i
 InvitationService.CreateInvitation | browser fresh | accepted | ok | session kept
 InvitationService.CreateInvitation | browser old | refused | unauthenticated: sign in again to continue | session ended
 InvitationService.CreateInvitation | cli | refused | permission_denied: do this in the web app | session kept
+CertificateService.RolloverCertificateAuthority | browser fresh | accepted | ok | session kept
+CertificateService.RolloverCertificateAuthority | browser old | refused | unauthenticated: sign in again to continue | session ended
+CertificateService.RolloverCertificateAuthority | cli | refused | permission_denied: do this in the web app | session kept
+CertificateService.UpdateCertificateAuthority | browser fresh | accepted | ok | session kept
+CertificateService.UpdateCertificateAuthority | browser old | refused | unauthenticated: sign in again to continue | session ended
+CertificateService.UpdateCertificateAuthority | cli | refused | permission_denied: do this in the web app | session kept
+ServiceAccountService.UpdateServiceAccount limits | browser fresh | accepted | ok | session kept
+ServiceAccountService.UpdateServiceAccount limits | browser old | refused | unauthenticated: sign in again to continue | session ended
+ServiceAccountService.UpdateServiceAccount limits | cli | refused | permission_denied: do this in the web app | session kept
 JoinTokenService.CreateJoinToken | browser fresh | accepted | ok | session kept
 JoinTokenService.CreateJoinToken | browser old | refused | unauthenticated: sign in again to continue | session ended
 JoinTokenService.CreateJoinToken | cli | refused | permission_denied: do this in the web app | session kept
 ServiceAccountService.CreateServiceAccountToken | browser fresh | accepted | ok | session kept
 ServiceAccountService.CreateServiceAccountToken | browser old | refused | unauthenticated: sign in again to continue | session ended
 ServiceAccountService.CreateServiceAccountToken | cli | refused | permission_denied: do this in the web app | session kept
+ServiceAccountService.AddServiceAccountFederation | browser fresh | accepted | ok | session kept
+ServiceAccountService.AddServiceAccountFederation | browser old | refused | unauthenticated: sign in again to continue | session ended
+ServiceAccountService.AddServiceAccountFederation | cli | refused | permission_denied: do this in the web app | session kept
+ServiceAccountService.RemoveServiceAccountFederation | browser fresh | accepted | not_found: the requested resource was not found | session kept
+ServiceAccountService.RemoveServiceAccountFederation | browser old | refused | unauthenticated: sign in again to continue | session ended
+ServiceAccountService.RemoveServiceAccountFederation | cli | refused | permission_denied: do this in the web app | session kept
 SCIMService.CreateSCIMToken | browser fresh | accepted | ok | session kept
 SCIMService.CreateSCIMToken | browser old | refused | unauthenticated: sign in again to continue | session ended
 SCIMService.CreateSCIMToken | cli | refused | permission_denied: do this in the web app | session kept

@@ -13,23 +13,34 @@ import (
 
 const createServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (name, description, role, tags)
+  service_accounts (
+    name,
+    description,
+    role,
+    tags,
+    force_command,
+    source_address
+  )
 VALUES
   (
     $1,
     $2,
     $3,
-    COALESCE($4::TEXT[], '{}')
+    COALESCE($4::TEXT[], '{}'),
+    $5,
+    $6
   )
 RETURNING
   id
 `
 
 type CreateServiceAccountParams struct {
-	Name        string              `json:"name"`
-	Description *string             `json:"description"`
-	Role        nokku.WorkspaceRole `json:"role"`
-	Tags        []string            `json:"tags"`
+	Name          string              `json:"name"`
+	Description   *string             `json:"description"`
+	Role          nokku.WorkspaceRole `json:"role"`
+	Tags          []string            `json:"tags"`
+	ForceCommand  string              `json:"forceCommand"`
+	SourceAddress string              `json:"sourceAddress"`
 }
 
 func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAccountParams) (string, error) {
@@ -38,10 +49,41 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg *CreateServiceAc
 		arg.Description,
 		arg.Role,
 		arg.Tags,
+		arg.ForceCommand,
+		arg.SourceAddress,
 	)
 	var id string
 	err := row.Scan(&id)
 	return id, err
+}
+
+const createServiceAccountFederation = `-- name: CreateServiceAccountFederation :one
+INSERT INTO
+  service_account_federations (service_account_id, issuer, claims)
+VALUES
+  ($1, $2, $3)
+RETURNING
+  id, workspace_id, service_account_id, issuer, claims, created_at
+`
+
+type CreateServiceAccountFederationParams struct {
+	ServiceAccountID string            `json:"serviceAccountId"`
+	Issuer           string            `json:"issuer"`
+	Claims           map[string]string `json:"claims"`
+}
+
+func (q *Queries) CreateServiceAccountFederation(ctx context.Context, arg *CreateServiceAccountFederationParams) (*ServiceAccountFederation, error) {
+	row := q.db.QueryRow(ctx, createServiceAccountFederation, arg.ServiceAccountID, arg.Issuer, arg.Claims)
+	var i ServiceAccountFederation
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.ServiceAccountID,
+		&i.Issuer,
+		&i.Claims,
+		&i.CreatedAt,
+	)
+	return &i, err
 }
 
 const deleteServiceAccount = `-- name: DeleteServiceAccount :exec
@@ -55,9 +97,29 @@ func (q *Queries) DeleteServiceAccount(ctx context.Context, serviceAccountID str
 	return err
 }
 
+const deleteServiceAccountFederation = `-- name: DeleteServiceAccountFederation :execrows
+DELETE FROM service_account_federations
+WHERE
+  id = $1
+  AND service_account_id = $2
+`
+
+type DeleteServiceAccountFederationParams struct {
+	ID               string `json:"id"`
+	ServiceAccountID string `json:"serviceAccountId"`
+}
+
+func (q *Queries) DeleteServiceAccountFederation(ctx context.Context, arg *DeleteServiceAccountFederationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteServiceAccountFederation, arg.ID, arg.ServiceAccountID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getServiceAccount = `-- name: GetServiceAccount :one
 SELECT
-  id, workspace_id, name, description, role, tags, last_used_at, created_at, updated_at
+  id, workspace_id, name, description, role, tags, force_command, source_address, last_used_at, created_at, updated_at
 FROM
   service_accounts
 WHERE
@@ -74,6 +136,8 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 		&i.Description,
 		&i.Role,
 		&i.Tags,
+		&i.ForceCommand,
+		&i.SourceAddress,
 		&i.LastUsedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -81,9 +145,75 @@ func (q *Queries) GetServiceAccount(ctx context.Context, serviceAccountID string
 	return &i, err
 }
 
+const getServiceAccountByName = `-- name: GetServiceAccountByName :one
+SELECT
+  id, workspace_id, name, description, role, tags, force_command, source_address, last_used_at, created_at, updated_at
+FROM
+  service_accounts
+WHERE
+  name = $1
+`
+
+func (q *Queries) GetServiceAccountByName(ctx context.Context, name string) (*ServiceAccount, error) {
+	row := q.db.QueryRow(ctx, getServiceAccountByName, name)
+	var i ServiceAccount
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Description,
+		&i.Role,
+		&i.Tags,
+		&i.ForceCommand,
+		&i.SourceAddress,
+		&i.LastUsedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
+const listServiceAccountFederations = `-- name: ListServiceAccountFederations :many
+SELECT
+  id, workspace_id, service_account_id, issuer, claims, created_at
+FROM
+  service_account_federations
+WHERE
+  service_account_id = $1
+ORDER BY
+  id ASC
+`
+
+func (q *Queries) ListServiceAccountFederations(ctx context.Context, serviceAccountID string) ([]*ServiceAccountFederation, error) {
+	rows, err := q.db.Query(ctx, listServiceAccountFederations, serviceAccountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ServiceAccountFederation
+	for rows.Next() {
+		var i ServiceAccountFederation
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.ServiceAccountID,
+			&i.Issuer,
+			&i.Claims,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listServiceAccounts = `-- name: ListServiceAccounts :many
 SELECT
-  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.tags, sa.last_used_at, sa.created_at, sa.updated_at,
+  sa.id, sa.workspace_id, sa.name, sa.description, sa.role, sa.tags, sa.force_command, sa.source_address, sa.last_used_at, sa.created_at, sa.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   service_accounts sa
@@ -144,6 +274,8 @@ func (q *Queries) ListServiceAccounts(ctx context.Context, arg *ListServiceAccou
 			&i.ServiceAccount.Description,
 			&i.ServiceAccount.Role,
 			&i.ServiceAccount.Tags,
+			&i.ServiceAccount.ForceCommand,
+			&i.ServiceAccount.SourceAddress,
 			&i.ServiceAccount.LastUsedAt,
 			&i.ServiceAccount.CreatedAt,
 			&i.ServiceAccount.UpdatedAt,
@@ -171,9 +303,11 @@ SET
     ELSE $3
   END,
   tags = COALESCE($4, tags),
+  force_command = COALESCE($5, force_command),
+  source_address = COALESCE($6, source_address),
   updated_at = NOW()
 WHERE
-  id = $5
+  id = $7
 RETURNING
   id
 `
@@ -183,6 +317,8 @@ type UpdateServiceAccountParams struct {
 	Description      *string             `json:"description"`
 	Role             nokku.WorkspaceRole `json:"role"`
 	Tags             []string            `json:"tags"`
+	ForceCommand     *string             `json:"forceCommand"`
+	SourceAddress    *string             `json:"sourceAddress"`
 	ServiceAccountID string              `json:"serviceAccountId"`
 }
 
@@ -192,6 +328,8 @@ func (q *Queries) UpdateServiceAccount(ctx context.Context, arg *UpdateServiceAc
 		arg.Description,
 		arg.Role,
 		arg.Tags,
+		arg.ForceCommand,
+		arg.SourceAddress,
 		arg.ServiceAccountID,
 	)
 	var id string

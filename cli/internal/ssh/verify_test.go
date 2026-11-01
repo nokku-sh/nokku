@@ -70,9 +70,9 @@ func trust(t *testing.T, s *state.State) {
 func TestVerifyHostDaemon(t *testing.T) {
 	setupSSHDir(t)
 	caSigner := newSigner(t)
-	target := state.Target{ID: verifyTargetID, Name: "prod", DaemonID: "d", CAID: "ca"}
+	target := state.Target{ID: verifyTargetID, Name: "prod", DaemonID: "d"}
 	trust(t, &state.State{
-		CAs:     []state.CA{{ID: "ca", HostPublicKey: string(ssh.MarshalAuthorizedKey(caSigner.PublicKey()))}},
+		CA:      &state.CA{HostPublicKey: string(ssh.MarshalAuthorizedKey(caSigner.PublicKey()))},
 		Targets: []state.Target{target},
 	})
 

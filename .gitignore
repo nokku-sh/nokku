@@ -29,7 +29,6 @@ bin/
 dist/
 data/
 artifacts/
-/cli/internal/enclave/build/
 
 # Internal strategy docs, never publish (see idea/billing-and-monetization.md)
 idea/

@@ -30,8 +30,8 @@ import (
 
 func (e *testEnv) session(t *testing.T, ws actor.Workspace, u *db.User, kind actor.Kind) (*db.AccessToken, string) {
 	t.Helper()
-	sess, token, err := e.svc.IssueToken(anon(t.Context(), ws), iam.TokenParams{
-		SubjectID: u.ID, Kind: kind, Method: iam.MethodPasskey, TTL: time.Hour,
+	sess, token, err := e.svc.IssueSignIn(anon(t.Context(), ws), u, iam.TokenParams{
+		Kind: kind, Method: iam.MethodPasskey, TTL: time.Hour,
 	})
 	require.NoError(t, err)
 	return sess, token
@@ -40,8 +40,8 @@ func (e *testEnv) session(t *testing.T, ws actor.Workspace, u *db.User, kind act
 func TestMiddlewareOnlyTrustsCookieSessions(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	_, cliToken, err := e.svc.IssueToken(anon(t.Context(), o.ws), iam.TokenParams{
-		SubjectID: o.owner.ID, Kind: actor.KindCLI, Method: iam.MethodDevice, Binding: "jkt", TTL: time.Hour,
+	_, cliToken, err := e.svc.IssueSignIn(anon(t.Context(), o.ws), o.owner, iam.TokenParams{
+		Kind: actor.KindCLI, Method: iam.MethodDevice, Binding: "jkt", TTL: time.Hour,
 	})
 	require.NoError(t, err)
 	_, userToken := e.session(t, o.ws, o.owner, actor.KindUser)
@@ -108,8 +108,8 @@ func TestLogoutRevokesBoundSession(t *testing.T) {
 	require.NoError(t, err)
 	tp, err := (&jose.JSONWebKey{Key: &key.PublicKey}).Thumbprint(crypto.SHA256)
 	require.NoError(t, err)
-	_, token, err := e.svc.IssueToken(ctx, iam.TokenParams{
-		SubjectID: o.owner.ID, Kind: actor.KindCLI, Method: iam.MethodDevice,
+	_, token, err := e.svc.IssueSignIn(ctx, o.owner, iam.TokenParams{
+		Kind: actor.KindCLI, Method: iam.MethodDevice,
 		Binding: base64.RawURLEncoding.EncodeToString(tp), TTL: time.Hour,
 	})
 	require.NoError(t, err)
@@ -142,8 +142,8 @@ func TestSessionRecordsDevice(t *testing.T) {
 		actor.RequestMeta{Header: header, RemoteAddr: "[2001:db8:abcd:1234::7]:4242"},
 	)
 
-	sess, _, err := e.svc.IssueToken(ctx, iam.TokenParams{
-		SubjectID: o.owner.ID, Kind: actor.KindUser, Method: iam.MethodPasskey, TTL: time.Hour,
+	sess, _, err := e.svc.IssueSignIn(ctx, o.owner, iam.TokenParams{
+		Kind: actor.KindUser, Method: iam.MethodPasskey, TTL: time.Hour,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, header.Get("User-Agent"), sess.UserAgent)
@@ -319,7 +319,7 @@ func TestBrowserIsRememberedAndNeverSignsIn(t *testing.T) {
 		{"Authorization": {"Bearer " + cookie.Value}},
 		{"Cookie": {sessionCookieName + "=" + cookie.Value}},
 	} {
-		_, _, err := e.svc.Authenticate(ctx, h, "/nokku.v1.UtilService/Whoami")
+		_, _, err := e.svc.Authenticate(ctx, h, "/nokku.v1.TargetService/GetSubjectAccess")
 		require.Error(t, err, "the device cookie signed in")
 	}
 
@@ -369,12 +369,12 @@ func TestSessionActivityIsNotedOnceAMinute(t *testing.T) {
 	}
 
 	recent := seen(30 * time.Second)
-	_, _, err := e.svc.Authenticate(ctx, header, "/nokku.v1.UtilService/Whoami")
+	_, _, err := e.svc.Authenticate(ctx, header, "/nokku.v1.TargetService/GetSubjectAccess")
 	require.NoError(t, err)
 	assert.WithinDuration(t, recent, lastSeen(), time.Millisecond, "a request within the minute wrote the stamp")
 
 	seen(time.Minute)
-	_, _, err = e.svc.Authenticate(ctx, header, "/nokku.v1.UtilService/Whoami")
+	_, _, err = e.svc.Authenticate(ctx, header, "/nokku.v1.TargetService/GetSubjectAccess")
 	require.NoError(t, err)
 	assert.WithinDuration(t, time.Now(), lastSeen(), 5*time.Second, "a later request did not move the stamp")
 }
@@ -395,7 +395,7 @@ func (e *testEnv) serviceAccount(t *testing.T, ws actor.Workspace) string {
 func (e *testEnv) key(t *testing.T, ws actor.Workspace, saID string) (*db.AccessToken, string) {
 	t.Helper()
 	tok, secret, err := e.svc.IssueToken(anon(t.Context(), ws), iam.TokenParams{
-		SubjectID: saID, Kind: actor.KindServiceAccount, Method: iam.MethodToken, Label: "deploy",
+		SubjectID: saID, Kind: actor.KindServiceAccount, Method: iam.MethodToken, Label: "deploy", TTL: time.Hour,
 	})
 	require.NoError(t, err)
 	return tok, secret
@@ -406,7 +406,7 @@ func TestBadChecksumNeverReachesTheDatabase(t *testing.T) {
 	e := newTestEnv(t)
 	whoami := func(token string) error {
 		_, _, err := e.svc.Authenticate(
-			t.Context(), http.Header{"Authorization": {"Bearer " + token}}, "/nokku.v1.UtilService/Whoami",
+			t.Context(), http.Header{"Authorization": {"Bearer " + token}}, "/nokku.v1.TargetService/GetSubjectAccess",
 		)
 		return err
 	}
@@ -434,7 +434,7 @@ func TestSCIMTokenIsNoConnectCredential(t *testing.T) {
 	_, _, err = e.svc.Authenticate(
 		ctx,
 		http.Header{"Authorization": {"Bearer " + token}},
-		"/nokku.v1.UtilService/Whoami",
+		"/nokku.v1.TargetService/GetSubjectAccess",
 	)
 	require.Error(t, err, "a SCIM token authenticated a connect call")
 }

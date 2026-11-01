@@ -3,6 +3,7 @@ package audit
 import (
 	"cmp"
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -113,14 +114,48 @@ func (s *Service) Record(ctx context.Context, e *Event) {
 	s.write(ctx, e)
 }
 
+// Commit writes the call's event now, for what leaves no other trace, like an issued certificate. The caller refuses
+// on an error, so nothing goes out that the log doesn't have. The interceptor then adds no second row.
+func (s *Service) Commit(ctx context.Context) error {
+	e, ok := ctx.Value(eventKey{}).(*Event)
+	if !ok {
+		return errors.New("audit: this call has no event")
+	}
+	if err := s.Confirm(ctx, e); err != nil {
+		return err
+	}
+	e.written = true
+	return nil
+}
+
+// Confirm is Log for a caller that must refuse when the row can't be written.
+func (s *Service) Confirm(ctx context.Context, e *Event) error {
+	if e.WorkspaceID == "" {
+		e.WorkspaceID = actor.WorkspaceIDFromContext(ctx)
+	}
+	s.stamp(ctx, e, nil)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), auditWriteTimeout)
+	defer cancel()
+	return s.Append(ctx, e)
+}
+
 // finish skips unauthenticated calls and calls outside a workspace, the sign-in flows record their own.
 func (s *Service) finish(ctx context.Context, e *Event, err error) {
 	p, _ := actor.PrincipalFromContext(ctx)
-	if p.ID == "" || e.WorkspaceID == "" {
+	if p.ID == "" || e.WorkspaceID == "" || e.written {
 		return
 	}
+	s.stamp(ctx, e, err)
+	s.write(ctx, e)
+}
+
+// stamp fills in what the request knows. A call with no principal keeps the actor the caller named.
+func (s *Service) stamp(ctx context.Context, e *Event, err error) {
+	p, _ := actor.PrincipalFromContext(ctx)
 	e.Timestamp = time.Now().UTC()
-	e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), cmp.Or(p.Email, p.Name)
+	if p.ID != "" {
+		e.ActorID, e.ActorKind, e.ActorName = p.ID, string(p.Kind), cmp.Or(p.Email, p.Name)
+	}
 	if meta, ok := actor.RequestMetaFromContext(ctx); ok {
 		e.IP = meta.ClientIP()
 		e.UserAgent = meta.UserAgent()
@@ -138,7 +173,6 @@ func (s *Service) finish(ctx context.Context, e *Event, err error) {
 			e.ActorName = u.Email
 		}
 	}
-	s.write(ctx, e)
 }
 
 // write runs before the answer goes out, so a shutdown loses no row and a client that hangs up does not stop it.

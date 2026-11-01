@@ -18,11 +18,11 @@ Nokku gives people short-lived SSH certificates instead of long-lived keys. You 
 
 This folder is the core: one Go binary with the API, the web app and the certificate authorities. It needs PostgreSQL and nothing else.
 
-Your servers keep working when the core is down. They enforce what they last synced, and a valid certificate still logs in.
+Your servers keep working when the core is down. They enforce what they last synced, and a valid certificate still logs in directly. A new certificate and a relayed connection need the core.
 
 | Part       | Folder                | What it does                                           |
 | ---------- | --------------------- | ------------------------------------------------------ |
-| **Core**   | `core` (this one)     | Users, access, certificate authorities, SSO, audit log |
+| **Core**   | `core` (this one)     | Users, access, one CA per workspace, SSO, audit log    |
 | **Daemon** | [`daemon`](../daemon) | Runs on a server and keeps its SSH access in sync      |
 | **CLI**    | [`cli`](../cli)       | Signs you in on your machine, then plain `ssh` works   |
 
@@ -76,9 +76,7 @@ Point your domain at the host and open ports 80 and 443. Caddy gets the certific
 
 ### Kubernetes
 
-A Helm chart is in [`charts/nokku`](./charts/nokku). Its `values.yaml` lists every option.
-
-The chart ships no default secret and no default database password. Set `secrets.secret`, or point `secrets.existingSecret` at your own, and set `postgresql.auth.password` for the bundled PostgreSQL.
+There is no chart. The image runs fine in a cluster with the settings on this page: one replica, a volume or bucket for recordings, and a PostgreSQL of your own. Stop the old pod before the new one starts, the core keeps its connections in memory, so use the `Recreate` strategy.
 
 ### Binary
 
@@ -103,9 +101,9 @@ The [Caddyfile](./Caddyfile) is a working example.
 
 Nokku takes the client's address from `X-Forwarded-For`. Out of the box it trusts a proxy on the same machine or on a private network, like a Docker network or the pod network of a cluster, and takes the address that proxy added. Docker and Kubernetes need nothing set.
 
-That address goes into the audit log, sessions, sign-in mails and rate limits, and a CA's `source-address` is checked against it. Anything on a private network that reaches port 3000 directly could claim any address. So let only the proxy reach Nokku: keep the port on the proxy's Docker network, as `compose.prod.yml` does, or turn on the chart's `networkPolicy` in a cluster.
+That address goes into the audit log, sessions, sign-in mails and rate limits, and the `source-address` on a certificate is checked against it. Anything on a private network that reaches port 3000 directly could claim any address. So let only the proxy reach Nokku: keep the port on the proxy's Docker network, as `compose.prod.yml` does, or use a NetworkPolicy in a cluster.
 
-To tighten it, set `NOKKU_TRUSTED_PROXIES` to your proxies, as IPs or CIDRs. That replaces the default, and only those may name the client. The Helm chart takes it as `app.trustedProxies`. Set it when:
+To tighten it, set `NOKKU_TRUSTED_PROXIES` to your proxies, as IPs or CIDRs. That replaces the default, and only those may name the client. Set it when:
 
 - you want only your proxy trusted, not every private address
 - your proxy reaches Nokku from a public address, like a Docker network or cluster on public IPv6, or from `100.64.0.0/10` like over Tailscale
@@ -117,7 +115,7 @@ A wrong setting does not stop Nokku from working. It gets addresses wrong:
 
 | Setting                                                               | What happens                                                                                                                                                      |
 | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Your proxy is not trusted                                             | Every client shows up as the proxy. They all share one rate limit, and a CA's `source-address` refuses browser and relayed sessions. The core logs a warning once |
+| Your proxy is not trusted                                             | Every client shows up as the proxy. They all share one rate limit, and a `source-address` on a certificate refuses browser and relayed sessions. The core logs a warning once |
 | A CDN or load balancer in front is not trusted, here or by your proxy | Every client shows up as the CDN, the load balancer or your proxy, with the same effects                                                                          |
 | The list covers your users too, like `10.0.0.0/8` with users in it    | They are taken for proxies. They show up as your proxy, or behind a proxy that keeps what the client sent, like plain nginx, they can claim any address           |
 
@@ -142,24 +140,13 @@ services:
       traefik.http.services.nokku.loadbalancer.server.scheme: h2c
 ```
 
-**Kubernetes.** Nokku sees the address of the Traefik pod. It is on the pod network, so it is trusted as it is. Every other pod is on that network too, so let only Traefik reach Nokku. The chart makes a NetworkPolicy for that with `networkPolicy.enabled`, off by default. It needs a network plugin that enforces policies.
+**Kubernetes.** Nokku sees the address of the Traefik pod. It is on the pod network, so it is trusted as it is. Every other pod is on that network too, so let only Traefik reach Nokku with a NetworkPolicy. It needs a network plugin that enforces policies.
 
-Name the namespace Traefik runs in. A wrong one cuts Nokku off, and Traefik answers 502 or 504. The same works with a gateway: name the namespace its proxy pods run in. Anything else in the cluster that calls Nokku directly, like a scraper, goes in `networkPolicy.extraFrom`. The health probes come from the node, most plugins let them through.
+Name the namespace Traefik runs in. A wrong one cuts Nokku off, and Traefik answers 502 or 504. The same works with a gateway: name the namespace its proxy pods run in. Anything else in the cluster that calls Nokku directly, like a scraper, needs a rule of its own. The health probes come from the node, most plugins let them through.
 
-Two setups need more than a namespace. A controller on the host network, common for ingress-nginx on bare metal, comes from the node's address. Add the nodes as an `ipBlock` in `networkPolicy.extraFrom`, if your plugin matches node addresses that way. Cilium's own ingress and gateway reach pods as Cilium's `ingress` identity, which a NetworkPolicy cannot name. Use a CiliumNetworkPolicy there.
+Two setups need more than a namespace. A controller on the host network, common for ingress-nginx on bare metal, comes from the node's address. Add the nodes as an `ipBlock`, if your plugin matches node addresses that way. Cilium's own ingress and gateway reach pods as Cilium's `ingress` identity, which a NetworkPolicy cannot name. Use a CiliumNetworkPolicy there.
 
-```yaml
-# values.yaml
-service:
-  annotations:
-    traefik.ingress.kubernetes.io/service.serversscheme: h2c
-ingress:
-  enabled: true
-  className: traefik
-networkPolicy:
-  enabled: true
-  namespaces: [kube-system] # where Traefik runs
-```
+Traefik has to speak h2c to Nokku, so annotate the Service with `traefik.ingress.kubernetes.io/service.serversscheme: h2c`.
 
 Traefik only sees real client addresses when its own Service keeps them, with `externalTrafficPolicy: Local` on a LoadBalancer or NodePort. Otherwise every client shows up as a node address.
 
@@ -204,6 +191,8 @@ sudo nokkud --api https://nokku.example.com enroll
 ```
 
 The web app shows the exact commands, with a token, under **Infrastructure, Daemons**.
+
+A CI job signs in with its platform's own token, so no secret is stored. Add a rule under **CI jobs** on a service account and run `nk login --ci <name>` in the job, see [CI and headless machines](../cli#ci-and-headless-machines). A service account key stays the answer for Ansible and scripts, and always has an end date. What the exchange checks is in [SECURITY.md](./SECURITY.md#what-to-know-about-the-design).
 
 ## Configuration
 
@@ -290,7 +279,7 @@ Any SMTP relay works. Without email, people sign in with passkeys or an identity
 <details>
 <summary><b>File storage</b></summary>
 
-Session recordings go to a local folder by default. They are encrypted before they are stored, wherever that is. Avatars live in the database.
+Session recordings go to a local folder by default. They are encrypted before they are stored, wherever that is.
 
 | Variable                | Default         | Purpose                                   |
 | ----------------------- | --------------- | ----------------------------------------- |
@@ -331,7 +320,6 @@ The log only carries warnings and errors. Traces, metrics and request logs go to
 | Variable                      | Purpose                                                              |
 | ----------------------------- | -------------------------------------------------------------------- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Turns on OTLP export of traces, metrics and logs                     |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` by default, `grpc` for a collector that expects gRPC |
 | `OTEL_EXPORTER_OTLP_HEADERS`  | Extra headers for the exporter                                       |
 | `OTEL_TRACES_SAMPLER`         | Every request is traced by default, see below for a share            |
 

@@ -691,12 +691,12 @@ const file_nokku_v1_audit_stream_proto_rawDesc = "" +
 	"\x1dAUDIT_STREAM_KIND_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19AUDIT_STREAM_KIND_WEBHOOK\x10\x01\x12\x1c\n" +
 	"\x18AUDIT_STREAM_KIND_SPLUNK\x10\x02\x12\x1d\n" +
-	"\x19AUDIT_STREAM_KIND_DATADOG\x10\x032\xae\x04\n" +
+	"\x19AUDIT_STREAM_KIND_DATADOG\x10\x032\xb4\x04\n" +
 	"\x12AuditStreamService\x12d\n" +
-	"\x10ListAuditStreams\x12!.nokku.v1.ListAuditStreamsRequest\x1a\".nokku.v1.ListAuditStreamsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12u\n" +
-	"\x11CreateAuditStream\x12\".nokku.v1.CreateAuditStreamRequest\x1a#.nokku.v1.CreateAuditStreamResponse\"\x17\xc2\xf3\x18\x13\x18\x05:\x0faudit_streaming\x12d\n" +
-	"\x11UpdateAuditStream\x12\".nokku.v1.UpdateAuditStreamRequest\x1a#.nokku.v1.UpdateAuditStreamResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12d\n" +
-	"\x11DeleteAuditStream\x12\".nokku.v1.DeleteAuditStreamRequest\x1a#.nokku.v1.DeleteAuditStreamResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12o\n" +
+	"\x10ListAuditStreams\x12!.nokku.v1.ListAuditStreamsRequest\x1a\".nokku.v1.ListAuditStreamsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12w\n" +
+	"\x11CreateAuditStream\x12\".nokku.v1.CreateAuditStreamRequest\x1a#.nokku.v1.CreateAuditStreamResponse\"\x19\xc2\xf3\x18\x15\x18\x050\x01:\x0faudit_streaming\x12f\n" +
+	"\x11UpdateAuditStream\x12\".nokku.v1.UpdateAuditStreamRequest\x1a#.nokku.v1.UpdateAuditStreamResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12f\n" +
+	"\x11DeleteAuditStream\x12\".nokku.v1.DeleteAuditStreamRequest\x1a#.nokku.v1.DeleteAuditStreamResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12o\n" +
 	"\x0fTestAuditStream\x12 .nokku.v1.TestAuditStreamRequest\x1a!.nokku.v1.TestAuditStreamResponse\"\x17\xc2\xf3\x18\x13\x18\x05:\x0faudit_streamingB\x91\x01\n" +
 	"\fcom.nokku.v1B\x10AuditStreamProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

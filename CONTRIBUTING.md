@@ -137,6 +137,7 @@ config enables golines formatting). `task core:lint` adds `pnpm fmt` and
 ```bash
 go test ./...                 # unit tests, no services needed
 task core:test:integration    # needs Docker
+task core:test:hosted         # the API tests in hosted mode, needs Docker
 ```
 
 Unit tests live next to the code and never open a connection. Tests
@@ -145,13 +146,20 @@ behind the `integration` build tag and start their own containers, so nothing
 has to run on your machine first. The TPM tests in `internal/tpm` run against
 the go-tpm simulator and skip when it cannot start. CI runs all of them.
 
+`NOKKU_TEST_HOSTED=1` runs the API tests the way the hosted service runs: with
+`NOKKU_SAAS`, a Vault KMS and workspace hosts. A test that only means something
+self-hosted says why it skips. Where the hosted answers differ from the
+self-hosted ones, they have their own `hosted_*.golden` file.
+
 `task smoke` is the end-to-end check, and it needs Docker. It builds the real
 `nokku`, `nk` and `nokkud`, the daemon into a local `nokkud:smoke` image, and
 starts its own Postgres and Mailpit on random ports. Then it walks one owner
 through it all: the admin link, a daemon that enrolls, `nk login`, ssh direct
 and through the relay, the web terminal, the recordings, a revoke that ends a
-live session, and the audit log. nk and ssh run in a HOME of their own, so
-your `~/.ssh`, `~/.config/nk` and ssh agent stay untouched.
+live session, and the audit log. Last, a CI job signs in with `nk login --ci`
+against a stand-in for GitHub Actions and reaches the server. nk and ssh run in
+a HOME of their own, so your `~/.ssh`, `~/.config/nk` and ssh agent stay
+untouched.
 
 Please add tests for new behavior and keep the existing suite green.
 Database-backed changes should include the relevant migration and regenerate

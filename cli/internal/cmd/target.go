@@ -37,10 +37,6 @@ func syncCMD() *cli.Command {
 		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "name", Usage: "Name for a new target, generated when empty"},
-			&cli.StringFlag{
-				Name:  "ca",
-				Usage: "Certificate authority id or name for a new target, defaults to the default one",
-			},
 			&cli.StringSliceFlag{
 				Name: "grant",
 				Usage: "Who may log in to a new target, as account=subject,subject. " +
@@ -81,26 +77,22 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	var ca *state.CA
+	ca, err := c.WorkspaceCA(ctx)
+	if err != nil {
+		return fmt.Errorf("reading the certificate authority: %w", err)
+	}
+	if ca == nil || strings.TrimSpace(ca.PublicKey) == "" {
+		return errors.New("the core sent no certificate authority key, nothing was written")
+	}
 	var seeds []client.Grant
 	if target == nil {
-		if target, ca, err = newTarget(ctx, c, cmd, dest); err != nil {
-			return err
-		}
+		target = newTarget(ctx, cmd, dest)
 		if seeds, err = c.ResolveGrants(ctx, cmd.StringSlice("grant")); err != nil {
 			return err
 		}
-	} else {
-		if cmd.IsSet("grant") || cmd.IsSet("tag") {
-			// The web app owns access from the first sync on, so a rerun never undoes a change made there.
-			warnf("%s is already a target, --grant and --tag only apply to a new one", target.Name)
-		}
-		if ca, err = targetCA(ctx, c, target.CAID); err != nil {
-			return err
-		}
-	}
-	if ca == nil || strings.TrimSpace(ca.PublicKey) == "" {
-		return fmt.Errorf("the certificate authority of %s is missing, run nk login and try again", target.Name)
+	} else if cmd.IsSet("grant") || cmd.IsSet("tag") {
+		// The web app owns access from the first sync on, so a rerun never undoes a change made there.
+		warnf("%s is already a target, --grant and --tag only apply to a new one", target.Name)
 	}
 
 	if dest, err = dest.trust(target, cmd.Bool("accept-host-key")); err != nil {
@@ -129,7 +121,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if !dryRun {
-		if err = applyPlan(ctx, c, target, created, dest, h, plan, progress); err != nil {
+		if err = applyPlan(ctx, c, ca, target, created, dest, h, plan, progress); err != nil {
 			return err
 		}
 	}
@@ -229,6 +221,7 @@ func newSyncResult(target *state.Target, plan manual.Plan, seeds []client.Grant,
 func applyPlan(
 	ctx context.Context,
 	c *client.Client,
+	ca *state.CA,
 	target *state.Target,
 	created bool,
 	dest remote,
@@ -248,6 +241,17 @@ func applyPlan(
 				"remove it with nk rm %s --keep-host: %w", dest.host, target.Name, target.Name, errors.Join(err, delErr))
 		}
 		return fmt.Errorf("writing to %s failed, the new target %s was removed again: %w", dest.host, target.Name, err)
+	}
+	// A report says the host has the current keys, a rollover in the meantime would clear the warning for nothing.
+	current, err := c.WorkspaceCA(ctx)
+	if err != nil {
+		return fmt.Errorf(
+			"the host was written, but reading the certificate authority failed, run nk sync again: %w",
+			err,
+		)
+	}
+	if current == nil || current.PublicKey != ca.PublicKey {
+		return errors.New("the keys of the certificate authority changed during this sync, run nk sync again")
 	}
 	if err = c.ReportTarget(ctx, target, h.Accounts, h.HostKey); err != nil {
 		return fmt.Errorf("the host is up to date, but reporting to Nokku failed, run nk sync again: %w", err)
@@ -423,36 +427,8 @@ func endpointMatch(t *state.Target, dest remote) (remote, bool) {
 	return remote{}, false
 }
 
-// targetCA falls back to the core, the access snapshot only has the CAs of targets the operator may log in to.
-func targetCA(ctx context.Context, c *client.Client, id string) (*state.CA, error) {
-	if ca := c.State.CAByID(id); ca != nil {
-		return ca, nil
-	}
-	cas, err := c.ListSSHCAs(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("listing certificate authorities: %w", err)
-	}
-	if i := slices.IndexFunc(cas, func(ca state.CA) bool { return ca.ID == id }); i >= 0 {
-		return &cas[i], nil
-	}
-	return nil, nil //nolint:nilnil // the caller names the missing CA
-}
-
-// Created on the core only once the host key is read. The local state only knows the CAs of existing targets.
-func newTarget(
-	ctx context.Context,
-	c *client.Client,
-	cmd *cli.Command,
-	dest remote,
-) (*state.Target, *state.CA, error) {
-	cas, err := c.ListSSHCAs(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("listing certificate authorities: %w", err)
-	}
-	ca, err := resolveCA(cas, cmd.String("ca"))
-	if err != nil {
-		return nil, nil, err
-	}
+// Created on the core only once the host key is read.
+func newTarget(ctx context.Context, cmd *cli.Command, dest remote) *state.Target {
 	// Users dial the endpoint directly, so store the real address behind an ssh config alias.
 	addr := dest.resolve(ctx)
 	endpoint := addr.host
@@ -460,49 +436,9 @@ func newTarget(
 		endpoint = net.JoinHostPort(addr.host, addr.port)
 	}
 	return &state.Target{
-		CAID:      ca.ID,
 		Name:      strings.TrimSpace(cmd.String("name")),
 		Endpoints: []string{endpoint},
-	}, &ca, nil
-}
-
-// An id wins, then an exact name, then one that matches without case. A name that fits several CAs is refused.
-func resolveCA(cas []state.CA, ref string) (state.CA, error) {
-	if ref == "" {
-		if i := slices.IndexFunc(cas, func(ca state.CA) bool { return ca.Default }); i >= 0 {
-			return cas[i], nil
-		}
-		switch len(cas) {
-		case 0:
-			return state.CA{}, errors.New("there is no certificate authority yet, create one in the Nokku UI")
-		case 1:
-			return cas[0], nil
-		}
-		return state.CA{}, errors.New("there are several certificate authorities, pass --ca")
 	}
-
-	var exact, folded []state.CA
-	for _, ca := range cas {
-		switch {
-		case ca.ID == ref:
-			return ca, nil
-		case ca.Name == ref:
-			exact = append(exact, ca)
-		case strings.EqualFold(ca.Name, ref):
-			folded = append(folded, ca)
-		}
-	}
-	found := exact
-	if len(found) == 0 {
-		found = folded
-	}
-	switch len(found) {
-	case 0:
-		return state.CA{}, fmt.Errorf("certificate authority %q not found", ref)
-	case 1:
-		return found[0], nil
-	}
-	return state.CA{}, fmt.Errorf("several certificate authorities are named %q, pass the id", ref)
 }
 
 // endpointRemote uses the endpoint's own port unless --port was set.

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/vault/api"
 	"github.com/moby/moby/api/types/container"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -162,7 +163,14 @@ func Keycloak(t *testing.T) string {
 // nokku only talks https to Vault.
 func Vault(t *testing.T) (addr, caFile string) {
 	t.Helper()
-	c, err := run(t.Context(), vaultImage,
+	c, addr, caFile, err := startVault(t.Context(), t.TempDir())
+	testcontainers.CleanupContainer(t, c)
+	require.NoError(t, err, "start vault")
+	return addr, caFile
+}
+
+func startVault(ctx context.Context, dir string) (*testcontainers.DockerContainer, string, string, error) {
+	c, err := run(ctx, vaultImage,
 		testcontainers.WithCmd("server", "-dev", "-dev-tls", "-dev-tls-cert-dir=/tmp"),
 		testcontainers.WithEnv(map[string]string{"VAULT_DEV_ROOT_TOKEN_ID": VaultToken}),
 		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
@@ -173,17 +181,57 @@ func Vault(t *testing.T) (addr, caFile string) {
 			wait.ForHTTP("/v1/sys/health").WithPort("8200/tcp").WithTLS(true).WithAllowInsecure(true),
 		),
 	)
-	testcontainers.CleanupContainer(t, c)
-	require.NoError(t, err, "start vault")
-	addr, err = c.PortEndpoint(t.Context(), "8200/tcp", "")
-	require.NoError(t, err)
-
-	rc, err := c.CopyFileFromContainer(t.Context(), "/tmp/vault-ca.pem")
-	require.NoError(t, err, "copy the vault CA")
+	if err != nil {
+		return c, "", "", err
+	}
+	addr, err := c.PortEndpoint(ctx, "8200/tcp", "")
+	if err != nil {
+		return c, "", "", err
+	}
+	rc, err := c.CopyFileFromContainer(ctx, "/tmp/vault-ca.pem")
+	if err != nil {
+		return c, "", "", fmt.Errorf("copy the vault CA: %w", err)
+	}
 	defer func() { _ = rc.Close() }()
 	ca, err := io.ReadAll(rc)
-	require.NoError(t, err)
-	caFile = filepath.Join(t.TempDir(), "vault-ca.pem")
-	require.NoError(t, os.WriteFile(caFile, ca, 0o600))
-	return addr, caFile
+	if err != nil {
+		return c, "", "", err
+	}
+	caFile := filepath.Join(dir, "vault-ca.pem")
+	return c, addr, caFile, os.WriteFile(caFile, ca, 0o600)
+}
+
+// KMS starts a Vault with one transit key and points the environment at it, the way a hosted server starts. Call it
+// from TestMain, run stop after.
+func KMS(dir string) (stop func()) {
+	ctx := context.Background()
+	c, addr, caFile, err := startVault(ctx, dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "start vault: %v\n", err)
+		os.Exit(1)
+	}
+	stop = func() { _ = testcontainers.TerminateContainer(c) }
+
+	for key, value := range map[string]string{
+		"KMS_URI":      "hcvault://" + addr + "/transit/keys/nokku",
+		"VAULT_CACERT": caFile,
+		"VAULT_TOKEN":  VaultToken,
+	} {
+		_ = os.Setenv(key, value)
+	}
+	cfg := api.DefaultConfig()
+	cfg.Address = "https://" + addr
+	client, err := api.NewClient(cfg)
+	if err == nil {
+		_, err = client.Logical().WriteWithContext(ctx, "sys/mounts/transit", map[string]any{"type": "transit"})
+	}
+	if err == nil {
+		_, err = client.Logical().WriteWithContext(ctx, "transit/keys/nokku", nil)
+	}
+	if err != nil {
+		stop()
+		fmt.Fprintf(os.Stderr, "make the vault key: %v\n", err)
+		os.Exit(1)
+	}
+	return stop
 }

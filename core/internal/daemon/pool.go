@@ -7,12 +7,15 @@ import (
 	"maps"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -30,6 +33,21 @@ type daemonConn struct {
 	state  chan *nokkuv1.ConnectResponse
 	ctx    context.Context
 	cancel context.CancelFunc
+	// wanted is the version the core had at the last heartbeat, behindSince when the daemon stopped reaching it.
+	wanted      int64
+	behindSince atomic.Pointer[time.Time]
+}
+
+// heartbeat compares what the daemon applied with what the core had a heartbeat ago, which it had time to reach, so a
+// daemon busy with the latest change never counts. It reports the moment the daemon falls behind.
+func (c *daemonConn) heartbeat(applied, current int64) (fell bool) {
+	behind := applied < c.wanted
+	c.wanted = current
+	if !behind {
+		c.behindSince.Store(nil)
+		return false
+	}
+	return c.behindSince.CompareAndSwap(nil, new(time.Now()))
 }
 
 // connection lets tests stub db.Connection without Postgres.
@@ -54,6 +72,8 @@ type Pool struct {
 	pendingRelays map[string]*relayPending
 	relayCounts   map[string]int
 	conn          connection
+	// Record is told when a daemon falls behind. Set before the server starts.
+	Record func(context.Context, *audit.Event)
 }
 
 func New(conn connection) *Pool {
@@ -89,6 +109,45 @@ func (p *Pool) IsConnected(daemonID string) bool {
 	defer p.mu.RUnlock()
 	_, ok := p.byID[daemonID]
 	return ok
+}
+
+// BehindSince is when a connected daemon stopped keeping up with access changes, zero while it keeps up. It may be
+// enforcing access that was revoked, and a failed sync only shows in that host's log.
+func (p *Pool) BehindSince(daemonID string) time.Time {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if c := p.byID[daemonID]; c != nil {
+		if since := c.behindSince.Load(); since != nil {
+			return *since
+		}
+	}
+	return time.Time{}
+}
+
+// BehindIn counts the daemons of a workspace that fell behind.
+func (p *Pool) BehindIn(workspaceID string) int32 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	var n int32
+	for daemonID := range p.byWksp[workspaceID] {
+		if c := p.byID[daemonID]; c != nil && c.behindSince.Load() != nil {
+			n++
+		}
+	}
+	return n
+}
+
+func (p *Pool) reportBehind(c *daemonConn, name string, applied, current int64) {
+	slog.Warn("daemon is behind", "daemon_id", c.daemonID, "applied", applied, "current", current)
+	if p.Record == nil {
+		return
+	}
+	p.Record(actor.WithWorkspace(c.ctx, actor.Workspace{ID: c.workspaceID}), &audit.Event{
+		Action:  "DaemonBehind",
+		Target:  c.daemonID,
+		OK:      true,
+		Details: map[string]any{"name": name, "applied": applied, "current": current},
+	})
 }
 
 // markSeen stamps the moment a daemon connects or goes, so an offline one shows when it was last there.

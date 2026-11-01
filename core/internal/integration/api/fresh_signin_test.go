@@ -15,6 +15,7 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -58,7 +59,7 @@ func TestFreshSignInMatrix(t *testing.T) {
 	require.NoError(t, err)
 	// The workspace is shared, the login page of later tests must not offer it.
 	t.Cleanup(func() {
-		ctx := actor.WithWorkspace(context.WithoutCancel(t.Context()), cfg.Tenant.Single())
+		ctx := actor.WithWorkspace(context.WithoutCancel(t.Context()), testWorkspace)
 		require.NoError(t, cfg.IAM.DeleteSSOProvider(ctx, providerID))
 	})
 	sa, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(browserSession(t, cfg, admin, 0))).
@@ -96,12 +97,28 @@ func TestFreshSignInMatrix(t *testing.T) {
 		}},
 		{"AccountService.RequestEmailChange", member, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewAccountServiceClient(rpc(s)).RequestEmailChange(t.Context(),
-				&nokkuv1.RequestEmailChangeRequest{NewEmail: new(uniq("moved") + "@api.test")})
+				&nokkuv1.RequestEmailChangeRequest{NewEmail: new(newMailAddress())})
 			return refusedRPC(err)
 		}},
 		{"InvitationService.CreateInvitation", admin, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewInvitationServiceClient(rpc(s)).CreateInvitation(t.Context(),
-				&nokkuv1.CreateInvitationRequest{Email: new(uniq("invited") + "@api.test")})
+				&nokkuv1.CreateInvitationRequest{Email: new(newMailAddress())})
+			return refusedRPC(err)
+		}},
+		// The emergency kind, so no later test finds a replaced key still trusted on the shared CA.
+		{"CertificateService.RolloverCertificateAuthority", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewCertificateServiceClient(rpc(s)).RolloverCertificateAuthority(t.Context(),
+				&nokkuv1.RolloverCertificateAuthorityRequest{RevokePrevious: new(true)})
+			return refusedRPC(err)
+		}},
+		{"CertificateService.UpdateCertificateAuthority", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewCertificateServiceClient(rpc(s)).UpdateCertificateAuthority(t.Context(),
+				masked(&nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("")}))
+			return refusedRPC(err)
+		}},
+		{"ServiceAccountService.UpdateServiceAccount limits", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).UpdateServiceAccount(t.Context(),
+				masked(&nokkuv1.UpdateServiceAccountRequest{Id: sa.GetServiceAccount().Id, ForceCommand: new("")}))
 			return refusedRPC(err)
 		}},
 		{"JoinTokenService.CreateJoinToken", admin, func(s login) (string, bool) {
@@ -111,7 +128,28 @@ func TestFreshSignInMatrix(t *testing.T) {
 		}},
 		{"ServiceAccountService.CreateServiceAccountToken", admin, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).CreateServiceAccountToken(t.Context(),
-				&nokkuv1.CreateServiceAccountTokenRequest{ServiceAccountId: new(sa.GetServiceAccount().GetId())})
+				&nokkuv1.CreateServiceAccountTokenRequest{
+					ServiceAccountId: new(sa.GetServiceAccount().GetId()),
+					ExpiresAt:        timestamppb.New(time.Now().Add(time.Hour)),
+				})
+			return refusedRPC(err)
+		}},
+		{"ServiceAccountService.AddServiceAccountFederation", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).AddServiceAccountFederation(t.Context(),
+				&nokkuv1.AddServiceAccountFederationRequest{
+					ServiceAccountId: new(sa.GetServiceAccount().GetId()),
+					Issuer:           new("https://ci.example.test"),
+					Claims:           map[string]string{"sub": "job"},
+				})
+			return refusedRPC(err)
+		}},
+		// No rule has this id. A call that gets past the fresh check answers not_found.
+		{"ServiceAccountService.RemoveServiceAccountFederation", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).RemoveServiceAccountFederation(t.Context(),
+				&nokkuv1.RemoveServiceAccountFederationRequest{
+					ServiceAccountId: new(sa.GetServiceAccount().GetId()),
+					Id:               new(uuid.NewV7().String()),
+				})
 			return refusedRPC(err)
 		}},
 		{"SCIMService.CreateSCIMToken", owner, func(s login) (string, bool) {
@@ -150,6 +188,10 @@ func TestFreshSignInMatrix(t *testing.T) {
 		"# plain HTTP routes, as Authorization: DPoP with a proof on RPCs. old is signed in 11m ago.",
 	}
 	for _, r := range routes {
+		// It would delete the workspace every test shares, TestHostedDeleteWorkspace has its own.
+		if hosted && r.name == "WorkspaceService.DeleteWorkspace" {
+			continue
+		}
 		for _, c := range []struct {
 			name string
 			s    login
@@ -168,7 +210,7 @@ func TestFreshSignInMatrix(t *testing.T) {
 			))
 		}
 	}
-	assertGolden(t, "fresh_signin.golden", lines)
+	assertGolden(t, hostedGolden("fresh_signin.golden"), lines)
 }
 
 // The web app reads fresh_for to ask for a new sign-in before a form opens, so it counts like the check does.

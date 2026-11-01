@@ -27,18 +27,9 @@ const (
 	// CertificateServiceGetCertificateAuthorityProcedure is the procedure name of the
 	// CertificateService's GetCertificateAuthority RPC.
 	CertificateServiceGetCertificateAuthorityProcedure = "/nokku.v1.CertificateService/GetCertificateAuthority"
-	// CertificateServiceCreateCertificateAuthorityProcedure is the procedure name of the
-	// CertificateService's CreateCertificateAuthority RPC.
-	CertificateServiceCreateCertificateAuthorityProcedure = "/nokku.v1.CertificateService/CreateCertificateAuthority"
 	// CertificateServiceUpdateCertificateAuthorityProcedure is the procedure name of the
 	// CertificateService's UpdateCertificateAuthority RPC.
 	CertificateServiceUpdateCertificateAuthorityProcedure = "/nokku.v1.CertificateService/UpdateCertificateAuthority"
-	// CertificateServiceListCertificateAuthoritiesProcedure is the procedure name of the
-	// CertificateService's ListCertificateAuthorities RPC.
-	CertificateServiceListCertificateAuthoritiesProcedure = "/nokku.v1.CertificateService/ListCertificateAuthorities"
-	// CertificateServiceDeleteCertificateAuthorityProcedure is the procedure name of the
-	// CertificateService's DeleteCertificateAuthority RPC.
-	CertificateServiceDeleteCertificateAuthorityProcedure = "/nokku.v1.CertificateService/DeleteCertificateAuthority"
 	// CertificateServiceRolloverCertificateAuthorityProcedure is the procedure name of the
 	// CertificateService's RolloverCertificateAuthority RPC.
 	CertificateServiceRolloverCertificateAuthorityProcedure = "/nokku.v1.CertificateService/RolloverCertificateAuthority"
@@ -56,33 +47,11 @@ var (
 			IdempotencyLevel: connect.IdempotencyNoSideEffects,
 		}
 	})
-	certificateServiceCreateCertificateAuthoritySpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_certificates_proto.Services().ByName("CertificateService").Methods().ByName("CreateCertificateAuthority"),
-			Procedure:  CertificateServiceCreateCertificateAuthorityProcedure,
-		}
-	})
 	certificateServiceUpdateCertificateAuthoritySpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_nokku_v1_certificates_proto.Services().ByName("CertificateService").Methods().ByName("UpdateCertificateAuthority"),
 			Procedure:  CertificateServiceUpdateCertificateAuthorityProcedure,
-		}
-	})
-	certificateServiceListCertificateAuthoritiesSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_certificates_proto.Services().ByName("CertificateService").Methods().ByName("ListCertificateAuthorities"),
-			Procedure:        CertificateServiceListCertificateAuthoritiesProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
-	certificateServiceDeleteCertificateAuthoritySpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_certificates_proto.Services().ByName("CertificateService").Methods().ByName("DeleteCertificateAuthority"),
-			Procedure:  CertificateServiceDeleteCertificateAuthorityProcedure,
 		}
 	})
 	certificateServiceRolloverCertificateAuthoritySpec = sync.OnceValue(func() connect.Spec {
@@ -104,10 +73,7 @@ var (
 // CertificateServiceClient is a client for the nokku.v1.CertificateService service.
 type CertificateServiceClient interface {
 	GetCertificateAuthority(context.Context, *v1.GetCertificateAuthorityRequest) (*v1.GetCertificateAuthorityResponse, error)
-	CreateCertificateAuthority(context.Context, *v1.CreateCertificateAuthorityRequest) (*v1.CreateCertificateAuthorityResponse, error)
 	UpdateCertificateAuthority(context.Context, *v1.UpdateCertificateAuthorityRequest) (*v1.UpdateCertificateAuthorityResponse, error)
-	ListCertificateAuthorities(context.Context, *v1.ListCertificateAuthoritiesRequest) (*v1.ListCertificateAuthoritiesResponse, error)
-	DeleteCertificateAuthority(context.Context, *v1.DeleteCertificateAuthorityRequest) (*v1.DeleteCertificateAuthorityResponse, error)
 	RolloverCertificateAuthority(context.Context, *v1.RolloverCertificateAuthorityRequest) (*v1.RolloverCertificateAuthorityResponse, error)
 	SignSSHCertificate(context.Context, *v1.SignSSHCertificateRequest) (*v1.SignSSHCertificateResponse, error)
 }
@@ -121,10 +87,7 @@ func NewCertificateServiceClient(client *connect.Client) CertificateServiceClien
 // CertificateServiceHandler is an implementation of the nokku.v1.CertificateService service.
 type CertificateServiceHandler interface {
 	GetCertificateAuthority(context.Context, *v1.GetCertificateAuthorityRequest) (*v1.GetCertificateAuthorityResponse, error)
-	CreateCertificateAuthority(context.Context, *v1.CreateCertificateAuthorityRequest) (*v1.CreateCertificateAuthorityResponse, error)
 	UpdateCertificateAuthority(context.Context, *v1.UpdateCertificateAuthorityRequest) (*v1.UpdateCertificateAuthorityResponse, error)
-	ListCertificateAuthorities(context.Context, *v1.ListCertificateAuthoritiesRequest) (*v1.ListCertificateAuthoritiesResponse, error)
-	DeleteCertificateAuthority(context.Context, *v1.DeleteCertificateAuthorityRequest) (*v1.DeleteCertificateAuthorityResponse, error)
 	RolloverCertificateAuthority(context.Context, *v1.RolloverCertificateAuthorityRequest) (*v1.RolloverCertificateAuthorityResponse, error)
 	SignSSHCertificate(context.Context, *v1.SignSSHCertificateRequest) (*v1.SignSSHCertificateResponse, error)
 }
@@ -135,10 +98,7 @@ func RegisterCertificateServiceHandler(server *connect.Server, svc CertificateSe
 	adapter := certificateServiceHandler{svc: svc}
 	server.Register(
 		connect.Method{Spec: certificateServiceGetCertificateAuthoritySpec(), Handler: adapter.getCertificateAuthority},
-		connect.Method{Spec: certificateServiceCreateCertificateAuthoritySpec(), Handler: adapter.createCertificateAuthority},
 		connect.Method{Spec: certificateServiceUpdateCertificateAuthoritySpec(), Handler: adapter.updateCertificateAuthority},
-		connect.Method{Spec: certificateServiceListCertificateAuthoritiesSpec(), Handler: adapter.listCertificateAuthorities},
-		connect.Method{Spec: certificateServiceDeleteCertificateAuthoritySpec(), Handler: adapter.deleteCertificateAuthority},
 		connect.Method{Spec: certificateServiceRolloverCertificateAuthoritySpec(), Handler: adapter.rolloverCertificateAuthority},
 		connect.Method{Spec: certificateServiceSignSSHCertificateSpec(), Handler: adapter.signSSHCertificate},
 	)
@@ -151,20 +111,8 @@ func (UnimplementedCertificateServiceHandler) GetCertificateAuthority(context.Co
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.CertificateService.GetCertificateAuthority is not implemented")
 }
 
-func (UnimplementedCertificateServiceHandler) CreateCertificateAuthority(context.Context, *v1.CreateCertificateAuthorityRequest) (*v1.CreateCertificateAuthorityResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.CertificateService.CreateCertificateAuthority is not implemented")
-}
-
 func (UnimplementedCertificateServiceHandler) UpdateCertificateAuthority(context.Context, *v1.UpdateCertificateAuthorityRequest) (*v1.UpdateCertificateAuthorityResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.CertificateService.UpdateCertificateAuthority is not implemented")
-}
-
-func (UnimplementedCertificateServiceHandler) ListCertificateAuthorities(context.Context, *v1.ListCertificateAuthoritiesRequest) (*v1.ListCertificateAuthoritiesResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.CertificateService.ListCertificateAuthorities is not implemented")
-}
-
-func (UnimplementedCertificateServiceHandler) DeleteCertificateAuthority(context.Context, *v1.DeleteCertificateAuthorityRequest) (*v1.DeleteCertificateAuthorityResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.CertificateService.DeleteCertificateAuthority is not implemented")
 }
 
 func (UnimplementedCertificateServiceHandler) RolloverCertificateAuthority(context.Context, *v1.RolloverCertificateAuthorityRequest) (*v1.RolloverCertificateAuthorityResponse, error) {
@@ -187,33 +135,9 @@ func (c *certificateServiceClient) GetCertificateAuthority(ctx context.Context, 
 	return &res, nil
 }
 
-func (c *certificateServiceClient) CreateCertificateAuthority(ctx context.Context, req *v1.CreateCertificateAuthorityRequest) (*v1.CreateCertificateAuthorityResponse, error) {
-	var res v1.CreateCertificateAuthorityResponse
-	if err := c.client.CallUnary(ctx, certificateServiceCreateCertificateAuthoritySpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
 func (c *certificateServiceClient) UpdateCertificateAuthority(ctx context.Context, req *v1.UpdateCertificateAuthorityRequest) (*v1.UpdateCertificateAuthorityResponse, error) {
 	var res v1.UpdateCertificateAuthorityResponse
 	if err := c.client.CallUnary(ctx, certificateServiceUpdateCertificateAuthoritySpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *certificateServiceClient) ListCertificateAuthorities(ctx context.Context, req *v1.ListCertificateAuthoritiesRequest) (*v1.ListCertificateAuthoritiesResponse, error) {
-	var res v1.ListCertificateAuthoritiesResponse
-	if err := c.client.CallUnary(ctx, certificateServiceListCertificateAuthoritiesSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *certificateServiceClient) DeleteCertificateAuthority(ctx context.Context, req *v1.DeleteCertificateAuthorityRequest) (*v1.DeleteCertificateAuthorityResponse, error) {
-	var res v1.DeleteCertificateAuthorityResponse
-	if err := c.client.CallUnary(ctx, certificateServiceDeleteCertificateAuthoritySpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -249,48 +173,12 @@ func (h certificateServiceHandler) getCertificateAuthority(ctx context.Context, 
 	return stream.Send(res)
 }
 
-func (h certificateServiceHandler) createCertificateAuthority(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.CreateCertificateAuthorityRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.CreateCertificateAuthority(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
 func (h certificateServiceHandler) updateCertificateAuthority(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.UpdateCertificateAuthorityRequest
 	if err := stream.Receive(&req); err != nil {
 		return err
 	}
 	res, err := h.svc.UpdateCertificateAuthority(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h certificateServiceHandler) listCertificateAuthorities(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.ListCertificateAuthoritiesRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.ListCertificateAuthorities(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h certificateServiceHandler) deleteCertificateAuthority(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.DeleteCertificateAuthorityRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.DeleteCertificateAuthority(ctx, &req)
 	if err != nil {
 		return err
 	}

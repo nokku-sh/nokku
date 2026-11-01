@@ -282,7 +282,7 @@ func seedAccessGraph(t *testing.T) accessFixture {
 		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
 	)
 	f.as = func(userID string) nokkuv1connect.TargetServiceClient {
-		token := sessionFor(t, cfg, &db.User{ID: userID})
+		token := sessionFor(t, cfg, &db.User{ID: userID, Active: true})
 		return nokkuv1connect.NewTargetServiceClient(
 			connect.NewClient(
 				connecthttp.NewTransport(srv.Client(), srv.URL),

@@ -7,39 +7,18 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto"
+	"time"
 )
-
-const clearDefaultCA = `-- name: ClearDefaultCA :exec
-UPDATE ssh_cas
-SET
-  is_default = FALSE,
-  updated_at = NOW()
-WHERE
-  is_default
-  AND id <> $1
-`
-
-// Runs before MarkDefaultCA. The partial unique index is checked row by row, so one statement that swaps
-// both can see two defaults. See Queries.SetDefaultCA.
-func (q *Queries) ClearDefaultCA(ctx context.Context, caID string) error {
-	_, err := q.db.Exec(ctx, clearDefaultCA, caID)
-	return err
-}
 
 const createCA = `-- name: CreateCA :one
 INSERT INTO
   ssh_cas (
-    name,
-    description,
     public_key,
     host_public_key,
     user_default_ttl,
     user_max_ttl,
-    force_command,
-    source_address,
     host_ttl
   )
 VALUES
@@ -48,48 +27,33 @@ VALUES
     $2,
     $3,
     $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9
+    $5
   )
 RETURNING
-  id, workspace_id, name, description, is_default, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, force_command, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 `
 
 type CreateCAParams struct {
-	Name           string        `json:"name"`
-	Description    *string       `json:"description"`
 	PublicKey      string        `json:"publicKey"`
 	HostPublicKey  string        `json:"hostPublicKey"`
 	UserDefaultTtl time.Duration `json:"userDefaultTtl"`
 	UserMaxTtl     time.Duration `json:"userMaxTtl"`
-	ForceCommand   string        `json:"forceCommand"`
-	SourceAddress  string        `json:"sourceAddress"`
 	HostTtl        time.Duration `json:"hostTtl"`
 }
 
 // Every setting comes from the caller, ssh.NewCA fills in what a new CA starts with. ssh.CreateCA adds the keys.
 func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, createCA,
-		arg.Name,
-		arg.Description,
 		arg.PublicKey,
 		arg.HostPublicKey,
 		arg.UserDefaultTtl,
 		arg.UserMaxTtl,
-		arg.ForceCommand,
-		arg.SourceAddress,
 		arg.HostTtl,
 	)
 	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.IsDefault,
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.PreviousPublicKey,
@@ -99,148 +63,6 @@ func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, er
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
 		&i.HostTtl,
-		&i.ForceCommand,
-		&i.SourceAddress,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const deleteCA = `-- name: DeleteCA :one
-DELETE FROM ssh_cas
-WHERE
-  id = $1
-RETURNING
-  id, workspace_id, name, description, is_default, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, force_command, source_address, created_at, updated_at
-`
-
-func (q *Queries) DeleteCA(ctx context.Context, caID string) (*SSHCA, error) {
-	row := q.db.QueryRow(ctx, deleteCA, caID)
-	var i SSHCA
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.IsDefault,
-		&i.PublicKey,
-		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
-		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
-		&i.ForceCommand,
-		&i.SourceAddress,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const getCA = `-- name: GetCA :one
-SELECT
-  id, workspace_id, name, description, is_default, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, force_command, source_address, created_at, updated_at
-FROM
-  ssh_cas
-WHERE
-  id = $1
-`
-
-func (q *Queries) GetCA(ctx context.Context, caID string) (*SSHCA, error) {
-	row := q.db.QueryRow(ctx, getCA, caID)
-	var i SSHCA
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.IsDefault,
-		&i.PublicKey,
-		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
-		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
-		&i.ForceCommand,
-		&i.SourceAddress,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const getCAByDaemonID = `-- name: GetCAByDaemonID :one
-SELECT
-  ca.id, ca.workspace_id, ca.name, ca.description, ca.is_default, ca.public_key, ca.host_public_key, ca.previous_public_key, ca.previous_host_public_key, ca.previous_trusted_until, ca.rotated_at, ca.user_default_ttl, ca.user_max_ttl, ca.host_ttl, ca.force_command, ca.source_address, ca.created_at, ca.updated_at
-FROM
-  ssh_cas ca
-  JOIN targets t ON t.ca_id = ca.id
-WHERE
-  t.daemon_id = $1
-`
-
-func (q *Queries) GetCAByDaemonID(ctx context.Context, daemonID *string) (*SSHCA, error) {
-	row := q.db.QueryRow(ctx, getCAByDaemonID, daemonID)
-	var i SSHCA
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.IsDefault,
-		&i.PublicKey,
-		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
-		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
-		&i.ForceCommand,
-		&i.SourceAddress,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
-}
-
-const getCAForUpdate = `-- name: GetCAForUpdate :one
-SELECT
-  id, workspace_id, name, description, is_default, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, force_command, source_address, created_at, updated_at
-FROM
-  ssh_cas
-WHERE
-  id = $1
-FOR UPDATE
-`
-
-func (q *Queries) GetCAForUpdate(ctx context.Context, caID string) (*SSHCA, error) {
-	row := q.db.QueryRow(ctx, getCAForUpdate, caID)
-	var i SSHCA
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.IsDefault,
-		&i.PublicKey,
-		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
-		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
-		&i.ForceCommand,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -292,168 +114,68 @@ func (q *Queries) GetCASigningKey(ctx context.Context, arg *GetCASigningKeyParam
 	return &i, err
 }
 
-const getCAsByIDs = `-- name: GetCAsByIDs :many
+const getWorkspaceCA = `-- name: GetWorkspaceCA :one
 SELECT
-  id,
-  workspace_id,
-  name,
-  public_key,
-  host_public_key,
-  previous_public_key,
-  previous_host_public_key,
-  previous_trusted_until,
-  rotated_at,
-  is_default,
-  user_default_ttl,
-  user_max_ttl
+  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
-  id = ANY ($1::UUID[])
+  workspace_id = current_workspace_id ()
 `
 
-type GetCAsByIDsRow struct {
-	ID                    string        `json:"id"`
-	WorkspaceID           string        `json:"workspaceId"`
-	Name                  string        `json:"name"`
-	PublicKey             string        `json:"publicKey"`
-	HostPublicKey         string        `json:"hostPublicKey"`
-	PreviousPublicKey     *string       `json:"previousPublicKey"`
-	PreviousHostPublicKey *string       `json:"previousHostPublicKey"`
-	PreviousTrustedUntil  *time.Time    `json:"previousTrustedUntil"`
-	RotatedAt             time.Time     `json:"rotatedAt"`
-	IsDefault             bool          `json:"isDefault"`
-	UserDefaultTtl        time.Duration `json:"userDefaultTtl"`
-	UserMaxTtl            time.Duration `json:"userMaxTtl"`
-}
-
-// What clients trust.
-func (q *Queries) GetCAsByIDs(ctx context.Context, caIds []string) ([]*GetCAsByIDsRow, error) {
-	rows, err := q.db.Query(ctx, getCAsByIDs, caIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*GetCAsByIDsRow
-	for rows.Next() {
-		var i GetCAsByIDsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.Name,
-			&i.PublicKey,
-			&i.HostPublicKey,
-			&i.PreviousPublicKey,
-			&i.PreviousHostPublicKey,
-			&i.PreviousTrustedUntil,
-			&i.RotatedAt,
-			&i.IsDefault,
-			&i.UserDefaultTtl,
-			&i.UserMaxTtl,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getDaemonCAKeys = `-- name: GetDaemonCAKeys :one
-SELECT
-  ca.public_key,
-  ca.host_public_key,
-  ca.previous_public_key,
-  ca.previous_trusted_until
-FROM
-  ssh_cas ca
-  JOIN targets t ON t.ca_id = ca.id
-WHERE
-  t.daemon_id = $1
-`
-
-type GetDaemonCAKeysRow struct {
-	PublicKey            string     `json:"publicKey"`
-	HostPublicKey        string     `json:"hostPublicKey"`
-	PreviousPublicKey    *string    `json:"previousPublicKey"`
-	PreviousTrustedUntil *time.Time `json:"previousTrustedUntil"`
-}
-
-// What a daemon trusts. Private keys live in ssh_ca_keys.
-func (q *Queries) GetDaemonCAKeys(ctx context.Context, daemonID *string) (*GetDaemonCAKeysRow, error) {
-	row := q.db.QueryRow(ctx, getDaemonCAKeys, daemonID)
-	var i GetDaemonCAKeysRow
+// What signs and what is trusted in the workspace. Private keys live in ssh_ca_keys.
+func (q *Queries) GetWorkspaceCA(ctx context.Context) (*SSHCA, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceCA)
+	var i SSHCA
 	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.PreviousPublicKey,
+		&i.PreviousHostPublicKey,
 		&i.PreviousTrustedUntil,
+		&i.RotatedAt,
+		&i.UserDefaultTtl,
+		&i.UserMaxTtl,
+		&i.HostTtl,
+		&i.SourceAddress,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
-const listCAs = `-- name: ListCAs :many
+const getWorkspaceCAForUpdate = `-- name: GetWorkspaceCAForUpdate :one
 SELECT
-  id, workspace_id, name, description, is_default, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, force_command, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
-ORDER BY
-  id ASC
-`
-
-func (q *Queries) ListCAs(ctx context.Context) ([]*SSHCA, error) {
-	rows, err := q.db.Query(ctx, listCAs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*SSHCA
-	for rows.Next() {
-		var i SSHCA
-		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.Name,
-			&i.Description,
-			&i.IsDefault,
-			&i.PublicKey,
-			&i.HostPublicKey,
-			&i.PreviousPublicKey,
-			&i.PreviousHostPublicKey,
-			&i.PreviousTrustedUntil,
-			&i.RotatedAt,
-			&i.UserDefaultTtl,
-			&i.UserMaxTtl,
-			&i.HostTtl,
-			&i.ForceCommand,
-			&i.SourceAddress,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const markDefaultCA = `-- name: MarkDefaultCA :exec
-UPDATE ssh_cas
-SET
-  is_default = TRUE,
-  updated_at = NOW()
 WHERE
-  id = $1
+  workspace_id = current_workspace_id ()
+FOR UPDATE
 `
 
-func (q *Queries) MarkDefaultCA(ctx context.Context, caID string) error {
-	_, err := q.db.Exec(ctx, markDefaultCA, caID)
-	return err
+func (q *Queries) GetWorkspaceCAForUpdate(ctx context.Context) (*SSHCA, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceCAForUpdate)
+	var i SSHCA
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.PublicKey,
+		&i.HostPublicKey,
+		&i.PreviousPublicKey,
+		&i.PreviousHostPublicKey,
+		&i.PreviousTrustedUntil,
+		&i.RotatedAt,
+		&i.UserDefaultTtl,
+		&i.UserMaxTtl,
+		&i.HostTtl,
+		&i.SourceAddress,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
 }
 
 const putCAKey = `-- name: PutCAKey :exec
@@ -500,7 +222,7 @@ SET
 WHERE
   id = $4
 RETURNING
-  id, workspace_id, name, description, is_default, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, force_command, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 `
 
 type ReplaceCAParams struct {
@@ -524,9 +246,6 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, 
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.IsDefault,
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.PreviousPublicKey,
@@ -536,7 +255,6 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, 
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
 		&i.HostTtl,
-		&i.ForceCommand,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -547,49 +265,35 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, 
 const updateCA = `-- name: UpdateCA :one
 UPDATE ssh_cas
 SET
-  name = COALESCE($1, name),
-  description = COALESCE($2, description),
-  user_default_ttl = COALESCE($3, user_default_ttl),
-  user_max_ttl = COALESCE($4, user_max_ttl),
-  force_command = COALESCE($5, force_command),
-  source_address = COALESCE($6, source_address),
-  host_ttl = COALESCE($7, host_ttl),
+  user_default_ttl = COALESCE($1, user_default_ttl),
+  user_max_ttl = COALESCE($2, user_max_ttl),
+  source_address = COALESCE($3, source_address),
+  host_ttl = COALESCE($4, host_ttl),
   updated_at = NOW()
 WHERE
-  id = $8
+  workspace_id = current_workspace_id ()
 RETURNING
-  id, workspace_id, name, description, is_default, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, force_command, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 `
 
 type UpdateCAParams struct {
-	Name           *string        `json:"name"`
-	Description    *string        `json:"description"`
 	UserDefaultTtl *time.Duration `json:"userDefaultTtl"`
 	UserMaxTtl     *time.Duration `json:"userMaxTtl"`
-	ForceCommand   *string        `json:"forceCommand"`
 	SourceAddress  *string        `json:"sourceAddress"`
 	HostTtl        *time.Duration `json:"hostTtl"`
-	CaID           string         `json:"caId"`
 }
 
 func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, updateCA,
-		arg.Name,
-		arg.Description,
 		arg.UserDefaultTtl,
 		arg.UserMaxTtl,
-		arg.ForceCommand,
 		arg.SourceAddress,
 		arg.HostTtl,
-		arg.CaID,
 	)
 	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.Name,
-		&i.Description,
-		&i.IsDefault,
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.PreviousPublicKey,
@@ -599,7 +303,6 @@ func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, er
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
 		&i.HostTtl,
-		&i.ForceCommand,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,

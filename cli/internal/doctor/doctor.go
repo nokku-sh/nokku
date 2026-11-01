@@ -14,7 +14,6 @@ import (
 
 	"github.com/mizuchilabs/kata/buildinfo"
 
-	"github.com/nokku-sh/nokku/cli/internal/enclave"
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
@@ -89,9 +88,6 @@ func checkSystem(ctx context.Context, r *Report) {
 	switch err := tpm.Available(); {
 	case err == nil:
 		r.add(sec, "TPM", StatusOK, "available")
-	case runtime.GOOS == "darwin":
-		status, detail := enclaveStatus()
-		r.add(sec, "Secure Enclave", status, detail)
 	case errors.Is(err, os.ErrPermission):
 		r.add(sec, "TPM", StatusWarn, "no access, run: sudo usermod -aG tss $USER, then log in again")
 	default:
@@ -99,19 +95,11 @@ func checkSystem(ctx context.Context, r *Report) {
 	}
 }
 
-func enclaveStatus() (Status, string) {
-	switch {
-	case enclave.Enabled():
-		return StatusOK, "available"
-	case enclave.Available():
-		return StatusInfo, "available but experimental, set NK_SECURE_ENCLAVE=1 before nk login to use it"
-	}
-	return StatusInfo, "not available, using a machine-wrapped key"
-}
-
 func checkAccount(ctx context.Context, r *Report, s *state.State) {
 	const sec = "Account"
 	switch {
+	case s.CIJob() && !s.SessionValid():
+		r.add(sec, "signed in", StatusWarn, "CI session ended, run nk login --ci")
 	case s.ServiceAccount != nil:
 		r.add(sec, "signed in", StatusOK, "service account "+s.ServiceAccount.Name)
 	case s.User != nil && s.SessionValid():
@@ -160,9 +148,7 @@ func checkSSH(r *Report, s *state.State) {
 	switch method := tpm.IdentityMethod(paths.SSHSignerFile()); {
 	case method == tpm.MethodTPM:
 		r.add(sec, "identity", StatusOK, "TPM key, never leaves the chip")
-	case method == tpm.MethodEnclave:
-		r.add(sec, "identity", StatusOK, "Secure Enclave key, never leaves the chip")
-	case method == tpm.MethodSoft && (tpm.Available() == nil || enclave.Enabled()):
+	case method == tpm.MethodSoft && tpm.Available() == nil:
 		// A software key is never moved to hardware on its own.
 		r.add(sec, "identity", StatusWarn,
 			"software key although this machine can keep it in hardware, run nk logout and nk login to move it")

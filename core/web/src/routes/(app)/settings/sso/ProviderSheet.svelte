@@ -136,16 +136,18 @@
 	function askRemove() {
 		if (!model) return;
 		const p = model;
-		void confirm({
-			title: `Remove ${p.name}?`,
-			description:
-				'Nobody can sign in through it anymore. Accounts it created stay, and keep their other sign-in methods.',
-			confirmText: 'Remove',
-			onConfirm: async () => {
-				await remove.mutateAsync({ providerId: p.providerId });
-				sheet.close();
-			}
-		});
+		void whenFresh(() =>
+			confirm({
+				title: `Remove ${p.name}?`,
+				description:
+					'Nobody can sign in through it anymore. Accounts it created stay, and keep their other sign-in methods.',
+				confirmText: 'Remove',
+				onConfirm: async () => {
+					await remove.mutateAsync({ providerId: p.providerId });
+					sheet.close();
+				}
+			})
+		);
 	}
 </script>
 

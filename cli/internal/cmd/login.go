@@ -17,6 +17,12 @@ func loginCMD() *cli.Command {
 		Name:    "login",
 		Usage:   "Sign in and set up ssh for your servers",
 		Aliases: []string{"refresh"},
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "ci",
+				Usage: "Sign in a CI job as this service account, with the job's token from its platform",
+			},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			s, err := loadState(cmd)
 			if err != nil {
@@ -26,13 +32,22 @@ func loginCMD() *cli.Command {
 			if err != nil {
 				return err
 			}
-			if err = c.Sync(ctx, true); err != nil {
+			if cmd.IsSet("ci") {
+				if err = c.LoginCI(ctx, cmd.String("ci")); err != nil {
+					return err
+				}
+			}
+			// Never a browser for a job, whatever became of its session a moment ago.
+			if err = c.Sync(ctx, !cmd.IsSet("ci")); err != nil {
 				return err
 			}
 
 			who := "service account"
-			if s.User != nil {
+			switch {
+			case s.User != nil:
 				who = s.User.Email
+			case s.ServiceAccount != nil:
+				who += " " + s.ServiceAccount.Name
 			}
 			fmt.Printf("%s Signed in as %s, %d servers available\n", ui.Green("✔"), who, len(s.Targets))
 			fmt.Println("  List them with nk ls, connect with ssh <server>")

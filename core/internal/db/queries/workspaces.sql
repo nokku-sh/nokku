@@ -59,38 +59,29 @@ LIMIT
   1;
 
 -- name: ListUnclaimedWorkspaces :many
--- Signups whose owner never signed in. Runs as nokku_system.
+-- Signups nobody ever signed in to. Runs as nokku_system.
 SELECT
-  w.*
+  *
 FROM
-  workspaces w
+  workspaces
 WHERE
-  w.created_at < @cutoff
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      access_tokens s
-    WHERE
-      s.workspace_id = w.id
-      AND s.kind IN ('user', 'cli')
-  )
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      credentials c
-    WHERE
-      c.workspace_id = w.id
-  )
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      known_devices d
-    WHERE
-      d.workspace_id = w.id
-  );
+  created_at < @cutoff
+  AND claimed_at IS NULL;
+
+-- name: DeleteUnclaimedWorkspace :execrows
+-- Asks again, a first sign-in may have come since the list.
+DELETE FROM workspaces
+WHERE
+  id = @workspace_id
+  AND claimed_at IS NULL;
+
+-- name: ClaimWorkspace :exec
+-- Stored once, the sessions and devices of a first sign-in all end or get deleted.
+UPDATE workspaces
+SET
+  claimed_at = NOW()
+WHERE
+  claimed_at IS NULL;
 
 -- name: UpdateWorkspace :one
 UPDATE workspaces

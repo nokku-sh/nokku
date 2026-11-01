@@ -12,11 +12,9 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
-	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/namegen"
-	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 var (
@@ -46,7 +44,7 @@ var (
 )
 
 type counts struct {
-	users, teams, serviceAccounts, cas, targets, daemons int
+	users, teams, serviceAccounts, targets, daemons int
 }
 
 // subjects is who can be granted an account on a server, by id.
@@ -54,7 +52,7 @@ type subjects struct {
 	users, teams, serviceAccounts []string
 }
 
-func seed(ctx context.Context, q *db.Queries, keys *kms.Keyset, ws *db.Workspace, n counts) error {
+func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error {
 	// Unique within the run. A name another run took fails the insert.
 	taken := map[string]bool{}
 	fresh := func() string {
@@ -97,7 +95,7 @@ func seed(ctx context.Context, q *db.Queries, keys *kms.Keyset, ws *db.Workspace
 		}
 	}
 
-	for i := range n.serviceAccounts {
+	for range n.serviceAccounts {
 		id, err := q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
 			Name: pick(robots) + "-" + fresh(),
 			Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
@@ -114,9 +112,7 @@ func seed(ctx context.Context, q *db.Queries, keys *kms.Keyset, ws *db.Workspace
 			SubjectID: &id,
 			Method:    string(iam.MethodToken),
 			Label:     "seed",
-		}
-		if i%3 == 0 {
-			tok.ExpiresAt = new(time.Now().AddDate(0, 1+roll(6), 0))
+			ExpiresAt: new(time.Now().AddDate(0, 1+roll(6), 0)),
 		}
 		if _, err := q.CreateAccessToken(ctx, tok); err != nil {
 			return fmt.Errorf("service account token: %w", err)
@@ -124,21 +120,8 @@ func seed(ctx context.Context, q *db.Queries, keys *kms.Keyset, ws *db.Workspace
 		who.serviceAccounts = append(who.serviceAccounts, id)
 	}
 
-	// No CA on a server means the default one of the workspace.
-	cas := []*string{nil}
-	for range n.cas {
-		ca := ssh.NewCA()
-		ca.Name = fresh() + " CA"
-		row, err := ssh.CreateCA(ctx, q, keys, ca)
-		if err != nil {
-			return fmt.Errorf("certificate authority: %w", err)
-		}
-		cas = append(cas, &row.ID)
-	}
-
 	for range n.targets {
 		t, err := q.CreateTarget(ctx, &db.CreateTargetParams{
-			CaID: pick(cas),
 			Name: fresh(),
 			// TEST-NET-3, an address nothing answers on.
 			Endpoints: []string{fmt.Sprintf("203.0.113.%d:22", 1+roll(254))},

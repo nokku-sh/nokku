@@ -19,16 +19,16 @@ func TestRenderSSHConfig(t *testing.T) {
 	setupSSHDir(t)
 	st := &state.State{
 		Targets: []state.Target{
-			{ID: "t-1", Name: "web", CAID: "ca-1", Usernames: []string{"alice", "bob"}},
-			{ID: "t-2", Name: "db", CAID: "ca-1", Usernames: []string{"alice"}},
-			{ID: "t-3", Name: "DB", CAID: "ca-1", Usernames: []string{"alice"}},
-			{ID: "t-4", Name: "no-users", CAID: "ca-1"},
-			{ID: "t-5", Name: "prod\n    ProxyCommand curl evil", CAID: "ca-1", Usernames: []string{"a"}},
-			{ID: "t-6", Name: "ok", CAID: "ca-1", Usernames: []string{"a\n    ProxyCommand curl evil"}},
-			{ID: "t-7", Name: "a/b", CAID: "ca-1", Usernames: []string{"a"}},
-			{ID: "t-8", Name: "github.com", CAID: "ca-1", Usernames: []string{"git"}},
-			{ID: "t-9", Name: "10.0.0.5", CAID: "ca-1", Usernames: []string{"root"}},
-			{ID: "t-10", Name: "wild", CAID: "ca-1", Usernames: []string{"*"}},
+			{ID: "t-1", Name: "web", Usernames: []string{"alice", "bob"}},
+			{ID: "t-2", Name: "db", Usernames: []string{"alice"}},
+			{ID: "t-3", Name: "DB", Usernames: []string{"alice"}},
+			{ID: "t-4", Name: "no-users"},
+			{ID: "t-5", Name: "prod\n    ProxyCommand curl evil", Usernames: []string{"a"}},
+			{ID: "t-6", Name: "ok", Usernames: []string{"a\n    ProxyCommand curl evil"}},
+			{ID: "t-7", Name: "a/b", Usernames: []string{"a"}},
+			{ID: "t-8", Name: "github.com", Usernames: []string{"git"}},
+			{ID: "t-9", Name: "10.0.0.5", Usernames: []string{"root"}},
+			{ID: "t-10", Name: "wild", Usernames: []string{"*"}},
 		},
 	}
 	out := string(renderSSHConfig(st, hostAliases(st, nil), "nk"))
@@ -62,43 +62,41 @@ func TestConfigValueQuotesPaths(t *testing.T) {
 func TestRenderKnownHosts(t *testing.T) {
 	t.Parallel()
 	st := &state.State{
-		CAs: []state.CA{
-			{
-				ID: "ca-1", PublicKey: "ssh-ed25519 AAAAUser1==", HostPublicKey: "ssh-ed25519 AAAACa1== production",
-				PreviousHostPublicKey: "ssh-ed25519 AAAAOld1==", PreviousTrustedUntil: time.Now().Add(time.Hour),
-			},
-			{
-				ID: "ca-3", HostPublicKey: "ssh-ed25519 AAAACa3==",
-				PreviousHostPublicKey: "ssh-ed25519 AAAAOld3==", PreviousTrustedUntil: time.Now().Add(-time.Hour),
-			},
-			{ID: "ca-2", HostPublicKey: "ssh-ed25519 AAAA==\nHost *\n    ProxyCommand curl evil"},
+		CA: &state.CA{
+			PublicKey: "ssh-ed25519 AAAAUser1==", HostPublicKey: "ssh-ed25519 AAAACa1== production",
+			PreviousHostPublicKey: "ssh-ed25519 AAAAOld1==", PreviousTrustedUntil: time.Now().Add(time.Hour),
 		},
 		Targets: []state.Target{
-			{ID: "t-1", CAID: "ca-1", DaemonID: "d-1"},
-			{ID: "t-2", CAID: "ca-2", DaemonID: "d-2"},
-			{ID: "t-3", CAID: "ca-1", HostPublicKey: "ssh-ed25519 AAAAhost== host"},
-			{ID: "t-4", CAID: "ca-1"},
-			{ID: "t-5", CAID: "ca-1", DaemonID: "d-5", HostPublicKey: "ssh-ed25519 AAAAstray"},
-			{ID: "t-6", CAID: "ca-3", DaemonID: "d-6"},
+			{ID: "t-1", DaemonID: "d-1"},
+			{ID: "t-3", HostPublicKey: "ssh-ed25519 AAAAhost== host"},
+			{ID: "t-4"},
+			{ID: "t-5", DaemonID: "d-5", HostPublicKey: "ssh-ed25519 AAAAstray"},
 		},
 	}
 	out := string(renderKnownHosts(st))
 
 	assert.Contains(t, out, "@cert-authority t-1 ssh-ed25519 AAAACa1== production\n")
+	assert.Contains(t, out, "@cert-authority t-5 ssh-ed25519 AAAACa1== production\n", "every daemon trusts the one CA")
 	assert.Contains(
 		t,
 		out,
 		"@cert-authority t-1 ssh-ed25519 AAAAOld1==\n",
 		"a replaced key stays trusted until its deadline",
 	)
-	assert.Contains(t, out, "@cert-authority t-6 ssh-ed25519 AAAACa3==\n")
-	assert.NotContains(t, out, "AAAAOld3", "a replaced key past its deadline is dropped")
 	assert.Contains(t, out, "t-3 ssh-ed25519 AAAAhost== host\n")
 	assert.NotContains(t, out, "@cert-authority t-3", "manual targets are pinned, not CA trusted")
 	assert.NotContains(t, out, "t-4", "nothing to pin without a host key")
 	assert.NotContains(t, out, "AAAAstray", "daemon targets are never pinned by a raw key")
-	assert.NotContains(t, out, "curl evil")
 	assert.NotContains(t, out, "AAAAUser1", "the user CA never vouches for a host")
+
+	st.CA.PreviousTrustedUntil = time.Now().Add(-time.Hour)
+	assert.NotContains(t, string(renderKnownHosts(st)), "AAAAOld1", "a replaced key past its deadline is dropped")
+
+	st.CA = &state.CA{HostPublicKey: "ssh-ed25519 AAAA==\nHost *\n    ProxyCommand curl evil"}
+	assert.NotContains(t, string(renderKnownHosts(st)), "curl evil")
+
+	st.CA = nil
+	assert.NotContains(t, string(renderKnownHosts(st)), "@cert-authority", "no CA cached means nothing to trust")
 }
 
 func TestInclude(t *testing.T) {

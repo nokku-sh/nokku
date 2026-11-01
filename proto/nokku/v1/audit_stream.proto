@@ -15,14 +15,21 @@ service AuditStreamService {
   rpc CreateAuditStream(CreateAuditStreamRequest) returns (CreateAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
+      fresh: true
       feature: "audit_streaming"
     };
   }
   rpc UpdateAuditStream(UpdateAuditStreamRequest) returns (UpdateAuditStreamResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      fresh: true
+    };
   }
   rpc DeleteAuditStream(DeleteAuditStreamRequest) returns (DeleteAuditStreamResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      fresh: true
+    };
   }
   rpc TestAuditStream(TestAuditStreamRequest) returns (TestAuditStreamResponse) {
     option (access) = {

@@ -17,7 +17,7 @@ import (
 func TestSignCertificate_UnspecifiedTypeIsUser(t *testing.T) {
 	ca := newTestCA(t)
 
-	cert, err := SignCertificate(ca.row, ca.user, newTestKey(t), []string{"alice"}, "k", time.Hour, 0)
+	cert, err := SignCertificate(ca.row, ca.user, newTestKey(t), []string{"alice"}, "k", time.Hour, 0, Limits{})
 	if err != nil {
 		t.Fatalf("SignCertificate() error: %v", err)
 	}
@@ -48,7 +48,16 @@ func TestSignCertificate_Errors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := SignCertificate(ca.row, ca.user, tt.pub, []string{"alice"}, "k", time.Hour, ssh.UserCert)
+			_, err := SignCertificate(
+				ca.row,
+				ca.user,
+				tt.pub,
+				[]string{"alice"},
+				"k",
+				time.Hour,
+				ssh.UserCert,
+				Limits{},
+			)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("error = %v, want containing %q", err, tt.wantErr)
 			}
@@ -108,15 +117,30 @@ func TestAcceptedKey(t *testing.T) {
 	}
 }
 
-func TestUserPermissions_Restrictions(t *testing.T) {
-	ca := newTestCA(t).row
-	if got := userPermissions(ca).CriticalOptions; len(got) != 0 {
-		t.Errorf("a CA without restrictions wrote %v", got)
+// A forced command is all the login may do. The other logins keep what the host allows.
+func TestUserPermissions_ForcedCommandEndsForwarding(t *testing.T) {
+	forced := userPermissions(Limits{ForceCommand: "/usr/local/bin/backup"}).Extensions
+	if want := map[string]string{"permit-pty": ""}; !maps.Equal(forced, want) {
+		t.Errorf("extensions with a forced command = %v, want %v", forced, want)
+	}
+	if plain := userPermissions(Limits{}).Extensions; !maps.Equal(plain, userExtensions) {
+		t.Errorf("extensions without one = %v, want %v", plain, userExtensions)
+	}
+	if !maps.Equal(userExtensions, map[string]string{
+		"permit-pty": "", "permit-user-rc": "", "permit-port-forwarding": "", "permit-agent-forwarding": "",
+	}) {
+		t.Errorf("a forced command changed the shared map: %v", userExtensions)
+	}
+}
+
+func TestUserPermissions_Limits(t *testing.T) {
+	if got := userPermissions(Limits{}).CriticalOptions; len(got) != 0 {
+		t.Errorf("no limits wrote %v", got)
 	}
 
-	ca.ForceCommand, ca.SourceAddress = "/usr/local/bin/backup", "10.0.0.0/8,192.0.2.7"
+	limits := Limits{ForceCommand: "/usr/local/bin/backup", SourceAddress: "10.0.0.0/8,192.0.2.7"}
 	want := map[string]string{"force-command": "/usr/local/bin/backup", "source-address": "10.0.0.0/8,192.0.2.7"}
-	if got := userPermissions(ca).CriticalOptions; !maps.Equal(got, want) {
+	if got := userPermissions(limits).CriticalOptions; !maps.Equal(got, want) {
 		t.Errorf("critical options = %v, want %v", got, want)
 	}
 }
@@ -152,6 +176,7 @@ func TestSignUserCertificate(t *testing.T) {
 		"nokku:login:user:alice:user-123",
 		0,
 		ssh.UserCert,
+		Limits{},
 	)
 	if err != nil {
 		t.Fatalf("SignCertificate failed: %v", err)
@@ -187,6 +212,7 @@ func TestSignHostCertificate(t *testing.T) {
 		"nokku:provision:daemon:d:d",
 		0,
 		ssh.HostCert,
+		Limits{},
 	)
 	if err != nil {
 		t.Fatalf("SignCertificate failed: %v", err)
@@ -211,7 +237,7 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 	ca := newTestCA(t)
 
 	// Negative TTL falls back to the default instead of expiring instantly
-	cert, err := SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", -time.Hour, 0)
+	cert, err := SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", -time.Hour, 0, Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +246,7 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 	}
 
 	// Over-max TTL falls back to the default
-	cert, err = SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 1000*time.Hour, 0)
+	cert, err = SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 1000*time.Hour, 0, Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +255,7 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 	}
 
 	// In-bounds TTL is honored
-	cert, err = SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 2*time.Hour, 0)
+	cert, err = SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 2*time.Hour, 0, Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,11 +267,11 @@ func TestSignCertificateTTLBounds(t *testing.T) {
 // A certificate without principals is valid for every account, and OpenSSH reads at most 256.
 func TestSignCertificatePrincipalCount(t *testing.T) {
 	ca := newTestCA(t)
-	if _, err := SignCertificate(ca.row, ca.user, newTestKey(t), nil, "k", 0, ssh.UserCert); err == nil {
+	if _, err := SignCertificate(ca.row, ca.user, newTestKey(t), nil, "k", 0, ssh.UserCert, Limits{}); err == nil {
 		t.Error("signed a certificate without principals")
 	}
 	many := make([]string, maxPrincipals+1)
-	if _, err := SignCertificate(ca.row, ca.user, newTestKey(t), many, "k", 0, ssh.UserCert); err == nil {
+	if _, err := SignCertificate(ca.row, ca.user, newTestKey(t), many, "k", 0, ssh.UserCert, Limits{}); err == nil {
 		t.Error("signed a certificate with more principals than OpenSSH reads")
 	}
 }

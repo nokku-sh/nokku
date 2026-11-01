@@ -174,6 +174,7 @@ type GetDashboardResponse struct {
 	Activity            []int32                `protobuf:"varint,12,rep,packed,name=activity" json:"activity,omitempty"`
 	Failures            []int32                `protobuf:"varint,13,rep,packed,name=failures" json:"failures,omitempty"`
 	RecentChanges       []*EventLog            `protobuf:"bytes,14,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
+	DaemonsBehind       *int32                 `protobuf:"varint,15,opt,name=daemons_behind,json=daemonsBehind" json:"daemons_behind,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -306,6 +307,13 @@ func (x *GetDashboardResponse) GetRecentChanges() []*EventLog {
 	return nil
 }
 
+func (x *GetDashboardResponse) GetDaemonsBehind() int32 {
+	if x != nil && x.DaemonsBehind != nil {
+		return *x.DaemonsBehind
+	}
+	return 0
+}
+
 var File_nokku_v1_dashboard_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_dashboard_proto_rawDesc = "" +
@@ -322,7 +330,7 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\x03web\x18\a \x01(\bR\x03web\x129\n" +
 	"\n" +
 	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\"\x15\n" +
-	"\x13GetDashboardRequest\"\xd7\x04\n" +
+	"\x13GetDashboardRequest\"\xfe\x04\n" +
 	"\x14GetDashboardResponse\x12\x18\n" +
 	"\atargets\x18\x01 \x01(\x05R\atargets\x12%\n" +
 	"\x0etargets_online\x18\x02 \x01(\x05R\rtargetsOnline\x12%\n" +
@@ -338,7 +346,8 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\rlive_sessions\x18\v \x03(\v2\x15.nokku.v1.LiveSessionR\fliveSessions\x12\x1a\n" +
 	"\bactivity\x18\f \x03(\x05R\bactivity\x12\x1a\n" +
 	"\bfailures\x18\r \x03(\x05R\bfailures\x129\n" +
-	"\x0erecent_changes\x18\x0e \x03(\v2\x12.nokku.v1.EventLogR\rrecentChanges2l\n" +
+	"\x0erecent_changes\x18\x0e \x03(\v2\x12.nokku.v1.EventLogR\rrecentChanges\x12%\n" +
+	"\x0edaemons_behind\x18\x0f \x01(\x05R\rdaemonsBehind2l\n" +
 	"\x10DashboardService\x12X\n" +
 	"\fGetDashboard\x12\x1d.nokku.v1.GetDashboardRequest\x1a\x1e.nokku.v1.GetDashboardResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eDashboardProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"

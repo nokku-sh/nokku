@@ -16,11 +16,3 @@ func (q *Queries) TransferOwnership(ctx context.Context, newOwnerID string) (boo
 	promoted, err := q.PromoteOwner(ctx, newOwnerID)
 	return promoted == 1, err
 }
-
-// SetDefaultCA moves the default to one CA. Call it in a transaction, or a failure leaves no default.
-func (q *Queries) SetDefaultCA(ctx context.Context, caID string) error {
-	if err := q.ClearDefaultCA(ctx, caID); err != nil {
-		return err
-	}
-	return q.MarkDefaultCA(ctx, caID)
-}

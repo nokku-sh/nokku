@@ -3,18 +3,23 @@ package api
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"connectrpc.com/connect/v2"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/dpop"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
+
+const actionExchangeWorkloadToken = "ExchangeWorkloadToken"
 
 type authService struct {
 	cfg *config.Config
@@ -152,4 +157,107 @@ func (s *authService) CancelEmailChange(
 		return nil, newError(connect.CodeInvalidArgument, "this link is invalid or expired")
 	}
 	return &nokkuv1.CancelEmailChangeResponse{}, nil
+}
+
+// ExchangeWorkloadToken trades a job's token for a session of a service account, bound to the key of the proof. The
+// call is public, so it runs the plan gate itself and writes its own audit row.
+func (s *authService) ExchangeWorkloadToken(
+	ctx context.Context,
+	req *nokkuv1.ExchangeWorkloadTokenRequest,
+) (*nokkuv1.ExchangeWorkloadTokenResponse, error) {
+	ci, err := callInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// First, so a client that has to sign again has not spent its job token.
+	binding, err := s.workloadBinding(ctx)
+	if errors.Is(err, dpop.ErrNonce) {
+		s.cfg.IAM.AdvertiseDPoPNonce(ctx, ci.ResponseHeader())
+		return nil, newError(connect.CodeUnauthenticated, "stale DPoP nonce")
+	}
+	if err != nil {
+		return nil, s.refuseWorkload(ctx, &iam.WorkloadRefusedError{Reason: "no valid DPoP proof"})
+	}
+
+	job, err := s.cfg.IAM.VerifyWorkload(ctx, req.GetServiceAccount(), req.GetToken())
+	if refusal, ok := errors.AsType[*iam.WorkloadRefusedError](err); ok {
+		return nil, s.refuseWorkload(ctx, refusal)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := s.cfg.Entitlements.CheckSigning(ctx); err != nil {
+		return nil, s.refuseWorkload(ctx, &iam.WorkloadRefusedError{
+			Account: job.Account, Reason: "the plan of the workspace does not sign", Signed: true,
+		})
+	}
+	tok, secret, err := s.cfg.IAM.IssueWorkloadSession(ctx, job, binding)
+	if refusal, ok := errors.AsType[*iam.WorkloadRefusedError](err); ok {
+		return nil, s.refuseWorkload(ctx, refusal)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// IssueToken writes no row for a service account. A session nobody heard of must not go out, it stays unused.
+	if err := s.cfg.Audit.Confirm(ctx, &audit.Event{
+		Action:    actionExchangeWorkloadToken,
+		ActorID:   job.Account.ID,
+		ActorKind: string(actor.KindServiceAccount),
+		ActorName: job.Account.Name,
+		Target:    tok.ID,
+		Details: map[string]any{
+			"method":     string(iam.MethodFederation),
+			"issuer":     job.Rule.Issuer,
+			"rule":       job.Rule.ID,
+			"subject":    job.Subject,
+			"jti":        job.JTI,
+			"expires_at": *tok.ExpiresAt,
+		},
+	}); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.ExchangeWorkloadTokenResponse{
+		AccessToken: &secret,
+		ExpiresAt:   timestamppb.New(*tok.ExpiresAt),
+	}, nil
+}
+
+// workloadBinding returns the thumbprint of the key that signed the proof. No token exists yet, so nothing binds it.
+func (s *authService) workloadBinding(ctx context.Context) (string, error) {
+	ws, _ := actor.WorkspaceFromContext(ctx)
+	meta, _ := actor.RequestMetaFromContext(ctx)
+	proof, err := dpop.ProofFrom(meta.Header)
+	if err != nil {
+		return "", err
+	}
+	return s.cfg.IAM.DPoP.Verify(
+		proof,
+		"",
+		http.MethodPost,
+		ws.BaseURL+nokkuv1connect.AuthServiceExchangeWorkloadTokenProcedure,
+		"",
+	)
+}
+
+// refuseWorkload keeps the reason here, the job gets one answer for every refusal. The call is public, so only a token
+// its issuer signed reaches the audit log. Nobody fills the log of a workspace at the rate limit.
+func (s *authService) refuseWorkload(ctx context.Context, r *iam.WorkloadRefusedError) error {
+	e := &audit.Event{
+		Action:    actionExchangeWorkloadToken,
+		ActorKind: string(actor.KindServiceAccount),
+		Details: map[string]any{
+			"method": string(iam.MethodFederation),
+			"reason": r.Reason,
+			"code":   connect.CodeUnauthenticated.String(),
+		},
+	}
+	if r.Account != nil {
+		e.ActorID, e.ActorName = r.Account.ID, r.Account.Name
+	}
+	slog.WarnContext(ctx, "workload token refused", "service_account", e.ActorName, "reason", r.Reason)
+	if r.Signed {
+		s.cfg.Audit.Record(ctx, e)
+	}
+	return errWorkloadRefused
 }

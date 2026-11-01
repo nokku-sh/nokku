@@ -68,6 +68,7 @@
 	const updateRole = users.updateRole();
 	const setActive = users.setActive();
 	const remove = users.delete();
+	const clearIdentities = users.clearIdentities();
 	const transfer = users.transferOwnership();
 	const addToTeam = teamApi.addMember();
 	const removeFromTeam = teamApi.removeMember();
@@ -139,6 +140,22 @@
 								onConfirm: () => setActive.mutateAsync({ userId: person.id, active: false })
 							})
 						: setActive.mutate({ userId: person.id, active: true })
+			});
+			actions.push({
+				title: 'Unlink sign-in providers',
+				description:
+					'For someone their provider gave a new identity. They are signed out and link again at their next sign-in.',
+				label: 'Unlink',
+				onClick: () =>
+					whenFresh(() =>
+						confirm({
+							title: `Unlink the sign-in providers of ${name}?`,
+							description:
+								'Whoever holds this address at the provider gets this account at the next sign-in. If they left, delete the account instead.',
+							confirmText: 'Unlink',
+							onConfirm: () => clearIdentities.mutateAsync({ userId: person.id })
+						})
+					)
 			});
 			actions.push({
 				title: 'Delete account',

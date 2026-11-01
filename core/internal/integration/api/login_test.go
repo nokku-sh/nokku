@@ -31,7 +31,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-const sessionCookie = "nokku_session"
+var sessionCookie = cookieNamed("nokku_session")
 
 // inbox holds the links the server would have mailed, by address.
 type inbox struct {
@@ -95,7 +95,7 @@ func iamServer(t *testing.T, base *config.Config, mail iam.Deps) (*config.Config
 	var err error
 	local.IAM, err = iam.New(t.Context(), mail)
 	require.NoError(t, err)
-	srv := httptest.NewServer(api.New(&local).Handler(t.Context()))
+	srv := httptest.NewServer(serving(api.New(&local).Handler(t.Context())))
 	t.Cleanup(srv.Close)
 	return &local, srv
 }
@@ -109,11 +109,11 @@ type login struct {
 // browserSession is a cookie session of u, signed in age ago.
 func browserSession(t *testing.T, cfg *config.Config, u *db.User, age time.Duration) login {
 	t.Helper()
-	tok, token, err := cfg.IAM.IssueToken(wsCtx(t, cfg), iam.TokenParams{
-		SubjectID: u.ID,
-		Kind:      actor.KindUser,
-		Method:    iam.MethodPasskey,
-	})
+	tok, token, err := cfg.IAM.IssueSignIn(
+		wsCtx(t, cfg),
+		u,
+		iam.TokenParams{Kind: actor.KindUser, Method: iam.MethodPasskey},
+	)
 	require.NoError(t, err)
 	if age > 0 {
 		ageSession(t, tok.ID, age)

@@ -18,7 +18,10 @@ service SSOService {
     };
   }
   rpc DeleteSSOProvider(DeleteSSOProviderRequest) returns (DeleteSSOProviderResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      fresh: true
+    };
   }
 }
 

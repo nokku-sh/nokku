@@ -3,17 +3,10 @@
 package api_test
 
 import (
-	"bytes"
-	"image"
-	"image/jpeg"
-	imgpng "image/png"
-	"net/http"
-	"strings"
 	"testing"
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
-	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -79,66 +72,6 @@ func TestTransferOwnershipAfterTheOwnerRowMoved(t *testing.T) {
 	assert.Equal(t, member.ID, seedOwner(t, cfg).ID)
 }
 
-// An avatar is kept in the database, shown to a session of the workspace only, and gone with its account.
-func TestAvatar(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	ws := seedWorkspace(t, cfg)
-	user := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	token := sessionFor(t, cfg, user)
-
-	// A transparent, wider than tall PNG. The server crops it to a square.
-	var png bytes.Buffer
-	require.NoError(t, imgpng.Encode(&png, image.NewNRGBA(image.Rect(0, 0, 300, 200))))
-	set, err := nokkuv1connect.NewAccountServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
-		SetAvatar(t.Context(), &nokkuv1.SetAvatarRequest{Image: png.Bytes()})
-	require.NoError(t, err)
-	picture := set.GetUser().GetPicture()
-	require.True(t, strings.HasPrefix(picture, "/avatars/"+user.ID+"?v="), "picture is %q", picture)
-
-	get := func(cookie string) *http.Response {
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+picture, nil)
-		require.NoError(t, err)
-		if cookie != "" {
-			req.Header.Set("Cookie", "nokku_session="+cookie)
-		}
-		resp, err := srv.Client().Do(req)
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = resp.Body.Close() })
-		return resp
-	}
-
-	resp := get(token)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "image/jpeg", resp.Header.Get("Content-Type"))
-	img, err := jpeg.Decode(resp.Body)
-	require.NoError(t, err)
-	assert.Equal(t, image.Rect(0, 0, 128, 128), img.Bounds())
-
-	assert.NotEqual(t, http.StatusOK, get("").StatusCode, "an avatar without a session")
-
-	admin := nokkuv1connect.NewWorkspaceServiceClient(
-		connect.NewClient(
-			connecthttp.NewTransport(srv.Client(), srv.URL),
-			header("Authorization", "Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)),
-		),
-	)
-	_, err = admin.DeleteUser(t.Context(), &nokkuv1.DeleteUserRequest{UserId: &user.ID})
-	require.NoError(t, err)
-	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
-		_, err := q.GetAvatar(t.Context(), user.ID)
-		assert.ErrorIs(t, err, pgx.ErrNoRows, "the photo outlived the account")
-		return nil
-	})
-}
-
-func TestAvatarRefusesWhatIsNoImage(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	user := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	_, err := nokkuv1connect.NewAccountServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+sessionFor(t, cfg, user)))).
-		SetAvatar(t.Context(), &nokkuv1.SetAvatarRequest{Image: []byte("<svg onload=alert(1)>")})
-	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
-}
-
 // Admins manage users below them and never the owner or themselves.
 func TestManageUsers(t *testing.T) {
 	cfg, srv := newTestAPI(t)
@@ -191,6 +124,7 @@ func TestManageUsers(t *testing.T) {
 
 // A self-hosted server keeps its workspace, and signup is for the hosted one.
 func TestSelfHostHasOneWorkspace(t *testing.T) {
+	selfHostedOnly(t, "hosted signup has tests of its own")
 	cfg, srv := newTestAPI(t)
 	owner := header(
 		"Authorization",

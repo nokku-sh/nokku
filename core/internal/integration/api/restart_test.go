@@ -24,6 +24,7 @@ import (
 // A restart gives the core a new nonce key. A daemon holding a nonce of the old boot syncs and connects by itself, wired
 // the way nokkud wires its client, and people stay signed in.
 func TestClientsOutliveACoreRestart(t *testing.T) {
+	selfHostedOnly(t, "it dials the real listener, which reads no workspace host")
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
@@ -44,7 +45,7 @@ func TestClientsOutliveACoreRestart(t *testing.T) {
 		proofer,
 		client,
 		func() string { return token },
-		dpopclient.Options{BaseURL: cfg.FullURL()},
+		dpopclient.Options{BaseURL: testWorkspace.BaseURL},
 	)
 	ctl := nokkuv1connect.NewDaemonControlServiceClient(
 		connect.NewClient(connecthttp.NewTransport(client, base), daemon.Intercept))
@@ -90,6 +91,6 @@ func TestClientsOutliveACoreRestart(t *testing.T) {
 
 	signedIn := nokkuv1connect.NewCertificateServiceClient(
 		connect.NewClient(connecthttp.NewTransport(client, base), header("Authorization", "Bearer "+member)))
-	_, err = signedIn.ListCertificateAuthorities(t.Context(), &nokkuv1.ListCertificateAuthoritiesRequest{})
+	_, err = signedIn.GetCertificateAuthority(t.Context(), &nokkuv1.GetCertificateAuthorityRequest{})
 	assert.NoError(t, err, "a restart signed someone out")
 }

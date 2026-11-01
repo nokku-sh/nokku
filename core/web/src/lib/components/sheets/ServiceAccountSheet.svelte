@@ -13,6 +13,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
@@ -25,6 +26,7 @@
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs, toDate } from '#lib/utils.js';
 	import {
+		Ban,
 		FileText,
 		Info,
 		KeyRound,
@@ -32,12 +34,14 @@
 		Settings2,
 		ShieldCheck,
 		Trash2,
-		UserCog
+		UserCog,
+		Workflow
 	} from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
 	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
+	import ServiceAccountFederations from './ServiceAccountFederations.svelte';
 
 	const sheet = useSheet();
 	const can = user.can();
@@ -65,7 +69,7 @@
 		variant: 'destructive' | 'warning' | 'outline';
 		text: string;
 	} {
-		if (!t.expiresAt) return { variant: 'outline', text: 'Never expires' };
+		if (!t.expiresAt) return { variant: 'destructive', text: 'Expired' };
 		const left = toDate(t.expiresAt).getTime() - Date.now();
 		if (left < 0) return { variant: 'destructive', text: 'Expired' };
 		return {
@@ -126,6 +130,7 @@
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
 		{ value: 'access', label: 'Access', icon: ShieldCheck },
+		{ value: 'ci', label: 'CI jobs', icon: Workflow },
 		{ value: 'tokens', label: 'Tokens', icon: KeyRound },
 		{ value: 'settings', label: 'Settings', icon: Settings2 }
 	]}
@@ -172,6 +177,10 @@
 			<SubjectAccess subjectId={entity.id} kind={SubjectKind.SERVICE_ACCOUNT} name={entity.name} />
 		</Tabs.Content>
 
+		<Tabs.Content value="ci" class="flex flex-col gap-2">
+			<ServiceAccountFederations serviceAccountId={entity.id} name={entity.name} />
+		</Tabs.Content>
+
 		<Tabs.Content value="tokens" class="flex flex-col gap-2">
 			{#if tokens.isLoading}
 				<Skeleton class="h-20 w-full rounded-xl" />
@@ -182,8 +191,8 @@
 						<Empty.Media variant="icon"><KeyRound /></Empty.Media>
 						<Empty.Title>No tokens</Empty.Title>
 						<Empty.Description>
-							Automation signs in as this account with a token. Create one and store it in your CI
-							secrets.
+							Ansible and scripts sign in as this account with a token. A CI job needs none, add a
+							rule under CI jobs.
 						</Empty.Description>
 					</Empty.Header>
 					{#if can.edit}
@@ -285,6 +294,45 @@
 							}}
 							placeholder="ci, ansible"
 						/>
+					</Field.Field>
+				</Field.Group>
+			</Section>
+
+			<Section
+				title="Login limits"
+				icon={Ban}
+				description="They go on every certificate this account gets."
+			>
+				<!-- A change here takes a recent sign-in, so that comes before anything is typed. -->
+				<Field.Group class="gap-4" onfocusin={() => whenFresh(() => {})}>
+					<Field.Field>
+						<Field.Label for="sa-force-command">Force a command</Field.Label>
+						<Input
+							id="sa-force-command"
+							class="font-mono"
+							bind:value={model.forceCommand}
+							disabled={!can.edit}
+							oninput={save}
+							placeholder="/usr/local/bin/deploy"
+						/>
+						<Field.Description>
+							Runs this instead of whatever the login asks for. Port and agent forwarding go off
+							with it.
+						</Field.Description>
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="sa-source-address">Allowed source IPs</Field.Label>
+						<Input
+							id="sa-source-address"
+							class="font-mono"
+							bind:value={model.sourceAddress}
+							disabled={!can.edit}
+							oninput={save}
+							placeholder="10.0.0.0/8, 192.168.1.10"
+						/>
+						<Field.Description>
+							Addresses and CIDRs, separated by commas. Leave empty to allow any.
+						</Field.Description>
 					</Field.Field>
 				</Field.Group>
 			</Section>

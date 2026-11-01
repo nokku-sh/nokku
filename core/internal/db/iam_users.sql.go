@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"time"
 
 	nokku "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
@@ -112,17 +111,6 @@ func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDPar
 	return &i, err
 }
 
-const deleteAvatar = `-- name: DeleteAvatar :exec
-DELETE FROM user_avatars
-WHERE
-  user_id = $1
-`
-
-func (q *Queries) DeleteAvatar(ctx context.Context, userID string) error {
-	_, err := q.db.Exec(ctx, deleteAvatar, userID)
-	return err
-}
-
 const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users
 WHERE
@@ -154,30 +142,6 @@ func (q *Queries) DemoteOwner(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const getAvatar = `-- name: GetAvatar :one
-SELECT
-  image,
-  etag,
-  updated_at
-FROM
-  user_avatars
-WHERE
-  user_id = $1
-`
-
-type GetAvatarRow struct {
-	Image     []byte    `json:"image"`
-	Etag      string    `json:"etag"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-func (q *Queries) GetAvatar(ctx context.Context, userID string) (*GetAvatarRow, error) {
-	row := q.db.QueryRow(ctx, getAvatar, userID)
-	var i GetAvatarRow
-	err := row.Scan(&i.Image, &i.Etag, &i.UpdatedAt)
-	return &i, err
 }
 
 const getOwner = `-- name: GetOwner :one
@@ -359,31 +323,6 @@ func (q *Queries) PromoteOwner(ctx context.Context, newOwnerID string) (int64, e
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const putAvatar = `-- name: PutAvatar :exec
-
-INSERT INTO
-  user_avatars (user_id, image, etag)
-VALUES
-  ($1, $2, $3)
-ON CONFLICT (user_id) DO UPDATE
-SET
-  image = EXCLUDED.image,
-  etag = EXCLUDED.etag,
-  updated_at = NOW()
-`
-
-type PutAvatarParams struct {
-	UserID string `json:"userId"`
-	Image  []byte `json:"image"`
-	Etag   string `json:"etag"`
-}
-
-// owner
-func (q *Queries) PutAvatar(ctx context.Context, arg *PutAvatarParams) error {
-	_, err := q.db.Exec(ctx, putAvatar, arg.UserID, arg.Image, arg.Etag)
-	return err
 }
 
 const setUserActive = `-- name: SetUserActive :exec

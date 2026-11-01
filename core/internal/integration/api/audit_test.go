@@ -28,9 +28,10 @@ func TestAuditDeniedCall(t *testing.T) {
 	viewer := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
 	other := seedOtherWorkspace(t, cfg)
 	outsider := seedUser(t, cfg, other, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
-	_, stranger, err := cfg.IAM.IssueToken(
+	_, stranger, err := cfg.IAM.IssueSignIn(
 		actor.WithWorkspace(t.Context(), actor.Workspace{ID: other, BaseURL: cfg.FullURL()}),
-		iam.TokenParams{SubjectID: outsider.ID, Kind: actor.KindUser, Method: iam.MethodPasskey},
+		outsider,
+		iam.TokenParams{Kind: actor.KindUser, Method: iam.MethodPasskey},
 	)
 	require.NoError(t, err)
 

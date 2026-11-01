@@ -40,15 +40,12 @@ WITH
   ),
   new_target AS (
     INSERT INTO
-      targets (daemon_id, name, ca_id)
+      targets (daemon_id, name)
     SELECT
       d.id,
-      d.name,
-      COALESCE($8::UUID, ca.id)
+      d.name
     FROM
       new_daemon d
-      LEFT JOIN ssh_cas ca ON ca.workspace_id = d.workspace_id
-      AND ca.is_default
     RETURNING
       id
   )
@@ -69,7 +66,6 @@ type CreateDaemonParams struct {
 	KeyThumbprint *string             `json:"keyThumbprint"`
 	JoinTokenID   *string             `json:"joinTokenId"`
 	RetireAfter   *time.Duration      `json:"retireAfter"`
-	CaID          *string             `json:"caId"`
 }
 
 type CreateDaemonRow struct {
@@ -89,7 +85,7 @@ type CreateDaemonRow struct {
 }
 
 // Returns no row on a taken name or key, so the caller can retry in its tx. A target of that name counts as
-// taken too, checked up front because its insert would otherwise abort the tx. No CA means the workspace default.
+// taken too, checked up front because its insert would otherwise abort the tx.
 func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*CreateDaemonRow, error) {
 	row := q.db.QueryRow(ctx, createDaemon,
 		arg.Name,
@@ -99,7 +95,6 @@ func (q *Queries) CreateDaemon(ctx context.Context, arg *CreateDaemonParams) (*C
 		arg.KeyThumbprint,
 		arg.JoinTokenID,
 		arg.RetireAfter,
-		arg.CaID,
 	)
 	var i CreateDaemonRow
 	err := row.Scan(
@@ -345,7 +340,7 @@ func (q *Queries) GetOfflineDaemonByTokenAndName(ctx context.Context, arg *GetOf
 
 const getTargetByDaemon = `-- name: GetTargetByDaemon :one
 SELECT
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
 FROM
   targets
 WHERE
@@ -358,7 +353,6 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.CaID,
 		&i.DaemonID,
 		&i.Name,
 		&i.Description,

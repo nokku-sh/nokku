@@ -219,10 +219,13 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 			return err
 		}
 		for _, ws := range rows {
-			if err := q.DeleteWorkspace(ctx, ws.ID); err != nil {
+			gone, err := q.DeleteUnclaimedWorkspace(ctx, ws.ID)
+			if err != nil {
 				return err
 			}
-			r.Forget(ws.Slug)
+			if gone > 0 {
+				r.Forget(ws.Slug)
+			}
 		}
 		return nil
 	})
@@ -250,13 +253,8 @@ func Create(ctx context.Context, conn *db.Connection, keys *kms.Keyset, slug, na
 		}); err != nil {
 			return err
 		}
-		ca := ssh.NewCA()
-		ca.Name, ca.Description = "Default CA", new("Default CA for "+ws.Name)
-		row, err := ssh.CreateCA(ctx, q, keys, ca)
-		if err != nil {
-			return err
-		}
-		return q.SetDefaultCA(ctx, row.ID)
+		_, err = ssh.CreateCA(ctx, q, keys, ssh.NewCA())
+		return err
 	})
 	if err != nil {
 		return nil, err

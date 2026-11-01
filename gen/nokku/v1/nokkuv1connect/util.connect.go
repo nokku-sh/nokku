@@ -29,8 +29,6 @@ const (
 	// UtilServiceGetInstanceInfoProcedure is the procedure name of the UtilService's GetInstanceInfo
 	// RPC.
 	UtilServiceGetInstanceInfoProcedure = "/nokku.v1.UtilService/GetInstanceInfo"
-	// UtilServiceWhoamiProcedure is the procedure name of the UtilService's Whoami RPC.
-	UtilServiceWhoamiProcedure = "/nokku.v1.UtilService/Whoami"
 	// UtilServiceListRolesProcedure is the procedure name of the UtilService's ListRoles RPC.
 	UtilServiceListRolesProcedure = "/nokku.v1.UtilService/ListRoles"
 	// UtilServiceListAuditLogsProcedure is the procedure name of the UtilService's ListAuditLogs RPC.
@@ -59,14 +57,6 @@ var (
 			StreamType:       connect.StreamTypeUnary,
 			Schema:           v1.File_nokku_v1_util_proto.Services().ByName("UtilService").Methods().ByName("GetInstanceInfo"),
 			Procedure:        UtilServiceGetInstanceInfoProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
-	utilServiceWhoamiSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_util_proto.Services().ByName("UtilService").Methods().ByName("Whoami"),
-			Procedure:        UtilServiceWhoamiProcedure,
 			IdempotencyLevel: connect.IdempotencyNoSideEffects,
 		}
 	})
@@ -114,7 +104,6 @@ var (
 type UtilServiceClient interface {
 	GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error)
 	GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error)
-	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
@@ -132,7 +121,6 @@ func NewUtilServiceClient(client *connect.Client) UtilServiceClient {
 type UtilServiceHandler interface {
 	GetVersion(context.Context, *v1.GetVersionRequest) (*v1.GetVersionResponse, error)
 	GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error)
-	Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error)
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
@@ -146,7 +134,6 @@ func RegisterUtilServiceHandler(server *connect.Server, svc UtilServiceHandler) 
 	server.Register(
 		connect.Method{Spec: utilServiceGetVersionSpec(), Handler: adapter.getVersion},
 		connect.Method{Spec: utilServiceGetInstanceInfoSpec(), Handler: adapter.getInstanceInfo},
-		connect.Method{Spec: utilServiceWhoamiSpec(), Handler: adapter.whoami},
 		connect.Method{Spec: utilServiceListRolesSpec(), Handler: adapter.listRoles},
 		connect.Method{Spec: utilServiceListAuditLogsSpec(), Handler: adapter.listAuditLogs},
 		connect.Method{Spec: utilServiceExportAuditLogsSpec(), Handler: adapter.exportAuditLogs},
@@ -164,10 +151,6 @@ func (UnimplementedUtilServiceHandler) GetVersion(context.Context, *v1.GetVersio
 
 func (UnimplementedUtilServiceHandler) GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.UtilService.GetInstanceInfo is not implemented")
-}
-
-func (UnimplementedUtilServiceHandler) Whoami(context.Context, *v1.WhoamiRequest) (*v1.WhoamiResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.UtilService.Whoami is not implemented")
 }
 
 func (UnimplementedUtilServiceHandler) ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error) {
@@ -205,14 +188,6 @@ func (c *utilServiceClient) GetVersion(ctx context.Context, req *v1.GetVersionRe
 func (c *utilServiceClient) GetInstanceInfo(ctx context.Context, req *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error) {
 	var res v1.GetInstanceInfoResponse
 	if err := c.client.CallUnary(ctx, utilServiceGetInstanceInfoSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *utilServiceClient) Whoami(ctx context.Context, req *v1.WhoamiRequest) (*v1.WhoamiResponse, error) {
-	var res v1.WhoamiResponse
-	if err := c.client.CallUnary(ctx, utilServiceWhoamiSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -278,18 +253,6 @@ func (h utilServiceHandler) getInstanceInfo(ctx context.Context, _ connect.Spec,
 		return err
 	}
 	res, err := h.svc.GetInstanceInfo(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h utilServiceHandler) whoami(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.WhoamiRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.Whoami(ctx, &req)
 	if err != nil {
 		return err
 	}

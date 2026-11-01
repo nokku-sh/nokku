@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	connectrpc "connectrpc.com/connect/v2"
+
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/cli/internal/client"
@@ -61,24 +63,23 @@ func proxyCMD() *cli.Command {
 			if target == nil {
 				return errors.New("you no longer have access to this server, run nk ls to see yours")
 			}
-			ca := s.CAByID(target.CAID)
-			if ca == nil {
+			if s.CA == nil {
 				return fmt.Errorf("the certificate authority of %s is missing, run nk login", target.Name)
 			}
 
-			// Only when nk prepare failed, or this sync brought a new CA or a newly granted account.
-			if !ssh.CertValid(*target, *ca, 0) {
+			// Only when nk prepare failed, or this sync brought a new CA key or a newly granted account.
+			if !ssh.CertValid(*target, *s.CA, 0) {
 				c, cerr := core()
 				if cerr == nil {
-					cerr = c.EnsureCert(ctx, *target, *ca)
+					cerr = c.EnsureCert(ctx, *target, *s.CA)
 				}
 				if cerr != nil {
-					return fmt.Errorf("no valid certificate for %s, run nk login: %w", target.Name, cerr)
+					return noCertificate(target.Name, cerr)
 				}
 				warnf("certificate for %s renewed, if ssh fails run it again", target.Name)
 			} else if !ssh.CertCovers(*target) {
 				// The old certificate still works for the accounts it names.
-				if c, cerr := core(); cerr == nil && c.EnsureCert(ctx, *target, *ca) == nil {
+				if c, cerr := core(); cerr == nil && c.EnsureCert(ctx, *target, *s.CA) == nil {
 					warnf("certificate for %s renewed for a new account, if ssh fails run it again", target.Name)
 				}
 			}
@@ -114,6 +115,17 @@ func prepareCMD() *cli.Command {
 	}
 }
 
+// noCertificate points at what helps. nk login can't work while the core is out of reach.
+func noCertificate(target string, err error) error {
+	if connectrpc.CodeOf(err) == connectrpc.CodeUnavailable {
+		return fmt.Errorf("no valid certificate for %s, and the core can't be reached to get one: %w", target, err)
+	}
+	if errors.Is(err, client.ErrCISessionEnded) {
+		return fmt.Errorf("no valid certificate for %s: %w", target, err)
+	}
+	return fmt.Errorf("no valid certificate for %s, run nk login: %w", target, err)
+}
+
 func renewCert(ctx context.Context, cmd *cli.Command) error {
 	s, err := loadState(cmd)
 	if err != nil {
@@ -123,19 +135,18 @@ func renewCert(ctx context.Context, cmd *cli.Command) error {
 	if target == nil {
 		return errors.New("unknown target")
 	}
-	ca := s.CAByID(target.CAID)
-	if ca == nil || ssh.CertFresh(*target, *ca) {
+	if s.CA == nil || ssh.CertFresh(*target, *s.CA) {
 		return nil
 	}
 	// A certificate that still works is not worth a timeout while the core is down.
-	if ssh.CertValid(*target, *ca, 0) && s.SyncFailedWithin(syncRetryAfter) {
+	if ssh.CertValid(*target, *s.CA, 0) && s.SyncFailedWithin(syncRetryAfter) {
 		return nil
 	}
 	c, err := newClient(s)
 	if err != nil {
 		return err
 	}
-	if err = c.EnsureCert(ctx, *target, *ca); err != nil {
+	if err = c.EnsureCert(ctx, *target, *s.CA); err != nil {
 		s.MarkSyncFailed()
 	}
 	return err

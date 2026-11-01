@@ -49,14 +49,6 @@ func (s *Service) getUser(ctx context.Context, id string) (*db.User, error) {
 	return u, nil
 }
 
-func (s *Service) GetUserByEmail(ctx context.Context, email string) (*db.User, error) {
-	u, err := s.conn.Tenant().GetUserByEmail(ctx, NormalizeEmail(email))
-	if err != nil {
-		return nil, mapNotFound(err)
-	}
-	return u, nil
-}
-
 func (s *Service) UpdateSelf(ctx context.Context, name *string) (*db.User, error) {
 	u, err := s.conn.Tenant().UpdateUser(ctx, &db.UpdateUserParams{
 		ID:   actor.UserIDFromContext(ctx),

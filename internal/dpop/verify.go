@@ -39,7 +39,7 @@ var (
 	errBindingMismatch = fmt.Errorf("%w: jkt mismatch", ErrInvalidProof)
 )
 
-// allowedAlgs is what nk and nokkud sign with, a P-256 key in a TPM or the Secure Enclave.
+// allowedAlgs is what nk and nokkud sign with, a P-256 key in a TPM or in software.
 var allowedAlgs = []jose.SignatureAlgorithm{jose.ES256}
 
 // Verifier checks proofs on the server. Its nonces are a stateless HMAC over

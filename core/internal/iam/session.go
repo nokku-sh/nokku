@@ -37,6 +37,10 @@ type TokenParams struct {
 	Label   string
 	// TTL zero never expires, the token must be revoked explicitly.
 	TTL time.Duration
+	// NotAfter cuts the TTL short when set.
+	NotAfter time.Time
+	// WorkloadJTI is the job token this one came from, see workload_jti.
+	WorkloadJTI string
 }
 
 // tokenKinds is the token kind of each kind of access token.
@@ -48,8 +52,45 @@ var tokenKinds = map[actor.Kind]crypto.TokenKind{
 	actor.KindSCIM:           crypto.TokenSCIM,
 }
 
-// IssueToken pins the token to the request's workspace. The plaintext is returned once, only its hash is stored.
+// IssueToken makes the token of a machine. A person's comes from IssueSignIn, which applies the sign-in rules first.
 func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToken, string, error) {
+	if p.Kind == actor.KindUser || p.Kind == actor.KindCLI {
+		return nil, "", errors.New("iam: a person's token comes from IssueSignIn")
+	}
+	return s.issue(ctx, p)
+}
+
+// IssueSignIn is the one way a person gets a token, in a browser or in nk. p.Method is how they proved who they are.
+func (s *Service) IssueSignIn(ctx context.Context, u *db.User, p TokenParams) (*db.AccessToken, string, error) {
+	deny := func(err error, detail string) (*db.AccessToken, string, error) {
+		s.record(ctx, event{Action: actionLoginDenied, Method: p.Method, UserID: u.ID, Email: u.Email, Detail: detail})
+		return nil, "", err
+	}
+	if !u.Active {
+		return deny(ErrInactive, "inactive")
+	}
+	if p.Method != MethodOIDC {
+		enforced, err := s.ssoEnforced(ctx)
+		if err != nil {
+			return nil, "", err
+		}
+		// The owner keeps the passkey and the sign-in link as the way in to fix a broken provider.
+		breakGlass := u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER &&
+			(p.Method == MethodPasskey || p.Method == MethodMagicLink)
+		if enforced && !breakGlass {
+			return deny(ErrSSORequired, "sso enforced")
+		}
+	}
+	// A workspace with no sign-in on record gets purged, so a sign-in that can't be recorded fails.
+	if err := s.conn.Tenant().ClaimWorkspace(ctx); err != nil {
+		return nil, "", err
+	}
+	p.SubjectID = u.ID
+	return s.issue(ctx, p)
+}
+
+// issue pins the token to the request's workspace. The plaintext is returned once, only its hash is stored.
+func (s *Service) issue(ctx context.Context, p TokenParams) (*db.AccessToken, string, error) {
 	kind, ok := tokenKinds[p.Kind]
 	if !ok {
 		return nil, "", errors.New("iam: no token for kind " + string(p.Kind))
@@ -76,7 +117,11 @@ func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToke
 	}
 	if p.TTL > 0 {
 		params.ExpiresAt = new(now.Add(p.TTL))
+		if !p.NotAfter.IsZero() && p.NotAfter.Before(*params.ExpiresAt) {
+			params.ExpiresAt = &p.NotAfter
+		}
 	}
+	params.WorkloadJti = nonEmpty(p.WorkloadJTI)
 	tok, err := s.conn.Tenant().CreateAccessToken(ctx, params)
 	if err != nil {
 		return nil, "", err
@@ -88,33 +133,9 @@ func (s *Service) IssueToken(ctx context.Context, p TokenParams) (*db.AccessToke
 	return tok, token, nil
 }
 
-// completeLogin applies the gates every login method shares.
+// completeLogin ends every browser sign-in.
 func (s *Service) completeLogin(ctx context.Context, u *db.User, method Method) (*http.Cookie, error) {
-	deny := func(err error, detail string) (*http.Cookie, error) {
-		s.record(ctx, event{Action: actionLoginDenied, Method: method, UserID: u.ID, Email: u.Email, Detail: detail})
-		return nil, err
-	}
-	if !u.Active {
-		return deny(ErrInactive, "inactive")
-	}
-	if method != MethodOIDC {
-		enforced, err := s.ssoEnforced(ctx)
-		if err != nil {
-			return nil, err
-		}
-		// The owner keeps the passkey and the sign-in link as the way in to fix a broken provider.
-		breakGlass := u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER &&
-			(method == MethodPasskey || method == MethodMagicLink)
-		if enforced && !breakGlass {
-			return deny(ErrSSORequired, "sso enforced")
-		}
-	}
-	sess, token, err := s.IssueToken(ctx, TokenParams{
-		SubjectID: u.ID,
-		Kind:      actor.KindUser,
-		Method:    method,
-		TTL:       sessionTTL,
-	})
+	sess, token, err := s.IssueSignIn(ctx, u, TokenParams{Kind: actor.KindUser, Method: method, TTL: sessionTTL})
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +292,16 @@ func (s *Service) Logout(ctx context.Context, header http.Header, procedure stri
 	if errors.Is(err, dpop.ErrNonce) || errors.Is(err, ErrDPoPRequired) {
 		return err
 	}
-	if err != nil || (p.Kind != actor.KindUser && p.Kind != actor.KindCLI) {
+	if err != nil {
+		return nil
+	}
+	if tok.WorkloadJti != nil {
+		// Its row stays, it says the job token is spent.
+		_, err := s.conn.Tenant().
+			RevokeWorkloadToken(ctx, &db.RevokeWorkloadTokenParams{ID: tok.ID, ServiceAccountID: p.ID})
+		return err
+	}
+	if p.Kind != actor.KindUser && p.Kind != actor.KindCLI {
 		return nil
 	}
 	if err := s.deleteToken(ctx, tok.ID); err != nil {

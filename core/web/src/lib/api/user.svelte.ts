@@ -28,7 +28,7 @@ export const user = {
 			get view() {
 				return atLeast(me.data?.role, WorkspaceRole.VIEWER);
 			},
-			/** Targets, daemons, CAs, teams, service accounts and grants. */
+			/** Targets, daemons, the CA, teams, service accounts and grants. */
 			get edit() {
 				return atLeast(me.data?.role, WorkspaceRole.EDITOR);
 			},
@@ -67,13 +67,6 @@ export const user = {
 	updateProfile: () =>
 		createMutation<User, Error, { name?: string }>(() => ({
 			mutationFn: (variables) => account.update(variables),
-			onSuccess: (updated) => {
-				queryClient.setQueryData(['account'], updated);
-			}
-		})),
-	setAvatar: () =>
-		createMutation<User, Error, Uint8Array>(() => ({
-			mutationFn: (image) => account.setAvatar(image),
 			onSuccess: (updated) => {
 				queryClient.setQueryData(['account'], updated);
 			}

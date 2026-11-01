@@ -41,8 +41,6 @@ exactly one implementation. The core uses `dpop`, `login` and `nktoken` only.
   persisted identity, TPM-backed when a TPM 2.0 is usable with a
   machine-wrapped software fallback otherwise. `NewSigner` loads or creates
   it, and every `SignerOptions.StatePath` is an identity of its own.
-  `SignerOptions.Enclave` plugs in another hardware key store, such as the
-  macOS Secure Enclave, tried after the TPM and before the software key.
   A `.lock` file beside the state file keeps two processes from creating
   different keys at once.
 
@@ -63,12 +61,9 @@ to live beside the blob and adds nothing, and PCR sealing breaks on kernel
 and firmware updates. The file permissions on the state file are the
 boundary on the machine.
 
-An enclave identity (`SignerOptions.Enclave`) works the same way: its opaque
-key blob is kept in the state file and only opens on the machine that
-created it, with no auth value. Any process that can read the state file as
-the owning user can ask the enclave to sign. A new enclave or TPM key must
-sign a test digest before it is persisted, so a half-working key store falls
-back to the software key instead of becoming an identity that cannot log in.
+A new TPM key must sign a test digest before it is persisted, so a half-working
+TPM falls back to the software key instead of becoming an identity that cannot
+log in.
 
 The software fallback wraps the key with a key derived from the machine's
 public fingerprint (`id.MachineID`). That stops a key file copied to another

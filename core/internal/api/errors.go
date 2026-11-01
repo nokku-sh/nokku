@@ -56,10 +56,10 @@ var (
 	)
 )
 
-// errTooManyUploads is not ResourceExhausted, a daemon waits an hour on that and this frees up in seconds.
+// errTooManyUploads is not ResourceExhausted, a daemon waits an hour on that and this frees up with the next commit.
 var errTooManyUploads = connect.NewError(
 	connect.CodeUnavailable,
-	"this daemon has too many recording uploads open, try again",
+	"the core is holding too many recording uploads, try again",
 )
 
 // errRecordingStorageFull is not InvalidArgument, a daemon gives up on that.
@@ -95,6 +95,12 @@ var (
 	errNoWorkspace = connect.NewError(
 		connect.CodeNotFound,
 		"no such workspace",
+	)
+	// errWorkloadRefused is every refused exchange. Which check failed goes to the logs, not to whoever asked.
+	errWorkloadRefused = connect.NewError(
+		connect.CodeUnauthenticated,
+		"this job can't sign in as this service account. Check its name and the issuer of its rules, "+
+			"the audit log says why for a token its issuer signed",
 	)
 )
 
@@ -146,6 +152,9 @@ func toConnectError(ctx context.Context, err error) error {
 		return errSSORequired
 	case errors.Is(err, iam.ErrInviteSpent):
 		return errInviteInvalid
+	case errors.Is(err, iam.ErrLastSSOProvider):
+		return newError(connect.CodeFailedPrecondition,
+			"this is the last provider that can sign people in, turn off required single sign-on first")
 	}
 	if refused, ok := errors.AsType[*ssh.RefusedError](err); ok {
 		return newError(connect.CodeInvalidArgument, refused.Reason)

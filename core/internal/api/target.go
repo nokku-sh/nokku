@@ -113,7 +113,6 @@ func (s *targetService) insertTarget(
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
 			Name:          name,
 			Description:   req.Description,
-			CaID:          req.CaId,
 			Endpoints:     req.GetEndpoints(),
 			Tags:          req.GetTags(),
 			HostPublicKey: trimmed(req.HostPublicKey),
@@ -186,7 +185,6 @@ func (s *targetService) UpdateTarget(
 		TargetID:      req.GetId(),
 		Name:          req.Name,
 		Description:   req.Description,
-		CaID:          req.CaId,
 		HostPublicKey: trimmed(req.HostPublicKey),
 		Endpoints:     maskedList(named("endpoints"), req.GetEndpoints()),
 		Tags:          maskedList(named("tags"), req.GetTags()),
@@ -233,7 +231,6 @@ func (s *targetService) ListTargets(
 		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
 			Query:    req.Query,
 			DaemonID: req.DaemonId,
-			CaID:     req.CaId,
 			Accounts: req.GetAccounts(),
 			Tags:     req.GetTags(),
 			Limit:    req.Limit,
@@ -317,10 +314,8 @@ func (s *targetService) GetSubjectAccess(
 	res := &nokkuv1.GetSubjectAccessResponse{}
 	var targets []*nokkuv1.Target
 	var daemons []*nokkuv1.Daemon
-	var cas []*nokkuv1.CertificateAuthority
 
 	uniqueDaemonIDs := make(map[string]struct{})
-	uniqueCAIDs := make(map[string]struct{})
 
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := setSubject(ctx, q, res, subjectID); err != nil {
@@ -341,7 +336,6 @@ func (s *targetService) GetSubjectAccess(
 			if r.DaemonID != nil {
 				uniqueDaemonIDs[*r.DaemonID] = struct{}{}
 			}
-			uniqueCAIDs[r.CaID] = struct{}{}
 		}
 
 		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
@@ -381,21 +375,17 @@ func (s *targetService) GetSubjectAccess(
 			}
 		}
 
-		if len(uniqueCAIDs) > 0 {
-			caRows, err := q.GetCAsByIDs(ctx, slices.Collect(maps.Keys(uniqueCAIDs)))
-			if err != nil {
-				return err
-			}
-			for _, ca := range caRows {
-				cas = append(cas, ca.ToProto())
-			}
+		ca, err := q.GetWorkspaceCA(ctx)
+		if err != nil {
+			return err
 		}
+		res.CertificateAuthority = ca.ToProto()
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
-	res.Targets, res.CertificateAuthorities, res.Daemons = targets, cas, daemons
+	res.Targets, res.Daemons = targets, daemons
 	return res, nil
 }
 

@@ -3,6 +3,7 @@ package api
 import (
 	"cmp"
 	"context"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect/v2"
@@ -15,6 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 type serviceAccountService struct {
@@ -43,14 +45,20 @@ func (s *serviceAccountService) CreateServiceAccount(
 	if !db.CanAssign(callerRole(ctx), role) {
 		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
+	source, err := ssh.SourceAddresses(req.GetSourceAddress())
+	if err != nil {
+		return nil, newError(connect.CodeInvalidArgument, err.Error())
+	}
 
 	var result *db.ServiceAccount
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		saID, err := q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
-			Name:        req.GetName(),
-			Description: req.Description,
-			Tags:        req.GetTags(),
-			Role:        role,
+			Name:          req.GetName(),
+			Description:   req.Description,
+			Tags:          req.GetTags(),
+			Role:          role,
+			ForceCommand:  strings.TrimSpace(req.GetForceCommand()),
+			SourceAddress: source,
 		})
 		if err != nil {
 			return err
@@ -79,18 +87,29 @@ func (s *serviceAccountService) UpdateServiceAccount(
 	if role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED && !db.CanAssign(callerRole(ctx), role) {
 		return nil, newError(connect.CodePermissionDenied, "role cannot be granted by you")
 	}
+	params := &db.UpdateServiceAccountParams{
+		ServiceAccountID: req.GetId(),
+		Name:             req.Name,
+		Description:      req.Description,
+		Role:             role,
+		Tags:             maskedList(named("tags"), req.GetTags()),
+	}
+	// Unset keeps what the account has, empty takes the limit away.
+	if req.ForceCommand != nil {
+		params.ForceCommand = new(strings.TrimSpace(req.GetForceCommand()))
+	}
+	if req.SourceAddress != nil {
+		list, err := ssh.SourceAddresses(req.GetSourceAddress())
+		if err != nil {
+			return nil, newError(connect.CodeInvalidArgument, err.Error())
+		}
+		params.SourceAddress = &list
+	}
 
 	var result *db.ServiceAccount
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
 			return err
-		}
-		params := &db.UpdateServiceAccountParams{
-			ServiceAccountID: req.GetId(),
-			Name:             req.Name,
-			Description:      req.Description,
-			Role:             role,
-			Tags:             maskedList(named("tags"), req.GetTags()),
 		}
 		updatedID, err := q.UpdateServiceAccount(ctx, params)
 		if err != nil {
@@ -152,16 +171,12 @@ func (s *serviceAccountService) CreateServiceAccountToken(
 	ctx context.Context,
 	req *nokkuv1.CreateServiceAccountTokenRequest,
 ) (*nokkuv1.CreateServiceAccountTokenResponse, error) {
-	expiry, err := tokenExpiry(req.GetExpiresAt())
+	ttl, err := keyTTL(req.GetExpiresAt())
 	if err != nil {
 		return nil, err
 	}
 	if err := checkCanManageServiceAccount(ctx, s.cfg.Conn.Tenant(), req.GetServiceAccountId()); err != nil {
 		return nil, err
-	}
-	var ttl time.Duration
-	if expiry != nil {
-		ttl = time.Until(*expiry)
 	}
 	tok, secret, err := s.cfg.IAM.IssueToken(ctx, iam.TokenParams{
 		SubjectID: req.GetServiceAccountId(),
@@ -208,21 +223,103 @@ func (s *serviceAccountService) RevokeServiceAccountToken(
 		return nil, err
 	}
 	if n == 0 {
+		// The session of a CI job, its row stays to keep the job token spent.
+		n, err = q.RevokeWorkloadToken(ctx, &db.RevokeWorkloadTokenParams{
+			ID:               req.GetId(),
+			ServiceAccountID: req.GetServiceAccountId(),
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	if n == 0 {
 		return nil, errNotFound
 	}
 	return &nokkuv1.RevokeServiceAccountTokenResponse{}, nil
 }
 
-// tokenExpiry is nil for a token that never expires.
-func tokenExpiry(ts *timestamppb.Timestamp) (*time.Time, error) {
+// maxRulesPerAccount is past any real use. Every exchange loads the rules of the account it names, and that call is public.
+const maxRulesPerAccount = 32
+
+// AddServiceAccountFederation lets the jobs a rule names sign in as the account, with no key to store.
+func (s *serviceAccountService) AddServiceAccountFederation(
+	ctx context.Context,
+	req *nokkuv1.AddServiceAccountFederationRequest,
+) (*nokkuv1.AddServiceAccountFederationResponse, error) {
+	if err := iam.ValidateFederation(req.GetIssuer(), req.GetClaims()); err != nil {
+		return nil, newError(connect.CodeInvalidArgument, err.Error())
+	}
+	q := s.cfg.Conn.Tenant()
+	if err := checkCanManageServiceAccount(ctx, q, req.GetServiceAccountId()); err != nil {
+		return nil, err
+	}
+	rules, err := q.ListServiceAccountFederations(ctx, req.GetServiceAccountId())
+	if err != nil {
+		return nil, err
+	}
+	if len(rules) >= maxRulesPerAccount {
+		return nil, newError(
+			connect.CodeResourceExhausted,
+			"this account has all the rules it can take, remove one first",
+		)
+	}
+	rule, err := q.CreateServiceAccountFederation(ctx, &db.CreateServiceAccountFederationParams{
+		ServiceAccountID: req.GetServiceAccountId(),
+		Issuer:           req.GetIssuer(),
+		Claims:           req.GetClaims(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	audit.SetTarget(ctx, rule.ID)
+	audit.Set(ctx, "issuer", rule.Issuer)
+	audit.Set(ctx, "claims", rule.Claims)
+	return &nokkuv1.AddServiceAccountFederationResponse{Federation: rule.ToProto()}, nil
+}
+
+func (s *serviceAccountService) ListServiceAccountFederations(
+	ctx context.Context,
+	req *nokkuv1.ListServiceAccountFederationsRequest,
+) (*nokkuv1.ListServiceAccountFederationsResponse, error) {
+	rows, err := s.cfg.Conn.Tenant().ListServiceAccountFederations(ctx, req.GetServiceAccountId())
+	if err != nil {
+		return nil, err
+	}
+	return &nokkuv1.ListServiceAccountFederationsResponse{Federations: db.ServiceAccountFederationsToProto(rows)}, nil
+}
+
+// RemoveServiceAccountFederation stops new sign-ins. A session a job already holds ends with its own expiry.
+func (s *serviceAccountService) RemoveServiceAccountFederation(
+	ctx context.Context,
+	req *nokkuv1.RemoveServiceAccountFederationRequest,
+) (*nokkuv1.RemoveServiceAccountFederationResponse, error) {
+	q := s.cfg.Conn.Tenant()
+	if err := checkCanManageServiceAccount(ctx, q, req.GetServiceAccountId()); err != nil {
+		return nil, err
+	}
+	n, err := q.DeleteServiceAccountFederation(ctx, &db.DeleteServiceAccountFederationParams{
+		ID:               req.GetId(),
+		ServiceAccountID: req.GetServiceAccountId(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, errNotFound
+	}
+	return &nokkuv1.RemoveServiceAccountFederationResponse{}, nil
+}
+
+// keyTTL is what a new key has left. A key without an end date can't be made.
+func keyTTL(ts *timestamppb.Timestamp) (time.Duration, error) {
 	if ts == nil {
-		return nil, nil
+		return 0, newError(connect.CodeInvalidArgument, "a key needs an end date, set expires_at")
 	}
-	expiry := ts.AsTime()
-	if expiry.Before(time.Now()) {
-		return nil, newError(connect.CodeInvalidArgument, "expires_at must be in the future")
+	ttl := time.Until(ts.AsTime())
+	if ttl <= 0 {
+		return 0, newError(connect.CodeInvalidArgument, "expires_at must be in the future")
 	}
-	return &expiry, nil
+	return ttl, nil
 }
 
 // checkCanManageServiceAccount keeps an editor from touching an account with a role above what they could grant.

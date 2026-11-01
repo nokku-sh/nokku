@@ -50,6 +50,9 @@ func Retire(
 		if err != nil || !locked {
 			return err
 		}
+		if err := q.QuietStateChange(ctx); err != nil {
+			return err
+		}
 		retired, err = q.DeleteRetiredDaemons(ctx, &db.DeleteRetiredDaemonsParams{
 			StartedAt: started,
 			Connected: connected,

@@ -252,12 +252,12 @@
 			<Tabs.Root value={activeTab} onValueChange={onTabChange} class="min-h-0 flex-1 gap-0">
 				<Tabs.List
 					variant="line"
-					class="w-full justify-start gap-5 border-b px-5 py-0 group-data-horizontal/tabs:h-[45px]"
+					class="no-scrollbar w-full max-w-full justify-start gap-5 overflow-x-auto border-b px-5 py-0 group-data-horizontal/tabs:h-[45px]"
 				>
 					{#each tabs as t (t.value)}
 						<Tabs.Trigger
 							value={t.value}
-							class="-mx-1.5 h-8 flex-none border-0 px-1.5 after:bg-primary group-data-horizontal/tabs:after:inset-x-1.5 group-data-horizontal/tabs:after:bottom-[-7px]"
+							class="-mx-1.5 h-8 flex-none border-0 px-1.5 after:bg-primary group-data-horizontal/tabs:after:inset-x-1.5 group-data-horizontal/tabs:after:bottom-[-6px]"
 						>
 							{#if t.icon}
 								<t.icon />

@@ -11,16 +11,16 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
-	import * as ImageCropper from '#lib/components/ui/image-cropper/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import { UserSchema } from '#lib/gen/nokku/v1/account_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
 	import { roleIcon, roleLabel } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
-	import { ArrowRight, Mail, MailQuestionMarkIcon, Trash } from '@lucide/svelte';
+	import { ArrowRight, Mail, MailQuestionMarkIcon } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 
 	const me = user.self();
@@ -29,7 +29,6 @@
 	const RoleIcon = $derived(roleIcon(me.data?.role || WorkspaceRole.MEMBER));
 
 	const updateProfile = user.updateProfile();
-	const setAvatar = user.setAvatar();
 	const deleteAccount = user.deleteAccount();
 	const requestEmailChange = user.requestEmailChange();
 	const creds = credentials.all();
@@ -53,17 +52,6 @@
 	const autoSave = useAutoSave(() => updateProfile.mutateAsync({ name: model?.name }));
 
 	// The crop comes at full size. The server keeps 128px, so a small copy is all it needs.
-	async function shrink(file: Blob, size = 256): Promise<Uint8Array> {
-		const bitmap = await createImageBitmap(file);
-		const canvas = document.createElement('canvas');
-		canvas.width = canvas.height = size;
-		canvas.getContext('2d')?.drawImage(bitmap, 0, 0, size, size);
-		bitmap.close();
-		const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-		if (!blob) throw new Error('The picture could not be read');
-		return new Uint8Array(await blob.arrayBuffer());
-	}
-
 	function askDelete() {
 		void confirm({
 			title: 'Delete your account?',
@@ -87,45 +75,7 @@
 {:else}
 	<Card.Root>
 		<Card.Content class="flex flex-col gap-6 sm:flex-row">
-			<ImageCropper.Root
-				bind:src={() => model.picture ?? '', (v) => (model.picture = v)}
-				onCropped={async (file) => {
-					try {
-						await setAvatar.mutateAsync(await shrink(file));
-						toast.success('Avatar updated');
-					} catch {
-						// The query client already toasted the error.
-					}
-				}}
-				onUnsupportedFile={(file) => toast.error(`Unsupported file type: ${file.type}`)}
-			>
-				<div class="relative self-center sm:self-start">
-					<ImageCropper.UploadTrigger>
-						<ImageCropper.Preview class="size-24" />
-					</ImageCropper.UploadTrigger>
-					{#if model.picture}
-						<Button
-							class="absolute -right-2 -bottom-2 rounded-full"
-							variant="outline"
-							size="icon-sm"
-							aria-label="Remove avatar"
-							onclick={() => {
-								model.picture = '';
-								setAvatar.mutate(new Uint8Array());
-							}}
-						>
-							<Trash />
-						</Button>
-					{/if}
-				</div>
-				<ImageCropper.Dialog>
-					<ImageCropper.Cropper />
-					<ImageCropper.Controls>
-						<ImageCropper.Crop />
-						<ImageCropper.Cancel />
-					</ImageCropper.Controls>
-				</ImageCropper.Dialog>
-			</ImageCropper.Root>
+			<UserAvatar user={model} class="size-24 self-center sm:self-start" />
 
 			<Field.Group class="flex-1 gap-4">
 				<Field.Field>

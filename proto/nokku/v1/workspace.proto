@@ -41,6 +41,15 @@ service WorkspaceService {
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
   }
+  // ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
+  // them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
+  rpc ClearUserIdentities(ClearUserIdentitiesRequest) returns (ClearUserIdentitiesResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      people_only: true
+      fresh: true
+    };
+  }
   rpc TransferOwnership(TransferOwnershipRequest) returns (TransferOwnershipResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
@@ -111,7 +120,6 @@ message UpdateWorkspaceRequest {
         "settings.default_daemon_config.allow_forwarding",
         "settings.default_daemon_config.allow_agent_forwarding",
         "settings.default_daemon_config.gateway_ports",
-        "settings.default_daemon_config.ephemeral",
         "settings.enforce_sso",
         "settings.session_idle_timeout"
       ]
@@ -187,6 +195,11 @@ message DeleteUserRequest {
   string user_id = 1 [(buf.validate.field).string.uuid = true];
 }
 message DeleteUserResponse {}
+
+message ClearUserIdentitiesRequest {
+  string user_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ClearUserIdentitiesResponse {}
 
 message TransferOwnershipRequest {
   string new_owner_id = 1 [(buf.validate.field).string.uuid = true];

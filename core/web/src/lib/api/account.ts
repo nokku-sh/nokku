@@ -28,10 +28,6 @@ export const account = {
 			(r) => r.user as User
 		),
 
-	/** An empty image removes the avatar. */
-	setAvatar: (image: Uint8Array): Promise<User> =>
-		guard(client.setAvatar({ image })).then((r) => r.user as User),
-
 	requestEmailChange: (newEmail: string): Promise<void> =>
 		guard(client.requestEmailChange({ newEmail })).then(() => undefined),
 

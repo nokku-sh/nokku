@@ -42,8 +42,6 @@ type matrixCaller struct {
 
 type matrixTarget struct {
 	label, id string
-	// wantCA is the label of the CA the target must end up on.
-	wantCA string
 	// daemonID, key and token stay empty without a daemon.
 	daemonID string
 	key      *ecdsa.PrivateKey
@@ -115,16 +113,11 @@ func seedMatrix(t *testing.T) *matrixFixture {
 		labels: map[string]string{},
 	}
 
-	active := f.seedCA(t, "ca-active")
-	f.seedDaemonTarget(t, "accepted", nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, active)
-	f.seedDaemonTarget(t, "pending", nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, active)
-	f.seedDaemonTarget(t, "rejected", nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, active)
-	f.seedDaemonlessTarget(t, "daemonless", active)
-	for _, tg := range f.targets {
-		row, err := cfg.Conn.Sys().GetTarget(t.Context(), tg.id)
-		require.NoError(t, err)
-		require.Equal(t, tg.wantCA, f.labels[row.CaID], "the CA of %s", tg.label)
-	}
+	f.labelCA(t, "ca-active")
+	f.seedDaemonTarget(t, "accepted", nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED)
+	f.seedDaemonTarget(t, "pending", nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING)
+	f.seedDaemonTarget(t, "rejected", nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)
+	f.seedDaemonlessTarget(t, "daemonless")
 
 	f.seedSubjects(t)
 
@@ -142,34 +135,23 @@ func seedMatrix(t *testing.T) *matrixFixture {
 	return f
 }
 
-func (f *matrixFixture) seedCA(t *testing.T, label string) string {
+// labelCA names the workspace CA, the one every target is under.
+func (f *matrixFixture) labelCA(t *testing.T, label string) {
 	t.Helper()
-	name := uniq("mx-" + label)
-	res, err := f.certs().CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-		Name: &name,
-	})
-	require.NoError(t, err)
-	ca := res.GetCertificateAuthority()
+	ca := workspaceCA(t, f.cfg)
 	f.labels[ca.GetId()] = label
-	f.labels[name] = label
 	f.labels[strings.TrimSpace(ca.GetPublicKey())] = label + ".user-key"
 	f.labels[strings.TrimSpace(ca.GetHostPublicKey())] = label + ".host-key"
-	return ca.GetId()
 }
 
 func (f *matrixFixture) seedDaemonTarget(
 	t *testing.T,
 	label string,
 	status nokkuv1.DaemonStatus,
-	caID string,
 ) {
 	t.Helper()
 	ws := seedWorkspace(t, f.cfg)
 	key, enrolled := enrollTestDaemon(t, f.cfg, f.srv, ws, status != nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING)
-	inWorkspace(t, f.cfg, ws, func(q *db.Queries) error {
-		_, err := q.UpdateTarget(t.Context(), &db.UpdateTargetParams{TargetID: enrolled.GetTargetId(), CaID: &caID})
-		return err
-	})
 	if status == nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED {
 		_, err := nokkuv1connect.NewDaemonServiceClient(f.adminClient()).UpdateDaemon(t.Context(),
 			masked(&nokkuv1.UpdateDaemonRequest{Id: enrolled.Id, Status: &status}))
@@ -179,7 +161,6 @@ func (f *matrixFixture) seedDaemonTarget(
 	f.addTarget(t, matrixTarget{
 		label:    label,
 		id:       enrolled.GetTargetId(),
-		wantCA:   f.labels[caID],
 		daemonID: enrolled.GetId(),
 		key:      key,
 		token:    enrolled.GetAccessToken(),
@@ -187,18 +168,18 @@ func (f *matrixFixture) seedDaemonTarget(
 }
 
 // seedDaemonlessTarget is a host that runs nk sync instead of a daemon.
-func (f *matrixFixture) seedDaemonlessTarget(t *testing.T, label, caID string) {
+func (f *matrixFixture) seedDaemonlessTarget(t *testing.T, label string) {
 	t.Helper()
 	var id string
 	inWorkspace(t, f.cfg, seedWorkspace(t, f.cfg), func(q *db.Queries) error {
-		target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{Name: uniq("mx-" + label), CaID: &caID})
+		target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{Name: uniq("mx-" + label)})
 		if err != nil {
 			return err
 		}
 		id = target.ID
 		return nil
 	})
-	f.addTarget(t, matrixTarget{label: label, id: id, wantCA: f.labels[caID]})
+	f.addTarget(t, matrixTarget{label: label, id: id})
 }
 
 func (f *matrixFixture) addTarget(t *testing.T, tg matrixTarget) {
@@ -210,7 +191,7 @@ func (f *matrixFixture) addTarget(t *testing.T, tg matrixTarget) {
 	f.targets = append(f.targets, tg)
 }
 
-// seedSubjects grants the same accounts on every target, so the targets differ only in their daemon and CA.
+// seedSubjects grants the same accounts on every target, so the targets differ only in their daemon.
 //
 //	root    alice for good, dave for good, carol until an hour ago
 //	deploy  team staff (bob, dave), service account ci
@@ -286,7 +267,7 @@ func (f *matrixFixture) seedSubjects(t *testing.T) {
 	})
 
 	for _, c := range []matrixSubject{{"alice", alice}, {"bob", bob}, {"carol", carol}, {"dave", dave}, {"eve", eve}} {
-		u := &db.User{ID: c.id}
+		u := &db.User{ID: c.id, Active: true}
 		f.callers = append(f.callers, matrixCaller{c.label, sessionFor(t, f.cfg, u), cliSessionFor(t, f.cfg, u)})
 	}
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(f.adminClient())
@@ -437,11 +418,7 @@ func (f *matrixFixture) selfAccessLines(t *testing.T) []string {
 		if res.GetServiceAccount() != nil {
 			subject = "service account " + res.GetServiceAccount().GetId()
 		}
-		cas := make([]string, 0, len(res.GetCertificateAuthorities()))
-		for _, ca := range res.GetCertificateAuthorities() {
-			cas = append(cas, ca.GetId())
-		}
-		lines = append(lines, prefix+": subject "+subject, prefix+": cas "+f.list(cas))
+		lines = append(lines, prefix+": subject "+subject, prefix+": cas "+f.list(caIDs(res)))
 		lines = append(lines, f.targetAccessLines(prefix, res.GetTargets())...)
 	}
 	return lines
@@ -484,12 +461,16 @@ func (f *matrixFixture) subjectAccess(
 	for _, d := range res.GetDaemons() {
 		daemons = append(daemons, d.GetId())
 	}
-	cas := make([]string, 0, len(res.GetCertificateAuthorities()))
-	for _, ca := range res.GetCertificateAuthorities() {
-		cas = append(cas, ca.GetId())
-	}
-	lines := []string{prefix + ": daemons " + f.list(daemons), prefix + ": cas " + f.list(cas)}
+	lines := []string{prefix + ": daemons " + f.list(daemons), prefix + ": cas " + f.list(caIDs(res))}
 	return append(lines, f.targetAccessLines(prefix, res.GetTargets())...)
+}
+
+// caIDs is empty for a subject with no targets, the answer carries no CA then.
+func caIDs(res *nokkuv1.GetSubjectAccessResponse) []string {
+	if ca := res.GetCertificateAuthority(); ca != nil {
+		return []string{ca.GetId()}
+	}
+	return []string{}
 }
 
 func (f *matrixFixture) targetAccessLines(prefix string, targets []*nokkuv1.Target) []string {
@@ -515,9 +496,13 @@ func (f *matrixFixture) reportLines(t *testing.T) []string {
 	t.Helper()
 	req := &nokkuv1.ExportAccessReportRequest{Format: nokkuv1.ExportAuditLogsRequest_FORMAT_JSON.Enum()}
 	var lines []string
+	restore := withoutAPlan(t, f.cfg)
 	if _, err := nokkuv1connect.NewUtilServiceClient(f.adminClient()).ExportAccessReport(t.Context(), req); err != nil {
-		lines = append(lines, "ExportAccessReport on community: "+errText(err))
+		// The hosted service has no free plan, the same refusal names the plan that ran out.
+		refused := strings.ReplaceAll(errText(err), "inactive", "Community")
+		lines = append(lines, "ExportAccessReport on community: "+refused)
 	}
+	restore()
 	_, srv := enterprise(t)
 	res, err := nokkuv1connect.NewUtilServiceClient(
 		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), f.admin),
@@ -576,10 +561,6 @@ func (f *matrixFixture) as(token string) *connect.Client {
 
 func (f *matrixFixture) adminClient() *connect.Client {
 	return f.conn(f.admin)
-}
-
-func (f *matrixFixture) certs() nokkuv1connect.CertificateServiceClient {
-	return nokkuv1connect.NewCertificateServiceClient(f.adminClient())
 }
 
 func setOrNone(at *time.Time) string {

@@ -2,26 +2,18 @@
 -- Every setting comes from the caller, ssh.NewCA fills in what a new CA starts with. ssh.CreateCA adds the keys.
 INSERT INTO
   ssh_cas (
-    name,
-    description,
     public_key,
     host_public_key,
     user_default_ttl,
     user_max_ttl,
-    force_command,
-    source_address,
     host_ttl
   )
 VALUES
   (
-    @name,
-    @description,
     @public_key,
     @host_public_key,
     @user_default_ttl,
     @user_max_ttl,
-    @force_command,
-    @source_address,
     @host_ttl
   )
 RETURNING
@@ -56,86 +48,34 @@ WHERE
   k.ca_id = @ca_id
   AND k.kind = @kind;
 
--- name: GetCA :one
+-- name: GetWorkspaceCA :one
+-- What signs and what is trusted in the workspace. Private keys live in ssh_ca_keys.
 SELECT
   *
 FROM
   ssh_cas
 WHERE
-  id = @ca_id;
+  workspace_id = current_workspace_id ();
 
--- name: GetCAForUpdate :one
+-- name: GetWorkspaceCAForUpdate :one
 SELECT
   *
 FROM
   ssh_cas
 WHERE
-  id = @ca_id
+  workspace_id = current_workspace_id ()
 FOR UPDATE;
-
--- name: GetCAByDaemonID :one
-SELECT
-  ca.*
-FROM
-  ssh_cas ca
-  JOIN targets t ON t.ca_id = ca.id
-WHERE
-  t.daemon_id = $1;
-
--- name: GetDaemonCAKeys :one
--- What a daemon trusts. Private keys live in ssh_ca_keys.
-SELECT
-  ca.public_key,
-  ca.host_public_key,
-  ca.previous_public_key,
-  ca.previous_trusted_until
-FROM
-  ssh_cas ca
-  JOIN targets t ON t.ca_id = ca.id
-WHERE
-  t.daemon_id = $1;
-
--- name: GetCAsByIDs :many
--- What clients trust.
-SELECT
-  id,
-  workspace_id,
-  name,
-  public_key,
-  host_public_key,
-  previous_public_key,
-  previous_host_public_key,
-  previous_trusted_until,
-  rotated_at,
-  is_default,
-  user_default_ttl,
-  user_max_ttl
-FROM
-  ssh_cas
-WHERE
-  id = ANY (sqlc.arg('ca_ids')::UUID[]);
-
--- name: ListCAs :many
-SELECT
-  *
-FROM
-  ssh_cas
-ORDER BY
-  id ASC;
 
 -- name: UpdateCA :one
 UPDATE ssh_cas
 SET
-  name = COALESCE(sqlc.narg('name'), name),
-  description = COALESCE(sqlc.narg('description'), description),
   user_default_ttl = COALESCE(sqlc.narg('user_default_ttl'), user_default_ttl),
   user_max_ttl = COALESCE(sqlc.narg('user_max_ttl'), user_max_ttl),
-  force_command = COALESCE(sqlc.narg('force_command'), force_command),
   source_address = COALESCE(sqlc.narg('source_address'), source_address),
   host_ttl = COALESCE(sqlc.narg('host_ttl'), host_ttl),
   updated_at = NOW()
 WHERE
-  id = @ca_id
+  workspace_id = current_workspace_id ()
 RETURNING
   *;
 
@@ -161,32 +101,6 @@ SET
   host_public_key = @host_public_key,
   rotated_at = NOW(),
   updated_at = NOW()
-WHERE
-  id = @ca_id
-RETURNING
-  *;
-
--- name: ClearDefaultCA :exec
--- Runs before MarkDefaultCA. The partial unique index is checked row by row, so one statement that swaps
--- both can see two defaults. See Queries.SetDefaultCA.
-UPDATE ssh_cas
-SET
-  is_default = FALSE,
-  updated_at = NOW()
-WHERE
-  is_default
-  AND id <> @ca_id;
-
--- name: MarkDefaultCA :exec
-UPDATE ssh_cas
-SET
-  is_default = TRUE,
-  updated_at = NOW()
-WHERE
-  id = @ca_id;
-
--- name: DeleteCA :one
-DELETE FROM ssh_cas
 WHERE
   id = @ca_id
 RETURNING

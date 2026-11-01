@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { ca } from '#lib/api/certificates.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import CreateTargetModal from '#lib/components/modals/CreateTargetModal.svelte';
@@ -16,7 +15,6 @@
 		ActionCell,
 		IdentityCell,
 		TagsCell,
-		TextCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -24,7 +22,7 @@
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
-	import { IdCard, Plus, Server, ShieldCheck, TagIcon, UserIcon } from '@lucide/svelte';
+	import { Plus, Server, ShieldCheck, TagIcon, UserIcon } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
 	const sheet = useSheet();
@@ -37,12 +35,9 @@
 	const targets = target.list(() => ({
 		...pager.args,
 		query: debounced.current,
-		caId: page.url.searchParams.get('ca') || undefined,
 		tags: page.url.searchParams.get('tags')?.split(','),
 		accounts: page.url.searchParams.get('accounts')?.split(',')
 	}));
-
-	const caData = ca.list();
 
 	const filterData = target.filters();
 
@@ -76,14 +71,6 @@
 						row.original.endpoints[0] ||
 						row.original.description,
 					mono: !!(row.original.metadata?.hostname || row.original.endpoints[0])
-				})
-		}),
-		columnHelper.accessor('caId', {
-			header: 'CA',
-			meta: { hideBelow: 'md' },
-			cell: ({ row }) =>
-				renderComponent(TextCell, {
-					label: caData.data?.find((c) => c.id === row.original.caId)?.name ?? 'Default CA'
 				})
 		}),
 		columnHelper.display({
@@ -181,12 +168,6 @@
 			searchResultCount={targets.data?.total}
 			{table}
 			filters={[
-				{
-					title: 'CA',
-					options: caData.data?.map((c) => ({ label: c.name, value: c.id, icon: IdCard })) ?? [],
-					param: 'ca',
-					mode: 'single'
-				},
 				{
 					title: 'Tags',
 					options: uniqueTags,

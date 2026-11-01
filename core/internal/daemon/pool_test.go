@@ -433,7 +433,7 @@ func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
 	if closed["s2"] {
 		t.Fatal("session of another daemon was torn down")
 	}
-	if p.GetSession("s1") != nil || p.GetSession("s2") == nil {
+	if p.sessions["s1"] != nil || p.sessions["s2"] == nil {
 		t.Fatal("session map out of sync with the teardown")
 	}
 	if _, ok := p.owned["d1"]; ok {
@@ -459,4 +459,21 @@ func TestPool_StateVersionNeedsNoListener(t *testing.T) {
 	v, err = p.stateVersion(t.Context(), "w1")
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), v, "the change never reached the heartbeat check")
+}
+
+// A daemon only counts as behind on a version it had a whole heartbeat to reach, so a busy one never does.
+func TestHeartbeatFindsADaemonThatFellBehind(t *testing.T) {
+	c := &daemonConn{}
+	assert.False(t, c.heartbeat(0, 5), "the first heartbeat has nothing to compare with")
+	assert.False(t, c.heartbeat(5, 7), "a daemon that reached the version of the last heartbeat")
+	assert.Nil(t, c.behindSince.Load())
+
+	assert.True(t, c.heartbeat(6, 7), "a daemon still short of the version of the last heartbeat")
+	since := c.behindSince.Load()
+	require.NotNil(t, since)
+	assert.False(t, c.heartbeat(6, 7), "falling behind is reported once")
+	assert.Equal(t, since, c.behindSince.Load(), "the first moment stays")
+
+	assert.False(t, c.heartbeat(7, 9), "a daemon that caught up")
+	assert.Nil(t, c.behindSince.Load())
 }

@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { Server } from '@lucide/svelte';
-	import { ca } from '#lib/api/certificates.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
-	import * as Select from '#lib/components/ui/select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { newDraft, useSheet } from '#lib/hooks/index.js';
@@ -14,12 +12,9 @@
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	const sheet = useSheet();
-	const cas = ca.list();
-	const caList = $derived(cas.data ?? []);
 	const tagFilters = targetApi.filters();
 	const createTarget = targetApi.create();
 
-	// No CA picked leaves caId unset, the server then takes the workspace default.
 	let model = $state(newDraft(TargetSchema));
 
 	async function onSubmit() {
@@ -41,22 +36,6 @@
 		<Field.Label for="new-target-name">Name</Field.Label>
 		<Input id="new-target-name" bind:value={model.name} placeholder="web-prod-1" required />
 		<Field.Description>Used in ssh user@name. Letters, digits, - and _.</Field.Description>
-	</Field.Field>
-
-	<Field.Field>
-		<Field.Label for="new-target-ca">Certificate authority</Field.Label>
-		<Select.Root type="single" value={model.caId} onValueChange={(v) => (model.caId = v)}>
-			<Select.Trigger id="new-target-ca" class="w-full">
-				{caList.find((c) => c.id === model.caId)?.name ?? 'Default CA'}
-			</Select.Trigger>
-			<Select.Content>
-				<Select.Group>
-					{#each caList as c (c.id)}
-						<Select.Item value={c.id}>{c.name}</Select.Item>
-					{/each}
-				</Select.Group>
-			</Select.Content>
-		</Select.Root>
 	</Field.Field>
 
 	<Field.Field>

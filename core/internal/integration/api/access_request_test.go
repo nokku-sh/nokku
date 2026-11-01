@@ -39,7 +39,7 @@ func enterprise(t *testing.T) (*config.Config, *httptest.Server) {
 	var err error
 	local.Entitlements, err = entitlement.New(t.Context(), cfg.Conn, pubHex, modeSelfHosted)
 	require.NoError(t, err)
-	srv := httptest.NewServer(api.New(&local).Handler(t.Context()))
+	srv := httptest.NewServer(serving(api.New(&local).Handler(t.Context())))
 	t.Cleanup(srv.Close)
 
 	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)

@@ -24,19 +24,12 @@ service DaemonService {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
       people_only: true
       signs: true
     };
-  }
-  rpc CloseSession(CloseSessionRequest) returns (CloseSessionResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc Relay(stream RelayRequest) returns (stream RelayResponse) {
     option (access) = {
@@ -99,6 +92,8 @@ message Daemon {
   google.protobuf.Timestamp last_seen_at = 9;
   // version is nokkud's, as its last enroll or sync reported it.
   string version = 10;
+  // behind_since is when a connected daemon stopped keeping up with access changes. Unset while it keeps up.
+  google.protobuf.Timestamp behind_since = 11;
 }
 
 message DaemonConfig {
@@ -178,29 +173,6 @@ message CreateSessionResponse {
   DaemonSession session = 1;
   string daemon_name = 2;
 }
-
-message ListSessionsRequest {
-  string daemon_id = 1 [
-    (buf.validate.field).string.uuid = true,
-    (buf.validate.field).required = true
-  ];
-}
-message ListSessionsResponse {
-  repeated DaemonSession sessions = 1;
-  string daemon_name = 2;
-}
-
-message CloseSessionRequest {
-  string daemon_id = 1 [
-    (buf.validate.field).string.uuid = true,
-    (buf.validate.field).required = true
-  ];
-  string session_id = 2 [
-    (buf.validate.field).string.uuid = true,
-    (buf.validate.field).required = true
-  ];
-}
-message CloseSessionResponse {}
 
 message EnrollDaemonRequest {
   string token = 1 [(buf.validate.field).string.min_len = 1];

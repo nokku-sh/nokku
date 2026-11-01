@@ -13,7 +13,6 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
-	import * as Select from '#lib/components/ui/select/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
@@ -51,8 +50,7 @@
 
 	const daemonQuery = daemonApi.get(() => entity?.daemonId);
 	const linkedDaemon = $derived(daemonQuery.data?.daemon);
-	const cas = ca.list();
-	const caList = $derived(cas.data ?? []);
+	const authority = ca.get();
 	const tagFilters = targetApi.filters();
 
 	const update = targetApi.update();
@@ -71,10 +69,16 @@
 	const lastSynced = $derived(formatTs(entity?.lastSyncAt, 'relative-short'));
 	// The server only learns a new CA key from nk sync.
 	const caRotated = $derived.by(() => {
-		const rotatedAt = (caList.find((c) => c.id === entity?.caId) ?? caList.find((c) => c.isDefault))
-			?.rotatedAt;
+		const rotatedAt = authority.data?.rotatedAt;
 		const syncedAt = entity?.lastSyncAt;
 		return !!syncedAt && !!rotatedAt && timestampDate(rotatedAt) > timestampDate(syncedAt);
+	});
+	// A sync while the old key still counts writes both, and the server has no way to drop one on a date.
+	const oldKeyUntil = $derived.by(() => {
+		const until = authority.data?.previousTrustedUntil;
+		const syncedAt = entity?.lastSyncAt;
+		if (!isManual || caRotated || !until || !syncedAt) return undefined;
+		return timestampDate(syncedAt) < timestampDate(until) ? until : undefined;
 	});
 	const syncCommand = $derived(`nk sync ${model?.name ?? '<name>'}`);
 	const systemInfo = $derived(
@@ -244,6 +248,12 @@
 							The certificate authority was rotated after the last sync. Sync again, or this server
 							rejects new certificates.
 						</p>
+					{:else if oldKeyUntil}
+						<p class="text-sm text-warning">
+							This server still trusts the previous key of the certificate authority. Sync again
+							after
+							{formatTs(oldKeyUntil)}, it can't drop that key on its own.
+						</p>
 					{/if}
 					<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
 						<SquareTerminal class="size-4 shrink-0 text-muted-foreground" />
@@ -342,45 +352,20 @@
 							oninput={save}
 						/>
 					</Field.Field>
-					<div class="grid gap-4 sm:grid-cols-2">
-						<Field.Field>
-							<Field.Label for="target-ca">Certificate authority</Field.Label>
-							<Select.Root
-								type="single"
-								value={model.caId}
-								disabled={!can.edit}
-								onValueChange={(v) => {
-									model.caId = v;
-									save();
-								}}
-							>
-								<Select.Trigger id="target-ca" class="w-full">
-									{caList.find((c) => c.id === model.caId)?.name ?? 'Default CA'}
-								</Select.Trigger>
-								<Select.Content>
-									<Select.Group>
-										{#each caList as c (c.id)}
-											<Select.Item value={c.id}>{c.name}</Select.Item>
-										{/each}
-									</Select.Group>
-								</Select.Content>
-							</Select.Root>
-						</Field.Field>
-						<Field.Field>
-							<Field.Label for="target-tags">Tags</Field.Label>
-							<TagsInput
-								id="target-tags"
-								value={model.tags}
-								suggestions={tagFilters.data?.tags}
-								disabled={!can.edit}
-								onValueChange={(tags) => {
-									model.tags = tags;
-									save();
-								}}
-								placeholder="linux, prod"
-							/>
-						</Field.Field>
-					</div>
+					<Field.Field>
+						<Field.Label for="target-tags">Tags</Field.Label>
+						<TagsInput
+							id="target-tags"
+							value={model.tags}
+							suggestions={tagFilters.data?.tags}
+							disabled={!can.edit}
+							onValueChange={(tags) => {
+								model.tags = tags;
+								save();
+							}}
+							placeholder="linux, prod"
+						/>
+					</Field.Field>
 				</Field.Group>
 			</Section>
 

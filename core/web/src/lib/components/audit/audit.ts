@@ -70,6 +70,9 @@ export const areas: Area[] = [
 			'DeleteServiceAccount',
 			'CreateServiceAccountToken',
 			'RevokeServiceAccountToken',
+			'AddServiceAccountFederation',
+			'RemoveServiceAccountFederation',
+			'ExchangeWorkloadToken',
 			'CreateJoinToken',
 			'DeleteJoinToken',
 			'UserCreated',
@@ -89,6 +92,7 @@ export const areas: Area[] = [
 			'SyncTargetUsers',
 			'EnrollDaemon',
 			'UpdateDaemon',
+			'DaemonBehind',
 			'DeleteDaemon'
 		]
 	},
@@ -96,19 +100,13 @@ export const areas: Area[] = [
 		value: 'certificates',
 		label: 'Certificates',
 		icon: Shield,
-		actions: [
-			'CreateCertificateAuthority',
-			'UpdateCertificateAuthority',
-			'DeleteCertificateAuthority',
-			'RolloverCertificateAuthority',
-			'SignSSHCertificate'
-		]
+		actions: ['UpdateCertificateAuthority', 'RolloverCertificateAuthority', 'SignSSHCertificate']
 	},
 	{
 		value: 'sessions',
 		label: 'Sessions',
 		icon: SquareTerminal,
-		actions: ['CreateSession', 'CloseSession', 'RelayOpen', 'RelayClose', 'GetRecording']
+		actions: ['CreateSession', 'RelayOpen', 'RelayClose', 'GetRecording']
 	},
 	{
 		value: 'signins',

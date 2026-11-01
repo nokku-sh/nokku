@@ -10,18 +10,16 @@ import (
 
 	"github.com/mizuchilabs/kata/fsutil"
 
-	"github.com/nokku-sh/nokku/cli/internal/enclave"
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// TPM or Secure Enclave when one is usable, otherwise a software key wrapped to this machine.
+// A TPM when one is usable, otherwise a software key wrapped to this machine.
 func newSSHSigner(requireTPM bool) (tpm.Signer, error) {
 	return tpm.NewSigner(tpm.SignerOptions{
 		StatePath:  paths.SSHSignerFile(),
 		RequireTPM: requireTPM,
 		Recreate:   true,
-		Enclave:    enclave.New(),
 	})
 }
 

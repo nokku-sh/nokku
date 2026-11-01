@@ -3,13 +3,10 @@
 package api_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
-	"image"
-	imgpng "image/png"
 	"net/http/httptest"
 	"slices"
 	"strings"
@@ -184,8 +181,6 @@ func partialConn(srv *httptest.Server, token string) *connect.Client {
 
 func partialAccount(t *testing.T, cfg *config.Config, srv *httptest.Server) partialResource {
 	t.Helper()
-	var png bytes.Buffer
-	require.NoError(t, imgpng.Encode(&png, image.NewNRGBA(image.Rect(0, 0, 64, 64))))
 	tokens := map[string]string{}
 	self := func(id string) nokkuv1connect.AccountServiceClient {
 		return nokkuv1connect.NewAccountServiceClient(partialConn(srv, tokens[id]))
@@ -199,10 +194,16 @@ func partialAccount(t *testing.T, cfg *config.Config, srv *httptest.Server) part
 	return partialResource{
 		rpc: "AccountService.UpdateAccount",
 		create: func() string {
-			u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+			ws := seedWorkspace(t, cfg)
+			u := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 			tokens[u.ID] = sessionFor(t, cfg, u)
-			_, err := self(u.ID).SetAvatar(t.Context(), &nokkuv1.SetAvatarRequest{Image: png.Bytes()})
-			require.NoError(t, err)
+			inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+				_, err := q.UpdateUser(
+					t.Context(),
+					&db.UpdateUserParams{ID: u.ID, Picture: new("https://idp.test/u.png")},
+				)
+				return err
+			})
 			return u.ID
 		},
 		read: func(id string) []partialField {
@@ -220,32 +221,25 @@ func partialAccount(t *testing.T, cfg *config.Config, srv *httptest.Server) part
 func partialCA(t *testing.T, admin *connect.Client) partialResource {
 	t.Helper()
 	certs := nokkuv1connect.NewCertificateServiceClient(admin)
-	listed, err := certs.ListCertificateAuthorities(t.Context(), &nokkuv1.ListCertificateAuthoritiesRequest{})
-	require.NoError(t, err)
-	var oldDefault string
-	for _, ca := range listed.GetCertificateAuthorities() {
-		if ca.GetIsDefault() {
-			oldDefault = ca.GetId()
-		}
+	read := func() *nokkuv1.CertificateAuthority {
+		res, err := certs.GetCertificateAuthority(t.Context(), &nokkuv1.GetCertificateAuthorityRequest{})
+		require.NoError(t, err)
+		return res.GetCertificateAuthority()
 	}
-	var made []string
-	// Each baseline CA takes the workspace default, so the old default gets it back before they go.
+	// The workspace has one CA, so every case starts by setting the baseline, and the test puts it back.
+	before := read()
 	t.Cleanup(func() {
-		ctx := context.WithoutCancel(t.Context())
-		if oldDefault != "" {
-			_, err := certs.UpdateCertificateAuthority(ctx, masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-				Id: &oldDefault, IsDefault: new(true),
+		_, err := certs.UpdateCertificateAuthority(context.WithoutCancel(t.Context()),
+			masked(&nokkuv1.UpdateCertificateAuthorityRequest{
+				UserDefaultTtl: before.GetUserDefaultTtl(),
+				UserMaxTtl:     before.GetUserMaxTtl(),
+				HostTtl:        before.GetHostTtl(),
+				SourceAddress:  new(before.GetSourceAddress()),
 			}))
-			require.NoError(t, err)
-		}
-		for _, id := range made {
-			_, err := certs.DeleteCertificateAuthority(ctx, &nokkuv1.DeleteCertificateAuthorityRequest{Id: &id})
-			require.NoError(t, err)
-		}
+		require.NoError(t, err)
 	})
 	update := func(req *nokkuv1.UpdateCertificateAuthorityRequest) func(string) error {
-		return func(id string) error {
-			req.Id = &id
+		return func(string) error {
 			_, err := certs.UpdateCertificateAuthority(t.Context(), masked(req))
 			return err
 		}
@@ -253,29 +247,17 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 	return partialResource{
 		rpc: "CertificateService.UpdateCertificateAuthority",
 		create: func() string {
-			res, err := certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-				Name:           new(uniq("partial")),
-				Description:    new("baseline"),
-				IsDefault:      new(true),
+			res, err := certs.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
 				UserDefaultTtl: durationpb.New(time.Hour),
 				UserMaxTtl:     durationpb.New(12 * time.Hour),
 				HostTtl:        durationpb.New(24 * time.Hour),
-				ForceCommand:   new("/usr/bin/baseline"),
 				SourceAddress:  new("10.0.0.0/8"),
-			})
+			}))
 			require.NoError(t, err)
-			made = append(made, res.GetCertificateAuthority().GetId())
 			return res.GetCertificateAuthority().GetId()
 		},
-		read: func(id string) []partialField {
-			res, err := certs.GetCertificateAuthority(t.Context(), &nokkuv1.GetCertificateAuthorityRequest{Id: &id})
-			require.NoError(t, err)
-			return partialFields(res.GetCertificateAuthority(), "id")
-		},
+		read: func(string) []partialField { return partialFields(read(), "id") },
 		cases: []partialCase{
-			{"name", update(&nokkuv1.UpdateCertificateAuthorityRequest{Name: new(uniq("renamed"))})},
-			{"description", update(&nokkuv1.UpdateCertificateAuthorityRequest{Description: new("changed")})},
-			{"is_default", update(&nokkuv1.UpdateCertificateAuthorityRequest{IsDefault: new(false)})},
 			{"user_default_ttl", update(&nokkuv1.UpdateCertificateAuthorityRequest{
 				UserDefaultTtl: durationpb.New(2 * time.Hour),
 			})},
@@ -285,7 +267,6 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 			{"host_ttl", update(&nokkuv1.UpdateCertificateAuthorityRequest{
 				HostTtl: durationpb.New(48 * time.Hour),
 			})},
-			{"force_command", update(&nokkuv1.UpdateCertificateAuthorityRequest{ForceCommand: new("/usr/bin/other")})},
 			{"source_address", update(&nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("192.0.2.0/24")})},
 			{"nothing", update(&nokkuv1.UpdateCertificateAuthorityRequest{})},
 		},
@@ -377,7 +358,6 @@ func partialWorkspace(t *testing.T, cfg *config.Config, srv *httptest.Server) pa
 						AllowForwarding:      new(false),
 						AllowAgentForwarding: new(false),
 						GatewayPorts:         new(true),
-						Ephemeral:            new(true),
 					},
 					SessionIdleTimeout: durationpb.New(10 * time.Minute),
 				},
@@ -486,22 +466,7 @@ func partialTeam(t *testing.T, cfg *config.Config, admin *connect.Client) partia
 
 func partialTarget(t *testing.T, admin *connect.Client) partialResource {
 	t.Helper()
-	certs := nokkuv1connect.NewCertificateServiceClient(admin)
 	targets := nokkuv1connect.NewTargetServiceClient(admin)
-	newCA := func() string {
-		res, err := certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-			Name: new(uniq("partial-target")),
-		})
-		require.NoError(t, err)
-		id := res.GetCertificateAuthority().GetId()
-		t.Cleanup(func() {
-			_, err := certs.DeleteCertificateAuthority(context.WithoutCancel(t.Context()),
-				&nokkuv1.DeleteCertificateAuthorityRequest{Id: &id})
-			require.NoError(t, err)
-		})
-		return id
-	}
-	baseCA, otherCA := newCA(), newCA()
 	update := func(req *nokkuv1.UpdateTargetRequest) func(string) error {
 		return func(id string) error {
 			req.Id = &id
@@ -513,7 +478,6 @@ func partialTarget(t *testing.T, admin *connect.Client) partialResource {
 		rpc: "TargetService.UpdateTarget",
 		create: func() string {
 			res, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
-				CaId:          &baseCA,
 				Name:          new(uniq("partial")),
 				Description:   new("baseline"),
 				HostPublicKey: new(partialHostKey(t)),
@@ -521,16 +485,7 @@ func partialTarget(t *testing.T, admin *connect.Client) partialResource {
 				Tags:          []string{"prod", "web"},
 			})
 			require.NoError(t, err)
-			id := res.GetTarget().GetId()
-			// Before its CAs go, a CA in use cannot be deleted.
-			t.Cleanup(func() {
-				_, err := targets.DeleteTarget(
-					context.WithoutCancel(t.Context()),
-					&nokkuv1.DeleteTargetRequest{Id: &id},
-				)
-				require.NoError(t, err)
-			})
-			return id
+			return res.GetTarget().GetId()
 		},
 		read: func(id string) []partialField {
 			res, err := targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &id})
@@ -538,7 +493,6 @@ func partialTarget(t *testing.T, admin *connect.Client) partialResource {
 			return partialFields(res.GetTarget(), "id")
 		},
 		cases: []partialCase{
-			{"ca_id", update(&nokkuv1.UpdateTargetRequest{CaId: &otherCA})},
 			{"name", update(&nokkuv1.UpdateTargetRequest{Name: new(uniq("renamed"))})},
 			{"description", update(&nokkuv1.UpdateTargetRequest{Description: new("changed")})},
 			{"host_public_key", update(&nokkuv1.UpdateTargetRequest{HostPublicKey: new(partialHostKey(t))})},
@@ -645,10 +599,12 @@ func partialServiceAccount(t *testing.T, admin *connect.Client) partialResource 
 		rpc: "ServiceAccountService.UpdateServiceAccount",
 		create: func() string {
 			res, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
-				Name:        new(uniq("partial")),
-				Description: new("baseline"),
-				Role:        nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR.Enum(),
-				Tags:        []string{"prod", "web"},
+				Name:          new(uniq("partial")),
+				Description:   new("baseline"),
+				Role:          nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR.Enum(),
+				Tags:          []string{"prod", "web"},
+				ForceCommand:  new("/usr/bin/baseline"),
+				SourceAddress: new("10.0.0.0/8"),
 			})
 			require.NoError(t, err)
 			return res.GetServiceAccount().GetId()
@@ -671,6 +627,8 @@ func partialServiceAccount(t *testing.T, admin *connect.Client) partialResource 
 					&nokkuv1.UpdateServiceAccountRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}}},
 				),
 			},
+			{"force_command", update(&nokkuv1.UpdateServiceAccountRequest{ForceCommand: new("/usr/bin/other")})},
+			{"source_address", update(&nokkuv1.UpdateServiceAccountRequest{SourceAddress: new("192.0.2.0/24")})},
 			{"nothing", update(&nokkuv1.UpdateServiceAccountRequest{})},
 		},
 	}

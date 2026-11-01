@@ -22,6 +22,7 @@ var (
 	ErrMailNotSent        = errors.New("iam: mail not sent")
 	ErrSSORequired        = errors.New("iam: single sign-on is required for this workspace")
 	ErrSecretRequired     = errors.New("iam: a new issuer needs the client secret again")
+	ErrLastSSOProvider    = errors.New("iam: enforced SSO needs an enabled provider")
 	errNoSession          = errors.New("iam: no session token")
 	errSessionExpired     = errors.New("iam: session expired")
 	errIdentityLinked     = errors.New("iam: identity already linked to another account")

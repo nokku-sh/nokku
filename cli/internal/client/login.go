@@ -37,6 +37,9 @@ func (c *Client) ensureSession(ctx context.Context, interactive bool) error {
 	if c.State.SessionValid() {
 		return nil
 	}
+	if c.State.CIJob() {
+		return ErrCISessionEnded
+	}
 	if !interactive {
 		return errors.New("not signed in to Nokku")
 	}

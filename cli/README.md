@@ -67,7 +67,7 @@ Prefer to add the package repository yourself? The [package repository](https://
 
 On Linux and Windows, `nk` keeps your SSH key in a TPM 2.0 when the machine has one. The key never leaves the chip. Without a TPM it falls back to a software key that only works on this machine. Pass `--require-tpm` to refuse that fallback.
 
-On macOS the key is a software key by default. `NK_SECURE_ENCLAVE=1` keeps it in the Secure Enclave instead, which is still experimental.
+A Mac has no TPM, so it always uses the software key, and `--require-tpm` refuses to run there.
 
 `nk doctor` shows whether a TPM is in use.
 
@@ -78,7 +78,50 @@ The details are in [SECURITY.md](./SECURITY.md#how-nk-protects-your-key).
 
 ## CI and headless machines
 
-Use a service account key where no browser is around:
+A CI job needs no stored secret. GitHub Actions and GitLab give every job a signed token, and `nk login --ci` trades it for a session of a service account. First add a rule on the account, under CI jobs on its page in the web app. The rule says which jobs may sign in.
+
+On GitHub Actions, the job needs `id-token: write`. Naming one permission turns the others off, so keep `contents: read` for `actions/checkout`:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NK_API_URL: https://nokku.example.com
+    steps:
+      - run: curl -fsSL https://get.nokku.sh/nk | sh
+      - run: nk login --ci deploy
+      - run: ssh deploy@web-1 ./release.sh
+```
+
+On GitLab, ask for the token with `id_tokens`. Its `aud` is the address of the core, exactly as in `NK_API_URL`:
+
+```yaml
+deploy:
+  environment: production
+  variables:
+    NK_API_URL: https://nokku.example.com
+  id_tokens:
+    NK_ID_TOKEN:
+      aud: https://nokku.example.com
+  script:
+    - curl -fsSL https://get.nokku.sh/nk | sh
+    - nk login --ci deploy
+    - ssh deploy@web-1 ./release.sh
+```
+
+Any other platform with signed tokens works the same way: put the job's token in `NK_ID_TOKEN`, with the address of the core as its audience.
+
+- The session lasts an hour at most and never past the job's token. It is bound to a key `nk` holds on the runner, so a session token in a log is worth nothing alone.
+- A job token works once, so a retry needs a new one. On GitHub Actions `nk login --ci` fetches a new token each time, so a long job can run it again. On GitLab the token is fixed for the job, so a job over an hour can't renew.
+- When the session ends, `nk` fails and says to run `nk login --ci` again. It never waits on a browser.
+- A forced command and a source list set on the service account go on its certificates. A forced command also turns off port and agent forwarding.
+
+A service account key is for Ansible and scripts that drive Nokku from a place with no signed token. CI should not hold one.
 
 ```bash
 export NK_TOKEN=nk_sa_<SECRET>
@@ -86,7 +129,7 @@ nk login
 ssh user@target
 ```
 
-The key has to start with `nk_sa_`. `nk` refuses any other token.
+The key has to start with `nk_sa_`. `nk` refuses any other token. A key always has an end date, so it needs rolling over.
 
 ## Servers without the daemon
 
@@ -100,11 +143,11 @@ nk sync web --dry-run       # show what would change on a known target
 What it does:
 
 - It connects as root with your own `ssh`, so your keys and SSH config apply and a password is asked at most once.
-- It writes the Nokku CA and an sshd drop-in with one fixed rule: let in a certificate Nokku signed for this server and the account asked for.
+- It writes the keys of the workspace's CA, the current one and a replaced one that is still trusted, and an sshd drop-in with one fixed rule: let in a certificate Nokku signed for this server and the account asked for.
 - It checks the result with `sshd -t` and rolls every file back if sshd rejects it, or if the run breaks off halfway.
 - Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
 
-Access changes need no new sync. Nokku decides who gets a certificate for the server, so a new grant works at once. A revoke lands within an hour: certificates for these servers last an hour at most, and the core signs no new one without the grant. Run `nk sync` again after the CA is rotated. `nk sync` and `nk rm` find a server by its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
+Access changes need no new sync. Nokku decides who gets a certificate for the server, so a new grant works at once. A revoke stops new logins within an hour: certificates for these servers last an hour at most, and the core signs no new one without the grant. An open session stays until it ends, and these servers have no recording and no relay. A workspace has one CA, so a rotation reaches every server: run `nk sync` again on each one you set up this way. `nk sync` and `nk rm` find a server by its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
 
 A new server can start with access in place, so nobody has to open the web app after the first sync:
 
@@ -146,9 +189,10 @@ It checks the pinned host key first, then removes the drop-in and the CA over th
 
 | Command      | Flags                                                                                            |
 | ------------ | ------------------------------------------------------------------------------------------------ |
+| `nk login`   | `--ci <service account>` to sign in a CI job with its platform's token                           |
 | `nk ls`      | `--json` for machine-readable output, with the `host` ssh knows each server by                   |
 | `nk doctor`  | `--fix` to repair permissions and regenerate files, `--json` for output                          |
-| `nk sync`    | `--name`, `--ca`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`       |
+| `nk sync`    | `--name`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`               |
 | `nk request` | `--reason` (required), `--for` from `15m` to `168h`, default `1h`, `--no-wait` to return at once |
 | `nk rm`      | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                       |
 
@@ -157,10 +201,10 @@ It checks the pinned host key first, then removes the drop-in and the CA over th
 | Flag            | Environment         | Purpose                                                                                         |
 | --------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
 | `--api`         | `NK_API_URL`        | Address of the core                                                                             |
-|                 | `NK_TOKEN`          | Service account key (`nk_sa_...`) for CI. Environment only, never a flag                        |
+|                 | `NK_TOKEN`          | Service account key (`nk_sa_...`) for scripts. Environment only, never a flag                   |
+|                 | `NK_ID_TOKEN`       | The job's signed token for `nk login --ci`, anywhere but GitHub Actions                         |
 | `--ttl`         | `NK_TTL`            | Requested SSH certificate lifetime, kept for later connections. `0` goes back to the CA default |
-| `--require-tpm` | `NK_REQUIRE_TPM`    | Require a TPM 2.0 or the Secure Enclave, refuse the software key fallback                       |
-|                 | `NK_SECURE_ENCLAVE` | Set to `1` on macOS to keep new keys in the Secure Enclave. Experimental                        |
+| `--require-tpm` | `NK_REQUIRE_TPM`    | Require a TPM 2.0, refuse the software key fallback                       |
 | `--ca-file`     | `NK_CA_FILE`        | PEM file with the core's private CA, kept for later runs                                        |
 | `--debug`       | `NK_DEBUG`          | Debug logging                                                                                   |
 

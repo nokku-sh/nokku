@@ -72,7 +72,13 @@ func CertFresh(target state.Target, ca state.CA) bool {
 		return false
 	}
 	after, before := CertWindow(cert)
-	return CheckCert(data, ca.PublicKey, before.Sub(after)/2) == nil
+	if CheckCert(data, ca.PublicKey, before.Sub(after)/2) == nil {
+		return true
+	}
+	// A server with no daemon learns a new key from nk sync alone, so a new certificate would lock this user out.
+	return target.Manual() && slices.ContainsFunc(ca.TrustedKeys()[1:], func(key string) bool {
+		return CheckCert(data, key, 0) == nil
+	})
 }
 
 // CertCovers is false for a certificate signed before a grant, the server refuses that account until renewal.

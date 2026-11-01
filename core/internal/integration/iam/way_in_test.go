@@ -7,7 +7,10 @@ import (
 	"testing"
 	"time"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
@@ -50,5 +53,38 @@ func TestNewWaysInAreMailed(t *testing.T) {
 	case got := <-mailed:
 		t.Errorf("one more mail than ways in: %s", got)
 	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+// A provider linked by address at a first sign-in is a new way in like any other. A brand new account has nobody to warn.
+func TestFirstSSOSignInMailsAnExistingAccount(t *testing.T) {
+	mailed := make(chan string, 4)
+	h := newOIDCIdP(t)
+	e, svc := h.setupWith(t, iam.OIDCProvider{JITProvisioning: true}, iam.Deps{
+		SendNewWayIn: func(_ context.Context, userID, _, _, what, _ string) error {
+			mailed <- userID + " " + what
+			return nil
+		},
+	})
+
+	h.user()
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	select {
+	case got := <-mailed:
+		t.Fatalf("a new account was warned about itself: %s", got)
+	case <-time.After(100 * time.Millisecond):
+	}
+	created := e.userByEmail(t, h.org.ws, h.email)
+	require.NotNil(t, created)
+	require.NoError(t, e.conn.Sys().DeleteUser(t.Context(), created.ID))
+
+	u := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	h.user()
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	select {
+	case got := <-mailed:
+		assert.Equal(t, u.ID+" Your Test OIDC account", got)
+	case <-time.After(2 * time.Second):
+		t.Fatal("a provider linked at a first sign-in sent no mail")
 	}
 }

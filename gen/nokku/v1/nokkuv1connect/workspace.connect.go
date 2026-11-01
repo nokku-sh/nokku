@@ -46,6 +46,9 @@ const (
 	// WorkspaceServiceDeleteUserProcedure is the procedure name of the WorkspaceService's DeleteUser
 	// RPC.
 	WorkspaceServiceDeleteUserProcedure = "/nokku.v1.WorkspaceService/DeleteUser"
+	// WorkspaceServiceClearUserIdentitiesProcedure is the procedure name of the WorkspaceService's
+	// ClearUserIdentities RPC.
+	WorkspaceServiceClearUserIdentitiesProcedure = "/nokku.v1.WorkspaceService/ClearUserIdentities"
 	// WorkspaceServiceTransferOwnershipProcedure is the procedure name of the WorkspaceService's
 	// TransferOwnership RPC.
 	WorkspaceServiceTransferOwnershipProcedure = "/nokku.v1.WorkspaceService/TransferOwnership"
@@ -114,6 +117,13 @@ var (
 			Procedure:  WorkspaceServiceDeleteUserProcedure,
 		}
 	})
+	workspaceServiceClearUserIdentitiesSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("ClearUserIdentities"),
+			Procedure:  WorkspaceServiceClearUserIdentitiesProcedure,
+		}
+	})
 	workspaceServiceTransferOwnershipSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -140,6 +150,9 @@ type WorkspaceServiceClient interface {
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
 	SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error)
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
+	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
+	// them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
+	ClearUserIdentities(context.Context, *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error)
 	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
 }
@@ -160,6 +173,9 @@ type WorkspaceServiceHandler interface {
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
 	SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error)
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
+	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
+	// them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
+	ClearUserIdentities(context.Context, *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error)
 	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
 }
@@ -177,6 +193,7 @@ func RegisterWorkspaceServiceHandler(server *connect.Server, svc WorkspaceServic
 		connect.Method{Spec: workspaceServiceUpdateUserRoleSpec(), Handler: adapter.updateUserRole},
 		connect.Method{Spec: workspaceServiceSetUserActiveSpec(), Handler: adapter.setUserActive},
 		connect.Method{Spec: workspaceServiceDeleteUserSpec(), Handler: adapter.deleteUser},
+		connect.Method{Spec: workspaceServiceClearUserIdentitiesSpec(), Handler: adapter.clearUserIdentities},
 		connect.Method{Spec: workspaceServiceTransferOwnershipSpec(), Handler: adapter.transferOwnership},
 		connect.Method{Spec: workspaceServiceCreateWorkspaceSpec(), Handler: adapter.createWorkspace},
 	)
@@ -215,6 +232,10 @@ func (UnimplementedWorkspaceServiceHandler) SetUserActive(context.Context, *v1.S
 
 func (UnimplementedWorkspaceServiceHandler) DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.DeleteUser is not implemented")
+}
+
+func (UnimplementedWorkspaceServiceHandler) ClearUserIdentities(context.Context, *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.ClearUserIdentities is not implemented")
 }
 
 func (UnimplementedWorkspaceServiceHandler) TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error) {
@@ -288,6 +309,14 @@ func (c *workspaceServiceClient) SetUserActive(ctx context.Context, req *v1.SetU
 func (c *workspaceServiceClient) DeleteUser(ctx context.Context, req *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
 	var res v1.DeleteUserResponse
 	if err := c.client.CallUnary(ctx, workspaceServiceDeleteUserSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *workspaceServiceClient) ClearUserIdentities(ctx context.Context, req *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error) {
+	var res v1.ClearUserIdentitiesResponse
+	if err := c.client.CallUnary(ctx, workspaceServiceClearUserIdentitiesSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -401,6 +430,18 @@ func (h workspaceServiceHandler) deleteUser(ctx context.Context, _ connect.Spec,
 		return err
 	}
 	res, err := h.svc.DeleteUser(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h workspaceServiceHandler) clearUserIdentities(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ClearUserIdentitiesRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ClearUserIdentities(ctx, &req)
 	if err != nil {
 		return err
 	}

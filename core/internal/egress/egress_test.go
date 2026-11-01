@@ -1,6 +1,8 @@
 package egress
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,6 +22,32 @@ func TestEgressClientRefusesPrivateAddresses(t *testing.T) {
 	require.NoError(t, err)
 	_, err = client.Get(srv.URL)
 	assert.ErrorIs(t, err, ssrf.ErrProhibitedIP, "loopback must be refused, got %v", err)
+}
+
+// An issuer a workspace picked must not fill the memory of the core, go-oidc reads an answer whole.
+func TestEgressClientStopsAtTheCap(t *testing.T) {
+	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(make([]byte, 2*maxResponseBytes))
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := NewClient(time.Second)
+	require.NoError(t, err)
+	res, err := client.Get(srv.URL)
+	require.NoError(t, err)
+	defer func() { _ = res.Body.Close() }()
+	body, err := io.ReadAll(res.Body)
+	_, capped := errors.AsType[*http.MaxBytesError](err)
+	assert.True(t, capped, "got %v", err)
+	assert.LessOrEqual(t, len(body), maxResponseBytes)
+}
+
+func TestCheckHosted(t *testing.T) {
+	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "")
+	require.NoError(t, CheckHosted())
+	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
+	assert.ErrorContains(t, CheckHosted(), "NOKKU_ALLOW_PRIVATE_NETWORKS")
 }
 
 func TestEgressClientAllowsPrivateWhenConfigured(t *testing.T) {

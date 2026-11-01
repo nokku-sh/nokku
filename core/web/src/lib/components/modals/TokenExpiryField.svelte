@@ -6,7 +6,6 @@
 		{ value: '30', label: '30 days' },
 		{ value: '90', label: '90 days' },
 		{ value: '365', label: '1 year' },
-		{ value: 'never', label: 'Never' },
 		{ value: 'custom', label: 'Custom' }
 	];
 
@@ -14,7 +13,6 @@
 		preset = $state('90');
 		custom = $state<DateValue>();
 		date = $derived.by(() => {
-			if (this.preset === 'never') return undefined;
 			if (this.preset === 'custom') return this.custom;
 			return today(getLocalTimeZone()).add({ days: Number(this.preset) });
 		});
@@ -80,8 +78,8 @@
 	<Field.Description>
 		{#if expiry.date}
 			Stops working on {DateValueFormat(expiry.date)}.
-		{:else if expiry.preset === 'never'}
-			Never expires. Revoke it if it leaks.
+		{:else}
+			Pick the day it stops working. Every token has an end date.
 		{/if}
 	</Field.Description>
 </Field.Set>

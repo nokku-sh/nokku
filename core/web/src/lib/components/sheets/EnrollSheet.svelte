@@ -1,6 +1,5 @@
 <script lang="ts">
 	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
-	import { ca } from '#lib/api/certificates.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import { token as tokenApi } from '#lib/api/tokens.svelte.js';
 	import SubjectChip from '#lib/components/access/SubjectChip.svelte';
@@ -17,7 +16,6 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
-	import * as Select from '#lib/components/ui/select/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
@@ -68,11 +66,7 @@
 	const usernameRE = /^[A-Za-z_][A-Za-z0-9._-]*\$?$/;
 
 	const tokens = tokenApi.list();
-	// Enrolled daemons create a target, which only an SSH CA can sign for.
-	const cas = ca.list();
 	const tagFilters = targetApi.filters();
-	const caList = $derived(cas.data ?? []);
-	const caName = (id: string) => caList.find((c) => c.id === id)?.name;
 	const createToken = tokenApi.create();
 	const removeToken = tokenApi.remove();
 
@@ -83,7 +77,6 @@
 	let uses = $state('unlimited');
 	let customUses = $state('');
 	let autoApprove = $state(true);
-	let caId = $state('');
 	let tags = $state<string[]>([]);
 	let grants = $state<{ username: string; subjects: Subject[] }[]>([]);
 	let newAccount = $state('');
@@ -131,7 +124,6 @@
 			ttl: expiry === 'never' ? undefined : { seconds: BigInt(expiry) },
 			maxUses,
 			autoApprove: autoApprove || ephemeral,
-			caId: caId || undefined,
 			tags,
 			grants: grants.map((g) => ({
 				username: g.username,
@@ -411,25 +403,6 @@ runcmd:
 						/>
 					</Field.Field>
 					<Field.Field>
-						<Field.Label for="token-ca">Certificate authority</Field.Label>
-						<Select.Root type="single" bind:value={caId}>
-							<Select.Trigger id="token-ca" class="w-full">
-								{caName(caId) ?? 'Workspace default'}
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Group>
-									<Select.Item value="">Workspace default</Select.Item>
-									{#each caList as c (c.id)}
-										<Select.Item value={c.id}>{c.name}</Select.Item>
-									{/each}
-								</Select.Group>
-							</Select.Content>
-						</Select.Root>
-						<Field.Description>
-							The target each host creates on enroll is pinned to this CA.
-						</Field.Description>
-					</Field.Field>
-					<Field.Field>
 						<Field.Label for="token-tags">Tags</Field.Label>
 						<TagsInput
 							id="token-tags"
@@ -573,7 +546,6 @@ runcmd:
 								<span class="truncate">{t.label || 'Untitled'}</span>
 								{#if t.ephemeral}<Badge variant="info">Ephemeral</Badge>{/if}
 								{#if t.autoApprove && !t.ephemeral}<Badge variant="info">Auto-approve</Badge>{/if}
-								{#if t.caId}<Badge variant="outline">CA {caName(t.caId) ?? 'unknown'}</Badge>{/if}
 								{#if t.grants.length}
 									<Badge variant="outline">
 										{t.grants.length}

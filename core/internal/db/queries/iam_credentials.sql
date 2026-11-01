@@ -69,6 +69,12 @@ DELETE FROM credentials
 WHERE
   user_id = @user_id;
 
+-- name: DeleteUserOIDCCredentials :exec
+DELETE FROM credentials
+WHERE
+  user_id = @user_id
+  AND type = 'oidc';
+
 -- name: DeleteCredentialsByProvider :execrows
 DELETE FROM credentials
 WHERE

@@ -29,8 +29,6 @@ const (
 	// AccountServiceUpdateAccountProcedure is the procedure name of the AccountService's UpdateAccount
 	// RPC.
 	AccountServiceUpdateAccountProcedure = "/nokku.v1.AccountService/UpdateAccount"
-	// AccountServiceSetAvatarProcedure is the procedure name of the AccountService's SetAvatar RPC.
-	AccountServiceSetAvatarProcedure = "/nokku.v1.AccountService/SetAvatar"
 	// AccountServiceRequestEmailChangeProcedure is the procedure name of the AccountService's
 	// RequestEmailChange RPC.
 	AccountServiceRequestEmailChangeProcedure = "/nokku.v1.AccountService/RequestEmailChange"
@@ -68,13 +66,6 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("UpdateAccount"),
 			Procedure:  AccountServiceUpdateAccountProcedure,
-		}
-	})
-	accountServiceSetAvatarSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_account_proto.Services().ByName("AccountService").Methods().ByName("SetAvatar"),
-			Procedure:  AccountServiceSetAvatarProcedure,
 		}
 	})
 	accountServiceRequestEmailChangeSpec = sync.OnceValue(func() connect.Spec {
@@ -134,7 +125,6 @@ var (
 type AccountServiceClient interface {
 	GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error)
 	UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error)
-	SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error)
 	RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error)
 	ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error)
 	RenameCredential(context.Context, *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error)
@@ -154,7 +144,6 @@ func NewAccountServiceClient(client *connect.Client) AccountServiceClient {
 type AccountServiceHandler interface {
 	GetAccount(context.Context, *v1.GetAccountRequest) (*v1.GetAccountResponse, error)
 	UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error)
-	SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error)
 	RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error)
 	ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error)
 	RenameCredential(context.Context, *v1.RenameCredentialRequest) (*v1.RenameCredentialResponse, error)
@@ -171,7 +160,6 @@ func RegisterAccountServiceHandler(server *connect.Server, svc AccountServiceHan
 	server.Register(
 		connect.Method{Spec: accountServiceGetAccountSpec(), Handler: adapter.getAccount},
 		connect.Method{Spec: accountServiceUpdateAccountSpec(), Handler: adapter.updateAccount},
-		connect.Method{Spec: accountServiceSetAvatarSpec(), Handler: adapter.setAvatar},
 		connect.Method{Spec: accountServiceRequestEmailChangeSpec(), Handler: adapter.requestEmailChange},
 		connect.Method{Spec: accountServiceListCredentialsSpec(), Handler: adapter.listCredentials},
 		connect.Method{Spec: accountServiceRenameCredentialSpec(), Handler: adapter.renameCredential},
@@ -191,10 +179,6 @@ func (UnimplementedAccountServiceHandler) GetAccount(context.Context, *v1.GetAcc
 
 func (UnimplementedAccountServiceHandler) UpdateAccount(context.Context, *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.UpdateAccount is not implemented")
-}
-
-func (UnimplementedAccountServiceHandler) SetAvatar(context.Context, *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.AccountService.SetAvatar is not implemented")
 }
 
 func (UnimplementedAccountServiceHandler) RequestEmailChange(context.Context, *v1.RequestEmailChangeRequest) (*v1.RequestEmailChangeResponse, error) {
@@ -240,14 +224,6 @@ func (c *accountServiceClient) GetAccount(ctx context.Context, req *v1.GetAccoun
 func (c *accountServiceClient) UpdateAccount(ctx context.Context, req *v1.UpdateAccountRequest) (*v1.UpdateAccountResponse, error) {
 	var res v1.UpdateAccountResponse
 	if err := c.client.CallUnary(ctx, accountServiceUpdateAccountSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *accountServiceClient) SetAvatar(ctx context.Context, req *v1.SetAvatarRequest) (*v1.SetAvatarResponse, error) {
-	var res v1.SetAvatarResponse
-	if err := c.client.CallUnary(ctx, accountServiceSetAvatarSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -329,18 +305,6 @@ func (h accountServiceHandler) updateAccount(ctx context.Context, _ connect.Spec
 		return err
 	}
 	res, err := h.svc.UpdateAccount(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h accountServiceHandler) setAvatar(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.SetAvatarRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.SetAvatar(ctx, &req)
 	if err != nil {
 		return err
 	}

@@ -3,8 +3,10 @@ package tpm
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -45,6 +47,8 @@ func pemOf(t *testing.T, s Signer) string {
 	require.NoError(t, err)
 	return string(pubPEM)
 }
+
+func noTPM() (transport.TPMCloser, error) { return nil, errors.New("no tpm in this test") }
 
 func TestSignerTPM(t *testing.T) {
 	opts := testOpts(t, simOpen(openSimulator(t)))
@@ -116,6 +120,48 @@ func TestSignerTPMStateWithoutKeyFile(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close() })
 	assert.Equal(t, MethodTPM, s.Method())
+}
+
+// A machine with no TPM gets a software key, every Mac among them. Requiring a TPM refuses that before and after.
+func TestSignerWithoutATPM(t *testing.T) {
+	opts := testOpts(t, noTPM)
+	opts.RequireTPM = true
+	_, err := NewSigner(opts)
+	require.ErrorContains(t, err, "no TPM available")
+	assert.Empty(t, IdentityMethod(opts.StatePath), "a refusal leaves no identity")
+
+	opts.RequireTPM = false
+	s, err := NewSigner(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+	assert.Equal(t, MethodSoft, s.Method())
+	assert.Equal(t, MethodSoft, IdentityMethod(opts.StatePath))
+
+	opts.RequireTPM = true
+	_, err = NewSigner(opts)
+	assert.ErrorContains(t, err, "require-tpm is set")
+}
+
+// wrongKey shows a public key it does not sign with, like a key store that half works.
+type wrongKey struct {
+	crypto.Signer
+
+	shows crypto.PublicKey
+}
+
+func (k wrongKey) Public() crypto.PublicKey { return k.shows }
+
+// A new key that can't sign must never become an identity nobody can log in with.
+func TestSelfTestRefusesAKeyThatDoesNotSign(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	other, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	_, err = selfTest(key)
+	require.NoError(t, err)
+	_, err = selfTest(wrongKey{Signer: key, shows: other.Public()})
+	assert.Error(t, err)
 }
 
 func TestSignerRequiresPath(t *testing.T) {

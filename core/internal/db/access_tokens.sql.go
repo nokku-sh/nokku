@@ -26,7 +26,8 @@ INSERT INTO
     user_agent,
     ip,
     expires_at,
-    last_seen_at
+    last_seen_at,
+    workload_jti
   )
 VALUES
   (
@@ -47,23 +48,25 @@ VALUES
     $7,
     $8,
     $9,
-    $10
+    $10,
+    $11
   )
 RETURNING
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 `
 
 type CreateAccessTokenParams struct {
-	TokenHash  crypto.HashedToken `json:"tokenHash"`
-	Kind       string             `json:"kind"`
-	SubjectID  *string            `json:"subjectId"`
-	Method     string             `json:"method"`
-	Binding    string             `json:"binding"`
-	Label      string             `json:"label"`
-	UserAgent  string             `json:"userAgent"`
-	Ip         string             `json:"ip"`
-	ExpiresAt  *time.Time         `json:"expiresAt"`
-	LastSeenAt *time.Time         `json:"lastSeenAt"`
+	TokenHash   crypto.HashedToken `json:"tokenHash"`
+	Kind        string             `json:"kind"`
+	SubjectID   *string            `json:"subjectId"`
+	Method      string             `json:"method"`
+	Binding     string             `json:"binding"`
+	Label       string             `json:"label"`
+	UserAgent   string             `json:"userAgent"`
+	Ip          string             `json:"ip"`
+	ExpiresAt   *time.Time         `json:"expiresAt"`
+	LastSeenAt  *time.Time         `json:"lastSeenAt"`
+	WorkloadJti *string            `json:"workloadJti"`
 }
 
 // One subject parameter, the column it lands in follows the kind. A SCIM token has no subject.
@@ -79,6 +82,7 @@ func (q *Queries) CreateAccessToken(ctx context.Context, arg *CreateAccessTokenP
 		arg.Ip,
 		arg.ExpiresAt,
 		arg.LastSeenAt,
+		arg.WorkloadJti,
 	)
 	var i AccessToken
 	err := row.Scan(
@@ -97,6 +101,7 @@ func (q *Queries) CreateAccessToken(ctx context.Context, arg *CreateAccessTokenP
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
+		&i.WorkloadJti,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -171,6 +176,7 @@ DELETE FROM access_tokens
 WHERE
   id = $1
   AND service_account_id = $2::UUID
+  AND workload_jti IS NULL
 `
 
 type DeleteServiceAccountTokenParams struct {
@@ -178,6 +184,7 @@ type DeleteServiceAccountTokenParams struct {
 	ServiceAccountID string `json:"serviceAccountId"`
 }
 
+// A key. The row of an exchange goes through RevokeWorkloadToken.
 func (q *Queries) DeleteServiceAccountToken(ctx context.Context, arg *DeleteServiceAccountTokenParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteServiceAccountToken, arg.ID, arg.ServiceAccountID)
 	if err != nil {
@@ -192,13 +199,19 @@ WITH
     DELETE FROM known_devices
     WHERE
       user_id = $1::UUID
+  ),
+  pending AS (
+    DELETE FROM device_grants
+    WHERE
+      user_id = $1::UUID
   )
 DELETE FROM access_tokens
 WHERE
   subject_id = $1::UUID
 `
 
-// Signs the subject out everywhere. A user's devices are forgotten too, so none is waved through quietly again.
+// Signs the subject out everywhere. A user's devices are forgotten too, so none is waved through quietly again, and a
+// pending nk login is dropped, or an approval from before this would still turn into a token.
 func (q *Queries) DeleteSubjectTokens(ctx context.Context, subjectID string) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteSubjectTokens, subjectID)
 	if err != nil {
@@ -209,7 +222,7 @@ func (q *Queries) DeleteSubjectTokens(ctx context.Context, subjectID string) (in
 
 const getAccessToken = `-- name: GetAccessToken :one
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 FROM
   access_tokens
 WHERE
@@ -235,6 +248,7 @@ func (q *Queries) GetAccessToken(ctx context.Context, tokenHash crypto.HashedTok
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
+		&i.WorkloadJti,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -242,7 +256,7 @@ func (q *Queries) GetAccessToken(ctx context.Context, tokenHash crypto.HashedTok
 
 const listSCIMTokens = `-- name: ListSCIMTokens :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 FROM
   access_tokens
 WHERE
@@ -276,6 +290,7 @@ func (q *Queries) ListSCIMTokens(ctx context.Context) ([]*AccessToken, error) {
 			&i.UserAgent,
 			&i.ExpiresAt,
 			&i.LastSeenAt,
+			&i.WorkloadJti,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -290,15 +305,17 @@ func (q *Queries) ListSCIMTokens(ctx context.Context) ([]*AccessToken, error) {
 
 const listServiceAccountTokens = `-- name: ListServiceAccountTokens :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 FROM
   access_tokens
 WHERE
   service_account_id = $1::UUID
+  AND token_hash NOT LIKE 'revoked:%'
 ORDER BY
   created_at DESC
 `
 
+// A revoked row of an exchange is no token any more, see RevokeWorkloadToken.
 func (q *Queries) ListServiceAccountTokens(ctx context.Context, serviceAccountID string) ([]*AccessToken, error) {
 	rows, err := q.db.Query(ctx, listServiceAccountTokens, serviceAccountID)
 	if err != nil {
@@ -324,6 +341,7 @@ func (q *Queries) ListServiceAccountTokens(ctx context.Context, serviceAccountID
 			&i.UserAgent,
 			&i.ExpiresAt,
 			&i.LastSeenAt,
+			&i.WorkloadJti,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -338,7 +356,7 @@ func (q *Queries) ListServiceAccountTokens(ctx context.Context, serviceAccountID
 
 const listUserSessions = `-- name: ListUserSessions :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 FROM
   access_tokens
 WHERE
@@ -373,6 +391,7 @@ func (q *Queries) ListUserSessions(ctx context.Context, userID string) ([]*Acces
 			&i.UserAgent,
 			&i.ExpiresAt,
 			&i.LastSeenAt,
+			&i.WorkloadJti,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -383,6 +402,31 @@ func (q *Queries) ListUserSessions(ctx context.Context, userID string) ([]*Acces
 		return nil, err
 	}
 	return items, nil
+}
+
+const revokeWorkloadToken = `-- name: RevokeWorkloadToken :execrows
+UPDATE access_tokens
+SET
+  token_hash = 'revoked:' || id::TEXT
+WHERE
+  id = $1
+  AND service_account_id = $2::UUID
+  AND workload_jti IS NOT NULL
+`
+
+type RevokeWorkloadTokenParams struct {
+	ID               string `json:"id"`
+	ServiceAccountID string `json:"serviceAccountId"`
+}
+
+// The row of an exchange also says its job token is spent, and that job token can outlive a revoke. So the row stays
+// until it expires, and loses the hash that signs in. No token hashes to this value.
+func (q *Queries) RevokeWorkloadToken(ctx context.Context, arg *RevokeWorkloadTokenParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeWorkloadToken, arg.ID, arg.ServiceAccountID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const touchAccessToken = `-- name: TouchAccessToken :exec

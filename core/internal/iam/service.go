@@ -32,6 +32,8 @@ const (
 	MethodDevice    Method = "device"
 	MethodToken     Method = "token" // a key made by hand, shown once
 	MethodSCIM      Method = "scim"
+	// MethodFederation is a CI job that traded its platform's token, see workload.go.
+	MethodFederation Method = "federation"
 )
 
 // action is the name an event gets in the audit log.

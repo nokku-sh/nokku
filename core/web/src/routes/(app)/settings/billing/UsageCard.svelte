@@ -92,9 +92,7 @@
 				<div class="flex items-center justify-between gap-4 px-3 py-2.5">
 					<dt class="flex flex-col">
 						<span class="text-muted-foreground">Resources</span>
-						<span class="text-xs text-muted-foreground"
-							>Targets, teams, service accounts and CAs</span
-						>
+						<span class="text-xs text-muted-foreground">Targets, teams and service accounts</span>
 					</dt>
 					<dd class="font-medium tabular-nums">{resources.used} of {resources.cap}</dd>
 				</div>

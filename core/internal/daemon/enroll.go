@@ -71,6 +71,11 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		return out, err
 	}
 
+	// A spent token still names the daemons it enrolled, that is the lookup above. It makes and replaces nothing.
+	if token.MaxUses != nil && token.Uses >= *token.MaxUses {
+		return nil, ErrEnrollToken
+	}
+
 	// An ephemeral box that comes back under its name takes over from the one that went away. Before the
 	// quota, since the old one frees what the new one takes.
 	wanted, named := namegen.FromHostname(in.ReqMetadata["hostname"])
@@ -99,6 +104,9 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	}
 
 	err = conn.TenantTx(ctx, func(q *db.Queries) error {
+		if err := q.QuietStateChange(ctx); err != nil {
+			return err
+		}
 		for attempt := range maxNameAttempts {
 			// A racing enrollment of the same key makes the insert a no-op.
 			if out, err = enrolledDaemon(ctx, q, in.Binding); err != nil || out != nil {
@@ -117,7 +125,6 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 				KeyThumbprint: &in.Binding,
 				JoinTokenID:   &token.ID,
 				RetireAfter:   token.RetireAfter,
-				CaID:          token.CaID,
 			})
 			if errors.Is(err, pgx.ErrNoRows) {
 				continue
@@ -177,6 +184,9 @@ func seedTarget(ctx context.Context, q *db.Queries, token *db.JoinToken, targetI
 // keeps its name and the newcomer gets a generated one.
 func replaceOffline(ctx context.Context, conn connection, tokenID, name string, connected []string) error {
 	return conn.TenantTx(ctx, func(q *db.Queries) error {
+		if err := q.QuietStateChange(ctx); err != nil {
+			return err
+		}
 		old, err := q.GetOfflineDaemonByTokenAndName(ctx, &db.GetOfflineDaemonByTokenAndNameParams{
 			JoinTokenID: &tokenID,
 			Name:        name,

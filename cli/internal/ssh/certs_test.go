@@ -68,7 +68,6 @@ func TestCertFresh(t *testing.T) {
 	setupSSHDir(t)
 	signer := newSigner(t)
 	ca := state.CA{
-		ID:        "0199a0a0-0000-7000-8000-000000000002",
 		PublicKey: string(ssh.MarshalAuthorizedKey(signer.PublicKey())),
 	}
 	target := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003"}
@@ -94,6 +93,38 @@ func TestCertFresh(t *testing.T) {
 			assert.Equal(t, tt.fresh, CertFresh(target, ca))
 		})
 	}
+}
+
+// A server with no daemon still trusts the old key until nk sync runs, and nk sync needs a certificate it takes.
+func TestCertFreshKeepsTheOldKeyOnAServerWithNoDaemon(t *testing.T) {
+	setupSSHDir(t)
+	old, current := newSigner(t), newSigner(t)
+	ca := state.CA{
+		PublicKey:            string(ssh.MarshalAuthorizedKey(current.PublicKey())),
+		PreviousPublicKey:    string(ssh.MarshalAuthorizedKey(old.PublicKey())),
+		PreviousTrustedUntil: time.Now().Add(time.Hour),
+	}
+	manual := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003"}
+	withDaemon := manual
+	withDaemon.DaemonID = "0199a0a0-0000-7000-8000-000000000004"
+	now := time.Now()
+	require.NoError(t, os.WriteFile(
+		paths.SSHCertificate(manual.ID), signCert(t, old, now.Add(-50*time.Minute), now.Add(10*time.Minute)), 0o600,
+	))
+
+	assert.True(t, CertFresh(manual, ca), "nk swapped a certificate the server takes for one it refuses")
+	assert.False(t, CertFresh(withDaemon, ca), "a daemon learns the new key at its next sync, so nk moves on")
+
+	require.NoError(t, os.WriteFile(
+		paths.SSHCertificate(manual.ID), signCert(t, old, now.Add(-2*time.Hour), now.Add(-time.Hour)), 0o600,
+	))
+	assert.False(t, CertFresh(manual, ca), "an expired certificate of the old key")
+
+	ca.PreviousTrustedUntil = time.Time{}
+	require.NoError(t, os.WriteFile(
+		paths.SSHCertificate(manual.ID), signCert(t, old, now.Add(-50*time.Minute), now.Add(10*time.Minute)), 0o600,
+	))
+	assert.False(t, CertFresh(manual, ca), "an emergency rollover distrusts the old key at once")
 }
 
 // A certificate signed before a grant misses the new account, so it counts as stale.

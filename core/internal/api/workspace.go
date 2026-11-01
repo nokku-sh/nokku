@@ -69,6 +69,18 @@ func (s *workspaceService) UpdateWorkspace(
 			base.Settings = cmp.Or(base.Settings, &nokkuv1.WorkspaceSettings{})
 			mergeSet(base.Settings.ProtoReflect(), req.GetSettings().ProtoReflect())
 		}
+		if !wasEnforced && base.Settings.GetEnforceSso() {
+			has, err := iam.HasSSOProvider(ctx, q)
+			if err != nil {
+				return err
+			}
+			if !has {
+				return newError(
+					connect.CodeFailedPrecondition,
+					"add and enable a provider before requiring single sign-on",
+				)
+			}
+		}
 		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
 			Name:        req.Name,
 			Description: req.Description,
@@ -263,6 +275,25 @@ func (s *workspaceService) DeleteUser(
 		return nil, err
 	}
 	return &nokkuv1.DeleteUserResponse{}, nil
+}
+
+// ClearUserIdentities signs the person out too, a wrong link must not keep the session it gave.
+func (s *workspaceService) ClearUserIdentities(
+	ctx context.Context,
+	req *nokkuv1.ClearUserIdentitiesRequest,
+) (*nokkuv1.ClearUserIdentitiesResponse, error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
+			return err
+		}
+		return q.DeleteUserOIDCCredentials(ctx, req.GetUserId())
+	}); err != nil {
+		return nil, err
+	}
+	if _, err := s.cfg.IAM.RevokeUser(ctx, req.GetUserId()); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.ClearUserIdentitiesResponse{}, nil
 }
 
 // checkCanManageUser also protects the owner, and keeps people from managing themselves.

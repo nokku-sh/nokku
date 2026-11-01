@@ -6,9 +6,6 @@ import "buf/validate/validate.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
-import "nokku/v1/account.proto";
-import "nokku/v1/daemon.proto";
-import "nokku/v1/service_account.proto";
 
 service UtilService {
   rpc GetVersion(GetVersionRequest) returns (GetVersionResponse) {
@@ -17,10 +14,6 @@ service UtilService {
   }
   rpc GetInstanceInfo(GetInstanceInfoRequest) returns (GetInstanceInfoResponse) {
     option (access) = {public: true};
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc Whoami(WhoamiRequest) returns (WhoamiResponse) {
-    option (access) = {self: true};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
@@ -67,15 +60,6 @@ message GetInstanceInfoResponse {
   string imprint_url = 6;
   string mode = 7;
   bool signup = 8;
-}
-
-message WhoamiRequest {}
-message WhoamiResponse {
-  string kind = 1;
-  string subject_id = 2;
-  User user = 3;
-  ServiceAccount service_account = 4;
-  Daemon daemon = 5;
 }
 
 message Role {

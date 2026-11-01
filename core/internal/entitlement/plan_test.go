@@ -23,7 +23,6 @@ func TestPlanMatrix(t *testing.T) {
 			wantRecordings:  7,
 			wantStorageCap:  1 << 30,
 			wantFeatures: map[string]bool{
-				FeatureOIDC:           true,
 				FeatureEnforceSSO:     false,
 				FeatureAuditExport:    false,
 				FeatureExpiringAccess: false,
@@ -41,7 +40,6 @@ func TestPlanMatrix(t *testing.T) {
 			wantRecordings:  90,
 			wantStorageCap:  50 << 30,
 			wantFeatures: map[string]bool{
-				FeatureOIDC:           true,
 				FeatureEnforceSSO:     true,
 				FeatureAuditExport:    true,
 				FeatureExpiringAccess: true,
@@ -59,7 +57,6 @@ func TestPlanMatrix(t *testing.T) {
 			wantRecordings:  365,
 			wantStorageCap:  500 << 30,
 			wantFeatures: map[string]bool{
-				FeatureOIDC:           true,
 				FeatureEnforceSSO:     true,
 				FeatureAuditExport:    true,
 				FeatureExpiringAccess: true,

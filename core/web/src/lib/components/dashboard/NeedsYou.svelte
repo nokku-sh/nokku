@@ -40,7 +40,7 @@
 						><CircleCheck /></Empty.Media
 					>
 					<Empty.Title>Nothing needs you</Empty.Title>
-					<Empty.Description>Daemons are up, CAs are fresh, no failure spikes.</Empty.Description>
+					<Empty.Description>Daemons are up, the CA is fresh, no failure spikes.</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>
 		{:else}

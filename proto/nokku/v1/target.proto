@@ -75,8 +75,9 @@ message SyncTargetUsersRequest {
 message SyncTargetUsersResponse {}
 
 message Target {
+  reserved 2;
+
   string id = 1;
-  string ca_id = 2;
   string daemon_id = 3;
   string name = 4;
   string description = 5;
@@ -112,7 +113,8 @@ message GetTargetResponse {
 }
 
 message CreateTargetRequest {
-  string ca_id = 1 [(buf.validate.field).string.uuid = true];
+  reserved 1;
+
   string name = 2 [(buf.validate.field).string = {
     max_len: 256
     pattern: "^$|^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
@@ -128,8 +130,9 @@ message CreateTargetResponse {
 }
 
 message UpdateTargetRequest {
+  reserved 2;
+
   string id = 1 [(buf.validate.field).string.uuid = true];
-  string ca_id = 2 [(buf.validate.field).string.uuid = true];
   string name = 3 [(buf.validate.field).string = {
     min_len: 1
     max_len: 256
@@ -144,7 +147,6 @@ message UpdateTargetRequest {
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
-        "ca_id",
         "name",
         "description",
         "host_public_key",
@@ -164,6 +166,8 @@ message DeleteTargetRequest {
 message DeleteTargetResponse {}
 
 message ListTargetsRequest {
+  reserved 5;
+
   int32 limit = 1 [(buf.validate.field).int32 = {
     gte: 1
     lte: 100
@@ -171,7 +175,6 @@ message ListTargetsRequest {
   int32 offset = 2 [(buf.validate.field).int32.gte = 0];
   string query = 3;
   string daemon_id = 4;
-  string ca_id = 5;
   repeated string accounts = 6;
   repeated string tags = 7;
 }
@@ -186,7 +189,8 @@ message GetSubjectAccessRequest {
 message GetSubjectAccessResponse {
   repeated Target targets = 1;
   repeated Daemon daemons = 2;
-  repeated CertificateAuthority certificate_authorities = 3;
+  // certificate_authority is the workspace's, for a subject with targets to log in to.
+  CertificateAuthority certificate_authority = 3;
   oneof subject {
     User user = 4;
     ServiceAccount service_account = 5;

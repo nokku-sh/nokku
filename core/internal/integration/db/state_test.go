@@ -11,7 +11,9 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -45,11 +47,11 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		VALUES ($2, $1, $2 || '@test', 5), ($3, $1, $3 || '@test', 2);
 		INSERT INTO teams (id, workspace_id, name) VALUES ($4, $1, 'team');
 		INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $3, $4);
-		INSERT INTO ssh_cas (id, workspace_id, name, public_key, host_public_key, is_default,
+		INSERT INTO ssh_cas (id, workspace_id, public_key, host_public_key,
 			user_default_ttl, user_max_ttl, host_ttl)
-		VALUES ($8, $1, 'default', 'pub', 'host-pub', TRUE, '1 hour', '1 hour', '1 hour');
+		VALUES ($8, $1, 'pub', 'host-pub', '1 hour', '1 hour', '1 hour');
 		INSERT INTO daemons (id, workspace_id, name, status) VALUES ($5, $1, 'd', 2);
-		INSERT INTO targets (id, workspace_id, daemon_id, name, ca_id) VALUES ($6, $1, $5, 't', $8);
+		INSERT INTO targets (id, workspace_id, daemon_id, name) VALUES ($6, $1, $5, 't');
 		INSERT INTO target_accounts (id, workspace_id, target_id, username) VALUES ($7, $1, $6, 'deploy');
 		INSERT INTO grants (account_id, workspace_id, user_id) VALUES ($7, $1, $3);
 		INSERT INTO grants (account_id, workspace_id, team_id) VALUES ($7, $1, $4);
@@ -183,6 +185,20 @@ func TestStateVersionBumpsOnAccessChanges(t *testing.T) {
 	}
 }
 
+// targets has no trigger of its own, so the delete of a server has to reach the daemons through its accounts.
+func TestDeletingATargetNotifies(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	before := stateVersion(t, c, f.ws)
+	asOwner(t, c, f, func(q *db.Queries) error {
+		_, err := q.DeleteTarget(t.Context(), f.target)
+		return err
+	})
+	if after := stateVersion(t, c, f.ws); after <= before {
+		t.Fatalf("target removal: version %d -> %d, want a bump", before, after)
+	}
+}
+
 // One transaction bumps once, however many rows it touches. A team with thousands of grants is one statement.
 func TestStateVersionBumpsOncePerTransaction(t *testing.T) {
 	c := testConnection(t)
@@ -281,6 +297,19 @@ func TestGrantRejectsForeignTeam(t *testing.T) {
 }
 
 // The code reads the target of a daemon as one row.
+// A server has no tie to SSH keys, so a target needs no CA and a CA can go with targets in the workspace.
+func TestTargetNeedsNoCA(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	if _, err := c.sysPool.Exec(t.Context(), `DELETE FROM ssh_cas WHERE id = $1`, f.ca); err != nil {
+		t.Fatalf("a target held on to the CA: %v", err)
+	}
+	asOwner(t, c, f, func(q *db.Queries) error {
+		_, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{Name: "no-ca"})
+		return err
+	})
+}
+
 func TestDaemonServesOneTarget(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -342,8 +371,10 @@ func TestAccessTokenTakesTheSubjectOfItsKind(t *testing.T) {
 	}
 	insert := func(kind string, user, serviceAccount, daemon *string) error {
 		_, err := c.sysPool.Exec(t.Context(), `
-			INSERT INTO access_tokens (token_hash, workspace_id, kind, method, user_id, service_account_id, daemon_id)
-			VALUES (uuidv7()::TEXT, $1, $2, 'test', $3, $4, $5)`,
+			INSERT INTO access_tokens (
+				token_hash, workspace_id, kind, method, user_id, service_account_id, daemon_id, expires_at
+			)
+			VALUES (uuidv7()::TEXT, $1, $2, 'test', $3, $4, $5, NOW() + INTERVAL '1 hour')`,
 			f.ws, kind, user, serviceAccount, daemon)
 		return err
 	}
@@ -376,6 +407,47 @@ func TestAccessTokenTakesTheSubjectOfItsKind(t *testing.T) {
 		if err := insert(tok.kind, tok.user, tok.serviceAccount, tok.daemon); err != nil {
 			t.Errorf("a %s token: %v", name, err)
 		}
+	}
+}
+
+// A service account token always ends, and only a bound one can have spent a job token.
+func TestServiceAccountTokenHasAnEndDate(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	var sa string
+	err := c.sysPool.QueryRow(t.Context(),
+		`INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci') RETURNING id`, f.ws).Scan(&sa)
+	if err != nil {
+		t.Fatalf("service account: %v", err)
+	}
+	insert := func(expiresAt *time.Time, binding string, jti *string) error {
+		_, err := c.sysPool.Exec(t.Context(), `
+			INSERT INTO access_tokens (
+				token_hash, workspace_id, kind, method, service_account_id, expires_at, binding, workload_jti
+			)
+			VALUES (uuidv7()::TEXT, $1, 'service_account', 'test', $2, $3, $4, $5)`,
+			f.ws, sa, expiresAt, binding, jti)
+		return err
+	}
+	refusedBy := func(err error, code string) bool {
+		pgErr, ok := errors.AsType[*pgconn.PgError](err)
+		return ok && pgErr.Code == code
+	}
+	hour := new(time.Now().Add(time.Hour))
+	if err := insert(hour, "", nil); err != nil {
+		t.Errorf("a dated key: %v", err)
+	}
+	if err := insert(hour, "jkt", new("https://ci.test job")); err != nil {
+		t.Errorf("the session of a job: %v", err)
+	}
+	if err := insert(nil, "", nil); !refusedBy(err, pgerrcode.CheckViolation) {
+		t.Errorf("a key with no end date got %v", err)
+	}
+	if err := insert(hour, "", new("https://ci.test other")); !refusedBy(err, pgerrcode.CheckViolation) {
+		t.Errorf("the session of a job with no key behind it got %v", err)
+	}
+	if err := insert(hour, "jkt", new("https://ci.test job")); !refusedBy(err, pgerrcode.UniqueViolation) {
+		t.Errorf("a job token stored twice got %v", err)
 	}
 }
 

@@ -25,15 +25,19 @@ const (
 )
 
 type ServiceAccount struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Role          *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
-	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	Role        *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Tags        []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
+	LastUsedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
+	CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt   *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	// force_command replaces what a login asks to run. source_address lists the addresses a login may come from.
+	// Both go on the account's certificates, and the CA's own settings don't.
+	ForceCommand  *string `protobuf:"bytes,9,opt,name=force_command,json=forceCommand" json:"force_command,omitempty"`
+	SourceAddress *string `protobuf:"bytes,10,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -124,6 +128,20 @@ func (x *ServiceAccount) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *ServiceAccount) GetForceCommand() string {
+	if x != nil && x.ForceCommand != nil {
+		return *x.ForceCommand
+	}
+	return ""
+}
+
+func (x *ServiceAccount) GetSourceAddress() string {
+	if x != nil && x.SourceAddress != nil {
+		return *x.SourceAddress
+	}
+	return ""
+}
+
 type ServiceAccountToken struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
@@ -200,6 +218,84 @@ func (x *ServiceAccountToken) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// A rule says which jobs of a CI platform may sign in as the account: the issuer of their token and the claims it must
+// hold, each exactly.
+type ServiceAccountFederation struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	ServiceAccountId *string                `protobuf:"bytes,2,opt,name=service_account_id,json=serviceAccountId" json:"service_account_id,omitempty"`
+	Issuer           *string                `protobuf:"bytes,3,opt,name=issuer" json:"issuer,omitempty"`
+	Claims           map[string]string      `protobuf:"bytes,4,rep,name=claims" json:"claims,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ServiceAccountFederation) Reset() {
+	*x = ServiceAccountFederation{}
+	mi := &file_nokku_v1_service_account_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServiceAccountFederation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServiceAccountFederation) ProtoMessage() {}
+
+func (x *ServiceAccountFederation) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_service_account_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServiceAccountFederation.ProtoReflect.Descriptor instead.
+func (*ServiceAccountFederation) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ServiceAccountFederation) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return ""
+}
+
+func (x *ServiceAccountFederation) GetServiceAccountId() string {
+	if x != nil && x.ServiceAccountId != nil {
+		return *x.ServiceAccountId
+	}
+	return ""
+}
+
+func (x *ServiceAccountFederation) GetIssuer() string {
+	if x != nil && x.Issuer != nil {
+		return *x.Issuer
+	}
+	return ""
+}
+
+func (x *ServiceAccountFederation) GetClaims() map[string]string {
+	if x != nil {
+		return x.Claims
+	}
+	return nil
+}
+
+func (x *ServiceAccountFederation) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 type GetServiceAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
@@ -209,7 +305,7 @@ type GetServiceAccountRequest struct {
 
 func (x *GetServiceAccountRequest) Reset() {
 	*x = GetServiceAccountRequest{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[2]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -221,7 +317,7 @@ func (x *GetServiceAccountRequest) String() string {
 func (*GetServiceAccountRequest) ProtoMessage() {}
 
 func (x *GetServiceAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[2]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,7 +330,7 @@ func (x *GetServiceAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetServiceAccountRequest.ProtoReflect.Descriptor instead.
 func (*GetServiceAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{2}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetServiceAccountRequest) GetId() string {
@@ -253,7 +349,7 @@ type GetServiceAccountResponse struct {
 
 func (x *GetServiceAccountResponse) Reset() {
 	*x = GetServiceAccountResponse{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[3]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -265,7 +361,7 @@ func (x *GetServiceAccountResponse) String() string {
 func (*GetServiceAccountResponse) ProtoMessage() {}
 
 func (x *GetServiceAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[3]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -278,7 +374,7 @@ func (x *GetServiceAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetServiceAccountResponse.ProtoReflect.Descriptor instead.
 func (*GetServiceAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{3}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetServiceAccountResponse) GetServiceAccount() *ServiceAccount {
@@ -294,13 +390,15 @@ type CreateServiceAccountRequest struct {
 	Description   *string                `protobuf:"bytes,2,opt,name=description" json:"description,omitempty"`
 	Role          *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
 	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	ForceCommand  *string                `protobuf:"bytes,5,opt,name=force_command,json=forceCommand" json:"force_command,omitempty"`
+	SourceAddress *string                `protobuf:"bytes,6,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateServiceAccountRequest) Reset() {
 	*x = CreateServiceAccountRequest{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[4]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -312,7 +410,7 @@ func (x *CreateServiceAccountRequest) String() string {
 func (*CreateServiceAccountRequest) ProtoMessage() {}
 
 func (x *CreateServiceAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[4]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -325,7 +423,7 @@ func (x *CreateServiceAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateServiceAccountRequest.ProtoReflect.Descriptor instead.
 func (*CreateServiceAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{4}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateServiceAccountRequest) GetName() string {
@@ -356,6 +454,20 @@ func (x *CreateServiceAccountRequest) GetTags() []string {
 	return nil
 }
 
+func (x *CreateServiceAccountRequest) GetForceCommand() string {
+	if x != nil && x.ForceCommand != nil {
+		return *x.ForceCommand
+	}
+	return ""
+}
+
+func (x *CreateServiceAccountRequest) GetSourceAddress() string {
+	if x != nil && x.SourceAddress != nil {
+		return *x.SourceAddress
+	}
+	return ""
+}
+
 type CreateServiceAccountResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ServiceAccount *ServiceAccount        `protobuf:"bytes,1,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
@@ -365,7 +477,7 @@ type CreateServiceAccountResponse struct {
 
 func (x *CreateServiceAccountResponse) Reset() {
 	*x = CreateServiceAccountResponse{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[5]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -377,7 +489,7 @@ func (x *CreateServiceAccountResponse) String() string {
 func (*CreateServiceAccountResponse) ProtoMessage() {}
 
 func (x *CreateServiceAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[5]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -390,7 +502,7 @@ func (x *CreateServiceAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateServiceAccountResponse.ProtoReflect.Descriptor instead.
 func (*CreateServiceAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{5}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CreateServiceAccountResponse) GetServiceAccount() *ServiceAccount {
@@ -408,13 +520,15 @@ type UpdateServiceAccountRequest struct {
 	Role          *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
 	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,6,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
+	ForceCommand  *string                `protobuf:"bytes,7,opt,name=force_command,json=forceCommand" json:"force_command,omitempty"`
+	SourceAddress *string                `protobuf:"bytes,8,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateServiceAccountRequest) Reset() {
 	*x = UpdateServiceAccountRequest{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[6]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -426,7 +540,7 @@ func (x *UpdateServiceAccountRequest) String() string {
 func (*UpdateServiceAccountRequest) ProtoMessage() {}
 
 func (x *UpdateServiceAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[6]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -439,7 +553,7 @@ func (x *UpdateServiceAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateServiceAccountRequest.ProtoReflect.Descriptor instead.
 func (*UpdateServiceAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{6}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UpdateServiceAccountRequest) GetId() string {
@@ -484,6 +598,20 @@ func (x *UpdateServiceAccountRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 	return nil
 }
 
+func (x *UpdateServiceAccountRequest) GetForceCommand() string {
+	if x != nil && x.ForceCommand != nil {
+		return *x.ForceCommand
+	}
+	return ""
+}
+
+func (x *UpdateServiceAccountRequest) GetSourceAddress() string {
+	if x != nil && x.SourceAddress != nil {
+		return *x.SourceAddress
+	}
+	return ""
+}
+
 type UpdateServiceAccountResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ServiceAccount *ServiceAccount        `protobuf:"bytes,1,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
@@ -493,7 +621,7 @@ type UpdateServiceAccountResponse struct {
 
 func (x *UpdateServiceAccountResponse) Reset() {
 	*x = UpdateServiceAccountResponse{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[7]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -505,7 +633,7 @@ func (x *UpdateServiceAccountResponse) String() string {
 func (*UpdateServiceAccountResponse) ProtoMessage() {}
 
 func (x *UpdateServiceAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[7]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +646,7 @@ func (x *UpdateServiceAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateServiceAccountResponse.ProtoReflect.Descriptor instead.
 func (*UpdateServiceAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{7}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateServiceAccountResponse) GetServiceAccount() *ServiceAccount {
@@ -537,7 +665,7 @@ type DeleteServiceAccountRequest struct {
 
 func (x *DeleteServiceAccountRequest) Reset() {
 	*x = DeleteServiceAccountRequest{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[8]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -549,7 +677,7 @@ func (x *DeleteServiceAccountRequest) String() string {
 func (*DeleteServiceAccountRequest) ProtoMessage() {}
 
 func (x *DeleteServiceAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[8]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -562,7 +690,7 @@ func (x *DeleteServiceAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteServiceAccountRequest.ProtoReflect.Descriptor instead.
 func (*DeleteServiceAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{8}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DeleteServiceAccountRequest) GetId() string {
@@ -580,7 +708,7 @@ type DeleteServiceAccountResponse struct {
 
 func (x *DeleteServiceAccountResponse) Reset() {
 	*x = DeleteServiceAccountResponse{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[9]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -592,7 +720,7 @@ func (x *DeleteServiceAccountResponse) String() string {
 func (*DeleteServiceAccountResponse) ProtoMessage() {}
 
 func (x *DeleteServiceAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[9]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -605,7 +733,7 @@ func (x *DeleteServiceAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteServiceAccountResponse.ProtoReflect.Descriptor instead.
 func (*DeleteServiceAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{9}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{10}
 }
 
 type ListServiceAccountsRequest struct {
@@ -621,7 +749,7 @@ type ListServiceAccountsRequest struct {
 
 func (x *ListServiceAccountsRequest) Reset() {
 	*x = ListServiceAccountsRequest{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[10]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -633,7 +761,7 @@ func (x *ListServiceAccountsRequest) String() string {
 func (*ListServiceAccountsRequest) ProtoMessage() {}
 
 func (x *ListServiceAccountsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[10]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -646,7 +774,7 @@ func (x *ListServiceAccountsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListServiceAccountsRequest.ProtoReflect.Descriptor instead.
 func (*ListServiceAccountsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{10}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListServiceAccountsRequest) GetLimit() int32 {
@@ -694,7 +822,7 @@ type ListServiceAccountsResponse struct {
 
 func (x *ListServiceAccountsResponse) Reset() {
 	*x = ListServiceAccountsResponse{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[11]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -706,7 +834,7 @@ func (x *ListServiceAccountsResponse) String() string {
 func (*ListServiceAccountsResponse) ProtoMessage() {}
 
 func (x *ListServiceAccountsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[11]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -719,7 +847,7 @@ func (x *ListServiceAccountsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListServiceAccountsResponse.ProtoReflect.Descriptor instead.
 func (*ListServiceAccountsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{11}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListServiceAccountsResponse) GetServiceAccounts() []*ServiceAccount {
@@ -747,7 +875,7 @@ type CreateServiceAccountTokenRequest struct {
 
 func (x *CreateServiceAccountTokenRequest) Reset() {
 	*x = CreateServiceAccountTokenRequest{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[12]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -759,7 +887,7 @@ func (x *CreateServiceAccountTokenRequest) String() string {
 func (*CreateServiceAccountTokenRequest) ProtoMessage() {}
 
 func (x *CreateServiceAccountTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[12]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -772,7 +900,7 @@ func (x *CreateServiceAccountTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateServiceAccountTokenRequest.ProtoReflect.Descriptor instead.
 func (*CreateServiceAccountTokenRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{12}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CreateServiceAccountTokenRequest) GetServiceAccountId() string {
@@ -806,7 +934,7 @@ type CreateServiceAccountTokenResponse struct {
 
 func (x *CreateServiceAccountTokenResponse) Reset() {
 	*x = CreateServiceAccountTokenResponse{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[13]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -818,7 +946,7 @@ func (x *CreateServiceAccountTokenResponse) String() string {
 func (*CreateServiceAccountTokenResponse) ProtoMessage() {}
 
 func (x *CreateServiceAccountTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[13]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -831,7 +959,7 @@ func (x *CreateServiceAccountTokenResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use CreateServiceAccountTokenResponse.ProtoReflect.Descriptor instead.
 func (*CreateServiceAccountTokenResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{13}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CreateServiceAccountTokenResponse) GetToken() *ServiceAccountToken {
@@ -857,7 +985,7 @@ type ListServiceAccountTokensRequest struct {
 
 func (x *ListServiceAccountTokensRequest) Reset() {
 	*x = ListServiceAccountTokensRequest{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[14]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -869,7 +997,7 @@ func (x *ListServiceAccountTokensRequest) String() string {
 func (*ListServiceAccountTokensRequest) ProtoMessage() {}
 
 func (x *ListServiceAccountTokensRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[14]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -882,7 +1010,7 @@ func (x *ListServiceAccountTokensRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListServiceAccountTokensRequest.ProtoReflect.Descriptor instead.
 func (*ListServiceAccountTokensRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{14}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListServiceAccountTokensRequest) GetServiceAccountId() string {
@@ -901,7 +1029,7 @@ type ListServiceAccountTokensResponse struct {
 
 func (x *ListServiceAccountTokensResponse) Reset() {
 	*x = ListServiceAccountTokensResponse{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[15]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -913,7 +1041,7 @@ func (x *ListServiceAccountTokensResponse) String() string {
 func (*ListServiceAccountTokensResponse) ProtoMessage() {}
 
 func (x *ListServiceAccountTokensResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[15]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -926,7 +1054,7 @@ func (x *ListServiceAccountTokensResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListServiceAccountTokensResponse.ProtoReflect.Descriptor instead.
 func (*ListServiceAccountTokensResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{15}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListServiceAccountTokensResponse) GetTokens() []*ServiceAccountToken {
@@ -946,7 +1074,7 @@ type RevokeServiceAccountTokenRequest struct {
 
 func (x *RevokeServiceAccountTokenRequest) Reset() {
 	*x = RevokeServiceAccountTokenRequest{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[16]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -958,7 +1086,7 @@ func (x *RevokeServiceAccountTokenRequest) String() string {
 func (*RevokeServiceAccountTokenRequest) ProtoMessage() {}
 
 func (x *RevokeServiceAccountTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[16]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -971,7 +1099,7 @@ func (x *RevokeServiceAccountTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeServiceAccountTokenRequest.ProtoReflect.Descriptor instead.
 func (*RevokeServiceAccountTokenRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{16}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RevokeServiceAccountTokenRequest) GetServiceAccountId() string {
@@ -996,7 +1124,7 @@ type RevokeServiceAccountTokenResponse struct {
 
 func (x *RevokeServiceAccountTokenResponse) Reset() {
 	*x = RevokeServiceAccountTokenResponse{}
-	mi := &file_nokku_v1_service_account_proto_msgTypes[17]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1008,7 +1136,7 @@ func (x *RevokeServiceAccountTokenResponse) String() string {
 func (*RevokeServiceAccountTokenResponse) ProtoMessage() {}
 
 func (x *RevokeServiceAccountTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_service_account_proto_msgTypes[17]
+	mi := &file_nokku_v1_service_account_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1021,14 +1149,294 @@ func (x *RevokeServiceAccountTokenResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use RevokeServiceAccountTokenResponse.ProtoReflect.Descriptor instead.
 func (*RevokeServiceAccountTokenResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{17}
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{18}
+}
+
+type AddServiceAccountFederationRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ServiceAccountId *string                `protobuf:"bytes,1,opt,name=service_account_id,json=serviceAccountId" json:"service_account_id,omitempty"`
+	Issuer           *string                `protobuf:"bytes,2,opt,name=issuer" json:"issuer,omitempty"`
+	Claims           map[string]string      `protobuf:"bytes,3,rep,name=claims" json:"claims,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AddServiceAccountFederationRequest) Reset() {
+	*x = AddServiceAccountFederationRequest{}
+	mi := &file_nokku_v1_service_account_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddServiceAccountFederationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddServiceAccountFederationRequest) ProtoMessage() {}
+
+func (x *AddServiceAccountFederationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_service_account_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddServiceAccountFederationRequest.ProtoReflect.Descriptor instead.
+func (*AddServiceAccountFederationRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *AddServiceAccountFederationRequest) GetServiceAccountId() string {
+	if x != nil && x.ServiceAccountId != nil {
+		return *x.ServiceAccountId
+	}
+	return ""
+}
+
+func (x *AddServiceAccountFederationRequest) GetIssuer() string {
+	if x != nil && x.Issuer != nil {
+		return *x.Issuer
+	}
+	return ""
+}
+
+func (x *AddServiceAccountFederationRequest) GetClaims() map[string]string {
+	if x != nil {
+		return x.Claims
+	}
+	return nil
+}
+
+type AddServiceAccountFederationResponse struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Federation    *ServiceAccountFederation `protobuf:"bytes,1,opt,name=federation" json:"federation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddServiceAccountFederationResponse) Reset() {
+	*x = AddServiceAccountFederationResponse{}
+	mi := &file_nokku_v1_service_account_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddServiceAccountFederationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddServiceAccountFederationResponse) ProtoMessage() {}
+
+func (x *AddServiceAccountFederationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_service_account_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddServiceAccountFederationResponse.ProtoReflect.Descriptor instead.
+func (*AddServiceAccountFederationResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *AddServiceAccountFederationResponse) GetFederation() *ServiceAccountFederation {
+	if x != nil {
+		return x.Federation
+	}
+	return nil
+}
+
+type ListServiceAccountFederationsRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ServiceAccountId *string                `protobuf:"bytes,1,opt,name=service_account_id,json=serviceAccountId" json:"service_account_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ListServiceAccountFederationsRequest) Reset() {
+	*x = ListServiceAccountFederationsRequest{}
+	mi := &file_nokku_v1_service_account_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListServiceAccountFederationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListServiceAccountFederationsRequest) ProtoMessage() {}
+
+func (x *ListServiceAccountFederationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_service_account_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListServiceAccountFederationsRequest.ProtoReflect.Descriptor instead.
+func (*ListServiceAccountFederationsRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ListServiceAccountFederationsRequest) GetServiceAccountId() string {
+	if x != nil && x.ServiceAccountId != nil {
+		return *x.ServiceAccountId
+	}
+	return ""
+}
+
+type ListServiceAccountFederationsResponse struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Federations   []*ServiceAccountFederation `protobuf:"bytes,1,rep,name=federations" json:"federations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListServiceAccountFederationsResponse) Reset() {
+	*x = ListServiceAccountFederationsResponse{}
+	mi := &file_nokku_v1_service_account_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListServiceAccountFederationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListServiceAccountFederationsResponse) ProtoMessage() {}
+
+func (x *ListServiceAccountFederationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_service_account_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListServiceAccountFederationsResponse.ProtoReflect.Descriptor instead.
+func (*ListServiceAccountFederationsResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ListServiceAccountFederationsResponse) GetFederations() []*ServiceAccountFederation {
+	if x != nil {
+		return x.Federations
+	}
+	return nil
+}
+
+type RemoveServiceAccountFederationRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ServiceAccountId *string                `protobuf:"bytes,1,opt,name=service_account_id,json=serviceAccountId" json:"service_account_id,omitempty"`
+	Id               *string                `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *RemoveServiceAccountFederationRequest) Reset() {
+	*x = RemoveServiceAccountFederationRequest{}
+	mi := &file_nokku_v1_service_account_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveServiceAccountFederationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveServiceAccountFederationRequest) ProtoMessage() {}
+
+func (x *RemoveServiceAccountFederationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_service_account_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveServiceAccountFederationRequest.ProtoReflect.Descriptor instead.
+func (*RemoveServiceAccountFederationRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RemoveServiceAccountFederationRequest) GetServiceAccountId() string {
+	if x != nil && x.ServiceAccountId != nil {
+		return *x.ServiceAccountId
+	}
+	return ""
+}
+
+func (x *RemoveServiceAccountFederationRequest) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return ""
+}
+
+type RemoveServiceAccountFederationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveServiceAccountFederationResponse) Reset() {
+	*x = RemoveServiceAccountFederationResponse{}
+	mi := &file_nokku_v1_service_account_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveServiceAccountFederationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveServiceAccountFederationResponse) ProtoMessage() {}
+
+func (x *RemoveServiceAccountFederationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_service_account_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveServiceAccountFederationResponse.ProtoReflect.Descriptor instead.
+func (*RemoveServiceAccountFederationResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_service_account_proto_rawDescGZIP(), []int{24}
 }
 
 var File_nokku_v1_service_account_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\n" +
-	"\x1enokku/v1/service_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xcb\x02\n" +
+	"\x1enokku/v1/service_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x97\x03\n" +
 	"\x0eServiceAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1040,7 +1448,10 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xef\x01\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12#\n" +
+	"\rforce_command\x18\t \x01(\tR\fforceCommand\x12%\n" +
+	"\x0esource_address\x18\n" +
+	" \x01(\tR\rsourceAddress\"\xef\x01\n" +
 	"\x13ServiceAccountToken\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x129\n" +
@@ -1049,26 +1460,40 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\flast_used_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastUsedAt\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"4\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xae\x02\n" +
+	"\x18ServiceAccountFederation\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
+	"\x12service_account_id\x18\x02 \x01(\tR\x10serviceAccountId\x12\x16\n" +
+	"\x06issuer\x18\x03 \x01(\tR\x06issuer\x12F\n" +
+	"\x06claims\x18\x04 \x03(\v2..nokku.v1.ServiceAccountFederation.ClaimsEntryR\x06claims\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x1a9\n" +
+	"\vClaimsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"4\n" +
 	"\x18GetServiceAccountRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"^\n" +
 	"\x19GetServiceAccountResponse\x12A\n" +
-	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xd7\x01\n" +
+	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xb7\x02\n" +
 	"\x1bCreateServiceAccountRequest\x12;\n" +
 	"\x04name\x18\x01 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12;\n" +
 	"\x04role\x18\x03 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleB\x0e\xbaH\v\x82\x01\b\x18\x00\x18\x01\x18\x02\x18\x03R\x04role\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\"a\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\x12-\n" +
+	"\rforce_command\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\fforceCommand\x12/\n" +
+	"\x0esource_address\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\rsourceAddress\"a\n" +
 	"\x1cCreateServiceAccountResponse\x12A\n" +
-	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xd8\x02\n" +
+	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xd8\x03\n" +
 	"\x1bUpdateServiceAccountRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12;\n" +
 	"\x04name\x18\x02 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12;\n" +
 	"\x04role\x18\x04 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleB\x0e\xbaH\v\x82\x01\b\x18\x00\x18\x01\x18\x02\x18\x03R\x04role\x12\x12\n" +
-	"\x04tags\x18\x05 \x03(\tR\x04tags\x12e\n" +
-	"\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskB(\xbaH%\xc8\x01\x01\xe2\x01\x1f\x12\x04name\x12\vdescription\x12\x04role\x12\x04tagsR\n" +
-	"updateMask\"a\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x12\x84\x01\n" +
+	"\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskBG\xbaHD\xc8\x01\x01\xe2\x01>\x12\x04name\x12\vdescription\x12\x04role\x12\x04tags\x12\rforce_command\x12\x0esource_addressR\n" +
+	"updateMask\x12-\n" +
+	"\rforce_command\x18\a \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\fforceCommand\x12/\n" +
+	"\x0esource_address\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\rsourceAddress\"a\n" +
 	"\x1cUpdateServiceAccountResponse\x12A\n" +
 	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"7\n" +
 	"\x1bDeleteServiceAccountRequest\x12\x18\n" +
@@ -1098,18 +1523,43 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	" RevokeServiceAccountTokenRequest\x126\n" +
 	"\x12service_account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x10serviceAccountId\x12\x18\n" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"#\n" +
-	"!RevokeServiceAccountTokenResponse2\xbf\a\n" +
+	"!RevokeServiceAccountTokenResponse\"\xa3\x02\n" +
+	"\"AddServiceAccountFederationRequest\x126\n" +
+	"\x12service_account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x10serviceAccountId\x12 \n" +
+	"\x06issuer\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\x06issuer\x12h\n" +
+	"\x06claims\x18\x03 \x03(\v28.nokku.v1.AddServiceAccountFederationRequest.ClaimsEntryB\x16\xbaH\x13\x9a\x01\x10\x10\x10\"\x05r\x03\x18\x80\x01*\x05r\x03\x18\x80\x04R\x06claims\x1a9\n" +
+	"\vClaimsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"i\n" +
+	"#AddServiceAccountFederationResponse\x12B\n" +
+	"\n" +
+	"federation\x18\x01 \x01(\v2\".nokku.v1.ServiceAccountFederationR\n" +
+	"federation\"^\n" +
+	"$ListServiceAccountFederationsRequest\x126\n" +
+	"\x12service_account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x10serviceAccountId\"m\n" +
+	"%ListServiceAccountFederationsResponse\x12D\n" +
+	"\vfederations\x18\x01 \x03(\v2\".nokku.v1.ServiceAccountFederationR\vfederations\"y\n" +
+	"%RemoveServiceAccountFederationRequest\x126\n" +
+	"\x12service_account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x10serviceAccountId\x12\x18\n" +
+	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"(\n" +
+	"&RemoveServiceAccountFederationResponse2\xea\n" +
+	"\n" +
 	"\x15ServiceAccountService\x12g\n" +
 	"\x11GetServiceAccount\x12\".nokku.v1.GetServiceAccountRequest\x1a#.nokku.v1.GetServiceAccountResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12m\n" +
 	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12q\n" +
 	"\x14CreateServiceAccount\x12%.nokku.v1.CreateServiceAccountRequest\x1a&.nokku.v1.CreateServiceAccountResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x03(\x01@\x01\x12m\n" +
-	"\x14UpdateServiceAccount\x12%.nokku.v1.UpdateServiceAccountRequest\x1a&.nokku.v1.UpdateServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12m\n" +
+	"\xc2\xf3\x18\x06\x18\x03(\x01@\x01\x12o\n" +
+	"\x14UpdateServiceAccount\x12%.nokku.v1.UpdateServiceAccountRequest\x1a&.nokku.v1.UpdateServiceAccountResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12m\n" +
 	"\x14DeleteServiceAccount\x12%.nokku.v1.DeleteServiceAccountRequest\x1a&.nokku.v1.DeleteServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12\x80\x01\n" +
 	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\n" +
 	"\xc2\xf3\x18\x06\x18\x03(\x010\x01\x12|\n" +
 	"\x18ListServiceAccountTokens\x12).nokku.v1.ListServiceAccountTokensRequest\x1a*.nokku.v1.ListServiceAccountTokensResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12|\n" +
-	"\x19RevokeServiceAccountToken\x12*.nokku.v1.RevokeServiceAccountTokenRequest\x1a+.nokku.v1.RevokeServiceAccountTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x03B\x94\x01\n" +
+	"\x19RevokeServiceAccountToken\x12*.nokku.v1.RevokeServiceAccountTokenRequest\x1a+.nokku.v1.RevokeServiceAccountTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12\x86\x01\n" +
+	"\x1bAddServiceAccountFederation\x12,.nokku.v1.AddServiceAccountFederationRequest\x1a-.nokku.v1.AddServiceAccountFederationResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x03(\x010\x01\x12\x8b\x01\n" +
+	"\x1dListServiceAccountFederations\x12..nokku.v1.ListServiceAccountFederationsRequest\x1a/.nokku.v1.ListServiceAccountFederationsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12\x8f\x01\n" +
+	"\x1eRemoveServiceAccountFederation\x12/.nokku.v1.RemoveServiceAccountFederationRequest\x1a0.nokku.v1.RemoveServiceAccountFederationResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x03(\x010\x01B\x94\x01\n" +
 	"\fcom.nokku.v1B\x13ServiceAccountProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -1124,70 +1574,90 @@ func file_nokku_v1_service_account_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_service_account_proto_rawDescData
 }
 
-var file_nokku_v1_service_account_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_nokku_v1_service_account_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_nokku_v1_service_account_proto_goTypes = []any{
-	(*ServiceAccount)(nil),                    // 0: nokku.v1.ServiceAccount
-	(*ServiceAccountToken)(nil),               // 1: nokku.v1.ServiceAccountToken
-	(*GetServiceAccountRequest)(nil),          // 2: nokku.v1.GetServiceAccountRequest
-	(*GetServiceAccountResponse)(nil),         // 3: nokku.v1.GetServiceAccountResponse
-	(*CreateServiceAccountRequest)(nil),       // 4: nokku.v1.CreateServiceAccountRequest
-	(*CreateServiceAccountResponse)(nil),      // 5: nokku.v1.CreateServiceAccountResponse
-	(*UpdateServiceAccountRequest)(nil),       // 6: nokku.v1.UpdateServiceAccountRequest
-	(*UpdateServiceAccountResponse)(nil),      // 7: nokku.v1.UpdateServiceAccountResponse
-	(*DeleteServiceAccountRequest)(nil),       // 8: nokku.v1.DeleteServiceAccountRequest
-	(*DeleteServiceAccountResponse)(nil),      // 9: nokku.v1.DeleteServiceAccountResponse
-	(*ListServiceAccountsRequest)(nil),        // 10: nokku.v1.ListServiceAccountsRequest
-	(*ListServiceAccountsResponse)(nil),       // 11: nokku.v1.ListServiceAccountsResponse
-	(*CreateServiceAccountTokenRequest)(nil),  // 12: nokku.v1.CreateServiceAccountTokenRequest
-	(*CreateServiceAccountTokenResponse)(nil), // 13: nokku.v1.CreateServiceAccountTokenResponse
-	(*ListServiceAccountTokensRequest)(nil),   // 14: nokku.v1.ListServiceAccountTokensRequest
-	(*ListServiceAccountTokensResponse)(nil),  // 15: nokku.v1.ListServiceAccountTokensResponse
-	(*RevokeServiceAccountTokenRequest)(nil),  // 16: nokku.v1.RevokeServiceAccountTokenRequest
-	(*RevokeServiceAccountTokenResponse)(nil), // 17: nokku.v1.RevokeServiceAccountTokenResponse
-	(WorkspaceRole)(0),                        // 18: nokku.v1.WorkspaceRole
-	(*timestamppb.Timestamp)(nil),             // 19: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),             // 20: google.protobuf.FieldMask
+	(*ServiceAccount)(nil),                         // 0: nokku.v1.ServiceAccount
+	(*ServiceAccountToken)(nil),                    // 1: nokku.v1.ServiceAccountToken
+	(*ServiceAccountFederation)(nil),               // 2: nokku.v1.ServiceAccountFederation
+	(*GetServiceAccountRequest)(nil),               // 3: nokku.v1.GetServiceAccountRequest
+	(*GetServiceAccountResponse)(nil),              // 4: nokku.v1.GetServiceAccountResponse
+	(*CreateServiceAccountRequest)(nil),            // 5: nokku.v1.CreateServiceAccountRequest
+	(*CreateServiceAccountResponse)(nil),           // 6: nokku.v1.CreateServiceAccountResponse
+	(*UpdateServiceAccountRequest)(nil),            // 7: nokku.v1.UpdateServiceAccountRequest
+	(*UpdateServiceAccountResponse)(nil),           // 8: nokku.v1.UpdateServiceAccountResponse
+	(*DeleteServiceAccountRequest)(nil),            // 9: nokku.v1.DeleteServiceAccountRequest
+	(*DeleteServiceAccountResponse)(nil),           // 10: nokku.v1.DeleteServiceAccountResponse
+	(*ListServiceAccountsRequest)(nil),             // 11: nokku.v1.ListServiceAccountsRequest
+	(*ListServiceAccountsResponse)(nil),            // 12: nokku.v1.ListServiceAccountsResponse
+	(*CreateServiceAccountTokenRequest)(nil),       // 13: nokku.v1.CreateServiceAccountTokenRequest
+	(*CreateServiceAccountTokenResponse)(nil),      // 14: nokku.v1.CreateServiceAccountTokenResponse
+	(*ListServiceAccountTokensRequest)(nil),        // 15: nokku.v1.ListServiceAccountTokensRequest
+	(*ListServiceAccountTokensResponse)(nil),       // 16: nokku.v1.ListServiceAccountTokensResponse
+	(*RevokeServiceAccountTokenRequest)(nil),       // 17: nokku.v1.RevokeServiceAccountTokenRequest
+	(*RevokeServiceAccountTokenResponse)(nil),      // 18: nokku.v1.RevokeServiceAccountTokenResponse
+	(*AddServiceAccountFederationRequest)(nil),     // 19: nokku.v1.AddServiceAccountFederationRequest
+	(*AddServiceAccountFederationResponse)(nil),    // 20: nokku.v1.AddServiceAccountFederationResponse
+	(*ListServiceAccountFederationsRequest)(nil),   // 21: nokku.v1.ListServiceAccountFederationsRequest
+	(*ListServiceAccountFederationsResponse)(nil),  // 22: nokku.v1.ListServiceAccountFederationsResponse
+	(*RemoveServiceAccountFederationRequest)(nil),  // 23: nokku.v1.RemoveServiceAccountFederationRequest
+	(*RemoveServiceAccountFederationResponse)(nil), // 24: nokku.v1.RemoveServiceAccountFederationResponse
+	nil,                           // 25: nokku.v1.ServiceAccountFederation.ClaimsEntry
+	nil,                           // 26: nokku.v1.AddServiceAccountFederationRequest.ClaimsEntry
+	(WorkspaceRole)(0),            // 27: nokku.v1.WorkspaceRole
+	(*timestamppb.Timestamp)(nil), // 28: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil), // 29: google.protobuf.FieldMask
 }
 var file_nokku_v1_service_account_proto_depIdxs = []int32{
-	18, // 0: nokku.v1.ServiceAccount.role:type_name -> nokku.v1.WorkspaceRole
-	19, // 1: nokku.v1.ServiceAccount.last_used_at:type_name -> google.protobuf.Timestamp
-	19, // 2: nokku.v1.ServiceAccount.created_at:type_name -> google.protobuf.Timestamp
-	19, // 3: nokku.v1.ServiceAccount.updated_at:type_name -> google.protobuf.Timestamp
-	19, // 4: nokku.v1.ServiceAccountToken.expires_at:type_name -> google.protobuf.Timestamp
-	19, // 5: nokku.v1.ServiceAccountToken.last_used_at:type_name -> google.protobuf.Timestamp
-	19, // 6: nokku.v1.ServiceAccountToken.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 7: nokku.v1.GetServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
-	18, // 8: nokku.v1.CreateServiceAccountRequest.role:type_name -> nokku.v1.WorkspaceRole
-	0,  // 9: nokku.v1.CreateServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
-	18, // 10: nokku.v1.UpdateServiceAccountRequest.role:type_name -> nokku.v1.WorkspaceRole
-	20, // 11: nokku.v1.UpdateServiceAccountRequest.update_mask:type_name -> google.protobuf.FieldMask
-	0,  // 12: nokku.v1.UpdateServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
-	18, // 13: nokku.v1.ListServiceAccountsRequest.role:type_name -> nokku.v1.WorkspaceRole
-	0,  // 14: nokku.v1.ListServiceAccountsResponse.service_accounts:type_name -> nokku.v1.ServiceAccount
-	19, // 15: nokku.v1.CreateServiceAccountTokenRequest.expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 16: nokku.v1.CreateServiceAccountTokenResponse.token:type_name -> nokku.v1.ServiceAccountToken
-	1,  // 17: nokku.v1.ListServiceAccountTokensResponse.tokens:type_name -> nokku.v1.ServiceAccountToken
-	2,  // 18: nokku.v1.ServiceAccountService.GetServiceAccount:input_type -> nokku.v1.GetServiceAccountRequest
-	10, // 19: nokku.v1.ServiceAccountService.ListServiceAccounts:input_type -> nokku.v1.ListServiceAccountsRequest
-	4,  // 20: nokku.v1.ServiceAccountService.CreateServiceAccount:input_type -> nokku.v1.CreateServiceAccountRequest
-	6,  // 21: nokku.v1.ServiceAccountService.UpdateServiceAccount:input_type -> nokku.v1.UpdateServiceAccountRequest
-	8,  // 22: nokku.v1.ServiceAccountService.DeleteServiceAccount:input_type -> nokku.v1.DeleteServiceAccountRequest
-	12, // 23: nokku.v1.ServiceAccountService.CreateServiceAccountToken:input_type -> nokku.v1.CreateServiceAccountTokenRequest
-	14, // 24: nokku.v1.ServiceAccountService.ListServiceAccountTokens:input_type -> nokku.v1.ListServiceAccountTokensRequest
-	16, // 25: nokku.v1.ServiceAccountService.RevokeServiceAccountToken:input_type -> nokku.v1.RevokeServiceAccountTokenRequest
-	3,  // 26: nokku.v1.ServiceAccountService.GetServiceAccount:output_type -> nokku.v1.GetServiceAccountResponse
-	11, // 27: nokku.v1.ServiceAccountService.ListServiceAccounts:output_type -> nokku.v1.ListServiceAccountsResponse
-	5,  // 28: nokku.v1.ServiceAccountService.CreateServiceAccount:output_type -> nokku.v1.CreateServiceAccountResponse
-	7,  // 29: nokku.v1.ServiceAccountService.UpdateServiceAccount:output_type -> nokku.v1.UpdateServiceAccountResponse
-	9,  // 30: nokku.v1.ServiceAccountService.DeleteServiceAccount:output_type -> nokku.v1.DeleteServiceAccountResponse
-	13, // 31: nokku.v1.ServiceAccountService.CreateServiceAccountToken:output_type -> nokku.v1.CreateServiceAccountTokenResponse
-	15, // 32: nokku.v1.ServiceAccountService.ListServiceAccountTokens:output_type -> nokku.v1.ListServiceAccountTokensResponse
-	17, // 33: nokku.v1.ServiceAccountService.RevokeServiceAccountToken:output_type -> nokku.v1.RevokeServiceAccountTokenResponse
-	26, // [26:34] is the sub-list for method output_type
-	18, // [18:26] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	27, // 0: nokku.v1.ServiceAccount.role:type_name -> nokku.v1.WorkspaceRole
+	28, // 1: nokku.v1.ServiceAccount.last_used_at:type_name -> google.protobuf.Timestamp
+	28, // 2: nokku.v1.ServiceAccount.created_at:type_name -> google.protobuf.Timestamp
+	28, // 3: nokku.v1.ServiceAccount.updated_at:type_name -> google.protobuf.Timestamp
+	28, // 4: nokku.v1.ServiceAccountToken.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 5: nokku.v1.ServiceAccountToken.last_used_at:type_name -> google.protobuf.Timestamp
+	28, // 6: nokku.v1.ServiceAccountToken.created_at:type_name -> google.protobuf.Timestamp
+	25, // 7: nokku.v1.ServiceAccountFederation.claims:type_name -> nokku.v1.ServiceAccountFederation.ClaimsEntry
+	28, // 8: nokku.v1.ServiceAccountFederation.created_at:type_name -> google.protobuf.Timestamp
+	0,  // 9: nokku.v1.GetServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
+	27, // 10: nokku.v1.CreateServiceAccountRequest.role:type_name -> nokku.v1.WorkspaceRole
+	0,  // 11: nokku.v1.CreateServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
+	27, // 12: nokku.v1.UpdateServiceAccountRequest.role:type_name -> nokku.v1.WorkspaceRole
+	29, // 13: nokku.v1.UpdateServiceAccountRequest.update_mask:type_name -> google.protobuf.FieldMask
+	0,  // 14: nokku.v1.UpdateServiceAccountResponse.service_account:type_name -> nokku.v1.ServiceAccount
+	27, // 15: nokku.v1.ListServiceAccountsRequest.role:type_name -> nokku.v1.WorkspaceRole
+	0,  // 16: nokku.v1.ListServiceAccountsResponse.service_accounts:type_name -> nokku.v1.ServiceAccount
+	28, // 17: nokku.v1.CreateServiceAccountTokenRequest.expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 18: nokku.v1.CreateServiceAccountTokenResponse.token:type_name -> nokku.v1.ServiceAccountToken
+	1,  // 19: nokku.v1.ListServiceAccountTokensResponse.tokens:type_name -> nokku.v1.ServiceAccountToken
+	26, // 20: nokku.v1.AddServiceAccountFederationRequest.claims:type_name -> nokku.v1.AddServiceAccountFederationRequest.ClaimsEntry
+	2,  // 21: nokku.v1.AddServiceAccountFederationResponse.federation:type_name -> nokku.v1.ServiceAccountFederation
+	2,  // 22: nokku.v1.ListServiceAccountFederationsResponse.federations:type_name -> nokku.v1.ServiceAccountFederation
+	3,  // 23: nokku.v1.ServiceAccountService.GetServiceAccount:input_type -> nokku.v1.GetServiceAccountRequest
+	11, // 24: nokku.v1.ServiceAccountService.ListServiceAccounts:input_type -> nokku.v1.ListServiceAccountsRequest
+	5,  // 25: nokku.v1.ServiceAccountService.CreateServiceAccount:input_type -> nokku.v1.CreateServiceAccountRequest
+	7,  // 26: nokku.v1.ServiceAccountService.UpdateServiceAccount:input_type -> nokku.v1.UpdateServiceAccountRequest
+	9,  // 27: nokku.v1.ServiceAccountService.DeleteServiceAccount:input_type -> nokku.v1.DeleteServiceAccountRequest
+	13, // 28: nokku.v1.ServiceAccountService.CreateServiceAccountToken:input_type -> nokku.v1.CreateServiceAccountTokenRequest
+	15, // 29: nokku.v1.ServiceAccountService.ListServiceAccountTokens:input_type -> nokku.v1.ListServiceAccountTokensRequest
+	17, // 30: nokku.v1.ServiceAccountService.RevokeServiceAccountToken:input_type -> nokku.v1.RevokeServiceAccountTokenRequest
+	19, // 31: nokku.v1.ServiceAccountService.AddServiceAccountFederation:input_type -> nokku.v1.AddServiceAccountFederationRequest
+	21, // 32: nokku.v1.ServiceAccountService.ListServiceAccountFederations:input_type -> nokku.v1.ListServiceAccountFederationsRequest
+	23, // 33: nokku.v1.ServiceAccountService.RemoveServiceAccountFederation:input_type -> nokku.v1.RemoveServiceAccountFederationRequest
+	4,  // 34: nokku.v1.ServiceAccountService.GetServiceAccount:output_type -> nokku.v1.GetServiceAccountResponse
+	12, // 35: nokku.v1.ServiceAccountService.ListServiceAccounts:output_type -> nokku.v1.ListServiceAccountsResponse
+	6,  // 36: nokku.v1.ServiceAccountService.CreateServiceAccount:output_type -> nokku.v1.CreateServiceAccountResponse
+	8,  // 37: nokku.v1.ServiceAccountService.UpdateServiceAccount:output_type -> nokku.v1.UpdateServiceAccountResponse
+	10, // 38: nokku.v1.ServiceAccountService.DeleteServiceAccount:output_type -> nokku.v1.DeleteServiceAccountResponse
+	14, // 39: nokku.v1.ServiceAccountService.CreateServiceAccountToken:output_type -> nokku.v1.CreateServiceAccountTokenResponse
+	16, // 40: nokku.v1.ServiceAccountService.ListServiceAccountTokens:output_type -> nokku.v1.ListServiceAccountTokensResponse
+	18, // 41: nokku.v1.ServiceAccountService.RevokeServiceAccountToken:output_type -> nokku.v1.RevokeServiceAccountTokenResponse
+	20, // 42: nokku.v1.ServiceAccountService.AddServiceAccountFederation:output_type -> nokku.v1.AddServiceAccountFederationResponse
+	22, // 43: nokku.v1.ServiceAccountService.ListServiceAccountFederations:output_type -> nokku.v1.ListServiceAccountFederationsResponse
+	24, // 44: nokku.v1.ServiceAccountService.RemoveServiceAccountFederation:output_type -> nokku.v1.RemoveServiceAccountFederationResponse
+	34, // [34:45] is the sub-list for method output_type
+	23, // [23:34] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_service_account_proto_init() }
@@ -1202,7 +1672,7 @@ func file_nokku_v1_service_account_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_service_account_proto_rawDesc), len(file_nokku_v1_service_account_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

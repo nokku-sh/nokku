@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { auditStreams } from '#lib/api/audit-streams.svelte.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { useFeatures } from '#lib/api/workspaces.svelte.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -66,17 +67,21 @@
 	async function add(e: SubmitEvent) {
 		e.preventDefault();
 		if (!valid) return;
-		await create.mutateAsync({ kind, url, secret });
-		url = secret = '';
+		await whenFresh(async () => {
+			await create.mutateAsync({ kind, url, secret });
+			url = secret = '';
+		});
 	}
 
 	function askRemove(s: AuditStream) {
-		void confirm({
-			title: `Remove the ${label(s.kind)} stream?`,
-			description: `Events stop going to ${s.url}. What was sent stays there.`,
-			confirmText: 'Remove',
-			onConfirm: () => remove.mutateAsync({ id: s.id })
-		});
+		void whenFresh(() =>
+			confirm({
+				title: `Remove the ${label(s.kind)} stream?`,
+				description: `Events stop going to ${s.url}. What was sent stays there.`,
+				confirmText: 'Remove',
+				onConfirm: () => remove.mutateAsync({ id: s.id })
+			})
+		);
 	}
 
 	function status(s: AuditStream) {
@@ -164,7 +169,8 @@
 										checked={s.enabled}
 										aria-label="Send events"
 										disabled={update.isPending || (!s.enabled && !available)}
-										onCheckedChange={(on) => update.mutate({ id: s.id, enabled: on })}
+										onCheckedChange={(on) =>
+											whenFresh(() => update.mutate({ id: s.id, enabled: on }))}
 									/>
 									<Button
 										variant="ghost"

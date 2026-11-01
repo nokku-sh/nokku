@@ -47,11 +47,9 @@ func rotationConn(t *testing.T) (*db.Connection, *kms.Keyset) {
 
 func seedCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, workspaceID string) *db.SSHCA {
 	t.Helper()
-	info := ssh.NewCA()
-	info.Name = "ca-" + uuid.NewV7().String()
 	var ca *db.SSHCA
 	require.NoError(t, conn.TenantTx(pinned(t, workspaceID), func(q *db.Queries) (err error) {
-		ca, err = ssh.CreateCA(t.Context(), q, keys, info)
+		ca, err = ssh.CreateCA(t.Context(), q, keys, ssh.NewCA())
 		return err
 	}))
 	return ca
@@ -101,7 +99,7 @@ func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
 	rollover := func(revoke bool) *db.SSHCA {
 		var next *db.SSHCA
 		require.NoError(t, conn.TenantTx(pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
-			current, err := q.GetCAForUpdate(t.Context(), ca.ID)
+			current, err := q.GetWorkspaceCAForUpdate(t.Context())
 			if err != nil {
 				return err
 			}
@@ -152,7 +150,9 @@ func TestCASignerSignsWithTheKeyOfItsKind(t *testing.T) {
 	} {
 		s, err := signer(t, conn, keys, ca, c.certType)
 		require.NoError(t, err)
-		cert, err := ssh.SignCertificate(ca, s, newPublicKey(t), []string{c.principal}, "test", time.Hour, c.certType)
+		cert, err := ssh.SignCertificate(
+			ca, s, newPublicKey(t), []string{c.principal}, "test", time.Hour, c.certType, ssh.Limits{},
+		)
 		require.NoError(t, err)
 		signedBy := ssh.MarshalKey(cert.SignatureKey)
 		assert.Equal(t, c.authority, signedBy, "a %s comes from the wrong key", c.keygenL)

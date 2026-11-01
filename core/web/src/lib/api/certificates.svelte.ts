@@ -1,44 +1,17 @@
 import { CertificateService } from '#lib/gen/nokku/v1/certificates_pb.js';
 import { toast } from 'svelte-sonner';
-import { plural, useBulkMutation } from './bulk';
-import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { usePatch } from './mask';
 
+// A workspace has one CA, so nothing here takes an id.
 export const ca = {
-	get: (id: MaybeGetter<string | undefined>) =>
-		useQuery(
-			CertificateService.method.getCertificateAuthority,
-			() => ({ id: extract(id) }),
-			() => ({
-				enabled: !!extract(id),
-				select: (res) => res.certificateAuthority
-			})
-		),
-	list: () =>
-		useQuery(CertificateService.method.listCertificateAuthorities, {}, () => ({
-			select: (res) => res.certificateAuthorities
+	get: () =>
+		useQuery(CertificateService.method.getCertificateAuthority, {}, () => ({
+			select: (res) => res.certificateAuthority
 		})),
-
-	create: () =>
-		useMutation(CertificateService.method.createCertificateAuthority, {
-			onSuccess: () => toast.success('Certificate authority created')
-		}),
 	update: () => usePatch(CertificateService.method.updateCertificateAuthority),
-	delete: () => useMutation(CertificateService.method.deleteCertificateAuthority),
-	deleteMany: () =>
-		useBulkMutation(
-			CertificateService.method.deleteCertificateAuthority,
-			(n) => `${plural(n, 'certificate authority', 'certificate authorities')} deleted`
-		),
 	rollover: () =>
 		useMutation(CertificateService.method.rolloverCertificateAuthority, {
-			onSuccess: (data) => {
-				if (!data.certificateAuthority) {
-					toast.success('Rollover skipped');
-					return;
-				}
-				toast.success('Certificate authority rolled over');
-			}
+			onSuccess: () => toast.success('New keys are in place')
 		})
 };

@@ -36,10 +36,20 @@ const (
 	// maxUploadBytes ends an upload. nokkud stops a recording at 50 MB, so only a daemon that ignores that gets here.
 	maxUploadBytes = 64 << 20
 
-	// maxOpenUploads bounds what one bad daemon costs. Every live session holds an upload open, which keeps up to 26 MiB
-	// of core memory on its way to a bucket and only counts toward the storage cap once stored. A try over the limit
-	// waits for its retry and loses nothing, the file stays on the daemon.
+	// maxOpenUploads bounds what one bad daemon costs. A try over the limit waits for its retry and loses nothing, the
+	// file stays on the daemon.
 	maxOpenUploads = 64
+
+	// maxUploadMemory is what one upload can keep in core memory on its way to a bucket. It only counts toward the
+	// storage cap once stored, so the core counts it here. A quiet session holds what it sent, which is why these limit
+	// bytes and not uploads: a live session may stay open for hours.
+	maxUploadMemory = 26 << 20
+
+	// maxCoreUploadMemory bounds all of it. A try over a limit is cut and comes again, the file stays on the daemon.
+	maxCoreUploadMemory = 2 << 30
+
+	// maxWorkspaceUploadMemory keeps one hosted workspace from taking the share of the others.
+	maxWorkspaceUploadMemory = 512 << 20
 
 	// storeTimeout bounds the commit and the transaction after it, each on its own.
 	storeTimeout = 30 * time.Second
@@ -55,11 +65,13 @@ type daemonControlService struct {
 	cfg *config.Config
 
 	uploadsMu sync.Mutex
-	uploads   map[string]int // open uploads by daemon
+	uploads   map[string]int   // open uploads by daemon
+	held      map[string]int64 // bytes in core memory by workspace
+	heldTotal int64
 }
 
 func newDaemonControlService(cfg *config.Config) *daemonControlService {
-	return &daemonControlService{Pool: cfg.Pool, cfg: cfg, uploads: map[string]int{}}
+	return &daemonControlService{Pool: cfg.Pool, cfg: cfg, uploads: map[string]int{}, held: map[string]int64{}}
 }
 
 func (s *daemonControlService) EnrollDaemon(
@@ -146,7 +158,7 @@ func (s *daemonControlService) SyncDaemon(
 	}, nil
 }
 
-// SignHostCertificate signs the daemon's host key for its own target, under the CA that target uses.
+// SignHostCertificate signs the daemon's host key for its own target.
 func (s *daemonControlService) SignHostCertificate(
 	ctx context.Context,
 	req *nokkuv1.SignHostCertificateRequest,
@@ -156,7 +168,7 @@ func (s *daemonControlService) SignHostCertificate(
 	var signer gossh.Signer
 	var target *db.Target
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if ca, err = q.GetCAByDaemonID(ctx, &daemonID); err != nil {
+		if ca, err = q.GetWorkspaceCA(ctx); err != nil {
 			return err
 		}
 		if signer, err = ssh.CASigner(ctx, q, s.cfg.Keyset, ca.ID, gossh.HostCert); err != nil {
@@ -175,6 +187,7 @@ func (s *daemonControlService) SignHostCertificate(
 		"nokku:provision:daemon:"+daemonID,
 		0,
 		gossh.HostCert,
+		ssh.Limits{},
 	)
 	if err != nil {
 		return nil, err
@@ -232,6 +245,10 @@ func (s *daemonControlService) UploadRecording(
 		return nil, fmt.Errorf("start recording %s: %w", rec.ID, err)
 	}
 
+	workspaceID := actor.WorkspaceIDFromContext(ctx)
+	var held int64
+	defer func() { s.releaseUploadMemory(workspaceID, held) }()
+
 	msgs, recvErr := receiveApart(ctx, stream)
 	var size int64
 	var final *nokkuv1.RecordingFinal
@@ -260,6 +277,11 @@ receive:
 			if size+int64(len(data)) > maxUploadBytes {
 				// The daemon keeps a refused file and stops sending it until its next start.
 				ended = newError(connect.CodeInvalidArgument, "recording is too large, the rest is cut")
+				break receive
+			}
+			var ok bool
+			if held, ok = s.holdUploadMemory(workspaceID, held, int64(len(data))); !ok {
+				ended = errTooManyUploads
 				break receive
 			}
 			if err := w.WriteChunk(data); err != nil {
@@ -322,6 +344,32 @@ func (s *daemonControlService) takeUploadSlot(daemonID string) (release func(), 
 			delete(s.uploads, daemonID)
 		}
 	}, true
+}
+
+// holdUploadMemory counts n more bytes of an upload holding held so far, against the core and, on the hosted service,
+// the workspace. It returns what the upload holds now.
+func (s *daemonControlService) holdUploadMemory(workspaceID string, held, n int64) (int64, bool) {
+	n = min(n, maxUploadMemory-held)
+	if n <= 0 {
+		return held, true
+	}
+	s.uploadsMu.Lock()
+	defer s.uploadsMu.Unlock()
+	if s.heldTotal+n > maxCoreUploadMemory || (s.cfg.SaaS && s.held[workspaceID]+n > maxWorkspaceUploadMemory) {
+		return held, false
+	}
+	s.heldTotal += n
+	s.held[workspaceID] += n
+	return held + n, true
+}
+
+func (s *daemonControlService) releaseUploadMemory(workspaceID string, n int64) {
+	s.uploadsMu.Lock()
+	defer s.uploadsMu.Unlock()
+	s.heldTotal -= n
+	if s.held[workspaceID] -= n; s.held[workspaceID] == 0 {
+		delete(s.held, workspaceID)
+	}
 }
 
 // receiveApart runs Receive on its own, Receive does not watch ctx. A deploy ends ctx, and must not wait out its
@@ -487,6 +535,9 @@ func (s *daemonControlService) UnenrollDaemon(
 ) (*nokkuv1.UnenrollDaemonResponse, error) {
 	daemonID := actor.DaemonIDFromContext(ctx)
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		if err := q.QuietStateChange(ctx); err != nil {
+			return err
+		}
 		if _, err := q.DeleteDaemon(ctx, daemonID); err != nil {
 			return err
 		}

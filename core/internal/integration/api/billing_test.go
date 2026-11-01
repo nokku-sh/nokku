@@ -37,6 +37,7 @@ func issueLicense(t *testing.T, plan string) (pubHex, key string) {
 
 // The real queries: the key lands in the database, applies at once, and a restart finds it.
 func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
+	selfHostedOnly(t, "the hosted service has no license")
 	cfg, _ := newTestAPI(t)
 	ctx := t.Context()
 
@@ -47,7 +48,7 @@ func TestActivateLicense_AppliesWithoutRestart(t *testing.T) {
 	var err error
 	local.Entitlements, err = entitlement.New(ctx, cfg.Conn, pubHex, modeSelfHosted)
 	require.NoError(t, err)
-	srv := httptest.NewServer(api.New(&local).Handler(ctx))
+	srv := httptest.NewServer(serving(api.New(&local).Handler(ctx)))
 	t.Cleanup(srv.Close)
 	owner := seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
 	sut := nokkuv1connect.NewBillingServiceClient(

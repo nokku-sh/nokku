@@ -12,13 +12,6 @@ func (s *Service) ListCredentials(ctx context.Context) ([]*db.Credential, error)
 	return s.conn.Tenant().ListUserCredentials(ctx, actor.UserIDFromContext(ctx))
 }
 
-func (s *Service) ListCredentialsByType(ctx context.Context, typ Method) ([]*db.Credential, error) {
-	return s.conn.Tenant().ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-		UserID: actor.UserIDFromContext(ctx),
-		Type:   string(typ),
-	})
-}
-
 func (s *Service) RenameCredential(ctx context.Context, id, label string) error {
 	return s.conn.Tenant().RenameCredential(ctx, &db.RenameCredentialParams{
 		UserID: actor.UserIDFromContext(ctx),

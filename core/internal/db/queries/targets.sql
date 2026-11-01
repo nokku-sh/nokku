@@ -1,8 +1,6 @@
 -- name: CreateTarget :one
--- No CA means the workspace default.
 INSERT INTO
   targets (
-    ca_id,
     name,
     description,
     endpoints,
@@ -12,18 +10,6 @@ INSERT INTO
   )
 VALUES
   (
-    COALESCE(
-      sqlc.narg('ca_id')::UUID,
-      (
-        SELECT
-          id
-        FROM
-          ssh_cas
-        WHERE
-          workspace_id = current_workspace_id ()
-          AND is_default
-      )
-    ),
     @name,
     @description,
     @endpoints,
@@ -59,10 +45,6 @@ WHERE
     OR t.daemon_id = sqlc.narg('daemon_id')::UUID
   )
   AND (
-    sqlc.narg('ca_id')::UUID IS NULL
-    OR t.ca_id = sqlc.narg('ca_id')::UUID
-  )
-  AND (
     sqlc.narg('accounts')::TEXT[] IS NULL
     OR EXISTS (
       SELECT
@@ -88,7 +70,6 @@ OFFSET
 -- name: UpdateTarget :one
 UPDATE targets
 SET
-  ca_id = COALESCE(sqlc.narg('ca_id'), ca_id),
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
   endpoints = COALESCE(sqlc.narg('endpoints'), endpoints),

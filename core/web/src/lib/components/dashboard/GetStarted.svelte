@@ -132,8 +132,8 @@
 				{#if connected}
 					{left} of 4 steps left.
 				{:else}
-					Four steps, most of them one command. {workspace} already has a default CA, so every login is
-					a short-lived certificate from day one.
+					Four steps, most of them one command. {workspace} already has its CA, so every login is a short-lived
+					certificate from day one.
 				{/if}
 			</Card.Description>
 			{#if connected}

@@ -74,6 +74,9 @@ sql:
               pointer: true
 
           # JSON overrides
+          - column: "service_account_federations.claims"
+            go_type:
+              type: "map[string]string"
           - column: "daemons.config"
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"

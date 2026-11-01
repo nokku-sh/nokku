@@ -20,6 +20,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/egress"
 	"github.com/nokku-sh/nokku/core/web"
 )
 
@@ -40,6 +41,10 @@ func New(cfg *config.Config) *Server {
 
 func (s *Server) Start(ctx context.Context) error {
 	if s.cfg.SaaS {
+		// Here and not in config.New, the hosted API tests boot through that and reach their issuers on loopback.
+		if err := egress.CheckHosted(); err != nil {
+			return err
+		}
 		go runLifecycle(ctx, s.cfg)
 	}
 
@@ -233,7 +238,6 @@ func (s *Server) registerServices(ctx context.Context) {
 	registerAuthRoutes(s.mux, s.cfg)
 
 	protec := chain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
-	s.mux.Handle("GET /avatars/{id}", protec(serveAvatar(s.cfg)))
 
 	terminal := &terminalHandler{cfg: s.cfg, tickets: tickets}
 	s.mux.Handle("GET /terminal/ws", protec(func(w http.ResponseWriter, r *http.Request) {

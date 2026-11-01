@@ -78,7 +78,7 @@ func testDomain() string {
 	return strings.ReplaceAll(uuid.NewV7().String(), "-", "") + ".test"
 }
 
-// workspace is a fresh tenant with its default CA, served at testBaseURL.
+// workspace is a fresh tenant with its CA, served at testBaseURL.
 func (e *testEnv) workspace(t *testing.T) actor.Workspace {
 	t.Helper()
 	slug := "w" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[:12]

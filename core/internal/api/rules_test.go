@@ -11,7 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
+
 	"google.golang.org/protobuf/reflect/protoregistry"
+
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
@@ -51,9 +55,6 @@ var conditionalFeatures = []string{
 	entitlement.FeatureAccessRequests, entitlement.FeatureAuditStreaming,
 }
 
-// featuresFreeInAllPlans need no gate. Making one paid means declaring it on its calls in the same change.
-var featuresFreeInAllPlans = []string{entitlement.FeatureOIDC}
-
 // A paid feature that no call enforces is revenue leakage, a gate on a feature no plan has is dead weight.
 func TestEveryFeatureIsGated(t *testing.T) {
 	gated := slices.Clone(conditionalFeatures)
@@ -63,7 +64,7 @@ func TestEveryFeatureIsGated(t *testing.T) {
 		}
 	}
 	for _, f := range entitlement.CatalogFeatures {
-		if !slices.Contains(gated, f.Code) && !slices.Contains(featuresFreeInAllPlans, f.Code) {
+		if !slices.Contains(gated, f.Code) {
 			t.Errorf("feature %q is gated nowhere: declare it on a call, or list it as free", f.Code)
 		}
 	}
@@ -83,6 +84,32 @@ func TestEveryTokenCallIsFresh(t *testing.T) {
 			t.Errorf("%s hands out a credential, mark it fresh", procedure)
 		}
 	}
+}
+
+// A stolen session must not quietly change who can sign in or where the audit log goes.
+func TestSignInAndAuditChangesAreFresh(t *testing.T) {
+	for _, procedure := range []string{
+		nokkuv1connect.SSOServicePutSSOProviderProcedure,
+		nokkuv1connect.SSOServiceDeleteSSOProviderProcedure,
+		nokkuv1connect.AuditStreamServiceCreateAuditStreamProcedure,
+		nokkuv1connect.AuditStreamServiceUpdateAuditStreamProcedure,
+		nokkuv1connect.AuditStreamServiceDeleteAuditStreamProcedure,
+		nokkuv1connect.WorkspaceServiceTransferOwnershipProcedure,
+		nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure,
+	} {
+		assert.True(t, procedureAccess[procedure].GetFresh(), "%s needs a recent sign-in", procedure)
+	}
+}
+
+func TestRequestedFresh(t *testing.T) {
+	update := func(s *nokkuv1.WorkspaceSettings) *nokkuv1.UpdateWorkspaceRequest {
+		return &nokkuv1.UpdateWorkspaceRequest{Name: new("renamed"), Settings: s}
+	}
+	assert.True(t, requestedFresh(update(&nokkuv1.WorkspaceSettings{EnforceSso: new(true)})), "turning SSO on")
+	assert.True(t, requestedFresh(update(&nokkuv1.WorkspaceSettings{EnforceSso: new(false)})), "turning SSO off")
+	assert.False(t, requestedFresh(update(nil)), "a rename stays free")
+	assert.False(t, requestedFresh(update(&nokkuv1.WorkspaceSettings{})), "other settings stay free")
+	assert.False(t, requestedFresh(&nokkuv1.GetVersionRequest{}), "another call")
 }
 
 // uncappedCreates have their bound somewhere else, with the place named.

@@ -25,7 +25,6 @@
 	import {
 		Bot,
 		CircleUser,
-		IdCard,
 		Moon,
 		Rocket,
 		Server,
@@ -108,13 +107,6 @@
 				fresh: true,
 				show: can.edit,
 				keywords: 'api ci automation'
-			},
-			{
-				title: 'Create CA',
-				icon: IdCard,
-				url: '/certificates?new=1',
-				show: can.edit,
-				keywords: 'certificate authority'
 			},
 			{
 				title: mode.current === 'dark' ? 'Switch to light mode' : 'Switch to dark mode',

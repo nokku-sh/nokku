@@ -27,7 +27,9 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/dpop"
+	nklogin "github.com/nokku-sh/nokku/internal/login"
 
+	"github.com/nokku-sh/nokku/core/internal/access"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
@@ -37,12 +39,22 @@ import (
 // dpopProof signs like nokkud. Session proofs carry the access token hash, the enrollment proof has no token yet.
 func dpopProof(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey, procedure, token string) string {
 	t.Helper()
+	return dpopProofWithNonce(t, cfg, key, procedure, token, cfg.IAM.DPoP.CurrentNonce())
+}
+
+func dpopProofWithNonce(
+	t *testing.T,
+	_ *config.Config,
+	key *ecdsa.PrivateKey,
+	procedure, token, nonce string,
+) string {
+	t.Helper()
 	claims := map[string]any{
 		"htm":   http.MethodPost,
-		"htu":   cfg.FullURL() + procedure,
+		"htu":   testWorkspace.BaseURL + procedure,
 		"iat":   time.Now().Unix(),
 		"jti":   rand.Text(),
-		"nonce": cfg.IAM.DPoP.CurrentNonce(),
+		"nonce": nonce,
 	}
 	if token != "" {
 		claims["ath"] = dpop.ATH(token)
@@ -166,13 +178,6 @@ func TestCreateSession(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 
-	// Enrollment falls back to the default CA, which CreateSession needs.
-	_, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
-		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-			Name:      new(uniq("default")),
-			IsDefault: new(true),
-		})
-	require.NoError(t, err)
 	created, err := nokkuv1connect.NewJoinTokenServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
 		CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
 			AutoApprove: new(true),
@@ -256,22 +261,17 @@ func TestCreateSession(t *testing.T) {
 	})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "another account on the host, got %v", err)
 
-	// The target's CA signs the sshtest server's host certificate and admits the member's cert.
+	// The workspace CA signs the sshtest server's host certificate and admits the member's cert.
 	var user, host gossh.Signer
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
-		params := ssh.NewCA()
-		params.Name = "sshtest"
-		row, err := ssh.CreateCA(t.Context(), q, cfg.Keyset, params)
+		row, err := q.GetWorkspaceCA(t.Context())
 		if err != nil {
 			return err
 		}
 		if user, err = ssh.CASigner(t.Context(), q, cfg.Keyset, row.ID, gossh.UserCert); err != nil {
 			return err
 		}
-		if host, err = ssh.CASigner(t.Context(), q, cfg.Keyset, row.ID, gossh.HostCert); err != nil {
-			return err
-		}
-		_, err = q.UpdateTarget(t.Context(), &db.UpdateTargetParams{TargetID: enrolled.GetTargetId(), CaID: &row.ID})
+		host, err = ssh.CASigner(t.Context(), q, cfg.Keyset, row.ID, gossh.HostCert)
 		return err
 	})
 	sshd := sshtest.NewServerSignedBy(t, enrolled.GetTargetId(), memberPrincipal.ID, user, host)
@@ -286,7 +286,7 @@ func TestCreateSession(t *testing.T) {
 			srv.URL+"/terminal/ws?session_id="+res.GetSession().GetSessionId(),
 			&websocket.DialOptions{
 				HTTPClient: srv.Client(),
-				HTTPHeader: http.Header{"Cookie": {"nokku_session=" + memberToken}},
+				HTTPHeader: http.Header{"Cookie": {sessionCookie + "=" + memberToken}},
 			},
 		)
 		require.NoError(t, err)
@@ -396,7 +396,7 @@ func TestCreateSession(t *testing.T) {
 	_, res, err := websocket.Dial(t.Context(), srv.URL+"/terminal/ws?session_id="+sessionID,
 		&websocket.DialOptions{
 			HTTPClient: srv.Client(),
-			HTTPHeader: http.Header{"Cookie": {"nokku_session=" + memberToken}},
+			HTTPHeader: http.Header{"Cookie": {sessionCookie + "=" + memberToken}},
 		})
 	require.Error(t, err, "a ticket opens one socket")
 	assert.Equal(t, http.StatusNotFound, res.StatusCode)
@@ -508,79 +508,219 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, synced.GetStatus())
 
-	_, err = sync()
-	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the session outlived the daemon, got %v", err)
-}
-
-// seedDefaultCA gives the workspace the CA an enrollment falls back to.
-func seedDefaultCA(
-	t *testing.T,
-	srv *httptest.Server,
-	adminAuth connect.ClientInterceptor,
-) *nokkuv1.CertificateAuthority {
-	t.Helper()
-	created, err := nokkuv1connect.NewCertificateServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)).
-		CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-			Name:      new(uniq("default")),
-			IsDefault: new(true),
-		})
+	// That answer can get lost, and a host that never hears it keeps serving its cache.
+	synced, err = sync()
 	require.NoError(t, err)
-	return created.GetCertificateAuthority()
+	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, synced.GetStatus(), "the answer was only there once")
+
+	_, err = nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL),
+		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure))).
+		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "the token did more than hear REJECTED: %v", err)
 }
 
-// An enrollment that names no CA gets the workspace default, wherever the default is at the time.
-func TestEnrollFallsBackToDefaultCA(t *testing.T) {
+// A sync that keeps failing only shows in the host's log, so the core has to notice from the heartbeat.
+func TestDaemonThatFallsBehindShows(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header(
-		"Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	token := enrolled.GetAccessToken()
+	ctx, call := connect.NewClientContext(t.Context())
+	call.RequestHeader().Set("Authorization", "DPoP "+token)
+	call.RequestHeader().Set("DPoP", dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceConnectProcedure, token))
+	stream, err := nokkuv1connect.NewDaemonControlServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
+	).Connect(ctx)
+	require.NoError(t, err)
+	go func() {
+		for {
+			if _, err := stream.Receive(); err != nil {
+				return
+			}
+		}
+	}()
+	heartbeat := func(applied int64) {
+		t.Helper()
+		require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
+			Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{StateVersion: &applied}},
+		}))
+	}
+	behind := func() bool {
+		return !cfg.Pool.BehindSince(enrolled.GetId()).IsZero()
+	}
+
+	// The first one tells the core what the daemon had time to reach by the next.
+	heartbeat(0)
+	require.Eventually(
+		t,
+		func() bool { return cfg.Pool.IsConnected(enrolled.GetId()) },
+		time.Second,
+		5*time.Millisecond,
 	)
-	certs := nokkuv1connect.NewCertificateServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
+	heartbeat(0)
+	require.Eventually(t, behind, 2*time.Second, 5*time.Millisecond, "a daemon stuck on an old version did not show")
+
+	daemons := nokkuv1connect.NewDaemonServiceClient(connect.NewClient(
+		connecthttp.NewTransport(srv.Client(), srv.URL),
+		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)),
+	))
+	got, err := daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(enrolled.GetId())})
+	require.NoError(t, err)
+	assert.NotNil(t, got.GetDaemon().GetBehindSince(), "the console can't see it")
+
+	var events []*db.ListAuditLogsRow
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
+		events, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+			Actions: []string{"DaemonBehind"}, Target: new(enrolled.GetId()), Limit: 10,
+		})
+		return err
+	})
+	assert.Len(t, events, 1, "falling behind is audited once")
+
+	var current int64
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
+		current, err = q.GetWorkspaceStateVersion(t.Context(), workspaceID)
+		return err
+	})
+	heartbeat(current)
+	require.Eventually(
+		t,
+		func() bool { return !behind() },
+		2*time.Second,
+		5*time.Millisecond,
+		"catching up did not clear it",
 	)
-	create := func(name string, isDefault bool) string {
-		res, err := certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-			Name:      new(uniq(name)),
-			IsDefault: new(isDefault),
+}
+
+// holdControlStream keeps a daemon's stream open like nokkud does. Each StateUpdate lands on the channel, and one
+// that is still waiting covers the next, the same as on the core.
+func holdControlStream(
+	t *testing.T,
+	cfg *config.Config,
+	srv *httptest.Server,
+	key *ecdsa.PrivateKey,
+	token string,
+) <-chan struct{} {
+	t.Helper()
+	ctx, call := connect.NewClientContext(t.Context())
+	call.RequestHeader().Set("Authorization", "DPoP "+token)
+	call.RequestHeader().Set("DPoP",
+		dpopProof(t, cfg, key, nokkuv1connect.DaemonControlServiceConnectProcedure, token))
+	stream, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL))).
+		Connect(ctx)
+	require.NoError(t, err)
+	updates := make(chan struct{}, 1)
+	go func() {
+		for {
+			msg, err := stream.Receive()
+			if err != nil {
+				return
+			}
+			if msg.GetStateUpdate() == nil {
+				continue
+			}
+			select {
+			case updates <- struct{}{}:
+			default:
+			}
+		}
+	}()
+	// A heartbeat with no version is out of date, so the update it earns shows the core holds the stream.
+	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
+		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
+	}))
+	require.True(t, woken(t, updates), "the core never answered the first heartbeat")
+	return updates
+}
+
+func woken(t *testing.T, updates <-chan struct{}) bool {
+	t.Helper()
+	return assert.Eventually(t, func() bool {
+		select {
+		case <-updates:
+			return true
+		default:
+			return false
+		}
+	}, 5*time.Second, 10*time.Millisecond, "no StateUpdate reached the daemon")
+}
+
+// One call takes a person off every server in a single transaction, and bump_state_version runs once per transaction.
+// So one bump and one notification have to reach every daemon, not only the one that owns the first deleted grant.
+func TestRevokeAllAccessReachesEveryServer(t *testing.T) {
+	n := newNKSync(t)
+	cfg, srv := n.cfg, n.srv
+	workspaceID := seedWorkspace(t, cfg)
+	revoked := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	kept := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+
+	type server struct {
+		key      *ecdsa.PrivateKey
+		enrolled *nokkuv1.EnrollDaemonResponse
+		updates  <-chan struct{}
+	}
+	servers := make([]*server, 3)
+	for i := range servers {
+		key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+		account, err := n.accounts.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
+			TargetId: new(enrolled.GetTargetId()),
+			Username: new("root"),
 		})
 		require.NoError(t, err)
-		return res.GetCertificateAuthority().GetId()
+		n.grant(t, account.GetAccount().GetId(), revoked.ID)
+		n.grant(t, account.GetAccount().GetId(), kept.ID)
+		servers[i] = &server{key: key, enrolled: enrolled}
 	}
-	enrolledCA := func() string {
-		_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
-		target, err := cfg.Conn.Sys().GetTarget(t.Context(), enrolled.GetTargetId())
+	sync := func(s *server) *nokkuv1.SyncDaemonResponse {
+		res, err := nokkuv1connect.NewDaemonControlServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), daemonAuth(t, cfg, s.key, s.enrolled.GetAccessToken(), nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))).
+			SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 		require.NoError(t, err)
-		return target.CaID
+		return res
+	}
+	principal := func(s *server, u *db.User) string {
+		return nklogin.Principal(u.ID, s.enrolled.GetTargetId(), "root")
+	}
+	version := func() int64 {
+		v, err := cfg.Conn.Sys().GetWorkspaceStateVersion(t.Context(), workspaceID)
+		require.NoError(t, err)
+		return v
 	}
 
-	create("plain", false)
-	first := create("first", true)
-	assert.Equal(t, first, enrolledCA(), "the default, not the newest")
+	// The expire loop would bump the version over an expired grant another test left, so that goes first.
+	require.NoError(t, access.Expire(t.Context(), cfg.Conn, cfg.Audit.Append))
+	before := version()
+	for _, s := range servers {
+		synced := sync(s)
+		require.Equal(t, before, synced.GetStateVersion(), "the daemon must start out up to date")
+		require.Len(t, synced.GetPrincipals(), 1)
+		require.ElementsMatch(t, []string{principal(s, revoked), principal(s, kept)},
+			synced.GetPrincipals()[0].GetCertPrincipals(), "both people must be on the server before the revoke")
+		s.updates = holdControlStream(t, cfg, srv, s.key, s.enrolled.GetAccessToken())
+	}
 
-	// Making another CA the default moves it. The partial unique index refuses two defaults.
-	second := create("second", true)
-	assert.Equal(t, second, enrolledCA(), "the new default")
-	listed, err := certs.ListCertificateAuthorities(t.Context(), &nokkuv1.ListCertificateAuthoritiesRequest{})
+	_, err := n.accounts.RevokeAllAccess(t.Context(), &nokkuv1.RevokeAllAccessRequest{
+		SubjectId: &revoked.ID,
+		Kind:      nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
+	})
 	require.NoError(t, err)
-	var defaults []string
-	for _, ca := range listed.GetCertificateAuthorities() {
-		if ca.GetIsDefault() {
-			defaults = append(defaults, ca.GetId())
-		}
+	after := version()
+	assert.Equal(t, before+1, after, "one transaction bumps once, however many servers its grants were on")
+
+	for i, s := range servers {
+		assert.True(t, woken(t, s.updates), "daemon %d was not told about the revoke", i)
+		synced := sync(s)
+		assert.Equal(t, after, synced.GetStateVersion(), "daemon %d must see the one bump", i)
+		require.Len(t, synced.GetPrincipals(), 1, "daemon %d lost the account of the person who stays", i)
+		assert.Equal(t, []string{principal(s, kept)}, synced.GetPrincipals()[0].GetCertPrincipals(),
+			"daemon %d must drop the revoked person and keep the other one", i)
 	}
-	assert.Equal(t, []string{second}, defaults, "one default")
 }
 
 // The report is a hint from the host. What does not parse is dropped, so one odd account never blocks a sync.
 func TestSyncDaemonReport(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header(
-		"Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
-	)
-	ca := seedDefaultCA(t, srv, adminAuth)
+	ca := workspaceCA(t, cfg)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	token := enrolled.GetAccessToken()
 
@@ -621,11 +761,7 @@ func TestSyncDaemonReport(t *testing.T) {
 func TestSignHostCertificate(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header(
-		"Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
-	)
-	caKey := seedDefaultCA(t, srv, adminAuth).GetHostPublicKey()
+	caKey := workspaceCA(t, cfg).GetHostPublicKey()
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 
 	hostKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

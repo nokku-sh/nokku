@@ -74,3 +74,34 @@ func TestLoadCacheLeavesOutAnotherServer(t *testing.T) {
 	require.NoError(t, old.LoadCache())
 	assert.True(t, old.HasCachedData(), "a snapshot from before the field existed keeps ssh working offline")
 }
+
+// Only a session from nk login --ci counts. A snapshot NK_TOKEN left behind must not lock a person out of the browser.
+func TestCIJob(t *testing.T) {
+	account := &ServiceAccount{ID: "sa", Name: "deploy"}
+	tests := []struct {
+		name  string
+		state State
+		want  bool
+	}{
+		{"a job's session", State{SessionToken: "s", ServiceAccount: account}, true},
+		{
+			"a job's session that expired",
+			State{
+				SessionToken: "s", SessionExpiresAt: time.Now().Add(-time.Hour),
+				ServiceAccount: account,
+			},
+			true,
+		},
+		{"a snapshot NK_TOKEN left behind", State{ServiceAccount: account}, false},
+		{"NK_TOKEN set", State{Token: "k", ServiceAccount: account}, false},
+		{"a person", State{SessionToken: "s", User: &User{ID: "u"}}, false},
+		{"nobody", State{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.state.CIJob(); got != tt.want {
+				t.Errorf("CIJob() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

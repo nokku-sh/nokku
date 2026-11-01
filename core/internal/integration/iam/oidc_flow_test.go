@@ -19,9 +19,12 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/go-jose/go-jose/v4"
 	"github.com/oauth2-proxy/mockoidc"
 
+	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
@@ -405,6 +408,32 @@ func TestOIDCFlowMissingEmailVerifiedLinksOnlyWhenTrusted(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A provider may give a leaver's address to someone new, with a new subject. That person must not land on the account.
+func TestOIDCFlowRefusesASecondSubjectOnAnAccount(t *testing.T) {
+	h := newOIDCIdP(t)
+	e, svc := h.setup(t, true)
+	h.user()
+	leaver := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+	e.putCredential(t, h.org.ws, db.UpsertCredentialParams{
+		ID:       "old",
+		UserID:   leaver.ID,
+		Type:     string(iam.MethodOIDC),
+		Provider: testProviderID,
+		Subject:  "the-leaver",
+		Data:     []byte{},
+	})
+
+	rec := h.runOIDCFlow(t, svc, "")
+	wantSSOFailure(t, rec)
+	assert.Contains(t, rec.Header().Get("Location"), "identity+linked", "the reason did not reach the error page")
+	assert.Nil(
+		t,
+		e.oidcCredential(t, h.org.ws, testProviderID, oidcTestSubject),
+		"a second subject landed on the account",
+	)
+	assert.Zero(t, e.sessions(t, h.org.ws, leaver.ID), "the new subject got a session of the old account")
 }
 
 // Whoever picks their own address at the provider must not become the owner.

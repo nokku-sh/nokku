@@ -50,8 +50,6 @@ type Session struct {
 	close func()
 }
 
-func (s *Session) DaemonID() string { return s.daemonID }
-
 // Stdout is closed when the session ends.
 func (s *Session) Stdout() <-chan []byte { return s.term.Stdout() }
 
@@ -168,6 +166,7 @@ func mintSessionCert(ca *db.SSHCA, caSigner ssh.Signer, principal, sessionID str
 		login.WebSessionKeyIDPrefix+sessionID,
 		sessionCertTTL,
 		ssh.UserCert,
+		nokkussh.Limits{SourceAddress: ca.SourceAddress},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("sign session certificate: %w", err)
@@ -177,12 +176,6 @@ func mintSessionCert(ca *db.SSHCA, caSigner ssh.Signer, principal, sessionID str
 		return nil, fmt.Errorf("session signer: %w", err)
 	}
 	return ssh.NewCertSigner(cert, base)
-}
-
-func (p *Pool) GetSession(sessionID string) *Session {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.sessions[sessionID]
 }
 
 // SessionDaemons names the daemons with a browser terminal open on this server, in every workspace.

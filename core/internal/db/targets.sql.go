@@ -12,7 +12,6 @@ import (
 const createTarget = `-- name: CreateTarget :one
 INSERT INTO
   targets (
-    ca_id,
     name,
     description,
     endpoints,
@@ -22,31 +21,18 @@ INSERT INTO
   )
 VALUES
   (
-    COALESCE(
-      $1::UUID,
-      (
-        SELECT
-          id
-        FROM
-          ssh_cas
-        WHERE
-          workspace_id = current_workspace_id ()
-          AND is_default
-      )
-    ),
+    $1,
     $2,
     $3,
-    $4,
-    COALESCE($5::TEXT[], '{}'),
-    COALESCE($6::JSONB, '{}'),
-    $7
+    COALESCE($4::TEXT[], '{}'),
+    COALESCE($5::JSONB, '{}'),
+    $6
   )
 RETURNING
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
 `
 
 type CreateTargetParams struct {
-	CaID          *string  `json:"caId"`
 	Name          string   `json:"name"`
 	Description   *string  `json:"description"`
 	Endpoints     []string `json:"endpoints"`
@@ -55,10 +41,8 @@ type CreateTargetParams struct {
 	HostPublicKey *string  `json:"hostPublicKey"`
 }
 
-// No CA means the workspace default.
 func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error) {
 	row := q.db.QueryRow(ctx, createTarget,
-		arg.CaID,
 		arg.Name,
 		arg.Description,
 		arg.Endpoints,
@@ -70,7 +54,6 @@ func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*T
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.CaID,
 		&i.DaemonID,
 		&i.Name,
 		&i.Description,
@@ -90,7 +73,7 @@ DELETE FROM targets
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
 `
 
 func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, error) {
@@ -99,7 +82,6 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.CaID,
 		&i.DaemonID,
 		&i.Name,
 		&i.Description,
@@ -116,7 +98,7 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 
 const getTarget = `-- name: GetTarget :one
 SELECT
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
 FROM
   targets
 WHERE
@@ -129,7 +111,6 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.CaID,
 		&i.DaemonID,
 		&i.Name,
 		&i.Description,
@@ -146,7 +127,7 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 
 const getTargetsBySubject = `-- name: GetTargetsBySubject :many
 SELECT
-  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_at, t.updated_at
+  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_at, t.updated_at
 FROM
   targets t
 WHERE
@@ -183,7 +164,6 @@ func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
-			&i.CaID,
 			&i.DaemonID,
 			&i.Name,
 			&i.Description,
@@ -265,7 +245,7 @@ func (q *Queries) GetWorkspaceTags(ctx context.Context) ([]string, error) {
 
 const listTargets = `-- name: ListTargets :many
 SELECT
-  t.id, t.workspace_id, t.ca_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_at, t.updated_at,
+  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_at, t.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
@@ -280,11 +260,7 @@ WHERE
     OR t.daemon_id = $2::UUID
   )
   AND (
-    $3::UUID IS NULL
-    OR t.ca_id = $3::UUID
-  )
-  AND (
-    $4::TEXT[] IS NULL
+    $3::TEXT[] IS NULL
     OR EXISTS (
       SELECT
         1
@@ -292,25 +268,24 @@ WHERE
         target_accounts p
       WHERE
         p.target_id = t.id
-        AND p.username = ANY ($4::TEXT[])
+        AND p.username = ANY ($3::TEXT[])
     )
   )
   AND (
-    $5::TEXT[] IS NULL
-    OR t.tags @> $5::TEXT[]
+    $4::TEXT[] IS NULL
+    OR t.tags @> $4::TEXT[]
   )
 ORDER BY
   t.id ASC
 LIMIT
-  $7
-OFFSET
   $6
+OFFSET
+  $5
 `
 
 type ListTargetsParams struct {
 	Query    *string  `json:"query"`
 	DaemonID *string  `json:"daemonId"`
-	CaID     *string  `json:"caId"`
 	Accounts []string `json:"accounts"`
 	Tags     []string `json:"tags"`
 	Offset   *int32   `json:"offset"`
@@ -326,7 +301,6 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 	rows, err := q.db.Query(ctx, listTargets,
 		arg.Query,
 		arg.DaemonID,
-		arg.CaID,
 		arg.Accounts,
 		arg.Tags,
 		arg.Offset,
@@ -342,7 +316,6 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 		if err := rows.Scan(
 			&i.Target.ID,
 			&i.Target.WorkspaceID,
-			&i.Target.CaID,
 			&i.Target.DaemonID,
 			&i.Target.Name,
 			&i.Target.Description,
@@ -408,22 +381,20 @@ func (q *Queries) TouchTargetSync(ctx context.Context, targetID string) error {
 const updateTarget = `-- name: UpdateTarget :one
 UPDATE targets
 SET
-  ca_id = COALESCE($1, ca_id),
-  name = COALESCE($2, name),
-  description = COALESCE($3, description),
-  endpoints = COALESCE($4, endpoints),
-  tags = COALESCE($5, tags),
-  metadata = COALESCE($6, metadata),
-  host_public_key = COALESCE($7, host_public_key),
+  name = COALESCE($1, name),
+  description = COALESCE($2, description),
+  endpoints = COALESCE($3, endpoints),
+  tags = COALESCE($4, tags),
+  metadata = COALESCE($5, metadata),
+  host_public_key = COALESCE($6, host_public_key),
   updated_at = NOW()
 WHERE
-  id = $8
+  id = $7
 RETURNING
-  id, workspace_id, ca_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
 `
 
 type UpdateTargetParams struct {
-	CaID          *string  `json:"caId"`
 	Name          *string  `json:"name"`
 	Description   *string  `json:"description"`
 	Endpoints     []string `json:"endpoints"`
@@ -435,7 +406,6 @@ type UpdateTargetParams struct {
 
 func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error) {
 	row := q.db.QueryRow(ctx, updateTarget,
-		arg.CaID,
 		arg.Name,
 		arg.Description,
 		arg.Endpoints,
@@ -448,7 +418,6 @@ func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*T
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.CaID,
 		&i.DaemonID,
 		&i.Name,
 		&i.Description,

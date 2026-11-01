@@ -44,6 +44,12 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	var targetID string
 	err := conn.TenantTx(ctx, func(q *db.Queries) error {
 		daemon, err := q.GetDaemon(ctx, in.DaemonID)
+		// A deleted daemon still serves its cached principals. REJECTED makes the host drop them. Its token stays until
+		// it expires, an answer that got lost must be there on the next try, and nothing else takes that token.
+		if errors.Is(err, pgx.ErrNoRows) {
+			res.Status = new(nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -76,7 +82,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		}
 		targetID = target.ID
 
-		ca, err := q.GetDaemonCAKeys(ctx, &daemon.ID)
+		ca, err := q.GetWorkspaceCA(ctx)
 		if err != nil {
 			return err
 		}
@@ -108,16 +114,6 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 
 		return nil
 	})
-	// A deleted daemon still serves its cached principals. REJECTED makes the host drop them.
-	if errors.Is(err, pgx.ErrNoRows) {
-		if err := conn.TenantTx(ctx, func(q *db.Queries) error {
-			_, err := q.DeleteSubjectTokens(ctx, in.DaemonID)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		return &Synced{Status: new(nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)}, nil
-	}
 	if err != nil {
 		return nil, err
 	}

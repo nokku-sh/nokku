@@ -503,12 +503,12 @@ const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\x18DeleteSSOProviderRequest\x12(\n" +
 	"\vprovider_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +
 	"providerId\"\x1b\n" +
-	"\x19DeleteSSOProviderResponse2\xb7\x02\n" +
+	"\x19DeleteSSOProviderResponse2\xb9\x02\n" +
 	"\n" +
 	"SSOService\x12d\n" +
 	"\x10ListSSOProviders\x12!.nokku.v1.ListSSOProvidersRequest\x1a\".nokku.v1.ListSSOProvidersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12]\n" +
-	"\x0ePutSSOProvider\x12\x1f.nokku.v1.PutSSOProviderRequest\x1a .nokku.v1.PutSSOProviderResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12d\n" +
-	"\x11DeleteSSOProvider\x12\".nokku.v1.DeleteSSOProviderRequest\x1a#.nokku.v1.DeleteSSOProviderResponse\"\x06\xc2\xf3\x18\x02\x18\x05B\x89\x01\n" +
+	"\x0ePutSSOProvider\x12\x1f.nokku.v1.PutSSOProviderRequest\x1a .nokku.v1.PutSSOProviderResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12f\n" +
+	"\x11DeleteSSOProvider\x12\".nokku.v1.DeleteSSOProviderRequest\x1a#.nokku.v1.DeleteSSOProviderResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01B\x89\x01\n" +
 	"\fcom.nokku.v1B\bSsoProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

@@ -71,8 +71,8 @@
 			)}
 			{@render row(
 				'daemons',
-				`${data.daemonsOnline}/${data.daemons - data.pendingDaemons.length} connected${data.pendingDaemons.length ? ` · ${data.pendingDaemons.length} pending` : ''}`,
-				data.offlineDaemons.length ? 'text-terminal-err' : ''
+				`${data.daemonsOnline}/${data.daemons - data.pendingDaemons.length} connected${data.pendingDaemons.length ? ` · ${data.pendingDaemons.length} pending` : ''}${data.daemonsBehind ? ` · ${data.daemonsBehind} behind` : ''}`,
+				data.offlineDaemons.length || data.daemonsBehind ? 'text-terminal-err' : ''
 			)}
 			{@render row(
 				'sessions',

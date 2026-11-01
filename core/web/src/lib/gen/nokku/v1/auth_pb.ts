@@ -5,6 +5,8 @@
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import { file_nokku_v1_access } from "./access_pb";
 import type { User } from "./account_pb";
 import { file_nokku_v1_account } from "./account_pb";
@@ -14,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/auth.proto.
  */
 export const file_nokku_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChNub2trdS92MS9hdXRoLnByb3RvEghub2trdS52MSIxChdSZXF1ZXN0TWFnaWNMaW5rUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASIaChhSZXF1ZXN0TWFnaWNMaW5rUmVzcG9uc2UiMQoXQ29uc3VtZU1hZ2ljTGlua1JlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiOAoYQ29uc3VtZU1hZ2ljTGlua1Jlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5ub2trdS52MS5Vc2VyIg8KDUxvZ291dFJlcXVlc3QiEAoOTG9nb3V0UmVzcG9uc2UiGAoWR2V0TG9naW5PcHRpb25zUmVxdWVzdCKeAQoXR2V0TG9naW5PcHRpb25zUmVzcG9uc2USFgoOd29ya3NwYWNlX25hbWUYASABKAkSEgoKbWFnaWNfbGluaxgCIAEoCBIPCgdwYXNza2V5GAMgASgIEhgKEGVtYWlsX2NvbmZpZ3VyZWQYBCABKAgSLAoJcHJvdmlkZXJzGAUgAygLMhkubm9ra3UudjEuU1NPUHJvdmlkZXJJbmZvIjQKD1NTT1Byb3ZpZGVySW5mbxITCgtwcm92aWRlcl9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIjMKGUNvbmZpcm1FbWFpbENoYW5nZVJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiHAoaQ29uZmlybUVtYWlsQ2hhbmdlUmVzcG9uc2UiMgoYQ2FuY2VsRW1haWxDaGFuZ2VSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABIhsKGUNhbmNlbEVtYWlsQ2hhbmdlUmVzcG9uc2UyygQKC0F1dGhTZXJ2aWNlEmEKEFJlcXVlc3RNYWdpY0xpbmsSIS5ub2trdS52MS5SZXF1ZXN0TWFnaWNMaW5rUmVxdWVzdBoiLm5va2t1LnYxLlJlcXVlc3RNYWdpY0xpbmtSZXNwb25zZSIGwvMYAggBEmEKEENvbnN1bWVNYWdpY0xpbmsSIS5ub2trdS52MS5Db25zdW1lTWFnaWNMaW5rUmVxdWVzdBoiLm5va2t1LnYxLkNvbnN1bWVNYWdpY0xpbmtSZXNwb25zZSIGwvMYAggBEkMKBkxvZ291dBIXLm5va2t1LnYxLkxvZ291dFJlcXVlc3QaGC5ub2trdS52MS5Mb2dvdXRSZXNwb25zZSIGwvMYAggBEmEKD0dldExvZ2luT3B0aW9ucxIgLm5va2t1LnYxLkdldExvZ2luT3B0aW9uc1JlcXVlc3QaIS5ub2trdS52MS5HZXRMb2dpbk9wdGlvbnNSZXNwb25zZSIJkAIBwvMYAggBEmcKEkNvbmZpcm1FbWFpbENoYW5nZRIjLm5va2t1LnYxLkNvbmZpcm1FbWFpbENoYW5nZVJlcXVlc3QaJC5ub2trdS52MS5Db25maXJtRW1haWxDaGFuZ2VSZXNwb25zZSIGwvMYAggBEmQKEUNhbmNlbEVtYWlsQ2hhbmdlEiIubm9ra3UudjEuQ2FuY2VsRW1haWxDaGFuZ2VSZXF1ZXN0GiMubm9ra3UudjEuQ2FuY2VsRW1haWxDaGFuZ2VSZXNwb25zZSIGwvMYAggBQooBCgxjb20ubm9ra3UudjFCCUF1dGhQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_nokku_v1_access, file_nokku_v1_account]);
+  fileDesc("ChNub2trdS92MS9hdXRoLnByb3RvEghub2trdS52MSIxChdSZXF1ZXN0TWFnaWNMaW5rUmVxdWVzdBIWCgVlbWFpbBgBIAEoCUIHukgEcgJgASIaChhSZXF1ZXN0TWFnaWNMaW5rUmVzcG9uc2UiMQoXQ29uc3VtZU1hZ2ljTGlua1JlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiOAoYQ29uc3VtZU1hZ2ljTGlua1Jlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5ub2trdS52MS5Vc2VyIg8KDUxvZ291dFJlcXVlc3QiEAoOTG9nb3V0UmVzcG9uc2UiGAoWR2V0TG9naW5PcHRpb25zUmVxdWVzdCKeAQoXR2V0TG9naW5PcHRpb25zUmVzcG9uc2USFgoOd29ya3NwYWNlX25hbWUYASABKAkSEgoKbWFnaWNfbGluaxgCIAEoCBIPCgdwYXNza2V5GAMgASgIEhgKEGVtYWlsX2NvbmZpZ3VyZWQYBCABKAgSLAoJcHJvdmlkZXJzGAUgAygLMhkubm9ra3UudjEuU1NPUHJvdmlkZXJJbmZvIjQKD1NTT1Byb3ZpZGVySW5mbxITCgtwcm92aWRlcl9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIjMKGUNvbmZpcm1FbWFpbENoYW5nZVJlcXVlc3QSFgoFdG9rZW4YASABKAlCB7pIBHICEAEiHAoaQ29uZmlybUVtYWlsQ2hhbmdlUmVzcG9uc2UiMgoYQ2FuY2VsRW1haWxDaGFuZ2VSZXF1ZXN0EhYKBXRva2VuGAEgASgJQge6SARyAhABIhsKGUNhbmNlbEVtYWlsQ2hhbmdlUmVzcG9uc2UifAocRXhjaGFuZ2VXb3JrbG9hZFRva2VuUmVxdWVzdBJACg9zZXJ2aWNlX2FjY291bnQYASABKAlCJ7pIJHIiEAEYgAIyG15bYS16QS1aMC05XVthLXpBLVowLTktX10qJBIaCgV0b2tlbhgCIAEoCUILukgIcgYQARiAgAEiZQodRXhjaGFuZ2VXb3JrbG9hZFRva2VuUmVzcG9uc2USFAoMYWNjZXNzX3Rva2VuGAEgASgJEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMrwFCgtBdXRoU2VydmljZRJhChBSZXF1ZXN0TWFnaWNMaW5rEiEubm9ra3UudjEuUmVxdWVzdE1hZ2ljTGlua1JlcXVlc3QaIi5ub2trdS52MS5SZXF1ZXN0TWFnaWNMaW5rUmVzcG9uc2UiBsLzGAIIARJhChBDb25zdW1lTWFnaWNMaW5rEiEubm9ra3UudjEuQ29uc3VtZU1hZ2ljTGlua1JlcXVlc3QaIi5ub2trdS52MS5Db25zdW1lTWFnaWNMaW5rUmVzcG9uc2UiBsLzGAIIARJDCgZMb2dvdXQSFy5ub2trdS52MS5Mb2dvdXRSZXF1ZXN0Ghgubm9ra3UudjEuTG9nb3V0UmVzcG9uc2UiBsLzGAIIARJhCg9HZXRMb2dpbk9wdGlvbnMSIC5ub2trdS52MS5HZXRMb2dpbk9wdGlvbnNSZXF1ZXN0GiEubm9ra3UudjEuR2V0TG9naW5PcHRpb25zUmVzcG9uc2UiCZACAcLzGAIIARJnChJDb25maXJtRW1haWxDaGFuZ2USIy5ub2trdS52MS5Db25maXJtRW1haWxDaGFuZ2VSZXF1ZXN0GiQubm9ra3UudjEuQ29uZmlybUVtYWlsQ2hhbmdlUmVzcG9uc2UiBsLzGAIIARJkChFDYW5jZWxFbWFpbENoYW5nZRIiLm5va2t1LnYxLkNhbmNlbEVtYWlsQ2hhbmdlUmVxdWVzdBojLm5va2t1LnYxLkNhbmNlbEVtYWlsQ2hhbmdlUmVzcG9uc2UiBsLzGAIIARJwChVFeGNoYW5nZVdvcmtsb2FkVG9rZW4SJi5ub2trdS52MS5FeGNoYW5nZVdvcmtsb2FkVG9rZW5SZXF1ZXN0Gicubm9ra3UudjEuRXhjaGFuZ2VXb3JrbG9hZFRva2VuUmVzcG9uc2UiBsLzGAIIAUKKAQoMY29tLm5va2t1LnYxQglBdXRoUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account]);
 
 /**
  * @generated from message nokku.v1.RequestMagicLinkRequest
@@ -239,6 +241,52 @@ export const CancelEmailChangeResponseSchema: GenMessage<CancelEmailChangeRespon
   messageDesc(file_nokku_v1_auth, 12);
 
 /**
+ * @generated from message nokku.v1.ExchangeWorkloadTokenRequest
+ */
+export type ExchangeWorkloadTokenRequest = Message<"nokku.v1.ExchangeWorkloadTokenRequest"> & {
+  /**
+   * The name of the account, what a job can know without a call.
+   *
+   * @generated from field: string service_account = 1;
+   */
+  serviceAccount: string;
+
+  /**
+   * @generated from field: string token = 2;
+   */
+  token: string;
+};
+
+/**
+ * Describes the message nokku.v1.ExchangeWorkloadTokenRequest.
+ * Use `create(ExchangeWorkloadTokenRequestSchema)` to create a new message.
+ */
+export const ExchangeWorkloadTokenRequestSchema: GenMessage<ExchangeWorkloadTokenRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_auth, 13);
+
+/**
+ * @generated from message nokku.v1.ExchangeWorkloadTokenResponse
+ */
+export type ExchangeWorkloadTokenResponse = Message<"nokku.v1.ExchangeWorkloadTokenResponse"> & {
+  /**
+   * @generated from field: string access_token = 1;
+   */
+  accessToken: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 2;
+   */
+  expiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.ExchangeWorkloadTokenResponse.
+ * Use `create(ExchangeWorkloadTokenResponseSchema)` to create a new message.
+ */
+export const ExchangeWorkloadTokenResponseSchema: GenMessage<ExchangeWorkloadTokenResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_auth, 14);
+
+/**
  * @generated from service nokku.v1.AuthService
  */
 export const AuthService: GenService<{
@@ -289,6 +337,17 @@ export const AuthService: GenService<{
     methodKind: "unary";
     input: typeof CancelEmailChangeRequestSchema;
     output: typeof CancelEmailChangeResponseSchema;
+  },
+  /**
+   * ExchangeWorkloadToken trades the signed token of a CI job for a short session of a service account. The workspace
+   * comes from the host. The call carries a DPoP proof and the session is bound to its key.
+   *
+   * @generated from rpc nokku.v1.AuthService.ExchangeWorkloadToken
+   */
+  exchangeWorkloadToken: {
+    methodKind: "unary";
+    input: typeof ExchangeWorkloadTokenRequestSchema;
+    output: typeof ExchangeWorkloadTokenResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_auth, 0);

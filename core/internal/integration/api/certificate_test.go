@@ -3,6 +3,7 @@
 package api_test
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
@@ -18,7 +20,9 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+	nklogin "github.com/nokku-sh/nokku/internal/login"
 
+	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -30,7 +34,6 @@ func TestSignSSHCertificate(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	seedDefaultCA(t, srv, adminAuth)
 	daemonKey, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, false)
 	targetID := enrolled.GetTargetId()
 	otherID := seedTarget(t, cfg, workspaceID)
@@ -39,7 +42,7 @@ func TestSignSSHCertificate(t *testing.T) {
 	member, _, err := cfg.IAM.AuthenticateToken(wsCtx(t, cfg), memberToken, accessTokens...)
 	require.NoError(t, err)
 	wantPrincipal := member.ID + "@" + targetID + ":root"
-	nkToken := cliSessionFor(t, cfg, &db.User{ID: member.ID})
+	nkToken := cliSessionFor(t, cfg, &db.User{ID: member.ID, Active: true})
 
 	principals := nokkuv1connect.NewTargetAccountServiceClient(
 		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
@@ -112,6 +115,37 @@ func TestSignSSHCertificate(t *testing.T) {
 	_, err = sign(targetID)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
 		"a revoked grant still got a certificate signed, %v", err)
+
+	// A certificate goes out only once the log has it, and gets one row.
+	_, err = principals.AddSubjects(t.Context(), grant)
+	require.NoError(t, err)
+	issued := func() int {
+		var rows []*db.ListAuditLogsRow
+		require.NoError(t, cfg.Conn.TenantTx(wsCtx(t, cfg), func(q *db.Queries) (err error) {
+			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+				Actions: []string{"SignSSHCertificate"}, Limit: 1000,
+			})
+			return err
+		}))
+		return len(rows)
+	}
+	before := issued()
+	_, err = sign(targetID)
+	require.NoError(t, err)
+	assert.Equal(t, before+1, issued(), "a certificate needs exactly one row")
+
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	restore := func() {
+		_, err := owner.Exec(context.WithoutCancel(t.Context()), "GRANT INSERT ON audit.audit_logs TO nokku_app")
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() { restore(); _ = owner.Close(context.WithoutCancel(t.Context())) })
+	_, err = owner.Exec(t.Context(), "REVOKE INSERT ON audit.audit_logs FROM nokku_app")
+	require.NoError(t, err)
+	_, err = sign(targetID)
+	require.Error(t, err, "a certificate went out with no row in the log")
+	restore()
 }
 
 // A service account's certificate lives an hour at most and never past the token it was asked for with.
@@ -122,7 +156,6 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	seedDefaultCA(t, srv, adminAuth)
 	_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
 	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, enrolled.GetStatus())
 	targetID := enrolled.GetTargetId()
@@ -173,114 +206,206 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 
 	long := serviceAccountToken(t, accounts, id, nil)
 	assert.WithinDuration(t, time.Now().Add(time.Hour), validUntil(long), time.Minute,
-		"a token that never expires gets the hour, the cap follows the token and not the account")
+		"a token good for a month gets the hour, the cap follows the token and not the account")
 }
 
-// A CA stores its source addresses the way a server reads them, and refuses a list no server can read.
-func TestCARestrictions(t *testing.T) {
+// setCA changes the workspace CA for one test. Every test shares it, so what it held comes back after.
+func setCA(
+	t *testing.T,
+	cfg *config.Config,
+	certs nokkuv1connect.CertificateServiceClient,
+	change *nokkuv1.UpdateCertificateAuthorityRequest,
+) {
+	t.Helper()
+	ca := workspaceCA(t, cfg)
+	t.Cleanup(func() {
+		_, err := certs.UpdateCertificateAuthority(context.WithoutCancel(t.Context()),
+			masked(&nokkuv1.UpdateCertificateAuthorityRequest{
+				UserDefaultTtl: ca.GetUserDefaultTtl(),
+				UserMaxTtl:     ca.GetUserMaxTtl(),
+				SourceAddress:  new(ca.GetSourceAddress()),
+			}))
+		require.NoError(t, err)
+	})
+	_, err := certs.UpdateCertificateAuthority(t.Context(), masked(change))
+	require.NoError(t, err)
+}
+
+// A person's certificate takes the CA's source list and no forced command. A service account's takes its own limits
+// and nothing from the CA, an office list must not block a hosted runner. Lifetimes depend on the caller and the server.
+func TestCertificateLimitsPerSubjectKind(t *testing.T) {
+	const (
+		day        = 24 * time.Hour
+		officeList = "10.0.0.0/8,192.0.2.7"
+	)
+	n := newNKSync(t)
+	workspaceID := seedWorkspace(t, n.cfg)
+	adminAuth := header("Authorization",
+		"Bearer "+seedMember(t, n.cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
+	admin := connect.NewClient(connecthttp.NewTransport(n.srv.Client(), n.srv.URL), adminAuth)
+
+	setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new(officeList)})
+	ca := workspaceCA(t, n.cfg)
+	require.Equal(t, 16*time.Hour, ca.GetUserDefaultTtl().AsDuration(), "the rows below assume the built-in default")
+	require.Equal(t, 7*day, ca.GetUserMaxTtl().AsDuration(), "the rows below assume the built-in max")
+
+	personID, personToken := n.person(t)
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(admin)
+	serviceLimits := map[string]string{
+		"force-command":  "/usr/local/bin/deploy",
+		"source-address": "198.51.100.0/24",
+	}
+	created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+		Name:          new(uniq("ci")),
+		ForceCommand:  new(serviceLimits["force-command"]),
+		SourceAddress: new(serviceLimits["source-address"]),
+	})
+	require.NoError(t, err)
+	serviceID := created.GetServiceAccount().GetId()
+	serviceToken := serviceAccountToken(t, accounts, serviceID, nil)
+	plain, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+		Name: new(uniq("plain-ci")),
+	})
+	require.NoError(t, err)
+	plainID := plain.GetServiceAccount().GetId()
+	plainToken := serviceAccountToken(t, accounts, plainID, nil)
+	grantBoth := func(accountID string) {
+		n.grant(t, accountID, personID)
+		_, err := n.accounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
+			Id:         &accountID,
+			Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum(),
+			SubjectIds: []string{serviceID, plainID},
+		})
+		require.NoError(t, err)
+	}
+
+	_, enrolled := enrollTestDaemon(t, n.cfg, n.srv, workspaceID, true)
+	daemonTarget := enrolled.GetTargetId()
+	daemonAccount, err := n.accounts.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
+		TargetId: &daemonTarget,
+		Username: new("root"),
+	})
+	require.NoError(t, err)
+	grantBoth(daemonAccount.GetAccount().GetId())
+	syncTarget, syncAccount := n.target(t, "root")
+	grantBoth(syncAccount)
+
+	type caller struct {
+		id, token string
+		limits    map[string]string
+	}
+	person := caller{personID, personToken, map[string]string{"source-address": officeList}}
+	service := caller{serviceID, serviceToken, serviceLimits}
+	onDaemon := func(c caller) []string {
+		return []string{nklogin.Principal(c.id, daemonTarget, "root")}
+	}
+	onSync := func(c caller) []string {
+		return []string{nklogin.Principal(c.id, syncTarget, "root"), nklogin.ServerPrincipal(syncTarget, "root")}
+	}
+
+	type row struct {
+		name       string
+		caller     caller
+		target     string
+		asked      time.Duration
+		want       time.Duration
+		principals []string
+	}
+	check := func(t *testing.T, tt row) {
+		t.Helper()
+		cert, err := n.sign(t, tt.caller.token, tt.target, tt.asked)
+		require.NoError(t, err)
+		assert.InDelta(t, tt.want, lifetime(cert), float64(2*time.Second), "wrong lifetime")
+		assert.Equal(t, tt.principals, cert.ValidPrincipals, "wrong principals")
+		assert.Equal(t, tt.caller.limits, cert.CriticalOptions, "the wrong limits reached the certificate")
+	}
+
+	for _, tt := range []row{
+		{"person with a daemon, nothing asked", person, daemonTarget, 0, 16 * time.Hour, onDaemon(person)},
+		{"person with a daemon, under the max", person, daemonTarget, 2 * day, 2 * day, onDaemon(person)},
+		{"person with a daemon, at the max", person, daemonTarget, 7 * day, 7 * day, onDaemon(person)},
+		{
+			"person with a daemon, over the max gets the default",
+			person,
+			daemonTarget,
+			8 * day,
+			16 * time.Hour,
+			onDaemon(person),
+		},
+		{"person without a daemon, nothing asked", person, syncTarget, 0, time.Hour, onSync(person)},
+		{"person without a daemon, under the hour", person, syncTarget, 10 * time.Minute, 10 * time.Minute, onSync(person)},
+		{"person without a daemon, over the hour", person, syncTarget, 2 * day, time.Hour, onSync(person)},
+		{"person without a daemon, over the max", person, syncTarget, 8 * day, time.Hour, onSync(person)},
+		{"service account with a daemon, nothing asked", service, daemonTarget, 0, time.Hour, onDaemon(service)},
+		{
+			"service account with a daemon, under the hour",
+			service,
+			daemonTarget,
+			10 * time.Minute,
+			10 * time.Minute,
+			onDaemon(service),
+		},
+		{"service account with a daemon, over the hour", service, daemonTarget, 2 * day, time.Hour, onDaemon(service)},
+		{"service account without a daemon, over the hour", service, syncTarget, 2 * day, time.Hour, onSync(service)},
+	} {
+		t.Run(tt.name, func(t *testing.T) { check(t, tt) })
+	}
+
+	t.Run("a service account with no limits gets none", func(t *testing.T) {
+		cert, err := n.sign(t, plainToken, daemonTarget, 0)
+		require.NoError(t, err)
+		assert.Empty(t, cert.CriticalOptions, "the CA's settings reached a service account")
+	})
+
+	t.Run("a CA under the hour", func(t *testing.T) {
+		setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{
+			UserDefaultTtl: durationpb.New(20 * time.Minute),
+			UserMaxTtl:     durationpb.New(30 * time.Minute),
+		})
+		for _, tt := range []row{
+			{"person without a daemon", person, syncTarget, 0, 20 * time.Minute, onSync(person)},
+			{"service account", service, syncTarget, 0, 20 * time.Minute, onSync(service)},
+			{"service account, over the max", service, syncTarget, 2 * day, 20 * time.Minute, onSync(service)},
+		} {
+			t.Run(tt.name, func(t *testing.T) { check(t, tt) })
+		}
+	})
+
+	t.Run("a CA with no source list", func(t *testing.T) {
+		setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("")})
+		cert, err := n.sign(t, personToken, daemonTarget, 0)
+		require.NoError(t, err)
+		assert.Empty(t, cert.CriticalOptions, "an empty list must add nothing")
+	})
+}
+
+// The CA stores its source list the way a server reads it, and refuses a list no server can read.
+func TestCASourceList(t *testing.T) {
 	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
 	admin := nokkuv1connect.NewCertificateServiceClient(
 		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header(
 			"Authorization",
-			"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+			"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 		)),
 	)
 
-	created, err := admin.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-		Name:          new(uniq("restricted")),
-		ForceCommand:  new(" /usr/local/bin/backup "),
-		SourceAddress: new("10.0.0.0/8, 192.0.2.7"),
-	})
-	require.NoError(t, err)
-	ca := created.GetCertificateAuthority()
-	assert.Equal(t, "/usr/local/bin/backup", ca.GetForceCommand())
-	assert.Equal(t, "10.0.0.0/8,192.0.2.7", ca.GetSourceAddress())
+	setCA(t, cfg, admin, &nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("10.0.0.0/8, 192.0.2.7")})
+	assert.Equal(t, "10.0.0.0/8,192.0.2.7", workspaceCA(t, cfg).GetSourceAddress())
 
-	_, err = admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-		Id: ca.Id, SourceAddress: new("the office"),
+	_, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
+		SourceAddress: new("the office"),
 	}))
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
 
-	// An update that names neither keeps both, an empty one takes the restriction away.
-	renamed, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-		Id: ca.Id, Name: new(uniq("renamed")),
+	// An update that doesn't name it keeps it, an empty one takes it away.
+	res, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
+		HostTtl: durationpb.New(90 * 24 * time.Hour),
 	}))
 	require.NoError(t, err)
-	assert.Equal(t, "10.0.0.0/8,192.0.2.7", renamed.GetCertificateAuthority().GetSourceAddress())
-	cleared, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-		Id: ca.Id, SourceAddress: new(""),
+	assert.Equal(t, "10.0.0.0/8,192.0.2.7", res.GetCertificateAuthority().GetSourceAddress())
+	res, err = admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
+		SourceAddress: new(""),
 	}))
 	require.NoError(t, err)
-	assert.Empty(t, cleared.GetCertificateAuthority().GetSourceAddress())
-	assert.Equal(t, "/usr/local/bin/backup", cleared.GetCertificateAuthority().GetForceCommand())
-}
-
-// The default moves in both directions. One statement that swaps it depends on which row Postgres visits first.
-func TestDefaultCAMoves(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
-	admin := nokkuv1connect.NewCertificateServiceClient(
-		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth),
-	)
-	defaults := func() []string {
-		res, err := admin.ListCertificateAuthorities(t.Context(), &nokkuv1.ListCertificateAuthoritiesRequest{})
-		require.NoError(t, err)
-		var ids []string
-		for _, ca := range res.GetCertificateAuthorities() {
-			if ca.GetIsDefault() {
-				ids = append(ids, ca.GetId())
-			}
-		}
-		return ids
-	}
-
-	first := seedDefaultCA(t, srv, adminAuth).GetId()
-	second := seedDefaultCA(t, srv, adminAuth).GetId()
-	assert.Equal(t, []string{second}, defaults(), "a new default takes it from the old one")
-
-	_, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-		Id: &first, IsDefault: new(true),
-	}))
-	require.NoError(t, err)
-	assert.Equal(t, []string{first}, defaults(), "the default moves back to an older CA")
-}
-
-// A server made without a CA gets the default. The default, and a CA a server still uses, cannot be deleted.
-func TestDeleteCAInUse(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	workspaceID := seedWorkspace(t, cfg)
-	adminAuth := header("Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
-	client := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), adminAuth)
-	certs := nokkuv1connect.NewCertificateServiceClient(client)
-	targets := nokkuv1connect.NewTargetServiceClient(client)
-	deleteCA := func(id string) error {
-		_, err := certs.DeleteCertificateAuthority(t.Context(), &nokkuv1.DeleteCertificateAuthorityRequest{Id: &id})
-		return err
-	}
-
-	defaultID := seedDefaultCA(t, srv, adminAuth).GetId()
-	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("no-ca"))})
-	require.NoError(t, err)
-	target := created.GetTarget()
-	assert.Equal(t, defaultID, target.GetCaId(), "a server made without a CA gets the default")
-	require.ErrorContains(t, deleteCA(defaultID), "the default", "the default stays")
-
-	other, err := certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-		Name: new(uniq("other")),
-	})
-	require.NoError(t, err)
-	otherID := other.GetCertificateAuthority().GetId()
-	_, err = targets.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{Id: target.Id, CaId: &otherID}))
-	require.NoError(t, err)
-	err = deleteCA(otherID)
-	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
-	require.ErrorContains(t, err, "servers still use", "a CA a server uses stays")
-
-	_, err = targets.DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: target.Id})
-	require.NoError(t, err)
-	assert.NoError(t, deleteCA(otherID), "a CA no server uses goes")
+	assert.Empty(t, res.GetCertificateAuthority().GetSourceAddress())
 }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -39,6 +40,9 @@ type Event struct {
 	IP          string         `json:"ip,omitempty"`
 	UserAgent   string         `json:"user_agent,omitempty"`
 	Details     map[string]any `json:"details,omitempty"`
+
+	// written keeps the interceptor from adding a second row for an event Commit wrote.
+	written bool
 }
 
 // Append writes the event into its workspace. A job outside a request pins the event's, a request may only write
@@ -158,6 +162,14 @@ func (s *Service) Export(
 	return buf.Bytes(), nil
 }
 
+// spreadsheetSafe keeps a value a client sent from running as a formula when an admin opens the export.
+func spreadsheetSafe(s string) string {
+	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
+		return "'" + s
+	}
+	return s
+}
+
 func eventsCSV(events []*Event) ([]byte, error) {
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
@@ -176,9 +188,9 @@ func eventsCSV(events []*Event) ([]byte, error) {
 		}
 		_ = w.Write([]string{
 			e.ID, e.Timestamp.Format(time.RFC3339Nano), e.WorkspaceID,
-			e.ActorID, e.ActorKind, e.ActorName,
-			e.Action, e.Target, strconv.FormatBool(e.OK),
-			e.IP, e.UserAgent, details,
+			e.ActorID, e.ActorKind, spreadsheetSafe(e.ActorName),
+			e.Action, spreadsheetSafe(e.Target), strconv.FormatBool(e.OK),
+			spreadsheetSafe(e.IP), spreadsheetSafe(e.UserAgent), details,
 		})
 	}
 	w.Flush()

@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -277,4 +279,54 @@ func TestCLISessionKeepsTheApproversMethod(t *testing.T) {
 		return err
 	}))
 	assert.Equal(t, []string{string(iam.MethodPasskey)}, methods)
+}
+
+// The rules apply when the token is issued. Enforcing SSO after the approval must not leave a way past it.
+func TestDevicePollHonorsSSOEnforcedAfterTheApproval(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	member := e.user(t, o.ws, "member@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	grant := beginDevice(t, e, o.ws)
+
+	r := httptest.NewRequest(http.MethodPost, "/auth/device/verify",
+		strings.NewReader(url.Values{"user_code": {grant.UserCode}}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	ctx := iam.ContextWithToken(as(r.Context(), o.ws, member), db.AccessToken{Method: string(iam.MethodPasskey)})
+	approved := httptest.NewRecorder()
+	e.svc.Device.Verify(approved, r.WithContext(ctx))
+	require.Equal(t, http.StatusOK, approved.Code, approved.Body.String())
+
+	e.setEnforceSSO(t, o.ws, true)
+
+	poll := pollDevice(t, e, o.ws, grant, key)
+	assert.NotEqual(t, http.StatusOK, poll.Code, "the approval outran enforced SSO")
+	assert.Contains(t, poll.Body.String(), "access_denied")
+	assert.Zero(t, e.sessions(t, o.ws, member.ID), "a poll under enforced SSO left a session")
+}
+
+// Signing someone out everywhere has to reach a login they approved a moment ago and have not collected yet.
+func TestRevokeDropsAnApprovedDeviceGrant(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	member := e.user(t, o.ws, "member@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	grant := beginDevice(t, e, o.ws)
+
+	r := httptest.NewRequest(http.MethodPost, "/auth/device/verify",
+		strings.NewReader(url.Values{"user_code": {grant.UserCode}}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	ctx := iam.ContextWithToken(as(r.Context(), o.ws, member), db.AccessToken{Method: string(iam.MethodOIDC)})
+	approved := httptest.NewRecorder()
+	e.svc.Device.Verify(approved, r.WithContext(ctx))
+	require.Equal(t, http.StatusOK, approved.Code, approved.Body.String())
+
+	_, err = e.svc.RevokeUser(anon(t.Context(), o.ws), member.ID)
+	require.NoError(t, err)
+
+	poll := pollDevice(t, e, o.ws, grant, key)
+	assert.NotEqual(t, http.StatusOK, poll.Code, "an approval outlived signing out everywhere")
+	assert.Zero(t, e.sessions(t, o.ws, member.ID), "the poll left a session")
 }

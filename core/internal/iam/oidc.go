@@ -166,10 +166,16 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 			fail(w, r, "email not verified")
 		case errors.Is(err, errOwnerLink):
 			fail(w, r, "owner link required")
+		case errors.Is(err, errIdentityLinked):
+			fail(w, r, "identity linked")
 		default:
 			fail(w, r, "identity rejected")
 		}
 		return
+	}
+	if linked {
+		h.svc.credentialAdded(r.Context(), r, u, MethodOIDC, cfg.ProviderID+":"+id.Subject,
+			"Your "+cmp.Or(cfg.Name, cfg.ProviderID)+" account")
 	}
 	// A link keeps the session that asked for it. A second session would pass the fresh sign-in checks.
 	if st.LinkUserID == "" {
@@ -182,9 +188,6 @@ func (h *oidcFlow) Callback(w http.ResponseWriter, r *http.Request) {
 		if c := h.svc.RememberDevice(r.Context(), r.Header, r.RemoteAddr, u); c != nil {
 			http.SetCookie(w, c)
 		}
-	} else if linked {
-		h.svc.credentialAdded(r.Context(), r, u, MethodOIDC, cfg.ProviderID+":"+id.Subject,
-			"Your "+cmp.Or(cfg.Name, cfg.ProviderID)+" account")
 	}
 	h.svc.spendFlow(flowID)
 	http.SetCookie(w, h.svc.newCookie(flowCookieName, "", time.Unix(0, 0)))
@@ -260,7 +263,7 @@ func identityFrom(cfg *SSOProvider, idToken *oidc.IDToken, claims map[string]any
 
 // resolve trusts a matching email and may create the account, the workspace owner configured the provider.
 // The owner is never matched by email. A provider user who can pick their address would take the workspace.
-// resolve reports whether it linked an identity the account did not have before.
+// resolve reports whether it linked an identity an existing account did not have before.
 func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool, error) {
 	var u *db.User
 	var created, linked bool
@@ -276,7 +279,7 @@ func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool
 			Action: actionUserCreated, Kind: actor.KindUser, Method: MethodOIDC, UserID: u.ID, Email: u.Email,
 		})
 	}
-	return u, linked, nil
+	return u, linked && !created, nil
 }
 
 // resolveIn finds or creates the user in the caller's tx and links the identity to it. It reports whether it created

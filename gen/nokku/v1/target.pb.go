@@ -183,7 +183,6 @@ func (*SyncTargetUsersResponse) Descriptor() ([]byte, []int) {
 type Target struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	CaId          *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
 	DaemonId      *string                `protobuf:"bytes,3,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
 	Name          *string                `protobuf:"bytes,4,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,5,opt,name=description" json:"description,omitempty"`
@@ -237,13 +236,6 @@ func (*Target) Descriptor() ([]byte, []int) {
 func (x *Target) GetId() string {
 	if x != nil && x.Id != nil {
 		return *x.Id
-	}
-	return ""
-}
-
-func (x *Target) GetCaId() string {
-	if x != nil && x.CaId != nil {
-		return *x.CaId
 	}
 	return ""
 }
@@ -436,7 +428,6 @@ func (x *GetTargetResponse) GetTarget() *Target {
 
 type CreateTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	CaId          *string                `protobuf:"bytes,1,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
 	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"` // can be empty
 	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
 	HostPublicKey *string                `protobuf:"bytes,4,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
@@ -475,13 +466,6 @@ func (x *CreateTargetRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateTargetRequest.ProtoReflect.Descriptor instead.
 func (*CreateTargetRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_target_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *CreateTargetRequest) GetCaId() string {
-	if x != nil && x.CaId != nil {
-		return *x.CaId
-	}
-	return ""
 }
 
 func (x *CreateTargetRequest) GetName() string {
@@ -573,7 +557,6 @@ func (x *CreateTargetResponse) GetTarget() *Target {
 type UpdateTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	CaId          *string                `protobuf:"bytes,2,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
 	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
 	HostPublicKey *string                `protobuf:"bytes,5,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
@@ -618,13 +601,6 @@ func (*UpdateTargetRequest) Descriptor() ([]byte, []int) {
 func (x *UpdateTargetRequest) GetId() string {
 	if x != nil && x.Id != nil {
 		return *x.Id
-	}
-	return ""
-}
-
-func (x *UpdateTargetRequest) GetCaId() string {
-	if x != nil && x.CaId != nil {
-		return *x.CaId
 	}
 	return ""
 }
@@ -801,7 +777,6 @@ type ListTargetsRequest struct {
 	Offset        *int32                 `protobuf:"varint,2,opt,name=offset" json:"offset,omitempty"`
 	Query         *string                `protobuf:"bytes,3,opt,name=query" json:"query,omitempty"`
 	DaemonId      *string                `protobuf:"bytes,4,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	CaId          *string                `protobuf:"bytes,5,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
 	Accounts      []string               `protobuf:"bytes,6,rep,name=accounts" json:"accounts,omitempty"`
 	Tags          []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -862,13 +837,6 @@ func (x *ListTargetsRequest) GetQuery() string {
 func (x *ListTargetsRequest) GetDaemonId() string {
 	if x != nil && x.DaemonId != nil {
 		return *x.DaemonId
-	}
-	return ""
-}
-
-func (x *ListTargetsRequest) GetCaId() string {
-	if x != nil && x.CaId != nil {
-		return *x.CaId
 	}
 	return ""
 }
@@ -984,10 +952,11 @@ func (x *GetSubjectAccessRequest) GetSubjectId() string {
 }
 
 type GetSubjectAccessResponse struct {
-	state                  protoimpl.MessageState  `protogen:"open.v1"`
-	Targets                []*Target               `protobuf:"bytes,1,rep,name=targets" json:"targets,omitempty"`
-	Daemons                []*Daemon               `protobuf:"bytes,2,rep,name=daemons" json:"daemons,omitempty"`
-	CertificateAuthorities []*CertificateAuthority `protobuf:"bytes,3,rep,name=certificate_authorities,json=certificateAuthorities" json:"certificate_authorities,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Targets []*Target              `protobuf:"bytes,1,rep,name=targets" json:"targets,omitempty"`
+	Daemons []*Daemon              `protobuf:"bytes,2,rep,name=daemons" json:"daemons,omitempty"`
+	// certificate_authority is the workspace's, for a subject with targets to log in to.
+	CertificateAuthority *CertificateAuthority `protobuf:"bytes,3,opt,name=certificate_authority,json=certificateAuthority" json:"certificate_authority,omitempty"`
 	// Types that are valid to be assigned to Subject:
 	//
 	//	*GetSubjectAccessResponse_User
@@ -1041,9 +1010,9 @@ func (x *GetSubjectAccessResponse) GetDaemons() []*Daemon {
 	return nil
 }
 
-func (x *GetSubjectAccessResponse) GetCertificateAuthorities() []*CertificateAuthority {
+func (x *GetSubjectAccessResponse) GetCertificateAuthority() *CertificateAuthority {
 	if x != nil {
-		return x.CertificateAuthorities
+		return x.CertificateAuthority
 	}
 	return nil
 }
@@ -1882,10 +1851,9 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\tusernames\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\xc8\x01\"\x05r\x03\x18\x80\x02R\tusernames\x12-\n" +
 	"\tendpoints\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\x10\x10\"\x05r\x03\x18\xff\x01R\tendpoints\"\x19\n" +
-	"\x17SyncTargetUsersResponse\"\xc6\x06\n" +
+	"\x17SyncTargetUsersResponse\"\xb7\x06\n" +
 	"\x06Target\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x13\n" +
-	"\x05ca_id\x18\x02 \x01(\tR\x04caId\x12\x1b\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tdaemon_id\x18\x03 \x01(\tR\bdaemonId\x12\x12\n" +
 	"\x04name\x18\x04 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x05 \x01(\tR\vdescription\x12&\n" +
@@ -1909,54 +1877,51 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a`\n" +
 	"\x16UsernameExpiresAtEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
-	"\x05value\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05value:\x028\x01\",\n" +
+	"\x05value\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05value:\x028\x01J\x04\b\x02\x10\x03\",\n" +
 	"\x10GetTargetRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
 	"\x11GetTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xb4\x02\n" +
-	"\x13CreateTargetRequest\x12\x1d\n" +
-	"\x05ca_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x04caId\x12<\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\x9b\x02\n" +
+	"\x13CreateTargetRequest\x12<\n" +
 	"\x04name\x18\x02 \x01(\tB(\xbaH%r#\x18\x80\x022\x1e^$|^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12&\n" +
 	"\x0fhost_public_key\x18\x04 \x01(\tR\rhostPublicKey\x12\x1c\n" +
 	"\tendpoints\x18\x05 \x03(\tR\tendpoints\x12\x12\n" +
 	"\x04tags\x18\x06 \x03(\tR\x04tags\x12:\n" +
-	"\x06grants\x18\a \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grants\"@\n" +
+	"\x06grants\x18\a \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grantsJ\x04\b\x01\x10\x02\"@\n" +
 	"\x14CreateTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\x96\x03\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xf5\x02\n" +
 	"\x13UpdateTargetRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1d\n" +
-	"\x05ca_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x04caId\x12;\n" +
+	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12;\n" +
 	"\x04name\x18\x03 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12&\n" +
 	"\x0fhost_public_key\x18\x05 \x01(\tR\rhostPublicKey\x12\x1c\n" +
 	"\tendpoints\x18\x06 \x03(\tR\tendpoints\x12\x12\n" +
-	"\x04tags\x18\a \x03(\tR\x04tags\x12\x82\x01\n" +
-	"\vupdate_mask\x18\b \x01(\v2\x1a.google.protobuf.FieldMaskBE\xbaHB\xc8\x01\x01\xe2\x01<\x12\x05ca_id\x12\x04name\x12\vdescription\x12\x0fhost_public_key\x12\tendpoints\x12\x04tagsR\n" +
-	"updateMask\"@\n" +
+	"\x04tags\x18\a \x03(\tR\x04tags\x12{\n" +
+	"\vupdate_mask\x18\b \x01(\v2\x1a.google.protobuf.FieldMaskB>\xbaH;\xc8\x01\x01\xe2\x015\x12\x04name\x12\vdescription\x12\x0fhost_public_key\x12\tendpoints\x12\x04tagsR\n" +
+	"updateMaskJ\x04\b\x02\x10\x03\"@\n" +
 	"\x14UpdateTargetResponse\x12(\n" +
 	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"/\n" +
 	"\x13DeleteTargetRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x16\n" +
-	"\x14DeleteTargetResponse\"\xce\x01\n" +
+	"\x14DeleteTargetResponse\"\xbf\x01\n" +
 	"\x12ListTargetsRequest\x12\x1f\n" +
 	"\x05limit\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x14\n" +
 	"\x05query\x18\x03 \x01(\tR\x05query\x12\x1b\n" +
-	"\tdaemon_id\x18\x04 \x01(\tR\bdaemonId\x12\x13\n" +
-	"\x05ca_id\x18\x05 \x01(\tR\x04caId\x12\x1a\n" +
+	"\tdaemon_id\x18\x04 \x01(\tR\bdaemonId\x12\x1a\n" +
 	"\baccounts\x18\x06 \x03(\tR\baccounts\x12\x12\n" +
-	"\x04tags\x18\a \x03(\tR\x04tags\"W\n" +
+	"\x04tags\x18\a \x03(\tR\x04tagsJ\x04\b\x05\x10\x06\"W\n" +
 	"\x13ListTargetsResponse\x12*\n" +
 	"\atargets\x18\x01 \x03(\v2\x10.nokku.v1.TargetR\atargets\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\"B\n" +
 	"\x17GetSubjectAccessRequest\x12'\n" +
 	"\n" +
-	"subject_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsubjectId\"\xc1\x02\n" +
+	"subject_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsubjectId\"\xbd\x02\n" +
 	"\x18GetSubjectAccessResponse\x12*\n" +
 	"\atargets\x18\x01 \x03(\v2\x10.nokku.v1.TargetR\atargets\x12*\n" +
-	"\adaemons\x18\x02 \x03(\v2\x10.nokku.v1.DaemonR\adaemons\x12W\n" +
-	"\x17certificate_authorities\x18\x03 \x03(\v2\x1e.nokku.v1.CertificateAuthorityR\x16certificateAuthorities\x12$\n" +
+	"\adaemons\x18\x02 \x03(\v2\x10.nokku.v1.DaemonR\adaemons\x12S\n" +
+	"\x15certificate_authority\x18\x03 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\x12$\n" +
 	"\x04user\x18\x04 \x01(\v2\x0e.nokku.v1.UserH\x00R\x04user\x12C\n" +
 	"\x0fservice_account\x18\x05 \x01(\v2\x18.nokku.v1.ServiceAccountH\x00R\x0eserviceAccountB\t\n" +
 	"\asubject\"\x19\n" +
@@ -2103,7 +2068,7 @@ var file_nokku_v1_target_proto_depIdxs = []int32{
 	3,  // 12: nokku.v1.ListTargetsResponse.targets:type_name -> nokku.v1.Target
 	3,  // 13: nokku.v1.GetSubjectAccessResponse.targets:type_name -> nokku.v1.Target
 	35, // 14: nokku.v1.GetSubjectAccessResponse.daemons:type_name -> nokku.v1.Daemon
-	36, // 15: nokku.v1.GetSubjectAccessResponse.certificate_authorities:type_name -> nokku.v1.CertificateAuthority
+	36, // 15: nokku.v1.GetSubjectAccessResponse.certificate_authority:type_name -> nokku.v1.CertificateAuthority
 	37, // 16: nokku.v1.GetSubjectAccessResponse.user:type_name -> nokku.v1.User
 	38, // 17: nokku.v1.GetSubjectAccessResponse.service_account:type_name -> nokku.v1.ServiceAccount
 	18, // 18: nokku.v1.GetAccessGraphRequest.filter:type_name -> nokku.v1.AccessGraphFilter

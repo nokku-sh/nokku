@@ -4,7 +4,6 @@ package entitlement
 import "slices"
 
 const (
-	FeatureOIDC           = "oidc"
 	FeatureEnforceSSO     = "enforce_sso"
 	FeatureSCIM           = "scim"
 	FeatureAuditExport    = "audit_export"
@@ -35,7 +34,6 @@ type Feature struct {
 
 // CatalogFeatures is the one list of what a plan has. The console reads it through GetWorkspace.
 var CatalogFeatures = []Feature{
-	{FeatureOIDC, "OIDC single sign-on", PlanCommunity},
 	{FeatureEnforceSSO, "Enforced single sign-on", PlanPro},
 	{FeatureAuditExport, "Audit log export", PlanPro},
 	{FeatureExpiringAccess, "Expiring access", PlanPro},

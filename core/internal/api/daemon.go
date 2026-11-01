@@ -13,6 +13,8 @@ import (
 
 	"connectrpc.com/connect/v2"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	nokkudaemon "github.com/nokku-sh/nokku/core/internal/daemon"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -38,8 +40,15 @@ func (s *daemonService) GetDaemon(
 	}
 
 	return &nokkuv1.GetDaemonResponse{
-		Daemon: result.ToProto(s.cfg.Pool.IsConnected(result.ID)),
+		Daemon: s.withBehind(result.ToProto(s.cfg.Pool.IsConnected(result.ID))),
 	}, nil
+}
+
+func (s *daemonService) withBehind(d *nokkuv1.Daemon) *nokkuv1.Daemon {
+	if since := s.cfg.Pool.BehindSince(d.GetId()); !since.IsZero() {
+		d.BehindSince = timestamppb.New(since)
+	}
+	return d
 }
 
 func (s *daemonService) UpdateDaemon(
@@ -93,10 +102,11 @@ func (s *daemonService) ListDaemons(
 		count = result[0].TotalCount
 	}
 
-	return &nokkuv1.ListDaemonsResponse{
-		Daemons: db.DaemonsToProto(result, s.cfg.Pool.IsConnected),
-		Total:   &count,
-	}, nil
+	daemons := db.DaemonsToProto(result, s.cfg.Pool.IsConnected)
+	for _, d := range daemons {
+		s.withBehind(d)
+	}
+	return &nokkuv1.ListDaemonsResponse{Daemons: daemons, Total: &count}, nil
 }
 
 func (s *daemonService) DeleteDaemon(
@@ -178,38 +188,6 @@ func grantedAccounts(ctx context.Context, q *db.Queries, daemonID, subject strin
 		}
 	}
 	return accounts, nil
-}
-
-func (s *daemonService) ListSessions(
-	ctx context.Context,
-	req *nokkuv1.ListSessionsRequest,
-) (*nokkuv1.ListSessionsResponse, error) {
-	daemon, err := s.cfg.Conn.Tenant().GetDaemon(ctx, req.GetDaemonId())
-	if err != nil {
-		return nil, err
-	}
-
-	sessions := s.cfg.Pool.ListSessions(daemon.ID)
-	return &nokkuv1.ListSessionsResponse{
-		Sessions:   sessions,
-		DaemonName: &daemon.Name,
-	}, nil
-}
-
-func (s *daemonService) CloseSession(
-	ctx context.Context,
-	req *nokkuv1.CloseSessionRequest,
-) (*nokkuv1.CloseSessionResponse, error) {
-	// The pool is shared across tenants, so the daemon must resolve in the pinned workspace first.
-	sess := s.cfg.Pool.GetSession(req.GetSessionId())
-	if sess == nil || sess.DaemonID() != req.GetDaemonId() {
-		return nil, errNotFound
-	}
-	if _, err := s.cfg.Conn.Tenant().GetDaemon(ctx, sess.DaemonID()); err != nil {
-		return nil, err
-	}
-	sess.Close()
-	return &nokkuv1.CloseSessionResponse{}, nil
 }
 
 // Relay bridges a raw byte stream to the daemon's sshd.

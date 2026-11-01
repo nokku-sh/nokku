@@ -13,7 +13,8 @@ INSERT INTO
     user_agent,
     ip,
     expires_at,
-    last_seen_at
+    last_seen_at,
+    workload_jti
   )
 VALUES
   (
@@ -34,7 +35,8 @@ VALUES
     @user_agent,
     @ip,
     sqlc.narg('expires_at'),
-    sqlc.narg('last_seen_at')
+    sqlc.narg('last_seen_at'),
+    sqlc.narg('workload_jti')
   )
 RETURNING
   *;
@@ -60,10 +62,16 @@ WHERE
   id = @id;
 
 -- name: DeleteSubjectTokens :execrows
--- Signs the subject out everywhere. A user's devices are forgotten too, so none is waved through quietly again.
+-- Signs the subject out everywhere. A user's devices are forgotten too, so none is waved through quietly again, and a
+-- pending nk login is dropped, or an approval from before this would still turn into a token.
 WITH
   forgotten AS (
     DELETE FROM known_devices
+    WHERE
+      user_id = @subject_id::UUID
+  ),
+  pending AS (
+    DELETE FROM device_grants
     WHERE
       user_id = @subject_id::UUID
   )
@@ -90,20 +98,35 @@ WHERE
   AND expires_at < @now;
 
 -- name: ListServiceAccountTokens :many
+-- A revoked row of an exchange is no token any more, see RevokeWorkloadToken.
 SELECT
   *
 FROM
   access_tokens
 WHERE
   service_account_id = @service_account_id::UUID
+  AND token_hash NOT LIKE 'revoked:%'
 ORDER BY
   created_at DESC;
 
 -- name: DeleteServiceAccountToken :execrows
+-- A key. The row of an exchange goes through RevokeWorkloadToken.
 DELETE FROM access_tokens
 WHERE
   id = @id
-  AND service_account_id = @service_account_id::UUID;
+  AND service_account_id = @service_account_id::UUID
+  AND workload_jti IS NULL;
+
+-- name: RevokeWorkloadToken :execrows
+-- The row of an exchange also says its job token is spent, and that job token can outlive a revoke. So the row stays
+-- until it expires, and loses the hash that signs in. No token hashes to this value.
+UPDATE access_tokens
+SET
+  token_hash = 'revoked:' || id::TEXT
+WHERE
+  id = @id
+  AND service_account_id = @service_account_id::UUID
+  AND workload_jti IS NOT NULL;
 
 -- name: ListSCIMTokens :many
 SELECT

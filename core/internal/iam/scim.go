@@ -3,8 +3,10 @@ package iam
 // SCIM 2.0 at /scim/v2 of the workspace host, under RLS. Only a SCIM token of that workspace gets in.
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -22,6 +24,9 @@ import (
 
 const (
 	scimMountPath = "/scim/v2"
+	// Each user is a request of its own, about 1 KiB. Only a group with its members gets big, and this fits tens of
+	// thousands of them.
+	maxSCIMBody = 4 << 20
 	// A server per workspace that syncs, kept a while so a sync does not build one per request.
 	scimServerTTL     = time.Hour
 	scimServerEntries = 10_000
@@ -65,6 +70,20 @@ func (f *SCIMFlow) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.svc.noteSeen(r.Context(), tok)
+	// Read here, the library drops a read error on a create, and the provider would hear bad JSON instead of too large.
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxSCIMBody))
+	if _, tooBig := errors.AsType[*http.MaxBytesError](err); tooBig {
+		writeScimError(w, scimerrors.ScimError{
+			Status: http.StatusRequestEntityTooLarge,
+			Detail: "the request is over the 4 MiB limit, send the members of a group in smaller batches",
+		})
+		return
+	}
+	if err != nil {
+		writeScimError(w, scimerrors.ScimError{Status: http.StatusBadRequest, Detail: "the request could not be read"})
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
 	server, err := f.serverFor(ws)
 	if err != nil {
 		writeScimError(w, scimerrors.ScimErrorInternal)

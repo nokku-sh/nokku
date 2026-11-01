@@ -1,12 +1,21 @@
 -- name: CreateServiceAccount :one
 INSERT INTO
-  service_accounts (name, description, role, tags)
+  service_accounts (
+    name,
+    description,
+    role,
+    tags,
+    force_command,
+    source_address
+  )
 VALUES
   (
     @name,
     @description,
     @role,
-    COALESCE(sqlc.narg('tags')::TEXT[], '{}')
+    COALESCE(sqlc.narg('tags')::TEXT[], '{}'),
+    @force_command,
+    @source_address
   )
 RETURNING
   id;
@@ -18,6 +27,14 @@ FROM
   service_accounts
 WHERE
   id = @service_account_id;
+
+-- name: GetServiceAccountByName :one
+SELECT
+  *
+FROM
+  service_accounts
+WHERE
+  name = @name;
 
 -- name: ListServiceAccounts :many
 SELECT
@@ -58,6 +75,8 @@ SET
     ELSE @role
   END,
   tags = COALESCE(sqlc.narg('tags'), tags),
+  force_command = COALESCE(sqlc.narg('force_command'), force_command),
+  source_address = COALESCE(sqlc.narg('source_address'), source_address),
   updated_at = NOW()
 WHERE
   id = @service_account_id
@@ -68,3 +87,27 @@ RETURNING
 DELETE FROM service_accounts
 WHERE
   id = @service_account_id;
+
+-- name: CreateServiceAccountFederation :one
+INSERT INTO
+  service_account_federations (service_account_id, issuer, claims)
+VALUES
+  (@service_account_id, @issuer, @claims)
+RETURNING
+  *;
+
+-- name: ListServiceAccountFederations :many
+SELECT
+  *
+FROM
+  service_account_federations
+WHERE
+  service_account_id = @service_account_id
+ORDER BY
+  id ASC;
+
+-- name: DeleteServiceAccountFederation :execrows
+DELETE FROM service_account_federations
+WHERE
+  id = @id
+  AND service_account_id = @service_account_id;

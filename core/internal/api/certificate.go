@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
@@ -34,72 +33,17 @@ type certificateService struct {
 	cfg *config.Config
 }
 
-func (s *certificateService) CreateCertificateAuthority(
-	ctx context.Context,
-	req *nokkuv1.CreateCertificateAuthorityRequest,
-) (*nokkuv1.CreateCertificateAuthorityResponse, error) {
-	source, err := ssh.SourceAddresses(req.GetSourceAddress())
-	if err != nil {
-		return nil, newError(connect.CodeInvalidArgument, err.Error())
-	}
-	ca := ssh.NewCA()
-	ca.SourceAddress = source
-	ca.ForceCommand = strings.TrimSpace(req.GetForceCommand())
-	ca.Name, ca.Description = req.GetName(), req.Description
-	if req.GetUserDefaultTtl() != nil {
-		ca.UserDefaultTtl = req.GetUserDefaultTtl().AsDuration()
-	}
-	if req.GetUserMaxTtl() != nil {
-		ca.UserMaxTtl = req.GetUserMaxTtl().AsDuration()
-	}
-	if req.GetHostTtl() != nil {
-		ca.HostTtl = req.GetHostTtl().AsDuration()
-	}
-
-	var result *db.SSHCA
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if result, err = ssh.CreateCA(ctx, q, s.cfg.Keyset, ca); err != nil {
-			return err
-		}
-		if !req.GetIsDefault() {
-			return nil
-		}
-		result.IsDefault = true
-		return q.SetDefaultCA(ctx, result.ID)
-	}); err != nil {
-		return nil, err
-	}
-
-	return &nokkuv1.CreateCertificateAuthorityResponse{
-		CertificateAuthority: result.ToProto(),
-	}, nil
-}
-
 func (s *certificateService) GetCertificateAuthority(
 	ctx context.Context,
-	req *nokkuv1.GetCertificateAuthorityRequest,
+	_ *nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
-	ca, err := s.cfg.Conn.Tenant().GetCA(ctx, req.GetId())
+	ca, err := s.cfg.Conn.Tenant().GetWorkspaceCA(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &nokkuv1.GetCertificateAuthorityResponse{
 		CertificateAuthority: ca.ToProto(),
-	}, nil
-}
-
-func (s *certificateService) ListCertificateAuthorities(
-	ctx context.Context,
-	_ *nokkuv1.ListCertificateAuthoritiesRequest,
-) (*nokkuv1.ListCertificateAuthoritiesResponse, error) {
-	result, err := s.cfg.Conn.Tenant().ListCAs(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return &nokkuv1.ListCertificateAuthoritiesResponse{
-		CertificateAuthorities: db.CAsToProto(result),
 	}, nil
 }
 
@@ -111,17 +55,11 @@ func (s *certificateService) UpdateCertificateAuthority(
 		return nil, err
 	}
 	params := &db.UpdateCAParams{
-		CaID:           req.GetId(),
-		Name:           req.Name,
-		Description:    req.Description,
 		UserDefaultTtl: optDuration(req.GetUserDefaultTtl()),
 		UserMaxTtl:     optDuration(req.GetUserMaxTtl()),
 		HostTtl:        optDuration(req.GetHostTtl()),
 	}
-	// Unset keeps what the CA has, empty takes the restriction away.
-	if req.ForceCommand != nil {
-		params.ForceCommand = new(strings.TrimSpace(req.GetForceCommand()))
-	}
+	// Unset keeps what the CA has, empty takes the list away.
 	if req.SourceAddress != nil {
 		list, err := ssh.SourceAddresses(req.GetSourceAddress())
 		if err != nil {
@@ -130,54 +68,15 @@ func (s *certificateService) UpdateCertificateAuthority(
 		params.SourceAddress = &list
 	}
 
-	// Only becoming the default moves it, so a workspace never ends up without one.
-	var result *db.SSHCA
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if result, err = q.UpdateCA(ctx, params); err != nil {
-			return err
-		}
-		if !req.GetIsDefault() || result.IsDefault {
-			return nil
-		}
-		result.IsDefault = true
-		return q.SetDefaultCA(ctx, result.ID)
-	}); err != nil {
+	result, err := s.cfg.Conn.Tenant().UpdateCA(ctx, params)
+	if err != nil {
 		return nil, err
 	}
+	audit.SetTarget(ctx, result.ID)
 
 	return &nokkuv1.UpdateCertificateAuthorityResponse{
 		CertificateAuthority: result.ToProto(),
 	}, nil
-}
-
-func (s *certificateService) DeleteCertificateAuthority(
-	ctx context.Context,
-	req *nokkuv1.DeleteCertificateAuthorityRequest,
-) (*nokkuv1.DeleteCertificateAuthorityResponse, error) {
-	// The lock keeps the CA from becoming the default between the check and the delete.
-	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		ca, err := q.GetCAForUpdate(ctx, req.GetId())
-		if err != nil {
-			return err
-		}
-		// Servers and enroll tokens without a CA of their own fall back to the default.
-		if ca.IsDefault {
-			return newError(connect.CodeFailedPrecondition, "make another certificate authority the default first")
-		}
-		_, err = q.DeleteCA(ctx, ca.ID)
-		return err
-	})
-	if db.IsRestrictViolation(err) {
-		return nil, newError(
-			connect.CodeFailedPrecondition,
-			"servers still use this certificate authority, move them first",
-		)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return &nokkuv1.DeleteCertificateAuthorityResponse{}, nil
 }
 
 func (s *certificateService) RolloverCertificateAuthority(
@@ -186,7 +85,7 @@ func (s *certificateService) RolloverCertificateAuthority(
 ) (*nokkuv1.RolloverCertificateAuthorityResponse, error) {
 	var result *db.SSHCA
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		ca, err := q.GetCAForUpdate(ctx, req.GetId())
+		ca, err := q.GetWorkspaceCAForUpdate(ctx)
 		if err != nil {
 			return err
 		}
@@ -195,6 +94,7 @@ func (s *certificateService) RolloverCertificateAuthority(
 	}); err != nil {
 		return nil, err
 	}
+	audit.SetTarget(ctx, result.ID)
 	audit.Set(ctx, "revoke_previous", req.GetRevokePrevious())
 
 	return &nokkuv1.RolloverCertificateAuthorityResponse{
@@ -215,6 +115,7 @@ func (s *certificateService) SignSSHCertificate(
 
 	var ca *db.SSHCA
 	var signer gossh.Signer
+	var limits ssh.Limits
 	var principals []string
 	// until is when the first grant in the certificate ends, nil when all of them are for good.
 	var until *time.Time
@@ -250,11 +151,20 @@ func (s *certificateService) SignSSHCertificate(
 				until = end
 			}
 		}
-		if ca, err = q.GetCA(ctx, target.CaID); err != nil {
+		if ca, err = q.GetWorkspaceCA(ctx); err != nil {
 			return err
 		}
 		if signer, err = ssh.CASigner(ctx, q, s.cfg.Keyset, ca.ID, gossh.UserCert); err != nil {
 			return err
+		}
+		limits = ssh.Limits{SourceAddress: ca.SourceAddress}
+		// A machine takes its own limits alone, an office list on the CA must not block a hosted runner.
+		if caller.Kind == actor.KindServiceAccount {
+			account, err := q.GetServiceAccount(ctx, caller.ID)
+			if err != nil {
+				return err
+			}
+			limits = ssh.Limits{ForceCommand: account.ForceCommand, SourceAddress: account.SourceAddress}
 		}
 		return q.TouchAccessUsage(ctx, &db.TouchAccessUsageParams{TargetID: target.ID, SubjectID: caller.ID})
 	}); err != nil {
@@ -289,6 +199,7 @@ func (s *certificateService) SignSSHCertificate(
 		fmt.Sprintf("nokku:login:%s:%s", caller.Kind, caller.ID),
 		ttl,
 		gossh.UserCert,
+		limits,
 	)
 	if err != nil {
 		return nil, err
@@ -300,9 +211,11 @@ func (s *certificateService) SignSSHCertificate(
 	audit.Set(ctx, "key_id", cert.KeyId)
 	audit.Set(ctx, "principals", cert.ValidPrincipals)
 	audit.Set(ctx, "expires_at", expiry)
+	// The event is the only record of the certificate, so it is written before anyone holds one.
+	if err := s.cfg.Audit.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return &nokkuv1.SignSSHCertificateResponse{
-		CaId:              &ca.ID,
-		CaName:            &ca.Name,
 		CaPublicKey:       &ca.PublicKey,
 		SignedCertificate: new(ssh.MarshalKey(cert)),
 		ExpiresAt:         timestamppb.New(expiry),

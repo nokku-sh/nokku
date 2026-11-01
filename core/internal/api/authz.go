@@ -116,6 +116,12 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 			return err
 		}
 	}
+	// After the mask, a field it leaves out changes nothing.
+	if !access.GetFresh() && requestedFresh(msg) {
+		if err := a.fresh(ctx, caller); err != nil {
+			return err
+		}
+	}
 	ent := a.cfg.Entitlements
 	features := entitlement.RequestedFeatures(msg)
 	if f := access.GetFeature(); f != "" {
@@ -133,6 +139,18 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 		return ent.CheckResources(ctx, ws)
 	}
 	return nil
+}
+
+// requestedFresh finds a change that needs a fresh sign-in inside a call that otherwise doesn't, like renaming a
+// workspace next to its enforced SSO.
+func requestedFresh(msg any) bool {
+	switch req := msg.(type) {
+	case *nokkuv1.UpdateWorkspaceRequest:
+		return req.GetSettings() != nil && req.GetSettings().EnforceSso != nil
+	case *nokkuv1.UpdateServiceAccountRequest:
+		return req.ForceCommand != nil || req.SourceAddress != nil
+	}
+	return false
 }
 
 // fresh refuses nk outright and a browser session older than 10 minutes, which ends here. The web app reads

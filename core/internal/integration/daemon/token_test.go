@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -150,6 +152,76 @@ func TestEnrollEphemeralReplacesOffline(t *testing.T) {
 		_, err := q.GetDaemon(f.ctx, second.DaemonID)
 		return err
 	}))
+}
+
+// A container coming or going wakes nobody, or a busy fleet would sync without end. The version still moves, so every
+// daemon catches up at its next heartbeat, and a real change wakes them all at once.
+func TestContainerChurnWakesNobody(t *testing.T) {
+	f, token := ephemeralToken(t, 10*time.Minute)
+	teamID := seedTeamGrant(t, f, "deploy")
+	workspaceID := actor.WorkspaceIDFromContext(f.ctx)
+
+	listener, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close(context.WithoutCancel(t.Context())) })
+	_, err = listener.Exec(t.Context(), "LISTEN nokku_state")
+	require.NoError(t, err)
+	woken := func() bool {
+		ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
+		defer cancel()
+		for {
+			n, err := listener.WaitForNotification(ctx)
+			if err != nil {
+				return false
+			}
+			if n.Payload == workspaceID {
+				return true
+			}
+		}
+	}
+	version := func() int64 {
+		v, err := f.conn.Sys().GetWorkspaceStateVersion(t.Context(), workspaceID)
+		require.NoError(t, err)
+		return v
+	}
+
+	before := version()
+	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	require.NoError(t, err)
+	assert.False(t, woken(), "a new container woke the fleet")
+	assert.Greater(t, version(), before, "the version must move, the heartbeat is the backstop")
+
+	before = version()
+	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	require.NoError(t, err)
+	assert.False(t, woken(), "a container replacing its offline self woke the fleet")
+	assert.Greater(t, version(), before)
+
+	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
+		return q.RevokeSubjectAccessInWorkspace(f.ctx, &db.RevokeSubjectAccessInWorkspaceParams{
+			SubjectKind: db.SubjectKindTeam, SubjectID: teamID,
+		})
+	}))
+	assert.True(t, woken(), "a revoke must wake the fleet at once")
+}
+
+// A leaked token that ran out names an offline daemon, and must not be able to delete it.
+func TestSpentTokenReplacesNothing(t *testing.T) {
+	retire, uses := 10*time.Minute, int32(1)
+	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
+		p.AutoApprove = true
+		p.RetireAfter = &retire
+		p.MaxUses = &uses
+	})
+	first, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	require.NoError(t, err)
+
+	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	require.ErrorIs(t, err, daemon.ErrEnrollToken, "a spent token enrolled a daemon")
+	assert.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
+		_, err := q.GetDaemon(f.ctx, first.DaemonID)
+		return err
+	}), "a spent token deleted the offline daemon of that name")
 }
 
 // The sweep deletes an ephemeral daemon once it has been away longer than retire_after, and only then.

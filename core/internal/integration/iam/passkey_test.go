@@ -146,8 +146,8 @@ func TestPasskeyRegistrationNeedsARecentSignIn(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	alice := e.user(t, o.ws, "alice@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	sess, _, err := e.svc.IssueToken(anon(t.Context(), o.ws), iam.TokenParams{
-		SubjectID: alice.ID, Kind: actor.KindUser, Method: iam.MethodPasskey,
+	sess, _, err := e.svc.IssueSignIn(anon(t.Context(), o.ws), alice, iam.TokenParams{
+		Kind: actor.KindUser, Method: iam.MethodPasskey,
 	})
 	require.NoError(t, err)
 	sess.CreatedAt = time.Now().Add(-time.Hour)

@@ -20,7 +20,6 @@ export const target = {
 		opts?: () => {
 			query?: string;
 			daemonId?: string;
-			caId?: string;
 			tags?: string[];
 			accounts?: string[];
 			limit?: number;

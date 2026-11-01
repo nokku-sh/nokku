@@ -83,6 +83,7 @@ func TestUnknownServiceIsNotFound(t *testing.T) {
 
 // A deploy lets a request that is under way finish, and ends the streams at once.
 func TestShutdownLetsARequestFinish(t *testing.T) {
+	selfHostedOnly(t, "it dials the real listener, which reads no workspace host")
 	cfg, srv := newTestAPI(t)
 	workspaceID := seedWorkspace(t, cfg)
 	member := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
@@ -165,6 +166,7 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 
 // The core only speaks plain HTTP. Its proxy forwards in h2c, and a client that connects by itself goes to https.
 func TestPlainHTTPIsForTheProxy(t *testing.T) {
+	selfHostedOnly(t, "it sets a base URL of its own")
 	cfg, _ := newTestAPI(t)
 	named := *cfg
 	named.BaseURL = "nokku.example.com"
@@ -225,6 +227,7 @@ func startCore(t *testing.T, cfg *config.Config) string {
 
 // The owner's link is a way into the workspace, and a log line can travel to a telemetry backend.
 func TestOwnerLinkStaysOutOfTheLog(t *testing.T) {
+	selfHostedOnly(t, "the hosted service makes no owner at start")
 	var out logLines
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&out, nil)))

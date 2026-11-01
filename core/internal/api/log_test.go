@@ -45,7 +45,7 @@ func TestWithRecover(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.withRecover(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		panic("boom")
-	})).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/avatars/x", nil))
+	})).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/x", nil))
 	assert.Equal(t, http.StatusInternalServerError, rec.Code, "a handler panic becomes a 500")
 	assert.NotContains(t, rec.Body.String(), "boom", "the panic value must not reach the client")
 

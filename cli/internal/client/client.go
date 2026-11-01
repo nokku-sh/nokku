@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 	"github.com/mizuchilabs/kata/fsutil"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/nokku-sh/nokku/cli/internal/enclave"
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
@@ -53,7 +53,6 @@ func New(s *state.State) (*Client, error) {
 			StatePath:  paths.SignerStateFile(),
 			RequireTPM: s.RequireTPM,
 			Recreate:   true,
-			Enclave:    enclave.New(),
 		})
 		if err != nil {
 			return nil, err
@@ -78,8 +77,9 @@ func (c *Client) dial() error {
 	auth := (&bearerAuth{token: s.Token, ua: buildinfo.UserAgent("nk")}).intercept
 	if c.proofer != nil {
 		c.dpop = dpopclient.New(c.proofer, c.httpc, func() string { return s.SessionToken }, dpopclient.Options{
-			BaseURL:   s.APIURL,
-			UserAgent: buildinfo.UserAgent("nk"),
+			BaseURL:           s.APIURL,
+			UnboundProcedures: map[string]bool{nokkuv1connect.AuthServiceExchangeWorkloadTokenProcedure: true},
+			UserAgent:         buildinfo.UserAgent("nk"),
 		})
 		auth = c.dpop.Intercept
 	}
@@ -107,7 +107,13 @@ func (c *Client) Sync(ctx context.Context, interactive bool) error {
 		return fmt.Errorf("this machine does not trust the certificate of %s. "+
 			"If it comes from a private CA, pass that CA with --ca-file: %w", c.State.APIURL, err)
 	}
-	if err == nil || !interactive || connect.CodeOf(err) != connect.CodeUnauthenticated {
+	if err == nil || connect.CodeOf(err) != connect.CodeUnauthenticated {
+		return err
+	}
+	if c.State.CIJob() {
+		return ErrCISessionEnded
+	}
+	if !interactive {
 		return err
 	}
 	// The stored session was rejected, log in once more.
@@ -123,6 +129,10 @@ func (c *Client) SyncOrCache(ctx context.Context, interactive bool) error {
 	err := c.Sync(ctx, interactive)
 	if err == nil {
 		return nil
+	}
+	// No outage. A job that goes on from the cache would only fail later, with less to say about why.
+	if errors.Is(err, ErrCISessionEnded) {
+		return err
 	}
 	if loadErr := c.State.LoadCache(); loadErr != nil || !c.State.HasCachedData() {
 		return fmt.Errorf("sync with Nokku failed and nothing is cached yet: %w", err)
@@ -189,6 +199,9 @@ func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.C
 		req.Ttl = durationpb.New(c.State.TTL)
 	}
 	res, err := c.certs.SignSSHCertificate(ctx, req)
+	if c.State.CIJob() && connect.CodeOf(err) == connect.CodeUnauthenticated {
+		return ErrCISessionEnded
+	}
 	if err != nil {
 		return err
 	}
@@ -219,7 +232,6 @@ func (c *Client) CreateTarget(
 	grants []Grant,
 ) (*state.Target, error) {
 	req := &nokkuv1.CreateTargetRequest{
-		CaId:          new(t.CAID),
 		Name:          new(t.Name),
 		HostPublicKey: new(t.HostPublicKey),
 		Endpoints:     t.Endpoints,
@@ -238,7 +250,6 @@ func (c *Client) CreateTarget(
 		return nil, err
 	}
 	created := state.MapTarget(res.GetTarget())
-	created.CAID = t.CAID
 	return &created, nil
 }
 
@@ -267,11 +278,11 @@ func (c *Client) ListAllTargets(ctx context.Context) ([]state.Target, error) {
 	}
 }
 
-// ListSSHCAs is for a new target, the access sync only carries the CAs of targets the subject can reach.
-func (c *Client) ListSSHCAs(ctx context.Context) ([]state.CA, error) {
-	res, err := c.certs.ListCertificateAuthorities(ctx, &nokkuv1.ListCertificateAuthoritiesRequest{})
+// WorkspaceCA is what nk sync writes to a server. It comes from the core, so a rollover reaches the server.
+func (c *Client) WorkspaceCA(ctx context.Context) (*state.CA, error) {
+	res, err := c.certs.GetCertificateAuthority(ctx, &nokkuv1.GetCertificateAuthorityRequest{})
 	if err != nil {
 		return nil, err
 	}
-	return state.SSHCAs(res.GetCertificateAuthorities()), nil
+	return state.MapCA(res.GetCertificateAuthority()), nil
 }

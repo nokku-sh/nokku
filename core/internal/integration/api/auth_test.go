@@ -72,7 +72,7 @@ func TestMagicLinkSignIn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, u.ID, got.GetUser().GetId())
 	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, got.GetUser().GetRole())
-	assert.Contains(t, info.ResponseHeader().Get("Set-Cookie"), "nokku_session=", "the sign-in sets a session")
+	assert.Contains(t, info.ResponseHeader().Get("Set-Cookie"), sessionCookie+"=", "the sign-in sets a session")
 
 	_, err = auth.ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{Token: &token})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "a spent link: %v", err)
@@ -95,10 +95,10 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 		name, rest, _ := strings.Cut(line, "=")
 		cookies[name], _, _ = strings.Cut(rest, ";")
 	}
-	require.NotEmpty(t, cookies["nokku_session"])
+	require.NotEmpty(t, cookies[sessionCookie])
 	var deviceCookie string
 	for name, value := range cookies {
-		if strings.HasPrefix(name, "nokku_device_") {
+		if strings.HasPrefix(name, cookieNamed("nokku_device_")) {
 			deviceCookie = value
 		}
 	}
@@ -115,7 +115,7 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	kinds := func() map[string]string {
 		t.Helper()
 		res, err := account(
-			cookies["nokku_session"],
+			cookies[sessionCookie],
 		).ListAccountSessions(t.Context(), &nokkuv1.ListAccountSessionsRequest{})
 		require.NoError(t, err)
 		out := map[string]string{}
@@ -132,7 +132,7 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the device cookie signed in: %v", err)
 
 	_, err = account(
-		cookies["nokku_session"],
+		cookies[sessionCookie],
 	).RemoveSession(t.Context(), &nokkuv1.RemoveSessionRequest{Id: new(listed["device"])})
 	require.NoError(t, err)
 	listed = kinds()

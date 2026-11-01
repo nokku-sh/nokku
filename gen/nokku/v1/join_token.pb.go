@@ -32,7 +32,6 @@ type JoinToken struct {
 	MaxUses       *int32                 `protobuf:"varint,4,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
 	Uses          *int32                 `protobuf:"varint,5,opt,name=uses" json:"uses,omitempty"`
 	AutoApprove   *bool                  `protobuf:"varint,6,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
-	CaId          *string                `protobuf:"bytes,7,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
 	Tags          []string               `protobuf:"bytes,10,rep,name=tags" json:"tags,omitempty"`
@@ -113,13 +112,6 @@ func (x *JoinToken) GetAutoApprove() bool {
 		return *x.AutoApprove
 	}
 	return false
-}
-
-func (x *JoinToken) GetCaId() string {
-	if x != nil && x.CaId != nil {
-		return *x.CaId
-	}
-	return ""
 }
 
 func (x *JoinToken) GetCreatedAt() *timestamppb.Timestamp {
@@ -238,7 +230,6 @@ type CreateJoinTokenRequest struct {
 	Ttl           *durationpb.Duration   `protobuf:"bytes,2,opt,name=ttl" json:"ttl,omitempty"`
 	MaxUses       *int32                 `protobuf:"varint,3,opt,name=max_uses,json=maxUses" json:"max_uses,omitempty"`
 	AutoApprove   *bool                  `protobuf:"varint,4,opt,name=auto_approve,json=autoApprove" json:"auto_approve,omitempty"`
-	CaId          *string                `protobuf:"bytes,5,opt,name=ca_id,json=caId" json:"ca_id,omitempty"`
 	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
 	Grants        []*JoinTokenGrant      `protobuf:"bytes,7,rep,name=grants" json:"grants,omitempty"`
 	Ephemeral     *bool                  `protobuf:"varint,8,opt,name=ephemeral" json:"ephemeral,omitempty"`
@@ -303,13 +294,6 @@ func (x *CreateJoinTokenRequest) GetAutoApprove() bool {
 		return *x.AutoApprove
 	}
 	return false
-}
-
-func (x *CreateJoinTokenRequest) GetCaId() string {
-	if x != nil && x.CaId != nil {
-		return *x.CaId
-	}
-	return ""
 }
 
 func (x *CreateJoinTokenRequest) GetTags() []string {
@@ -556,7 +540,7 @@ var File_nokku_v1_join_token_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_join_token_proto_rawDesc = "" +
 	"\n" +
-	"\x19nokku/v1/join_token.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xee\x03\n" +
+	"\x19nokku/v1/join_token.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xdf\x03\n" +
 	"\tJoinToken\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x129\n" +
@@ -564,8 +548,7 @@ const file_nokku_v1_join_token_proto_rawDesc = "" +
 	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x19\n" +
 	"\bmax_uses\x18\x04 \x01(\x05R\amaxUses\x12\x12\n" +
 	"\x04uses\x18\x05 \x01(\x05R\x04uses\x12!\n" +
-	"\fauto_approve\x18\x06 \x01(\bR\vautoApprove\x12\x13\n" +
-	"\x05ca_id\x18\a \x01(\tR\x04caId\x129\n" +
+	"\fauto_approve\x18\x06 \x01(\bR\vautoApprove\x129\n" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\flast_used_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
@@ -574,23 +557,22 @@ const file_nokku_v1_join_token_proto_rawDesc = "" +
 	" \x03(\tR\x04tags\x120\n" +
 	"\x06grants\x18\v \x03(\v2\x18.nokku.v1.JoinTokenGrantR\x06grants\x12\x1c\n" +
 	"\tephemeral\x18\f \x01(\bR\tephemeral\x12<\n" +
-	"\fretire_after\x18\r \x01(\v2\x19.google.protobuf.DurationR\vretireAfter\"\xef\x01\n" +
+	"\fretire_after\x18\r \x01(\v2\x19.google.protobuf.DurationR\vretireAfterJ\x04\b\a\x10\b\"\xef\x01\n" +
 	"\x0eJoinTokenGrant\x12D\n" +
 	"\busername\x18\x01 \x01(\tB(\xbaH%r#\x10\x01\x18 2\x1d^[A-Za-z_][A-Za-z0-9._-]*\\$?$R\busername\x12*\n" +
 	"\buser_ids\x18\x02 \x03(\tB\x0f\xbaH\f\x92\x01\t\x102\"\x05r\x03\xb0\x01\x01R\auserIds\x12*\n" +
 	"\bteam_ids\x18\x03 \x03(\tB\x0f\xbaH\f\x92\x01\t\x102\"\x05r\x03\xb0\x01\x01R\ateamIds\x12?\n" +
-	"\x13service_account_ids\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\x102\"\x05r\x03\xb0\x01\x01R\x11serviceAccountIds\"\xa2\x03\n" +
+	"\x13service_account_ids\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\x102\"\x05r\x03\xb0\x01\x01R\x11serviceAccountIds\"\x89\x03\n" +
 	"\x16CreateJoinTokenRequest\x12\x1d\n" +
 	"\x05label\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x05label\x125\n" +
 	"\x03ttl\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\b\xbaH\x05\xaa\x01\x02*\x00R\x03ttl\x12\"\n" +
 	"\bmax_uses\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02 \x00R\amaxUses\x12!\n" +
-	"\fauto_approve\x18\x04 \x01(\bR\vautoApprove\x12\x1d\n" +
-	"\x05ca_id\x18\x05 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x04caId\x12\"\n" +
+	"\fauto_approve\x18\x04 \x01(\bR\vautoApprove\x12\"\n" +
 	"\x04tags\x18\x06 \x03(\tB\x0e\xbaH\v\x92\x01\b\x10 \"\x04r\x02\x18@R\x04tags\x12:\n" +
 	"\x06grants\x18\a \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grants\x12\x1c\n" +
 	"\tephemeral\x18\b \x01(\bR\tephemeral\x12N\n" +
 	"\fretire_after\x18\t \x01(\v2\x19.google.protobuf.DurationB\x10\xbaH\r\xaa\x01\n" +
-	"\"\x04\b\x80\xf5$2\x02\b<R\vretireAfter\"\\\n" +
+	"\"\x04\b\x80\xf5$2\x02\b<R\vretireAfterJ\x04\b\x05\x10\x06\"\\\n" +
 	"\x17CreateJoinTokenResponse\x12)\n" +
 	"\x05token\x18\x01 \x01(\v2\x13.nokku.v1.JoinTokenR\x05token\x12\x16\n" +
 	"\x06secret\x18\x02 \x01(\tR\x06secret\"\x17\n" +

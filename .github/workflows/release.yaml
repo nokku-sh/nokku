@@ -1,7 +1,6 @@
 name: Release
 
 on:
-  # Manual only. The darwin nk binaries need a Mac runner, that split is not set up yet.
   workflow_dispatch:
 
 concurrency:

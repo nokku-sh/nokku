@@ -25,6 +25,8 @@ func TestEveryAccessTableNotifies(t *testing.T) {
 
 	tables := viewTables(t, owner, "effective_access")
 	require.Contains(t, tables, "grants", "the walk found nothing, the view moved or was renamed")
+	// A target's daemon never changes, and deleting a target deletes its accounts, which notify.
+	tables = slices.DeleteFunc(tables, func(name string) bool { return name == "targets" })
 	assert.NotContains(t, tables, "teams", "teams have no trigger, the view must reach them through team_members")
 	assert.NotContains(t, tables, "service_accounts", "service accounts have no trigger")
 	assert.Empty(

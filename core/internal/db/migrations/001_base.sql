@@ -13,6 +13,7 @@ CREATE TABLE workspaces (
   description TEXT,
   settings JSONB NOT NULL DEFAULT '{}',
   requestable_tags TEXT[] NOT NULL DEFAULT '{}',
+  claimed_at TIMESTAMPTZ, -- the first sign-in, NULL is a signup nobody used
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -25,9 +26,9 @@ CREATE TABLE workspace_state (
 
 CREATE TABLE workspace_subscriptions (
   workspace_id UUID PRIMARY KEY DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  source TEXT NOT NULL DEFAULT '', -- stripe, trial, manual
-  plan TEXT NOT NULL DEFAULT '', -- pro, enterprise
-  status TEXT NOT NULL DEFAULT '', -- stripe's own, or trial
+  source TEXT NOT NULL CHECK (source IN ('stripe', 'trial', 'manual')),
+  plan TEXT NOT NULL CHECK (plan IN ('pro', 'enterprise')),
+  status TEXT NOT NULL DEFAULT '', -- stripe's own, or trial. Free text, a value Stripe adds must not fail its webhook
   customer_id TEXT NOT NULL DEFAULT '',
   subscription_id TEXT NOT NULL DEFAULT '',
   current_period_end TIMESTAMPTZ,
@@ -37,7 +38,8 @@ CREATE TABLE workspace_subscriptions (
   trial_reminder INTEGER NOT NULL DEFAULT 0, -- days before the trial end of the last reminder, 0 for none
   deletion_warning INTEGER NOT NULL DEFAULT 0, -- days before the deletion of the last warning, 0 for none
   deletion_warned_at TIMESTAMPTZ, -- a late warning pushes the deletion back
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (source <> 'trial' OR current_period_end IS NOT NULL)
 );
 
 -- Subjects -------------------------------------------------------------------
@@ -49,6 +51,7 @@ CREATE TABLE users (
   picture TEXT,
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5), -- 1=member, 2=viewer, 3=editor, 4=admin, 5=owner
   active BOOLEAN NOT NULL DEFAULT TRUE,
+  CHECK (role <> 5 OR active), -- the owner can't be switched off
   scim_external_id TEXT,
   scim_managed BOOLEAN NOT NULL DEFAULT FALSE, -- SCIM created it, so the identity provider owns the address
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -61,16 +64,6 @@ CREATE TABLE users (
 CREATE UNIQUE INDEX idx_users_owner ON users (workspace_id)
 WHERE
   role = 5;
-
--- An uploaded picture, apart so user queries never carry it. An identity provider's picture is a URL in users.
-CREATE TABLE user_avatars (
-  user_id UUID PRIMARY KEY,
-  workspace_id UUID NOT NULL DEFAULT current_workspace_id (),
-  image BYTEA NOT NULL,
-  etag TEXT NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
-);
 
 CREATE TABLE teams (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -109,12 +102,30 @@ CREATE TABLE service_accounts (
   description TEXT,
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 3), -- like users.role, the editor at most
   tags TEXT[] NOT NULL DEFAULT '{}',
+  force_command TEXT NOT NULL DEFAULT '', -- what its certificates run, whatever the login asks for
+  source_address TEXT NOT NULL DEFAULT '', -- addresses and CIDRs, comma separated
   last_used_at TIMESTAMPTZ, -- kept by note_service_account_used
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
   UNIQUE (workspace_id, id)
 );
+
+-- Which CI jobs may sign in as a service account: the issuer of their token and the claims it must hold.
+CREATE TABLE service_account_federations (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
+  service_account_id UUID NOT NULL,
+  issuer TEXT NOT NULL CHECK (issuer <> ''),
+  claims JSONB NOT NULL CHECK (
+    jsonb_typeof(claims) = 'object'
+    AND claims <> '{}'
+  ), -- string to string, each must match exactly
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_service_account_federations_account ON service_account_federations (service_account_id);
 
 -- Sign-in --------------------------------------------------------------------
 CREATE TABLE sso_providers (
@@ -137,6 +148,7 @@ CREATE TABLE credentials (
   subject TEXT NOT NULL DEFAULT '',
   data BYTEA NOT NULL DEFAULT '',
   label TEXT NOT NULL DEFAULT '',
+  CHECK (type <> 'oidc' OR (provider <> '' AND subject <> '')),
   last_used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -147,6 +159,11 @@ CREATE TABLE credentials (
 CREATE UNIQUE INDEX idx_credentials_external ON credentials (workspace_id, type, provider, subject)
 WHERE
   subject <> '';
+
+-- One identity per provider. A provider may hand a leaver's address to someone new, who must not land on that account.
+CREATE UNIQUE INDEX idx_credentials_one_per_provider ON credentials (workspace_id, user_id, provider)
+WHERE
+  type = 'oidc';
 
 CREATE INDEX idx_credentials_user ON credentials (user_id, type);
 
@@ -210,6 +227,7 @@ CREATE TABLE device_grants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, user_code),
   CHECK ((status = 'pending') = (user_id IS NULL)),
+  CHECK (status <> 'approved' OR approved_method IS NOT NULL),
   FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
 );
 
@@ -227,20 +245,24 @@ CREATE TABLE access_tokens (
   service_account_id UUID,
   daemon_id UUID,
   subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, service_account_id, daemon_id)) STORED,
-  method TEXT NOT NULL, -- passkey, magic_link, oidc, device, token, scim
+  method TEXT NOT NULL, -- passkey, magic_link, oidc, device, token, federation, scim
   binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions and keys
   label TEXT NOT NULL DEFAULT '',
   ip TEXT NOT NULL DEFAULT '',
   user_agent TEXT NOT NULL DEFAULT '',
   expires_at TIMESTAMPTZ, -- NULL never expires, a deleted daemon's gets one from expire_daemon_token
   last_seen_at TIMESTAMPTZ,
+  -- Issuer, a space and jti of the job token an exchange spent. The row keeps it spent, so a revoke keeps the row.
+  workload_jti TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, service_account_id) REFERENCES service_accounts (workspace_id, id) ON DELETE CASCADE,
   -- A kind is one value, so these three also keep it to one subject.
   CHECK ((kind IN ('user', 'cli')) = (user_id IS NOT NULL)),
   CHECK ((kind = 'daemon') = (daemon_id IS NOT NULL)),
-  CHECK ((kind = 'service_account') = (service_account_id IS NOT NULL))
+  CHECK ((kind = 'service_account') = (service_account_id IS NOT NULL)),
+  CHECK (kind <> 'service_account' OR expires_at IS NOT NULL),
+  CHECK (workload_jti IS NULL OR (kind = 'service_account' AND binding <> ''))
 );
 
 CREATE INDEX idx_access_tokens_subject ON access_tokens (subject_id);
@@ -251,13 +273,16 @@ CREATE INDEX idx_access_tokens_expiry ON access_tokens (expires_at)
 WHERE
   expires_at IS NOT NULL;
 
+-- A job token works once.
+CREATE UNIQUE INDEX idx_access_tokens_workload_jti ON access_tokens (workspace_id, workload_jti)
+WHERE
+  workload_jti IS NOT NULL;
+
 -- Certificate authorities ----------------------------------------------------
+-- One per workspace, made with it. A server has no tie to it, so a rollover reaches every server.
 CREATE TABLE ssh_cas (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_default BOOLEAN NOT NULL DEFAULT FALSE,
   -- The user key signs logins, the host key the daemons' host certificates. Private halves are in ssh_ca_keys.
   public_key TEXT NOT NULL,
   host_public_key TEXT NOT NULL,
@@ -270,19 +295,15 @@ CREATE TABLE ssh_cas (
   user_default_ttl INTERVAL NOT NULL,
   user_max_ttl INTERVAL NOT NULL,
   host_ttl INTERVAL NOT NULL, -- a daemon never asks for a lifetime, so a host certificate always gets this
-  force_command TEXT NOT NULL DEFAULT '',
-  source_address TEXT NOT NULL DEFAULT '', -- addresses and CIDRs, comma separated
+  source_address TEXT NOT NULL DEFAULT '', -- where people log in from, addresses and CIDRs, comma separated
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, name),
+  UNIQUE (workspace_id),
   UNIQUE (workspace_id, id),
-  CHECK (user_default_ttl <= user_max_ttl)
+  CHECK (user_default_ttl <= user_max_ttl),
+  CHECK (user_default_ttl > INTERVAL '0' AND host_ttl > INTERVAL '0'),
+  CHECK (num_nonnulls (previous_public_key, previous_host_public_key, previous_trusted_until) IN (0, 3))
 );
-
--- One default per workspace.
-CREATE UNIQUE INDEX idx_ssh_cas_default ON ssh_cas (workspace_id)
-WHERE
-  is_default = TRUE;
 
 -- Apart so reading a CA never touches a private key. Only GetCASigningKey reads one.
 CREATE TABLE ssh_ca_keys (
@@ -299,19 +320,17 @@ CREATE TABLE ssh_ca_keys (
 CREATE TABLE join_tokens (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  ca_id UUID, -- NULL is the workspace default
   token_hash TEXT NOT NULL UNIQUE,
   label TEXT NOT NULL DEFAULT '',
   tags TEXT[] NOT NULL DEFAULT '{}',
   auto_approve BOOLEAN NOT NULL DEFAULT FALSE,
-  retire_after INTERVAL, -- set on an ephemeral token
+  retire_after INTERVAL CHECK (retire_after > INTERVAL '0'), -- set on an ephemeral token
   max_uses INTEGER CHECK (max_uses > 0), -- NULL is unlimited
-  uses INTEGER NOT NULL DEFAULT 0,
+  uses INTEGER NOT NULL DEFAULT 0 CHECK (uses <= max_uses),
   expires_at TIMESTAMPTZ, -- NULL never expires
   last_used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, id),
-  FOREIGN KEY (workspace_id, ca_id) REFERENCES ssh_cas (workspace_id, id) ON DELETE SET NULL (ca_id)
+  UNIQUE (workspace_id, id)
 );
 
 CREATE INDEX idx_join_tokens_workspace ON join_tokens (workspace_id);
@@ -339,7 +358,6 @@ CREATE TABLE daemons (
 CREATE TABLE targets (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  ca_id UUID NOT NULL,
   daemon_id UUID,
   name TEXT NOT NULL,
   description TEXT,
@@ -352,12 +370,8 @@ CREATE TABLE targets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
   UNIQUE (workspace_id, id),
-  -- A CA that servers still use cannot be deleted, they would have nothing to sign or trust.
-  FOREIGN KEY (workspace_id, ca_id) REFERENCES ssh_cas (workspace_id, id) ON DELETE RESTRICT,
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE CASCADE
 );
-
-CREATE INDEX idx_targets_ca_id ON targets (ca_id);
 
 -- A daemon serves one target, a manual target has none.
 CREATE UNIQUE INDEX idx_targets_daemon_id ON targets (daemon_id);
@@ -445,12 +459,13 @@ CREATE TABLE access_requests (
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   requester_id UUID NOT NULL,
   account_id UUID NOT NULL,
-  duration INTERVAL NOT NULL,
+  duration INTERVAL NOT NULL CHECK (duration > INTERVAL '0'),
   reason TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'cancelled', 'expired')),
   decided_by UUID,
   decided_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (status NOT IN ('approved', 'denied') OR decided_at IS NOT NULL),
   FOREIGN KEY (workspace_id, requester_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, account_id) REFERENCES target_accounts (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, decided_by) REFERENCES users (workspace_id, id) ON DELETE SET NULL (decided_by)
@@ -576,8 +591,10 @@ CREATE TABLE recordings (
   object_id UUID,
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ended_at TIMESTAMPTZ, -- when the session ended, as the daemon says. A broken upload leaves it NULL
-  size_bytes BIGINT NOT NULL DEFAULT 0, -- of the stored copy
+  size_bytes BIGINT NOT NULL DEFAULT 0 CHECK (size_bytes >= 0), -- of the stored copy
   complete BOOLEAN NOT NULL DEFAULT FALSE, -- FALSE when the upload stream ended abruptly
+  CHECK (NOT complete OR object_id IS NOT NULL),
+  CHECK (ended_at >= started_at),
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE SET NULL (daemon_id)
 );
 
@@ -730,7 +747,10 @@ BEGIN
     RETURN NULL;
   END IF;
   UPDATE workspace_state SET version = version + 1 WHERE workspace_id = ws;
-  PERFORM pg_notify('nokku_state', ws::TEXT);
+  -- A server coming or going changes nothing for the others. The version still moves, so they catch up at a heartbeat.
+  IF current_setting('nokku.quiet', TRUE) IS DISTINCT FROM 'on' THEN
+    PERFORM pg_notify('nokku_state', ws::TEXT);
+  END IF;
   PERFORM set_config('nokku.bumped', ws::TEXT, TRUE);
   RETURN NULL;
 END;
@@ -758,19 +778,12 @@ AFTER INSERT
 OR DELETE ON team_members FOR EACH ROW
 EXECUTE FUNCTION bump_state_version ();
 
-CREATE TRIGGER bump_state_version
-AFTER INSERT
-OR DELETE ON ssh_cas FOR EACH ROW
-EXECUTE FUNCTION bump_state_version ();
-
 CREATE TRIGGER bump_state_version_update
 AFTER
 UPDATE OF public_key,
-host_public_key,
-is_default ON ssh_cas FOR EACH ROW WHEN (
+host_public_key ON ssh_cas FOR EACH ROW WHEN (
   OLD.public_key IS DISTINCT FROM NEW.public_key
   OR OLD.host_public_key IS DISTINCT FROM NEW.host_public_key
-  OR OLD.is_default IS DISTINCT FROM NEW.is_default
 )
 EXECUTE FUNCTION bump_state_version ();
 
@@ -785,11 +798,6 @@ EXECUTE FUNCTION bump_state_version ();
 
 CREATE TRIGGER bump_state_version_delete
 AFTER DELETE ON daemons FOR EACH ROW
-EXECUTE FUNCTION bump_state_version ();
-
-CREATE TRIGGER bump_state_version
-AFTER
-UPDATE OF ca_id ON targets FOR EACH ROW WHEN (OLD.ca_id IS DISTINCT FROM NEW.ca_id)
 EXECUTE FUNCTION bump_state_version ();
 
 -- A new account carries no grants, so only deletes matter.
@@ -876,10 +884,10 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'workspace_subscriptions',
     'users',
-    'user_avatars',
     'teams',
     'team_members',
     'service_accounts',
+    'service_account_federations',
     'sso_providers',
     'credentials',
     'known_devices',

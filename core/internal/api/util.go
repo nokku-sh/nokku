@@ -51,45 +51,6 @@ func (s *utilService) GetInstanceInfo(
 	}, nil
 }
 
-func (s *utilService) Whoami(
-	ctx context.Context,
-	_ *nokkuv1.WhoamiRequest,
-) (*nokkuv1.WhoamiResponse, error) {
-	p, ok := actor.PrincipalFromContext(ctx)
-	if !ok {
-		return nil, newError(connect.CodeUnauthenticated, "not authenticated")
-	}
-
-	out := &nokkuv1.WhoamiResponse{
-		Kind:      new(string(p.Kind)),
-		SubjectId: new(p.ID),
-	}
-
-	switch p.Kind {
-	case actor.KindUser, actor.KindCLI:
-		u, err := s.cfg.IAM.GetUser(ctx)
-		if err != nil {
-			return nil, err
-		}
-		out.User = u.ToProto()
-	case actor.KindServiceAccount:
-		sa, err := s.cfg.Conn.Tenant().GetServiceAccount(ctx, p.ID)
-		if err != nil {
-			return nil, err
-		}
-		out.ServiceAccount = sa.ToProto()
-	case actor.KindDaemon:
-		d, err := s.cfg.Conn.Tenant().GetDaemon(ctx, p.ID)
-		if err != nil {
-			return nil, err
-		}
-		out.Daemon = d.ToProto(s.cfg.Pool.IsConnected(d.ID))
-	case actor.KindSCIM:
-		// SCIM tokens never reach connect.
-	}
-	return out, nil
-}
-
 func (s *utilService) ListRoles(
 	_ context.Context,
 	_ *nokkuv1.ListRolesRequest,

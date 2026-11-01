@@ -4,10 +4,13 @@ package api_test
 
 import (
 	"context"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"uuid"
@@ -45,8 +48,10 @@ var accessTokens = []crypto.TokenKind{
 
 // One server for the package, the tests share its workspace.
 var (
-	testCfg    *config.Config
-	testServer *httptest.Server
+	testCfg       *config.Config
+	testServer    *httptest.Server
+	testHandler   http.Handler
+	testWorkspace actor.Workspace
 	// storageDir is where the test server keeps recordings.
 	storageDir string
 )
@@ -55,7 +60,18 @@ var (
 func TestMain(m *testing.M) {
 	stop := testenv.Postgres()
 	storageDir, _ = os.MkdirTemp("", "nokku-api-test")
-	os.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
+	stopKMS := func() {}
+	if hosted {
+		stopKMS = testenv.KMS(storageDir)
+		os.Setenv("NOKKU_SAAS", "true")
+		os.Setenv("NOKKU_BASE_URL", hostedBase)
+		os.Setenv("STRIPE_SECRET_KEY", "sk_test_never_called")
+		os.Setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
+		os.Setenv("STRIPE_PRO_MONTHLY_PRICE_ID", "price_monthly")
+		os.Setenv("STRIPE_PRO_YEARLY_PRICE_ID", "price_yearly")
+	} else {
+		os.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
+	}
 	os.Setenv("NOKKU_STORAGE_URL", "file://"+storageDir)
 	// A test that holds a license key must not ask the real license worker for a new one.
 	os.Setenv("NOKKU_LICENSE_OFFLINE", "true")
@@ -70,15 +86,36 @@ func TestMain(m *testing.M) {
 		stop()
 		os.Exit(1)
 	}
-	// Self-host mode: every request lands in the one workspace, whatever the host. Bidi streams need HTTP/2.
-	testServer = httptest.NewUnstartedServer(api.New(testCfg).Handler(ctx))
+	testWorkspace = testCfg.Tenant.Single()
+	if hosted {
+		if testWorkspace, err = hostedWorkspace(ctx, testCfg); err != nil {
+			fmt.Fprintf(os.Stderr, "make the hosted workspace: %v\n", err)
+			stopKMS()
+			stop()
+			os.Exit(1)
+		}
+	}
+	// Every request lands in the one workspace, self-hosted whatever the host, hosted by the host serving sets.
+	// Bidi streams need HTTP/2.
+	testHandler = api.New(testCfg).Handler(ctx)
+	testServer = httptest.NewUnstartedServer(serving(testHandler))
 	testServer.EnableHTTP2 = true
 	testServer.StartTLS()
+	// A federation rule only takes https, and the egress client reads the system roots. httptest has one certificate.
+	roots := filepath.Join(storageDir, "httptest-roots.pem")
+	block := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: testServer.Certificate().Raw})
+	if err := os.WriteFile(roots, block, 0o600); err != nil {
+		fmt.Fprintf(os.Stderr, "write the test roots: %v\n", err)
+		stop()
+		os.Exit(1)
+	}
+	os.Setenv("SSL_CERT_FILE", roots)
 
 	code := m.Run()
 	cancel()
 	testServer.Close()
 	_ = os.RemoveAll(storageDir)
+	stopKMS()
 	stop()
 	os.Exit(code)
 }
@@ -98,9 +135,9 @@ func workspaceName(ctx context.Context, conn *db.Connection) (string, error) {
 }
 
 // seedWorkspace is the one workspace the test server serves. Tests tell their rows apart by fresh ids.
-func seedWorkspace(t *testing.T, cfg *config.Config) string {
+func seedWorkspace(t *testing.T, _ *config.Config) string {
 	t.Helper()
-	return cfg.Tenant.Single().ID
+	return testWorkspace.ID
 }
 
 // seedOtherWorkspace makes a workspace no request can reach. What lives in it must never show up through the API.
@@ -111,6 +148,17 @@ func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 	return ws.ID
 }
 
+// workspaceCA reads the one CA of the test workspace. Every test shares it, a test that changes it uses setCA.
+func workspaceCA(t *testing.T, cfg *config.Config) *nokkuv1.CertificateAuthority {
+	t.Helper()
+	var ca *db.SSHCA
+	inWorkspace(t, cfg, seedWorkspace(t, cfg), func(q *db.Queries) (err error) {
+		ca, err = q.GetWorkspaceCA(t.Context())
+		return err
+	})
+	return ca.ToProto()
+}
+
 // inWorkspace runs fn the way a request does: nokku_app, pinned to the workspace.
 func inWorkspace(t *testing.T, cfg *config.Config, workspaceID string, fn func(q *db.Queries) error) {
 	t.Helper()
@@ -119,9 +167,9 @@ func inWorkspace(t *testing.T, cfg *config.Config, workspaceID string, fn func(q
 }
 
 // wsCtx is a request context on the host of the test workspace.
-func wsCtx(t *testing.T, cfg *config.Config) context.Context {
+func wsCtx(t *testing.T, _ *config.Config) context.Context {
 	t.Helper()
-	return actor.WithWorkspace(t.Context(), cfg.Tenant.Single())
+	return actor.WithWorkspace(t.Context(), testWorkspace)
 }
 
 func seedUser(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1.WorkspaceRole) *db.User {
@@ -147,7 +195,7 @@ func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return seedUser(t, cfg, cfg.Tenant.Single().ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
+		return seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
 	}
 	require.NoError(t, err)
 	return owner
@@ -155,11 +203,11 @@ func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 
 func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	t.Helper()
-	_, token, err := cfg.IAM.IssueToken(wsCtx(t, cfg), iam.TokenParams{
-		SubjectID: u.ID,
-		Kind:      actor.KindUser,
-		Method:    iam.MethodPasskey,
-	})
+	_, token, err := cfg.IAM.IssueSignIn(
+		wsCtx(t, cfg),
+		u,
+		iam.TokenParams{Kind: actor.KindUser, Method: iam.MethodPasskey},
+	)
 	require.NoError(t, err)
 	return token
 }
@@ -167,11 +215,11 @@ func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 // cliSessionFor is an nk session for u, unbound. nk binds it to its key, the server skips the proof without one.
 func cliSessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	t.Helper()
-	_, token, err := cfg.IAM.IssueToken(wsCtx(t, cfg), iam.TokenParams{
-		SubjectID: u.ID,
-		Kind:      actor.KindCLI,
-		Method:    iam.MethodPasskey,
-	})
+	_, token, err := cfg.IAM.IssueSignIn(
+		wsCtx(t, cfg),
+		u,
+		iam.TokenParams{Kind: actor.KindCLI, Method: iam.MethodPasskey},
+	)
 	require.NoError(t, err)
 	return token
 }

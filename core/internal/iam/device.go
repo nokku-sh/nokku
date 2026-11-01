@@ -189,7 +189,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		writeOAuthError(w, "access_denied")
 	case grantApproved:
 		u, err := h.svc.getUser(ctx, deref(g.UserID))
-		if err != nil || !u.Active {
+		if err != nil {
 			writeOAuthError(w, "access_denied")
 			return
 		}
@@ -212,14 +212,18 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sess, token, err := h.svc.IssueToken(ctx, TokenParams{
-			SubjectID: u.ID,
-			Kind:      actor.KindCLI,
-			Method:    Method(cmp.Or(deref(g.ApprovedMethod), string(MethodDevice))),
-			Binding:   binding,
-			Label:     cmp.Or(truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel), "Terminal"),
-			TTL:       deviceSessionTTL,
+		// The rules apply now, not at the approval. SSO may have been enforced in the meantime.
+		sess, token, err := h.svc.IssueSignIn(ctx, u, TokenParams{
+			Kind:    actor.KindCLI,
+			Method:  Method(cmp.Or(deref(g.ApprovedMethod), string(MethodDevice))),
+			Binding: binding,
+			Label:   cmp.Or(truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel), "Terminal"),
+			TTL:     deviceSessionTTL,
 		})
+		if errors.Is(err, ErrInactive) || errors.Is(err, ErrSSORequired) {
+			writeOAuthError(w, "access_denied")
+			return
+		}
 		if err != nil {
 			writeOAuthError(w, "server_error")
 			return

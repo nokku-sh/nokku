@@ -17,6 +17,7 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -36,11 +37,15 @@ func TestTokenKinds(t *testing.T) {
 		return connect.NewClient(transport, header("Authorization", "Bearer "+token))
 	}
 	whoami := func(client *connect.Client) string {
-		res, err := nokkuv1connect.NewUtilServiceClient(client).Whoami(ctx, &nokkuv1.WhoamiRequest{})
+		res, err := nokkuv1connect.NewTargetServiceClient(client).
+			GetSubjectAccess(ctx, &nokkuv1.GetSubjectAccessRequest{})
 		if err != nil {
-			return "Whoami " + rpcAnswer(err)
+			return "GetSubjectAccess " + rpcAnswer(err)
 		}
-		return "Whoami as " + res.GetKind()
+		if res.GetServiceAccount() != nil {
+			return "GetSubjectAccess as service account"
+		}
+		return "GetSubjectAccess as user"
 	}
 	scim := func(token string) string {
 		const path = "/scim/v2/ServiceProviderConfig"
@@ -89,9 +94,9 @@ func TestTokenKinds(t *testing.T) {
 	fact(browser, "verifies", whoami(as(login{token: session.Value})))
 
 	const device = "remembered device cookie"
-	remembered := cookies["nokku_device_"+reader.ID]
+	remembered := cookies[cookieNamed("nokku_device_")+reader.ID]
 	require.NotNil(t, remembered, "a new browser gets the device cookie")
-	fact(device, "name", "nokku_device_<user id>")
+	fact(device, "name", cookieNamed("nokku_device_")+"<user id>")
 	fact(device, "shape", shape(remembered.Value))
 	fact(device, "attributes", cookieAttributes(remembered))
 	fact(device, "as a session", whoami(as(login{token: remembered.Value})))
@@ -167,6 +172,7 @@ func TestTokenKinds(t *testing.T) {
 	require.NoError(t, err)
 	issued, err := accounts.CreateServiceAccountToken(ctx, &nokkuv1.CreateServiceAccountTokenRequest{
 		ServiceAccountId: new(account.GetServiceAccount().GetId()),
+		ExpiresAt:        timestamppb.New(time.Now().Add(time.Hour)),
 	})
 	require.NoError(t, err)
 	secret := issued.GetSecret()
@@ -185,7 +191,7 @@ func TestTokenKinds(t *testing.T) {
 	fact(scimKey, "verifies", scim(provisioning.GetToken()))
 
 	const invite = "invite link"
-	newcomer := uniq("newcomer") + "@api.test"
+	newcomer := newMailAddress()
 	_, err = nokkuv1connect.NewInvitationServiceClient(as(owner)).CreateInvitation(ctx,
 		&nokkuv1.CreateInvitationRequest{Email: &newcomer})
 	require.NoError(t, err)
@@ -209,7 +215,7 @@ func TestTokenKinds(t *testing.T) {
 	// The confirm and cancel links are mailed by the API, which this server sends nowhere. The tokens come from iam.
 	const confirmLink, cancelLink = "email change confirm token", "email change cancel token"
 	mover := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t, cfg), mover, uniq("moved")+"@api.test")
+	confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t, cfg), mover, newMailAddress())
 	require.NoError(t, err)
 	fact(confirmLink, "shape", shape(confirm))
 	_, err = auth.ConfirmEmailChange(ctx, &nokkuv1.ConfirmEmailChangeRequest{Token: new(tamper(confirm))})
@@ -222,7 +228,7 @@ func TestTokenKinds(t *testing.T) {
 	_, err = auth.CancelEmailChange(ctx, &nokkuv1.CancelEmailChangeRequest{Token: &cancel})
 	fact(cancelLink, "verifies", "CancelEmailChange "+rpcAnswer(err))
 
-	assertGolden(t, "token_kinds.golden", lines)
+	assertGolden(t, hostedGolden("token_kinds.golden"), lines)
 }
 
 func tokenOf(t *testing.T, link string) string {

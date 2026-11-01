@@ -18,10 +18,6 @@ import (
 
 func testState() *state.State {
 	return &state.State{
-		CAs: []state.CA{
-			{ID: "ca-1", Name: "main", Default: true},
-			{ID: "ca-2", Name: "legacy"},
-		},
 		Targets: []state.Target{
 			{ID: "t-1", Name: "web", Endpoints: []string{"10.0.0.5:2222"}},
 			{ID: "t-2", Name: "db", DaemonID: "d", Endpoints: []string{"10.0.0.6"}},
@@ -102,49 +98,6 @@ func TestFindTarget(t *testing.T) {
 			assert.Equal(t, tt.wantAt, at, "where nk connects")
 		})
 	}
-}
-
-func TestResolveCA(t *testing.T) {
-	t.Parallel()
-	cas := testState().CAs
-
-	ca, err := resolveCA(cas, "")
-	require.NoError(t, err)
-	assert.Equal(t, "ca-1", ca.ID, "the default wins")
-
-	ca, err = resolveCA(cas, "legacy")
-	require.NoError(t, err)
-	assert.Equal(t, "ca-2", ca.ID)
-
-	_, err = resolveCA(cas, "nope")
-	require.Error(t, err)
-
-	ca, err = resolveCA(cas, "LEGACY")
-	require.NoError(t, err)
-	assert.Equal(t, "ca-2", ca.ID, "a name matches without its case")
-
-	cas = append(cas, state.CA{ID: "ca-3", Name: "Legacy"})
-	ca, err = resolveCA(cas, "Legacy")
-	require.NoError(t, err)
-	assert.Equal(t, "ca-3", ca.ID, "the exact name wins")
-	_, err = resolveCA(cas, "LEGACY")
-	require.ErrorContains(t, err, "pass the id", "two names that differ only by case")
-
-	cas = append(cas, state.CA{ID: "ca-4", Name: "Legacy"})
-	_, err = resolveCA(cas, "Legacy")
-	require.ErrorContains(t, err, "pass the id", "two CAs with the same name")
-	ca, err = resolveCA(cas, "ca-4")
-	require.NoError(t, err)
-	assert.Equal(t, "ca-4", ca.ID, "the id settles it")
-
-	cas[0].Default = false
-	_, err = resolveCA(cas, "")
-	require.ErrorContains(t, err, "--ca")
-
-	cas = cas[:1]
-	ca, err = resolveCA(cas, "")
-	require.NoError(t, err)
-	assert.Equal(t, "ca-1", ca.ID, "the only CA needs no flag")
 }
 
 func TestEndpointRemote(t *testing.T) {

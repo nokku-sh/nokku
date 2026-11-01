@@ -58,11 +58,11 @@ func newNKSync(t *testing.T) *nkSync {
 	}
 }
 
-// target is a server set up with nk sync, on the CA caID, with one account.
-func (n *nkSync) target(t *testing.T, caID, username string) (targetID, accountID string) {
+// target is a server set up with nk sync, with one account.
+func (n *nkSync) target(t *testing.T, username string) (targetID, accountID string) {
 	t.Helper()
 	inWorkspace(t, n.cfg, seedWorkspace(t, n.cfg), func(q *db.Queries) error {
-		target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{Name: uniq("nk-sync"), CaID: &caID})
+		target, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{Name: uniq("nk-sync")})
 		if err != nil {
 			return err
 		}
@@ -137,20 +137,10 @@ func lifetime(cert *gossh.Certificate) time.Duration {
 // less keeps its own default, and a server with a daemon keeps the CA's lifetimes.
 func TestNKSyncCertificateLifetime(t *testing.T) {
 	n := newNKSync(t)
-	caID := seedDefaultCA(t, n.srv, header("Authorization",
-		"Bearer "+seedMember(t, n.cfg, seedWorkspace(t, n.cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))).GetId()
-	short, err := n.certs.CreateCertificateAuthority(t.Context(), &nokkuv1.CreateCertificateAuthorityRequest{
-		Name:           new(uniq("short")),
-		UserDefaultTtl: durationpb.New(20 * time.Minute),
-		UserMaxTtl:     durationpb.New(30 * time.Minute),
-	})
-	require.NoError(t, err)
 	personID, token := n.person(t)
 
-	targetID, accountID := n.target(t, caID, "root")
+	targetID, accountID := n.target(t, "root")
 	n.grant(t, accountID, personID)
-	shortID, shortAccount := n.target(t, short.GetCertificateAuthority().GetId(), "root")
-	n.grant(t, shortAccount, personID)
 	_, enrolled := enrollTestDaemon(t, n.cfg, n.srv, seedWorkspace(t, n.cfg), true)
 	daemonAccount, err := n.accounts.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
 		TargetId: new(enrolled.GetTargetId()),
@@ -167,14 +157,18 @@ func TestNKSyncCertificateLifetime(t *testing.T) {
 		nklogin.ServerPrincipal(targetID, "root"),
 	}, cert.ValidPrincipals)
 
-	cert, err = n.sign(t, token, shortID, 0)
-	require.NoError(t, err)
-	assert.InDelta(t, 20*time.Minute, lifetime(cert), float64(2*time.Second), "the cap made a short CA longer")
-
 	cert, err = n.sign(t, token, enrolled.GetTargetId(), 48*time.Hour)
 	require.NoError(t, err)
 	assert.InDelta(t, 48*time.Hour, lifetime(cert), float64(2*time.Second), "a server with a daemon got the cap")
 	assert.Equal(t, []string{nklogin.Principal(personID, enrolled.GetTargetId(), "root")}, cert.ValidPrincipals)
+
+	setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{
+		UserDefaultTtl: durationpb.New(20 * time.Minute),
+		UserMaxTtl:     durationpb.New(30 * time.Minute),
+	})
+	cert, err = n.sign(t, token, targetID, 0)
+	require.NoError(t, err)
+	assert.InDelta(t, 20*time.Minute, lifetime(cert), float64(2*time.Second), "the cap made a short CA longer")
 }
 
 // The core signs, real OpenSSH checks with the rule nk sync writes. Access changes on the core alone: a new grant
@@ -195,10 +189,9 @@ func TestNKSyncServerWithOpenSSH(t *testing.T) {
 	account := current.Username
 
 	n := newNKSync(t)
-	ca := seedDefaultCA(t, n.srv, header("Authorization",
-		"Bearer "+seedMember(t, n.cfg, seedWorkspace(t, n.cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
-	targetID, accountID := n.target(t, ca.GetId(), account)
-	otherID, otherAccount := n.target(t, ca.GetId(), account)
+	ca := workspaceCA(t, n.cfg)
+	targetID, accountID := n.target(t, account)
+	otherID, otherAccount := n.target(t, account)
 	alice, aliceToken := n.person(t)
 	bob, bobToken := n.person(t)
 	n.grant(t, accountID, alice)

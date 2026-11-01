@@ -1,6 +1,6 @@
 -- name: CreateDaemon :one
 -- Returns no row on a taken name or key, so the caller can retry in its tx. A target of that name counts as
--- taken too, checked up front because its insert would otherwise abort the tx. No CA means the workspace default.
+-- taken too, checked up front because its insert would otherwise abort the tx.
 WITH
   new_daemon AS (
     INSERT INTO
@@ -28,15 +28,12 @@ WITH
   ),
   new_target AS (
     INSERT INTO
-      targets (daemon_id, name, ca_id)
+      targets (daemon_id, name)
     SELECT
       d.id,
-      d.name,
-      COALESCE(sqlc.narg('ca_id')::UUID, ca.id)
+      d.name
     FROM
       new_daemon d
-      LEFT JOIN ssh_cas ca ON ca.workspace_id = d.workspace_id
-      AND ca.is_default
     RETURNING
       id
   )

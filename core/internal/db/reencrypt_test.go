@@ -13,9 +13,8 @@ import (
 
 // clearBytea are the BYTEA columns that hold no secret, and why.
 var clearBytea = map[string]string{
-	"user_avatars.image": "a picture the workspace sees anyway",
-	"credentials.data":   "the public half of a passkey and its counters",
-	"keysets.data":       "the keyset itself, wrapped by the KMS key or NOKKU_SECRET",
+	"credentials.data": "the public half of a passkey and its counters",
+	"keysets.data":     "the keyset itself, wrapped by the KMS key or NOKKU_SECRET",
 }
 
 var (

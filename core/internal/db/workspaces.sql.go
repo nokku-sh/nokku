@@ -12,13 +12,27 @@ import (
 	nokku "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
+const claimWorkspace = `-- name: ClaimWorkspace :exec
+UPDATE workspaces
+SET
+  claimed_at = NOW()
+WHERE
+  claimed_at IS NULL
+`
+
+// Stored once, the sessions and devices of a first sign-in all end or get deleted.
+func (q *Queries) ClaimWorkspace(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, claimWorkspace)
+	return err
+}
+
 const createWorkspace = `-- name: CreateWorkspace :one
 INSERT INTO
   workspaces (id, slug, name, description, settings)
 VALUES
   ($1, $2, $3, $4, $5)
 RETURNING
-  id, slug, name, description, settings, requestable_tags, created_at, updated_at
+  id, slug, name, description, settings, requestable_tags, claimed_at, created_at, updated_at
 `
 
 type CreateWorkspaceParams struct {
@@ -45,10 +59,27 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg *CreateWorkspaceParam
 		&i.Description,
 		&i.Settings,
 		&i.RequestableTags,
+		&i.ClaimedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return &i, err
+}
+
+const deleteUnclaimedWorkspace = `-- name: DeleteUnclaimedWorkspace :execrows
+DELETE FROM workspaces
+WHERE
+  id = $1
+  AND claimed_at IS NULL
+`
+
+// Asks again, a first sign-in may have come since the list.
+func (q *Queries) DeleteUnclaimedWorkspace(ctx context.Context, workspaceID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUnclaimedWorkspace, workspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteWorkspace = `-- name: DeleteWorkspace :exec
@@ -65,7 +96,7 @@ func (q *Queries) DeleteWorkspace(ctx context.Context, workspaceID string) error
 
 const getFirstWorkspace = `-- name: GetFirstWorkspace :one
 SELECT
-  id, slug, name, description, settings, requestable_tags, created_at, updated_at
+  id, slug, name, description, settings, requestable_tags, claimed_at, created_at, updated_at
 FROM
   workspaces
 ORDER BY
@@ -86,6 +117,7 @@ func (q *Queries) GetFirstWorkspace(ctx context.Context) (*Workspace, error) {
 		&i.Description,
 		&i.Settings,
 		&i.RequestableTags,
+		&i.ClaimedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -94,7 +126,7 @@ func (q *Queries) GetFirstWorkspace(ctx context.Context) (*Workspace, error) {
 
 const getWorkspace = `-- name: GetWorkspace :one
 SELECT
-  id, slug, name, description, settings, requestable_tags, created_at, updated_at
+  id, slug, name, description, settings, requestable_tags, claimed_at, created_at, updated_at
 FROM
   workspaces
 WHERE
@@ -112,6 +144,7 @@ func (q *Queries) GetWorkspace(ctx context.Context) (*Workspace, error) {
 		&i.Description,
 		&i.Settings,
 		&i.RequestableTags,
+		&i.ClaimedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -120,7 +153,7 @@ func (q *Queries) GetWorkspace(ctx context.Context) (*Workspace, error) {
 
 const getWorkspaceBySlug = `-- name: GetWorkspaceBySlug :one
 SELECT
-  id, slug, name, description, settings, requestable_tags, created_at, updated_at
+  id, slug, name, description, settings, requestable_tags, claimed_at, created_at, updated_at
 FROM
   workspaces
 WHERE
@@ -137,6 +170,7 @@ func (q *Queries) GetWorkspaceBySlug(ctx context.Context, slug string) (*Workspa
 		&i.Description,
 		&i.Settings,
 		&i.RequestableTags,
+		&i.ClaimedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -145,7 +179,7 @@ func (q *Queries) GetWorkspaceBySlug(ctx context.Context, slug string) (*Workspa
 
 const getWorkspaceForUpdate = `-- name: GetWorkspaceForUpdate :one
 SELECT
-  id, slug, name, description, settings, requestable_tags, created_at, updated_at
+  id, slug, name, description, settings, requestable_tags, claimed_at, created_at, updated_at
 FROM
   workspaces
 WHERE
@@ -163,6 +197,7 @@ func (q *Queries) GetWorkspaceForUpdate(ctx context.Context) (*Workspace, error)
 		&i.Description,
 		&i.Settings,
 		&i.RequestableTags,
+		&i.ClaimedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -187,39 +222,15 @@ func (q *Queries) GetWorkspaceStateVersion(ctx context.Context, workspaceID stri
 
 const listUnclaimedWorkspaces = `-- name: ListUnclaimedWorkspaces :many
 SELECT
-  w.id, w.slug, w.name, w.description, w.settings, w.requestable_tags, w.created_at, w.updated_at
+  id, slug, name, description, settings, requestable_tags, claimed_at, created_at, updated_at
 FROM
-  workspaces w
+  workspaces
 WHERE
-  w.created_at < $1
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      access_tokens s
-    WHERE
-      s.workspace_id = w.id
-      AND s.kind IN ('user', 'cli')
-  )
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      credentials c
-    WHERE
-      c.workspace_id = w.id
-  )
-  AND NOT EXISTS (
-    SELECT
-      1
-    FROM
-      known_devices d
-    WHERE
-      d.workspace_id = w.id
-  )
+  created_at < $1
+  AND claimed_at IS NULL
 `
 
-// Signups whose owner never signed in. Runs as nokku_system.
+// Signups nobody ever signed in to. Runs as nokku_system.
 func (q *Queries) ListUnclaimedWorkspaces(ctx context.Context, cutoff time.Time) ([]*Workspace, error) {
 	rows, err := q.db.Query(ctx, listUnclaimedWorkspaces, cutoff)
 	if err != nil {
@@ -236,6 +247,7 @@ func (q *Queries) ListUnclaimedWorkspaces(ctx context.Context, cutoff time.Time)
 			&i.Description,
 			&i.Settings,
 			&i.RequestableTags,
+			&i.ClaimedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -284,7 +296,7 @@ SET
 WHERE
   id = current_workspace_id ()
 RETURNING
-  id, slug, name, description, settings, requestable_tags, created_at, updated_at
+  id, slug, name, description, settings, requestable_tags, claimed_at, created_at, updated_at
 `
 
 type UpdateWorkspaceParams struct {
@@ -303,6 +315,7 @@ func (q *Queries) UpdateWorkspace(ctx context.Context, arg *UpdateWorkspaceParam
 		&i.Description,
 		&i.Settings,
 		&i.RequestableTags,
+		&i.ClaimedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

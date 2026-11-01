@@ -7,7 +7,7 @@ Workspace deletion
 
 Its {{ if .Trial }}trial{{ else }}plan{{ end }} ended on {{ .EndDate }} and nobody subscribed since. Subscribe before the deletion and everything stays as it is.
 
-What goes: the servers and their access rules, the certificate authorities, the audit log and the recordings.
+What goes: the servers and their access rules, the certificate authority, the audit log and the recordings.
 
 The name: {{ .Slug }} becomes free for anyone to sign up with.
 

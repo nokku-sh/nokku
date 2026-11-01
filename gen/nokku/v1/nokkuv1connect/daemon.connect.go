@@ -34,13 +34,9 @@ const (
 	DaemonServiceDeleteDaemonProcedure = "/nokku.v1.DaemonService/DeleteDaemon"
 	// DaemonServiceListDaemonsProcedure is the procedure name of the DaemonService's ListDaemons RPC.
 	DaemonServiceListDaemonsProcedure = "/nokku.v1.DaemonService/ListDaemons"
-	// DaemonServiceListSessionsProcedure is the procedure name of the DaemonService's ListSessions RPC.
-	DaemonServiceListSessionsProcedure = "/nokku.v1.DaemonService/ListSessions"
 	// DaemonServiceCreateSessionProcedure is the procedure name of the DaemonService's CreateSession
 	// RPC.
 	DaemonServiceCreateSessionProcedure = "/nokku.v1.DaemonService/CreateSession"
-	// DaemonServiceCloseSessionProcedure is the procedure name of the DaemonService's CloseSession RPC.
-	DaemonServiceCloseSessionProcedure = "/nokku.v1.DaemonService/CloseSession"
 	// DaemonServiceRelayProcedure is the procedure name of the DaemonService's Relay RPC.
 	DaemonServiceRelayProcedure = "/nokku.v1.DaemonService/Relay"
 	// DaemonControlServiceEnrollDaemonProcedure is the procedure name of the DaemonControlService's
@@ -97,26 +93,11 @@ var (
 			IdempotencyLevel: connect.IdempotencyNoSideEffects,
 		}
 	})
-	daemonServiceListSessionsSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonService").Methods().ByName("ListSessions"),
-			Procedure:        DaemonServiceListSessionsProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
 	daemonServiceCreateSessionSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonService").Methods().ByName("CreateSession"),
 			Procedure:  DaemonServiceCreateSessionProcedure,
-		}
-	})
-	daemonServiceCloseSessionSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonService").Methods().ByName("CloseSession"),
-			Procedure:  DaemonServiceCloseSessionProcedure,
 		}
 	})
 	daemonServiceRelaySpec = sync.OnceValue(func() connect.Spec {
@@ -134,9 +115,7 @@ type DaemonServiceClient interface {
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
-	ListSessions(context.Context, *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error)
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
-	CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error)
 	Relay(context.Context) (DaemonServiceRelayClientStream, error)
 }
 
@@ -188,9 +167,7 @@ type DaemonServiceHandler interface {
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
-	ListSessions(context.Context, *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error)
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
-	CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error)
 	Relay(context.Context, DaemonServiceRelayServerStream) error
 }
 
@@ -203,9 +180,7 @@ func RegisterDaemonServiceHandler(server *connect.Server, svc DaemonServiceHandl
 		connect.Method{Spec: daemonServiceUpdateDaemonSpec(), Handler: adapter.updateDaemon},
 		connect.Method{Spec: daemonServiceDeleteDaemonSpec(), Handler: adapter.deleteDaemon},
 		connect.Method{Spec: daemonServiceListDaemonsSpec(), Handler: adapter.listDaemons},
-		connect.Method{Spec: daemonServiceListSessionsSpec(), Handler: adapter.listSessions},
 		connect.Method{Spec: daemonServiceCreateSessionSpec(), Handler: adapter.createSession},
-		connect.Method{Spec: daemonServiceCloseSessionSpec(), Handler: adapter.closeSession},
 		connect.Method{Spec: daemonServiceRelaySpec(), Handler: adapter.relay},
 	)
 }
@@ -253,16 +228,8 @@ func (UnimplementedDaemonServiceHandler) ListDaemons(context.Context, *v1.ListDa
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.ListDaemons is not implemented")
 }
 
-func (UnimplementedDaemonServiceHandler) ListSessions(context.Context, *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.ListSessions is not implemented")
-}
-
 func (UnimplementedDaemonServiceHandler) CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.CreateSession is not implemented")
-}
-
-func (UnimplementedDaemonServiceHandler) CloseSession(context.Context, *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.CloseSession is not implemented")
 }
 
 func (UnimplementedDaemonServiceHandler) Relay(context.Context, DaemonServiceRelayServerStream) error {
@@ -305,25 +272,9 @@ func (c *daemonServiceClient) ListDaemons(ctx context.Context, req *v1.ListDaemo
 	return &res, nil
 }
 
-func (c *daemonServiceClient) ListSessions(ctx context.Context, req *v1.ListSessionsRequest) (*v1.ListSessionsResponse, error) {
-	var res v1.ListSessionsResponse
-	if err := c.client.CallUnary(ctx, daemonServiceListSessionsSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
 func (c *daemonServiceClient) CreateSession(ctx context.Context, req *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error) {
 	var res v1.CreateSessionResponse
 	if err := c.client.CallUnary(ctx, daemonServiceCreateSessionSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *daemonServiceClient) CloseSession(ctx context.Context, req *v1.CloseSessionRequest) (*v1.CloseSessionResponse, error) {
-	var res v1.CloseSessionResponse
-	if err := c.client.CallUnary(ctx, daemonServiceCloseSessionSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -387,36 +338,12 @@ func (h daemonServiceHandler) listDaemons(ctx context.Context, _ connect.Spec, s
 	return stream.Send(res)
 }
 
-func (h daemonServiceHandler) listSessions(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.ListSessionsRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.ListSessions(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
 func (h daemonServiceHandler) createSession(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.CreateSessionRequest
 	if err := stream.Receive(&req); err != nil {
 		return err
 	}
 	res, err := h.svc.CreateSession(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h daemonServiceHandler) closeSession(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.CloseSessionRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.CloseSession(ctx, &req)
 	if err != nil {
 		return err
 	}

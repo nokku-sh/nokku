@@ -29,7 +29,6 @@ func main() {
 			&cli.IntFlag{Name: "users", Value: 8, Usage: "number of users"},
 			&cli.IntFlag{Name: "teams", Value: 5, Usage: "number of teams"},
 			&cli.IntFlag{Name: "service-accounts", Value: 5, Usage: "number of service accounts"},
-			&cli.IntFlag{Name: "cas", Value: 2, Usage: "number of SSH certificate authorities"},
 			&cli.IntFlag{Name: "targets", Value: 5, Usage: "number of servers without a daemon"},
 			&cli.IntFlag{Name: "daemons", Value: 5, Usage: "number of daemons, each with its server"},
 		},
@@ -55,7 +54,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	ctx, conn, keys, ws, err := open(ctx, ec)
+	ctx, conn, _, ws, err := open(ctx, ec)
 	if err != nil {
 		return err
 	}
@@ -63,12 +62,11 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		users:           cmd.Int("users"),
 		teams:           cmd.Int("teams"),
 		serviceAccounts: cmd.Int("service-accounts"),
-		cas:             cmd.Int("cas"),
 		targets:         cmd.Int("targets"),
 		daemons:         cmd.Int("daemons"),
 	}
 	err = conn.TenantTx(ctx, func(q *db.Queries) error {
-		return seed(ctx, q, keys, ws, n)
+		return seed(ctx, q, ws, n)
 	})
 	// The names are random, now and then one is taken already.
 	if db.IsUniqueViolation(err) || errors.Is(err, pgx.ErrNoRows) {
@@ -78,8 +76,8 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	fmt.Printf(
-		"%s got %d users, %d teams, %d service accounts, %d CAs, %d servers and %d daemons\n",
-		ws.Name, n.users, n.teams, n.serviceAccounts, n.cas, n.targets, n.daemons,
+		"%s got %d users, %d teams, %d service accounts, %d servers and %d daemons\n",
+		ws.Name, n.users, n.teams, n.serviceAccounts, n.targets, n.daemons,
 	)
 	return nil
 }

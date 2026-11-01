@@ -9,22 +9,14 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 // An edit moves updated_at. What a host reports about itself is no edit, or every sync would look like one.
 func TestEditsMoveUpdatedAt(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	ca := ssh.NewCA()
-	ca.Name = "ca"
-	var caID, serviceAccount string
-	asOwner(t, c, f, func(q *db.Queries) error {
-		row, err := q.CreateCA(t.Context(), ca)
-		if err != nil {
-			return err
-		}
-		caID = row.ID
+	var serviceAccount string
+	asOwner(t, c, f, func(q *db.Queries) (err error) {
 		serviceAccount, err = q.CreateServiceAccount(t.Context(), &db.CreateServiceAccountParams{
 			Name: "ci", Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
 		})
@@ -63,11 +55,10 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 			})
 			return err
 		}},
-		{"ssh_cas", caID, func(q *db.Queries) error {
-			_, err := q.UpdateCA(t.Context(), &db.UpdateCAParams{CaID: caID, Name: new("renamed")})
+		{"ssh_cas", f.ca, func(q *db.Queries) error {
+			_, err := q.UpdateCA(t.Context(), &db.UpdateCAParams{SourceAddress: new("10.0.0.0/8")})
 			return err
 		}},
-		{"ssh_cas", caID, func(q *db.Queries) error { return q.SetDefaultCA(t.Context(), caID) }},
 	} {
 		before := updatedAt(edit.table, edit.id)
 		asOwner(t, c, f, edit.run)

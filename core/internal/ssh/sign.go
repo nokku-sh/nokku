@@ -23,6 +23,12 @@ type RefusedError struct{ Reason string }
 
 func (e *RefusedError) Error() string { return e.Reason }
 
+// Limits are what a login certificate carries as critical options. An empty one adds nothing.
+type Limits struct {
+	ForceCommand  string
+	SourceAddress string
+}
+
 // SignCertificate refuses an empty principal list, such a certificate is valid for anyone. signer is the key
 // CASigner returns for the same certType, the host key never signs a login and the user key never vouches for a server.
 func SignCertificate(
@@ -33,6 +39,7 @@ func SignCertificate(
 	keyID string,
 	ttl time.Duration,
 	certType uint32,
+	limits Limits,
 ) (*ssh.Certificate, error) {
 	if len(principals) == 0 || len(principals) > maxPrincipals {
 		return nil, &RefusedError{fmt.Sprintf("a certificate takes 1 to %d principals, got %d",
@@ -67,7 +74,7 @@ func SignCertificate(
 	} else {
 		cert.CertType = ssh.UserCert
 		ttl = UserTTL(ca, ttl)
-		cert.Permissions = userPermissions(ca)
+		cert.Permissions = userPermissions(limits)
 	}
 	cert.ValidBefore = UnixUint64(time.Now().Add(ttl).Unix())
 
@@ -98,13 +105,15 @@ var userExtensions = map[string]string{
 	"permit-agent-forwarding": "",
 }
 
-func userPermissions(ca *db.SSHCA) ssh.Permissions {
+func userPermissions(limits Limits) ssh.Permissions {
 	perms := ssh.Permissions{Extensions: maps.Clone(userExtensions), CriticalOptions: map[string]string{}}
-	if ca.ForceCommand != "" {
-		perms.CriticalOptions["force-command"] = ca.ForceCommand
+	if limits.ForceCommand != "" {
+		perms.CriticalOptions["force-command"] = limits.ForceCommand
+		// ssh -N opens no session, so the command never runs and forwarding would be a free tunnel. A user rc runs first.
+		perms.Extensions = map[string]string{"permit-pty": ""}
 	}
-	if ca.SourceAddress != "" {
-		perms.CriticalOptions["source-address"] = ca.SourceAddress
+	if limits.SourceAddress != "" {
+		perms.CriticalOptions["source-address"] = limits.SourceAddress
 	}
 	return perms
 }

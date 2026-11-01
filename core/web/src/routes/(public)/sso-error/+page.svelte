@@ -43,6 +43,11 @@
 			description:
 				'Your identity provider account is not set up to sign in here yet. Contact your workspace admin.'
 		},
+		'identity linked': {
+			title: 'This account has another identity',
+			description:
+				'It is already linked to a different identity at this provider. Ask an admin to check the account.'
+		},
 		'email not verified': {
 			title: 'Email not verified',
 			description:

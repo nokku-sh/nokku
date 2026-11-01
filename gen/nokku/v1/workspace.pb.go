@@ -1139,6 +1139,86 @@ func (*DeleteUserResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{20}
 }
 
+type ClearUserIdentitiesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        *string                `protobuf:"bytes,1,opt,name=user_id,json=userId" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClearUserIdentitiesRequest) Reset() {
+	*x = ClearUserIdentitiesRequest{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClearUserIdentitiesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClearUserIdentitiesRequest) ProtoMessage() {}
+
+func (x *ClearUserIdentitiesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClearUserIdentitiesRequest.ProtoReflect.Descriptor instead.
+func (*ClearUserIdentitiesRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ClearUserIdentitiesRequest) GetUserId() string {
+	if x != nil && x.UserId != nil {
+		return *x.UserId
+	}
+	return ""
+}
+
+type ClearUserIdentitiesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClearUserIdentitiesResponse) Reset() {
+	*x = ClearUserIdentitiesResponse{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClearUserIdentitiesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClearUserIdentitiesResponse) ProtoMessage() {}
+
+func (x *ClearUserIdentitiesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClearUserIdentitiesResponse.ProtoReflect.Descriptor instead.
+func (*ClearUserIdentitiesResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{22}
+}
+
 type TransferOwnershipRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NewOwnerId    *string                `protobuf:"bytes,1,opt,name=new_owner_id,json=newOwnerId" json:"new_owner_id,omitempty"`
@@ -1148,7 +1228,7 @@ type TransferOwnershipRequest struct {
 
 func (x *TransferOwnershipRequest) Reset() {
 	*x = TransferOwnershipRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[21]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1160,7 +1240,7 @@ func (x *TransferOwnershipRequest) String() string {
 func (*TransferOwnershipRequest) ProtoMessage() {}
 
 func (x *TransferOwnershipRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[21]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1173,7 +1253,7 @@ func (x *TransferOwnershipRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferOwnershipRequest.ProtoReflect.Descriptor instead.
 func (*TransferOwnershipRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{21}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *TransferOwnershipRequest) GetNewOwnerId() string {
@@ -1191,7 +1271,7 @@ type TransferOwnershipResponse struct {
 
 func (x *TransferOwnershipResponse) Reset() {
 	*x = TransferOwnershipResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[22]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1203,7 +1283,7 @@ func (x *TransferOwnershipResponse) String() string {
 func (*TransferOwnershipResponse) ProtoMessage() {}
 
 func (x *TransferOwnershipResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[22]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1216,7 +1296,7 @@ func (x *TransferOwnershipResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferOwnershipResponse.ProtoReflect.Descriptor instead.
 func (*TransferOwnershipResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{22}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{24}
 }
 
 var File_nokku_v1_workspace_proto protoreflect.FileDescriptor
@@ -1259,13 +1339,13 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\vPlanFeature\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
-	"\x04plan\x18\x03 \x01(\tR\x04plan\"\xa1\x04\n" +
+	"\x04plan\x18\x03 \x01(\tR\x04plan\"\xf7\x03\n" +
 	"\x16UpdateWorkspaceRequest\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x03\x18\x80\x02R\x04name\x12*\n" +
 	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x127\n" +
-	"\bsettings\x18\x03 \x01(\v2\x1b.nokku.v1.WorkspaceSettingsR\bsettings\x12\x81\x03\n" +
-	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB\xc3\x02\xbaH\xbf\x02\xc8\x01\x01\xe2\x01\xb8\x02\x12\x04name\x12\vdescription\x12.settings.default_daemon_config.record_sessions\x12/settings.default_daemon_config.allow_forwarding\x125settings.default_daemon_config.allow_agent_forwarding\x12,settings.default_daemon_config.gateway_ports\x12(settings.default_daemon_config.ephemeral\x12\x14settings.enforce_sso\x12\x1dsettings.session_idle_timeoutR\n" +
+	"\bsettings\x18\x03 \x01(\v2\x1b.nokku.v1.WorkspaceSettingsR\bsettings\x12\xd7\x02\n" +
+	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB\x99\x02\xbaH\x95\x02\xc8\x01\x01\xe2\x01\x8e\x02\x12\x04name\x12\vdescription\x12.settings.default_daemon_config.record_sessions\x12/settings.default_daemon_config.allow_forwarding\x125settings.default_daemon_config.allow_agent_forwarding\x12,settings.default_daemon_config.gateway_ports\x12\x14settings.enforce_sso\x12\x1dsettings.session_idle_timeoutR\n" +
 	"updateMask\"L\n" +
 	"\x17UpdateWorkspaceResponse\x121\n" +
 	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\x18\n" +
@@ -1303,11 +1383,14 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x15SetUserActiveResponse\"6\n" +
 	"\x11DeleteUserRequest\x12!\n" +
 	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x14\n" +
-	"\x12DeleteUserResponse\"F\n" +
+	"\x12DeleteUserResponse\"?\n" +
+	"\x1aClearUserIdentitiesRequest\x12!\n" +
+	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x1d\n" +
+	"\x1bClearUserIdentitiesResponse\"F\n" +
 	"\x18TransferOwnershipRequest\x12*\n" +
 	"\fnew_owner_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
 	"newOwnerId\"\x1b\n" +
-	"\x19TransferOwnershipResponse2\x9a\a\n" +
+	"\x19TransferOwnershipResponse2\x8a\b\n" +
 	"\x10WorkspaceService\x12X\n" +
 	"\fGetWorkspace\x12\x1d.nokku.v1.GetWorkspaceRequest\x1a\x1e.nokku.v1.GetWorkspaceResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12^\n" +
 	"\x0fUpdateWorkspace\x12 .nokku.v1.UpdateWorkspaceRequest\x1a!.nokku.v1.UpdateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12`\n" +
@@ -1317,7 +1400,9 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x0eUpdateUserRole\x12\x1f.nokku.v1.UpdateUserRoleRequest\x1a .nokku.v1.UpdateUserRoleResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12X\n" +
 	"\rSetUserActive\x12\x1e.nokku.v1.SetUserActiveRequest\x1a\x1f.nokku.v1.SetUserActiveResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12O\n" +
 	"\n" +
-	"DeleteUser\x12\x1b.nokku.v1.DeleteUserRequest\x1a\x1c.nokku.v1.DeleteUserResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12f\n" +
+	"DeleteUser\x12\x1b.nokku.v1.DeleteUserRequest\x1a\x1c.nokku.v1.DeleteUserResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12n\n" +
+	"\x13ClearUserIdentities\x12$.nokku.v1.ClearUserIdentitiesRequest\x1a%.nokku.v1.ClearUserIdentitiesResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x04(\x010\x01\x12f\n" +
 	"\x11TransferOwnership\x12\".nokku.v1.TransferOwnershipRequest\x1a#.nokku.v1.TransferOwnershipResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12^\n" +
 	"\x0fCreateWorkspace\x12 .nokku.v1.CreateWorkspaceRequest\x1a!.nokku.v1.CreateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\b\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eWorkspaceProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -1334,58 +1419,60 @@ func file_nokku_v1_workspace_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_workspace_proto_rawDescData
 }
 
-var file_nokku_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_nokku_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_nokku_v1_workspace_proto_goTypes = []any{
-	(*Workspace)(nil),                 // 0: nokku.v1.Workspace
-	(*WorkspaceSettings)(nil),         // 1: nokku.v1.WorkspaceSettings
-	(*GetWorkspaceRequest)(nil),       // 2: nokku.v1.GetWorkspaceRequest
-	(*GetWorkspaceResponse)(nil),      // 3: nokku.v1.GetWorkspaceResponse
-	(*PlanFeature)(nil),               // 4: nokku.v1.PlanFeature
-	(*UpdateWorkspaceRequest)(nil),    // 5: nokku.v1.UpdateWorkspaceRequest
-	(*UpdateWorkspaceResponse)(nil),   // 6: nokku.v1.UpdateWorkspaceResponse
-	(*DeleteWorkspaceRequest)(nil),    // 7: nokku.v1.DeleteWorkspaceRequest
-	(*DeleteWorkspaceResponse)(nil),   // 8: nokku.v1.DeleteWorkspaceResponse
-	(*CreateWorkspaceRequest)(nil),    // 9: nokku.v1.CreateWorkspaceRequest
-	(*CreateWorkspaceResponse)(nil),   // 10: nokku.v1.CreateWorkspaceResponse
-	(*ListUsersRequest)(nil),          // 11: nokku.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),         // 12: nokku.v1.ListUsersResponse
-	(*GetUserRequest)(nil),            // 13: nokku.v1.GetUserRequest
-	(*GetUserResponse)(nil),           // 14: nokku.v1.GetUserResponse
-	(*UpdateUserRoleRequest)(nil),     // 15: nokku.v1.UpdateUserRoleRequest
-	(*UpdateUserRoleResponse)(nil),    // 16: nokku.v1.UpdateUserRoleResponse
-	(*SetUserActiveRequest)(nil),      // 17: nokku.v1.SetUserActiveRequest
-	(*SetUserActiveResponse)(nil),     // 18: nokku.v1.SetUserActiveResponse
-	(*DeleteUserRequest)(nil),         // 19: nokku.v1.DeleteUserRequest
-	(*DeleteUserResponse)(nil),        // 20: nokku.v1.DeleteUserResponse
-	(*TransferOwnershipRequest)(nil),  // 21: nokku.v1.TransferOwnershipRequest
-	(*TransferOwnershipResponse)(nil), // 22: nokku.v1.TransferOwnershipResponse
-	nil,                               // 23: nokku.v1.GetWorkspaceResponse.FeaturesEntry
-	nil,                               // 24: nokku.v1.GetWorkspaceResponse.PlanNamesEntry
-	(*timestamppb.Timestamp)(nil),     // 25: google.protobuf.Timestamp
-	(*DaemonConfig)(nil),              // 26: nokku.v1.DaemonConfig
-	(*durationpb.Duration)(nil),       // 27: google.protobuf.Duration
-	(*fieldmaskpb.FieldMask)(nil),     // 28: google.protobuf.FieldMask
-	(WorkspaceRole)(0),                // 29: nokku.v1.WorkspaceRole
-	(*User)(nil),                      // 30: nokku.v1.User
+	(*Workspace)(nil),                   // 0: nokku.v1.Workspace
+	(*WorkspaceSettings)(nil),           // 1: nokku.v1.WorkspaceSettings
+	(*GetWorkspaceRequest)(nil),         // 2: nokku.v1.GetWorkspaceRequest
+	(*GetWorkspaceResponse)(nil),        // 3: nokku.v1.GetWorkspaceResponse
+	(*PlanFeature)(nil),                 // 4: nokku.v1.PlanFeature
+	(*UpdateWorkspaceRequest)(nil),      // 5: nokku.v1.UpdateWorkspaceRequest
+	(*UpdateWorkspaceResponse)(nil),     // 6: nokku.v1.UpdateWorkspaceResponse
+	(*DeleteWorkspaceRequest)(nil),      // 7: nokku.v1.DeleteWorkspaceRequest
+	(*DeleteWorkspaceResponse)(nil),     // 8: nokku.v1.DeleteWorkspaceResponse
+	(*CreateWorkspaceRequest)(nil),      // 9: nokku.v1.CreateWorkspaceRequest
+	(*CreateWorkspaceResponse)(nil),     // 10: nokku.v1.CreateWorkspaceResponse
+	(*ListUsersRequest)(nil),            // 11: nokku.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),           // 12: nokku.v1.ListUsersResponse
+	(*GetUserRequest)(nil),              // 13: nokku.v1.GetUserRequest
+	(*GetUserResponse)(nil),             // 14: nokku.v1.GetUserResponse
+	(*UpdateUserRoleRequest)(nil),       // 15: nokku.v1.UpdateUserRoleRequest
+	(*UpdateUserRoleResponse)(nil),      // 16: nokku.v1.UpdateUserRoleResponse
+	(*SetUserActiveRequest)(nil),        // 17: nokku.v1.SetUserActiveRequest
+	(*SetUserActiveResponse)(nil),       // 18: nokku.v1.SetUserActiveResponse
+	(*DeleteUserRequest)(nil),           // 19: nokku.v1.DeleteUserRequest
+	(*DeleteUserResponse)(nil),          // 20: nokku.v1.DeleteUserResponse
+	(*ClearUserIdentitiesRequest)(nil),  // 21: nokku.v1.ClearUserIdentitiesRequest
+	(*ClearUserIdentitiesResponse)(nil), // 22: nokku.v1.ClearUserIdentitiesResponse
+	(*TransferOwnershipRequest)(nil),    // 23: nokku.v1.TransferOwnershipRequest
+	(*TransferOwnershipResponse)(nil),   // 24: nokku.v1.TransferOwnershipResponse
+	nil,                                 // 25: nokku.v1.GetWorkspaceResponse.FeaturesEntry
+	nil,                                 // 26: nokku.v1.GetWorkspaceResponse.PlanNamesEntry
+	(*timestamppb.Timestamp)(nil),       // 27: google.protobuf.Timestamp
+	(*DaemonConfig)(nil),                // 28: nokku.v1.DaemonConfig
+	(*durationpb.Duration)(nil),         // 29: google.protobuf.Duration
+	(*fieldmaskpb.FieldMask)(nil),       // 30: google.protobuf.FieldMask
+	(WorkspaceRole)(0),                  // 31: nokku.v1.WorkspaceRole
+	(*User)(nil),                        // 32: nokku.v1.User
 }
 var file_nokku_v1_workspace_proto_depIdxs = []int32{
 	1,  // 0: nokku.v1.Workspace.settings:type_name -> nokku.v1.WorkspaceSettings
-	25, // 1: nokku.v1.Workspace.created_at:type_name -> google.protobuf.Timestamp
-	25, // 2: nokku.v1.Workspace.updated_at:type_name -> google.protobuf.Timestamp
-	26, // 3: nokku.v1.WorkspaceSettings.default_daemon_config:type_name -> nokku.v1.DaemonConfig
-	27, // 4: nokku.v1.WorkspaceSettings.session_idle_timeout:type_name -> google.protobuf.Duration
+	27, // 1: nokku.v1.Workspace.created_at:type_name -> google.protobuf.Timestamp
+	27, // 2: nokku.v1.Workspace.updated_at:type_name -> google.protobuf.Timestamp
+	28, // 3: nokku.v1.WorkspaceSettings.default_daemon_config:type_name -> nokku.v1.DaemonConfig
+	29, // 4: nokku.v1.WorkspaceSettings.session_idle_timeout:type_name -> google.protobuf.Duration
 	0,  // 5: nokku.v1.GetWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	25, // 6: nokku.v1.GetWorkspaceResponse.delete_at:type_name -> google.protobuf.Timestamp
-	23, // 7: nokku.v1.GetWorkspaceResponse.features:type_name -> nokku.v1.GetWorkspaceResponse.FeaturesEntry
+	27, // 6: nokku.v1.GetWorkspaceResponse.delete_at:type_name -> google.protobuf.Timestamp
+	25, // 7: nokku.v1.GetWorkspaceResponse.features:type_name -> nokku.v1.GetWorkspaceResponse.FeaturesEntry
 	4,  // 8: nokku.v1.GetWorkspaceResponse.catalog:type_name -> nokku.v1.PlanFeature
-	24, // 9: nokku.v1.GetWorkspaceResponse.plan_names:type_name -> nokku.v1.GetWorkspaceResponse.PlanNamesEntry
+	26, // 9: nokku.v1.GetWorkspaceResponse.plan_names:type_name -> nokku.v1.GetWorkspaceResponse.PlanNamesEntry
 	1,  // 10: nokku.v1.UpdateWorkspaceRequest.settings:type_name -> nokku.v1.WorkspaceSettings
-	28, // 11: nokku.v1.UpdateWorkspaceRequest.update_mask:type_name -> google.protobuf.FieldMask
+	30, // 11: nokku.v1.UpdateWorkspaceRequest.update_mask:type_name -> google.protobuf.FieldMask
 	0,  // 12: nokku.v1.UpdateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	29, // 13: nokku.v1.ListUsersRequest.role:type_name -> nokku.v1.WorkspaceRole
-	30, // 14: nokku.v1.ListUsersResponse.users:type_name -> nokku.v1.User
-	30, // 15: nokku.v1.GetUserResponse.user:type_name -> nokku.v1.User
-	29, // 16: nokku.v1.UpdateUserRoleRequest.role:type_name -> nokku.v1.WorkspaceRole
+	31, // 13: nokku.v1.ListUsersRequest.role:type_name -> nokku.v1.WorkspaceRole
+	32, // 14: nokku.v1.ListUsersResponse.users:type_name -> nokku.v1.User
+	32, // 15: nokku.v1.GetUserResponse.user:type_name -> nokku.v1.User
+	31, // 16: nokku.v1.UpdateUserRoleRequest.role:type_name -> nokku.v1.WorkspaceRole
 	2,  // 17: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
 	5,  // 18: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
 	7,  // 19: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
@@ -1394,20 +1481,22 @@ var file_nokku_v1_workspace_proto_depIdxs = []int32{
 	15, // 22: nokku.v1.WorkspaceService.UpdateUserRole:input_type -> nokku.v1.UpdateUserRoleRequest
 	17, // 23: nokku.v1.WorkspaceService.SetUserActive:input_type -> nokku.v1.SetUserActiveRequest
 	19, // 24: nokku.v1.WorkspaceService.DeleteUser:input_type -> nokku.v1.DeleteUserRequest
-	21, // 25: nokku.v1.WorkspaceService.TransferOwnership:input_type -> nokku.v1.TransferOwnershipRequest
-	9,  // 26: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
-	3,  // 27: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
-	6,  // 28: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
-	8,  // 29: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
-	12, // 30: nokku.v1.WorkspaceService.ListUsers:output_type -> nokku.v1.ListUsersResponse
-	14, // 31: nokku.v1.WorkspaceService.GetUser:output_type -> nokku.v1.GetUserResponse
-	16, // 32: nokku.v1.WorkspaceService.UpdateUserRole:output_type -> nokku.v1.UpdateUserRoleResponse
-	18, // 33: nokku.v1.WorkspaceService.SetUserActive:output_type -> nokku.v1.SetUserActiveResponse
-	20, // 34: nokku.v1.WorkspaceService.DeleteUser:output_type -> nokku.v1.DeleteUserResponse
-	22, // 35: nokku.v1.WorkspaceService.TransferOwnership:output_type -> nokku.v1.TransferOwnershipResponse
-	10, // 36: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
-	27, // [27:37] is the sub-list for method output_type
-	17, // [17:27] is the sub-list for method input_type
+	21, // 25: nokku.v1.WorkspaceService.ClearUserIdentities:input_type -> nokku.v1.ClearUserIdentitiesRequest
+	23, // 26: nokku.v1.WorkspaceService.TransferOwnership:input_type -> nokku.v1.TransferOwnershipRequest
+	9,  // 27: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
+	3,  // 28: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
+	6,  // 29: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
+	8,  // 30: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
+	12, // 31: nokku.v1.WorkspaceService.ListUsers:output_type -> nokku.v1.ListUsersResponse
+	14, // 32: nokku.v1.WorkspaceService.GetUser:output_type -> nokku.v1.GetUserResponse
+	16, // 33: nokku.v1.WorkspaceService.UpdateUserRole:output_type -> nokku.v1.UpdateUserRoleResponse
+	18, // 34: nokku.v1.WorkspaceService.SetUserActive:output_type -> nokku.v1.SetUserActiveResponse
+	20, // 35: nokku.v1.WorkspaceService.DeleteUser:output_type -> nokku.v1.DeleteUserResponse
+	22, // 36: nokku.v1.WorkspaceService.ClearUserIdentities:output_type -> nokku.v1.ClearUserIdentitiesResponse
+	24, // 37: nokku.v1.WorkspaceService.TransferOwnership:output_type -> nokku.v1.TransferOwnershipResponse
+	10, // 38: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
+	28, // [28:39] is the sub-list for method output_type
+	17, // [17:28] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
 	17, // [17:17] is the sub-list for extension extendee
 	0,  // [0:17] is the sub-list for field type_name
@@ -1427,7 +1516,7 @@ func file_nokku_v1_workspace_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_workspace_proto_rawDesc), len(file_nokku_v1_workspace_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

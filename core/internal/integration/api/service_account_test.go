@@ -67,6 +67,120 @@ func TestUpdateServiceAccount(t *testing.T) {
 	assert.Empty(t, cleared.GetServiceAccount().GetTags(), "naming the tags with none clears them")
 }
 
+// An account stores its limits the way a server reads them, and refuses a list no server can read.
+func TestServiceAccountLimits(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	client := nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header(
+			"Authorization",
+			"Bearer "+seedMember(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+		)),
+	)
+
+	_, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+		Name: new(uniq("limited")), SourceAddress: new("the office"),
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
+
+	created, err := client.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+		Name:          new(uniq("limited")),
+		ForceCommand:  new(" /usr/local/bin/deploy "),
+		SourceAddress: new("10.0.0.0/8, 192.0.2.7"),
+	})
+	require.NoError(t, err)
+	account := created.GetServiceAccount()
+	assert.Equal(t, "/usr/local/bin/deploy", account.GetForceCommand())
+	assert.Equal(t, "10.0.0.0/8,192.0.2.7", account.GetSourceAddress())
+
+	_, err = client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+		Id: account.Id, SourceAddress: new("the office"),
+	}))
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
+
+	// An update that names neither keeps both, an empty one takes the limit away.
+	renamed, err := client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+		Id: account.Id, Description: new("changed"),
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, "10.0.0.0/8,192.0.2.7", renamed.GetServiceAccount().GetSourceAddress())
+	cleared, err := client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+		Id: account.Id, SourceAddress: new(""),
+	}))
+	require.NoError(t, err)
+	assert.Empty(t, cleared.GetServiceAccount().GetSourceAddress())
+	assert.Equal(t, "/usr/local/bin/deploy", cleared.GetServiceAccount().GetForceCommand())
+}
+
+// Only a person changes what limits a machine. An editor account could otherwise lift its own limits, and a CI job that
+// holds one could roll the CA over for the whole workspace.
+func TestMachinesDoNotChangeTheirLimits(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	u := seedUser(t, cfg, seedWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+	person := header("Authorization", "Bearer "+sessionFor(t, cfg, u))
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(
+		connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), person),
+	)
+	created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+		Name:          new(uniq("editor")),
+		Role:          nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR.Enum(),
+		ForceCommand:  new("/usr/local/bin/deploy"),
+		SourceAddress: new("10.0.0.0/8"),
+	})
+	require.NoError(t, err)
+	id := created.GetServiceAccount().Id
+	minted, err := accounts.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
+		ServiceAccountId: id,
+		Label:            new("ci"),
+		ExpiresAt:        timestamppb.New(time.Now().Add(time.Hour)),
+	})
+	require.NoError(t, err)
+
+	machine := connect.NewClient(
+		connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+minted.GetSecret()),
+	)
+	_, err = nokkuv1connect.NewServiceAccountServiceClient(machine).UpdateServiceAccount(t.Context(),
+		masked(&nokkuv1.UpdateServiceAccountRequest{Id: id, ForceCommand: new(""), SourceAddress: new("")}))
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "lifting its own limits: %v", err)
+
+	authority := nokkuv1connect.NewCertificateServiceClient(machine)
+	_, err = authority.UpdateCertificateAuthority(t.Context(),
+		masked(&nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("")}))
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "clearing the list of people: %v", err)
+	_, err = authority.RolloverCertificateAuthority(t.Context(),
+		&nokkuv1.RolloverCertificateAuthorityRequest{RevokePrevious: new(true)})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "rolling the CA over: %v", err)
+
+	got, err := accounts.GetServiceAccount(t.Context(), &nokkuv1.GetServiceAccountRequest{Id: id})
+	require.NoError(t, err)
+	assert.Equal(t, "/usr/local/bin/deploy", got.GetServiceAccount().GetForceCommand())
+
+	// A name is no limit, an old sign-in may change it.
+	old := connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL),
+		header("Cookie", sessionCookie+"="+browserSession(t, cfg, u, oldSignIn).token))
+	oldAccounts := nokkuv1connect.NewServiceAccountServiceClient(old)
+	_, err = oldAccounts.UpdateServiceAccount(t.Context(),
+		masked(&nokkuv1.UpdateServiceAccountRequest{Id: id, Description: new("changed")}))
+	require.NoError(t, err)
+
+	// The web app sends the whole account and names what changed, a field the mask leaves out asks for nothing.
+	_, err = oldAccounts.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{
+		Id:           id,
+		Description:  new("changed again"),
+		ForceCommand: new(""),
+		UpdateMask:   &fieldmaskpb.FieldMask{Paths: []string{"description"}},
+	})
+	require.NoError(t, err)
+	got, err = accounts.GetServiceAccount(t.Context(), &nokkuv1.GetServiceAccountRequest{Id: id})
+	require.NoError(t, err)
+	assert.Equal(t, "changed again", got.GetServiceAccount().GetDescription())
+	assert.Equal(
+		t,
+		"/usr/local/bin/deploy",
+		got.GetServiceAccount().GetForceCommand(),
+		"a field outside the mask changed",
+	)
+}
+
 func TestServiceAccountRole(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	auth := header(
@@ -119,6 +233,7 @@ func TestServiceAccountRole(t *testing.T) {
 	assert.Error(t, err, "the table took a service account above the editor")
 }
 
+// serviceAccountToken is a key that ends at expiresAt, in a month when it is nil.
 func serviceAccountToken(
 	t *testing.T,
 	client nokkuv1connect.ServiceAccountServiceClient,
@@ -126,6 +241,9 @@ func serviceAccountToken(
 	expiresAt *timestamppb.Timestamp,
 ) string {
 	t.Helper()
+	if expiresAt == nil {
+		expiresAt = timestamppb.New(time.Now().AddDate(0, 1, 0))
+	}
 	res, err := client.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
 		ServiceAccountId: &id,
 		ExpiresAt:        expiresAt,
@@ -165,14 +283,18 @@ func TestServiceAccountTokens(t *testing.T) {
 	assert.WithinDuration(t, expiry, first.GetToken().GetExpiresAt().AsTime(), time.Second)
 	second, err := client.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
 		ServiceAccountId: &id,
+		ExpiresAt:        timestamppb.New(expiry),
 	})
 	require.NoError(t, err)
-	assert.Nil(t, second.GetToken().GetExpiresAt(), "an expiry that is left out never expires")
+	_, err = client.CreateServiceAccountToken(t.Context(), &nokkuv1.CreateServiceAccountTokenRequest{
+		ServiceAccountId: &id,
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a key with no end date, got %v", err)
 
 	whoami := func(token string) (string, error) {
-		res, err := nokkuv1connect.NewUtilServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
-			Whoami(t.Context(), &nokkuv1.WhoamiRequest{})
-		return res.GetSubjectId(), err
+		res, err := nokkuv1connect.NewTargetServiceClient(connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL), header("Authorization", "Bearer "+token))).
+			GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{})
+		return res.GetServiceAccount().GetId(), err
 	}
 	for _, secret := range []string{first.GetSecret(), second.GetSecret()} {
 		got, err := whoami(secret)

@@ -22,13 +22,11 @@ type ServiceAccount struct {
 	Name string `json:"name"`
 }
 
+// CA is the one certificate authority of the workspace.
 type CA struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
 	// PublicKey signs login certificates, HostPublicKey the host certificates daemons present.
 	PublicKey     string `json:"public_key"`
 	HostPublicKey string `json:"host_public_key,omitempty"`
-	Default       bool   `json:"default,omitzero"`
 	// The keys before the last rollover. Their certificates stay trusted until PreviousTrustedUntil.
 	PreviousPublicKey     string    `json:"previous_public_key,omitempty"`
 	PreviousHostPublicKey string    `json:"previous_host_public_key,omitempty"`
@@ -55,7 +53,6 @@ func (ca CA) trusted(current, previous string) []string {
 
 type Target struct {
 	ID        string   `json:"id"`
-	CAID      string   `json:"ca_id,omitempty"`
 	DaemonID  string   `json:"daemon_id,omitempty"`
 	Name      string   `json:"name"`
 	Endpoints []string `json:"endpoints,omitempty"`
@@ -90,7 +87,7 @@ type Cache struct {
 	FailedAt       time.Time       `json:"failed_at,omitzero"`
 	User           *User           `json:"user,omitempty"`
 	ServiceAccount *ServiceAccount `json:"service_account,omitempty"`
-	CAs            []CA            `json:"cas,omitempty"`
+	CA             *CA             `json:"ca,omitempty"`
 	Targets        []Target        `json:"targets,omitempty"`
 }
 
@@ -152,6 +149,10 @@ func (s *State) SyncFailedWithin(d time.Duration) bool {
 
 func (s *State) IsServiceAccount() bool { return s.Token != "" }
 
+// CIJob reports a session nk login --ci got. No person is around to approve a browser sign-in for it. A snapshot left
+// by NK_TOKEN names an account too, but holds no session.
+func (s *State) CIJob() bool { return s.Token == "" && s.ServiceAccount != nil && s.SessionToken != "" }
+
 // SubjectID is empty when the snapshot names no subject.
 func (c Cache) SubjectID() string {
 	switch {
@@ -181,15 +182,6 @@ func (s *State) TargetByID(id string) *Target {
 	for i := range s.Targets {
 		if s.Targets[i].ID == id {
 			return &s.Targets[i]
-		}
-	}
-	return nil
-}
-
-func (s *State) CAByID(id string) *CA {
-	for i := range s.CAs {
-		if s.CAs[i].ID == id {
-			return &s.CAs[i]
 		}
 	}
 	return nil

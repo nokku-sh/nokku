@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 
@@ -51,42 +49,6 @@ func (s *accountService) UpdateAccount(
 		return nil, err
 	}
 	return &nokkuv1.UpdateAccountResponse{User: u.ToProto()}, nil
-}
-
-// SetAvatar keeps the picture in the database and points users.picture at it, by a URL that changes with it.
-func (s *accountService) SetAvatar(
-	ctx context.Context,
-	req *nokkuv1.SetAvatarRequest,
-) (*nokkuv1.SetAvatarResponse, error) {
-	userID := actor.UserIDFromContext(ctx)
-	var image []byte
-	var etag, picture string
-	if len(req.GetImage()) > 0 {
-		var err error
-		if image, err = avatarJPEG(req.GetImage()); err != nil {
-			return nil, newError(connect.CodeInvalidArgument, err.Error())
-		}
-		sum := sha256.Sum256(image)
-		etag = hex.EncodeToString(sum[:8])
-		picture = "/avatars/" + userID + "?v=" + etag
-	}
-
-	var u *db.User
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if image == nil {
-			err = q.DeleteAvatar(ctx, userID)
-		} else {
-			err = q.PutAvatar(ctx, &db.PutAvatarParams{UserID: userID, Image: image, Etag: etag})
-		}
-		if err != nil {
-			return err
-		}
-		u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: userID, Picture: &picture})
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	return &nokkuv1.SetAvatarResponse{User: u.ToProto()}, nil
 }
 
 // RequestEmailChange mails the confirm link to the new address and a cancel link to the current one.

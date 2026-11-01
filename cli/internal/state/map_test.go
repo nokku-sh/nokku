@@ -9,33 +9,29 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
-const (
-	caID     = "0199a0a0-0000-7000-8000-000000000002"
-	targetID = "0199a0a0-0000-7000-8000-000000000003"
-)
+const targetID = "0199a0a0-0000-7000-8000-000000000003"
 
 func TestFromAccess(t *testing.T) {
 	t.Parallel()
 	res := &nokkuv1.GetSubjectAccessResponse{
-		Subject: &nokkuv1.GetSubjectAccessResponse_User{User: &nokkuv1.User{Id: new("u"), Name: new("alice")}},
-		CertificateAuthorities: []*nokkuv1.CertificateAuthority{
-			{Id: new(caID), Name: new("ssh"), PublicKey: new("ssh-ed25519 AAAA")},
-			{Id: new("not-a-uuid"), Name: new("odd")},
+		Subject: &nokkuv1.GetSubjectAccessResponse_User{
+			User: &nokkuv1.User{Id: new("u"), Name: new("alice")},
 		},
+		CertificateAuthority: &nokkuv1.CertificateAuthority{PublicKey: new("ssh-ed25519 AAAA")},
 		Targets: []*nokkuv1.Target{
-			{Id: new(targetID), CaId: new(caID), Name: new("web")},
-			{Id: new("../../etc"), CaId: new(caID), Name: new("evil")},
-			{Id: new("{" + targetID + "}"), CaId: new(caID), Name: new("braces")},
+			{Id: new(targetID), Name: new("web")},
+			{Id: new("../../etc"), Name: new("evil")},
+			{Id: new("{" + targetID + "}"), Name: new("braces")},
 		},
 	}
 
 	c := FromAccess(res)
 	require.NotNil(t, c.User)
 	assert.Equal(t, "alice", c.User.Name)
-	require.Len(t, c.CAs, 1, "non-canonical CA ids are dropped")
+	require.NotNil(t, c.CA)
+	assert.Equal(t, "ssh-ed25519 AAAA", c.CA.PublicKey)
 	require.Len(t, c.Targets, 1, "non-canonical ids are dropped")
 	assert.Equal(t, "web", c.Targets[0].Name)
-	assert.Equal(t, caID, c.Targets[0].CAID)
 }
 
 // Names are printed by nk ls, nk doctor and in warnings.
@@ -45,15 +41,13 @@ func TestFromAccessDropsControlCharacters(t *testing.T) {
 		Subject: &nokkuv1.GetSubjectAccessResponse_User{
 			User: &nokkuv1.User{Id: new("u"), Name: new("al\x1b[2Jice"), Email: new("a@b.example\x07")},
 		},
-		CertificateAuthorities: []*nokkuv1.CertificateAuthority{{Id: new(caID), Name: new("ssh\x1b[31m")}},
 		Targets: []*nokkuv1.Target{{
-			Id: new(targetID), CaId: new(caID), Name: new("web\x1b]0;owned\x07"),
+			Id: new(targetID), Name: new("web\x1b]0;owned\x07"),
 			Usernames: []string{"ro\x1bot", "alice"}, Endpoints: []string{"10.0.0.5\r\n"},
 		}},
 	})
 
 	assert.Equal(t, &User{ID: "u", Name: "al[2Jice", Email: "a@b.example"}, c.User)
-	assert.Equal(t, "ssh[31m", c.CAs[0].Name)
 	require.Len(t, c.Targets, 1)
 	assert.Equal(t, "web]0;owned", c.Targets[0].Name)
 	assert.Equal(t, []string{"root", "alice"}, c.Targets[0].Usernames)

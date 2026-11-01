@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -62,15 +64,13 @@ func TestCreateTarget(t *testing.T) {
 	)
 
 	created, err := c.CreateTarget(t.Context(), &state.Target{
-		CAID: "ca-1", HostPublicKey: "ssh-ed25519 AAAA", Endpoints: []string{"10.0.0.5"},
+		HostPublicKey: "ssh-ed25519 AAAA", Endpoints: []string{"10.0.0.5"},
 	}, []string{"prod"}, []Grant{{Account: "deploy", Users: []string{"user-1"}, Teams: []string{"team-1"}}})
 	require.NoError(t, err)
 
 	assert.Equal(t, "fair-juniper", created.Name, "the server-generated name comes back")
-	assert.Equal(t, "ca-1", created.CAID)
 	require.NotNil(t, svc.got)
 	assert.Empty(t, svc.got.GetName(), "an empty name asks the server to generate one")
-	assert.Equal(t, "ca-1", svc.got.GetCaId())
 	assert.Equal(t, []string{"10.0.0.5"}, svc.got.GetEndpoints())
 	assert.Equal(t, "ssh-ed25519 AAAA", svc.got.GetHostPublicKey())
 	assert.Equal(t, []string{"prod"}, svc.got.GetTags())
@@ -101,34 +101,30 @@ func TestDeleteTarget(t *testing.T) {
 	assert.Equal(t, "target-1", svc.deleted.GetId())
 }
 
-type listCAService struct {
+type workspaceCAService struct {
 	nokkuv1connect.UnimplementedCertificateServiceHandler
 }
 
-func (listCAService) ListCertificateAuthorities(
+func (workspaceCAService) GetCertificateAuthority(
 	context.Context,
-	*nokkuv1.ListCertificateAuthoritiesRequest,
-) (*nokkuv1.ListCertificateAuthoritiesResponse, error) {
-	return &nokkuv1.ListCertificateAuthoritiesResponse{
-		CertificateAuthorities: []*nokkuv1.CertificateAuthority{
-			{
-				Id:        new("0199a0a0-0000-7000-8000-000000000001"),
-				Name:      new("default"),
-				PublicKey: new("ssh-ed25519 AAAA"),
-				IsDefault: new(true),
-			},
-			{Id: new("0199a0a0-0000-7000-8000-000000000002"), Name: new("staging")},
+	*nokkuv1.GetCertificateAuthorityRequest,
+) (*nokkuv1.GetCertificateAuthorityResponse, error) {
+	return &nokkuv1.GetCertificateAuthorityResponse{
+		CertificateAuthority: &nokkuv1.CertificateAuthority{
+			PublicKey:            new("ssh-ed25519 AAAA"),
+			PreviousPublicKey:    new("ssh-ed25519 BBBB"),
+			PreviousTrustedUntil: timestamppb.New(time.Now().Add(time.Hour)),
 		},
 	}, nil
 }
 
-// A CA without targets is missing from the access sync, nk sync still needs it.
-func TestListSSHCAs(t *testing.T) {
+// nk sync asks the core, a subject with no targets has no CA in its access sync.
+func TestWorkspaceCA(t *testing.T) {
 	t.Parallel()
 
 	mux := http.NewServeMux()
 	srv := connect.NewServer()
-	nokkuv1connect.RegisterCertificateServiceHandler(srv, listCAService{})
+	nokkuv1connect.RegisterCertificateServiceHandler(srv, workspaceCAService{})
 	connecthttp.Mount(mux, srv)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
@@ -138,13 +134,9 @@ func TestListSSHCAs(t *testing.T) {
 		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
 	)
 
-	cas, err := c.ListSSHCAs(t.Context())
+	ca, err := c.WorkspaceCA(t.Context())
 	require.NoError(t, err)
-	require.Len(t, cas, 2, "every CA of the workspace is offered")
-	assert.Equal(t, "default", cas[0].Name)
-	assert.True(t, cas[0].Default)
-	assert.Equal(t, "ssh-ed25519 AAAA", cas[0].PublicKey)
-	assert.False(t, cas[1].Default)
+	assert.Equal(t, []string{"ssh-ed25519 AAAA", "ssh-ed25519 BBBB"}, ca.TrustedKeys(), "nk sync writes both")
 }
 
 type pagedTargetService struct {
@@ -161,7 +153,6 @@ func (s pagedTargetService) ListTargets(
 	for i := int(req.GetOffset()); i < min(s.total, int(req.GetOffset()+req.GetLimit())); i++ {
 		res.Targets = append(res.Targets, &nokkuv1.Target{
 			Id:   new(fmt.Sprintf("0199a0a0-0000-7000-8000-%012d", i)),
-			CaId: new("0199a0a0-0000-7000-8000-000000000001"),
 			Name: new(fmt.Sprintf("t%d", i)),
 		})
 	}

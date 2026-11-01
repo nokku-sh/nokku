@@ -34,13 +34,6 @@ SELECT
         service_accounts sa
       WHERE
         sa.workspace_id = $1
-    ) + (
-      SELECT
-        COUNT(*)
-      FROM
-        ssh_cas ca
-      WHERE
-        ca.workspace_id = $1
     )
   )::bigint AS resource_count
 `

@@ -49,7 +49,7 @@ func TestListOpenRecordings(t *testing.T) {
 			}
 		}
 		_, err := q.FinishRecordingUpload(t.Context(), &db.FinishRecordingUploadParams{
-			ID: closed, Complete: true, EndedAt: new(time.Now()),
+			ID: closed, Complete: true, EndedAt: new(time.Now()), ObjectID: new(uuid.NewV7().String()),
 		})
 		return err
 	})

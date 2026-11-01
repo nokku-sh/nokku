@@ -25,7 +25,7 @@ internal/crypto/kms/kms.go Keyset.load Sys GetKeysetData
 internal/crypto/kms/kms.go Keyset.load Sys GetKeysetData
 internal/crypto/kms/kms.go Keyset.load Sys InsertKeyset
 internal/daemon/pool.go Pool.stateVersion SysTx GetWorkspaceStateVersion
-internal/daemon/retire.go Retire SysTx DeleteRetiredDaemons,TryAdvisoryXactLock
+internal/daemon/retire.go Retire SysTx DeleteRetiredDaemons,QuietStateChange,TryAdvisoryXactLock
 internal/entitlement/license.go Service.loadLicense Sys GetInstanceLicense
 internal/entitlement/license.go Service.storeLicense Sys SetInstanceLicense
 internal/entitlement/limits.go Service.CheckResources Sys CountWorkspaceResources
@@ -41,4 +41,4 @@ internal/recording/retention.go Service.cleanup Sys ListRecordingWorkspaceIDs
 internal/recording/retention.go Service.expire SysTx DeleteRecordingsBefore,TryAdvisoryXactLock
 internal/tenant/tenant.go New Sys GetFirstWorkspace
 internal/tenant/tenant.go Resolver.FromHost Sys GetWorkspaceBySlug
-internal/tenant/tenant.go Resolver.PurgeUnclaimed SysTx DeleteWorkspace,ListUnclaimedWorkspaces
+internal/tenant/tenant.go Resolver.PurgeUnclaimed SysTx DeleteUnclaimedWorkspace,ListUnclaimedWorkspaces

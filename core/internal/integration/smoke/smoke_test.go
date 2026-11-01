@@ -88,6 +88,7 @@ func TestSmoke(t *testing.T) {
 		{"sessions are recorded", s.checkRecordings},
 		{"revoking the grant ends the session", s.revokeGrant},
 		{"audit log holds the flows", s.checkAuditLog},
+		{"a CI job reaches the server with no stored secret", s.ciJob},
 	} {
 		require.True(t, t.Run(phase.name, phase.run), "the phases after %q build on it", phase.name)
 	}
@@ -95,14 +96,16 @@ func TestSmoke(t *testing.T) {
 
 // smoke is what the phases share. Each phase fills in what the later ones need.
 type smoke struct {
-	core core
-	home nkHome
+	core     core
+	home     nkHome
+	platform *jobPlatform
 	// The daemon container, removed when the test ends.
 	container string
 	sshPort   string
 
 	// The owner's browser. Its cookie jar holds the session the web app calls the API with.
 	browser        *http.Client
+	client         *connect.Client
 	auth           nokkuv1connect.AuthServiceClient
 	joinTokens     nokkuv1connect.JoinTokenServiceClient
 	daemons        nokkuv1connect.DaemonServiceClient
@@ -140,9 +143,11 @@ func setUp(t *testing.T) *smoke {
 	run(t, exec.CommandContext(t.Context(), "docker", "image", "prune", "--force", "--filter", "label="+smokeLabel))
 
 	smtpHost, smtpPort := startMailpit(t)
+	platform := startJobPlatform(t)
 	s := &smoke{
-		core:      startCore(t, bin, smtpHost, smtpPort),
+		core:      startCore(t, bin, smtpHost, smtpPort, platform.certFile),
 		home:      newNKHome(t, bin, sshBinary),
+		platform:  platform,
 		container: "nokkud-smoke-" + strings.ToLower(rand.Text()[:8]),
 		sshPort:   freePort(t),
 	}
@@ -153,6 +158,7 @@ func setUp(t *testing.T) *smoke {
 	// Bounded like the child processes, see bounded.
 	s.browser = &http.Client{Jar: jar, Timeout: 30 * time.Second}
 	client := connect.NewClient(connecthttp.NewTransport(s.browser, s.core.url))
+	s.client = client
 	s.auth = nokkuv1connect.NewAuthServiceClient(client)
 	s.joinTokens = nokkuv1connect.NewJoinTokenServiceClient(client)
 	s.daemons = nokkuv1connect.NewDaemonServiceClient(client)
@@ -478,7 +484,7 @@ type core struct {
 	env []string
 }
 
-func startCore(t *testing.T, bin, smtpHost, smtpPort string) core {
+func startCore(t *testing.T, bin, smtpHost, smtpPort, platformCert string) core {
 	port := freePort(t)
 	c := core{
 		binary: filepath.Join(bin, "nokku"),
@@ -495,6 +501,9 @@ func startCore(t *testing.T, bin, smtpHost, smtpPort string) core {
 			"NOKKU_EMAIL_SENDER=nokku@smoke.test",
 			"NOKKU_STORAGE_URL=file://" + t.TempDir(),
 			"NOKKU_LICENSE_OFFLINE=true",
+			// The job platform of this test listens on loopback, behind a certificate of its own.
+			"NOKKU_ALLOW_PRIVATE_NETWORKS=true",
+			"SSL_CERT_FILE=" + platformCert,
 		},
 	}
 	// testenv.Postgres pointed these at its container.

@@ -53,7 +53,7 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 - **Signing happens in a small background agent.** `nk` starts it on the first SSH connection and stops it after 30 idle minutes. `ssh` reads the key only through the agent socket, never directly.
 - **Without a TPM**, `nk` falls back to a software ECDSA P-256 key, wrapped with a key derived from the machine fingerprint. The state file is useless on another machine, unless that machine's ID is copied along, as a full backup or a VM clone does. On the machine itself it is only as safe as its file permissions.
 - **`--require-tpm` refuses the fallback.** Use it where a TPM is expected.
-- **On macOS**, the key is a software key by default. `NK_SECURE_ENCLAVE=1` keeps new keys in the Secure Enclave instead, as an opaque blob only that Mac can use. This is experimental.
+- **On macOS** there is no TPM, so the key is the software key above. `--require-tpm` refuses it.
 
 `nk doctor` shows which of these is in use.
 
@@ -88,3 +88,7 @@ The CA is stored in `~/.config/nk/config.json` and dropped when `--api` changes.
 **Offline.** When the core is unavailable, `nk` uses cached target data and a certificate you still hold. It cannot refresh access or get a new certificate until the core is back.
 
 **Servers enforce access, not `nk`.** `nk` shows what you can reach, but the server decides. A revoke applies on the server, whatever the local cache says.
+
+**One CA per workspace.** `nk` keeps the public keys of the workspace's CA with the access it caches, and checks every new certificate and every daemon's host certificate against them. A rollover reaches it at the next sync. `nk sync` reads the keys from the core each time it runs, and writes the current key plus a replaced one that is still trusted to `/etc/ssh/nokku_ca.pub`.
+
+**Limits are on the certificate.** A person's certificate carries the source list of the workspace's CA. A service account's carries its own forced command and source list, and nothing from the CA. A forced command also turns off port forwarding, agent forwarding and `~/.ssh/rc`. The server enforces both, not `nk`.

@@ -6,7 +6,6 @@ INSERT INTO
     expires_at,
     max_uses,
     auto_approve,
-    ca_id,
     tags,
     retire_after
   )
@@ -17,7 +16,6 @@ VALUES
     sqlc.narg('expires_at'),
     sqlc.narg('max_uses'),
     @auto_approve,
-    sqlc.narg('ca_id'),
     COALESCE(sqlc.narg('tags')::TEXT[], '{}'),
     sqlc.narg('retire_after')
   )

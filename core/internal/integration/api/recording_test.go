@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -530,6 +531,55 @@ func deleteRecording(t *testing.T, cfg *config.Config, srv *httptest.Server, wor
 	_, err := nokkuv1connect.NewRecordingServiceClient(editor).
 		DeleteRecording(t.Context(), &nokkuv1.DeleteRecordingRequest{RecordingId: &id})
 	require.NoError(t, err)
+}
+
+// bearerTransport signs in a stream, which the header interceptor leaves alone.
+type bearerTransport struct {
+	token string
+	next  http.RoundTripper
+}
+
+func (b bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("Authorization", "Bearer "+b.token)
+	return b.next.RoundTrip(r)
+}
+
+// A playback leaves no other trace, so nothing plays unless the log has it.
+func TestPlaybackNeedsItsAuditRow(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := seedWorkspace(t, cfg)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+	require.NoError(t, uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, 1))
+	viewer := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	client := *srv.Client()
+	client.Transport = bearerTransport{viewer, client.Transport}
+	play := func() error {
+		stream, err := nokkuv1connect.NewRecordingServiceClient(
+			connect.NewClient(connecthttp.NewTransport(&client, srv.URL)),
+		).GetRecording(t.Context(), &nokkuv1.GetRecordingRequest{RecordingId: &id})
+		if err != nil {
+			return err
+		}
+		defer func() { _ = stream.Close() }()
+		_, err = stream.Receive()
+		return err
+	}
+
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	restore := func() {
+		_, err := owner.Exec(context.WithoutCancel(t.Context()), "GRANT INSERT ON audit.audit_logs TO nokku_app")
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() { restore(); _ = owner.Close(context.WithoutCancel(t.Context())) })
+	_, err = owner.Exec(t.Context(), "REVOKE INSERT ON audit.audit_logs FROM nokku_app")
+	require.NoError(t, err)
+
+	require.Error(t, play(), "a recording played with no row in the log")
+	restore()
+	require.NoError(t, play(), "a recording did not play once the log worked again")
 }
 
 // A deleted recording is gone with its key at once, its object when the delete queue runs.

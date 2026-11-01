@@ -91,7 +91,7 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			shortcut: 'd'
 		},
 		{
-			title: 'Certificate authorities',
+			title: 'Certificate authority',
 			url: '/certificates',
 			icon: IdCard,
 			role: WorkspaceRole.VIEWER,

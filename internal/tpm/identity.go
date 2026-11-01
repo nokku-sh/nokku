@@ -6,10 +6,6 @@
 // otherwise a software P-256 key wrapped to the machine fingerprint. The
 // private key never leaves the TPM in the first case and never leaves the
 // machine in the second. Every state file holds a key of its own.
-//
-// A caller on a machine with another hardware key store, such as the macOS
-// Secure Enclave, plugs it in through [SignerOptions.Enclave]. It is tried
-// after the TPM and before the software key.
 package tpm
 
 import (
@@ -32,8 +28,6 @@ import (
 const (
 	// MethodTPM identifies a TPM-backed signing key.
 	MethodTPM = "tpm"
-	// MethodEnclave identifies a key held by a [SignerOptions.Enclave].
-	MethodEnclave = "enclave"
 	// MethodSoft identifies a software signing key wrapped to the machine.
 	MethodSoft = "soft"
 )
@@ -48,22 +42,18 @@ type Signer interface {
 	crypto.Signer
 	io.Closer
 
-	// Method reports the signing method, MethodTPM, MethodEnclave or
-	// MethodSoft.
+	// Method reports the signing method, MethodTPM or MethodSoft.
 	Method() string
 }
 
 // SignerOptions configures [NewSigner].
 type SignerOptions struct {
 	// StatePath is where the identity state is persisted, with the TSS2 key
-	// file of a TPM key, the opaque blob of an enclave key, or the wrapped
-	// private key of a software key. Each path is an identity of its own.
+	// file of a TPM key or the wrapped private key of a software key. Each
+	// path is an identity of its own.
 	StatePath string
-	// RequireTPM refuses the software fallback. An enclave key satisfies it.
+	// RequireTPM refuses the software fallback.
 	RequireTPM bool
-	// Enclave is the hardware key store tried when no TPM is usable. Nil
-	// means the machine has none.
-	Enclave Enclave
 	// Recreate replaces the key and its state when the persisted identity no
 	// longer matches the machine or its state no longer parses, instead of
 	// failing with [ErrIdentityChanged]. Interactive callers set it so a
@@ -80,8 +70,8 @@ type SignerOptions struct {
 }
 
 // NewSigner loads or creates the machine's signing identity: a TPM key when
-// one is usable, then an enclave key, otherwise a machine-wrapped software
-// key (an error when RequireTPM is set). The method is persisted, so an
+// one is usable, otherwise a machine-wrapped software key (an error when
+// RequireTPM is set). The method is persisted, so an
 // existing software identity is never silently upgraded to hardware later.
 // Concurrent calls for one state path, from any process, run one at a time.
 func NewSigner(opts SignerOptions) (Signer, error) {
@@ -110,8 +100,6 @@ func NewSigner(opts SignerOptions) (Signer, error) {
 		switch st.Method {
 		case MethodTPM:
 			return openTPMIdentity(opts, st)
-		case MethodEnclave:
-			return openEnclave(opts, st)
 		case MethodSoft:
 			if opts.RequireTPM {
 				return nil, errors.New(
@@ -132,17 +120,10 @@ func NewSigner(opts SignerOptions) (Signer, error) {
 		return s, nil
 	}
 	hwErr := fmt.Errorf("tpm: no TPM available: %w", tpmErr)
-	if opts.Enclave != nil {
-		e, encErr := createEnclave(opts)
-		if encErr == nil {
-			return e, nil
-		}
-		hwErr = errors.Join(hwErr, encErr)
-	}
 	if opts.RequireTPM {
 		return nil, hwErr
 	}
-	slog.Warn("no usable hardware key store, using a machine-wrapped software key", "error", hwErr)
+	slog.Warn("no usable TPM, using a machine-wrapped software key", "error", hwErr)
 	fallback, softErr := openSoft(opts, nil)
 	if softErr != nil {
 		return nil, errors.Join(hwErr, softErr)
@@ -150,9 +131,8 @@ func NewSigner(opts SignerOptions) (Signer, error) {
 	return fallback, nil
 }
 
-// IdentityMethod reports the signing method persisted at statePath
-// (MethodTPM, MethodEnclave or MethodSoft) without loading or creating any
-// key material.
+// IdentityMethod reports the signing method persisted at statePath (MethodTPM
+// or MethodSoft) without loading or creating any key material.
 // It returns "" when no identity exists yet.
 func IdentityMethod(statePath string) string {
 	st, err := loadState(statePath)
