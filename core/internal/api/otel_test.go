@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // All three signals reach a collector over OTLP HTTP on the standard variable.
@@ -50,4 +54,51 @@ func TestTelemetryExportsOverHTTP(t *testing.T) {
 		defer mu.Unlock()
 		return got["/v1/traces"] && got["/v1/metrics"] && got["/v1/logs"]
 	}, 10*time.Second, 20*time.Millisecond, "not every signal reached the collector")
+}
+
+func TestWithTraceCoversPlainRoutesOnly(t *testing.T) {
+	spans := tracetest.NewSpanRecorder()
+	provider := otel.GetTracerProvider()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(spans)))
+	t.Cleanup(func() { otel.SetTracerProvider(provider) })
+
+	s := New(nil)
+	var inHandler trace.SpanContext
+	ok := func(_ http.ResponseWriter, r *http.Request) {
+		inHandler = trace.SpanContextFromContext(r.Context())
+	}
+	s.mux.HandleFunc("POST /passkey/login/begin", ok)
+	s.mux.HandleFunc("/nokku.v1.UtilService/", ok)
+	s.mux.HandleFunc("/healthz", ok)
+	s.mux.HandleFunc("GET /terminal/ws", ok)
+	s.mux.HandleFunc("/", ok)
+
+	// A copy, like the real middleware makes.
+	h := s.withTrace(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mux.ServeHTTP(w, r.WithContext(r.Context()))
+	}))
+
+	for _, target := range []string{
+		"/nokku.v1.UtilService/GetVersion", "/healthz", "/terminal/ws", "/assets/app.js",
+	} {
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, target, nil))
+		assert.Empty(t, spans.Ended(), "%s got an HTTP span", target)
+	}
+
+	r := httptest.NewRequest(http.MethodPost, "/passkey/login/begin?token=secret", nil)
+	const remote = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+	r.Header.Set("Traceparent", remote)
+	h.ServeHTTP(httptest.NewRecorder(), r)
+
+	require.Len(t, spans.Ended(), 1, "the plain route got no span")
+	span := spans.Ended()[0]
+	assert.Equal(t, "POST /passkey/login/begin", span.Name())
+	assert.Contains(t, span.Attributes(),
+		attribute.String("http.route", "/passkey/login/begin"))
+	assert.Equal(t, span.SpanContext().SpanID(), inHandler.SpanID(), "the handler lost the span")
+	assert.False(t, span.Parent().IsValid(), "a client picked the parent span")
+	assert.Len(t, span.Links(), 1, "the client's traceparent was dropped")
+	for _, attr := range span.Attributes() {
+		assert.NotContains(t, attr.Value.String(), "secret", "the query reached %s", attr.Key)
+	}
 }

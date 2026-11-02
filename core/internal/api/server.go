@@ -133,6 +133,7 @@ func (s *Server) Handler(ctx context.Context) http.Handler {
 
 func (s *Server) handler() http.Handler {
 	return chain(
+		s.withTrace,
 		s.withHTTPS,
 		s.withRateLimit,
 		s.withHeaders,

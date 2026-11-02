@@ -3,12 +3,15 @@ package api
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
+	"strings"
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/otelconnect"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/contrib/processors/minsev"
 	"go.opentelemetry.io/otel"
@@ -105,4 +108,33 @@ func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 		return nil
 	}
 	return interceptor
+}
+
+// withTrace covers plain HTTP routes, the otelconnect interceptor the RPCs.
+// It is a no-op until newTelemetry sets the global providers.
+func (s *Server) withTrace(next http.Handler) http.Handler {
+	traced := otelhttp.NewHandler(next, "http",
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return r.Pattern }),
+		// Anyone can send a traceparent, so it becomes a link and never a parent.
+		otelhttp.WithPublicEndpointFn(func(*http.Request) bool { return true }),
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, pattern := s.mux.Handler(r)
+		if !tracedRoute(r.URL.Path, pattern) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Middleware copies the request, so the mux's own Pattern never gets back here.
+		r.Pattern = pattern
+		traced.ServeHTTP(w, r)
+	})
+}
+
+// tracedRoute skips RPCs, static files, probes and terminals, which last for hours.
+func tracedRoute(path, pattern string) bool {
+	switch pattern {
+	case "", "/", "/healthz", "GET /terminal/ws":
+		return false
+	}
+	return !strings.HasPrefix(path, "/nokku.v1.")
 }
