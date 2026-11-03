@@ -81,11 +81,12 @@ func silentClient(t *testing.T) (*Client, *silentCore) {
 	}, core
 }
 
-// A relay left open would hold up a stop just the same, in Run's join.
-func TestRelayEndsWithItsContext(t *testing.T) {
+// idleRelay opens a relay to a silent core and parks a read on it.
+func idleRelay(t *testing.T) (*relayConn, context.CancelFunc, <-chan error) {
+	t.Helper()
 	c, core := silentClient(t)
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	t.Cleanup(cancel)
 	stream, err := c.ctl.DaemonRelay(ctx)
 	require.NoError(t, err)
 	require.NoError(t, stream.Send(&nokkuv1.DaemonRelayRequest{}))
@@ -100,6 +101,12 @@ func TestRelayEndsWithItsContext(t *testing.T) {
 		read <- readErr
 	}()
 	time.Sleep(100 * time.Millisecond)
+	return conn, cancel, read
+}
+
+// A relay left open would hold up a stop just the same, in Run's join.
+func TestRelayEndsWithItsContext(t *testing.T) {
+	conn, _, read := idleRelay(t)
 
 	require.NoError(t, conn.Close())
 	select {
@@ -107,6 +114,20 @@ func TestRelayEndsWithItsContext(t *testing.T) {
 		require.Error(t, readErr)
 	case <-time.After(3 * time.Second):
 		t.Fatal("the relay outlived its Close")
+	}
+}
+
+// On a stop the sshd closes the relay after its context ends, so no Closed frame goes out.
+func TestRelayEndsOnStop(t *testing.T) {
+	conn, cancel, read := idleRelay(t)
+
+	cancel()
+	require.NoError(t, conn.Close())
+	select {
+	case readErr := <-read:
+		require.Error(t, readErr)
+	case <-time.After(3 * time.Second):
+		t.Fatal("the relay outlived the stop")
 	}
 }
 

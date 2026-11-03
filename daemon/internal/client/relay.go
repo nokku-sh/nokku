@@ -21,13 +21,13 @@ var relayClosed = &nokkuv1.DaemonRelayRequest{
 // A test seam, so the relay can be driven without a core.
 type relayStream interface {
 	Send(*nokkuv1.DaemonRelayRequest) error
+	CloseSend() error
 	Receive() (*nokkuv1.DaemonRelayResponse, error)
 }
 
 // Remote is the user's, so audit and source-address rules don't see the relay.
 type relayConn struct {
-	stream relayStream
-	// cancel ends the stream, which unblocks a pending Receive or Send.
+	stream        relayStream
 	cancel        context.CancelFunc
 	remote, local net.Addr
 
@@ -127,8 +127,14 @@ func (c *relayConn) Close() error {
 		}
 		c.sendMu.Unlock()
 	}
-	c.cancel()
+	c.end()
 	return c.SetDeadline(time.Time{})
+}
+
+// HTTP/2 only sees the cancel once the request body ends, an idle read waits forever.
+func (c *relayConn) end() {
+	_ = c.stream.CloseSend()
+	c.cancel()
 }
 
 // SetDeadline ends the connection, a stream cannot time out one read.
@@ -140,7 +146,7 @@ func (c *relayConn) SetDeadline(t time.Time) error {
 		c.deadline = nil
 	}
 	if !t.IsZero() {
-		c.deadline = time.AfterFunc(time.Until(t), c.cancel)
+		c.deadline = time.AfterFunc(time.Until(t), c.end)
 	}
 	return nil
 }

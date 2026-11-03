@@ -40,6 +40,8 @@ func (s *fakeRelayStream) Send(req *nokkuv1.DaemonRelayRequest) error {
 	return nil
 }
 
+func (s *fakeRelayStream) CloseSend() error { return nil }
+
 func (s *fakeRelayStream) Receive() (*nokkuv1.DaemonRelayResponse, error) {
 	select {
 	case msg := <-s.recv:
