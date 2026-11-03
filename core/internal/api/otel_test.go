@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
@@ -58,9 +59,13 @@ func TestTelemetryExportsOverHTTP(t *testing.T) {
 
 func TestWithTraceCoversPlainRoutesOnly(t *testing.T) {
 	spans := tracetest.NewSpanRecorder()
-	provider := otel.GetTracerProvider()
+	provider, propagator := otel.GetTracerProvider(), otel.GetTextMapPropagator()
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(spans)))
-	t.Cleanup(func() { otel.SetTracerProvider(provider) })
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() {
+		otel.SetTracerProvider(provider)
+		otel.SetTextMapPropagator(propagator)
+	})
 
 	s := New(nil)
 	var inHandler trace.SpanContext
