@@ -289,10 +289,10 @@ func seedAccessGraph(t *testing.T) accessFixture {
 	f := accessFixture{workspaceID: testWorkspace.ID}
 	other := seedOtherWorkspace(t, cfg)
 
-	// Earlier tests' grants go first. Only the owner role deletes past RLS.
+	// Earlier tests' grants go first, a daemon with its target as the API does. Only the owner gets past RLS.
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
-	for _, table := range []string{"targets", "teams", "service_accounts"} {
+	for _, table := range []string{"daemons", "targets", "teams", "service_accounts"} {
 		_, err = owner.Exec(t.Context(), "DELETE FROM "+table+" WHERE workspace_id = $1", f.workspaceID)
 		require.NoError(t, err)
 	}

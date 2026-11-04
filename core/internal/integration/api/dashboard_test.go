@@ -94,11 +94,13 @@ func TestDashboardRecentChangesSkipRoutine(t *testing.T) {
 func TestDashboardEndingGrants(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := testWorkspace.ID
-	// Earlier tests' grants go first. Only the owner role deletes past RLS.
+	// Earlier tests' servers go, a daemon with its target as the API does. Only the owner gets past RLS.
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
-	_, err = owner.Exec(t.Context(), "DELETE FROM targets WHERE workspace_id = $1", workspaceID)
-	require.NoError(t, err)
+	for _, table := range []string{"daemons", "targets"} {
+		_, err = owner.Exec(t.Context(), "DELETE FROM "+table+" WHERE workspace_id = $1", workspaceID)
+		require.NoError(t, err)
+	}
 	require.NoError(t, owner.Close(t.Context()))
 
 	soon := time.Now().Add(2 * time.Hour).Truncate(time.Second)
