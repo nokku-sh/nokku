@@ -222,7 +222,6 @@ func (s *certificateService) SignSSHCertificate(
 		return nil, err
 	}
 	return &nokkuv1.SignSSHCertificateResponse{
-		CaPublicKey:       &ca.PublicKey,
 		SignedCertificate: new(ssh.MarshalKey(cert)),
 		ExpiresAt:         timestamppb.New(expiry),
 	}, nil

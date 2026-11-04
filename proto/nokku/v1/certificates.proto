@@ -112,7 +112,6 @@ message SignSSHCertificateRequest {
   ];
 }
 message SignSSHCertificateResponse {
-  string ca_public_key = 1;
-  string signed_certificate = 2;
-  google.protobuf.Timestamp expires_at = 3;
+  string signed_certificate = 1;
+  google.protobuf.Timestamp expires_at = 2;
 }

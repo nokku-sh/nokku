@@ -503,9 +503,8 @@ func (x *SignSSHCertificateRequest) GetTargetId() string {
 
 type SignSSHCertificateResponse struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	CaPublicKey       *string                `protobuf:"bytes,1,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
-	SignedCertificate *string                `protobuf:"bytes,2,opt,name=signed_certificate,json=signedCertificate" json:"signed_certificate,omitempty"`
-	ExpiresAt         *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	SignedCertificate *string                `protobuf:"bytes,1,opt,name=signed_certificate,json=signedCertificate" json:"signed_certificate,omitempty"`
+	ExpiresAt         *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -538,13 +537,6 @@ func (x *SignSSHCertificateResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use SignSSHCertificateResponse.ProtoReflect.Descriptor instead.
 func (*SignSSHCertificateResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_certificates_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *SignSSHCertificateResponse) GetCaPublicKey() string {
-	if x != nil && x.CaPublicKey != nil {
-		return *x.CaPublicKey
-	}
-	return ""
 }
 
 func (x *SignSSHCertificateResponse) GetSignedCertificate() string {
@@ -606,12 +598,11 @@ const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"public_key\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x90NR\tpublicKey\x12>\n" +
 	"\x03ttl\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x05\b\x80\xe7\x84\x0f2\x02\b<R\x03ttl\x12(\n" +
-	"\ttarget_id\x18\x03 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\btargetId\"\xaa\x01\n" +
-	"\x1aSignSSHCertificateResponse\x12\"\n" +
-	"\rca_public_key\x18\x01 \x01(\tR\vcaPublicKey\x12-\n" +
-	"\x12signed_certificate\x18\x02 \x01(\tR\x11signedCertificate\x129\n" +
+	"\ttarget_id\x18\x03 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\btargetId\"\x86\x01\n" +
+	"\x1aSignSSHCertificateResponse\x12-\n" +
+	"\x12signed_certificate\x18\x01 \x01(\tR\x11signedCertificate\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x8c\x04\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x8c\x04\n" +
 	"\x12CertificateService\x12y\n" +
 	"\x17GetCertificateAuthority\x12(.nokku.v1.GetCertificateAuthorityRequest\x1a).nokku.v1.GetCertificateAuthorityResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12\x83\x01\n" +
 	"\x1aUpdateCertificateAuthority\x12+.nokku.v1.UpdateCertificateAuthorityRequest\x1a,.nokku.v1.UpdateCertificateAuthorityResponse\"\n" +
