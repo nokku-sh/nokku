@@ -477,12 +477,12 @@ func TestForwardSocketsBelongToTheUser(t *testing.T) {
 	ln, err := listenAs(t.Context(), sysUser, "127.0.0.1:0")
 	require.NoError(t, err)
 	defer ln.Close()
-	assert.Equal(t, nobody, tcpSocketUID(t, ln.Addr()), "listener of a remote forward")
+	assert.Equal(t, nobody, tcpSocketUID(t, ln.Addr(), nil), "listener of a remote forward")
 
 	c, err := dialAs(t.Context(), sysUser, ln.Addr().String())
 	require.NoError(t, err)
 	defer c.Close()
-	assert.Equal(t, nobody, tcpSocketUID(t, c.LocalAddr()), "connection of a direct forward")
+	assert.Equal(t, nobody, tcpSocketUID(t, c.LocalAddr(), c.RemoteAddr()), "connection of a direct forward")
 }
 
 // go test builds the binary in a directory only its user can enter.
@@ -507,20 +507,28 @@ func helperForEveryone(t *testing.T) {
 }
 
 // The uid column of /proc/net/tcp is the owner a firewall matches on.
-func tcpSocketUID(t *testing.T, local net.Addr) int {
+// Loopback clients can share a local port, so the remote end has to match too.
+func tcpSocketUID(t *testing.T, local, remote net.Addr) int {
 	t.Helper()
-	ap := addrPort(local)
-	want := fmt.Sprintf("%08X:%04X", binary.LittleEndian.Uint32(ap.Addr().AsSlice()), ap.Port())
+	wantLocal, wantRemote := procNetAddr(local), procNetAddr(remote)
 	data, err := os.ReadFile("/proc/net/tcp")
 	require.NoError(t, err)
 	for line := range strings.SplitSeq(string(data), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) > 7 && fields[1] == want {
+		if len(fields) > 7 && fields[1] == wantLocal && fields[2] == wantRemote {
 			uid, convErr := strconv.Atoi(fields[7])
 			require.NoError(t, convErr)
 			return uid
 		}
 	}
-	t.Fatalf("no socket on %s in /proc/net/tcp", local)
+	t.Fatalf("no socket %s to %v in /proc/net/tcp", local, remote)
 	return 0
+}
+
+func procNetAddr(a net.Addr) string {
+	if a == nil {
+		return "00000000:0000"
+	}
+	ap := addrPort(a)
+	return fmt.Sprintf("%08X:%04X", binary.LittleEndian.Uint32(ap.Addr().AsSlice()), ap.Port())
 }
