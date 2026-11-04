@@ -31,7 +31,7 @@
 				{#each sessions as s (s.id)}
 					<Item.Root size="xs" class="rounded-none">
 						{#snippet child({ props })}
-							<a {...props} href={s.web ? '/sessions' : '/recordings'}>
+							<a {...props} href={s.web ? '/shell' : '/recordings'}>
 								<Item.Media
 									><StatusDot tone={s.recording ? 'destructive' : 'success'} live /></Item.Media
 								>

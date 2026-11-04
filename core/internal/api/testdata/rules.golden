@@ -34,9 +34,9 @@
 /nokku.v1.BillingService/GetBilling public=false self=false role=ADMIN daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.BillingService/GetLicense public=false self=true role=UNSPECIFIED daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.CertificateService/GetCertificateAuthority public=false self=false role=MEMBER daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
-/nokku.v1.CertificateService/RolloverCertificateAuthority public=false self=false role=EDITOR daemon=false people_only=true fresh=true feature= capped=false signs=false audited=true
+/nokku.v1.CertificateService/RolloverCertificateAuthority public=false self=false role=ADMIN daemon=false people_only=true fresh=true feature= capped=false signs=false audited=true
 /nokku.v1.CertificateService/SignSSHCertificate public=false self=true role=UNSPECIFIED daemon=false people_only=false fresh=false feature= capped=false signs=true audited=true
-/nokku.v1.CertificateService/UpdateCertificateAuthority public=false self=false role=EDITOR daemon=false people_only=true fresh=true feature= capped=false signs=false audited=true
+/nokku.v1.CertificateService/UpdateCertificateAuthority public=false self=false role=ADMIN daemon=false people_only=true fresh=true feature= capped=false signs=false audited=true
 /nokku.v1.DaemonControlService/Connect public=false self=false role=UNSPECIFIED daemon=true people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.DaemonControlService/DaemonRelay public=false self=false role=UNSPECIFIED daemon=true people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.DaemonControlService/EnrollDaemon public=true self=false role=UNSPECIFIED daemon=false people_only=false fresh=false feature= capped=false signs=false audited=true
@@ -88,6 +88,7 @@
 /nokku.v1.TargetService/CreateTarget public=false self=false role=EDITOR daemon=false people_only=false fresh=false feature= capped=true signs=false audited=true
 /nokku.v1.TargetService/DeleteTarget public=false self=false role=EDITOR daemon=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.TargetService/GetAccessGraph public=false self=false role=VIEWER daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
+/nokku.v1.TargetService/GetAccessMatrix public=false self=false role=VIEWER daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.TargetService/GetSubjectAccess public=false self=true role=UNSPECIFIED daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.TargetService/GetTarget public=false self=false role=VIEWER daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.TargetService/GetTargetFilters public=false self=false role=VIEWER daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
@@ -120,5 +121,6 @@
 /nokku.v1.WorkspaceService/ListUsers public=false self=false role=VIEWER daemon=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.WorkspaceService/SetUserActive public=false self=false role=ADMIN daemon=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.WorkspaceService/TransferOwnership public=false self=false role=OWNER daemon=false people_only=false fresh=true feature= capped=false signs=false audited=true
+/nokku.v1.WorkspaceService/UpdateDaemonDefaults public=false self=false role=ADMIN daemon=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.WorkspaceService/UpdateUserRole public=false self=false role=ADMIN daemon=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.WorkspaceService/UpdateWorkspace public=false self=false role=OWNER daemon=false people_only=false fresh=false feature= capped=false signs=false audited=true

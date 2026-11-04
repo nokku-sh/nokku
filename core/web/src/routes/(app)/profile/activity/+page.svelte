@@ -3,8 +3,8 @@
 	import StatTile from '#lib/components/blocks/StatTile.svelte';
 	import { page } from '$app/state';
 	import { sessionMethodLabel, session } from '#lib/api/session.svelte.js';
-	import { user } from '#lib/api/user.svelte.js';
-	import { areas, setParams } from '#lib/components/audit/audit.js';
+	import { user, type ActivityFilter } from '#lib/api/user.svelte.js';
+	import { areas, eventWhat, setParams } from '#lib/components/audit/audit.js';
 	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -15,12 +15,13 @@
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import { describeAgent } from '#lib/agent.js';
-	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
 	import { formatTs } from '#lib/utils.js';
-	import { timestampDate } from '@bufbuild/protobuf/wkt';
+	import { timestampDate, timestampFromMs } from '@bufbuild/protobuf/wkt';
 	import { Activity, LogIn, MonitorSmartphone, ShieldAlert, TriangleAlert } from '@lucide/svelte';
 
 	const signIns = areas.find((a) => a.value === 'signins')!.actions;
+	const RECENT_DAYS = 30;
 
 	const views = [
 		{ value: 'all', label: 'Everything' },
@@ -31,29 +32,37 @@
 
 	const me = user.self();
 	const view = $derived(page.url.searchParams.get('view') ?? 'all');
+	const signedIn = () => !!me.data?.id;
 
-	// The personal log has no server side filter, the views narrow what is loaded so far.
-	const feed = user.activityFeed(() => !!me.data?.id);
-	const loaded = $derived(feed.data?.pages.flatMap((p) => p.logs) ?? []);
+	const filter = $derived.by((): ActivityFilter | undefined => {
+		switch (view) {
+			case 'signins':
+				return { actions: signIns };
+			case 'changes':
+				return { excludedActions: signIns };
+			case 'failed':
+				return { outcome: AuditOutcome.FAILED };
+			default:
+				return undefined;
+		}
+	});
+	const feed = user.activityFeed(() => filter, signedIn);
+	const events = $derived(feed.data?.pages.flatMap((p) => p.logs) ?? []);
 	const total = $derived(feed.data?.pages[0]?.total ?? 0);
-	const events = $derived(
-		loaded.filter((e) => {
-			switch (view) {
-				case 'signins':
-					return signIns.includes(e.action);
-				case 'changes':
-					return !signIns.includes(e.action);
-				case 'failed':
-					return !e.ok;
-				default:
-					return true;
-			}
-		})
-	);
 
+	// The tiles look at all your events, whatever the view shows.
+	const since = timestampFromMs(Date.now() - RECENT_DAYS * 86_400_000);
+	const lastLogin = user.activity(
+		() => ({ actions: ['Login'], outcome: AuditOutcome.SUCCEEDED }),
+		signedIn
+	);
+	const failedSignIns = user.activity(
+		() => ({ actions: signIns, outcome: AuditOutcome.FAILED, startDate: since }),
+		signedIn
+	);
 	const sessions = session.list();
-	const last = $derived(loaded.find((e) => e.action === 'Login' && e.ok));
-	const failed = $derived(loaded.filter((e) => signIns.includes(e.action) && !e.ok).length);
+	const last = $derived(lastLogin.data?.logs[0]);
+	const failed = $derived(failedSignIns.data?.total ?? 0);
 
 	function dayLabel(date: Date) {
 		const yesterday = new Date(Date.now() - 24 * 3600_000);
@@ -89,7 +98,7 @@
 	<StatTile
 		label="Last sign-in"
 		icon={LogIn}
-		loading={feed.isLoading}
+		loading={lastLogin.isLoading}
 		hint={last ? `${describeAgent(last.userAgent)}${last.ip ? ` · ${last.ip}` : ''}` : undefined}
 	>
 		{#if last}
@@ -107,7 +116,7 @@
 		href="/profile/security"
 		value={failed}
 		tone={failed ? 'destructive' : undefined}
-		hint="among the events loaded"
+		hint={`in the last ${RECENT_DAYS} days`}
 	/>
 	<StatTile
 		label="Signed in on"
@@ -168,7 +177,12 @@
 				</h3>
 				<div class="divide-y overflow-hidden rounded-xl border bg-card">
 					{#each day.events as e (e.id)}
-						<EventRow log={e} onclick={() => (selected = e)} meta={formatTs(e.timestamp, 'time')} />
+						<EventRow
+							log={e}
+							onclick={() => (selected = e)}
+							subtitle={eventWhat(e)}
+							meta={formatTs(e.timestamp, 'time')}
+						/>
 					{/each}
 				</div>
 			</section>

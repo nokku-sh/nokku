@@ -35,6 +35,7 @@ export const workspace = {
 		),
 
 	update: () => usePatch(WorkspaceService.method.updateWorkspace),
+	updateDaemonDefaults: () => usePatch(WorkspaceService.method.updateDaemonDefaults),
 	delete: () =>
 		useMutation(WorkspaceService.method.deleteWorkspace, {
 			onSuccess: () => {

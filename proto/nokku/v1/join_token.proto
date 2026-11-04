@@ -24,20 +24,18 @@ service JoinTokenService {
 }
 
 message JoinToken {
-  reserved 7;
-
   string id = 1;
   string label = 2;
   google.protobuf.Timestamp expires_at = 3;
   int32 max_uses = 4;
   int32 uses = 5;
   bool auto_approve = 6;
-  google.protobuf.Timestamp created_at = 8;
-  google.protobuf.Timestamp last_used_at = 9;
-  repeated string tags = 10;
-  repeated JoinTokenGrant grants = 11;
-  bool ephemeral = 12;
-  google.protobuf.Duration retire_after = 13;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp last_used_at = 8;
+  repeated string tags = 9;
+  repeated JoinTokenGrant grants = 10;
+  bool ephemeral = 11;
+  google.protobuf.Duration retire_after = 12;
 }
 
 message JoinTokenGrant {
@@ -67,21 +65,19 @@ message JoinTokenGrant {
 }
 
 message CreateJoinTokenRequest {
-  reserved 5;
-
   string label = 1 [(buf.validate.field).string.max_len = 100];
   google.protobuf.Duration ttl = 2 [(buf.validate.field).duration.gt = {seconds: 0}];
   int32 max_uses = 3 [(buf.validate.field).int32.gt = 0];
   bool auto_approve = 4;
-  repeated string tags = 6 [(buf.validate.field).repeated = {
+  repeated string tags = 5 [(buf.validate.field).repeated = {
     max_items: 32
     items: {
       string: {max_len: 64}
     }
   }];
-  repeated JoinTokenGrant grants = 7 [(buf.validate.field).repeated.max_items = 32];
-  bool ephemeral = 8;
-  google.protobuf.Duration retire_after = 9 [(buf.validate.field).duration = {
+  repeated JoinTokenGrant grants = 6 [(buf.validate.field).repeated.max_items = 32];
+  bool ephemeral = 7;
+  google.protobuf.Duration retire_after = 8 [(buf.validate.field).duration = {
     gte: {seconds: 60}
     lte: {seconds: 604800}
   }];

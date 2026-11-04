@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EventRow from '#lib/components/audit/EventRow.svelte';
+	import { eventWhat } from '#lib/components/audit/audit.js';
 	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -76,7 +77,9 @@
 						<EventRow
 							{log}
 							onclick={() => (selected = log)}
-							subtitle={`by ${log.actorName || 'system'}`}
+							subtitle={[eventWhat(log), `by ${log.actorName || 'system'}`]
+								.filter(Boolean)
+								.join(' · ')}
 							meta={formatTs(log.timestamp, 'relative-short')}
 						/>
 					{/each}

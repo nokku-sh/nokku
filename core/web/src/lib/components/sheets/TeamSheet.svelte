@@ -172,7 +172,7 @@
 						{#each shownMembers as m (m.id)}
 							<Chip
 								label={m.name || m.email}
-								href={`/access/users?id=${m.id}`}
+								href={`/access/people?id=${m.id}`}
 								title={m.email}
 								onRemove={can.edit ? () => toggleMember(m.id) : undefined}
 							>

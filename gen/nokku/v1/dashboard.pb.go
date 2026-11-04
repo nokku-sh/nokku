@@ -122,6 +122,99 @@ func (x *LiveSession) GetStartedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// EndingGrant is a subject's grants on one account that end at the same time, usually given in one go.
+type EndingGrant struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubjectKind   *SubjectKind           `protobuf:"varint,1,opt,name=subject_kind,json=subjectKind,enum=nokku.v1.SubjectKind" json:"subject_kind,omitempty"`
+	SubjectId     *string                `protobuf:"bytes,2,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
+	SubjectName   *string                `protobuf:"bytes,3,opt,name=subject_name,json=subjectName" json:"subject_name,omitempty"`
+	Username      *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	Targets       []*EndingGrant_Target  `protobuf:"bytes,6,rep,name=targets" json:"targets,omitempty"` // the first 20 by name, target_count has them all
+	TargetCount   *int32                 `protobuf:"varint,7,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndingGrant) Reset() {
+	*x = EndingGrant{}
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndingGrant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndingGrant) ProtoMessage() {}
+
+func (x *EndingGrant) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndingGrant.ProtoReflect.Descriptor instead.
+func (*EndingGrant) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *EndingGrant) GetSubjectKind() SubjectKind {
+	if x != nil && x.SubjectKind != nil {
+		return *x.SubjectKind
+	}
+	return SubjectKind_SUBJECT_KIND_UNSPECIFIED
+}
+
+func (x *EndingGrant) GetSubjectId() string {
+	if x != nil && x.SubjectId != nil {
+		return *x.SubjectId
+	}
+	return ""
+}
+
+func (x *EndingGrant) GetSubjectName() string {
+	if x != nil && x.SubjectName != nil {
+		return *x.SubjectName
+	}
+	return ""
+}
+
+func (x *EndingGrant) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+func (x *EndingGrant) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *EndingGrant) GetTargets() []*EndingGrant_Target {
+	if x != nil {
+		return x.Targets
+	}
+	return nil
+}
+
+func (x *EndingGrant) GetTargetCount() int32 {
+	if x != nil && x.TargetCount != nil {
+		return *x.TargetCount
+	}
+	return 0
+}
+
 type GetDashboardRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -130,7 +223,7 @@ type GetDashboardRequest struct {
 
 func (x *GetDashboardRequest) Reset() {
 	*x = GetDashboardRequest{}
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[1]
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -142,7 +235,7 @@ func (x *GetDashboardRequest) String() string {
 func (*GetDashboardRequest) ProtoMessage() {}
 
 func (x *GetDashboardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[1]
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -155,7 +248,7 @@ func (x *GetDashboardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDashboardRequest.ProtoReflect.Descriptor instead.
 func (*GetDashboardRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{1}
+	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{2}
 }
 
 type GetDashboardResponse struct {
@@ -166,7 +259,7 @@ type GetDashboardResponse struct {
 	Daemons             *int32                 `protobuf:"varint,4,opt,name=daemons" json:"daemons,omitempty"`
 	DaemonsOnline       *int32                 `protobuf:"varint,5,opt,name=daemons_online,json=daemonsOnline" json:"daemons_online,omitempty"`
 	PendingDaemons      []*Daemon              `protobuf:"bytes,6,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
-	OfflineDaemons      []*Daemon              `protobuf:"bytes,7,rep,name=offline_daemons,json=offlineDaemons" json:"offline_daemons,omitempty"`
+	OfflineServers      []*Target              `protobuf:"bytes,7,rep,name=offline_servers,json=offlineServers" json:"offline_servers,omitempty"` // with their daemons, approved but not connected
 	Users               *int32                 `protobuf:"varint,8,opt,name=users" json:"users,omitempty"`
 	RecordingBytes      *int64                 `protobuf:"varint,9,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
 	RecordingQuotaBytes *int64                 `protobuf:"varint,10,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
@@ -175,13 +268,15 @@ type GetDashboardResponse struct {
 	Failures            []int32                `protobuf:"varint,13,rep,packed,name=failures" json:"failures,omitempty"`
 	RecentChanges       []*EventLog            `protobuf:"bytes,14,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
 	DaemonsBehind       *int32                 `protobuf:"varint,15,opt,name=daemons_behind,json=daemonsBehind" json:"daemons_behind,omitempty"`
+	EndingGrants        []*EndingGrant         `protobuf:"bytes,16,rep,name=ending_grants,json=endingGrants" json:"ending_grants,omitempty"` // the next five to end within a day
+	EndingGrantsTotal   *int32                 `protobuf:"varint,17,opt,name=ending_grants_total,json=endingGrantsTotal" json:"ending_grants_total,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
 func (x *GetDashboardResponse) Reset() {
 	*x = GetDashboardResponse{}
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[2]
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -193,7 +288,7 @@ func (x *GetDashboardResponse) String() string {
 func (*GetDashboardResponse) ProtoMessage() {}
 
 func (x *GetDashboardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_dashboard_proto_msgTypes[2]
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -206,7 +301,7 @@ func (x *GetDashboardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDashboardResponse.ProtoReflect.Descriptor instead.
 func (*GetDashboardResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{2}
+	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetDashboardResponse) GetTargets() int32 {
@@ -251,9 +346,9 @@ func (x *GetDashboardResponse) GetPendingDaemons() []*Daemon {
 	return nil
 }
 
-func (x *GetDashboardResponse) GetOfflineDaemons() []*Daemon {
+func (x *GetDashboardResponse) GetOfflineServers() []*Target {
 	if x != nil {
-		return x.OfflineDaemons
+		return x.OfflineServers
 	}
 	return nil
 }
@@ -314,11 +409,77 @@ func (x *GetDashboardResponse) GetDaemonsBehind() int32 {
 	return 0
 }
 
+func (x *GetDashboardResponse) GetEndingGrants() []*EndingGrant {
+	if x != nil {
+		return x.EndingGrants
+	}
+	return nil
+}
+
+func (x *GetDashboardResponse) GetEndingGrantsTotal() int32 {
+	if x != nil && x.EndingGrantsTotal != nil {
+		return *x.EndingGrantsTotal
+	}
+	return 0
+}
+
+type EndingGrant_Target struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndingGrant_Target) Reset() {
+	*x = EndingGrant_Target{}
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndingGrant_Target) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndingGrant_Target) ProtoMessage() {}
+
+func (x *EndingGrant_Target) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_dashboard_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndingGrant_Target.ProtoReflect.Descriptor instead.
+func (*EndingGrant_Target) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{1, 0}
+}
+
+func (x *EndingGrant_Target) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return ""
+}
+
+func (x *EndingGrant_Target) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
 var File_nokku_v1_dashboard_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\n" +
-	"\x18nokku/v1/dashboard.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x15nokku/v1/daemon.proto\x1a\x13nokku/v1/util.proto\"\xfb\x01\n" +
+	"\x18nokku/v1/dashboard.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x15nokku/v1/daemon.proto\x1a\x15nokku/v1/target.proto\x1a\x1dnokku/v1/target_account.proto\x1a\x13nokku/v1/util.proto\"\xfb\x01\n" +
 	"\vLiveSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tdaemon_id\x18\x02 \x01(\tR\bdaemonId\x12\x1f\n" +
@@ -329,8 +490,21 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\trecording\x18\x06 \x01(\bR\trecording\x12\x10\n" +
 	"\x03web\x18\a \x01(\bR\x03web\x129\n" +
 	"\n" +
-	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\"\x15\n" +
-	"\x13GetDashboardRequest\"\xfe\x04\n" +
+	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\"\xe9\x02\n" +
+	"\vEndingGrant\x128\n" +
+	"\fsubject_kind\x18\x01 \x01(\x0e2\x15.nokku.v1.SubjectKindR\vsubjectKind\x12\x1d\n" +
+	"\n" +
+	"subject_id\x18\x02 \x01(\tR\tsubjectId\x12!\n" +
+	"\fsubject_name\x18\x03 \x01(\tR\vsubjectName\x12\x1a\n" +
+	"\busername\x18\x04 \x01(\tR\busername\x129\n" +
+	"\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x126\n" +
+	"\atargets\x18\x06 \x03(\v2\x1c.nokku.v1.EndingGrant.TargetR\atargets\x12!\n" +
+	"\ftarget_count\x18\a \x01(\x05R\vtargetCount\x1a,\n" +
+	"\x06Target\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x15\n" +
+	"\x13GetDashboardRequest\"\xea\x05\n" +
 	"\x14GetDashboardResponse\x12\x18\n" +
 	"\atargets\x18\x01 \x01(\x05R\atargets\x12%\n" +
 	"\x0etargets_online\x18\x02 \x01(\x05R\rtargetsOnline\x12%\n" +
@@ -338,7 +512,7 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\adaemons\x18\x04 \x01(\x05R\adaemons\x12%\n" +
 	"\x0edaemons_online\x18\x05 \x01(\x05R\rdaemonsOnline\x129\n" +
 	"\x0fpending_daemons\x18\x06 \x03(\v2\x10.nokku.v1.DaemonR\x0ependingDaemons\x129\n" +
-	"\x0foffline_daemons\x18\a \x03(\v2\x10.nokku.v1.DaemonR\x0eofflineDaemons\x12\x14\n" +
+	"\x0foffline_servers\x18\a \x03(\v2\x10.nokku.v1.TargetR\x0eofflineServers\x12\x14\n" +
 	"\x05users\x18\b \x01(\x05R\x05users\x12'\n" +
 	"\x0frecording_bytes\x18\t \x01(\x03R\x0erecordingBytes\x122\n" +
 	"\x15recording_quota_bytes\x18\n" +
@@ -347,7 +521,9 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\bactivity\x18\f \x03(\x05R\bactivity\x12\x1a\n" +
 	"\bfailures\x18\r \x03(\x05R\bfailures\x129\n" +
 	"\x0erecent_changes\x18\x0e \x03(\v2\x12.nokku.v1.EventLogR\rrecentChanges\x12%\n" +
-	"\x0edaemons_behind\x18\x0f \x01(\x05R\rdaemonsBehind2l\n" +
+	"\x0edaemons_behind\x18\x0f \x01(\x05R\rdaemonsBehind\x12:\n" +
+	"\rending_grants\x18\x10 \x03(\v2\x15.nokku.v1.EndingGrantR\fendingGrants\x12.\n" +
+	"\x13ending_grants_total\x18\x11 \x01(\x05R\x11endingGrantsTotal2l\n" +
 	"\x10DashboardService\x12X\n" +
 	"\fGetDashboard\x12\x1d.nokku.v1.GetDashboardRequest\x1a\x1e.nokku.v1.GetDashboardResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eDashboardProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -364,28 +540,36 @@ func file_nokku_v1_dashboard_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_dashboard_proto_rawDescData
 }
 
-var file_nokku_v1_dashboard_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_nokku_v1_dashboard_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_nokku_v1_dashboard_proto_goTypes = []any{
 	(*LiveSession)(nil),           // 0: nokku.v1.LiveSession
-	(*GetDashboardRequest)(nil),   // 1: nokku.v1.GetDashboardRequest
-	(*GetDashboardResponse)(nil),  // 2: nokku.v1.GetDashboardResponse
-	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
-	(*Daemon)(nil),                // 4: nokku.v1.Daemon
-	(*EventLog)(nil),              // 5: nokku.v1.EventLog
+	(*EndingGrant)(nil),           // 1: nokku.v1.EndingGrant
+	(*GetDashboardRequest)(nil),   // 2: nokku.v1.GetDashboardRequest
+	(*GetDashboardResponse)(nil),  // 3: nokku.v1.GetDashboardResponse
+	(*EndingGrant_Target)(nil),    // 4: nokku.v1.EndingGrant.Target
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(SubjectKind)(0),              // 6: nokku.v1.SubjectKind
+	(*Daemon)(nil),                // 7: nokku.v1.Daemon
+	(*Target)(nil),                // 8: nokku.v1.Target
+	(*EventLog)(nil),              // 9: nokku.v1.EventLog
 }
 var file_nokku_v1_dashboard_proto_depIdxs = []int32{
-	3, // 0: nokku.v1.LiveSession.started_at:type_name -> google.protobuf.Timestamp
-	4, // 1: nokku.v1.GetDashboardResponse.pending_daemons:type_name -> nokku.v1.Daemon
-	4, // 2: nokku.v1.GetDashboardResponse.offline_daemons:type_name -> nokku.v1.Daemon
-	0, // 3: nokku.v1.GetDashboardResponse.live_sessions:type_name -> nokku.v1.LiveSession
-	5, // 4: nokku.v1.GetDashboardResponse.recent_changes:type_name -> nokku.v1.EventLog
-	1, // 5: nokku.v1.DashboardService.GetDashboard:input_type -> nokku.v1.GetDashboardRequest
-	2, // 6: nokku.v1.DashboardService.GetDashboard:output_type -> nokku.v1.GetDashboardResponse
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5,  // 0: nokku.v1.LiveSession.started_at:type_name -> google.protobuf.Timestamp
+	6,  // 1: nokku.v1.EndingGrant.subject_kind:type_name -> nokku.v1.SubjectKind
+	5,  // 2: nokku.v1.EndingGrant.expires_at:type_name -> google.protobuf.Timestamp
+	4,  // 3: nokku.v1.EndingGrant.targets:type_name -> nokku.v1.EndingGrant.Target
+	7,  // 4: nokku.v1.GetDashboardResponse.pending_daemons:type_name -> nokku.v1.Daemon
+	8,  // 5: nokku.v1.GetDashboardResponse.offline_servers:type_name -> nokku.v1.Target
+	0,  // 6: nokku.v1.GetDashboardResponse.live_sessions:type_name -> nokku.v1.LiveSession
+	9,  // 7: nokku.v1.GetDashboardResponse.recent_changes:type_name -> nokku.v1.EventLog
+	1,  // 8: nokku.v1.GetDashboardResponse.ending_grants:type_name -> nokku.v1.EndingGrant
+	2,  // 9: nokku.v1.DashboardService.GetDashboard:input_type -> nokku.v1.GetDashboardRequest
+	3,  // 10: nokku.v1.DashboardService.GetDashboard:output_type -> nokku.v1.GetDashboardResponse
+	10, // [10:11] is the sub-list for method output_type
+	9,  // [9:10] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_dashboard_proto_init() }
@@ -395,6 +579,8 @@ func file_nokku_v1_dashboard_proto_init() {
 	}
 	file_nokku_v1_access_proto_init()
 	file_nokku_v1_daemon_proto_init()
+	file_nokku_v1_target_proto_init()
+	file_nokku_v1_target_account_proto_init()
 	file_nokku_v1_util_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -402,7 +588,7 @@ func file_nokku_v1_dashboard_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_dashboard_proto_rawDesc), len(file_nokku_v1_dashboard_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -84,13 +84,13 @@ type Daemon struct {
 	Online     *bool                  `protobuf:"varint,3,opt,name=online" json:"online,omitempty"`
 	Status     *DaemonStatus          `protobuf:"varint,4,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
 	Config     *DaemonConfig          `protobuf:"bytes,5,opt,name=config" json:"config,omitempty"`
-	UpdatedAt  *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	CreatedAt  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	LastSeenAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_seen_at,json=lastSeenAt" json:"last_seen_at,omitempty"`
+	UpdatedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	CreatedAt  *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	LastSeenAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_seen_at,json=lastSeenAt" json:"last_seen_at,omitempty"`
 	// version is nokkud's, as its last enroll or sync reported it.
-	Version *string `protobuf:"bytes,10,opt,name=version" json:"version,omitempty"`
+	Version *string `protobuf:"bytes,9,opt,name=version" json:"version,omitempty"`
 	// behind_since is when a connected daemon stopped keeping up with access changes. Unset while it keeps up.
-	BehindSince   *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=behind_since,json=behindSince" json:"behind_since,omitempty"`
+	BehindSince   *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=behind_since,json=behindSince" json:"behind_since,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2243,7 +2243,7 @@ var File_nokku_v1_daemon_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/daemon.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x19nokku/v1/recordings.proto\"\xb7\x03\n" +
+	"\x15nokku/v1/daemon.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x19nokku/v1/recordings.proto\"\xb1\x03\n" +
 	"\x06Daemon\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
@@ -2251,14 +2251,14 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\x06status\x18\x04 \x01(\x0e2\x16.nokku.v1.DaemonStatusR\x06status\x12.\n" +
 	"\x06config\x18\x05 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
 	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
-	"\flast_seen_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
+	"\flast_seen_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastSeenAt\x12\x18\n" +
-	"\aversion\x18\n" +
-	" \x01(\tR\aversion\x12=\n" +
-	"\fbehind_since\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\vbehindSinceJ\x04\b\x06\x10\a\"\x99\x02\n" +
+	"\aversion\x18\t \x01(\tR\aversion\x12=\n" +
+	"\fbehind_since\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\vbehindSince\"\x99\x02\n" +
 	"\fDaemonConfig\x12'\n" +
 	"\x0frecord_sessions\x18\x01 \x01(\bR\x0erecordSessions\x12)\n" +
 	"\x10allow_forwarding\x18\x02 \x01(\bR\x0fallowForwarding\x124\n" +

@@ -30,6 +30,9 @@ const (
 	// WorkspaceServiceUpdateWorkspaceProcedure is the procedure name of the WorkspaceService's
 	// UpdateWorkspace RPC.
 	WorkspaceServiceUpdateWorkspaceProcedure = "/nokku.v1.WorkspaceService/UpdateWorkspace"
+	// WorkspaceServiceUpdateDaemonDefaultsProcedure is the procedure name of the WorkspaceService's
+	// UpdateDaemonDefaults RPC.
+	WorkspaceServiceUpdateDaemonDefaultsProcedure = "/nokku.v1.WorkspaceService/UpdateDaemonDefaults"
 	// WorkspaceServiceDeleteWorkspaceProcedure is the procedure name of the WorkspaceService's
 	// DeleteWorkspace RPC.
 	WorkspaceServiceDeleteWorkspaceProcedure = "/nokku.v1.WorkspaceService/DeleteWorkspace"
@@ -71,6 +74,13 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("UpdateWorkspace"),
 			Procedure:  WorkspaceServiceUpdateWorkspaceProcedure,
+		}
+	})
+	workspaceServiceUpdateDaemonDefaultsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("UpdateDaemonDefaults"),
+			Procedure:  WorkspaceServiceUpdateDaemonDefaultsProcedure,
 		}
 	})
 	workspaceServiceDeleteWorkspaceSpec = sync.OnceValue(func() connect.Spec {
@@ -144,6 +154,8 @@ var (
 type WorkspaceServiceClient interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
+	// UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
+	UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
@@ -167,6 +179,8 @@ func NewWorkspaceServiceClient(client *connect.Client) WorkspaceServiceClient {
 type WorkspaceServiceHandler interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
+	// UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
+	UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
@@ -187,6 +201,7 @@ func RegisterWorkspaceServiceHandler(server *connect.Server, svc WorkspaceServic
 	server.Register(
 		connect.Method{Spec: workspaceServiceGetWorkspaceSpec(), Handler: adapter.getWorkspace},
 		connect.Method{Spec: workspaceServiceUpdateWorkspaceSpec(), Handler: adapter.updateWorkspace},
+		connect.Method{Spec: workspaceServiceUpdateDaemonDefaultsSpec(), Handler: adapter.updateDaemonDefaults},
 		connect.Method{Spec: workspaceServiceDeleteWorkspaceSpec(), Handler: adapter.deleteWorkspace},
 		connect.Method{Spec: workspaceServiceListUsersSpec(), Handler: adapter.listUsers},
 		connect.Method{Spec: workspaceServiceGetUserSpec(), Handler: adapter.getUser},
@@ -208,6 +223,10 @@ func (UnimplementedWorkspaceServiceHandler) GetWorkspace(context.Context, *v1.Ge
 
 func (UnimplementedWorkspaceServiceHandler) UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.UpdateWorkspace is not implemented")
+}
+
+func (UnimplementedWorkspaceServiceHandler) UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.UpdateDaemonDefaults is not implemented")
 }
 
 func (UnimplementedWorkspaceServiceHandler) DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error) {
@@ -261,6 +280,14 @@ func (c *workspaceServiceClient) GetWorkspace(ctx context.Context, req *v1.GetWo
 func (c *workspaceServiceClient) UpdateWorkspace(ctx context.Context, req *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error) {
 	var res v1.UpdateWorkspaceResponse
 	if err := c.client.CallUnary(ctx, workspaceServiceUpdateWorkspaceSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *workspaceServiceClient) UpdateDaemonDefaults(ctx context.Context, req *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error) {
+	var res v1.UpdateDaemonDefaultsResponse
+	if err := c.client.CallUnary(ctx, workspaceServiceUpdateDaemonDefaultsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -358,6 +385,18 @@ func (h workspaceServiceHandler) updateWorkspace(ctx context.Context, _ connect.
 		return err
 	}
 	res, err := h.svc.UpdateWorkspace(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h workspaceServiceHandler) updateDaemonDefaults(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.UpdateDaemonDefaultsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.UpdateDaemonDefaults(ctx, &req)
 	if err != nil {
 		return err
 	}

@@ -56,6 +56,7 @@ func Expire(ctx context.Context, conn *db.Connection, write func(context.Context
 				Details: map[string]any{
 					"subject_kind": g.SubjectKind,
 					"subject_id":   g.SubjectID,
+					"subjects":     []string{g.SubjectName},
 					"target":       g.TargetName,
 					"username":     g.Username,
 					"expires_at":   g.ExpiresAt,

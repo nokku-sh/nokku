@@ -61,11 +61,15 @@ SELECT
   gone.subject_id,
   gone.expires_at::TIMESTAMPTZ AS expires_at,
   p.username,
-  t.name AS target_name
+  t.name AS target_name,
+  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, '')::TEXT AS subject_name
 FROM
   gone
   JOIN target_accounts p ON p.id = gone.account_id
   JOIN targets t ON t.id = p.target_id
+  LEFT JOIN users u ON u.id = gone.subject_id
+  LEFT JOIN teams m ON m.id = gone.subject_id
+  LEFT JOIN service_accounts s ON s.id = gone.subject_id
 `
 
 type DeleteExpiredGrantsRow struct {
@@ -75,6 +79,7 @@ type DeleteExpiredGrantsRow struct {
 	ExpiresAt   time.Time `json:"expiresAt"`
 	Username    string    `json:"username"`
 	TargetName  string    `json:"targetName"`
+	SubjectName string    `json:"subjectName"`
 }
 
 // One workspace at a time, the state version is bumped once per transaction and workspace.
@@ -94,6 +99,7 @@ func (q *Queries) DeleteExpiredGrants(ctx context.Context, workspaceID string) (
 			&i.ExpiresAt,
 			&i.Username,
 			&i.TargetName,
+			&i.SubjectName,
 		); err != nil {
 			return nil, err
 		}
@@ -141,9 +147,10 @@ func (q *Queries) ExtendGrant(ctx context.Context, arg *ExtendGrantParams) error
 	return err
 }
 
-const getTargetAccountWorkspace = `-- name: GetTargetAccountWorkspace :one
+const getTargetAccountLabel = `-- name: GetTargetAccountLabel :one
 SELECT
-  t.workspace_id
+  t.name AS target_name,
+  p.username
 FROM
   target_accounts p
   JOIN targets t ON t.id = p.target_id
@@ -151,11 +158,17 @@ WHERE
   p.id = $1
 `
 
-func (q *Queries) GetTargetAccountWorkspace(ctx context.Context, accountID string) (string, error) {
-	row := q.db.QueryRow(ctx, getTargetAccountWorkspace, accountID)
-	var workspace_id string
-	err := row.Scan(&workspace_id)
-	return workspace_id, err
+type GetTargetAccountLabelRow struct {
+	TargetName string `json:"targetName"`
+	Username   string `json:"username"`
+}
+
+// What an audit event shows for a login account. An account of another workspace does not exist here.
+func (q *Queries) GetTargetAccountLabel(ctx context.Context, accountID string) (*GetTargetAccountLabelRow, error) {
+	row := q.db.QueryRow(ctx, getTargetAccountLabel, accountID)
+	var i GetTargetAccountLabelRow
+	err := row.Scan(&i.TargetName, &i.Username)
+	return &i, err
 }
 
 const getTargetAccountsByTargetIDs = `-- name: GetTargetAccountsByTargetIDs :many

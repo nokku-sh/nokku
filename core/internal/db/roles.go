@@ -20,9 +20,9 @@ func RoleDescription(r nokkuv1.WorkspaceRole) string {
 	case nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER:
 		return "Read everything in the workspace, including the audit log"
 	case nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR:
-		return "Manage targets, access, daemons, the certificate authority, teams, and service accounts"
+		return "Manage servers, access, daemons, teams, and service accounts"
 	case nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN:
-		return "Also manage members, invites, and tokens"
+		return "Also manage members, invites, tokens, the certificate authority, and daemon defaults"
 	case nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER:
 		return "Also workspace settings, SSO, SCIM, billing, ownership transfer, and deleting the workspace"
 	}

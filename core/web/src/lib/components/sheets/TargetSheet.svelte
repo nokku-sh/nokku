@@ -1,28 +1,36 @@
 <script lang="ts">
 	import { ca, manualKeyState } from '#lib/api/certificates.svelte.js';
+	import { daemon as daemonApi, useDaemonReview } from '#lib/api/daemons.svelte.js';
 	import { useConnect } from '#lib/api/connect.svelte.js';
-	import { daemon as daemonApi } from '#lib/api/daemons.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { grantsOf } from '#lib/components/access/subjects.svelte.js';
 	import TargetAccess from '#lib/components/access/TargetAccess.svelte';
-	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
 	import Monogram from '#lib/components/blocks/Monogram.svelte';
+	import { daemonRules, type DaemonRule } from '#lib/daemon-rules.js';
+	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
 	import {
+		Ban,
+		Bot,
 		ChevronDown,
+		Clock,
 		Copy,
 		Cpu,
 		FileText,
@@ -47,8 +55,7 @@
 	const draft = useDraft(TargetSchema, () => query.data);
 	const model = $derived(draft.current);
 
-	const daemonQuery = daemonApi.get(() => entity?.daemonId);
-	const linkedDaemon = $derived(daemonQuery.data?.daemon);
+	const linkedDaemon = $derived(entity?.daemon);
 	const authority = ca.get();
 	const tagFilters = targetApi.filters();
 
@@ -63,6 +70,9 @@
 
 	const isManual = $derived(!entity?.daemonId);
 	const online = $derived(!!linkedDaemon?.online);
+	// Only an accepted daemon connects. Every other state gets the approve card.
+	const accepted = $derived(linkedDaemon?.status === DaemonStatus.ACCEPTED);
+	const pending = $derived(linkedDaemon?.status === DaemonStatus.PENDING);
 	const accounts = $derived(entity?.accounts ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
 	const lastSynced = $derived(formatTs(entity?.lastSyncAt, 'relative-short'));
@@ -96,13 +106,32 @@
 		save();
 	}
 
+	const updateDaemon = daemonApi.update();
+	const review = useDaemonReview();
+	// A switch shows what was flipped until the server's copy catches up.
+	let flipped = $state<Partial<Record<DaemonRule, boolean>>>({});
+	const ruleOn = (key: DaemonRule) => flipped[key] ?? linkedDaemon?.config?.[key] ?? false;
+
+	async function applyRule(key: DaemonRule, value: boolean) {
+		const d = linkedDaemon;
+		if (!d) return;
+		flipped[key] = value;
+		try {
+			const config: Partial<Record<DaemonRule, boolean>> = { [key]: value };
+			// Resolves after the refetch every change runs, so the switch never jumps back.
+			await updateDaemon.mutateAsync({ id: d.id, config });
+		} finally {
+			delete flipped[key];
+		}
+	}
+
 	function askDelete() {
 		if (!entity) return;
 		void confirm({
 			title: `Delete ${entity.name}?`,
 			description: entity.daemonId
-				? 'Everyone loses access to this target. Its login accounts, grants and daemon are removed.'
-				: 'Everyone loses access to this target. Its login accounts and grants are removed.',
+				? 'Everyone loses access to this server. Its login accounts, grants and daemon are removed.'
+				: 'Everyone loses access to this server. Its login accounts and grants are removed.',
 			typeToConfirm: entity.name,
 			onConfirm: async () => {
 				await remove.mutateAsync({ id: entity.id });
@@ -192,17 +221,25 @@
 	{#snippet subtitle()}
 		{#if isManual}
 			<Badge variant="outline"><RefreshCw data-icon="inline-start" />Manual sync</Badge>
-		{:else}
+		{:else if linkedDaemon}
 			<span class="flex items-center gap-1.5">
 				<StatusDot tone={online ? 'success' : 'warning'} live={online} />
-				{online ? 'Online' : 'Offline'} via
-				<a
-					href={`/infrastructure/daemons?id=${entity?.daemonId}`}
-					class="underline decoration-muted-foreground/40 decoration-dotted underline-offset-2 hover:decoration-current"
-				>
-					{linkedDaemon?.name ?? 'daemon'}
-				</a>
+				{#if linkedDaemon.behindSince}
+					Behind since {formatTs(linkedDaemon.behindSince, 'relative')}, it may still let in access
+					you revoked
+				{:else if online}
+					Online
+				{:else}
+					Offline, {linkedDaemon.lastSeenAt
+						? `last seen ${formatTs(linkedDaemon.lastSeenAt, 'relative')}`
+						: 'never connected'}
+				{/if}
 			</span>
+			{#if pending}
+				<Badge variant="warning">Waiting for approval</Badge>
+			{:else if !accepted}
+				<Badge variant="destructive">Rejected</Badge>
+			{/if}
 		{/if}
 		{#each model?.tags ?? [] as tag (tag)}
 			<Badge variant="outline" class="h-5 rounded-full px-2 font-normal">{tag}</Badge>
@@ -211,7 +248,42 @@
 
 	{#if model && entity}
 		<Tabs.Content value="overview" class="flex flex-col divide-y">
-			<div class="grid grid-cols-3 gap-2 pb-5">
+			{#if linkedDaemon && !accepted}
+				<div class="pb-5">
+					<Alert.Root variant={pending ? 'warning' : 'destructive'}>
+						{#if pending}<Clock />{:else}<Ban />{/if}
+						<Alert.Title>
+							{pending ? 'This server wants to join' : 'This server was rejected'}
+						</Alert.Title>
+						<Alert.Description>
+							{#if !can.edit}
+								Nobody can log in to it until an editor approves it.
+							{:else if pending}
+								Its daemon enrolled. Check that you expect this host before you approve it, people
+								can log in once you do.
+							{:else}
+								Nobody can log in to it until you approve it.
+							{/if}
+						</Alert.Description>
+						{#if can.edit}
+							<div class="col-start-2 mt-2 flex gap-2">
+								<Button
+									size="sm"
+									onclick={() => review.approve(linkedDaemon)}
+									disabled={review.pending}>Approve</Button
+								>
+								<Button
+									size="sm"
+									variant="destructive"
+									onclick={() => review.reject(linkedDaemon, () => sheet.close())}>Reject</Button
+								>
+							</div>
+						{/if}
+					</Alert.Root>
+				</div>
+			{/if}
+
+			<div class="grid grid-cols-3 gap-2 py-5 first:pt-0">
 				{#each glance as stat (stat.label)}
 					<button
 						type="button"
@@ -253,6 +325,26 @@
 				</Section>
 			{/if}
 
+			{#if linkedDaemon}
+				<Section title="Daemon" icon={Bot}>
+					<DetailList
+						items={[
+							{ label: 'Version', value: linkedDaemon.version || 'unknown', mono: true },
+							{
+								label: 'Last seen',
+								value: linkedDaemon.lastSeenAt
+									? formatTs(linkedDaemon.lastSeenAt, 'relative')
+									: 'Never'
+							},
+							{ label: 'Enrolled', value: formatTs(linkedDaemon.createdAt) },
+							...(linkedDaemon.config?.ephemeral
+								? [{ label: 'Ephemeral', value: 'Removed once its host is gone' }]
+								: [])
+						]}
+					/>
+				</Section>
+			{/if}
+
 			<Section title="System" icon={Cpu}>
 				{#if systemInfo.length || entity.hostPublicKey}
 					<DetailList
@@ -281,6 +373,35 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="settings" class="flex flex-col divide-y">
+			{#if linkedDaemon && accepted}
+				<Section
+					title="Session rules"
+					icon={ShieldCheck}
+					description="Its daemon takes them at its next sync. Running sessions keep the rules they started with."
+				>
+					<Item.Group class="divide-y rounded-lg border">
+						{#each daemonRules as rule (rule.key)}
+							<Item.Root size="sm" class="rounded-none">
+								<Item.Content>
+									<Item.Title>
+										<label for={`rule-${rule.key}`}>{rule.title}</label>
+									</Item.Title>
+									<Item.Description>{rule.description}</Item.Description>
+								</Item.Content>
+								<Item.Actions>
+									<Switch
+										id={`rule-${rule.key}`}
+										checked={ruleOn(rule.key)}
+										onCheckedChange={(v) => void applyRule(rule.key, v)}
+										disabled={!can.edit || rule.key in flipped}
+									/>
+								</Item.Actions>
+							</Item.Root>
+						{/each}
+					</Item.Group>
+				</Section>
+			{/if}
+
 			<Section
 				title="Endpoints"
 				icon={Globe}
@@ -360,8 +481,10 @@
 				<DangerZone
 					actions={[
 						{
-							title: 'Delete target',
-							description: 'Removes the target, its login accounts and every grant.',
+							title: 'Delete server',
+							description: linkedDaemon
+								? 'Removes the server, its daemon, its login accounts and every grant.'
+								: 'Removes the server, its login accounts and every grant.',
 							label: 'Delete',
 							onClick: askDelete
 						}
@@ -371,7 +494,7 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="access">
-			<TargetAccess targetId={entity.id} manual={isManual} />
+			<TargetAccess targetId={entity.id} name={entity.name} manual={isManual} />
 		</Tabs.Content>
 	{/if}
 </EntitySheet>

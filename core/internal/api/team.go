@@ -5,6 +5,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -56,6 +57,7 @@ func (s *teamService) UpdateTeam(
 	if err != nil {
 		return nil, err
 	}
+	audit.Set(ctx, "name", team.Name)
 	return &nokkuv1.UpdateTeamResponse{Team: team.ToProto()}, nil
 }
 
@@ -63,9 +65,11 @@ func (s *teamService) DeleteTeam(
 	ctx context.Context,
 	req *nokkuv1.DeleteTeamRequest,
 ) (*nokkuv1.DeleteTeamResponse, error) {
-	if _, err := s.cfg.Conn.Tenant().DeleteTeam(ctx, req.GetId()); err != nil {
+	team, err := s.cfg.Conn.Tenant().DeleteTeam(ctx, req.GetId())
+	if err != nil {
 		return nil, err
 	}
+	audit.Set(ctx, "name", team.Name)
 	return &nokkuv1.DeleteTeamResponse{}, nil
 }
 
@@ -151,7 +155,11 @@ func (s *teamService) AddTeamMember(
 	ctx context.Context,
 	req *nokkuv1.AddTeamMemberRequest,
 ) (*nokkuv1.AddTeamMemberResponse, error) {
-	if err := s.cfg.Conn.Tenant().AddTeamMember(ctx, &db.AddTeamMemberParams{
+	q := s.cfg.Conn.Tenant()
+	if err := auditMember(ctx, q, req.GetTeamId(), req.GetUserId()); err != nil {
+		return nil, err
+	}
+	if err := q.AddTeamMember(ctx, &db.AddTeamMemberParams{
 		TeamID: req.GetTeamId(),
 		UserID: req.GetUserId(),
 	}); err != nil {
@@ -164,7 +172,11 @@ func (s *teamService) RemoveTeamMember(
 	ctx context.Context,
 	req *nokkuv1.RemoveTeamMemberRequest,
 ) (*nokkuv1.RemoveTeamMemberResponse, error) {
-	if err := s.cfg.Conn.Tenant().RemoveTeamMember(ctx, &db.RemoveTeamMemberParams{
+	q := s.cfg.Conn.Tenant()
+	if err := auditMember(ctx, q, req.GetTeamId(), req.GetUserId()); err != nil {
+		return nil, err
+	}
+	if err := q.RemoveTeamMember(ctx, &db.RemoveTeamMemberParams{
 		TeamID: req.GetTeamId(),
 		UserID: req.GetUserId(),
 	}); err != nil {
@@ -172,4 +184,15 @@ func (s *teamService) RemoveTeamMember(
 	}
 
 	return &nokkuv1.RemoveTeamMemberResponse{}, nil
+}
+
+// auditMember names the team and the person of a membership change.
+func auditMember(ctx context.Context, q *db.Queries, teamID, userID string) error {
+	names, err := q.GetNames(ctx, []string{teamID, userID})
+	if err != nil {
+		return err
+	}
+	audit.Set(ctx, "name", names[0])
+	audit.Set(ctx, "member", names[1])
+	return nil
 }

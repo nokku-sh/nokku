@@ -119,7 +119,6 @@ type Daemon struct {
 	ID            string              `json:"id"`
 	WorkspaceID   string              `json:"workspaceId"`
 	JoinTokenID   *string             `json:"joinTokenId"`
-	Name          string              `json:"name"`
 	KeyThumbprint *string             `json:"keyThumbprint"`
 	Version       string              `json:"version"`
 	Status        nokku.DaemonStatus  `json:"status"`

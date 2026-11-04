@@ -18,7 +18,7 @@ INSERT INTO
 SELECT
   $1,
   d.id,
-  d.name,
+  t.name,
   $2,
   $3,
   -- Subject ids are unique across kinds, so one of the two has it.
@@ -35,6 +35,7 @@ SELECT
   END
 FROM
   daemons d
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
   d.id = $7
 RETURNING

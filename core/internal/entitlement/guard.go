@@ -47,7 +47,8 @@ func RequestedFeatures(msg any) []string {
 		if req.GetSettings().GetEnforceSso() {
 			features = append(features, FeatureEnforceSSO)
 		}
-		if req.GetSettings().GetSessionIdleTimeout().AsDuration() > 0 {
+	case *nokkuv1.UpdateDaemonDefaultsRequest:
+		if req.GetSessionIdleTimeout().AsDuration() > 0 {
 			features = append(features, FeatureIdleTimeout)
 		}
 	case *nokkuv1.SetRequestableTagsRequest:

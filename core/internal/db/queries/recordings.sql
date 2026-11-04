@@ -5,7 +5,7 @@ INSERT INTO
 SELECT
   @id,
   d.id,
-  d.name,
+  t.name,
   @username,
   sqlc.narg('subject_id'),
   -- Subject ids are unique across kinds, so one of the two has it.
@@ -22,6 +22,7 @@ SELECT
   END
 FROM
   daemons d
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
   d.id = @daemon_id
 RETURNING

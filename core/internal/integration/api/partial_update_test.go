@@ -59,17 +59,21 @@ func TestPartialUpdates(t *testing.T) {
 	// Idle timeout and audit streams are paid, the shared server has neither.
 	_, paid := enterprise(t)
 
-	var lines []string
-	for _, r := range []partialResource{
+	resources := []partialResource{
 		partialAccount(t, cfg, srv),
 		partialCA(t, admin),
 		partialDaemon(t, cfg, srv, admin),
-		partialWorkspace(t, cfg, paid),
+	}
+	resources = append(resources, partialWorkspace(t, cfg, paid)...)
+	resources = append(resources,
 		partialTeam(t, cfg, admin),
 		partialTarget(t, admin),
 		partialAuditStream(t, cfg, paid),
 		partialServiceAccount(t, admin),
-	} {
+	)
+
+	var lines []string
+	for _, r := range resources {
 		lines = append(lines, r.record(t)...)
 	}
 	assertGolden(t, "partial_update.golden", lines)
@@ -321,8 +325,8 @@ func partialDaemon(t *testing.T, cfg *config.Config, srv *httptest.Server, admin
 	}
 }
 
-// partialWorkspace leaves enforce_sso off, it ends every non-SSO session.
-func partialWorkspace(t *testing.T, cfg *config.Config, srv *httptest.Server) partialResource {
+// partialWorkspace leaves enforce_sso off, and both calls on the workspace row share its baseline.
+func partialWorkspace(t *testing.T, cfg *config.Config, srv *httptest.Server) []partialResource {
 	t.Helper()
 	ws := testWorkspace.ID
 	owner := nokkuv1connect.NewWorkspaceServiceClient(
@@ -341,53 +345,70 @@ func partialWorkspace(t *testing.T, cfg *config.Config, srv *httptest.Server) pa
 			return err
 		}
 	}
-	return partialResource{
-		rpc: "WorkspaceService.UpdateWorkspace",
-		create: func() string {
-			restoreWorkspace(t.Context(), t, cfg, original)
-			_, err := owner.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-				Name:        new("partial baseline"),
-				Description: new("baseline"),
-				Settings: &nokkuv1.WorkspaceSettings{
-					DefaultDaemonConfig: &nokkuv1.DaemonConfig{
-						RecordSessions:       new(false),
-						AllowForwarding:      new(false),
-						AllowAgentForwarding: new(false),
-						GatewayPorts:         new(true),
-					},
-					SessionIdleTimeout: durationpb.New(10 * time.Minute),
-				},
-			}))
-			require.NoError(t, err)
-			inWorkspace(t, cfg, ws, func(q *db.Queries) error {
-				return q.SetRequestableTags(t.Context(), []string{"prod", "web"})
-			})
-			return ws
+	defaults := func(req *nokkuv1.UpdateDaemonDefaultsRequest) func(string) error {
+		return func(string) error {
+			_, err := owner.UpdateDaemonDefaults(t.Context(), masked(req))
+			return err
+		}
+	}
+	create := func() string {
+		restoreWorkspace(t.Context(), t, cfg, original)
+		_, err := owner.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
+			Name:        new("partial baseline"),
+			Description: new("baseline"),
+		}))
+		require.NoError(t, err)
+		_, err = owner.UpdateDaemonDefaults(t.Context(), masked(&nokkuv1.UpdateDaemonDefaultsRequest{
+			DefaultDaemonConfig: &nokkuv1.DaemonConfig{
+				RecordSessions:       new(false),
+				AllowForwarding:      new(false),
+				AllowAgentForwarding: new(false),
+				GatewayPorts:         new(true),
+			},
+			SessionIdleTimeout: durationpb.New(10 * time.Minute),
+		}))
+		require.NoError(t, err)
+		inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+			return q.SetRequestableTags(t.Context(), []string{"prod", "web"})
+		})
+		return ws
+	}
+	read := func(string) []partialField {
+		res, err := owner.GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
+		require.NoError(t, err)
+		// requestable_tags is checked on the row, the one access requests match against.
+		var row *db.Workspace
+		inWorkspace(t, cfg, ws, func(q *db.Queries) (err error) {
+			row, err = q.GetWorkspace(t.Context())
+			return err
+		})
+		return append(partialFields(res.GetWorkspace(), "id", "requestable_tags"),
+			partialField{"requestable_tags (stored)", strings.Join(row.RequestableTags, "\x00")})
+	}
+	return []partialResource{
+		{
+			rpc:    "WorkspaceService.UpdateWorkspace",
+			create: create,
+			read:   read,
+			cases: []partialCase{
+				{"name", update(&nokkuv1.UpdateWorkspaceRequest{Name: new("partial renamed")})},
+				{"description", update(&nokkuv1.UpdateWorkspaceRequest{Description: new("changed")})},
+				{"nothing", update(&nokkuv1.UpdateWorkspaceRequest{})},
+			},
 		},
-		read: func(string) []partialField {
-			res, err := owner.GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
-			require.NoError(t, err)
-			// The API never shows requestable_tags, the row does.
-			var row *db.Workspace
-			inWorkspace(t, cfg, ws, func(q *db.Queries) (err error) {
-				row, err = q.GetWorkspace(t.Context())
-				return err
-			})
-			return append(partialFields(res.GetWorkspace(), "id", "requestable_tags"),
-				partialField{"requestable_tags (stored)", strings.Join(row.RequestableTags, "\x00")})
-		},
-		cases: []partialCase{
-			{"name", update(&nokkuv1.UpdateWorkspaceRequest{Name: new("partial renamed")})},
-			{"description", update(&nokkuv1.UpdateWorkspaceRequest{Description: new("changed")})},
-			{"settings.default_daemon_config.record_sessions", update(&nokkuv1.UpdateWorkspaceRequest{
-				Settings: &nokkuv1.WorkspaceSettings{
+		{
+			rpc:    "WorkspaceService.UpdateDaemonDefaults",
+			create: create,
+			read:   read,
+			cases: []partialCase{
+				{"default_daemon_config.record_sessions", defaults(&nokkuv1.UpdateDaemonDefaultsRequest{
 					DefaultDaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(true)},
-				},
-			})},
-			{"settings.session_idle_timeout", update(&nokkuv1.UpdateWorkspaceRequest{
-				Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(20 * time.Minute)},
-			})},
-			{"nothing", update(&nokkuv1.UpdateWorkspaceRequest{})},
+				})},
+				{"session_idle_timeout", defaults(&nokkuv1.UpdateDaemonDefaultsRequest{
+					SessionIdleTimeout: durationpb.New(20 * time.Minute),
+				})},
+				{"nothing", defaults(&nokkuv1.UpdateDaemonDefaultsRequest{})},
+			},
 		},
 	}
 }
@@ -649,16 +670,14 @@ func TestConcurrentSettingsKeepBoth(t *testing.T) {
 		record := round%2 == 0
 		errs := make(chan error, 2)
 		go func() {
-			_, err := owner.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-				Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(timeout)},
+			_, err := owner.UpdateDaemonDefaults(t.Context(), masked(&nokkuv1.UpdateDaemonDefaultsRequest{
+				SessionIdleTimeout: durationpb.New(timeout),
 			}))
 			errs <- err
 		}()
 		go func() {
-			_, err := owner.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-				Settings: &nokkuv1.WorkspaceSettings{
-					DefaultDaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(record)},
-				},
+			_, err := owner.UpdateDaemonDefaults(t.Context(), masked(&nokkuv1.UpdateDaemonDefaultsRequest{
+				DefaultDaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(record)},
 			}))
 			errs <- err
 		}()

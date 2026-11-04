@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/workspace.proto.
  */
 export const file_nokku_v1_workspace: GenFile = /*@__PURE__*/
-  fileDesc("Chhub2trdS92MS93b3Jrc3BhY2UucHJvdG8SCG5va2t1LnYxIvEBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEc2x1ZxgCIAEoCRIMCgRuYW1lGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEi0KCHNldHRpbmdzGAUgASgLMhsubm9ra3UudjEuV29ya3NwYWNlU2V0dGluZ3MSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQcmVxdWVzdGFibGVfdGFncxgIIAMoCSKoAQoRV29ya3NwYWNlU2V0dGluZ3MSNQoVZGVmYXVsdF9kYWVtb25fY29uZmlnGAEgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEhMKC2VuZm9yY2Vfc3NvGAIgASgIEkcKFHNlc3Npb25faWRsZV90aW1lb3V0GAMgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQg66SAuqAQgiBAiAowUyACIVChNHZXRXb3Jrc3BhY2VSZXF1ZXN0Ip8DChRHZXRXb3Jrc3BhY2VSZXNwb25zZRImCgl3b3Jrc3BhY2UYASABKAsyEy5ub2trdS52MS5Xb3Jrc3BhY2USEAoIYmFzZV91cmwYAiABKAkSEAoIaW5hY3RpdmUYAyABKAgSLQoJZGVsZXRlX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI+CghmZWF0dXJlcxgFIAMoCzIsLm5va2t1LnYxLkdldFdvcmtzcGFjZVJlc3BvbnNlLkZlYXR1cmVzRW50cnkSJgoHY2F0YWxvZxgGIAMoCzIVLm5va2t1LnYxLlBsYW5GZWF0dXJlEkEKCnBsYW5fbmFtZXMYByADKAsyLS5ub2trdS52MS5HZXRXb3Jrc3BhY2VSZXNwb25zZS5QbGFuTmFtZXNFbnRyeRovCg1GZWF0dXJlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCDoCOAEaMAoOUGxhbk5hbWVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI3CgtQbGFuRmVhdHVyZRILCgNrZXkYASABKAkSDQoFbGFiZWwYAiABKAkSDAoEcGxhbhgDIAEoCSLOAwoWVXBkYXRlV29ya3NwYWNlUmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRADGIACEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxItCghzZXR0aW5ncxgDIAEoCzIbLm5va2t1LnYxLldvcmtzcGFjZVNldHRpbmdzEssCCgt1cGRhdGVfbWFzaxgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tCmQK6SJUCyAEB4gGOAhIEbmFtZRILZGVzY3JpcHRpb24SLnNldHRpbmdzLmRlZmF1bHRfZGFlbW9uX2NvbmZpZy5yZWNvcmRfc2Vzc2lvbnMSL3NldHRpbmdzLmRlZmF1bHRfZGFlbW9uX2NvbmZpZy5hbGxvd19mb3J3YXJkaW5nEjVzZXR0aW5ncy5kZWZhdWx0X2RhZW1vbl9jb25maWcuYWxsb3dfYWdlbnRfZm9yd2FyZGluZxIsc2V0dGluZ3MuZGVmYXVsdF9kYWVtb25fY29uZmlnLmdhdGV3YXlfcG9ydHMSFHNldHRpbmdzLmVuZm9yY2Vfc3NvEh1zZXR0aW5ncy5zZXNzaW9uX2lkbGVfdGltZW91dCJBChdVcGRhdGVXb3Jrc3BhY2VSZXNwb25zZRImCgl3b3Jrc3BhY2UYASABKAsyEy5ub2trdS52MS5Xb3Jrc3BhY2UiGAoWRGVsZXRlV29ya3NwYWNlUmVxdWVzdCIZChdEZWxldGVXb3Jrc3BhY2VSZXNwb25zZSKtAQoWQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBI9CgRzbHVnGAEgASgJQi+6SCxyKhABGD8yJF5bYS16MC05XShbYS16MC05LV17MCw2MX1bYS16MC05XSk/JBIYCgRuYW1lGAIgASgJQgq6SAdyBRADGIACEhwKC293bmVyX2VtYWlsGAMgASgJQge6SARyAmABEhwKCm93bmVyX25hbWUYBCABKAlCCLpIBXIDGIACIiYKF0NyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlEgsKA3VybBgBIAEoCSKFAQoQTGlzdFVzZXJzUmVxdWVzdBIYCgVsaW1pdBgBIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgCIAEoBUIHukgEGgIoABINCgVxdWVyeRgDIAEoCRIvCgRyb2xlGAQgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZUIIukgFggECEAEiQQoRTGlzdFVzZXJzUmVzcG9uc2USHQoFdXNlcnMYASADKAsyDi5ub2trdS52MS5Vc2VyEg0KBXRvdGFsGAIgASgFIisKDkdldFVzZXJSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBIi8KD0dldFVzZXJSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubm9ra3UudjEuVXNlciJpChVVcGRhdGVVc2VyUm9sZVJlcXVlc3QSGQoHdXNlcl9pZBgBIAEoCUIIukgFcgOwAQESNQoEcm9sZRgCIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGVCDrpIC4IBCBgBGAIYAxgEIhgKFlVwZGF0ZVVzZXJSb2xlUmVzcG9uc2UiQQoUU2V0VXNlckFjdGl2ZVJlcXVlc3QSGQoHdXNlcl9pZBgBIAEoCUIIukgFcgOwAQESDgoGYWN0aXZlGAIgASgIIhcKFVNldFVzZXJBY3RpdmVSZXNwb25zZSIuChFEZWxldGVVc2VyUmVxdWVzdBIZCgd1c2VyX2lkGAEgASgJQgi6SAVyA7ABASIUChJEZWxldGVVc2VyUmVzcG9uc2UiNwoaQ2xlYXJVc2VySWRlbnRpdGllc1JlcXVlc3QSGQoHdXNlcl9pZBgBIAEoCUIIukgFcgOwAQEiHQobQ2xlYXJVc2VySWRlbnRpdGllc1Jlc3BvbnNlIjoKGFRyYW5zZmVyT3duZXJzaGlwUmVxdWVzdBIeCgxuZXdfb3duZXJfaWQYASABKAlCCLpIBXIDsAEBIhsKGVRyYW5zZmVyT3duZXJzaGlwUmVzcG9uc2UyiggKEFdvcmtzcGFjZVNlcnZpY2USWAoMR2V0V29ya3NwYWNlEh0ubm9ra3UudjEuR2V0V29ya3NwYWNlUmVxdWVzdBoeLm5va2t1LnYxLkdldFdvcmtzcGFjZVJlc3BvbnNlIgmQAgHC8xgCEAESXgoPVXBkYXRlV29ya3NwYWNlEiAubm9ra3UudjEuVXBkYXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLlVwZGF0ZVdvcmtzcGFjZVJlc3BvbnNlIgbC8xgCGAUSYAoPRGVsZXRlV29ya3NwYWNlEiAubm9ra3UudjEuRGVsZXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZVdvcmtzcGFjZVJlc3BvbnNlIgjC8xgEGAUwARJPCglMaXN0VXNlcnMSGi5ub2trdS52MS5MaXN0VXNlcnNSZXF1ZXN0Ghsubm9ra3UudjEuTGlzdFVzZXJzUmVzcG9uc2UiCZACAcLzGAIYAhJJCgdHZXRVc2VyEhgubm9ra3UudjEuR2V0VXNlclJlcXVlc3QaGS5ub2trdS52MS5HZXRVc2VyUmVzcG9uc2UiCZACAcLzGAIYAhJbCg5VcGRhdGVVc2VyUm9sZRIfLm5va2t1LnYxLlVwZGF0ZVVzZXJSb2xlUmVxdWVzdBogLm5va2t1LnYxLlVwZGF0ZVVzZXJSb2xlUmVzcG9uc2UiBsLzGAIYBBJYCg1TZXRVc2VyQWN0aXZlEh4ubm9ra3UudjEuU2V0VXNlckFjdGl2ZVJlcXVlc3QaHy5ub2trdS52MS5TZXRVc2VyQWN0aXZlUmVzcG9uc2UiBsLzGAIYBBJPCgpEZWxldGVVc2VyEhsubm9ra3UudjEuRGVsZXRlVXNlclJlcXVlc3QaHC5ub2trdS52MS5EZWxldGVVc2VyUmVzcG9uc2UiBsLzGAIYBBJuChNDbGVhclVzZXJJZGVudGl0aWVzEiQubm9ra3UudjEuQ2xlYXJVc2VySWRlbnRpdGllc1JlcXVlc3QaJS5ub2trdS52MS5DbGVhclVzZXJJZGVudGl0aWVzUmVzcG9uc2UiCsLzGAYYBCgBMAESZgoRVHJhbnNmZXJPd25lcnNoaXASIi5ub2trdS52MS5UcmFuc2Zlck93bmVyc2hpcFJlcXVlc3QaIy5ub2trdS52MS5UcmFuc2Zlck93bmVyc2hpcFJlc3BvbnNlIgjC8xgEGAUwARJeCg9DcmVhdGVXb3Jrc3BhY2USIC5ub2trdS52MS5DcmVhdGVXb3Jrc3BhY2VSZXF1ZXN0GiEubm9ra3UudjEuQ3JlYXRlV29ya3NwYWNlUmVzcG9uc2UiBsLzGAIIAUKPAQoMY29tLm5va2t1LnYxQg5Xb3Jrc3BhY2VQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_daemon]);
+  fileDesc("Chhub2trdS92MS93b3Jrc3BhY2UucHJvdG8SCG5va2t1LnYxIvEBCglXb3Jrc3BhY2USCgoCaWQYASABKAkSDAoEc2x1ZxgCIAEoCRIMCgRuYW1lGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEi0KCHNldHRpbmdzGAUgASgLMhsubm9ra3UudjEuV29ya3NwYWNlU2V0dGluZ3MSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQcmVxdWVzdGFibGVfdGFncxgIIAMoCSKoAQoRV29ya3NwYWNlU2V0dGluZ3MSNQoVZGVmYXVsdF9kYWVtb25fY29uZmlnGAEgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEhMKC2VuZm9yY2Vfc3NvGAIgASgIEkcKFHNlc3Npb25faWRsZV90aW1lb3V0GAMgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQg66SAuqAQgiBAiAowUyACIVChNHZXRXb3Jrc3BhY2VSZXF1ZXN0Ip8DChRHZXRXb3Jrc3BhY2VSZXNwb25zZRImCgl3b3Jrc3BhY2UYASABKAsyEy5ub2trdS52MS5Xb3Jrc3BhY2USEAoIYmFzZV91cmwYAiABKAkSEAoIaW5hY3RpdmUYAyABKAgSLQoJZGVsZXRlX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI+CghmZWF0dXJlcxgFIAMoCzIsLm5va2t1LnYxLkdldFdvcmtzcGFjZVJlc3BvbnNlLkZlYXR1cmVzRW50cnkSJgoHY2F0YWxvZxgGIAMoCzIVLm5va2t1LnYxLlBsYW5GZWF0dXJlEkEKCnBsYW5fbmFtZXMYByADKAsyLS5ub2trdS52MS5HZXRXb3Jrc3BhY2VSZXNwb25zZS5QbGFuTmFtZXNFbnRyeRovCg1GZWF0dXJlc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCDoCOAEaMAoOUGxhbk5hbWVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI3CgtQbGFuRmVhdHVyZRILCgNrZXkYASABKAkSDQoFbGFiZWwYAiABKAkSDAoEcGxhbhgDIAEoCSLlAQoWVXBkYXRlV29ya3NwYWNlUmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRADGIACEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxItCghzZXR0aW5ncxgDIAEoCzIbLm5va2t1LnYxLldvcmtzcGFjZVNldHRpbmdzEmMKC3VwZGF0ZV9tYXNrGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0IyukgvyAEB4gEpEgRuYW1lEgtkZXNjcmlwdGlvbhIUc2V0dGluZ3MuZW5mb3JjZV9zc28iQQoXVXBkYXRlV29ya3NwYWNlUmVzcG9uc2USJgoJd29ya3NwYWNlGAEgASgLMhMubm9ra3UudjEuV29ya3NwYWNlIpUDChtVcGRhdGVEYWVtb25EZWZhdWx0c1JlcXVlc3QSNQoVZGVmYXVsdF9kYWVtb25fY29uZmlnGAEgASgLMhYubm9ra3UudjEuRGFlbW9uQ29uZmlnEkcKFHNlc3Npb25faWRsZV90aW1lb3V0GAIgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQg66SAuqAQgiBAiAowUyABL1AQoLdXBkYXRlX21hc2sYAyABKAsyGi5nb29nbGUucHJvdG9idWYuRmllbGRNYXNrQsMBuki/AcgBAeIBuAESJWRlZmF1bHRfZGFlbW9uX2NvbmZpZy5yZWNvcmRfc2Vzc2lvbnMSJmRlZmF1bHRfZGFlbW9uX2NvbmZpZy5hbGxvd19mb3J3YXJkaW5nEixkZWZhdWx0X2RhZW1vbl9jb25maWcuYWxsb3dfYWdlbnRfZm9yd2FyZGluZxIjZGVmYXVsdF9kYWVtb25fY29uZmlnLmdhdGV3YXlfcG9ydHMSFHNlc3Npb25faWRsZV90aW1lb3V0IkYKHFVwZGF0ZURhZW1vbkRlZmF1bHRzUmVzcG9uc2USJgoJd29ya3NwYWNlGAEgASgLMhMubm9ra3UudjEuV29ya3NwYWNlIhgKFkRlbGV0ZVdvcmtzcGFjZVJlcXVlc3QiGQoXRGVsZXRlV29ya3NwYWNlUmVzcG9uc2UirQEKFkNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QSPQoEc2x1ZxgBIAEoCUIvukgscioQARg/MiReW2EtejAtOV0oW2EtejAtOS1dezAsNjF9W2EtejAtOV0pPyQSGAoEbmFtZRgCIAEoCUIKukgHcgUQAxiAAhIcCgtvd25lcl9lbWFpbBgDIAEoCUIHukgEcgJgARIcCgpvd25lcl9uYW1lGAQgASgJQgi6SAVyAxiAAiImChdDcmVhdGVXb3Jrc3BhY2VSZXNwb25zZRILCgN1cmwYASABKAkihQEKEExpc3RVc2Vyc1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSLwoEcm9sZRgEIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGVCCLpIBYIBAhABIkEKEUxpc3RVc2Vyc1Jlc3BvbnNlEh0KBXVzZXJzGAEgAygLMg4ubm9ra3UudjEuVXNlchINCgV0b3RhbBgCIAEoBSIrCg5HZXRVc2VyUmVxdWVzdBIZCgd1c2VyX2lkGAEgASgJQgi6SAVyA7ABASIvCg9HZXRVc2VyUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm5va2t1LnYxLlVzZXIiaQoVVXBkYXRlVXNlclJvbGVSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBEjUKBHJvbGUYAiABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlQg66SAuCAQgYARgCGAMYBCIYChZVcGRhdGVVc2VyUm9sZVJlc3BvbnNlIkEKFFNldFVzZXJBY3RpdmVSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBEg4KBmFjdGl2ZRgCIAEoCCIXChVTZXRVc2VyQWN0aXZlUmVzcG9uc2UiLgoRRGVsZXRlVXNlclJlcXVlc3QSGQoHdXNlcl9pZBgBIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVXNlclJlc3BvbnNlIjcKGkNsZWFyVXNlcklkZW50aXRpZXNSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBIh0KG0NsZWFyVXNlcklkZW50aXRpZXNSZXNwb25zZSI6ChhUcmFuc2Zlck93bmVyc2hpcFJlcXVlc3QSHgoMbmV3X293bmVyX2lkGAEgASgJQgi6SAVyA7ABASIbChlUcmFuc2Zlck93bmVyc2hpcFJlc3BvbnNlMvkIChBXb3Jrc3BhY2VTZXJ2aWNlElgKDEdldFdvcmtzcGFjZRIdLm5va2t1LnYxLkdldFdvcmtzcGFjZVJlcXVlc3QaHi5ub2trdS52MS5HZXRXb3Jrc3BhY2VSZXNwb25zZSIJkAIBwvMYAhABEl4KD1VwZGF0ZVdvcmtzcGFjZRIgLm5va2t1LnYxLlVwZGF0ZVdvcmtzcGFjZVJlcXVlc3QaIS5ub2trdS52MS5VcGRhdGVXb3Jrc3BhY2VSZXNwb25zZSIGwvMYAhgFEm0KFFVwZGF0ZURhZW1vbkRlZmF1bHRzEiUubm9ra3UudjEuVXBkYXRlRGFlbW9uRGVmYXVsdHNSZXF1ZXN0GiYubm9ra3UudjEuVXBkYXRlRGFlbW9uRGVmYXVsdHNSZXNwb25zZSIGwvMYAhgEEmAKD0RlbGV0ZVdvcmtzcGFjZRIgLm5va2t1LnYxLkRlbGV0ZVdvcmtzcGFjZVJlcXVlc3QaIS5ub2trdS52MS5EZWxldGVXb3Jrc3BhY2VSZXNwb25zZSIIwvMYBBgFMAESTwoJTGlzdFVzZXJzEhoubm9ra3UudjEuTGlzdFVzZXJzUmVxdWVzdBobLm5va2t1LnYxLkxpc3RVc2Vyc1Jlc3BvbnNlIgmQAgHC8xgCGAISSQoHR2V0VXNlchIYLm5va2t1LnYxLkdldFVzZXJSZXF1ZXN0Ghkubm9ra3UudjEuR2V0VXNlclJlc3BvbnNlIgmQAgHC8xgCGAISWwoOVXBkYXRlVXNlclJvbGUSHy5ub2trdS52MS5VcGRhdGVVc2VyUm9sZVJlcXVlc3QaIC5ub2trdS52MS5VcGRhdGVVc2VyUm9sZVJlc3BvbnNlIgbC8xgCGAQSWAoNU2V0VXNlckFjdGl2ZRIeLm5va2t1LnYxLlNldFVzZXJBY3RpdmVSZXF1ZXN0Gh8ubm9ra3UudjEuU2V0VXNlckFjdGl2ZVJlc3BvbnNlIgbC8xgCGAQSTwoKRGVsZXRlVXNlchIbLm5va2t1LnYxLkRlbGV0ZVVzZXJSZXF1ZXN0Ghwubm9ra3UudjEuRGVsZXRlVXNlclJlc3BvbnNlIgbC8xgCGAQSbgoTQ2xlYXJVc2VySWRlbnRpdGllcxIkLm5va2t1LnYxLkNsZWFyVXNlcklkZW50aXRpZXNSZXF1ZXN0GiUubm9ra3UudjEuQ2xlYXJVc2VySWRlbnRpdGllc1Jlc3BvbnNlIgrC8xgGGAQoATABEmYKEVRyYW5zZmVyT3duZXJzaGlwEiIubm9ra3UudjEuVHJhbnNmZXJPd25lcnNoaXBSZXF1ZXN0GiMubm9ra3UudjEuVHJhbnNmZXJPd25lcnNoaXBSZXNwb25zZSIIwvMYBBgFMAESXgoPQ3JlYXRlV29ya3NwYWNlEiAubm9ra3UudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBohLm5va2t1LnYxLkNyZWF0ZVdvcmtzcGFjZVJlc3BvbnNlIgbC8xgCCAFCjwEKDGNvbS5ub2trdS52MUIOV29ya3NwYWNlUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_daemon]);
 
 /**
  * @generated from message nokku.v1.Workspace
@@ -247,6 +247,50 @@ export const UpdateWorkspaceResponseSchema: GenMessage<UpdateWorkspaceResponse> 
   messageDesc(file_nokku_v1_workspace, 6);
 
 /**
+ * @generated from message nokku.v1.UpdateDaemonDefaultsRequest
+ */
+export type UpdateDaemonDefaultsRequest = Message<"nokku.v1.UpdateDaemonDefaultsRequest"> & {
+  /**
+   * @generated from field: nokku.v1.DaemonConfig default_daemon_config = 1;
+   */
+  defaultDaemonConfig?: DaemonConfig | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Duration session_idle_timeout = 2;
+   */
+  sessionIdleTimeout?: Duration | undefined;
+
+  /**
+   * @generated from field: google.protobuf.FieldMask update_mask = 3;
+   */
+  updateMask?: FieldMask | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.UpdateDaemonDefaultsRequest.
+ * Use `create(UpdateDaemonDefaultsRequestSchema)` to create a new message.
+ */
+export const UpdateDaemonDefaultsRequestSchema: GenMessage<UpdateDaemonDefaultsRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 7);
+
+/**
+ * @generated from message nokku.v1.UpdateDaemonDefaultsResponse
+ */
+export type UpdateDaemonDefaultsResponse = Message<"nokku.v1.UpdateDaemonDefaultsResponse"> & {
+  /**
+   * @generated from field: nokku.v1.Workspace workspace = 1;
+   */
+  workspace?: Workspace | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.UpdateDaemonDefaultsResponse.
+ * Use `create(UpdateDaemonDefaultsResponseSchema)` to create a new message.
+ */
+export const UpdateDaemonDefaultsResponseSchema: GenMessage<UpdateDaemonDefaultsResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_workspace, 8);
+
+/**
  * @generated from message nokku.v1.DeleteWorkspaceRequest
  */
 export type DeleteWorkspaceRequest = Message<"nokku.v1.DeleteWorkspaceRequest"> & {
@@ -257,7 +301,7 @@ export type DeleteWorkspaceRequest = Message<"nokku.v1.DeleteWorkspaceRequest"> 
  * Use `create(DeleteWorkspaceRequestSchema)` to create a new message.
  */
 export const DeleteWorkspaceRequestSchema: GenMessage<DeleteWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 7);
+  messageDesc(file_nokku_v1_workspace, 9);
 
 /**
  * @generated from message nokku.v1.DeleteWorkspaceResponse
@@ -270,7 +314,7 @@ export type DeleteWorkspaceResponse = Message<"nokku.v1.DeleteWorkspaceResponse"
  * Use `create(DeleteWorkspaceResponseSchema)` to create a new message.
  */
 export const DeleteWorkspaceResponseSchema: GenMessage<DeleteWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 8);
+  messageDesc(file_nokku_v1_workspace, 10);
 
 /**
  * @generated from message nokku.v1.CreateWorkspaceRequest
@@ -302,7 +346,7 @@ export type CreateWorkspaceRequest = Message<"nokku.v1.CreateWorkspaceRequest"> 
  * Use `create(CreateWorkspaceRequestSchema)` to create a new message.
  */
 export const CreateWorkspaceRequestSchema: GenMessage<CreateWorkspaceRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 9);
+  messageDesc(file_nokku_v1_workspace, 11);
 
 /**
  * @generated from message nokku.v1.CreateWorkspaceResponse
@@ -319,7 +363,7 @@ export type CreateWorkspaceResponse = Message<"nokku.v1.CreateWorkspaceResponse"
  * Use `create(CreateWorkspaceResponseSchema)` to create a new message.
  */
 export const CreateWorkspaceResponseSchema: GenMessage<CreateWorkspaceResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 10);
+  messageDesc(file_nokku_v1_workspace, 12);
 
 /**
  * Users ----------------------------------------------------------------------
@@ -353,7 +397,7 @@ export type ListUsersRequest = Message<"nokku.v1.ListUsersRequest"> & {
  * Use `create(ListUsersRequestSchema)` to create a new message.
  */
 export const ListUsersRequestSchema: GenMessage<ListUsersRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 11);
+  messageDesc(file_nokku_v1_workspace, 13);
 
 /**
  * @generated from message nokku.v1.ListUsersResponse
@@ -375,7 +419,7 @@ export type ListUsersResponse = Message<"nokku.v1.ListUsersResponse"> & {
  * Use `create(ListUsersResponseSchema)` to create a new message.
  */
 export const ListUsersResponseSchema: GenMessage<ListUsersResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 12);
+  messageDesc(file_nokku_v1_workspace, 14);
 
 /**
  * @generated from message nokku.v1.GetUserRequest
@@ -392,7 +436,7 @@ export type GetUserRequest = Message<"nokku.v1.GetUserRequest"> & {
  * Use `create(GetUserRequestSchema)` to create a new message.
  */
 export const GetUserRequestSchema: GenMessage<GetUserRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 13);
+  messageDesc(file_nokku_v1_workspace, 15);
 
 /**
  * @generated from message nokku.v1.GetUserResponse
@@ -409,7 +453,7 @@ export type GetUserResponse = Message<"nokku.v1.GetUserResponse"> & {
  * Use `create(GetUserResponseSchema)` to create a new message.
  */
 export const GetUserResponseSchema: GenMessage<GetUserResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 14);
+  messageDesc(file_nokku_v1_workspace, 16);
 
 /**
  * @generated from message nokku.v1.UpdateUserRoleRequest
@@ -431,7 +475,7 @@ export type UpdateUserRoleRequest = Message<"nokku.v1.UpdateUserRoleRequest"> & 
  * Use `create(UpdateUserRoleRequestSchema)` to create a new message.
  */
 export const UpdateUserRoleRequestSchema: GenMessage<UpdateUserRoleRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 15);
+  messageDesc(file_nokku_v1_workspace, 17);
 
 /**
  * @generated from message nokku.v1.UpdateUserRoleResponse
@@ -444,7 +488,7 @@ export type UpdateUserRoleResponse = Message<"nokku.v1.UpdateUserRoleResponse"> 
  * Use `create(UpdateUserRoleResponseSchema)` to create a new message.
  */
 export const UpdateUserRoleResponseSchema: GenMessage<UpdateUserRoleResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 16);
+  messageDesc(file_nokku_v1_workspace, 18);
 
 /**
  * @generated from message nokku.v1.SetUserActiveRequest
@@ -466,7 +510,7 @@ export type SetUserActiveRequest = Message<"nokku.v1.SetUserActiveRequest"> & {
  * Use `create(SetUserActiveRequestSchema)` to create a new message.
  */
 export const SetUserActiveRequestSchema: GenMessage<SetUserActiveRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 17);
+  messageDesc(file_nokku_v1_workspace, 19);
 
 /**
  * @generated from message nokku.v1.SetUserActiveResponse
@@ -479,7 +523,7 @@ export type SetUserActiveResponse = Message<"nokku.v1.SetUserActiveResponse"> & 
  * Use `create(SetUserActiveResponseSchema)` to create a new message.
  */
 export const SetUserActiveResponseSchema: GenMessage<SetUserActiveResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 18);
+  messageDesc(file_nokku_v1_workspace, 20);
 
 /**
  * @generated from message nokku.v1.DeleteUserRequest
@@ -496,7 +540,7 @@ export type DeleteUserRequest = Message<"nokku.v1.DeleteUserRequest"> & {
  * Use `create(DeleteUserRequestSchema)` to create a new message.
  */
 export const DeleteUserRequestSchema: GenMessage<DeleteUserRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 19);
+  messageDesc(file_nokku_v1_workspace, 21);
 
 /**
  * @generated from message nokku.v1.DeleteUserResponse
@@ -509,7 +553,7 @@ export type DeleteUserResponse = Message<"nokku.v1.DeleteUserResponse"> & {
  * Use `create(DeleteUserResponseSchema)` to create a new message.
  */
 export const DeleteUserResponseSchema: GenMessage<DeleteUserResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 20);
+  messageDesc(file_nokku_v1_workspace, 22);
 
 /**
  * @generated from message nokku.v1.ClearUserIdentitiesRequest
@@ -526,7 +570,7 @@ export type ClearUserIdentitiesRequest = Message<"nokku.v1.ClearUserIdentitiesRe
  * Use `create(ClearUserIdentitiesRequestSchema)` to create a new message.
  */
 export const ClearUserIdentitiesRequestSchema: GenMessage<ClearUserIdentitiesRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 21);
+  messageDesc(file_nokku_v1_workspace, 23);
 
 /**
  * @generated from message nokku.v1.ClearUserIdentitiesResponse
@@ -539,7 +583,7 @@ export type ClearUserIdentitiesResponse = Message<"nokku.v1.ClearUserIdentitiesR
  * Use `create(ClearUserIdentitiesResponseSchema)` to create a new message.
  */
 export const ClearUserIdentitiesResponseSchema: GenMessage<ClearUserIdentitiesResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 22);
+  messageDesc(file_nokku_v1_workspace, 24);
 
 /**
  * @generated from message nokku.v1.TransferOwnershipRequest
@@ -556,7 +600,7 @@ export type TransferOwnershipRequest = Message<"nokku.v1.TransferOwnershipReques
  * Use `create(TransferOwnershipRequestSchema)` to create a new message.
  */
 export const TransferOwnershipRequestSchema: GenMessage<TransferOwnershipRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 23);
+  messageDesc(file_nokku_v1_workspace, 25);
 
 /**
  * @generated from message nokku.v1.TransferOwnershipResponse
@@ -569,7 +613,7 @@ export type TransferOwnershipResponse = Message<"nokku.v1.TransferOwnershipRespo
  * Use `create(TransferOwnershipResponseSchema)` to create a new message.
  */
 export const TransferOwnershipResponseSchema: GenMessage<TransferOwnershipResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_workspace, 24);
+  messageDesc(file_nokku_v1_workspace, 26);
 
 /**
  * @generated from service nokku.v1.WorkspaceService
@@ -590,6 +634,16 @@ export const WorkspaceService: GenService<{
     methodKind: "unary";
     input: typeof UpdateWorkspaceRequestSchema;
     output: typeof UpdateWorkspaceResponseSchema;
+  },
+  /**
+   * UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
+   *
+   * @generated from rpc nokku.v1.WorkspaceService.UpdateDaemonDefaults
+   */
+  updateDaemonDefaults: {
+    methodKind: "unary";
+    input: typeof UpdateDaemonDefaultsRequestSchema;
+    output: typeof UpdateDaemonDefaultsResponseSchema;
   },
   /**
    * @generated from rpc nokku.v1.WorkspaceService.DeleteWorkspace

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { ca, manualKeyState } from '#lib/api/certificates.svelte.js';
+	import { plural } from '#lib/api/bulk.js';
 	import { target } from '#lib/api/targets.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
@@ -16,8 +17,9 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { CertificateAuthoritySchema } from '#lib/gen/nokku/v1/certificates_pb.js';
+	import { TargetStatus } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
-	import { formatTs, toDate } from '#lib/utils.js';
+	import { formatTs, listNames, toDate } from '#lib/utils.js';
 	import type { Duration } from '@bufbuild/protobuf/wkt';
 	import { Clock, Fingerprint, History, KeyRound, RefreshCw, Server } from '@lucide/svelte';
 
@@ -59,8 +61,9 @@
 		save();
 	}
 
-	const targets = target.list();
-	const manual = $derived((targets.data?.targets ?? []).filter((t) => !t.daemonId));
+	const manualList = target.list(() => ({ status: TargetStatus.MANUAL }));
+	const manual = $derived(manualList.data?.targets ?? []);
+	const manualCount = $derived(manualList.data?.total ?? 0);
 	const missingKey = $derived(
 		manual.filter((t) => manualKeyState(entity, t.lastSyncAt).rotated).map((t) => t.name)
 	);
@@ -68,7 +71,10 @@
 		manual.filter((t) => manualKeyState(entity, t.lastSyncAt).oldKeyUntil).map((t) => t.name)
 	);
 	const syncCommands = (names: string[]) => names.map((name) => `nk sync ${name}`).join('\n');
-	const unchecked = $derived((targets.data?.total ?? 0) - (targets.data?.targets.length ?? 0));
+	const manualNames = $derived(manual.map((t) => t.name));
+	// Shown before a rotation, so the commands are at hand when it happens.
+	const syncNeeded = $derived(missingKey.length > 0 || keepsOldKey.length > 0);
+	const unchecked = $derived(manualCount - manual.length);
 
 	const previousTrusted = $derived(
 		!!entity?.previousPublicKey &&
@@ -82,7 +88,10 @@
 			confirm({
 				title: 'Rotate the keys?',
 				description:
-					'New keys replace both, for every server in this workspace. Servers with the daemon take them at their next sync, and certificates already signed keep working until they run out. A server set up with nk sync still trusts only the old key, so run nk sync on it right away. Until you do, people there keep the certificate they hold, an hour at most, and then get refused.',
+					'New keys replace both, for every server in this workspace. Servers with the daemon take them at their next sync, and certificates already signed keep working until they run out. A server set up with nk sync still trusts only the old key, so run nk sync on it right away. Until you do, people there keep the certificate they hold, an hour at most, and then get refused.' +
+					(manualCount
+						? ` That is ${plural(manualCount, 'server')} here: ${listNames(manualNames, 5, manualCount)}.`
+						: ''),
 				confirmText: 'Rotate',
 				onConfirm: () => rollover.mutateAsync({ revokePrevious: false })
 			})
@@ -111,7 +120,9 @@
 		<SaveStatus
 			state={autoSave.saveState}
 			onRetry={autoSave.retry}
-			idleText={can.edit ? 'Changes save automatically' : 'View only, your role cannot change this'}
+			idleText={can.admin
+				? 'Changes save automatically'
+				: 'View only, your role cannot change this'}
 		/>
 	{/if}
 </PageHeader>
@@ -127,14 +138,14 @@
 	<Skeleton class="h-56 w-full rounded-xl" />
 	<Skeleton class="h-36 w-full rounded-xl" />
 {:else}
-	{#if missingKey.length || keepsOldKey.length}
+	{#if syncNeeded}
 		<Card.Root>
 			<Card.Header>
 				<Card.Title><h2>Servers to sync</h2></Card.Title>
 				<Card.Description>
 					These servers were set up with nk sync, so they only learn a key when you run it.
 					{#if unchecked > 0}
-						{unchecked} more servers were not checked, open them under Infrastructure.
+						{unchecked} more servers were not checked, open them under Servers.
 					{/if}
 				</Card.Description>
 			</Card.Header>
@@ -176,7 +187,7 @@
 						<DurationInput
 							id="ca-{l.key}"
 							value={model[l.key]}
-							disabled={!can.edit}
+							disabled={!can.admin}
 							onchange={(v) => setLifetime(l.key, v)}
 						/>
 						<Field.Description>{l.hint}</Field.Description>
@@ -206,7 +217,7 @@
 					id="ca-source-address"
 					class="font-mono"
 					bind:value={model.sourceAddress}
-					disabled={!can.edit}
+					disabled={!can.admin}
 					oninput={save}
 					placeholder="10.0.0.0/8, 192.168.1.10"
 				/>
@@ -265,8 +276,26 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if manual.length && !syncNeeded}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title><h2>Servers set up with nk sync</h2></Card.Title>
+				<Card.Description>
+					They have no daemon, so they only learn new keys when you run nk sync. Keep this at hand
+					for a rotation.
+					{#if unchecked > 0}
+						{unchecked} more servers were not checked, open them under Servers.
+					{/if}
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<CodeSnippet code={syncCommands(manualNames)} language="bash" wrap />
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<DangerZone
-		actions={can.edit
+		actions={can.admin
 			? [
 					{
 						title: 'Rotate keys',

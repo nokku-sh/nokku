@@ -1,65 +1,48 @@
 -- name: CreateDaemon :one
--- Returns no row on a taken name or key, so the caller can retry in its tx. A target of that name counts as
--- taken too, checked up front because its insert would otherwise abort the tx.
-WITH
-  new_daemon AS (
-    INSERT INTO
-      daemons (name, status, config, version, key_thumbprint, join_token_id, retire_after)
-    SELECT
-      @name AS name,
-      @status AS status,
-      COALESCE(@config, '{}'::jsonb) AS config,
-      @version AS version,
-      @key_thumbprint AS key_thumbprint,
-      sqlc.narg('join_token_id') AS join_token_id,
-      sqlc.narg('retire_after') AS retire_after
-    WHERE
-      NOT EXISTS (
-        SELECT
-          1
-        FROM
-          targets
-        WHERE
-          name = @name
-      )
-    ON CONFLICT DO NOTHING
-    RETURNING
-      *
-  ),
-  new_target AS (
-    INSERT INTO
-      targets (daemon_id, name)
-    SELECT
-      d.id,
-      d.name
-    FROM
-      new_daemon d
-    RETURNING
-      id
-  )
+-- Returns no row on a taken key, a racing enrollment of the same machine. CreateDaemonTarget names it.
+INSERT INTO
+  daemons (status, config, version, key_thumbprint, join_token_id, retire_after)
 SELECT
-  d.*,
-  t.id AS target_id
-FROM
-  new_daemon d
-CROSS JOIN
-  new_target t;
+  @status AS status,
+  COALESCE(@config, '{}'::jsonb) AS config,
+  @version AS version,
+  @key_thumbprint AS key_thumbprint,
+  sqlc.narg('join_token_id') AS join_token_id,
+  sqlc.narg('retire_after') AS retire_after
+ON CONFLICT DO NOTHING
+RETURNING
+  *;
+
+-- name: CreateDaemonTarget :one
+-- Returns no row on a taken name, also one a racing enrollment just took.
+INSERT INTO
+  targets (daemon_id, name)
+VALUES
+  (@daemon_id, @name)
+ON CONFLICT DO NOTHING
+RETURNING
+  id;
 
 -- name: GetDaemonByKeyThumbprint :one
 SELECT
-  *
+  sqlc.embed(d),
+  t.id AS target_id,
+  t.name
 FROM
-  daemons
+  daemons d
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
-  key_thumbprint = @key_thumbprint;
+  d.key_thumbprint = @key_thumbprint;
 
 -- name: GetDaemon :one
 SELECT
-  *
+  sqlc.embed(d),
+  t.name
 FROM
-  daemons
+  daemons d
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
-  id = @daemon_id;
+  d.id = @daemon_id;
 
 -- name: GetTargetByDaemon :one
 SELECT
@@ -71,13 +54,13 @@ WHERE
 
 -- name: GetDaemonsByIDs :many
 SELECT
-  id,
-  name,
-  last_seen_at
+  sqlc.embed(d),
+  t.name
 FROM
-  daemons
+  daemons d
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
-  id = ANY (sqlc.arg('daemon_ids')::UUID[]);
+  d.id = ANY (sqlc.arg('daemon_ids')::UUID[]);
 
 -- name: GetDaemonConfigForUpdate :one
 SELECT
@@ -89,20 +72,23 @@ WHERE
 FOR UPDATE;
 
 -- name: UpdateDaemon :one
-UPDATE daemons
+UPDATE daemons d
 SET
   -- 0 is unset and keeps the status. The column comes first, sqlc types the parameter by its first use.
   status = CASE
-    WHEN status = @status
-    OR @status = 0 THEN status
+    WHEN d.status = @status
+    OR @status = 0 THEN d.status
     ELSE @status
   END,
-  config = COALESCE(sqlc.narg('config'), config),
+  config = COALESCE(sqlc.narg('config'), d.config),
   updated_at = NOW()
+FROM
+  targets t
 WHERE
-  id = @daemon_id
+  d.id = @daemon_id
+  AND t.daemon_id = d.id
 RETURNING
-  *;
+  t.name;
 
 -- name: UpdateDaemonVersion :exec
 -- Every sync reports it, so an unchanged value must not rewrite the row.
@@ -123,13 +109,15 @@ WHERE
 -- name: ListDaemons :many
 SELECT
   sqlc.embed(d),
+  t.name,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   daemons d
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
   (
     sqlc.narg('query')::TEXT IS NULL
-    OR d.name ILIKE '%' || sqlc.narg('query') || '%'
+    OR t.name ILIKE '%' || sqlc.narg('query') || '%'
   )
   AND (
     d.status = @status
@@ -147,32 +135,34 @@ OFFSET
   sqlc.narg('offset');
 
 -- name: DeleteDaemon :one
-DELETE FROM daemons
+-- The target goes with it, so the name is read before the cascade.
+DELETE FROM daemons d
 WHERE
-  id = @daemon_id
+  d.id = @daemon_id
 RETURNING
-  *;
+  COALESCE((SELECT t.name FROM targets t WHERE t.daemon_id = d.id), '')::TEXT AS name;
 
 -- name: GetOfflineDaemonByTokenAndName :one
 -- The one an ephemeral enrollment of the same name may replace. A daemon that is connected keeps its name.
 SELECT
-  *
+  d.id
 FROM
-  daemons
+  daemons d
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
-  join_token_id = @join_token_id
-  AND name = @name
-  AND NOT COALESCE(id = ANY (@connected::UUID[]), FALSE);
+  d.join_token_id = @join_token_id
+  AND t.name = @name
+  AND NOT COALESCE(d.id = ANY (@connected::UUID[]), FALSE);
 
 -- name: DeleteRetiredDaemons :many
 -- Across workspaces, so it runs as the system. A daemon never seen counts from its creation, a connected one stays.
 -- Nothing counts from before the core started, a crash stamps no daemon as gone.
-DELETE FROM daemons
+DELETE FROM daemons d
 WHERE
-  retire_after IS NOT NULL
-  AND GREATEST(COALESCE(last_seen_at, created_at), @started_at::TIMESTAMPTZ) < NOW() - retire_after
-  AND NOT COALESCE(id = ANY (@connected::UUID[]), FALSE)
+  d.retire_after IS NOT NULL
+  AND GREATEST(COALESCE(d.last_seen_at, d.created_at), @started_at::TIMESTAMPTZ) < NOW() - d.retire_after
+  AND NOT COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
 RETURNING
-  id,
-  workspace_id,
-  name;
+  d.id,
+  d.workspace_id,
+  COALESCE((SELECT t.name FROM targets t WHERE t.daemon_id = d.id), '')::TEXT AS name;

@@ -88,6 +88,13 @@ func TestAccessRequestFlow(t *testing.T) {
 	_, err := asAdmin.SetRequestableTags(ctx, &nokkuv1.SetRequestableTagsRequest{Tags: []string{tag}})
 	require.NoError(t, err)
 
+	// The web greys out Request access without them.
+	shown, err := nokkuv1connect.NewWorkspaceServiceClient(
+		clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, member))),
+	).GetWorkspace(ctx, &nokkuv1.GetWorkspaceRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{tag}, shown.GetWorkspace().GetRequestableTags(), "a member must see the requestable tags")
+
 	listed, err := asMember.ListRequestableAccounts(ctx, &nokkuv1.ListRequestableAccountsRequest{})
 	require.NoError(t, err)
 	var names []string
@@ -165,17 +172,17 @@ func TestAccessRequestFlow(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// A zero timeout replaces a stored one, a merge would keep it on for good.
+// A zero timeout replaces a stored one, a merge would keep it on for good. Admins set it, it is theirs to run.
 func TestIdleTimeoutTurnsOff(t *testing.T) {
 	cfg, _ := newTestAPI(t)
 	srv := enterpriseServer(t)
-	owner := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
+	admin := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	client := nokkuv1connect.NewWorkspaceServiceClient(
-		clientOn(srv, header("Authorization", "Bearer "+owner)),
+		clientOn(srv, header("Authorization", "Bearer "+admin)),
 	)
 	set := func(d time.Duration) *nokkuv1.WorkspaceSettings {
-		res, err := client.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-			Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(d)},
+		res, err := client.UpdateDaemonDefaults(t.Context(), masked(&nokkuv1.UpdateDaemonDefaultsRequest{
+			SessionIdleTimeout: durationpb.New(d),
 		}))
 		require.NoError(t, err)
 		return res.GetWorkspace().GetSettings()

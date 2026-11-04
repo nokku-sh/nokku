@@ -143,9 +143,11 @@ WHERE
   g.token_id = @token_id
 ON CONFLICT DO NOTHING;
 
--- name: GetTargetAccountWorkspace :one
+-- name: GetTargetAccountLabel :one
+-- What an audit event shows for a login account. An account of another workspace does not exist here.
 SELECT
-  t.workspace_id
+  t.name AS target_name,
+  p.username
 FROM
   target_accounts p
   JOIN targets t ON t.id = p.target_id
@@ -221,11 +223,15 @@ SELECT
   gone.subject_id,
   gone.expires_at::TIMESTAMPTZ AS expires_at,
   p.username,
-  t.name AS target_name
+  t.name AS target_name,
+  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, '')::TEXT AS subject_name
 FROM
   gone
   JOIN target_accounts p ON p.id = gone.account_id
-  JOIN targets t ON t.id = p.target_id;
+  JOIN targets t ON t.id = p.target_id
+  LEFT JOIN users u ON u.id = gone.subject_id
+  LEFT JOIN teams m ON m.id = gone.subject_id
+  LEFT JOIN service_accounts s ON s.id = gone.subject_id;
 
 -- name: RemoveGrant :exec
 DELETE FROM grants

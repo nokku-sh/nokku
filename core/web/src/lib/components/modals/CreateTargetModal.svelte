@@ -26,10 +26,10 @@
 
 <FormModal
 	bind:open
-	title="Add a target"
+	title="Add a server"
 	description="A server people log in to. Accounts and access are set up right after."
 	icon={Server}
-	submitLabel="Add target"
+	submitLabel="Add server"
 	{onSubmit}
 >
 	<Field.Field>

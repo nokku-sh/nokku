@@ -18,7 +18,16 @@
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm, useAutoSave, useSheet } from '#lib/hooks/index.js';
 	import { atLeast } from '#lib/roles.js';
-	import { Check, Crown, Info, Plus, Settings2, ShieldCheck, UserCog, Users } from '@lucide/svelte';
+	import {
+		Check,
+		Crown,
+		Plus,
+		Server,
+		Settings2,
+		ShieldCheck,
+		UserCog,
+		Users
+	} from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import DangerZone, { type DangerAction } from './DangerZone.svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -100,7 +109,7 @@
 				onClick: () =>
 					confirm({
 						title: `Revoke all access for ${name}?`,
-						description: 'Direct grants on every target are removed. Access through teams stays.',
+						description: 'Direct grants on every server are removed. Access through teams stays.',
 						confirmText: 'Revoke all',
 						onConfirm: () => revokeAll.mutateAsync({ subjectId: person.id, kind: SubjectKind.USER })
 					})
@@ -189,7 +198,6 @@
 	detail={person?.name ? person.email : undefined}
 	detailMono
 	tabs={[
-		{ value: 'overview', label: 'Overview', icon: Info },
 		{ value: 'access', label: 'Access', icon: ShieldCheck },
 		{ value: 'settings', label: 'Settings', icon: Settings2 }
 	]}
@@ -218,7 +226,29 @@
 	{/snippet}
 
 	{#if person}
-		<Tabs.Content value="overview" class="flex flex-col divide-y">
+		<Tabs.Content value="settings" class="flex flex-col divide-y">
+			<Section
+				title="Workspace role"
+				icon={UserCog}
+				description={isOwner
+					? 'The owner can do everything. Ownership changes through a transfer.'
+					: 'What they may change in this workspace.'}
+			>
+				{#if !isOwner}
+					{#key pickerKey}
+						<RolePicker
+							value={person.role}
+							disabled={!canManage || updateRole.isPending}
+							onChange={changeRole}
+						/>
+					{/key}
+				{/if}
+			</Section>
+
+			<DangerZone actions={dangerActions} />
+		</Tabs.Content>
+
+		<Tabs.Content value="access" class="flex flex-col divide-y">
 			<Section
 				title="Teams"
 				icon={Users}
@@ -273,36 +303,13 @@
 					<p class="text-sm text-muted-foreground">Not in any team yet.</p>
 				{/if}
 			</Section>
-		</Tabs.Content>
-
-		<Tabs.Content value="settings" class="flex flex-col divide-y">
-			<Section
-				title="Workspace role"
-				icon={UserCog}
-				description={isOwner
-					? 'The owner can do everything. Ownership changes through a transfer.'
-					: 'What they may change in this workspace.'}
-			>
-				{#if !isOwner}
-					{#key pickerKey}
-						<RolePicker
-							value={person.role}
-							disabled={!canManage || updateRole.isPending}
-							onChange={changeRole}
-						/>
-					{/key}
-				{/if}
+			<Section title="Servers" icon={Server}>
+				<SubjectAccess
+					subjectId={person.id}
+					kind={SubjectKind.USER}
+					name={person.name || person.email}
+				/>
 			</Section>
-
-			<DangerZone actions={dangerActions} />
-		</Tabs.Content>
-
-		<Tabs.Content value="access">
-			<SubjectAccess
-				subjectId={person.id}
-				kind={SubjectKind.USER}
-				name={person.name || person.email}
-			/>
 		</Tabs.Content>
 	{/if}
 </EntitySheet>

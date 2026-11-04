@@ -67,10 +67,9 @@ export function useSheet() {
 	};
 }
 
-// useCreate keeps "the create form is open" in `?new`, so the command palette can open it from any page. A fresh
-// form hands out a credential and opens only after a recent sign-in.
-export function useCreate({ fresh = false } = {}) {
-	const open = $derived(page.url.searchParams.has('new'));
+// useCreate keeps an open create form in `?new`, named where a page has two, and a fresh one waits for a recent sign-in.
+export function useCreate({ fresh = false, form = '1' } = {}) {
+	const open = $derived(page.url.searchParams.get('new') === form);
 
 	return {
 		get open() {
@@ -78,7 +77,7 @@ export function useCreate({ fresh = false } = {}) {
 		},
 		set open(value: boolean) {
 			if (value === open) return;
-			const url = urlWith({ new: value ? '1' : undefined });
+			const url = urlWith({ new: value ? form : undefined });
 			const go = () => void goto(url, { replace: true, reset: false });
 			if (value && fresh) void whenFresh(go, url.pathname + url.search);
 			else go();

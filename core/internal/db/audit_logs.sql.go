@@ -68,6 +68,41 @@ func (q *Queries) EnableAuditRetention(ctx context.Context) error {
 	return err
 }
 
+const getNames = `-- name: GetNames :many
+SELECT
+  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, t.name, dt.name, '')::TEXT AS name
+FROM
+  unnest($1::UUID[]) WITH ORDINALITY AS i (id, n)
+  LEFT JOIN users u ON u.id = i.id
+  LEFT JOIN teams m ON m.id = i.id
+  LEFT JOIN service_accounts s ON s.id = i.id
+  LEFT JOIN targets t ON t.id = i.id
+  LEFT JOIN targets dt ON dt.daemon_id = i.id -- a daemon goes by its server's name
+ORDER BY
+  i.n
+`
+
+// Names for audit events in the order of the ids, an id that names nothing here gets an empty one.
+func (q *Queries) GetNames(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, getNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertAuditLog = `-- name: InsertAuditLog :exec
 INSERT INTO
   audit.audit_logs (
@@ -189,6 +224,16 @@ WITH
         OR action ILIKE '%' || $9 || '%'
         OR actor_name ILIKE '%' || $9 || '%'
         OR target ILIKE '%' || $9 || '%'
+        -- The names an event stored, so "web-1" finds the grants on it.
+        OR concat_ws(
+          ' ',
+          details ->> 'name',
+          details ->> 'target',
+          details ->> 'username',
+          details ->> 'member',
+          details ->> 'subject',
+          details ->> 'subjects'
+        ) ILIKE '%' || $9 || '%'
       )
       AND (
         $10::timestamptz IS NULL

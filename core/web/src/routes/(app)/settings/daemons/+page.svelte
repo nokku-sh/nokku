@@ -11,16 +11,17 @@
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
-	import { DaemonConfigSchema, type DaemonConfig } from '#lib/gen/nokku/v1/daemon_pb.js';
+	import { DaemonConfigSchema } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { WorkspaceSettingsSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
 	import { useAutoSave } from '#lib/hooks/index.js';
+	import { daemonRules, type DaemonRule } from '#lib/daemon-rules.js';
 	import { atLeast } from '#lib/roles.js';
 	import { create } from '@bufbuild/protobuf';
 
 	const ws = workspace.get();
 	const me = user.self();
-	const update = workspace.update();
-	const canEdit = $derived(atLeast(me.data?.role, WorkspaceRole.OWNER));
+	const update = workspace.updateDaemonDefaults();
+	const canEdit = $derived(atLeast(me.data?.role, WorkspaceRole.ADMIN));
 
 	// A real protobuf message, not a plain object, so the transport accepts it.
 	const settings = $derived.by(() => {
@@ -31,11 +32,11 @@
 	const config = $derived(settings.defaultDaemonConfig!);
 
 	// Only the switches flipped since the last save go out, so a setting the plan no longer allows never blocks it.
-	const flipped: Partial<Record<Toggle['key'], boolean>> = {};
+	const flipped: Partial<Record<DaemonRule, boolean>> = {};
 	const autoSave = useAutoSave(async () => {
 		const changes = { ...flipped };
-		await update.mutateAsync({ settings: { defaultDaemonConfig: changes } });
-		for (const [key, value] of Object.entries(changes) as [Toggle['key'], boolean][]) {
+		await update.mutateAsync({ defaultDaemonConfig: changes });
+		for (const [key, value] of Object.entries(changes) as [DaemonRule, boolean][]) {
 			if (flipped[key] === value) delete flipped[key];
 		}
 	});
@@ -59,44 +60,8 @@
 	);
 
 	function setIdle(minutes: number) {
-		update.mutate({
-			settings: create(WorkspaceSettingsSchema, {
-				sessionIdleTimeout: durationFromMs(minutes * 60_000)
-			})
-		});
+		update.mutate({ sessionIdleTimeout: durationFromMs(minutes * 60_000) });
 	}
-
-	type Toggle = {
-		key: keyof Pick<
-			DaemonConfig,
-			'recordSessions' | 'allowForwarding' | 'allowAgentForwarding' | 'gatewayPorts'
-		>;
-		title: string;
-		description: string;
-	};
-
-	const toggles: Toggle[] = [
-		{
-			key: 'recordSessions',
-			title: 'Session recording',
-			description: 'Record every SSH session for later playback.'
-		},
-		{
-			key: 'allowForwarding',
-			title: 'Port forwarding',
-			description: 'Allow -L, -D and -R port forwards from sessions.'
-		},
-		{
-			key: 'allowAgentForwarding',
-			title: 'Agent forwarding',
-			description: "Expose the client's ssh-agent to sessions through SSH_AUTH_SOCK."
-		},
-		{
-			key: 'gatewayPorts',
-			title: 'Gateway ports',
-			description: 'Let remote (-R) forwards bind to addresses other than loopback.'
-		}
-	];
 </script>
 
 <PageHeader
@@ -113,7 +78,7 @@
 	</Card.Header>
 	<Card.Content>
 		<Item.Group class="gap-3">
-			{#each toggles as t (t.key)}
+			{#each daemonRules as t (t.key)}
 				<Item.Root variant="outline">
 					<Item.Content>
 						<Item.Title>{t.title}</Item.Title>
@@ -142,7 +107,7 @@
 	<Card.Footer>
 		<SaveStatus
 			state={autoSave.saveState}
-			idleText={canEdit ? 'Changes save automatically' : 'Only the owner can change this'}
+			idleText={canEdit ? 'Changes save automatically' : 'Only admins can change this'}
 		/>
 	</Card.Footer>
 </Card.Root>

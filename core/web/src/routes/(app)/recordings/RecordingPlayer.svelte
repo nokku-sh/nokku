@@ -3,19 +3,19 @@
 	import { create as createAsciinemaPlayer, type Player } from 'asciinema-player';
 	import 'asciinema-player/dist/bundle/asciinema-player.css';
 	import { recordings } from '#lib/api/recordings.svelte.js';
+	import { Code, ConnectError } from '@connectrpc/connect';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
 	import { TriangleAlert, RefreshCw } from '@lucide/svelte';
 
 	interface Props {
-		recording: Recording | null;
+		id: string;
 		open: boolean;
 		onOpenChange: (open: boolean) => void;
 	}
 
-	let { recording, open, onOpenChange }: Props = $props();
+	let { id, open, onOpenChange }: Props = $props();
 
 	let playerEl = $state<HTMLDivElement | null>(null);
 	// Only we touch this wrapper, so Svelte never sees the player's DOM.
@@ -48,7 +48,7 @@
 	}
 
 	async function play() {
-		if (!recording || !playerEl) return;
+		if (!id || !playerEl) return;
 		playState = 'loading';
 		error = '';
 		abortCtrl = new AbortController();
@@ -56,11 +56,17 @@
 
 		const chunks: Uint8Array[] = [];
 		try {
-			await recordings.stream(recording.id, (chunk) => chunks.push(chunk), abortCtrl.signal);
+			await recordings.stream(id, (chunk) => chunks.push(chunk), abortCtrl.signal);
 		} catch (err) {
 			if (abortCtrl.signal.aborted) return;
 			playState = 'error';
-			error = err instanceof Error ? err.message : 'Failed to fetch recording';
+			// A link can outlive the recording it points at.
+			error =
+				ConnectError.from(err).code === Code.NotFound
+					? 'This recording is gone. Someone deleted it, or the link is wrong.'
+					: err instanceof Error
+						? err.message
+						: 'Failed to fetch recording';
 			return;
 		}
 
@@ -190,7 +196,7 @@
 
 	// Only track the dialog state, play() mutates $state and would loop.
 	$effect(() => {
-		if (!open || !recording || !playerEl) return;
+		if (!open || !id || !playerEl) return;
 		untrack(() => void play());
 	});
 

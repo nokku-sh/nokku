@@ -7,7 +7,7 @@
 	interface Props {
 		title: string;
 		description?: string;
-		/** Only for pages outside the nav, others take the nav icon. */
+		/** Wins over the nav icon, for pages outside the nav or a header two pages share. */
 		icon?: LucideIcon;
 		/** Actions, right aligned. */
 		children?: Snippet;
@@ -15,7 +15,7 @@
 
 	let { title, description, icon, children }: Props = $props();
 
-	const Icon = $derived(routeFor(page.url.pathname)?.icon ?? icon);
+	const Icon = $derived(icon ?? routeFor(page.url.pathname)?.icon);
 </script>
 
 <svelte:head>

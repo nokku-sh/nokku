@@ -40,6 +40,8 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 		Settings:    settings,
 		CreatedAt:   SafeTimestamp(&w.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
+		// Members read them too, the web offers Request access only when some are set.
+		RequestableTags: w.RequestableTags,
 	}
 }
 
@@ -275,14 +277,14 @@ func ResolveDaemonConfig(cfg *nokkuv1.DaemonConfig) *nokkuv1.DaemonConfig {
 	return resolved
 }
 
-// ToProto takes online from the caller, only the pool knows it.
-func (d *Daemon) ToProto(online bool) *nokkuv1.Daemon {
+// ToProto takes the name from the daemon's target and online from the pool.
+func (d *Daemon) ToProto(name string, online bool) *nokkuv1.Daemon {
 	if d == nil {
 		return nil
 	}
 	return &nokkuv1.Daemon{
 		Id:         &d.ID,
-		Name:       &d.Name,
+		Name:       &name,
 		Status:     &d.Status,
 		Config:     d.EffectiveConfig(),
 		Online:     &online,
@@ -294,7 +296,9 @@ func (d *Daemon) ToProto(online bool) *nokkuv1.Daemon {
 }
 
 func DaemonsToProto(rows []*ListDaemonsRow, online func(daemonID string) bool) []*nokkuv1.Daemon {
-	return mapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon { return r.Daemon.ToProto(online(r.Daemon.ID)) })
+	return mapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon {
+		return r.Daemon.ToProto(r.Name, online(r.Daemon.ID))
+	})
 }
 
 func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {

@@ -9,6 +9,8 @@ export type BulkAction<T> = {
 	variant?: ButtonVariant;
 	class?: string;
 	disabled?: boolean;
+	/** Hides the action when it does nothing for this selection. */
+	show?: (selectedItems: T[]) => boolean;
 	/** Asks first. The action runs inside the dialog, which shows its spinner. */
 	confirm?: (selectedItems: T[]) => ConfirmOptions;
 	onClick?: (selectedItems: T[]) => unknown;

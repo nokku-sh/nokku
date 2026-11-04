@@ -76,6 +76,65 @@ func (AccessBlock) EnumDescriptor() ([]byte, []int) {
 	return file_nokku_v1_target_proto_rawDescGZIP(), []int{0}
 }
 
+// TargetStatus is what a server's daemon is up to, or that it has none.
+type TargetStatus int32
+
+const (
+	TargetStatus_TARGET_STATUS_UNSPECIFIED TargetStatus = 0
+	// Its daemon waits for approval or was rejected.
+	TargetStatus_TARGET_STATUS_PENDING TargetStatus = 1
+	TargetStatus_TARGET_STATUS_ONLINE  TargetStatus = 2
+	// Its daemon is approved but not connected.
+	TargetStatus_TARGET_STATUS_OFFLINE TargetStatus = 3
+	// Set up with nk sync, no daemon.
+	TargetStatus_TARGET_STATUS_MANUAL TargetStatus = 4
+)
+
+// Enum value maps for TargetStatus.
+var (
+	TargetStatus_name = map[int32]string{
+		0: "TARGET_STATUS_UNSPECIFIED",
+		1: "TARGET_STATUS_PENDING",
+		2: "TARGET_STATUS_ONLINE",
+		3: "TARGET_STATUS_OFFLINE",
+		4: "TARGET_STATUS_MANUAL",
+	}
+	TargetStatus_value = map[string]int32{
+		"TARGET_STATUS_UNSPECIFIED": 0,
+		"TARGET_STATUS_PENDING":     1,
+		"TARGET_STATUS_ONLINE":      2,
+		"TARGET_STATUS_OFFLINE":     3,
+		"TARGET_STATUS_MANUAL":      4,
+	}
+)
+
+func (x TargetStatus) Enum() *TargetStatus {
+	p := new(TargetStatus)
+	*p = x
+	return p
+}
+
+func (x TargetStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TargetStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_nokku_v1_target_proto_enumTypes[1].Descriptor()
+}
+
+func (TargetStatus) Type() protoreflect.EnumType {
+	return &file_nokku_v1_target_proto_enumTypes[1]
+}
+
+func (x TargetStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TargetStatus.Descriptor instead.
+func (TargetStatus) EnumDescriptor() ([]byte, []int) {
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{1}
+}
+
 type SyncTargetUsersRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TargetId      *string                `protobuf:"bytes,1,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
@@ -183,22 +242,24 @@ func (*SyncTargetUsersResponse) Descriptor() ([]byte, []int) {
 type Target struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	DaemonId      *string                `protobuf:"bytes,3,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	Name          *string                `protobuf:"bytes,4,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,5,opt,name=description" json:"description,omitempty"`
-	HostPublicKey *string                `protobuf:"bytes,6,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"` // pinned SSH host public key (manual mode)
-	Tags          []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
-	Endpoints     []string               `protobuf:"bytes,8,rep,name=endpoints" json:"endpoints,omitempty"`
-	Usernames     []string               `protobuf:"bytes,9,rep,name=usernames" json:"usernames,omitempty"`
-	Accounts      []*TargetAccount       `protobuf:"bytes,10,rep,name=accounts" json:"accounts,omitempty"`
-	Metadata      map[string]string      `protobuf:"bytes,11,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	LastSyncAt    *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=last_sync_at,json=lastSyncAt" json:"last_sync_at,omitempty"`
+	DaemonId      *string                `protobuf:"bytes,2,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
+	HostPublicKey *string                `protobuf:"bytes,5,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"` // pinned SSH host public key (manual mode)
+	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
+	Endpoints     []string               `protobuf:"bytes,7,rep,name=endpoints" json:"endpoints,omitempty"`
+	Usernames     []string               `protobuf:"bytes,8,rep,name=usernames" json:"usernames,omitempty"`
+	Accounts      []*TargetAccount       `protobuf:"bytes,9,rep,name=accounts" json:"accounts,omitempty"`
+	Metadata      map[string]string      `protobuf:"bytes,10,rep,name=metadata" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	LastSyncAt    *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=last_sync_at,json=lastSyncAt" json:"last_sync_at,omitempty"`
 	// username_expires_at holds the usernames the subject asked about may only use until then. The others are for good.
-	UsernameExpiresAt map[string]*timestamppb.Timestamp `protobuf:"bytes,15,rep,name=username_expires_at,json=usernameExpiresAt" json:"username_expires_at,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	UsernameExpiresAt map[string]*timestamppb.Timestamp `protobuf:"bytes,14,rep,name=username_expires_at,json=usernameExpiresAt" json:"username_expires_at,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// blocked says why the subject's grants here let nobody in today. Unset when they work.
-	Blocked       *AccessBlock `protobuf:"varint,16,opt,name=blocked,enum=nokku.v1.AccessBlock" json:"blocked,omitempty"`
+	Blocked *AccessBlock `protobuf:"varint,15,opt,name=blocked,enum=nokku.v1.AccessBlock" json:"blocked,omitempty"`
+	// daemon is the server's daemon with its live state, from ListTargets and GetTarget. Unset for nk sync servers.
+	Daemon        *Daemon `protobuf:"bytes,16,opt,name=daemon" json:"daemon,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -338,6 +399,13 @@ func (x *Target) GetBlocked() AccessBlock {
 	return AccessBlock_ACCESS_BLOCK_UNSPECIFIED
 }
 
+func (x *Target) GetDaemon() *Daemon {
+	if x != nil {
+		return x.Daemon
+	}
+	return nil
+}
+
 type GetTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
@@ -428,12 +496,12 @@ func (x *GetTargetResponse) GetTarget() *Target {
 
 type CreateTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"` // can be empty
-	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	HostPublicKey *string                `protobuf:"bytes,4,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
-	Endpoints     []string               `protobuf:"bytes,5,rep,name=endpoints" json:"endpoints,omitempty"`
-	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
-	Grants        []*JoinTokenGrant      `protobuf:"bytes,7,rep,name=grants" json:"grants,omitempty"`
+	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"` // can be empty
+	Description   *string                `protobuf:"bytes,2,opt,name=description" json:"description,omitempty"`
+	HostPublicKey *string                `protobuf:"bytes,3,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
+	Endpoints     []string               `protobuf:"bytes,4,rep,name=endpoints" json:"endpoints,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
+	Grants        []*JoinTokenGrant      `protobuf:"bytes,6,rep,name=grants" json:"grants,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -557,13 +625,13 @@ func (x *CreateTargetResponse) GetTarget() *Target {
 type UpdateTargetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,4,opt,name=description" json:"description,omitempty"`
-	HostPublicKey *string                `protobuf:"bytes,5,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
-	Endpoints     []string               `protobuf:"bytes,6,rep,name=endpoints" json:"endpoints,omitempty"`
-	Tags          []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	HostPublicKey *string                `protobuf:"bytes,4,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
+	Endpoints     []string               `protobuf:"bytes,5,rep,name=endpoints" json:"endpoints,omitempty"`
+	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
 	// update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,8,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,7,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -772,13 +840,16 @@ func (*DeleteTargetResponse) Descriptor() ([]byte, []int) {
 }
 
 type ListTargetsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Limit         *int32                 `protobuf:"varint,1,opt,name=limit" json:"limit,omitempty"`
-	Offset        *int32                 `protobuf:"varint,2,opt,name=offset" json:"offset,omitempty"`
-	Query         *string                `protobuf:"bytes,3,opt,name=query" json:"query,omitempty"`
-	DaemonId      *string                `protobuf:"bytes,4,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
-	Accounts      []string               `protobuf:"bytes,6,rep,name=accounts" json:"accounts,omitempty"`
-	Tags          []string               `protobuf:"bytes,7,rep,name=tags" json:"tags,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Limit    *int32                 `protobuf:"varint,1,opt,name=limit" json:"limit,omitempty"`
+	Offset   *int32                 `protobuf:"varint,2,opt,name=offset" json:"offset,omitempty"`
+	Query    *string                `protobuf:"bytes,3,opt,name=query" json:"query,omitempty"`
+	DaemonId *string                `protobuf:"bytes,4,opt,name=daemon_id,json=daemonId" json:"daemon_id,omitempty"`
+	Accounts []string               `protobuf:"bytes,5,rep,name=accounts" json:"accounts,omitempty"`
+	Tags     []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
+	Status   *TargetStatus          `protobuf:"varint,7,opt,name=status,enum=nokku.v1.TargetStatus" json:"status,omitempty"`
+	// ids keeps only these servers, like the ones a person picked.
+	Ids           []string `protobuf:"bytes,8,rep,name=ids" json:"ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -851,6 +922,20 @@ func (x *ListTargetsRequest) GetAccounts() []string {
 func (x *ListTargetsRequest) GetTags() []string {
 	if x != nil {
 		return x.Tags
+	}
+	return nil
+}
+
+func (x *ListTargetsRequest) GetStatus() TargetStatus {
+	if x != nil && x.Status != nil {
+		return *x.Status
+	}
+	return TargetStatus_TARGET_STATUS_UNSPECIFIED
+}
+
+func (x *ListTargetsRequest) GetIds() []string {
+	if x != nil {
+		return x.Ids
 	}
 	return nil
 }
@@ -1840,6 +1925,327 @@ func (x *AccessGraphTarget) GetMatched() bool {
 	return false
 }
 
+type GetAccessMatrixRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// query matches the name or email of a row.
+	Query *string `protobuf:"bytes,1,opt,name=query" json:"query,omitempty"`
+	// kind keeps only people, teams or service accounts.
+	Kind *SubjectKind `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
+	// tags are the columns, the biggest ones when empty. An empty tag is the servers with none.
+	Tags          []string `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty"`
+	Limit         *int32   `protobuf:"varint,4,opt,name=limit" json:"limit,omitempty"`
+	Offset        *int32   `protobuf:"varint,5,opt,name=offset" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAccessMatrixRequest) Reset() {
+	*x = GetAccessMatrixRequest{}
+	mi := &file_nokku_v1_target_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccessMatrixRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccessMatrixRequest) ProtoMessage() {}
+
+func (x *GetAccessMatrixRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccessMatrixRequest.ProtoReflect.Descriptor instead.
+func (*GetAccessMatrixRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *GetAccessMatrixRequest) GetQuery() string {
+	if x != nil && x.Query != nil {
+		return *x.Query
+	}
+	return ""
+}
+
+func (x *GetAccessMatrixRequest) GetKind() SubjectKind {
+	if x != nil && x.Kind != nil {
+		return *x.Kind
+	}
+	return SubjectKind_SUBJECT_KIND_UNSPECIFIED
+}
+
+func (x *GetAccessMatrixRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *GetAccessMatrixRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *GetAccessMatrixRequest) GetOffset() int32 {
+	if x != nil && x.Offset != nil {
+		return *x.Offset
+	}
+	return 0
+}
+
+type GetAccessMatrixResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// columns are the tags the cells are for, in order.
+	Columns []*AccessGraphTag  `protobuf:"bytes,1,rep,name=columns" json:"columns,omitempty"`
+	Rows    []*AccessMatrixRow `protobuf:"bytes,2,rep,name=rows" json:"rows,omitempty"`
+	// total counts every row that matches, not only this page.
+	Total *int32 `protobuf:"varint,3,opt,name=total" json:"total,omitempty"`
+	// tags is every tag with its servers, to pick other columns from.
+	Tags          []*AccessGraphTag `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAccessMatrixResponse) Reset() {
+	*x = GetAccessMatrixResponse{}
+	mi := &file_nokku_v1_target_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccessMatrixResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccessMatrixResponse) ProtoMessage() {}
+
+func (x *GetAccessMatrixResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccessMatrixResponse.ProtoReflect.Descriptor instead.
+func (*GetAccessMatrixResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *GetAccessMatrixResponse) GetColumns() []*AccessGraphTag {
+	if x != nil {
+		return x.Columns
+	}
+	return nil
+}
+
+func (x *GetAccessMatrixResponse) GetRows() []*AccessMatrixRow {
+	if x != nil {
+		return x.Rows
+	}
+	return nil
+}
+
+func (x *GetAccessMatrixResponse) GetTotal() int32 {
+	if x != nil && x.Total != nil {
+		return *x.Total
+	}
+	return 0
+}
+
+func (x *GetAccessMatrixResponse) GetTags() []*AccessGraphTag {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+// AccessMatrixRow is a person, team or service account holding a grant. A team's members get in through its row.
+type AccessMatrixRow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubjectId     *string                `protobuf:"bytes,1,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
+	Kind          *SubjectKind           `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
+	Name          *string                `protobuf:"bytes,3,opt,name=name" json:"name,omitempty"`
+	Email         *string                `protobuf:"bytes,4,opt,name=email" json:"email,omitempty"`                                 // people only
+	MemberCount   *int32                 `protobuf:"varint,5,opt,name=member_count,json=memberCount" json:"member_count,omitempty"` // teams only
+	Targets       *int32                 `protobuf:"varint,6,opt,name=targets" json:"targets,omitempty"`                            // every server the row reaches, any tag
+	Cells         []*AccessMatrixCell    `protobuf:"bytes,7,rep,name=cells" json:"cells,omitempty"`                                 // only the columns it reaches, in no order
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccessMatrixRow) Reset() {
+	*x = AccessMatrixRow{}
+	mi := &file_nokku_v1_target_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccessMatrixRow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccessMatrixRow) ProtoMessage() {}
+
+func (x *AccessMatrixRow) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccessMatrixRow.ProtoReflect.Descriptor instead.
+func (*AccessMatrixRow) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *AccessMatrixRow) GetSubjectId() string {
+	if x != nil && x.SubjectId != nil {
+		return *x.SubjectId
+	}
+	return ""
+}
+
+func (x *AccessMatrixRow) GetKind() SubjectKind {
+	if x != nil && x.Kind != nil {
+		return *x.Kind
+	}
+	return SubjectKind_SUBJECT_KIND_UNSPECIFIED
+}
+
+func (x *AccessMatrixRow) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *AccessMatrixRow) GetEmail() string {
+	if x != nil && x.Email != nil {
+		return *x.Email
+	}
+	return ""
+}
+
+func (x *AccessMatrixRow) GetMemberCount() int32 {
+	if x != nil && x.MemberCount != nil {
+		return *x.MemberCount
+	}
+	return 0
+}
+
+func (x *AccessMatrixRow) GetTargets() int32 {
+	if x != nil && x.Targets != nil {
+		return *x.Targets
+	}
+	return 0
+}
+
+func (x *AccessMatrixRow) GetCells() []*AccessMatrixCell {
+	if x != nil {
+		return x.Cells
+	}
+	return nil
+}
+
+type AccessMatrixCell struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Tag       *string                `protobuf:"bytes,1,opt,name=tag" json:"tag,omitempty"`
+	Targets   *int32                 `protobuf:"varint,2,opt,name=targets" json:"targets,omitempty"` // servers with the tag it reaches
+	Usernames []string               `protobuf:"bytes,3,rep,name=usernames" json:"usernames,omitempty"`
+	// expires_at is when the last of its grants here ends. Unset when one is for good.
+	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	// last_used_at is the newest certificate for one of these servers, by the row or a member of its team.
+	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccessMatrixCell) Reset() {
+	*x = AccessMatrixCell{}
+	mi := &file_nokku_v1_target_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccessMatrixCell) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccessMatrixCell) ProtoMessage() {}
+
+func (x *AccessMatrixCell) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccessMatrixCell.ProtoReflect.Descriptor instead.
+func (*AccessMatrixCell) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *AccessMatrixCell) GetTag() string {
+	if x != nil && x.Tag != nil {
+		return *x.Tag
+	}
+	return ""
+}
+
+func (x *AccessMatrixCell) GetTargets() int32 {
+	if x != nil && x.Targets != nil {
+		return *x.Targets
+	}
+	return 0
+}
+
+func (x *AccessMatrixCell) GetUsernames() []string {
+	if x != nil {
+		return x.Usernames
+	}
+	return nil
+}
+
+func (x *AccessMatrixCell) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *AccessMatrixCell) GetLastUsedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastUsedAt
+	}
+	return nil
+}
+
 var File_nokku_v1_target_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_target_proto_rawDesc = "" +
@@ -1851,67 +2257,70 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\tusernames\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\xc8\x01\"\x05r\x03\x18\x80\x02R\tusernames\x12-\n" +
 	"\tendpoints\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\x10\x10\"\x05r\x03\x18\xff\x01R\tendpoints\"\x19\n" +
-	"\x17SyncTargetUsersResponse\"\xb7\x06\n" +
+	"\x17SyncTargetUsersResponse\"\xdb\x06\n" +
 	"\x06Target\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
-	"\tdaemon_id\x18\x03 \x01(\tR\bdaemonId\x12\x12\n" +
-	"\x04name\x18\x04 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x05 \x01(\tR\vdescription\x12&\n" +
-	"\x0fhost_public_key\x18\x06 \x01(\tR\rhostPublicKey\x12\x12\n" +
-	"\x04tags\x18\a \x03(\tR\x04tags\x12\x1c\n" +
-	"\tendpoints\x18\b \x03(\tR\tendpoints\x12\x1c\n" +
-	"\tusernames\x18\t \x03(\tR\tusernames\x123\n" +
-	"\baccounts\x18\n" +
-	" \x03(\v2\x17.nokku.v1.TargetAccountR\baccounts\x12:\n" +
-	"\bmetadata\x18\v \x03(\v2\x1e.nokku.v1.Target.MetadataEntryR\bmetadata\x129\n" +
+	"\tdaemon_id\x18\x02 \x01(\tR\bdaemonId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12&\n" +
+	"\x0fhost_public_key\x18\x05 \x01(\tR\rhostPublicKey\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x12\x1c\n" +
+	"\tendpoints\x18\a \x03(\tR\tendpoints\x12\x1c\n" +
+	"\tusernames\x18\b \x03(\tR\tusernames\x123\n" +
+	"\baccounts\x18\t \x03(\v2\x17.nokku.v1.TargetAccountR\baccounts\x12:\n" +
+	"\bmetadata\x18\n" +
+	" \x03(\v2\x1e.nokku.v1.Target.MetadataEntryR\bmetadata\x129\n" +
 	"\n" +
-	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12<\n" +
-	"\flast_sync_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12<\n" +
+	"\flast_sync_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastSyncAt\x12W\n" +
-	"\x13username_expires_at\x18\x0f \x03(\v2'.nokku.v1.Target.UsernameExpiresAtEntryR\x11usernameExpiresAt\x12/\n" +
-	"\ablocked\x18\x10 \x01(\x0e2\x15.nokku.v1.AccessBlockR\ablocked\x1a;\n" +
+	"\x13username_expires_at\x18\x0e \x03(\v2'.nokku.v1.Target.UsernameExpiresAtEntryR\x11usernameExpiresAt\x12/\n" +
+	"\ablocked\x18\x0f \x01(\x0e2\x15.nokku.v1.AccessBlockR\ablocked\x12(\n" +
+	"\x06daemon\x18\x10 \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a`\n" +
 	"\x16UsernameExpiresAtEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
-	"\x05value\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05value:\x028\x01J\x04\b\x02\x10\x03\",\n" +
+	"\x05value\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05value:\x028\x01\",\n" +
 	"\x10GetTargetRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
 	"\x11GetTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\x9b\x02\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\x95\x02\n" +
 	"\x13CreateTargetRequest\x12<\n" +
-	"\x04name\x18\x02 \x01(\tB(\xbaH%r#\x18\x80\x022\x1e^$|^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
+	"\x04name\x18\x01 \x01(\tB(\xbaH%r#\x18\x80\x022\x1e^$|^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
+	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12&\n" +
+	"\x0fhost_public_key\x18\x03 \x01(\tR\rhostPublicKey\x12\x1c\n" +
+	"\tendpoints\x18\x04 \x03(\tR\tendpoints\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x12:\n" +
+	"\x06grants\x18\x06 \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grants\"@\n" +
+	"\x14CreateTargetResponse\x12(\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xef\x02\n" +
+	"\x13UpdateTargetRequest\x12\x18\n" +
+	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12;\n" +
+	"\x04name\x18\x02 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12&\n" +
 	"\x0fhost_public_key\x18\x04 \x01(\tR\rhostPublicKey\x12\x1c\n" +
 	"\tendpoints\x18\x05 \x03(\tR\tendpoints\x12\x12\n" +
-	"\x04tags\x18\x06 \x03(\tR\x04tags\x12:\n" +
-	"\x06grants\x18\a \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grantsJ\x04\b\x01\x10\x02\"@\n" +
-	"\x14CreateTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xf5\x02\n" +
-	"\x13UpdateTargetRequest\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12;\n" +
-	"\x04name\x18\x03 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
-	"\vdescription\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12&\n" +
-	"\x0fhost_public_key\x18\x05 \x01(\tR\rhostPublicKey\x12\x1c\n" +
-	"\tendpoints\x18\x06 \x03(\tR\tendpoints\x12\x12\n" +
-	"\x04tags\x18\a \x03(\tR\x04tags\x12{\n" +
-	"\vupdate_mask\x18\b \x01(\v2\x1a.google.protobuf.FieldMaskB>\xbaH;\xc8\x01\x01\xe2\x015\x12\x04name\x12\vdescription\x12\x0fhost_public_key\x12\tendpoints\x12\x04tagsR\n" +
-	"updateMaskJ\x04\b\x02\x10\x03\"@\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x12{\n" +
+	"\vupdate_mask\x18\a \x01(\v2\x1a.google.protobuf.FieldMaskB>\xbaH;\xc8\x01\x01\xe2\x015\x12\x04name\x12\vdescription\x12\x0fhost_public_key\x12\tendpoints\x12\x04tagsR\n" +
+	"updateMask\"@\n" +
 	"\x14UpdateTargetResponse\x12(\n" +
 	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"/\n" +
 	"\x13DeleteTargetRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x16\n" +
-	"\x14DeleteTargetResponse\"\xbf\x01\n" +
+	"\x14DeleteTargetResponse\"\x96\x02\n" +
 	"\x12ListTargetsRequest\x12\x1f\n" +
 	"\x05limit\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x14\n" +
 	"\x05query\x18\x03 \x01(\tR\x05query\x12\x1b\n" +
 	"\tdaemon_id\x18\x04 \x01(\tR\bdaemonId\x12\x1a\n" +
-	"\baccounts\x18\x06 \x03(\tR\baccounts\x12\x12\n" +
-	"\x04tags\x18\a \x03(\tR\x04tagsJ\x04\b\x05\x10\x06\"W\n" +
+	"\baccounts\x18\x05 \x03(\tR\baccounts\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x128\n" +
+	"\x06status\x18\a \x01(\x0e2\x16.nokku.v1.TargetStatusB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06status\x12!\n" +
+	"\x03ids\x18\b \x03(\tB\x0f\xbaH\f\x92\x01\t\x10d\"\x05r\x03\xb0\x01\x01R\x03ids\"W\n" +
 	"\x13ListTargetsResponse\x12*\n" +
 	"\atargets\x18\x01 \x03(\v2\x10.nokku.v1.TargetR\atargets\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\"B\n" +
@@ -1978,11 +2387,45 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x11AccessGraphTarget\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
-	"\amatched\x18\x03 \x01(\bR\amatched*q\n" +
+	"\amatched\x18\x03 \x01(\bR\amatched\"\xd4\x01\n" +
+	"\x16GetAccessMatrixRequest\x12\x1e\n" +
+	"\x05query\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x05query\x123\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\x15.nokku.v1.SubjectKindB\b\xbaH\x05\x82\x01\x02\x10\x01R\x04kind\x12#\n" +
+	"\x04tags\x18\x03 \x03(\tB\x0f\xbaH\f\x92\x01\t\x10\x14\"\x05r\x03\x18\x80\x02R\x04tags\x12\x1f\n" +
+	"\x05limit\x18\x04 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
+	"\x06offset\x18\x05 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\"\xc0\x01\n" +
+	"\x17GetAccessMatrixResponse\x122\n" +
+	"\acolumns\x18\x01 \x03(\v2\x18.nokku.v1.AccessGraphTagR\acolumns\x12-\n" +
+	"\x04rows\x18\x02 \x03(\v2\x19.nokku.v1.AccessMatrixRowR\x04rows\x12\x14\n" +
+	"\x05total\x18\x03 \x01(\x05R\x05total\x12,\n" +
+	"\x04tags\x18\x04 \x03(\v2\x18.nokku.v1.AccessGraphTagR\x04tags\"\xf4\x01\n" +
+	"\x0fAccessMatrixRow\x12\x1d\n" +
+	"\n" +
+	"subject_id\x18\x01 \x01(\tR\tsubjectId\x12)\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\x15.nokku.v1.SubjectKindR\x04kind\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12!\n" +
+	"\fmember_count\x18\x05 \x01(\x05R\vmemberCount\x12\x18\n" +
+	"\atargets\x18\x06 \x01(\x05R\atargets\x120\n" +
+	"\x05cells\x18\a \x03(\v2\x1a.nokku.v1.AccessMatrixCellR\x05cells\"\xd5\x01\n" +
+	"\x10AccessMatrixCell\x12\x10\n" +
+	"\x03tag\x18\x01 \x01(\tR\x03tag\x12\x18\n" +
+	"\atargets\x18\x02 \x01(\x05R\atargets\x12\x1c\n" +
+	"\tusernames\x18\x03 \x03(\tR\tusernames\x129\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12<\n" +
+	"\flast_used_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastUsedAt*q\n" +
 	"\vAccessBlock\x12\x1c\n" +
 	"\x18ACCESS_BLOCK_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aACCESS_BLOCK_USER_INACTIVE\x10\x01\x12$\n" +
-	" ACCESS_BLOCK_DAEMON_NOT_APPROVED\x10\x022\xc2\a\n" +
+	" ACCESS_BLOCK_DAEMON_NOT_APPROVED\x10\x02*\x97\x01\n" +
+	"\fTargetStatus\x12\x1d\n" +
+	"\x19TARGET_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15TARGET_STATUS_PENDING\x10\x01\x12\x18\n" +
+	"\x14TARGET_STATUS_ONLINE\x10\x02\x12\x19\n" +
+	"\x15TARGET_STATUS_OFFLINE\x10\x03\x12\x18\n" +
+	"\x14TARGET_STATUS_MANUAL\x10\x042\xa5\b\n" +
 	"\rTargetService\x12O\n" +
 	"\tGetTarget\x12\x1a.nokku.v1.GetTargetRequest\x1a\x1b.nokku.v1.GetTargetResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12U\n" +
 	"\vListTargets\x12\x1c.nokku.v1.ListTargetsRequest\x1a\x1d.nokku.v1.ListTargetsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12W\n" +
@@ -1993,7 +2436,8 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x10GetTargetFilters\x12!.nokku.v1.GetTargetFiltersRequest\x1a\".nokku.v1.GetTargetFiltersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12^\n" +
 	"\x0fSyncTargetUsers\x12 .nokku.v1.SyncTargetUsersRequest\x1a!.nokku.v1.SyncTargetUsersResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12^\n" +
 	"\x0eGetAccessGraph\x12\x1f.nokku.v1.GetAccessGraphRequest\x1a .nokku.v1.GetAccessGraphResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12v\n" +
-	"\x16ListAccessGraphTargets\x12'.nokku.v1.ListAccessGraphTargetsRequest\x1a(.nokku.v1.ListAccessGraphTargetsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01B\x8c\x01\n" +
+	"\x16ListAccessGraphTargets\x12'.nokku.v1.ListAccessGraphTargetsRequest\x1a(.nokku.v1.ListAccessGraphTargetsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12a\n" +
+	"\x0fGetAccessMatrix\x12 .nokku.v1.GetAccessMatrixRequest\x1a!.nokku.v1.GetAccessMatrixResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01B\x8c\x01\n" +
 	"\fcom.nokku.v1B\vTargetProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -2008,104 +2452,121 @@ func file_nokku_v1_target_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_target_proto_rawDescData
 }
 
-var file_nokku_v1_target_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nokku_v1_target_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_nokku_v1_target_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_nokku_v1_target_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_nokku_v1_target_proto_goTypes = []any{
 	(AccessBlock)(0),                       // 0: nokku.v1.AccessBlock
-	(*SyncTargetUsersRequest)(nil),         // 1: nokku.v1.SyncTargetUsersRequest
-	(*SyncTargetUsersResponse)(nil),        // 2: nokku.v1.SyncTargetUsersResponse
-	(*Target)(nil),                         // 3: nokku.v1.Target
-	(*GetTargetRequest)(nil),               // 4: nokku.v1.GetTargetRequest
-	(*GetTargetResponse)(nil),              // 5: nokku.v1.GetTargetResponse
-	(*CreateTargetRequest)(nil),            // 6: nokku.v1.CreateTargetRequest
-	(*CreateTargetResponse)(nil),           // 7: nokku.v1.CreateTargetResponse
-	(*UpdateTargetRequest)(nil),            // 8: nokku.v1.UpdateTargetRequest
-	(*UpdateTargetResponse)(nil),           // 9: nokku.v1.UpdateTargetResponse
-	(*DeleteTargetRequest)(nil),            // 10: nokku.v1.DeleteTargetRequest
-	(*DeleteTargetResponse)(nil),           // 11: nokku.v1.DeleteTargetResponse
-	(*ListTargetsRequest)(nil),             // 12: nokku.v1.ListTargetsRequest
-	(*ListTargetsResponse)(nil),            // 13: nokku.v1.ListTargetsResponse
-	(*GetSubjectAccessRequest)(nil),        // 14: nokku.v1.GetSubjectAccessRequest
-	(*GetSubjectAccessResponse)(nil),       // 15: nokku.v1.GetSubjectAccessResponse
-	(*GetTargetFiltersRequest)(nil),        // 16: nokku.v1.GetTargetFiltersRequest
-	(*GetTargetFiltersResponse)(nil),       // 17: nokku.v1.GetTargetFiltersResponse
-	(*AccessGraphFilter)(nil),              // 18: nokku.v1.AccessGraphFilter
-	(*GetAccessGraphRequest)(nil),          // 19: nokku.v1.GetAccessGraphRequest
-	(*GetAccessGraphResponse)(nil),         // 20: nokku.v1.GetAccessGraphResponse
-	(*AccessGraphSubject)(nil),             // 21: nokku.v1.AccessGraphSubject
-	(*AccessGraphAccount)(nil),             // 22: nokku.v1.AccessGraphAccount
-	(*AccessGraphTag)(nil),                 // 23: nokku.v1.AccessGraphTag
-	(*AccessGraphGrant)(nil),               // 24: nokku.v1.AccessGraphGrant
-	(*AccessGraphReach)(nil),               // 25: nokku.v1.AccessGraphReach
-	(*ListAccessGraphTargetsRequest)(nil),  // 26: nokku.v1.ListAccessGraphTargetsRequest
-	(*ListAccessGraphTargetsResponse)(nil), // 27: nokku.v1.ListAccessGraphTargetsResponse
-	(*AccessGraphTarget)(nil),              // 28: nokku.v1.AccessGraphTarget
-	nil,                                    // 29: nokku.v1.Target.MetadataEntry
-	nil,                                    // 30: nokku.v1.Target.UsernameExpiresAtEntry
-	(*TargetAccount)(nil),                  // 31: nokku.v1.TargetAccount
-	(*timestamppb.Timestamp)(nil),          // 32: google.protobuf.Timestamp
-	(*JoinTokenGrant)(nil),                 // 33: nokku.v1.JoinTokenGrant
-	(*fieldmaskpb.FieldMask)(nil),          // 34: google.protobuf.FieldMask
-	(*Daemon)(nil),                         // 35: nokku.v1.Daemon
-	(*CertificateAuthority)(nil),           // 36: nokku.v1.CertificateAuthority
-	(*User)(nil),                           // 37: nokku.v1.User
-	(*ServiceAccount)(nil),                 // 38: nokku.v1.ServiceAccount
-	(SubjectKind)(0),                       // 39: nokku.v1.SubjectKind
+	(TargetStatus)(0),                      // 1: nokku.v1.TargetStatus
+	(*SyncTargetUsersRequest)(nil),         // 2: nokku.v1.SyncTargetUsersRequest
+	(*SyncTargetUsersResponse)(nil),        // 3: nokku.v1.SyncTargetUsersResponse
+	(*Target)(nil),                         // 4: nokku.v1.Target
+	(*GetTargetRequest)(nil),               // 5: nokku.v1.GetTargetRequest
+	(*GetTargetResponse)(nil),              // 6: nokku.v1.GetTargetResponse
+	(*CreateTargetRequest)(nil),            // 7: nokku.v1.CreateTargetRequest
+	(*CreateTargetResponse)(nil),           // 8: nokku.v1.CreateTargetResponse
+	(*UpdateTargetRequest)(nil),            // 9: nokku.v1.UpdateTargetRequest
+	(*UpdateTargetResponse)(nil),           // 10: nokku.v1.UpdateTargetResponse
+	(*DeleteTargetRequest)(nil),            // 11: nokku.v1.DeleteTargetRequest
+	(*DeleteTargetResponse)(nil),           // 12: nokku.v1.DeleteTargetResponse
+	(*ListTargetsRequest)(nil),             // 13: nokku.v1.ListTargetsRequest
+	(*ListTargetsResponse)(nil),            // 14: nokku.v1.ListTargetsResponse
+	(*GetSubjectAccessRequest)(nil),        // 15: nokku.v1.GetSubjectAccessRequest
+	(*GetSubjectAccessResponse)(nil),       // 16: nokku.v1.GetSubjectAccessResponse
+	(*GetTargetFiltersRequest)(nil),        // 17: nokku.v1.GetTargetFiltersRequest
+	(*GetTargetFiltersResponse)(nil),       // 18: nokku.v1.GetTargetFiltersResponse
+	(*AccessGraphFilter)(nil),              // 19: nokku.v1.AccessGraphFilter
+	(*GetAccessGraphRequest)(nil),          // 20: nokku.v1.GetAccessGraphRequest
+	(*GetAccessGraphResponse)(nil),         // 21: nokku.v1.GetAccessGraphResponse
+	(*AccessGraphSubject)(nil),             // 22: nokku.v1.AccessGraphSubject
+	(*AccessGraphAccount)(nil),             // 23: nokku.v1.AccessGraphAccount
+	(*AccessGraphTag)(nil),                 // 24: nokku.v1.AccessGraphTag
+	(*AccessGraphGrant)(nil),               // 25: nokku.v1.AccessGraphGrant
+	(*AccessGraphReach)(nil),               // 26: nokku.v1.AccessGraphReach
+	(*ListAccessGraphTargetsRequest)(nil),  // 27: nokku.v1.ListAccessGraphTargetsRequest
+	(*ListAccessGraphTargetsResponse)(nil), // 28: nokku.v1.ListAccessGraphTargetsResponse
+	(*AccessGraphTarget)(nil),              // 29: nokku.v1.AccessGraphTarget
+	(*GetAccessMatrixRequest)(nil),         // 30: nokku.v1.GetAccessMatrixRequest
+	(*GetAccessMatrixResponse)(nil),        // 31: nokku.v1.GetAccessMatrixResponse
+	(*AccessMatrixRow)(nil),                // 32: nokku.v1.AccessMatrixRow
+	(*AccessMatrixCell)(nil),               // 33: nokku.v1.AccessMatrixCell
+	nil,                                    // 34: nokku.v1.Target.MetadataEntry
+	nil,                                    // 35: nokku.v1.Target.UsernameExpiresAtEntry
+	(*TargetAccount)(nil),                  // 36: nokku.v1.TargetAccount
+	(*timestamppb.Timestamp)(nil),          // 37: google.protobuf.Timestamp
+	(*Daemon)(nil),                         // 38: nokku.v1.Daemon
+	(*JoinTokenGrant)(nil),                 // 39: nokku.v1.JoinTokenGrant
+	(*fieldmaskpb.FieldMask)(nil),          // 40: google.protobuf.FieldMask
+	(*CertificateAuthority)(nil),           // 41: nokku.v1.CertificateAuthority
+	(*User)(nil),                           // 42: nokku.v1.User
+	(*ServiceAccount)(nil),                 // 43: nokku.v1.ServiceAccount
+	(SubjectKind)(0),                       // 44: nokku.v1.SubjectKind
 }
 var file_nokku_v1_target_proto_depIdxs = []int32{
-	31, // 0: nokku.v1.Target.accounts:type_name -> nokku.v1.TargetAccount
-	29, // 1: nokku.v1.Target.metadata:type_name -> nokku.v1.Target.MetadataEntry
-	32, // 2: nokku.v1.Target.created_at:type_name -> google.protobuf.Timestamp
-	32, // 3: nokku.v1.Target.updated_at:type_name -> google.protobuf.Timestamp
-	32, // 4: nokku.v1.Target.last_sync_at:type_name -> google.protobuf.Timestamp
-	30, // 5: nokku.v1.Target.username_expires_at:type_name -> nokku.v1.Target.UsernameExpiresAtEntry
+	36, // 0: nokku.v1.Target.accounts:type_name -> nokku.v1.TargetAccount
+	34, // 1: nokku.v1.Target.metadata:type_name -> nokku.v1.Target.MetadataEntry
+	37, // 2: nokku.v1.Target.created_at:type_name -> google.protobuf.Timestamp
+	37, // 3: nokku.v1.Target.updated_at:type_name -> google.protobuf.Timestamp
+	37, // 4: nokku.v1.Target.last_sync_at:type_name -> google.protobuf.Timestamp
+	35, // 5: nokku.v1.Target.username_expires_at:type_name -> nokku.v1.Target.UsernameExpiresAtEntry
 	0,  // 6: nokku.v1.Target.blocked:type_name -> nokku.v1.AccessBlock
-	3,  // 7: nokku.v1.GetTargetResponse.target:type_name -> nokku.v1.Target
-	33, // 8: nokku.v1.CreateTargetRequest.grants:type_name -> nokku.v1.JoinTokenGrant
-	3,  // 9: nokku.v1.CreateTargetResponse.target:type_name -> nokku.v1.Target
-	34, // 10: nokku.v1.UpdateTargetRequest.update_mask:type_name -> google.protobuf.FieldMask
-	3,  // 11: nokku.v1.UpdateTargetResponse.target:type_name -> nokku.v1.Target
-	3,  // 12: nokku.v1.ListTargetsResponse.targets:type_name -> nokku.v1.Target
-	3,  // 13: nokku.v1.GetSubjectAccessResponse.targets:type_name -> nokku.v1.Target
-	35, // 14: nokku.v1.GetSubjectAccessResponse.daemons:type_name -> nokku.v1.Daemon
-	36, // 15: nokku.v1.GetSubjectAccessResponse.certificate_authority:type_name -> nokku.v1.CertificateAuthority
-	37, // 16: nokku.v1.GetSubjectAccessResponse.user:type_name -> nokku.v1.User
-	38, // 17: nokku.v1.GetSubjectAccessResponse.service_account:type_name -> nokku.v1.ServiceAccount
-	18, // 18: nokku.v1.GetAccessGraphRequest.filter:type_name -> nokku.v1.AccessGraphFilter
-	21, // 19: nokku.v1.GetAccessGraphResponse.subjects:type_name -> nokku.v1.AccessGraphSubject
-	22, // 20: nokku.v1.GetAccessGraphResponse.accounts:type_name -> nokku.v1.AccessGraphAccount
-	23, // 21: nokku.v1.GetAccessGraphResponse.tags:type_name -> nokku.v1.AccessGraphTag
-	24, // 22: nokku.v1.GetAccessGraphResponse.grants:type_name -> nokku.v1.AccessGraphGrant
-	25, // 23: nokku.v1.GetAccessGraphResponse.reach:type_name -> nokku.v1.AccessGraphReach
-	39, // 24: nokku.v1.AccessGraphSubject.kind:type_name -> nokku.v1.SubjectKind
-	18, // 25: nokku.v1.ListAccessGraphTargetsRequest.filter:type_name -> nokku.v1.AccessGraphFilter
-	28, // 26: nokku.v1.ListAccessGraphTargetsResponse.targets:type_name -> nokku.v1.AccessGraphTarget
-	32, // 27: nokku.v1.Target.UsernameExpiresAtEntry.value:type_name -> google.protobuf.Timestamp
-	4,  // 28: nokku.v1.TargetService.GetTarget:input_type -> nokku.v1.GetTargetRequest
-	12, // 29: nokku.v1.TargetService.ListTargets:input_type -> nokku.v1.ListTargetsRequest
-	6,  // 30: nokku.v1.TargetService.CreateTarget:input_type -> nokku.v1.CreateTargetRequest
-	8,  // 31: nokku.v1.TargetService.UpdateTarget:input_type -> nokku.v1.UpdateTargetRequest
-	10, // 32: nokku.v1.TargetService.DeleteTarget:input_type -> nokku.v1.DeleteTargetRequest
-	14, // 33: nokku.v1.TargetService.GetSubjectAccess:input_type -> nokku.v1.GetSubjectAccessRequest
-	16, // 34: nokku.v1.TargetService.GetTargetFilters:input_type -> nokku.v1.GetTargetFiltersRequest
-	1,  // 35: nokku.v1.TargetService.SyncTargetUsers:input_type -> nokku.v1.SyncTargetUsersRequest
-	19, // 36: nokku.v1.TargetService.GetAccessGraph:input_type -> nokku.v1.GetAccessGraphRequest
-	26, // 37: nokku.v1.TargetService.ListAccessGraphTargets:input_type -> nokku.v1.ListAccessGraphTargetsRequest
-	5,  // 38: nokku.v1.TargetService.GetTarget:output_type -> nokku.v1.GetTargetResponse
-	13, // 39: nokku.v1.TargetService.ListTargets:output_type -> nokku.v1.ListTargetsResponse
-	7,  // 40: nokku.v1.TargetService.CreateTarget:output_type -> nokku.v1.CreateTargetResponse
-	9,  // 41: nokku.v1.TargetService.UpdateTarget:output_type -> nokku.v1.UpdateTargetResponse
-	11, // 42: nokku.v1.TargetService.DeleteTarget:output_type -> nokku.v1.DeleteTargetResponse
-	15, // 43: nokku.v1.TargetService.GetSubjectAccess:output_type -> nokku.v1.GetSubjectAccessResponse
-	17, // 44: nokku.v1.TargetService.GetTargetFilters:output_type -> nokku.v1.GetTargetFiltersResponse
-	2,  // 45: nokku.v1.TargetService.SyncTargetUsers:output_type -> nokku.v1.SyncTargetUsersResponse
-	20, // 46: nokku.v1.TargetService.GetAccessGraph:output_type -> nokku.v1.GetAccessGraphResponse
-	27, // 47: nokku.v1.TargetService.ListAccessGraphTargets:output_type -> nokku.v1.ListAccessGraphTargetsResponse
-	38, // [38:48] is the sub-list for method output_type
-	28, // [28:38] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	38, // 7: nokku.v1.Target.daemon:type_name -> nokku.v1.Daemon
+	4,  // 8: nokku.v1.GetTargetResponse.target:type_name -> nokku.v1.Target
+	39, // 9: nokku.v1.CreateTargetRequest.grants:type_name -> nokku.v1.JoinTokenGrant
+	4,  // 10: nokku.v1.CreateTargetResponse.target:type_name -> nokku.v1.Target
+	40, // 11: nokku.v1.UpdateTargetRequest.update_mask:type_name -> google.protobuf.FieldMask
+	4,  // 12: nokku.v1.UpdateTargetResponse.target:type_name -> nokku.v1.Target
+	1,  // 13: nokku.v1.ListTargetsRequest.status:type_name -> nokku.v1.TargetStatus
+	4,  // 14: nokku.v1.ListTargetsResponse.targets:type_name -> nokku.v1.Target
+	4,  // 15: nokku.v1.GetSubjectAccessResponse.targets:type_name -> nokku.v1.Target
+	38, // 16: nokku.v1.GetSubjectAccessResponse.daemons:type_name -> nokku.v1.Daemon
+	41, // 17: nokku.v1.GetSubjectAccessResponse.certificate_authority:type_name -> nokku.v1.CertificateAuthority
+	42, // 18: nokku.v1.GetSubjectAccessResponse.user:type_name -> nokku.v1.User
+	43, // 19: nokku.v1.GetSubjectAccessResponse.service_account:type_name -> nokku.v1.ServiceAccount
+	19, // 20: nokku.v1.GetAccessGraphRequest.filter:type_name -> nokku.v1.AccessGraphFilter
+	22, // 21: nokku.v1.GetAccessGraphResponse.subjects:type_name -> nokku.v1.AccessGraphSubject
+	23, // 22: nokku.v1.GetAccessGraphResponse.accounts:type_name -> nokku.v1.AccessGraphAccount
+	24, // 23: nokku.v1.GetAccessGraphResponse.tags:type_name -> nokku.v1.AccessGraphTag
+	25, // 24: nokku.v1.GetAccessGraphResponse.grants:type_name -> nokku.v1.AccessGraphGrant
+	26, // 25: nokku.v1.GetAccessGraphResponse.reach:type_name -> nokku.v1.AccessGraphReach
+	44, // 26: nokku.v1.AccessGraphSubject.kind:type_name -> nokku.v1.SubjectKind
+	19, // 27: nokku.v1.ListAccessGraphTargetsRequest.filter:type_name -> nokku.v1.AccessGraphFilter
+	29, // 28: nokku.v1.ListAccessGraphTargetsResponse.targets:type_name -> nokku.v1.AccessGraphTarget
+	44, // 29: nokku.v1.GetAccessMatrixRequest.kind:type_name -> nokku.v1.SubjectKind
+	24, // 30: nokku.v1.GetAccessMatrixResponse.columns:type_name -> nokku.v1.AccessGraphTag
+	32, // 31: nokku.v1.GetAccessMatrixResponse.rows:type_name -> nokku.v1.AccessMatrixRow
+	24, // 32: nokku.v1.GetAccessMatrixResponse.tags:type_name -> nokku.v1.AccessGraphTag
+	44, // 33: nokku.v1.AccessMatrixRow.kind:type_name -> nokku.v1.SubjectKind
+	33, // 34: nokku.v1.AccessMatrixRow.cells:type_name -> nokku.v1.AccessMatrixCell
+	37, // 35: nokku.v1.AccessMatrixCell.expires_at:type_name -> google.protobuf.Timestamp
+	37, // 36: nokku.v1.AccessMatrixCell.last_used_at:type_name -> google.protobuf.Timestamp
+	37, // 37: nokku.v1.Target.UsernameExpiresAtEntry.value:type_name -> google.protobuf.Timestamp
+	5,  // 38: nokku.v1.TargetService.GetTarget:input_type -> nokku.v1.GetTargetRequest
+	13, // 39: nokku.v1.TargetService.ListTargets:input_type -> nokku.v1.ListTargetsRequest
+	7,  // 40: nokku.v1.TargetService.CreateTarget:input_type -> nokku.v1.CreateTargetRequest
+	9,  // 41: nokku.v1.TargetService.UpdateTarget:input_type -> nokku.v1.UpdateTargetRequest
+	11, // 42: nokku.v1.TargetService.DeleteTarget:input_type -> nokku.v1.DeleteTargetRequest
+	15, // 43: nokku.v1.TargetService.GetSubjectAccess:input_type -> nokku.v1.GetSubjectAccessRequest
+	17, // 44: nokku.v1.TargetService.GetTargetFilters:input_type -> nokku.v1.GetTargetFiltersRequest
+	2,  // 45: nokku.v1.TargetService.SyncTargetUsers:input_type -> nokku.v1.SyncTargetUsersRequest
+	20, // 46: nokku.v1.TargetService.GetAccessGraph:input_type -> nokku.v1.GetAccessGraphRequest
+	27, // 47: nokku.v1.TargetService.ListAccessGraphTargets:input_type -> nokku.v1.ListAccessGraphTargetsRequest
+	30, // 48: nokku.v1.TargetService.GetAccessMatrix:input_type -> nokku.v1.GetAccessMatrixRequest
+	6,  // 49: nokku.v1.TargetService.GetTarget:output_type -> nokku.v1.GetTargetResponse
+	14, // 50: nokku.v1.TargetService.ListTargets:output_type -> nokku.v1.ListTargetsResponse
+	8,  // 51: nokku.v1.TargetService.CreateTarget:output_type -> nokku.v1.CreateTargetResponse
+	10, // 52: nokku.v1.TargetService.UpdateTarget:output_type -> nokku.v1.UpdateTargetResponse
+	12, // 53: nokku.v1.TargetService.DeleteTarget:output_type -> nokku.v1.DeleteTargetResponse
+	16, // 54: nokku.v1.TargetService.GetSubjectAccess:output_type -> nokku.v1.GetSubjectAccessResponse
+	18, // 55: nokku.v1.TargetService.GetTargetFilters:output_type -> nokku.v1.GetTargetFiltersResponse
+	3,  // 56: nokku.v1.TargetService.SyncTargetUsers:output_type -> nokku.v1.SyncTargetUsersResponse
+	21, // 57: nokku.v1.TargetService.GetAccessGraph:output_type -> nokku.v1.GetAccessGraphResponse
+	28, // 58: nokku.v1.TargetService.ListAccessGraphTargets:output_type -> nokku.v1.ListAccessGraphTargetsResponse
+	31, // 59: nokku.v1.TargetService.GetAccessMatrix:output_type -> nokku.v1.GetAccessMatrixResponse
+	49, // [49:60] is the sub-list for method output_type
+	38, // [38:49] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_target_proto_init() }
@@ -2129,8 +2590,8 @@ func file_nokku_v1_target_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_target_proto_rawDesc), len(file_nokku_v1_target_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   30,
+			NumEnums:      2,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

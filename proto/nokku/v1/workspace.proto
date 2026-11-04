@@ -18,6 +18,10 @@ service WorkspaceService {
   rpc UpdateWorkspace(UpdateWorkspaceRequest) returns (UpdateWorkspaceResponse) {
     option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
+  // UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
+  rpc UpdateDaemonDefaults(UpdateDaemonDefaultsRequest) returns (UpdateDaemonDefaultsResponse) {
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  }
   rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (DeleteWorkspaceResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
@@ -116,17 +120,35 @@ message UpdateWorkspaceRequest {
       in: [
         "name",
         "description",
-        "settings.default_daemon_config.record_sessions",
-        "settings.default_daemon_config.allow_forwarding",
-        "settings.default_daemon_config.allow_agent_forwarding",
-        "settings.default_daemon_config.gateway_ports",
-        "settings.enforce_sso",
-        "settings.session_idle_timeout"
+        "settings.enforce_sso"
       ]
     }
   ];
 }
 message UpdateWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message UpdateDaemonDefaultsRequest {
+  nokku.v1.DaemonConfig default_daemon_config = 1;
+  google.protobuf.Duration session_idle_timeout = 2 [(buf.validate.field).duration = {
+    gte: {}
+    lte: {seconds: 86400}
+  }];
+  google.protobuf.FieldMask update_mask = 3 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).field_mask = {
+      in: [
+        "default_daemon_config.record_sessions",
+        "default_daemon_config.allow_forwarding",
+        "default_daemon_config.allow_agent_forwarding",
+        "default_daemon_config.gateway_ports",
+        "session_idle_timeout"
+      ]
+    }
+  ];
+}
+message UpdateDaemonDefaultsResponse {
   Workspace workspace = 1;
 }
 

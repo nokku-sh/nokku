@@ -598,17 +598,19 @@ func (x *EventLog) GetTimestamp() *timestamppb.Timestamp {
 }
 
 type AuditLogFilter struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Search        *string                `protobuf:"bytes,1,opt,name=search" json:"search,omitempty"`
-	ActorIds      []string               `protobuf:"bytes,2,rep,name=actor_ids,json=actorIds" json:"actor_ids,omitempty"`
-	ActorKinds    []string               `protobuf:"bytes,3,rep,name=actor_kinds,json=actorKinds" json:"actor_kinds,omitempty"`
-	Actions       []string               `protobuf:"bytes,4,rep,name=actions" json:"actions,omitempty"`
-	Target        *string                `protobuf:"bytes,5,opt,name=target" json:"target,omitempty"`
-	Outcome       *AuditOutcome          `protobuf:"varint,6,opt,name=outcome,enum=nokku.v1.AuditOutcome" json:"outcome,omitempty"`
-	StartDate     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=start_date,json=startDate" json:"start_date,omitempty"`
-	EndDate       *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=end_date,json=endDate" json:"end_date,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Search     *string                `protobuf:"bytes,1,opt,name=search" json:"search,omitempty"`
+	ActorIds   []string               `protobuf:"bytes,2,rep,name=actor_ids,json=actorIds" json:"actor_ids,omitempty"`
+	ActorKinds []string               `protobuf:"bytes,3,rep,name=actor_kinds,json=actorKinds" json:"actor_kinds,omitempty"`
+	Actions    []string               `protobuf:"bytes,4,rep,name=actions" json:"actions,omitempty"`
+	Target     *string                `protobuf:"bytes,5,opt,name=target" json:"target,omitempty"`
+	Outcome    *AuditOutcome          `protobuf:"varint,6,opt,name=outcome,enum=nokku.v1.AuditOutcome" json:"outcome,omitempty"`
+	StartDate  *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=start_date,json=startDate" json:"start_date,omitempty"`
+	EndDate    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=end_date,json=endDate" json:"end_date,omitempty"`
+	// excluded_actions leaves these out, like every sign-in for a view of changes.
+	ExcludedActions []string `protobuf:"bytes,9,rep,name=excluded_actions,json=excludedActions" json:"excluded_actions,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AuditLogFilter) Reset() {
@@ -693,6 +695,13 @@ func (x *AuditLogFilter) GetStartDate() *timestamppb.Timestamp {
 func (x *AuditLogFilter) GetEndDate() *timestamppb.Timestamp {
 	if x != nil {
 		return x.EndDate
+	}
+	return nil
+}
+
+func (x *AuditLogFilter) GetExcludedActions() []string {
+	if x != nil {
+		return x.ExcludedActions
 	}
 	return nil
 }
@@ -1034,9 +1043,11 @@ func (x *ExportAccessReportResponse) GetContentType() string {
 }
 
 type ListMyActivityRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Limit         *int32                 `protobuf:"varint,1,opt,name=limit" json:"limit,omitempty"`
-	Offset        *int32                 `protobuf:"varint,2,opt,name=offset" json:"offset,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Limit  *int32                 `protobuf:"varint,1,opt,name=limit" json:"limit,omitempty"`
+	Offset *int32                 `protobuf:"varint,2,opt,name=offset" json:"offset,omitempty"`
+	// filter narrows your own events, its actor_ids are ignored. Without dates it reads all the log keeps.
+	Filter        *AuditLogFilter `protobuf:"bytes,3,opt,name=filter" json:"filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1083,6 +1094,13 @@ func (x *ListMyActivityRequest) GetOffset() int32 {
 		return *x.Offset
 	}
 	return 0
+}
+
+func (x *ListMyActivityRequest) GetFilter() *AuditLogFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
 }
 
 type ListMyActivityResponse struct {
@@ -1145,7 +1163,7 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x11GetVersionRequest\".\n" +
 	"\x12GetVersionResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\"\x18\n" +
-	"\x16GetInstanceInfoRequest\"\x95\x02\n" +
+	"\x16GetInstanceInfoRequest\"\x8f\x02\n" +
 	"\x17GetInstanceInfoResponse\x12#\n" +
 	"\roperator_name\x18\x01 \x01(\tR\foperatorName\x12#\n" +
 	"\rsupport_email\x18\x02 \x01(\tR\fsupportEmail\x12\x1f\n" +
@@ -1157,8 +1175,7 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\vimprint_url\x18\x06 \x01(\tR\n" +
 	"imprintUrl\x12\x12\n" +
 	"\x04mode\x18\a \x01(\tR\x04mode\x12\x16\n" +
-	"\x06signup\x18\b \x01(\bR\x06signupJ\x04\b\t\x10\n" +
-	"\"U\n" +
+	"\x06signup\x18\b \x01(\bR\x06signup\"U\n" +
 	"\x04Role\x12+\n" +
 	"\x04role\x18\x01 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\"\x12\n" +
@@ -1180,7 +1197,7 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"user_agent\x18\t \x01(\tR\tuserAgent\x121\n" +
 	"\adetails\x18\n" +
 	" \x01(\v2\x17.google.protobuf.StructR\adetails\x128\n" +
-	"\ttimestamp\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xd5\x02\n" +
+	"\ttimestamp\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\x80\x03\n" +
 	"\x0eAuditLogFilter\x12\x16\n" +
 	"\x06search\x18\x01 \x01(\tR\x06search\x12*\n" +
 	"\tactor_ids\x18\x02 \x03(\tB\r\xbaH\n" +
@@ -1192,7 +1209,8 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\aoutcome\x18\x06 \x01(\x0e2\x16.nokku.v1.AuditOutcomeB\b\xbaH\x05\x82\x01\x02\x10\x01R\aoutcome\x129\n" +
 	"\n" +
 	"start_date\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tstartDate\x125\n" +
-	"\bend_date\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\aendDate\"\x8a\x01\n" +
+	"\bend_date\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\aendDate\x12)\n" +
+	"\x10excluded_actions\x18\t \x03(\tR\x0fexcludedActions\"\x8a\x01\n" +
 	"\x14ListAuditLogsRequest\x12\x1f\n" +
 	"\x05limit\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x120\n" +
@@ -1219,10 +1237,11 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x1aExportAccessReportResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1a\n" +
 	"\bfilename\x18\x02 \x01(\tR\bfilename\x12!\n" +
-	"\fcontent_type\x18\x03 \x01(\tR\vcontentType\"Y\n" +
+	"\fcontent_type\x18\x03 \x01(\tR\vcontentType\"\x8b\x01\n" +
 	"\x15ListMyActivityRequest\x12\x1f\n" +
 	"\x05limit\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
-	"\x06offset\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\"V\n" +
+	"\x06offset\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x120\n" +
+	"\x06filter\x18\x03 \x01(\v2\x18.nokku.v1.AuditLogFilterR\x06filter\"V\n" +
 	"\x16ListMyActivityResponse\x12&\n" +
 	"\x04logs\x18\x01 \x03(\v2\x12.nokku.v1.EventLogR\x04logs\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total*~\n" +
@@ -1293,26 +1312,27 @@ var file_nokku_v1_util_proto_depIdxs = []int32{
 	1,  // 9: nokku.v1.ExportAuditLogsRequest.format:type_name -> nokku.v1.ExportAuditLogsRequest.Format
 	10, // 10: nokku.v1.ExportAuditLogsRequest.filter:type_name -> nokku.v1.AuditLogFilter
 	1,  // 11: nokku.v1.ExportAccessReportRequest.format:type_name -> nokku.v1.ExportAuditLogsRequest.Format
-	9,  // 12: nokku.v1.ListMyActivityResponse.logs:type_name -> nokku.v1.EventLog
-	2,  // 13: nokku.v1.UtilService.GetVersion:input_type -> nokku.v1.GetVersionRequest
-	4,  // 14: nokku.v1.UtilService.GetInstanceInfo:input_type -> nokku.v1.GetInstanceInfoRequest
-	7,  // 15: nokku.v1.UtilService.ListRoles:input_type -> nokku.v1.ListRolesRequest
-	11, // 16: nokku.v1.UtilService.ListAuditLogs:input_type -> nokku.v1.ListAuditLogsRequest
-	13, // 17: nokku.v1.UtilService.ExportAuditLogs:input_type -> nokku.v1.ExportAuditLogsRequest
-	15, // 18: nokku.v1.UtilService.ExportAccessReport:input_type -> nokku.v1.ExportAccessReportRequest
-	17, // 19: nokku.v1.UtilService.ListMyActivity:input_type -> nokku.v1.ListMyActivityRequest
-	3,  // 20: nokku.v1.UtilService.GetVersion:output_type -> nokku.v1.GetVersionResponse
-	5,  // 21: nokku.v1.UtilService.GetInstanceInfo:output_type -> nokku.v1.GetInstanceInfoResponse
-	8,  // 22: nokku.v1.UtilService.ListRoles:output_type -> nokku.v1.ListRolesResponse
-	12, // 23: nokku.v1.UtilService.ListAuditLogs:output_type -> nokku.v1.ListAuditLogsResponse
-	14, // 24: nokku.v1.UtilService.ExportAuditLogs:output_type -> nokku.v1.ExportAuditLogsResponse
-	16, // 25: nokku.v1.UtilService.ExportAccessReport:output_type -> nokku.v1.ExportAccessReportResponse
-	18, // 26: nokku.v1.UtilService.ListMyActivity:output_type -> nokku.v1.ListMyActivityResponse
-	20, // [20:27] is the sub-list for method output_type
-	13, // [13:20] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	10, // 12: nokku.v1.ListMyActivityRequest.filter:type_name -> nokku.v1.AuditLogFilter
+	9,  // 13: nokku.v1.ListMyActivityResponse.logs:type_name -> nokku.v1.EventLog
+	2,  // 14: nokku.v1.UtilService.GetVersion:input_type -> nokku.v1.GetVersionRequest
+	4,  // 15: nokku.v1.UtilService.GetInstanceInfo:input_type -> nokku.v1.GetInstanceInfoRequest
+	7,  // 16: nokku.v1.UtilService.ListRoles:input_type -> nokku.v1.ListRolesRequest
+	11, // 17: nokku.v1.UtilService.ListAuditLogs:input_type -> nokku.v1.ListAuditLogsRequest
+	13, // 18: nokku.v1.UtilService.ExportAuditLogs:input_type -> nokku.v1.ExportAuditLogsRequest
+	15, // 19: nokku.v1.UtilService.ExportAccessReport:input_type -> nokku.v1.ExportAccessReportRequest
+	17, // 20: nokku.v1.UtilService.ListMyActivity:input_type -> nokku.v1.ListMyActivityRequest
+	3,  // 21: nokku.v1.UtilService.GetVersion:output_type -> nokku.v1.GetVersionResponse
+	5,  // 22: nokku.v1.UtilService.GetInstanceInfo:output_type -> nokku.v1.GetInstanceInfoResponse
+	8,  // 23: nokku.v1.UtilService.ListRoles:output_type -> nokku.v1.ListRolesResponse
+	12, // 24: nokku.v1.UtilService.ListAuditLogs:output_type -> nokku.v1.ListAuditLogsResponse
+	14, // 25: nokku.v1.UtilService.ExportAuditLogs:output_type -> nokku.v1.ExportAuditLogsResponse
+	16, // 26: nokku.v1.UtilService.ExportAccessReport:output_type -> nokku.v1.ExportAccessReportResponse
+	18, // 27: nokku.v1.UtilService.ListMyActivity:output_type -> nokku.v1.ListMyActivityResponse
+	21, // [21:28] is the sub-list for method output_type
+	14, // [14:21] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_util_proto_init() }

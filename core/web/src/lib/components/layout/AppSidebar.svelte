@@ -16,6 +16,8 @@
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { page } from '$app/state';
 	import NokkuCaret from '#lib/assets/nokku_caret.svelte';
+	import { plural } from '#lib/api/bulk.js';
+	import { useWaitingRequests } from '#lib/components/access/requests.svelte.js';
 	import { headline, isFresh, issuesOf } from '#lib/components/dashboard/issues.js';
 	import { toneText } from '#lib/tone.js';
 
@@ -33,7 +35,17 @@
 	const can = user.can();
 	const overview = dashboard.get(() => can.view);
 	const issues = $derived(overview.data && issuesOf(overview.data));
-	const status = $derived(headline(issues, isFresh(overview.data)));
+	const requests = useWaitingRequests();
+	const status = $derived(headline(issues, isFresh(overview.data), requests.count));
+	const statusTitle = $derived(
+		[
+			requests.count &&
+				`${plural(requests.count, 'access request')} ${requests.count === 1 ? 'waits' : 'wait'} for an answer`,
+			...(issues ?? []).map((i) => i.title)
+		]
+			.filter(Boolean)
+			.join('\n')
+	);
 
 	const visibleRoutes = $derived(
 		Object.entries(AppRoutes)
@@ -76,11 +88,7 @@
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton size="lg">
 					{#snippet child({ props })}
-						<a
-							href="/"
-							{...props}
-							title={issues?.length ? issues.map((i) => i.title).join('\n') : ws.data?.description}
-						>
+						<a href="/" {...props} title={statusTitle || ws.data?.description}>
 							<div class="rounded-lg bg-terminal p-2.5 text-brand-caret">
 								<NokkuCaret class="pl-0.5" />
 							</div>

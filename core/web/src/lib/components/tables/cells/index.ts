@@ -1,6 +1,5 @@
 export { default as ActionCell } from './ActionCell.svelte';
 
-export { default as DaemonStatusCell } from './DaemonStatusCell.svelte';
 export { default as IdentityCell } from './IdentityCell.svelte';
 export { default as MachineCell } from './MachineCell.svelte';
 export { default as MemberCell } from './MemberCell.svelte';

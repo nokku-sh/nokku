@@ -31,7 +31,7 @@ func (p *Pool) Connect(
 		)
 	}
 
-	var daemon *db.Daemon
+	var daemon *db.GetDaemonRow
 	err := p.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, daemonID)
 		return err
@@ -42,11 +42,11 @@ func (p *Pool) Connect(
 	if err != nil {
 		return err
 	}
-	if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+	if daemon.Daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		return connect.NewError(connect.CodePermissionDenied, "daemon not accepted")
 	}
 
-	conn := p.registerDaemon(ctx, daemonID, daemon.WorkspaceID)
+	conn := p.registerDaemon(ctx, daemonID, daemon.Daemon.WorkspaceID)
 	p.markSeen(ctx, daemonID)
 	defer p.markSeen(context.WithoutCancel(ctx), daemonID)
 	defer p.unregisterDaemon(daemonID, conn)
@@ -93,7 +93,7 @@ func (p *Pool) Connect(
 			if hb == nil {
 				continue
 			}
-			version, err := p.stateVersion(conn.ctx, daemon.WorkspaceID)
+			version, err := p.stateVersion(conn.ctx, daemon.Daemon.WorkspaceID)
 			if err != nil {
 				slog.Warn("read workspace state version", "daemon_id", daemonID, "error", err)
 				continue

@@ -1,6 +1,10 @@
 import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '#lib/query/index.js';
-import { AccessRequestService } from '#lib/gen/nokku/v1/access_request_pb.js';
+import {
+	AccessRequestService,
+	type ListAccessRequestsRequestSchema
+} from '#lib/gen/nokku/v1/access_request_pb.js';
+import type { MessageInitShape } from '@bufbuild/protobuf';
 import { LIVE } from './client';
 
 export const accessRequests = {
@@ -9,13 +13,15 @@ export const accessRequests = {
 			enabled: when(),
 			select: (res) => res.targets
 		})),
-	// The newest hundred, every status. Members get only their own.
-	list: () =>
-		useQuery(
-			AccessRequestService.method.listAccessRequests,
-			{ limit: 100 },
-			{ refetchInterval: LIVE }
-		),
+	// Newest first, members get their own. Only views that show them poll, the sidebar reads the same answer.
+	list: (
+		input: MessageInitShape<typeof ListAccessRequestsRequestSchema> = { limit: 100 },
+		{ when = () => true, live = true }: { when?: () => boolean; live?: boolean } = {}
+	) =>
+		useQuery(AccessRequestService.method.listAccessRequests, input, () => ({
+			enabled: when(),
+			...(live && { refetchInterval: LIVE })
+		})),
 
 	create: () =>
 		useMutation(AccessRequestService.method.createAccessRequest, {

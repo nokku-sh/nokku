@@ -861,3 +861,96 @@ func certificateKeyIDs(t *testing.T, cfg *config.Config) []string {
 	}
 	return ids
 }
+
+// A person sees whether a server records them before they log in, and nothing else of its daemon's rules.
+func TestAccessTellsRecording(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := testWorkspace.ID
+	_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	person := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
+		p, err := q.CreateTargetAccount(t.Context(), &db.CreateTargetAccountParams{
+			TargetID: enrolled.GetTargetId(), Username: "root",
+		})
+		if err != nil {
+			return err
+		}
+		return q.PutGrant(t.Context(), &db.PutGrantParams{
+			AccountID: p.ID, SubjectKind: db.SubjectKindUser, SubjectID: person.ID,
+		})
+	})
+	editor := nokkuv1connect.NewDaemonServiceClient(clientOn(srv, header("Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR))))
+	self := nokkuv1connect.NewTargetServiceClient(clientOn(srv, header("Authorization",
+		"Bearer "+sessionFor(t, cfg, person))))
+
+	records := func(on bool) *nokkuv1.DaemonConfig {
+		_, err := editor.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
+			Id:     new(enrolled.GetId()),
+			Config: &nokkuv1.DaemonConfig{RecordSessions: new(on), AllowForwarding: new(true)},
+		}))
+		require.NoError(t, err)
+		res, err := self.GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{SubjectId: &person.ID})
+		require.NoError(t, err)
+		require.Len(t, res.GetDaemons(), 1)
+		return res.GetDaemons()[0].GetConfig()
+	}
+
+	assert.True(t, records(true).GetRecordSessions())
+	assert.False(t, records(false).GetRecordSessions())
+	assert.Nil(t, records(false).AllowForwarding, "a member learns only whether it records")
+}
+
+// A server carries its daemon, so the server list needs no second call. A server set up with nk sync has none.
+func TestServersCarryTheirDaemon(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := testWorkspace.ID
+	_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, false)
+	manual := seedTarget(t, cfg, workspaceID)
+	targets := nokkuv1connect.NewTargetServiceClient(clientOn(srv, header("Authorization",
+		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER))))
+
+	list, err := targets.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{
+		Limit: new(int32(10)), DaemonId: new(enrolled.GetId()),
+	})
+	require.NoError(t, err)
+	require.Len(t, list.GetTargets(), 1)
+	d := list.GetTargets()[0].GetDaemon()
+	assert.Equal(t, enrolled.GetId(), d.GetId())
+	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, d.GetStatus(), "the list shows it waits for approval")
+	assert.False(t, d.GetOnline())
+
+	got, err := targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: new(enrolled.GetTargetId())})
+	require.NoError(t, err)
+	assert.Equal(t, enrolled.GetId(), got.GetTarget().GetDaemon().GetId())
+
+	got, err = targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &manual})
+	require.NoError(t, err)
+	assert.Nil(t, got.GetTarget().GetDaemon(), "an nk sync server has no daemon")
+
+	ids := func(status nokkuv1.TargetStatus) []string {
+		res, err := targets.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{
+			Limit: new(int32(100)), Status: status.Enum(),
+		})
+		require.NoError(t, err)
+		var out []string
+		for _, t := range res.GetTargets() {
+			out = append(out, t.GetId())
+		}
+		return out
+	}
+	assert.Contains(t, ids(nokkuv1.TargetStatus_TARGET_STATUS_PENDING), enrolled.GetTargetId())
+	assert.NotContains(t, ids(nokkuv1.TargetStatus_TARGET_STATUS_PENDING), manual)
+	assert.Contains(t, ids(nokkuv1.TargetStatus_TARGET_STATUS_MANUAL), manual)
+	assert.NotContains(t, ids(nokkuv1.TargetStatus_TARGET_STATUS_MANUAL), enrolled.GetTargetId())
+	assert.NotContains(t, ids(nokkuv1.TargetStatus_TARGET_STATUS_OFFLINE), enrolled.GetTargetId(),
+		"a daemon nobody approved is pending, not offline")
+	assert.NotContains(t, ids(nokkuv1.TargetStatus_TARGET_STATUS_ONLINE), enrolled.GetTargetId())
+
+	picked, err := targets.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{
+		Limit: new(int32(100)), Ids: []string{manual},
+	})
+	require.NoError(t, err)
+	require.Len(t, picked.GetTargets(), 1, "the ids filter keeps only the picked servers")
+	assert.Equal(t, manual, picked.GetTargets()[0].GetId())
+}

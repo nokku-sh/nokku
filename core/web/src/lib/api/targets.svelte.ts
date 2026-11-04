@@ -1,5 +1,12 @@
 import { MAX_PAGE_SIZE } from '#lib/config.js';
-import { TargetService, type AccessGraphFilterSchema } from '#lib/gen/nokku/v1/target_pb.js';
+import { LIVE } from './client';
+import {
+	TargetService,
+	type AccessGraphFilterSchema,
+	type GetAccessMatrixRequestSchema,
+	type ListTargetsRequestSchema
+} from '#lib/gen/nokku/v1/target_pb.js';
+import { keepPreviousData } from '@tanstack/svelte-query';
 import type { MessageInitShape } from '@bufbuild/protobuf';
 import { toast } from 'svelte-sonner';
 import { extract, type MaybeGetter } from 'runed';
@@ -17,15 +24,9 @@ export const target = {
 			() => ({ enabled: !!extract(id), select: (res) => res.target })
 		),
 	list: (
-		opts?: () => {
-			query?: string;
-			daemonId?: string;
-			tags?: string[];
-			accounts?: string[];
-			limit?: number;
-			offset?: number;
-		},
-		when?: () => boolean
+		opts?: () => MessageInitShape<typeof ListTargetsRequestSchema>,
+		when?: () => boolean,
+		live = false
 	) =>
 		useQuery(
 			TargetService.method.listTargets,
@@ -34,7 +35,8 @@ export const target = {
 				offset: 0,
 				...opts?.()
 			}),
-			() => ({ enabled: when?.() ?? true })
+			// The servers page passes live, each one carries its daemon's online state.
+			() => ({ enabled: when?.() ?? true, ...(live && { refetchInterval: LIVE }) })
 		),
 	access: (subjectId: MaybeGetter<string | undefined>) =>
 		useQuery(
@@ -66,15 +68,21 @@ export const target = {
 			})
 		),
 
+	// A page of the access matrix. The last page stays on screen while the next one loads.
+	accessMatrix: (input: () => MessageInitShape<typeof GetAccessMatrixRequestSchema>) =>
+		useQuery(TargetService.method.getAccessMatrix, input, () => ({
+			placeholderData: keepPreviousData
+		})),
+
 	create: () =>
 		useMutation(TargetService.method.createTarget, {
-			onSuccess: () => toast.success('Target created')
+			onSuccess: () => toast.success('Server added')
 		}),
 	update: () => usePatch(TargetService.method.updateTarget),
 	delete: () =>
 		useMutation(TargetService.method.deleteTarget, {
-			onSuccess: () => toast.success('Target deleted')
+			onSuccess: () => toast.success('Server deleted')
 		}),
 	deleteMany: () =>
-		useBulkMutation(TargetService.method.deleteTarget, (n) => `${plural(n, 'target')} deleted`)
+		useBulkMutation(TargetService.method.deleteTarget, (n) => `${plural(n, 'server')} deleted`)
 };

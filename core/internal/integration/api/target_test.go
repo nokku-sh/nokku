@@ -636,3 +636,77 @@ func TestDeleteTargetTakesItsDaemon(t *testing.T) {
 		&nokkuv1.GetDaemonRequest{Id: enrolled.Id})
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "the daemon was left behind")
 }
+
+// carol only gets in through platform, so she has no row and her use of web-2 counts for the team.
+func TestGetAccessMatrix(t *testing.T) {
+	f := seedAccessGraph(t)
+	cfg, _ := newTestAPI(t)
+	inWorkspace(t, cfg, f.workspaceID, func(q *db.Queries) error {
+		var web2 string
+		targets, err := q.ListTargets(t.Context(), &db.ListTargetsParams{Query: new("web-2")})
+		if err != nil {
+			return err
+		}
+		web2 = targets[0].Target.ID
+		return q.TouchAccessUsage(t.Context(), &db.TouchAccessUsageParams{TargetID: web2, SubjectID: f.carol})
+	})
+
+	matrix := func(req *nokkuv1.GetAccessMatrixRequest) *nokkuv1.GetAccessMatrixResponse {
+		res, err := f.client.GetAccessMatrix(t.Context(), req)
+		require.NoError(t, err)
+		return res
+	}
+	type cell struct {
+		targets   int32
+		usernames string
+	}
+	cells := func(r *nokkuv1.AccessMatrixRow) map[string]cell {
+		out := map[string]cell{}
+		for _, c := range r.GetCells() {
+			out[c.GetTag()] = cell{c.GetTargets(), strings.Join(c.GetUsernames(), ",")}
+		}
+		return out
+	}
+
+	res := matrix(&nokkuv1.GetAccessMatrixRequest{})
+	var columns []string
+	for _, c := range res.GetColumns() {
+		columns = append(columns, c.GetTag())
+	}
+	assert.Equal(t, []string{"prod", "", "web"}, columns, "the biggest tags first, untagged is the empty one")
+	assert.EqualValues(t, 3, res.GetColumns()[0].GetTotal())
+
+	require.EqualValues(t, 4, res.GetTotal())
+	var names []string
+	for _, r := range res.GetRows() {
+		names = append(names, r.GetName())
+	}
+	assert.Equal(t, "platform", names[0], "teams come first")
+	assert.NotContains(t, names, "carol", "someone in a team has no row without a grant of her own")
+
+	platform := res.GetRows()[0]
+	assert.EqualValues(t, 2, platform.GetMemberCount())
+	assert.Equal(t, map[string]cell{"prod": {2, "root"}, "web": {1, "root"}}, cells(platform),
+		"only the cells with access")
+	assert.NotNil(t, platform.GetCells()[0].GetLastUsedAt(), "a member's use is the team's")
+	assert.Nil(t, platform.GetCells()[0].GetExpiresAt(), "for good")
+
+	teams := matrix(&nokkuv1.GetAccessMatrixRequest{Kind: nokkuv1.SubjectKind_SUBJECT_KIND_TEAM.Enum()})
+	assert.Len(t, teams.GetRows(), 1)
+	bob := matrix(&nokkuv1.GetAccessMatrixRequest{Query: new("bob"), Tags: []string{"", "prod"}})
+	require.Len(t, bob.GetRows(), 1)
+	assert.Equal(t, map[string]cell{"": {1, "root"}}, cells(bob.GetRows()[0]))
+
+	page := matrix(&nokkuv1.GetAccessMatrixRequest{Limit: new(int32(2)), Offset: new(int32(2))})
+	assert.Len(t, page.GetRows(), 2)
+	assert.EqualValues(t, 4, page.GetTotal(), "the total counts every row")
+
+	_, err := f.memberClient.GetAccessMatrix(t.Context(), &nokkuv1.GetAccessMatrixRequest{})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "a member reads only its own access")
+
+	inWorkspace(t, cfg, f.workspaceID, func(q *db.Queries) error {
+		return q.SetUserActive(t.Context(), &db.SetUserActiveParams{ID: f.bob, Active: false})
+	})
+	assert.Empty(t, matrix(&nokkuv1.GetAccessMatrixRequest{Query: new("bob")}).GetRows(),
+		"someone deactivated logs in nowhere")
+}

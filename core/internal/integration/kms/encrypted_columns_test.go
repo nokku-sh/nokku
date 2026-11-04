@@ -422,11 +422,14 @@ func seedRecording(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws strin
 	var rec *db.Recording
 	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) error {
 		d, err := q.CreateDaemon(t.Context(), &db.CreateDaemonParams{
-			Name:          "rotation",
 			Status:        nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED,
 			Config:        &nokkuv1.DaemonConfig{},
 			KeyThumbprint: new(uuid.New().String()),
 		})
+		if err != nil {
+			return err
+		}
+		_, err = q.CreateDaemonTarget(t.Context(), &db.CreateDaemonTargetParams{DaemonID: &d.ID, Name: "rotation"})
 		if err != nil {
 			return err
 		}

@@ -26,7 +26,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/target.proto.
  */
 export const file_nokku_v1_target: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS90YXJnZXQucHJvdG8SCG5va2t1LnYxIpcBChZTeW5jVGFyZ2V0VXNlcnNSZXF1ZXN0EhsKCXRhcmdldF9pZBgBIAEoCUIIukgFcgOwAQESFwoPaG9zdF9wdWJsaWNfa2V5GAIgASgJEiMKCXVzZXJuYW1lcxgDIAMoCUIQukgNkgEKEMgBIgVyAxiAAhIiCgllbmRwb2ludHMYBCADKAlCD7pIDJIBCRAQIgVyAxj/ASIZChdTeW5jVGFyZ2V0VXNlcnNSZXNwb25zZSKBBQoGVGFyZ2V0EgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgDIAEoCRIMCgRuYW1lGAQgASgJEhMKC2Rlc2NyaXB0aW9uGAUgASgJEhcKD2hvc3RfcHVibGljX2tleRgGIAEoCRIMCgR0YWdzGAcgAygJEhEKCWVuZHBvaW50cxgIIAMoCRIRCgl1c2VybmFtZXMYCSADKAkSKQoIYWNjb3VudHMYCiADKAsyFy5ub2trdS52MS5UYXJnZXRBY2NvdW50EjAKCG1ldGFkYXRhGAsgAygLMh4ubm9ra3UudjEuVGFyZ2V0Lk1ldGFkYXRhRW50cnkSLgoKY3JlYXRlZF9hdBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zeW5jX2F0GA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBJEChN1c2VybmFtZV9leHBpcmVzX2F0GA8gAygLMicubm9ra3UudjEuVGFyZ2V0LlVzZXJuYW1lRXhwaXJlc0F0RW50cnkSJgoHYmxvY2tlZBgQIAEoDjIVLm5va2t1LnYxLkFjY2Vzc0Jsb2NrGi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ARpUChZVc2VybmFtZUV4cGlyZXNBdEVudHJ5EgsKA2tleRgBIAEoCRIpCgV2YWx1ZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXA6AjgBSgQIAhADIigKEEdldFRhcmdldFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIjUKEUdldFRhcmdldFJlc3BvbnNlEiAKBnRhcmdldBgBIAEoCzIQLm5va2t1LnYxLlRhcmdldCLgAQoTQ3JlYXRlVGFyZ2V0UmVxdWVzdBI2CgRuYW1lGAIgASgJQii6SCVyIxiAAjIeXiR8XlthLXpBLVowLTldW2EtekEtWjAtOS1fXSokEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxIXCg9ob3N0X3B1YmxpY19rZXkYBCABKAkSEQoJZW5kcG9pbnRzGAUgAygJEgwKBHRhZ3MYBiADKAkSMgoGZ3JhbnRzGAcgAygLMhgubm9ra3UudjEuSm9pblRva2VuR3JhbnRCCLpIBZIBAhAgSgQIARACIjgKFENyZWF0ZVRhcmdldFJlc3BvbnNlEiAKBnRhcmdldBgBIAEoCzIQLm5va2t1LnYxLlRhcmdldCKyAgoTVXBkYXRlVGFyZ2V0UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESNQoEbmFtZRgDIAEoCUInukgkciIQARiAAjIbXlthLXpBLVowLTldW2EtekEtWjAtOS1fXSokEh0KC2Rlc2NyaXB0aW9uGAQgASgJQgi6SAVyAxjoBxIXCg9ob3N0X3B1YmxpY19rZXkYBSABKAkSEQoJZW5kcG9pbnRzGAYgAygJEgwKBHRhZ3MYByADKAkSbwoLdXBkYXRlX21hc2sYCCABKAsyGi5nb29nbGUucHJvdG9idWYuRmllbGRNYXNrQj66SDvIAQHiATUSBG5hbWUSC2Rlc2NyaXB0aW9uEg9ob3N0X3B1YmxpY19rZXkSCWVuZHBvaW50cxIEdGFnc0oECAIQAyI4ChRVcGRhdGVUYXJnZXRSZXNwb25zZRIgCgZ0YXJnZXQYASABKAsyEC5ub2trdS52MS5UYXJnZXQiKwoTRGVsZXRlVGFyZ2V0UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiFgoURGVsZXRlVGFyZ2V0UmVzcG9uc2UijwEKEkxpc3RUYXJnZXRzUmVxdWVzdBIYCgVsaW1pdBgBIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgCIAEoBUIHukgEGgIoABINCgVxdWVyeRgDIAEoCRIRCglkYWVtb25faWQYBCABKAkSEAoIYWNjb3VudHMYBiADKAkSDAoEdGFncxgHIAMoCUoECAUQBiJHChNMaXN0VGFyZ2V0c1Jlc3BvbnNlEiEKB3RhcmdldHMYASADKAsyEC5ub2trdS52MS5UYXJnZXQSDQoFdG90YWwYAiABKAUiNwoXR2V0U3ViamVjdEFjY2Vzc1JlcXVlc3QSHAoKc3ViamVjdF9pZBgBIAEoCUIIukgFcgOwAQEi/wEKGEdldFN1YmplY3RBY2Nlc3NSZXNwb25zZRIhCgd0YXJnZXRzGAEgAygLMhAubm9ra3UudjEuVGFyZ2V0EiEKB2RhZW1vbnMYAiADKAsyEC5ub2trdS52MS5EYWVtb24SPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAMgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkSHgoEdXNlchgEIAEoCzIOLm5va2t1LnYxLlVzZXJIABIzCg9zZXJ2aWNlX2FjY291bnQYBSABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudEgAQgkKB3N1YmplY3QiGQoXR2V0VGFyZ2V0RmlsdGVyc1JlcXVlc3QiOgoYR2V0VGFyZ2V0RmlsdGVyc1Jlc3BvbnNlEgwKBHRhZ3MYASADKAkSEAoIYWNjb3VudHMYAiADKAkigAEKEUFjY2Vzc0dyYXBoRmlsdGVyEhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEhsKCXRhcmdldF9pZBgCIAEoCUIIukgFcgOwAQESGQoIdXNlcm5hbWUYAyABKAlCB7pIBHICGCASFQoDdGFnGAQgASgJQgi6SAVyAxiAAiJEChVHZXRBY2Nlc3NHcmFwaFJlcXVlc3QSKwoGZmlsdGVyGAEgASgLMhsubm9ra3UudjEuQWNjZXNzR3JhcGhGaWx0ZXIiiAIKFkdldEFjY2Vzc0dyYXBoUmVzcG9uc2USLgoIc3ViamVjdHMYASADKAsyHC5ub2trdS52MS5BY2Nlc3NHcmFwaFN1YmplY3QSLgoIYWNjb3VudHMYAiADKAsyHC5ub2trdS52MS5BY2Nlc3NHcmFwaEFjY291bnQSJgoEdGFncxgDIAMoCzIYLm5va2t1LnYxLkFjY2Vzc0dyYXBoVGFnEioKBmdyYW50cxgEIAMoCzIaLm5va2t1LnYxLkFjY2Vzc0dyYXBoR3JhbnQSKQoFcmVhY2gYBSADKAsyGi5ub2trdS52MS5BY2Nlc3NHcmFwaFJlYWNoEg8KB3RhcmdldHMYBiABKAUiiQEKEkFjY2Vzc0dyYXBoU3ViamVjdBIKCgJpZBgBIAEoCRIjCgRraW5kGAIgASgOMhUubm9ra3UudjEuU3ViamVjdEtpbmQSDAoEbmFtZRgDIAEoCRINCgVlbWFpbBgEIAEoCRIUCgxtZW1iZXJfY291bnQYBSABKAUSDwoHdGFyZ2V0cxgGIAEoBSI3ChJBY2Nlc3NHcmFwaEFjY291bnQSEAoIdXNlcm5hbWUYASABKAkSDwoHdGFyZ2V0cxgCIAEoBSI9Cg5BY2Nlc3NHcmFwaFRhZxILCgN0YWcYASABKAkSDwoHdGFyZ2V0cxgCIAEoBRINCgV0b3RhbBgDIAEoBSJJChBBY2Nlc3NHcmFwaEdyYW50EhIKCnN1YmplY3RfaWQYASABKAkSEAoIdXNlcm5hbWUYAiABKAkSDwoHdGFyZ2V0cxgDIAEoBSJCChBBY2Nlc3NHcmFwaFJlYWNoEhAKCHVzZXJuYW1lGAEgASgJEgsKA3RhZxgCIAEoCRIPCgd0YXJnZXRzGAMgASgFIpYBCh1MaXN0QWNjZXNzR3JhcGhUYXJnZXRzUmVxdWVzdBIrCgZmaWx0ZXIYASABKAsyGy5ub2trdS52MS5BY2Nlc3NHcmFwaEZpbHRlchIVCgN0YWcYAiABKAlCCLpIBXIDGIACEhgKBWxpbWl0GAMgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAQgASgFQge6SAQaAigAIl0KHkxpc3RBY2Nlc3NHcmFwaFRhcmdldHNSZXNwb25zZRIsCgd0YXJnZXRzGAEgAygLMhsubm9ra3UudjEuQWNjZXNzR3JhcGhUYXJnZXQSDQoFdG90YWwYAiABKAUiPgoRQWNjZXNzR3JhcGhUYXJnZXQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIPCgdtYXRjaGVkGAMgASgIKnEKC0FjY2Vzc0Jsb2NrEhwKGEFDQ0VTU19CTE9DS19VTlNQRUNJRklFRBAAEh4KGkFDQ0VTU19CTE9DS19VU0VSX0lOQUNUSVZFEAESJAogQUNDRVNTX0JMT0NLX0RBRU1PTl9OT1RfQVBQUk9WRUQQAjLCBwoNVGFyZ2V0U2VydmljZRJPCglHZXRUYXJnZXQSGi5ub2trdS52MS5HZXRUYXJnZXRSZXF1ZXN0Ghsubm9ra3UudjEuR2V0VGFyZ2V0UmVzcG9uc2UiCZACAcLzGAIYAhJVCgtMaXN0VGFyZ2V0cxIcLm5va2t1LnYxLkxpc3RUYXJnZXRzUmVxdWVzdBodLm5va2t1LnYxLkxpc3RUYXJnZXRzUmVzcG9uc2UiCZACAcLzGAIYAhJXCgxDcmVhdGVUYXJnZXQSHS5ub2trdS52MS5DcmVhdGVUYXJnZXRSZXF1ZXN0Gh4ubm9ra3UudjEuQ3JlYXRlVGFyZ2V0UmVzcG9uc2UiCMLzGAQYA0ABElUKDFVwZGF0ZVRhcmdldBIdLm5va2t1LnYxLlVwZGF0ZVRhcmdldFJlcXVlc3QaHi5ub2trdS52MS5VcGRhdGVUYXJnZXRSZXNwb25zZSIGwvMYAhgDElUKDERlbGV0ZVRhcmdldBIdLm5va2t1LnYxLkRlbGV0ZVRhcmdldFJlcXVlc3QaHi5ub2trdS52MS5EZWxldGVUYXJnZXRSZXNwb25zZSIGwvMYAhgDEmQKEEdldFN1YmplY3RBY2Nlc3MSIS5ub2trdS52MS5HZXRTdWJqZWN0QWNjZXNzUmVxdWVzdBoiLm5va2t1LnYxLkdldFN1YmplY3RBY2Nlc3NSZXNwb25zZSIJkAIBwvMYAhABEmQKEEdldFRhcmdldEZpbHRlcnMSIS5ub2trdS52MS5HZXRUYXJnZXRGaWx0ZXJzUmVxdWVzdBoiLm5va2t1LnYxLkdldFRhcmdldEZpbHRlcnNSZXNwb25zZSIJkAIBwvMYAhgCEl4KD1N5bmNUYXJnZXRVc2VycxIgLm5va2t1LnYxLlN5bmNUYXJnZXRVc2Vyc1JlcXVlc3QaIS5ub2trdS52MS5TeW5jVGFyZ2V0VXNlcnNSZXNwb25zZSIGwvMYAhgDEl4KDkdldEFjY2Vzc0dyYXBoEh8ubm9ra3UudjEuR2V0QWNjZXNzR3JhcGhSZXF1ZXN0GiAubm9ra3UudjEuR2V0QWNjZXNzR3JhcGhSZXNwb25zZSIJkAIBwvMYAhgCEnYKFkxpc3RBY2Nlc3NHcmFwaFRhcmdldHMSJy5ub2trdS52MS5MaXN0QWNjZXNzR3JhcGhUYXJnZXRzUmVxdWVzdBooLm5va2t1LnYxLkxpc3RBY2Nlc3NHcmFwaFRhcmdldHNSZXNwb25zZSIJkAIBwvMYAhgCQowBCgxjb20ubm9ra3UudjFCC1RhcmdldFByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_certificates, file_nokku_v1_daemon, file_nokku_v1_join_token, file_nokku_v1_service_account, file_nokku_v1_target_account]);
+  fileDesc("ChVub2trdS92MS90YXJnZXQucHJvdG8SCG5va2t1LnYxIpcBChZTeW5jVGFyZ2V0VXNlcnNSZXF1ZXN0EhsKCXRhcmdldF9pZBgBIAEoCUIIukgFcgOwAQESFwoPaG9zdF9wdWJsaWNfa2V5GAIgASgJEiMKCXVzZXJuYW1lcxgDIAMoCUIQukgNkgEKEMgBIgVyAxiAAhIiCgllbmRwb2ludHMYBCADKAlCD7pIDJIBCRAQIgVyAxj/ASIZChdTeW5jVGFyZ2V0VXNlcnNSZXNwb25zZSKdBQoGVGFyZ2V0EgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEhcKD2hvc3RfcHVibGljX2tleRgFIAEoCRIMCgR0YWdzGAYgAygJEhEKCWVuZHBvaW50cxgHIAMoCRIRCgl1c2VybmFtZXMYCCADKAkSKQoIYWNjb3VudHMYCSADKAsyFy5ub2trdS52MS5UYXJnZXRBY2NvdW50EjAKCG1ldGFkYXRhGAogAygLMh4ubm9ra3UudjEuVGFyZ2V0Lk1ldGFkYXRhRW50cnkSLgoKY3JlYXRlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zeW5jX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBJEChN1c2VybmFtZV9leHBpcmVzX2F0GA4gAygLMicubm9ra3UudjEuVGFyZ2V0LlVzZXJuYW1lRXhwaXJlc0F0RW50cnkSJgoHYmxvY2tlZBgPIAEoDjIVLm5va2t1LnYxLkFjY2Vzc0Jsb2NrEiAKBmRhZW1vbhgQIAEoCzIQLm5va2t1LnYxLkRhZW1vbhovCg1NZXRhZGF0YUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEaVAoWVXNlcm5hbWVFeHBpcmVzQXRFbnRyeRILCgNrZXkYASABKAkSKQoFdmFsdWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wOgI4ASIoChBHZXRUYXJnZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASI1ChFHZXRUYXJnZXRSZXNwb25zZRIgCgZ0YXJnZXQYASABKAsyEC5ub2trdS52MS5UYXJnZXQi2gEKE0NyZWF0ZVRhcmdldFJlcXVlc3QSNgoEbmFtZRgBIAEoCUIoukglciMYgAIyHl4kfF5bYS16QS1aMC05XVthLXpBLVowLTktX10qJBIdCgtkZXNjcmlwdGlvbhgCIAEoCUIIukgFcgMY6AcSFwoPaG9zdF9wdWJsaWNfa2V5GAMgASgJEhEKCWVuZHBvaW50cxgEIAMoCRIMCgR0YWdzGAUgAygJEjIKBmdyYW50cxgGIAMoCzIYLm5va2t1LnYxLkpvaW5Ub2tlbkdyYW50Qgi6SAWSAQIQICI4ChRDcmVhdGVUYXJnZXRSZXNwb25zZRIgCgZ0YXJnZXQYASABKAsyEC5ub2trdS52MS5UYXJnZXQirAIKE1VwZGF0ZVRhcmdldFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBEjUKBG5hbWUYAiABKAlCJ7pIJHIiEAEYgAIyG15bYS16QS1aMC05XVthLXpBLVowLTktX10qJBIdCgtkZXNjcmlwdGlvbhgDIAEoCUIIukgFcgMY6AcSFwoPaG9zdF9wdWJsaWNfa2V5GAQgASgJEhEKCWVuZHBvaW50cxgFIAMoCRIMCgR0YWdzGAYgAygJEm8KC3VwZGF0ZV9tYXNrGAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0I+ukg7yAEB4gE1EgRuYW1lEgtkZXNjcmlwdGlvbhIPaG9zdF9wdWJsaWNfa2V5EgllbmRwb2ludHMSBHRhZ3MiOAoUVXBkYXRlVGFyZ2V0UmVzcG9uc2USIAoGdGFyZ2V0GAEgASgLMhAubm9ra3UudjEuVGFyZ2V0IisKE0RlbGV0ZVRhcmdldFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIhYKFERlbGV0ZVRhcmdldFJlc3BvbnNlItkBChJMaXN0VGFyZ2V0c1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSEQoJZGFlbW9uX2lkGAQgASgJEhAKCGFjY291bnRzGAUgAygJEgwKBHRhZ3MYBiADKAkSMAoGc3RhdHVzGAcgASgOMhYubm9ra3UudjEuVGFyZ2V0U3RhdHVzQgi6SAWCAQIQARIcCgNpZHMYCCADKAlCD7pIDJIBCRBkIgVyA7ABASJHChNMaXN0VGFyZ2V0c1Jlc3BvbnNlEiEKB3RhcmdldHMYASADKAsyEC5ub2trdS52MS5UYXJnZXQSDQoFdG90YWwYAiABKAUiNwoXR2V0U3ViamVjdEFjY2Vzc1JlcXVlc3QSHAoKc3ViamVjdF9pZBgBIAEoCUIIukgFcgOwAQEi/wEKGEdldFN1YmplY3RBY2Nlc3NSZXNwb25zZRIhCgd0YXJnZXRzGAEgAygLMhAubm9ra3UudjEuVGFyZ2V0EiEKB2RhZW1vbnMYAiADKAsyEC5ub2trdS52MS5EYWVtb24SPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAMgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkSHgoEdXNlchgEIAEoCzIOLm5va2t1LnYxLlVzZXJIABIzCg9zZXJ2aWNlX2FjY291bnQYBSABKAsyGC5ub2trdS52MS5TZXJ2aWNlQWNjb3VudEgAQgkKB3N1YmplY3QiGQoXR2V0VGFyZ2V0RmlsdGVyc1JlcXVlc3QiOgoYR2V0VGFyZ2V0RmlsdGVyc1Jlc3BvbnNlEgwKBHRhZ3MYASADKAkSEAoIYWNjb3VudHMYAiADKAkigAEKEUFjY2Vzc0dyYXBoRmlsdGVyEhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEhsKCXRhcmdldF9pZBgCIAEoCUIIukgFcgOwAQESGQoIdXNlcm5hbWUYAyABKAlCB7pIBHICGCASFQoDdGFnGAQgASgJQgi6SAVyAxiAAiJEChVHZXRBY2Nlc3NHcmFwaFJlcXVlc3QSKwoGZmlsdGVyGAEgASgLMhsubm9ra3UudjEuQWNjZXNzR3JhcGhGaWx0ZXIiiAIKFkdldEFjY2Vzc0dyYXBoUmVzcG9uc2USLgoIc3ViamVjdHMYASADKAsyHC5ub2trdS52MS5BY2Nlc3NHcmFwaFN1YmplY3QSLgoIYWNjb3VudHMYAiADKAsyHC5ub2trdS52MS5BY2Nlc3NHcmFwaEFjY291bnQSJgoEdGFncxgDIAMoCzIYLm5va2t1LnYxLkFjY2Vzc0dyYXBoVGFnEioKBmdyYW50cxgEIAMoCzIaLm5va2t1LnYxLkFjY2Vzc0dyYXBoR3JhbnQSKQoFcmVhY2gYBSADKAsyGi5ub2trdS52MS5BY2Nlc3NHcmFwaFJlYWNoEg8KB3RhcmdldHMYBiABKAUiiQEKEkFjY2Vzc0dyYXBoU3ViamVjdBIKCgJpZBgBIAEoCRIjCgRraW5kGAIgASgOMhUubm9ra3UudjEuU3ViamVjdEtpbmQSDAoEbmFtZRgDIAEoCRINCgVlbWFpbBgEIAEoCRIUCgxtZW1iZXJfY291bnQYBSABKAUSDwoHdGFyZ2V0cxgGIAEoBSI3ChJBY2Nlc3NHcmFwaEFjY291bnQSEAoIdXNlcm5hbWUYASABKAkSDwoHdGFyZ2V0cxgCIAEoBSI9Cg5BY2Nlc3NHcmFwaFRhZxILCgN0YWcYASABKAkSDwoHdGFyZ2V0cxgCIAEoBRINCgV0b3RhbBgDIAEoBSJJChBBY2Nlc3NHcmFwaEdyYW50EhIKCnN1YmplY3RfaWQYASABKAkSEAoIdXNlcm5hbWUYAiABKAkSDwoHdGFyZ2V0cxgDIAEoBSJCChBBY2Nlc3NHcmFwaFJlYWNoEhAKCHVzZXJuYW1lGAEgASgJEgsKA3RhZxgCIAEoCRIPCgd0YXJnZXRzGAMgASgFIpYBCh1MaXN0QWNjZXNzR3JhcGhUYXJnZXRzUmVxdWVzdBIrCgZmaWx0ZXIYASABKAsyGy5ub2trdS52MS5BY2Nlc3NHcmFwaEZpbHRlchIVCgN0YWcYAiABKAlCCLpIBXIDGIACEhgKBWxpbWl0GAMgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAQgASgFQge6SAQaAigAIl0KHkxpc3RBY2Nlc3NHcmFwaFRhcmdldHNSZXNwb25zZRIsCgd0YXJnZXRzGAEgAygLMhsubm9ra3UudjEuQWNjZXNzR3JhcGhUYXJnZXQSDQoFdG90YWwYAiABKAUiPgoRQWNjZXNzR3JhcGhUYXJnZXQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIPCgdtYXRjaGVkGAMgASgIIrIBChZHZXRBY2Nlc3NNYXRyaXhSZXF1ZXN0EhcKBXF1ZXJ5GAEgASgJQgi6SAVyAxiAAhItCgRraW5kGAIgASgOMhUubm9ra3UudjEuU3ViamVjdEtpbmRCCLpIBYIBAhABEh0KBHRhZ3MYAyADKAlCD7pIDJIBCRAUIgVyAxiAAhIYCgVsaW1pdBgEIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgFIAEoBUIHukgEGgIoACKkAQoXR2V0QWNjZXNzTWF0cml4UmVzcG9uc2USKQoHY29sdW1ucxgBIAMoCzIYLm5va2t1LnYxLkFjY2Vzc0dyYXBoVGFnEicKBHJvd3MYAiADKAsyGS5ub2trdS52MS5BY2Nlc3NNYXRyaXhSb3cSDQoFdG90YWwYAyABKAUSJgoEdGFncxgEIAMoCzIYLm5va2t1LnYxLkFjY2Vzc0dyYXBoVGFnIrkBCg9BY2Nlc3NNYXRyaXhSb3cSEgoKc3ViamVjdF9pZBgBIAEoCRIjCgRraW5kGAIgASgOMhUubm9ra3UudjEuU3ViamVjdEtpbmQSDAoEbmFtZRgDIAEoCRINCgVlbWFpbBgEIAEoCRIUCgxtZW1iZXJfY291bnQYBSABKAUSDwoHdGFyZ2V0cxgGIAEoBRIpCgVjZWxscxgHIAMoCzIaLm5va2t1LnYxLkFjY2Vzc01hdHJpeENlbGwipQEKEEFjY2Vzc01hdHJpeENlbGwSCwoDdGFnGAEgASgJEg8KB3RhcmdldHMYAiABKAUSEQoJdXNlcm5hbWVzGAMgAygJEi4KCmV4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAqcQoLQWNjZXNzQmxvY2sSHAoYQUNDRVNTX0JMT0NLX1VOU1BFQ0lGSUVEEAASHgoaQUNDRVNTX0JMT0NLX1VTRVJfSU5BQ1RJVkUQARIkCiBBQ0NFU1NfQkxPQ0tfREFFTU9OX05PVF9BUFBST1ZFRBACKpcBCgxUYXJnZXRTdGF0dXMSHQoZVEFSR0VUX1NUQVRVU19VTlNQRUNJRklFRBAAEhkKFVRBUkdFVF9TVEFUVVNfUEVORElORxABEhgKFFRBUkdFVF9TVEFUVVNfT05MSU5FEAISGQoVVEFSR0VUX1NUQVRVU19PRkZMSU5FEAMSGAoUVEFSR0VUX1NUQVRVU19NQU5VQUwQBDKlCAoNVGFyZ2V0U2VydmljZRJPCglHZXRUYXJnZXQSGi5ub2trdS52MS5HZXRUYXJnZXRSZXF1ZXN0Ghsubm9ra3UudjEuR2V0VGFyZ2V0UmVzcG9uc2UiCZACAcLzGAIYAhJVCgtMaXN0VGFyZ2V0cxIcLm5va2t1LnYxLkxpc3RUYXJnZXRzUmVxdWVzdBodLm5va2t1LnYxLkxpc3RUYXJnZXRzUmVzcG9uc2UiCZACAcLzGAIYAhJXCgxDcmVhdGVUYXJnZXQSHS5ub2trdS52MS5DcmVhdGVUYXJnZXRSZXF1ZXN0Gh4ubm9ra3UudjEuQ3JlYXRlVGFyZ2V0UmVzcG9uc2UiCMLzGAQYA0ABElUKDFVwZGF0ZVRhcmdldBIdLm5va2t1LnYxLlVwZGF0ZVRhcmdldFJlcXVlc3QaHi5ub2trdS52MS5VcGRhdGVUYXJnZXRSZXNwb25zZSIGwvMYAhgDElUKDERlbGV0ZVRhcmdldBIdLm5va2t1LnYxLkRlbGV0ZVRhcmdldFJlcXVlc3QaHi5ub2trdS52MS5EZWxldGVUYXJnZXRSZXNwb25zZSIGwvMYAhgDEmQKEEdldFN1YmplY3RBY2Nlc3MSIS5ub2trdS52MS5HZXRTdWJqZWN0QWNjZXNzUmVxdWVzdBoiLm5va2t1LnYxLkdldFN1YmplY3RBY2Nlc3NSZXNwb25zZSIJkAIBwvMYAhABEmQKEEdldFRhcmdldEZpbHRlcnMSIS5ub2trdS52MS5HZXRUYXJnZXRGaWx0ZXJzUmVxdWVzdBoiLm5va2t1LnYxLkdldFRhcmdldEZpbHRlcnNSZXNwb25zZSIJkAIBwvMYAhgCEl4KD1N5bmNUYXJnZXRVc2VycxIgLm5va2t1LnYxLlN5bmNUYXJnZXRVc2Vyc1JlcXVlc3QaIS5ub2trdS52MS5TeW5jVGFyZ2V0VXNlcnNSZXNwb25zZSIGwvMYAhgDEl4KDkdldEFjY2Vzc0dyYXBoEh8ubm9ra3UudjEuR2V0QWNjZXNzR3JhcGhSZXF1ZXN0GiAubm9ra3UudjEuR2V0QWNjZXNzR3JhcGhSZXNwb25zZSIJkAIBwvMYAhgCEnYKFkxpc3RBY2Nlc3NHcmFwaFRhcmdldHMSJy5ub2trdS52MS5MaXN0QWNjZXNzR3JhcGhUYXJnZXRzUmVxdWVzdBooLm5va2t1LnYxLkxpc3RBY2Nlc3NHcmFwaFRhcmdldHNSZXNwb25zZSIJkAIBwvMYAhgCEmEKD0dldEFjY2Vzc01hdHJpeBIgLm5va2t1LnYxLkdldEFjY2Vzc01hdHJpeFJlcXVlc3QaIS5ub2trdS52MS5HZXRBY2Nlc3NNYXRyaXhSZXNwb25zZSIJkAIBwvMYAhgCQowBCgxjb20ubm9ra3UudjFCC1RhcmdldFByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_certificates, file_nokku_v1_daemon, file_nokku_v1_join_token, file_nokku_v1_service_account, file_nokku_v1_target_account]);
 
 /**
  * @generated from message nokku.v1.SyncTargetUsersRequest
@@ -83,80 +83,87 @@ export type Target = Message<"nokku.v1.Target"> & {
   id: string;
 
   /**
-   * @generated from field: string daemon_id = 3;
+   * @generated from field: string daemon_id = 2;
    */
   daemonId: string;
 
   /**
-   * @generated from field: string name = 4;
+   * @generated from field: string name = 3;
    */
   name: string;
 
   /**
-   * @generated from field: string description = 5;
+   * @generated from field: string description = 4;
    */
   description: string;
 
   /**
    * pinned SSH host public key (manual mode)
    *
-   * @generated from field: string host_public_key = 6;
+   * @generated from field: string host_public_key = 5;
    */
   hostPublicKey: string;
 
   /**
-   * @generated from field: repeated string tags = 7;
+   * @generated from field: repeated string tags = 6;
    */
   tags: string[];
 
   /**
-   * @generated from field: repeated string endpoints = 8;
+   * @generated from field: repeated string endpoints = 7;
    */
   endpoints: string[];
 
   /**
-   * @generated from field: repeated string usernames = 9;
+   * @generated from field: repeated string usernames = 8;
    */
   usernames: string[];
 
   /**
-   * @generated from field: repeated nokku.v1.TargetAccount accounts = 10;
+   * @generated from field: repeated nokku.v1.TargetAccount accounts = 9;
    */
   accounts: TargetAccount[];
 
   /**
-   * @generated from field: map<string, string> metadata = 11;
+   * @generated from field: map<string, string> metadata = 10;
    */
   metadata: { [key: string]: string };
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 12;
+   * @generated from field: google.protobuf.Timestamp created_at = 11;
    */
   createdAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 13;
+   * @generated from field: google.protobuf.Timestamp updated_at = 12;
    */
   updatedAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp last_sync_at = 14;
+   * @generated from field: google.protobuf.Timestamp last_sync_at = 13;
    */
   lastSyncAt?: Timestamp | undefined;
 
   /**
    * username_expires_at holds the usernames the subject asked about may only use until then. The others are for good.
    *
-   * @generated from field: map<string, google.protobuf.Timestamp> username_expires_at = 15;
+   * @generated from field: map<string, google.protobuf.Timestamp> username_expires_at = 14;
    */
   usernameExpiresAt: { [key: string]: Timestamp };
 
   /**
    * blocked says why the subject's grants here let nobody in today. Unset when they work.
    *
-   * @generated from field: nokku.v1.AccessBlock blocked = 16;
+   * @generated from field: nokku.v1.AccessBlock blocked = 15;
    */
   blocked: AccessBlock;
+
+  /**
+   * daemon is the server's daemon with its live state, from ListTargets and GetTarget. Unset for nk sync servers.
+   *
+   * @generated from field: nokku.v1.Daemon daemon = 16;
+   */
+  daemon?: Daemon | undefined;
 };
 
 /**
@@ -207,32 +214,32 @@ export type CreateTargetRequest = Message<"nokku.v1.CreateTargetRequest"> & {
   /**
    * can be empty
    *
-   * @generated from field: string name = 2;
+   * @generated from field: string name = 1;
    */
   name: string;
 
   /**
-   * @generated from field: string description = 3;
+   * @generated from field: string description = 2;
    */
   description: string;
 
   /**
-   * @generated from field: string host_public_key = 4;
+   * @generated from field: string host_public_key = 3;
    */
   hostPublicKey: string;
 
   /**
-   * @generated from field: repeated string endpoints = 5;
+   * @generated from field: repeated string endpoints = 4;
    */
   endpoints: string[];
 
   /**
-   * @generated from field: repeated string tags = 6;
+   * @generated from field: repeated string tags = 5;
    */
   tags: string[];
 
   /**
-   * @generated from field: repeated nokku.v1.JoinTokenGrant grants = 7;
+   * @generated from field: repeated nokku.v1.JoinTokenGrant grants = 6;
    */
   grants: JoinTokenGrant[];
 };
@@ -271,34 +278,34 @@ export type UpdateTargetRequest = Message<"nokku.v1.UpdateTargetRequest"> & {
   id: string;
 
   /**
-   * @generated from field: string name = 3;
+   * @generated from field: string name = 2;
    */
   name: string;
 
   /**
-   * @generated from field: string description = 4;
+   * @generated from field: string description = 3;
    */
   description: string;
 
   /**
-   * @generated from field: string host_public_key = 5;
+   * @generated from field: string host_public_key = 4;
    */
   hostPublicKey: string;
 
   /**
-   * @generated from field: repeated string endpoints = 6;
+   * @generated from field: repeated string endpoints = 5;
    */
   endpoints: string[];
 
   /**
-   * @generated from field: repeated string tags = 7;
+   * @generated from field: repeated string tags = 6;
    */
   tags: string[];
 
   /**
    * update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
    *
-   * @generated from field: google.protobuf.FieldMask update_mask = 8;
+   * @generated from field: google.protobuf.FieldMask update_mask = 7;
    */
   updateMask?: FieldMask | undefined;
 };
@@ -382,14 +389,26 @@ export type ListTargetsRequest = Message<"nokku.v1.ListTargetsRequest"> & {
   daemonId: string;
 
   /**
-   * @generated from field: repeated string accounts = 6;
+   * @generated from field: repeated string accounts = 5;
    */
   accounts: string[];
 
   /**
-   * @generated from field: repeated string tags = 7;
+   * @generated from field: repeated string tags = 6;
    */
   tags: string[];
+
+  /**
+   * @generated from field: nokku.v1.TargetStatus status = 7;
+   */
+  status: TargetStatus;
+
+  /**
+   * ids keeps only these servers, like the ones a person picked.
+   *
+   * @generated from field: repeated string ids = 8;
+   */
+  ids: string[];
 };
 
 /**
@@ -849,6 +868,187 @@ export const AccessGraphTargetSchema: GenMessage<AccessGraphTarget> = /*@__PURE_
   messageDesc(file_nokku_v1_target, 27);
 
 /**
+ * @generated from message nokku.v1.GetAccessMatrixRequest
+ */
+export type GetAccessMatrixRequest = Message<"nokku.v1.GetAccessMatrixRequest"> & {
+  /**
+   * query matches the name or email of a row.
+   *
+   * @generated from field: string query = 1;
+   */
+  query: string;
+
+  /**
+   * kind keeps only people, teams or service accounts.
+   *
+   * @generated from field: nokku.v1.SubjectKind kind = 2;
+   */
+  kind: SubjectKind;
+
+  /**
+   * tags are the columns, the biggest ones when empty. An empty tag is the servers with none.
+   *
+   * @generated from field: repeated string tags = 3;
+   */
+  tags: string[];
+
+  /**
+   * @generated from field: int32 limit = 4;
+   */
+  limit: number;
+
+  /**
+   * @generated from field: int32 offset = 5;
+   */
+  offset: number;
+};
+
+/**
+ * Describes the message nokku.v1.GetAccessMatrixRequest.
+ * Use `create(GetAccessMatrixRequestSchema)` to create a new message.
+ */
+export const GetAccessMatrixRequestSchema: GenMessage<GetAccessMatrixRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_target, 28);
+
+/**
+ * @generated from message nokku.v1.GetAccessMatrixResponse
+ */
+export type GetAccessMatrixResponse = Message<"nokku.v1.GetAccessMatrixResponse"> & {
+  /**
+   * columns are the tags the cells are for, in order.
+   *
+   * @generated from field: repeated nokku.v1.AccessGraphTag columns = 1;
+   */
+  columns: AccessGraphTag[];
+
+  /**
+   * @generated from field: repeated nokku.v1.AccessMatrixRow rows = 2;
+   */
+  rows: AccessMatrixRow[];
+
+  /**
+   * total counts every row that matches, not only this page.
+   *
+   * @generated from field: int32 total = 3;
+   */
+  total: number;
+
+  /**
+   * tags is every tag with its servers, to pick other columns from.
+   *
+   * @generated from field: repeated nokku.v1.AccessGraphTag tags = 4;
+   */
+  tags: AccessGraphTag[];
+};
+
+/**
+ * Describes the message nokku.v1.GetAccessMatrixResponse.
+ * Use `create(GetAccessMatrixResponseSchema)` to create a new message.
+ */
+export const GetAccessMatrixResponseSchema: GenMessage<GetAccessMatrixResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_target, 29);
+
+/**
+ * AccessMatrixRow is a person, team or service account holding a grant. A team's members get in through its row.
+ *
+ * @generated from message nokku.v1.AccessMatrixRow
+ */
+export type AccessMatrixRow = Message<"nokku.v1.AccessMatrixRow"> & {
+  /**
+   * @generated from field: string subject_id = 1;
+   */
+  subjectId: string;
+
+  /**
+   * @generated from field: nokku.v1.SubjectKind kind = 2;
+   */
+  kind: SubjectKind;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * people only
+   *
+   * @generated from field: string email = 4;
+   */
+  email: string;
+
+  /**
+   * teams only
+   *
+   * @generated from field: int32 member_count = 5;
+   */
+  memberCount: number;
+
+  /**
+   * every server the row reaches, any tag
+   *
+   * @generated from field: int32 targets = 6;
+   */
+  targets: number;
+
+  /**
+   * only the columns it reaches, in no order
+   *
+   * @generated from field: repeated nokku.v1.AccessMatrixCell cells = 7;
+   */
+  cells: AccessMatrixCell[];
+};
+
+/**
+ * Describes the message nokku.v1.AccessMatrixRow.
+ * Use `create(AccessMatrixRowSchema)` to create a new message.
+ */
+export const AccessMatrixRowSchema: GenMessage<AccessMatrixRow> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_target, 30);
+
+/**
+ * @generated from message nokku.v1.AccessMatrixCell
+ */
+export type AccessMatrixCell = Message<"nokku.v1.AccessMatrixCell"> & {
+  /**
+   * @generated from field: string tag = 1;
+   */
+  tag: string;
+
+  /**
+   * servers with the tag it reaches
+   *
+   * @generated from field: int32 targets = 2;
+   */
+  targets: number;
+
+  /**
+   * @generated from field: repeated string usernames = 3;
+   */
+  usernames: string[];
+
+  /**
+   * expires_at is when the last of its grants here ends. Unset when one is for good.
+   *
+   * @generated from field: google.protobuf.Timestamp expires_at = 4;
+   */
+  expiresAt?: Timestamp | undefined;
+
+  /**
+   * last_used_at is the newest certificate for one of these servers, by the row or a member of its team.
+   *
+   * @generated from field: google.protobuf.Timestamp last_used_at = 5;
+   */
+  lastUsedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message nokku.v1.AccessMatrixCell.
+ * Use `create(AccessMatrixCellSchema)` to create a new message.
+ */
+export const AccessMatrixCellSchema: GenMessage<AccessMatrixCell> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_target, 31);
+
+/**
  * AccessBlock is why grants that stand let nobody in today.
  *
  * @generated from enum nokku.v1.AccessBlock
@@ -879,6 +1079,50 @@ export enum AccessBlock {
  */
 export const AccessBlockSchema: GenEnum<AccessBlock> = /*@__PURE__*/
   enumDesc(file_nokku_v1_target, 0);
+
+/**
+ * TargetStatus is what a server's daemon is up to, or that it has none.
+ *
+ * @generated from enum nokku.v1.TargetStatus
+ */
+export enum TargetStatus {
+  /**
+   * @generated from enum value: TARGET_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Its daemon waits for approval or was rejected.
+   *
+   * @generated from enum value: TARGET_STATUS_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: TARGET_STATUS_ONLINE = 2;
+   */
+  ONLINE = 2,
+
+  /**
+   * Its daemon is approved but not connected.
+   *
+   * @generated from enum value: TARGET_STATUS_OFFLINE = 3;
+   */
+  OFFLINE = 3,
+
+  /**
+   * Set up with nk sync, no daemon.
+   *
+   * @generated from enum value: TARGET_STATUS_MANUAL = 4;
+   */
+  MANUAL = 4,
+}
+
+/**
+ * Describes the enum nokku.v1.TargetStatus.
+ */
+export const TargetStatusSchema: GenEnum<TargetStatus> = /*@__PURE__*/
+  enumDesc(file_nokku_v1_target, 1);
 
 /**
  * @generated from service nokku.v1.TargetService
@@ -963,6 +1207,16 @@ export const TargetService: GenService<{
     methodKind: "unary";
     input: typeof ListAccessGraphTargetsRequestSchema;
     output: typeof ListAccessGraphTargetsResponseSchema;
+  },
+  /**
+   * GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
+   *
+   * @generated from rpc nokku.v1.TargetService.GetAccessMatrix
+   */
+  getAccessMatrix: {
+    methodKind: "unary";
+    input: typeof GetAccessMatrixRequestSchema;
+    output: typeof GetAccessMatrixResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_nokku_v1_target, 0);

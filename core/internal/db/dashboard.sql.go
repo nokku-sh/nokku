@@ -127,42 +127,124 @@ func (q *Queries) DashboardCounts(ctx context.Context, connected []string) (*Das
 	return &i, err
 }
 
-const listOfflineDaemons = `-- name: ListOfflineDaemons :many
+const listEndingGrants = `-- name: ListEndingGrants :many
 SELECT
-  id, workspace_id, join_token_id, name, key_thumbprint, version, status, config, retire_after, last_seen_at, created_at, updated_at
+  g.subject_kind::TEXT AS subject_kind,
+  g.subject_id,
+  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, '')::TEXT AS subject_name,
+  p.username,
+  g.expires_at::TIMESTAMPTZ AS expires_at,
+  (array_agg(t.id ORDER BY t.name))[1:20]::UUID[] AS target_ids,
+  (array_agg(t.name ORDER BY t.name))[1:20]::TEXT[] AS target_names,
+  COUNT(*)::INTEGER AS target_count,
+  (COUNT(*) OVER ())::INTEGER AS total
 FROM
-  daemons
+  live_grants g
+  JOIN target_accounts p ON p.id = g.account_id
+  JOIN targets t ON t.id = p.target_id
+  LEFT JOIN users u ON u.id = g.user_id
+  LEFT JOIN teams m ON m.id = g.team_id
+  LEFT JOIN service_accounts s ON s.id = g.service_account_id
 WHERE
-  status = 2 -- accepted
-  AND NOT COALESCE(id = ANY ($1::UUID[]), FALSE)
+  g.expires_at <= NOW() + INTERVAL '24 hours'
+  AND COALESCE(u.active, TRUE)
+GROUP BY
+  g.subject_kind,
+  g.subject_id,
+  subject_name,
+  p.username,
+  g.expires_at
 ORDER BY
-  id ASC
+  g.expires_at,
+  subject_name
 LIMIT
   5
 `
 
-func (q *Queries) ListOfflineDaemons(ctx context.Context, connected []string) ([]*Daemon, error) {
-	rows, err := q.db.Query(ctx, listOfflineDaemons, connected)
+type ListEndingGrantsRow struct {
+	SubjectKind string    `json:"subjectKind"`
+	SubjectID   string    `json:"subjectId"`
+	SubjectName string    `json:"subjectName"`
+	Username    string    `json:"username"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+	TargetIds   []string  `json:"targetIds"`
+	TargetNames []string  `json:"targetNames"`
+	TargetCount int32     `json:"targetCount"`
+	Total       int32     `json:"total"`
+}
+
+// Grants given in one go share their end, so they come back as one row with its first 20 servers.
+func (q *Queries) ListEndingGrants(ctx context.Context) ([]*ListEndingGrantsRow, error) {
+	rows, err := q.db.Query(ctx, listEndingGrants)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*Daemon
+	var items []*ListEndingGrantsRow
 	for rows.Next() {
-		var i Daemon
+		var i ListEndingGrantsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.JoinTokenID,
-			&i.Name,
-			&i.KeyThumbprint,
-			&i.Version,
-			&i.Status,
-			&i.Config,
-			&i.RetireAfter,
-			&i.LastSeenAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.SubjectKind,
+			&i.SubjectID,
+			&i.SubjectName,
+			&i.Username,
+			&i.ExpiresAt,
+			&i.TargetIds,
+			&i.TargetNames,
+			&i.TargetCount,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOfflineTargets = `-- name: ListOfflineTargets :many
+SELECT
+  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_at, t.updated_at
+FROM
+  daemons d
+  JOIN targets t ON t.daemon_id = d.id
+WHERE
+  d.status = 2 -- accepted
+  AND NOT COALESCE(d.id = ANY ($1::UUID[]), FALSE)
+ORDER BY
+  d.id ASC
+LIMIT
+  5
+`
+
+type ListOfflineTargetsRow struct {
+	Target Target `json:"target"`
+}
+
+func (q *Queries) ListOfflineTargets(ctx context.Context, connected []string) ([]*ListOfflineTargetsRow, error) {
+	rows, err := q.db.Query(ctx, listOfflineTargets, connected)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListOfflineTargetsRow
+	for rows.Next() {
+		var i ListOfflineTargetsRow
+		if err := rows.Scan(
+			&i.Target.ID,
+			&i.Target.WorkspaceID,
+			&i.Target.DaemonID,
+			&i.Target.Name,
+			&i.Target.Description,
+			&i.Target.Endpoints,
+			&i.Target.HostPublicKey,
+			&i.Target.Tags,
+			&i.Target.Metadata,
+			&i.Target.LastSyncAt,
+			&i.Target.CreatedAt,
+			&i.Target.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -180,10 +262,11 @@ SELECT
   d.id AS daemon_id,
   r.username,
   r.started_at,
-  d.name AS daemon_name
+  t.name AS daemon_name
 FROM
   recordings r
   JOIN daemons d ON d.id = r.daemon_id
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
   r.ended_at IS NULL
   AND r.started_at > NOW() - INTERVAL '24 hours'
@@ -231,40 +314,47 @@ func (q *Queries) ListOpenRecordings(ctx context.Context, connected []string) ([
 
 const listPendingDaemons = `-- name: ListPendingDaemons :many
 SELECT
-  id, workspace_id, join_token_id, name, key_thumbprint, version, status, config, retire_after, last_seen_at, created_at, updated_at
+  d.id, d.workspace_id, d.join_token_id, d.key_thumbprint, d.version, d.status, d.config, d.retire_after, d.last_seen_at, d.created_at, d.updated_at,
+  t.name
 FROM
-  daemons
+  daemons d
+  JOIN targets t ON t.daemon_id = d.id
 WHERE
-  status = 1 -- pending
+  d.status = 1 -- pending
 ORDER BY
-  id DESC
+  d.id DESC
 LIMIT
   5
 `
 
+type ListPendingDaemonsRow struct {
+	Daemon Daemon `json:"daemon"`
+	Name   string `json:"name"`
+}
+
 // The id is a uuidv7, so this is newest first.
-func (q *Queries) ListPendingDaemons(ctx context.Context) ([]*Daemon, error) {
+func (q *Queries) ListPendingDaemons(ctx context.Context) ([]*ListPendingDaemonsRow, error) {
 	rows, err := q.db.Query(ctx, listPendingDaemons)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*Daemon
+	var items []*ListPendingDaemonsRow
 	for rows.Next() {
-		var i Daemon
+		var i ListPendingDaemonsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.JoinTokenID,
+			&i.Daemon.ID,
+			&i.Daemon.WorkspaceID,
+			&i.Daemon.JoinTokenID,
+			&i.Daemon.KeyThumbprint,
+			&i.Daemon.Version,
+			&i.Daemon.Status,
+			&i.Daemon.Config,
+			&i.Daemon.RetireAfter,
+			&i.Daemon.LastSeenAt,
+			&i.Daemon.CreatedAt,
+			&i.Daemon.UpdatedAt,
 			&i.Name,
-			&i.KeyThumbprint,
-			&i.Version,
-			&i.Status,
-			&i.Config,
-			&i.RetireAfter,
-			&i.LastSeenAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

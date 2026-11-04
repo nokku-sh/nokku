@@ -99,6 +99,33 @@ func (s *workspaceService) UpdateWorkspace(
 	return &nokkuv1.UpdateWorkspaceResponse{Workspace: workspace.ToProto()}, nil
 }
 
+func (s *workspaceService) UpdateDaemonDefaults(
+	ctx context.Context,
+	req *nokkuv1.UpdateDaemonDefaultsRequest,
+) (*nokkuv1.UpdateDaemonDefaultsResponse, error) {
+	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
+		return nil, err
+	}
+	var workspace *db.Workspace
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		// Locked like UpdateWorkspace, both write the same settings.
+		base, err := q.GetWorkspaceForUpdate(ctx)
+		if err != nil {
+			return err
+		}
+		base.Settings = cmp.Or(base.Settings, &nokkuv1.WorkspaceSettings{})
+		mergeSet(base.Settings.ProtoReflect(), (&nokkuv1.WorkspaceSettings{
+			DefaultDaemonConfig: req.GetDefaultDaemonConfig(),
+			SessionIdleTimeout:  req.GetSessionIdleTimeout(),
+		}).ProtoReflect())
+		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{Settings: base.Settings})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.UpdateDaemonDefaultsResponse{Workspace: workspace.ToProto()}, nil
+}
+
 // DeleteWorkspace is hosted only, a self-hosted server serves nothing else.
 func (s *workspaceService) DeleteWorkspace(
 	ctx context.Context,
@@ -228,6 +255,9 @@ func (s *workspaceService) UpdateUserRole(
 		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
 			return err
 		}
+		if err := auditName(ctx, q, "name", req.GetUserId()); err != nil {
+			return err
+		}
 		return q.UpdateUserRole(
 			ctx,
 			&db.UpdateUserRoleParams{ID: req.GetUserId(), Role: req.GetRole()},
@@ -243,9 +273,17 @@ func (s *workspaceService) SetUserActive(
 	ctx context.Context,
 	req *nokkuv1.SetUserActiveRequest,
 ) (*nokkuv1.SetUserActiveResponse, error) {
-	audit.Set(ctx, "active", req.GetActive())
+	// The same actions SCIM records, so the log reads the same whoever did it.
+	action := "UserDeactivated"
+	if req.GetActive() {
+		action = "UserActivated"
+	}
+	audit.SetAction(ctx, action)
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
+			return err
+		}
+		if err := auditName(ctx, q, "name", req.GetUserId()); err != nil {
 			return err
 		}
 		_, err := s.cfg.IAM.SetUserActive(ctx, q, req.GetUserId(), req.GetActive())
@@ -268,6 +306,9 @@ func (s *workspaceService) DeleteUser(
 ) (*nokkuv1.DeleteUserResponse, error) {
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
+			return err
+		}
+		if err := auditName(ctx, q, "name", req.GetUserId()); err != nil {
 			return err
 		}
 		return q.DeleteUser(ctx, req.GetUserId())

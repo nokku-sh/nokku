@@ -2,13 +2,21 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
-	import { eventLabel, outcomeLabel, outcomeOf, setParams } from '#lib/components/audit/audit.js';
+	import {
+		eventLabel,
+		eventWhat,
+		outcomeLabel,
+		outcomeOf,
+		setParams
+	} from '#lib/components/audit/audit.js';
 	import EventIcon from '#lib/components/audit/EventIcon.svelte';
 
 	let { log }: { log: EventLog } = $props();
 
 	const outcome = $derived(outcomeOf(log));
 	const code = $derived(log.details?.['code'] as string | undefined);
+	// Older events stored only the id, they show it as before.
+	const what = $derived(eventWhat(log));
 </script>
 
 <div class="flex min-w-0 items-center gap-2.5">
@@ -32,11 +40,14 @@
 		{#if log.target}
 			<button
 				type="button"
-				class="max-w-64 truncate rounded-sm text-left font-mono text-xs text-muted-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-2 hover:text-foreground hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-				title="Show only events for this target"
+				class={[
+					'max-w-80 truncate rounded-sm text-left text-xs text-muted-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-2 hover:text-foreground hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+					!what && 'font-mono'
+				]}
+				title={`Show only events about this (${log.target})`}
 				onclick={() => setParams({ target: log.target })}
 			>
-				{log.target}
+				{what ?? log.target}
 			</button>
 		{/if}
 	</div>

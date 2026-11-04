@@ -9,6 +9,10 @@ import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import { file_nokku_v1_access } from "./access_pb";
 import type { Daemon } from "./daemon_pb";
 import { file_nokku_v1_daemon } from "./daemon_pb";
+import type { Target } from "./target_pb";
+import { file_nokku_v1_target } from "./target_pb";
+import type { SubjectKind } from "./target_account_pb";
+import { file_nokku_v1_target_account } from "./target_account_pb";
 import type { EventLog } from "./util_pb";
 import { file_nokku_v1_util } from "./util_pb";
 import type { Message } from "@bufbuild/protobuf";
@@ -17,7 +21,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/dashboard.proto.
  */
 export const file_nokku_v1_dashboard: GenFile = /*@__PURE__*/
-  fileDesc("Chhub2trdS92MS9kYXNoYm9hcmQucHJvdG8SCG5va2t1LnYxIrQBCgtMaXZlU2Vzc2lvbhIKCgJpZBgBIAEoCRIRCglkYWVtb25faWQYAiABKAkSEwoLZGFlbW9uX25hbWUYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSDwoHdXNlcl9pZBgFIAEoCRIRCglyZWNvcmRpbmcYBiABKAgSCwoDd2ViGAcgASgIEi4KCnN0YXJ0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIhUKE0dldERhc2hib2FyZFJlcXVlc3QiswMKFEdldERhc2hib2FyZFJlc3BvbnNlEg8KB3RhcmdldHMYASABKAUSFgoOdGFyZ2V0c19vbmxpbmUYAiABKAUSFgoOdGFyZ2V0c19tYW51YWwYAyABKAUSDwoHZGFlbW9ucxgEIAEoBRIWCg5kYWVtb25zX29ubGluZRgFIAEoBRIpCg9wZW5kaW5nX2RhZW1vbnMYBiADKAsyEC5ub2trdS52MS5EYWVtb24SKQoPb2ZmbGluZV9kYWVtb25zGAcgAygLMhAubm9ra3UudjEuRGFlbW9uEg0KBXVzZXJzGAggASgFEhcKD3JlY29yZGluZ19ieXRlcxgJIAEoAxIdChVyZWNvcmRpbmdfcXVvdGFfYnl0ZXMYCiABKAMSLAoNbGl2ZV9zZXNzaW9ucxgLIAMoCzIVLm5va2t1LnYxLkxpdmVTZXNzaW9uEhAKCGFjdGl2aXR5GAwgAygFEhAKCGZhaWx1cmVzGA0gAygFEioKDnJlY2VudF9jaGFuZ2VzGA4gAygLMhIubm9ra3UudjEuRXZlbnRMb2cSFgoOZGFlbW9uc19iZWhpbmQYDyABKAUybAoQRGFzaGJvYXJkU2VydmljZRJYCgxHZXREYXNoYm9hcmQSHS5ub2trdS52MS5HZXREYXNoYm9hcmRSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0RGFzaGJvYXJkUmVzcG9uc2UiCZACAcLzGAIYAkKPAQoMY29tLm5va2t1LnYxQg5EYXNoYm9hcmRQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_daemon, file_nokku_v1_util]);
+  fileDesc("Chhub2trdS92MS9kYXNoYm9hcmQucHJvdG8SCG5va2t1LnYxIrQBCgtMaXZlU2Vzc2lvbhIKCgJpZBgBIAEoCRIRCglkYWVtb25faWQYAiABKAkSEwoLZGFlbW9uX25hbWUYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSDwoHdXNlcl9pZBgFIAEoCRIRCglyZWNvcmRpbmcYBiABKAgSCwoDd2ViGAcgASgIEi4KCnN0YXJ0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIo8CCgtFbmRpbmdHcmFudBIrCgxzdWJqZWN0X2tpbmQYASABKA4yFS5ub2trdS52MS5TdWJqZWN0S2luZBISCgpzdWJqZWN0X2lkGAIgASgJEhQKDHN1YmplY3RfbmFtZRgDIAEoCRIQCgh1c2VybmFtZRgEIAEoCRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCgd0YXJnZXRzGAYgAygLMhwubm9ra3UudjEuRW5kaW5nR3JhbnQuVGFyZ2V0EhQKDHRhcmdldF9jb3VudBgHIAEoBRoiCgZUYXJnZXQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCSIVChNHZXREYXNoYm9hcmRSZXF1ZXN0Iv4DChRHZXREYXNoYm9hcmRSZXNwb25zZRIPCgd0YXJnZXRzGAEgASgFEhYKDnRhcmdldHNfb25saW5lGAIgASgFEhYKDnRhcmdldHNfbWFudWFsGAMgASgFEg8KB2RhZW1vbnMYBCABKAUSFgoOZGFlbW9uc19vbmxpbmUYBSABKAUSKQoPcGVuZGluZ19kYWVtb25zGAYgAygLMhAubm9ra3UudjEuRGFlbW9uEikKD29mZmxpbmVfc2VydmVycxgHIAMoCzIQLm5va2t1LnYxLlRhcmdldBINCgV1c2VycxgIIAEoBRIXCg9yZWNvcmRpbmdfYnl0ZXMYCSABKAMSHQoVcmVjb3JkaW5nX3F1b3RhX2J5dGVzGAogASgDEiwKDWxpdmVfc2Vzc2lvbnMYCyADKAsyFS5ub2trdS52MS5MaXZlU2Vzc2lvbhIQCghhY3Rpdml0eRgMIAMoBRIQCghmYWlsdXJlcxgNIAMoBRIqCg5yZWNlbnRfY2hhbmdlcxgOIAMoCzISLm5va2t1LnYxLkV2ZW50TG9nEhYKDmRhZW1vbnNfYmVoaW5kGA8gASgFEiwKDWVuZGluZ19ncmFudHMYECADKAsyFS5ub2trdS52MS5FbmRpbmdHcmFudBIbChNlbmRpbmdfZ3JhbnRzX3RvdGFsGBEgASgFMmwKEERhc2hib2FyZFNlcnZpY2USWAoMR2V0RGFzaGJvYXJkEh0ubm9ra3UudjEuR2V0RGFzaGJvYXJkUmVxdWVzdBoeLm5va2t1LnYxLkdldERhc2hib2FyZFJlc3BvbnNlIgmQAgHC8xgCGAJCjwEKDGNvbS5ub2trdS52MUIORGFzaGJvYXJkUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_daemon, file_nokku_v1_target, file_nokku_v1_target_account, file_nokku_v1_util]);
 
 /**
  * @generated from message nokku.v1.LiveSession
@@ -72,6 +76,79 @@ export const LiveSessionSchema: GenMessage<LiveSession> = /*@__PURE__*/
   messageDesc(file_nokku_v1_dashboard, 0);
 
 /**
+ * EndingGrant is a subject's grants on one account that end at the same time, usually given in one go.
+ *
+ * @generated from message nokku.v1.EndingGrant
+ */
+export type EndingGrant = Message<"nokku.v1.EndingGrant"> & {
+  /**
+   * @generated from field: nokku.v1.SubjectKind subject_kind = 1;
+   */
+  subjectKind: SubjectKind;
+
+  /**
+   * @generated from field: string subject_id = 2;
+   */
+  subjectId: string;
+
+  /**
+   * @generated from field: string subject_name = 3;
+   */
+  subjectName: string;
+
+  /**
+   * @generated from field: string username = 4;
+   */
+  username: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 5;
+   */
+  expiresAt?: Timestamp | undefined;
+
+  /**
+   * the first 20 by name, target_count has them all
+   *
+   * @generated from field: repeated nokku.v1.EndingGrant.Target targets = 6;
+   */
+  targets: EndingGrant_Target[];
+
+  /**
+   * @generated from field: int32 target_count = 7;
+   */
+  targetCount: number;
+};
+
+/**
+ * Describes the message nokku.v1.EndingGrant.
+ * Use `create(EndingGrantSchema)` to create a new message.
+ */
+export const EndingGrantSchema: GenMessage<EndingGrant> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_dashboard, 1);
+
+/**
+ * @generated from message nokku.v1.EndingGrant.Target
+ */
+export type EndingGrant_Target = Message<"nokku.v1.EndingGrant.Target"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message nokku.v1.EndingGrant.Target.
+ * Use `create(EndingGrant_TargetSchema)` to create a new message.
+ */
+export const EndingGrant_TargetSchema: GenMessage<EndingGrant_Target> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_dashboard, 1, 0);
+
+/**
  * @generated from message nokku.v1.GetDashboardRequest
  */
 export type GetDashboardRequest = Message<"nokku.v1.GetDashboardRequest"> & {
@@ -82,7 +159,7 @@ export type GetDashboardRequest = Message<"nokku.v1.GetDashboardRequest"> & {
  * Use `create(GetDashboardRequestSchema)` to create a new message.
  */
 export const GetDashboardRequestSchema: GenMessage<GetDashboardRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_dashboard, 1);
+  messageDesc(file_nokku_v1_dashboard, 2);
 
 /**
  * @generated from message nokku.v1.GetDashboardResponse
@@ -119,9 +196,11 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   pendingDaemons: Daemon[];
 
   /**
-   * @generated from field: repeated nokku.v1.Daemon offline_daemons = 7;
+   * with their daemons, approved but not connected
+   *
+   * @generated from field: repeated nokku.v1.Target offline_servers = 7;
    */
-  offlineDaemons: Daemon[];
+  offlineServers: Target[];
 
   /**
    * @generated from field: int32 users = 8;
@@ -162,6 +241,18 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
    * @generated from field: int32 daemons_behind = 15;
    */
   daemonsBehind: number;
+
+  /**
+   * the next five to end within a day
+   *
+   * @generated from field: repeated nokku.v1.EndingGrant ending_grants = 16;
+   */
+  endingGrants: EndingGrant[];
+
+  /**
+   * @generated from field: int32 ending_grants_total = 17;
+   */
+  endingGrantsTotal: number;
 };
 
 /**
@@ -169,7 +260,7 @@ export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
  * Use `create(GetDashboardResponseSchema)` to create a new message.
  */
 export const GetDashboardResponseSchema: GenMessage<GetDashboardResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_dashboard, 2);
+  messageDesc(file_nokku_v1_dashboard, 3);
 
 /**
  * @generated from service nokku.v1.DashboardService

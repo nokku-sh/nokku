@@ -12,8 +12,6 @@
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import { Copy, Search, Server, SquareTerminal } from '@lucide/svelte';
 
-	let { showAll = false }: { showAll?: boolean } = $props();
-
 	const LIMIT = 9;
 
 	const connect = useConnect();
@@ -113,10 +111,7 @@
 			</div>
 			{#if !query && servers.length > LIMIT}
 				<p class="mt-3 text-xs text-muted-foreground">
-					{servers.length - LIMIT} more, filter to find them{#if showAll}, or
-						<a href="/infrastructure/targets" class="text-primary hover:underline"
-							>see all targets</a
-						>{/if}.
+					{servers.length - LIMIT} more, filter to find them.
 				</p>
 			{/if}
 		{/if}

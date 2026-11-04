@@ -11,59 +11,54 @@
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
-	import { Ellipsis, KeyRound, Plus, Search, SquareTerminal, Trash2 } from '@lucide/svelte';
-	import { SvelteMap } from 'svelte/reactivity';
-	import GrantLength from './GrantLength.svelte';
+	import {
+		Ellipsis,
+		KeyRound,
+		Plus,
+		Search,
+		SquareTerminal,
+		Trash2,
+		UserPlus
+	} from '@lucide/svelte';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { openGrant } from './grant.svelte';
 	import SubjectChip from './SubjectChip.svelte';
-	import SubjectPicker from './SubjectPicker.svelte';
-	import { grantEnd, grantsOf, kindLabels, type Subject, type SubjectRef } from './subjects.svelte';
+	import { grantsOf, kindLabels, type SubjectRef } from './subjects.svelte';
 
 	interface Props {
 		targetId: string;
+		name: string;
 		/** Accounts come from `nk sync` instead of a daemon. */
 		manual?: boolean;
 	}
 
-	let { targetId, manual = false }: Props = $props();
+	let { targetId, name, manual = false }: Props = $props();
 
 	const can = user.can();
 	const accounts = accountApi.list(() => ({ targetId, limit: MAX_PAGE_SIZE }));
-	const addSubjects = accountApi.addSubjects();
 	const removeSubjects = accountApi.removeSubjects();
 	const addAccount = accountApi.addAccount();
 	const removeAccount = accountApi.removeAccount();
 
-	// Pending grants and revokes, shown right away until the refetch lands.
-	const pending = new SvelteMap<string, SubjectRef | null>();
+	// Revokes leave the list right away, before the refetch lands.
+	const revoking = new SvelteSet<string>();
 	const key = (p: TargetAccount, id: string) => `${p.id}:${id}`;
 
-	function granted(p: TargetAccount): SubjectRef[] {
-		const server = grantsOf(p).filter((g) => pending.get(key(p, g.id)) !== null);
-		const added = [...pending]
-			.filter(([k, g]) => g && k.startsWith(`${p.id}:`) && !server.some((s) => s.id === g.id))
-			.map(([, g]) => g as SubjectRef);
-		return [...server, ...added];
-	}
+	const granted = (p: TargetAccount): SubjectRef[] =>
+		grantsOf(p).filter((g) => !revoking.has(key(p, g.id)));
 
-	// Hours a grant made here lasts, 0 is for good.
-	let hours = $state(0);
-
-	async function toggle(p: TargetAccount, subject: Pick<Subject, 'id' | 'kind'>, grant: boolean) {
-		const k = key(p, subject.id);
-		const expiresAt = grant ? grantEnd(hours) : undefined;
-		pending.set(
-			k,
-			grant ? { id: subject.id, kind: subject.kind, subject: subject as Subject, expiresAt } : null
-		);
-		const change = { id: p.id, subjectIds: [subject.id], kind: subject.kind };
+	async function revoke(p: TargetAccount, grant: SubjectRef) {
+		const k = key(p, grant.id);
+		revoking.add(k);
 		try {
-			await (grant
-				? addSubjects.mutateAsync({ ...change, expiresAt })
-				: removeSubjects.mutateAsync(change));
+			await removeSubjects.mutateAsync({ id: p.id, subjectIds: [grant.id], kind: grant.kind });
 		} finally {
-			pending.delete(k);
+			revoking.delete(k);
 		}
 	}
+
+	const grantOn = (p: TargetAccount) =>
+		openGrant({ servers: [{ id: targetId, name }], account: p.username });
 
 	function summary(grants: SubjectRef[]) {
 		if (!grants.length) return 'Nobody can use it yet';
@@ -109,9 +104,6 @@
 	<p class="text-sm text-muted-foreground">
 		People log in as one of these accounts. Grant a team and every member gets it.
 	</p>
-	{#if can.edit && list.length}
-		<GrantLength bind:hours />
-	{/if}
 
 	{#if list.length > 6}
 		<InputGroup.Root>
@@ -177,12 +169,10 @@
 						<p class="truncate text-xs text-muted-foreground">{summary(grants)}</p>
 					</div>
 					{#if can.edit}
-						<SubjectPicker
-							selected={grants.map((g) => g.id)}
-							onToggle={(s, grant) => toggle(account, s, grant)}
-							label="Grant"
-							variant="ghost"
-						/>
+						<Button variant="ghost" size="sm" onclick={() => grantOn(account)}>
+							<UserPlus data-icon="inline-start" />
+							Grant
+						</Button>
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger>
 								{#snippet child({ props })}
@@ -208,10 +198,7 @@
 				{#if grants.length}
 					<div class="flex flex-wrap gap-1.5 border-t bg-muted/40 px-3 py-2.5">
 						{#each grants as grant (grant.id)}
-							<SubjectChip
-								{grant}
-								onRemove={can.edit ? () => toggle(account, grant, false) : undefined}
-							/>
+							<SubjectChip {grant} onRemove={can.edit ? () => revoke(account, grant) : undefined} />
 						{/each}
 					</div>
 				{/if}

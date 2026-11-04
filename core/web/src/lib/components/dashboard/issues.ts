@@ -13,16 +13,17 @@ export type Issue = {
 	approve?: Daemon[];
 };
 
-/** The one line that sums the issues up. Undefined issues means still loading, fresh means nothing is enrolled yet. */
+/** Sums up the issues and waiting requests. Undefined issues is still loading, fresh is nothing enrolled yet. */
 export function headline(
 	issues: Issue[] | undefined,
-	fresh = false
+	fresh = false,
+	requests = 0
 ): { mark: string; text: string; tone: Tone } {
 	if (!issues) return { mark: '…', text: 'checking', tone: 'muted' };
-	if (!issues.length && fresh) return { mark: '○', text: 'no servers yet', tone: 'info' };
-	if (!issues.length) return { mark: '●', text: 'all good', tone: 'success' };
-	const n = issues.length;
-	const bad = issues[0].tone === 'destructive';
+	const n = issues.length + requests;
+	if (!n && fresh) return { mark: '○', text: 'no servers yet', tone: 'info' };
+	if (!n) return { mark: '●', text: 'all good', tone: 'success' };
+	const bad = issues[0]?.tone === 'destructive';
 	return {
 		mark: bad ? '✖' : '▲',
 		text: `${n} ${n === 1 ? 'thing needs' : 'things need'} you`,
@@ -52,22 +53,23 @@ export function issuesOf(d: GetDashboardResponse): Issue[] {
 		issues.push({
 			id: 'pending',
 			tone: 'warning',
-			title: `${n} ${n === 1 ? 'daemon waits' : 'daemons wait'} for approval`,
-			detail: 'They cannot serve targets until someone approves them.',
-			href: '/infrastructure/daemons',
+			title: `${n} ${n === 1 ? 'server waits' : 'servers wait'} for approval`,
+			detail: 'Their daemons enrolled. Nobody can log in to them until someone approves them.',
+			href: '/servers?status=pending',
 			approve: d.pendingDaemons
 		});
 	}
 
-	for (const daemon of d.offlineDaemons) {
+	for (const server of d.offlineServers) {
+		const seen = server.daemon?.lastSeenAt;
 		issues.push({
-			id: `offline-${daemon.id}`,
+			id: `offline-${server.id}`,
 			tone: 'destructive',
-			title: `${daemon.name} is offline`,
-			detail: daemon.lastSeenAt
-				? `Last seen ${formatTs(daemon.lastSeenAt, 'relative')}. Its targets are unreachable.`
+			title: `${server.name} is offline`,
+			detail: seen
+				? `Last seen ${formatTs(seen, 'relative')}. Nobody can log in through its daemon.`
 				: 'It never connected. Check that nokkud runs on the host.',
-			href: `/infrastructure/daemons?id=${daemon.id}`
+			href: `/servers?id=${server.id}`
 		});
 	}
 

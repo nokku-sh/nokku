@@ -12,10 +12,10 @@
 	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { AccessBlock, type Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Clock, Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';
+	import { Clock, Plus, Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import GrantPopover from './GrantPopover.svelte';
-	import { kindLabels, subjectIds } from './subjects.svelte';
+	import { openGrant } from './grant.svelte';
+	import { kindLabels, subjectIds, type Subject } from './subjects.svelte';
 
 	interface Props {
 		subjectId: string;
@@ -24,6 +24,8 @@
 	}
 
 	let { subjectId, kind, name }: Props = $props();
+
+	const self = $derived<Subject>({ id: subjectId, kind, name, detail: '' });
 
 	const PAGE = 30;
 	const can = user.can();
@@ -95,7 +97,7 @@
 		<p class="text-sm text-muted-foreground">
 			{#if usable.length}
 				{name} can log in to <span class="font-medium text-foreground">{usable.length}</span>
-				{usable.length === 1 ? 'target' : 'targets'} with
+				{usable.length === 1 ? 'server' : 'servers'} with
 				<span class="font-medium text-foreground">{accountCount}</span>
 				{accountCount === 1 ? 'login account' : 'login accounts'}.
 				{#if targets.length > usable.length}
@@ -104,7 +106,7 @@
 			{:else if targets.length}
 				{name} holds access to
 				<span class="font-medium text-foreground">{targets.length}</span>
-				{targets.length === 1 ? 'target' : 'targets'}, none lets them in today.
+				{targets.length === 1 ? 'server' : 'servers'}, none lets them in today.
 			{:else if !access.isLoading}
 				{name} can't log in anywhere yet.
 			{/if}
@@ -112,7 +114,12 @@
 				Every member gets this access.
 			{/if}
 		</p>
-		{#if can.edit}<GrantPopover {subjectId} {kind} />{/if}
+		{#if can.edit}
+			<Button size="sm" onclick={() => openGrant({ subjects: [self] })}>
+				<Plus data-icon="inline-start" />
+				Grant access
+			</Button>
+		{/if}
 	</div>
 
 	{#if targets.length > 6}
@@ -120,8 +127,8 @@
 			<InputGroup.Addon><Search /></InputGroup.Addon>
 			<InputGroup.Input
 				bind:value={filter}
-				placeholder="Filter targets"
-				aria-label="Filter targets"
+				placeholder="Filter servers"
+				aria-label="Filter servers"
 			/>
 		</InputGroup.Root>
 	{/if}
@@ -136,7 +143,7 @@
 				<Empty.Title>No access yet</Empty.Title>
 				<Empty.Description>
 					{can.edit
-						? `Grant this ${kindLabels[kind].one} a login account on a target to let them in.`
+						? `Grant this ${kindLabels[kind].one} a login account on a server to let them in.`
 						: `Nobody granted this ${kindLabels[kind].one} a login account yet.`}
 				</Empty.Description>
 			</Empty.Header>
@@ -154,7 +161,7 @@
 					<div class="min-w-0 flex-1">
 						<div class="flex items-center gap-2">
 							<a
-								href={`/infrastructure/targets?id=${t.id}&tab=access`}
+								href={`/servers?id=${t.id}&tab=access`}
 								class="block truncate text-sm font-medium hover:underline"
 							>
 								{t.name}
@@ -171,7 +178,13 @@
 						</p>
 					</div>
 					{#if can.edit}
-						<GrantPopover {subjectId} {kind} targetId={t.id} label="Edit" variant="ghost" />
+						<Button
+							variant="ghost"
+							size="sm"
+							onclick={() => openGrant({ subjects: [self], servers: [t] })}
+						>
+							Grant
+						</Button>
 					{/if}
 				</div>
 				<div class="flex flex-wrap gap-1.5 border-t bg-muted/40 px-3 py-2.5">
@@ -205,11 +218,11 @@
 				</div>
 			</div>
 		{:else}
-			<p class="py-4 text-center text-sm text-muted-foreground">No target matches.</p>
+			<p class="py-4 text-center text-sm text-muted-foreground">No server matches.</p>
 		{/each}
 		{#if filtered.length > shown.length}
 			<Button variant="ghost" size="sm" onclick={() => (showAll = true)}>
-				Show all {filtered.length} targets
+				Show all {filtered.length} servers
 			</Button>
 		{/if}
 		{#if kind === SubjectKind.USER && targets.some((t) => grants(t).some((g) => !g.direct))}

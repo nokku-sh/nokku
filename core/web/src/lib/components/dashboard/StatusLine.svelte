@@ -9,11 +9,13 @@
 		issues: Issue[];
 		workspace: string;
 		updatedAt: number;
+		/** Access requests waiting for an answer. */
+		requests?: number;
 	}
 
-	let { data, issues, workspace, updatedAt }: Props = $props();
+	let { data, issues, workspace, updatedAt, requests = 0 }: Props = $props();
 
-	const summary = $derived(headline(data ? issues : undefined));
+	const summary = $derived(headline(data ? issues : undefined, false, requests));
 	// The same tones, in the colors that hold on the console background.
 	const onConsole: Partial<Record<Tone, string>> = {
 		muted: 'text-terminal-dim',
@@ -35,9 +37,9 @@
 </script>
 
 {#snippet row(key: string, value: string, tone = '')}
-	<div class="flex gap-4">
-		<dt class="w-20 shrink-0 text-terminal-dim">{key}</dt>
-		<dd class={['min-w-0 truncate', tone]}>{value}</dd>
+	<div class="flex min-w-0 flex-col gap-0.5">
+		<dt class="text-xs text-terminal-dim">{key}</dt>
+		<dd class={['min-w-0 text-pretty', tone]}>{value}</dd>
 	</div>
 {/snippet}
 
@@ -61,9 +63,9 @@
 	</p>
 
 	{#if data}
-		<dl class="flex flex-col gap-1">
+		<dl class="grid grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] gap-x-6 gap-y-3">
 			{@render row(
-				'targets',
+				'servers',
 				`${data.targets} total · ${data.targetsOnline} online${data.targetsManual ? ` · ${data.targetsManual} via nk sync` : ''}`,
 				data.targets && data.targetsOnline + data.targetsManual < data.targets
 					? 'text-terminal-warn'
@@ -72,13 +74,13 @@
 			{@render row(
 				'daemons',
 				`${data.daemonsOnline}/${data.daemons - data.pendingDaemons.length} connected${data.pendingDaemons.length ? ` · ${data.pendingDaemons.length} pending` : ''}${data.daemonsBehind ? ` · ${data.daemonsBehind} behind` : ''}`,
-				data.offlineDaemons.length || data.daemonsBehind ? 'text-terminal-err' : ''
+				data.offlineServers.length || data.daemonsBehind ? 'text-terminal-err' : ''
 			)}
 			{@render row(
 				'sessions',
 				`${data.liveSessions.length} live${recording ? ` · ${recording} recording` : ''}`
 			)}
-			{@render row('users', String(data.users))}
+			{@render row('people', String(data.users))}
 			{@render row(
 				'storage',
 				quota < 0
@@ -87,9 +89,9 @@
 			)}
 		</dl>
 	{:else}
-		<div class="flex flex-col gap-2">
+		<div class="grid grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] gap-x-6 gap-y-3">
 			{#each { length: 5 }, i (i)}
-				<div class="h-4 rounded-sm bg-terminal-foreground/10" style:width="{70 - i * 8}%"></div>
+				<div class="h-9 rounded-sm bg-terminal-foreground/10"></div>
 			{/each}
 		</div>
 	{/if}

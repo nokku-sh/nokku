@@ -36,26 +36,12 @@ func TestRequestedFeatures(t *testing.T) {
 		},
 		{
 			name: "an idle timeout is gated",
-			msg: &nokkuv1.UpdateWorkspaceRequest{
-				Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(15 * time.Minute)},
-			},
+			msg:  &nokkuv1.UpdateDaemonDefaultsRequest{SessionIdleTimeout: durationpb.New(15 * time.Minute)},
 			want: []string{FeatureIdleTimeout},
 		},
 		{
 			name: "turning the idle timeout off is never gated",
-			msg: &nokkuv1.UpdateWorkspaceRequest{
-				Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(0)},
-			},
-		},
-		{
-			name: "both settings at once are both checked",
-			msg: &nokkuv1.UpdateWorkspaceRequest{
-				Settings: &nokkuv1.WorkspaceSettings{
-					EnforceSso:         new(true),
-					SessionIdleTimeout: durationpb.New(time.Minute),
-				},
-			},
-			want: []string{FeatureEnforceSSO, FeatureIdleTimeout},
+			msg:  &nokkuv1.UpdateDaemonDefaultsRequest{SessionIdleTimeout: durationpb.New(0)},
 		},
 		{
 			name: "a grant that ends is gated",

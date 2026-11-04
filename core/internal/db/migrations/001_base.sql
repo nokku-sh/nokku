@@ -339,7 +339,6 @@ CREATE TABLE daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   join_token_id UUID, -- so a replacement of the same name is only ever its own token's
-  name TEXT NOT NULL,
   key_thumbprint TEXT,
   version TEXT NOT NULL DEFAULT '',
   status INTEGER NOT NULL DEFAULT 1 CHECK (status IN (1, 2, 3)), -- 1=pending, 2=accepted, 3=rejected
@@ -349,7 +348,6 @@ CREATE TABLE daemons (
   last_seen_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, name),
   UNIQUE (workspace_id, id),
   UNIQUE (workspace_id, key_thumbprint),
   FOREIGN KEY (workspace_id, join_token_id) REFERENCES join_tokens (workspace_id, id) ON DELETE SET NULL (join_token_id)
@@ -373,7 +371,7 @@ CREATE TABLE targets (
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE CASCADE
 );
 
--- A daemon serves one target, a manual target has none.
+-- A daemon serves one target, a manual target has none. The daemon goes by its target's name.
 CREATE UNIQUE INDEX idx_targets_daemon_id ON targets (daemon_id);
 
 -- A local account on a server, like root. Grants point here.

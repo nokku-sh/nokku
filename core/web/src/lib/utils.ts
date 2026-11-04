@@ -131,3 +131,13 @@ export function nkLoginCommand(): string {
 		? 'nk login'
 		: `nk login --api ${location.origin}`;
 }
+
+/** "a, b and c", or "a, b, c and 4 more" past max. A total above the list counts names it left out. */
+export function listNames(list: string[], max = 3, total = list.length): string {
+	const shown = list.slice(0, max);
+	const rest = total - shown.length;
+	if (rest > 0) return `${shown.join(', ')} and ${rest} more`;
+	return shown.length > 1
+		? `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}`
+		: (shown[0] ?? '');
+}

@@ -6,6 +6,7 @@
 	import AppHeader from '#lib/components/layout/AppHeader.svelte';
 	import AppSidebar from '#lib/components/layout/AppSidebar.svelte';
 	import CommandPalette from '#lib/components/layout/CommandPalette.svelte';
+	import GrantSheet from '#lib/components/access/GrantSheet.svelte';
 	import ConnectionBanner from '#lib/components/layout/ConnectionBanner.svelte';
 	import { canVisit } from '#lib/components/layout/routes.js';
 	import LicenseBanner from '#lib/components/layout/LicenseBanner.svelte';
@@ -63,7 +64,7 @@
 	});
 
 	// These lay out their own full-width canvas.
-	const fullBleed = $derived(page.url.pathname === '/sessions');
+	const fullBleed = $derived(page.url.pathname === '/shell');
 
 	// The nav hides what the role cannot use, this covers a typed address. The server refuses the calls either way.
 	$effect(() => {
@@ -96,6 +97,7 @@
 <svelte:window {onbeforeunload} />
 
 <CommandPalette />
+<GrantSheet />
 
 {#if booting && bootFailed}
 	<main class="flex min-h-dvh items-center justify-center p-4">

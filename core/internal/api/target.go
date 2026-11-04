@@ -16,12 +16,21 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	nokkudaemon "github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/namegen"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
+
+var targetStatuses = map[nokkuv1.TargetStatus]*string{
+	nokkuv1.TargetStatus_TARGET_STATUS_UNSPECIFIED: nil,
+	nokkuv1.TargetStatus_TARGET_STATUS_PENDING:     new("pending"),
+	nokkuv1.TargetStatus_TARGET_STATUS_ONLINE:      new("online"),
+	nokkuv1.TargetStatus_TARGET_STATUS_OFFLINE:     new("offline"),
+	nokkuv1.TargetStatus_TARGET_STATUS_MANUAL:      new("manual"),
+}
 
 type targetService struct {
 	cfg *config.Config
@@ -43,12 +52,37 @@ func (s *targetService) GetTarget(
 		}
 		target = row.ToProto()
 		target.Accounts = accounts[row.ID]
-		return nil
+		return withDaemons(ctx, q, s.cfg.Pool, []*nokkuv1.Target{target})
 	}); err != nil {
 		return nil, err
 	}
 
 	return &nokkuv1.GetTargetResponse{Target: target}, nil
+}
+
+// withDaemons puts each server's daemon on it, live state included.
+func withDaemons(ctx context.Context, q *db.Queries, pool *nokkudaemon.Pool, targets []*nokkuv1.Target) error {
+	var ids []string
+	for _, t := range targets {
+		if t.DaemonId != nil {
+			ids = append(ids, t.GetDaemonId())
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := q.GetDaemonsByIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	daemons := make(map[string]*nokkuv1.Daemon, len(rows))
+	for _, d := range rows {
+		daemons[d.Daemon.ID] = liveDaemon(pool, &d.Daemon, d.Name)
+	}
+	for _, t := range targets {
+		t.Daemon = daemons[t.GetDaemonId()]
+	}
+	return nil
 }
 
 func accountsByTarget(
@@ -133,6 +167,9 @@ func (s *targetService) insertTarget(
 	}); err != nil {
 		return nil, err
 	}
+	// A generated name is only known now.
+	audit.SetTarget(ctx, result.ID)
+	audit.Set(ctx, "name", result.Name)
 	return &nokkuv1.CreateTargetResponse{
 		Target: result.ToProto(),
 	}, nil
@@ -191,6 +228,7 @@ func (s *targetService) UpdateTarget(
 	if err != nil {
 		return nil, err
 	}
+	audit.Set(ctx, "name", result.Name)
 
 	return &nokkuv1.UpdateTargetResponse{
 		Target: result.ToProto(),
@@ -207,6 +245,7 @@ func (s *targetService) DeleteTarget(
 		if err != nil {
 			return err
 		}
+		audit.Set(ctx, "name", target.Name)
 		if target.DaemonID != nil {
 			_, err = q.DeleteDaemon(ctx, *target.DaemonID)
 			return err
@@ -225,14 +264,23 @@ func (s *targetService) ListTargets(
 ) (*nokkuv1.ListTargetsResponse, error) {
 	var targets []*nokkuv1.Target
 	var count int32
+	// Only the online and offline filters read the pool.
+	var connected []string
+	if st := req.GetStatus(); st == nokkuv1.TargetStatus_TARGET_STATUS_ONLINE ||
+		st == nokkuv1.TargetStatus_TARGET_STATUS_OFFLINE {
+		connected = s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx))
+	}
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
-			Query:    req.Query,
-			DaemonID: req.DaemonId,
-			Accounts: req.GetAccounts(),
-			Tags:     req.GetTags(),
-			Limit:    req.Limit,
-			Offset:   req.Offset,
+			Query:     req.Query,
+			DaemonID:  req.DaemonId,
+			Accounts:  req.GetAccounts(),
+			Tags:      req.GetTags(),
+			Ids:       req.GetIds(),
+			Status:    targetStatuses[req.GetStatus()],
+			Connected: connected,
+			Limit:     req.Limit,
+			Offset:    req.Offset,
 		})
 		if err != nil || len(rows) == 0 {
 			return err
@@ -253,7 +301,7 @@ func (s *targetService) ListTargets(
 			target.Accounts = accounts[r.Target.ID]
 			targets = append(targets, target)
 		}
-		return nil
+		return withDaemons(ctx, q, s.cfg.Pool, targets)
 	}); err != nil {
 		return nil, err
 	}
@@ -366,9 +414,13 @@ func (s *targetService) GetSubjectAccess(
 			}
 			for _, d := range daemonRows {
 				daemons = append(daemons, &nokkuv1.Daemon{
-					Id:     &d.ID,
+					Id:     &d.Daemon.ID,
 					Name:   &d.Name,
-					Online: new(s.cfg.Pool.IsConnected(d.ID)),
+					Online: new(s.cfg.Pool.IsConnected(d.Daemon.ID)),
+					// Only whether it records, so people know before they log in.
+					Config: &nokkuv1.DaemonConfig{
+						RecordSessions: new(db.ResolveDaemonConfig(d.Daemon.Config).GetRecordSessions()),
+					},
 				})
 			}
 		}

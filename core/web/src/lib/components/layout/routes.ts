@@ -4,7 +4,6 @@ import { atLeast } from '#lib/roles.js';
 import {
 	Activity,
 	BookText,
-	Bot,
 	CircleUser,
 	CreditCard,
 	FileClock,
@@ -40,22 +39,22 @@ export type RouteItem = {
 // Groups hold four pages at most, so every entry is a link and nothing hides behind a toggle.
 export const AppRoutes: Record<string, RouteItem[]> = {
 	Overview: [
-		{ title: 'Dashboard', url: '/', icon: Gauge, shortcut: 'h' },
+		{ title: 'Home', url: '/', icon: Gauge, shortcut: 'h' },
 		// Every member opens shells on their own servers here.
-		{ title: 'Sessions', url: '/sessions', icon: SquareTerminal, shortcut: 's' },
-		{ title: 'Requests', url: '/access/requests', icon: Hand, shortcut: 'q' },
+		{ title: 'Shell', url: '/shell', icon: SquareTerminal, shortcut: 's' },
+		{ title: 'Requests', url: '/access/requests', icon: Hand, shortcut: 'q' }
+	],
+	Access: [
 		{
 			title: 'Topology',
 			url: '/topology',
 			icon: VectorSquare,
 			role: WorkspaceRole.VIEWER,
 			shortcut: 'o'
-		}
-	],
-	Access: [
+		},
 		{
-			title: 'Users',
-			url: '/access/users',
+			title: 'People',
+			url: '/access/people',
 			icon: CircleUser,
 			role: WorkspaceRole.VIEWER,
 			shortcut: 'u'
@@ -75,20 +74,13 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			shortcut: 'v'
 		}
 	],
-	Infrastructure: [
+	Servers: [
 		{
-			title: 'Targets',
-			url: '/infrastructure/targets',
+			title: 'Servers',
+			url: '/servers',
 			icon: Server,
 			role: WorkspaceRole.VIEWER,
 			shortcut: 't'
-		},
-		{
-			title: 'Daemons',
-			url: '/infrastructure/daemons',
-			icon: Bot,
-			role: WorkspaceRole.VIEWER,
-			shortcut: 'd'
 		},
 		{
 			title: 'Certificate authority',
@@ -100,18 +92,18 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 	],
 	Activity: [
 		{
-			title: 'Recordings',
-			url: '/recordings',
-			icon: Video,
-			role: WorkspaceRole.VIEWER,
-			shortcut: 'r'
-		},
-		{
 			title: 'Audit log',
 			url: '/audit',
 			icon: FileClock,
 			role: WorkspaceRole.VIEWER,
 			shortcut: 'a'
+		},
+		{
+			title: 'Recordings',
+			url: '/recordings',
+			icon: Video,
+			role: WorkspaceRole.VIEWER,
+			shortcut: 'r'
 		}
 	],
 	Settings: [
@@ -123,18 +115,18 @@ export const AppRoutes: Record<string, RouteItem[]> = {
 			shortcut: 'w'
 		},
 		{
-			title: 'Daemon defaults',
-			url: '/settings/daemons',
-			icon: ServerCog,
-			role: WorkspaceRole.VIEWER,
-			shortcut: 'f'
-		},
-		{
 			title: 'Single sign-on',
 			url: '/settings/sso',
 			icon: KeyRound,
 			role: WorkspaceRole.VIEWER,
 			shortcut: 'i'
+		},
+		{
+			title: 'Daemon defaults',
+			url: '/settings/daemons',
+			icon: ServerCog,
+			role: WorkspaceRole.VIEWER,
+			shortcut: 'f'
 		},
 		{
 			title: 'Billing',

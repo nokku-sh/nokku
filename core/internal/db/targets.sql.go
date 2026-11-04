@@ -249,6 +249,7 @@ SELECT
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
+  LEFT JOIN daemons d ON d.id = t.daemon_id
 WHERE
   (
     $1::TEXT IS NULL
@@ -275,21 +276,50 @@ WHERE
     $4::TEXT[] IS NULL
     OR t.tags @> $4::TEXT[]
   )
+  AND (
+    $5::UUID[] IS NULL
+    OR t.id = ANY ($5::UUID[])
+  )
+  -- Online comes from the pool, the caller passes the daemons connected now.
+  AND (
+    $6::TEXT IS NULL
+    OR (
+      $6 = 'pending'
+      AND d.status <> 2 -- accepted
+    )
+    OR (
+      $6 = 'online'
+      AND d.status = 2
+      AND d.id = ANY ($7::UUID[])
+    )
+    OR (
+      $6 = 'offline'
+      AND d.status = 2
+      AND NOT COALESCE(d.id = ANY ($7::UUID[]), FALSE)
+    )
+    OR (
+      $6 = 'manual'
+      AND t.daemon_id IS NULL
+    )
+  )
 ORDER BY
   t.id ASC
 LIMIT
-  $6
+  $9
 OFFSET
-  $5
+  $8
 `
 
 type ListTargetsParams struct {
-	Query    *string  `json:"query"`
-	DaemonID *string  `json:"daemonId"`
-	Accounts []string `json:"accounts"`
-	Tags     []string `json:"tags"`
-	Offset   *int32   `json:"offset"`
-	Limit    *int32   `json:"limit"`
+	Query     *string  `json:"query"`
+	DaemonID  *string  `json:"daemonId"`
+	Accounts  []string `json:"accounts"`
+	Tags      []string `json:"tags"`
+	Ids       []string `json:"ids"`
+	Status    *string  `json:"status"`
+	Connected []string `json:"connected"`
+	Offset    *int32   `json:"offset"`
+	Limit     *int32   `json:"limit"`
 }
 
 type ListTargetsRow struct {
@@ -303,6 +333,9 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 		arg.DaemonID,
 		arg.Accounts,
 		arg.Tags,
+		arg.Ids,
+		arg.Status,
+		arg.Connected,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -379,18 +412,6 @@ func (q *Queries) TouchTargetSync(ctx context.Context, targetID string) error {
 }
 
 const updateTarget = `-- name: UpdateTarget :one
-WITH renamed AS (
-  UPDATE daemons d
-  SET
-    name = $1,
-    updated_at = NOW()
-  FROM
-    targets t
-  WHERE
-    t.id = $7
-    AND d.id = t.daemon_id
-    AND $1::TEXT IS NOT NULL
-)
 UPDATE targets
 SET
   name = COALESCE($1, name),
@@ -416,7 +437,6 @@ type UpdateTargetParams struct {
 	TargetID      string   `json:"targetId"`
 }
 
-// A rename reaches the daemon too, sessions and recordings show its name.
 func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error) {
 	row := q.db.QueryRow(ctx, updateTarget,
 		arg.Name,

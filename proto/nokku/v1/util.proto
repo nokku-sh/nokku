@@ -50,8 +50,6 @@ message GetVersionResponse {
 message GetInstanceInfoRequest {}
 
 message GetInstanceInfoResponse {
-  reserved 9;
-
   string operator_name = 1;
   string support_email = 2;
   string website_url = 3;
@@ -101,6 +99,8 @@ message AuditLogFilter {
   AuditOutcome outcome = 6 [(buf.validate.field).enum = {defined_only: true}];
   google.protobuf.Timestamp start_date = 7;
   google.protobuf.Timestamp end_date = 8;
+  // excluded_actions leaves these out, like every sign-in for a view of changes.
+  repeated string excluded_actions = 9;
 }
 
 message ListAuditLogsRequest {
@@ -150,6 +150,8 @@ message ListMyActivityRequest {
     lte: 100
   }];
   int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+  // filter narrows your own events, its actor_ids are ignored. Without dates it reads all the log keeps.
+  AuditLogFilter filter = 3;
 }
 message ListMyActivityResponse {
   repeated EventLog logs = 1;

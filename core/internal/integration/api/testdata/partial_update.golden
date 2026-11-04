@@ -150,34 +150,6 @@ WorkspaceService.UpdateWorkspace sets description: settings.session_idle_timeout
 WorkspaceService.UpdateWorkspace sets description: created_at kept
 WorkspaceService.UpdateWorkspace sets description: updated_at changed
 WorkspaceService.UpdateWorkspace sets description: requestable_tags (stored) kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: slug kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: name kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: description kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: settings.default_daemon_config.record_sessions changed
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: settings.default_daemon_config.allow_forwarding kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: settings.default_daemon_config.allow_agent_forwarding kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: settings.default_daemon_config.gateway_ports kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: settings.default_daemon_config.ephemeral kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: settings.default_daemon_config.idle_timeout kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: settings.enforce_sso kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: settings.session_idle_timeout kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: created_at kept
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: updated_at changed
-WorkspaceService.UpdateWorkspace sets settings.default_daemon_config.record_sessions: requestable_tags (stored) kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: slug kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: name kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: description kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: settings.default_daemon_config.record_sessions kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: settings.default_daemon_config.allow_forwarding kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: settings.default_daemon_config.allow_agent_forwarding kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: settings.default_daemon_config.gateway_ports kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: settings.default_daemon_config.ephemeral kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: settings.default_daemon_config.idle_timeout kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: settings.enforce_sso kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: settings.session_idle_timeout changed
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: created_at kept
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: updated_at changed
-WorkspaceService.UpdateWorkspace sets settings.session_idle_timeout: requestable_tags (stored) kept
 WorkspaceService.UpdateWorkspace sets nothing: slug kept
 WorkspaceService.UpdateWorkspace sets nothing: name kept
 WorkspaceService.UpdateWorkspace sets nothing: description kept
@@ -192,6 +164,49 @@ WorkspaceService.UpdateWorkspace sets nothing: settings.session_idle_timeout kep
 WorkspaceService.UpdateWorkspace sets nothing: created_at kept
 WorkspaceService.UpdateWorkspace sets nothing: updated_at changed
 WorkspaceService.UpdateWorkspace sets nothing: requestable_tags (stored) kept
+WorkspaceService.UpdateDaemonDefaults baseline: empty [settings.default_daemon_config.idle_timeout settings.enforce_sso]
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: slug kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: name kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: description kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: settings.default_daemon_config.record_sessions changed
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: settings.default_daemon_config.allow_forwarding kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: settings.default_daemon_config.allow_agent_forwarding kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: settings.default_daemon_config.gateway_ports kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: settings.default_daemon_config.ephemeral kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: settings.default_daemon_config.idle_timeout kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: settings.enforce_sso kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: settings.session_idle_timeout kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: created_at kept
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: updated_at changed
+WorkspaceService.UpdateDaemonDefaults sets default_daemon_config.record_sessions: requestable_tags (stored) kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: slug kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: name kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: description kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: settings.default_daemon_config.record_sessions kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: settings.default_daemon_config.allow_forwarding kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: settings.default_daemon_config.allow_agent_forwarding kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: settings.default_daemon_config.gateway_ports kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: settings.default_daemon_config.ephemeral kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: settings.default_daemon_config.idle_timeout kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: settings.enforce_sso kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: settings.session_idle_timeout changed
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: created_at kept
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: updated_at changed
+WorkspaceService.UpdateDaemonDefaults sets session_idle_timeout: requestable_tags (stored) kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: slug kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: name kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: description kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: settings.default_daemon_config.record_sessions kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: settings.default_daemon_config.allow_forwarding kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: settings.default_daemon_config.allow_agent_forwarding kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: settings.default_daemon_config.gateway_ports kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: settings.default_daemon_config.ephemeral kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: settings.default_daemon_config.idle_timeout kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: settings.enforce_sso kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: settings.session_idle_timeout kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: created_at kept
+WorkspaceService.UpdateDaemonDefaults sets nothing: updated_at changed
+WorkspaceService.UpdateDaemonDefaults sets nothing: requestable_tags (stored) kept
 TeamService.UpdateTeam baseline: empty [member_count]
 TeamService.UpdateTeam sets name: name changed
 TeamService.UpdateTeam sets name: description kept
@@ -223,7 +238,7 @@ TeamService.UpdateTeam sets nothing: tags kept
 TeamService.UpdateTeam sets nothing: member_count kept
 TeamService.UpdateTeam sets nothing: created_at kept
 TeamService.UpdateTeam sets nothing: updated_at changed
-TargetService.UpdateTarget baseline: empty [daemon_id usernames metadata last_sync_at username_expires_at blocked]
+TargetService.UpdateTarget baseline: empty [daemon_id usernames metadata last_sync_at username_expires_at blocked daemon.id daemon.name daemon.online daemon.status daemon.config.record_sessions daemon.config.allow_forwarding daemon.config.allow_agent_forwarding daemon.config.gateway_ports daemon.config.ephemeral daemon.config.idle_timeout daemon.updated_at daemon.created_at daemon.last_seen_at daemon.version daemon.behind_since]
 TargetService.UpdateTarget sets name: daemon_id kept
 TargetService.UpdateTarget sets name: name changed
 TargetService.UpdateTarget sets name: description kept
@@ -238,6 +253,21 @@ TargetService.UpdateTarget sets name: updated_at changed
 TargetService.UpdateTarget sets name: last_sync_at kept
 TargetService.UpdateTarget sets name: username_expires_at kept
 TargetService.UpdateTarget sets name: blocked kept
+TargetService.UpdateTarget sets name: daemon.id kept
+TargetService.UpdateTarget sets name: daemon.name kept
+TargetService.UpdateTarget sets name: daemon.online kept
+TargetService.UpdateTarget sets name: daemon.status kept
+TargetService.UpdateTarget sets name: daemon.config.record_sessions kept
+TargetService.UpdateTarget sets name: daemon.config.allow_forwarding kept
+TargetService.UpdateTarget sets name: daemon.config.allow_agent_forwarding kept
+TargetService.UpdateTarget sets name: daemon.config.gateway_ports kept
+TargetService.UpdateTarget sets name: daemon.config.ephemeral kept
+TargetService.UpdateTarget sets name: daemon.config.idle_timeout kept
+TargetService.UpdateTarget sets name: daemon.updated_at kept
+TargetService.UpdateTarget sets name: daemon.created_at kept
+TargetService.UpdateTarget sets name: daemon.last_seen_at kept
+TargetService.UpdateTarget sets name: daemon.version kept
+TargetService.UpdateTarget sets name: daemon.behind_since kept
 TargetService.UpdateTarget sets description: daemon_id kept
 TargetService.UpdateTarget sets description: name kept
 TargetService.UpdateTarget sets description: description changed
@@ -252,6 +282,21 @@ TargetService.UpdateTarget sets description: updated_at changed
 TargetService.UpdateTarget sets description: last_sync_at kept
 TargetService.UpdateTarget sets description: username_expires_at kept
 TargetService.UpdateTarget sets description: blocked kept
+TargetService.UpdateTarget sets description: daemon.id kept
+TargetService.UpdateTarget sets description: daemon.name kept
+TargetService.UpdateTarget sets description: daemon.online kept
+TargetService.UpdateTarget sets description: daemon.status kept
+TargetService.UpdateTarget sets description: daemon.config.record_sessions kept
+TargetService.UpdateTarget sets description: daemon.config.allow_forwarding kept
+TargetService.UpdateTarget sets description: daemon.config.allow_agent_forwarding kept
+TargetService.UpdateTarget sets description: daemon.config.gateway_ports kept
+TargetService.UpdateTarget sets description: daemon.config.ephemeral kept
+TargetService.UpdateTarget sets description: daemon.config.idle_timeout kept
+TargetService.UpdateTarget sets description: daemon.updated_at kept
+TargetService.UpdateTarget sets description: daemon.created_at kept
+TargetService.UpdateTarget sets description: daemon.last_seen_at kept
+TargetService.UpdateTarget sets description: daemon.version kept
+TargetService.UpdateTarget sets description: daemon.behind_since kept
 TargetService.UpdateTarget sets host_public_key: daemon_id kept
 TargetService.UpdateTarget sets host_public_key: name kept
 TargetService.UpdateTarget sets host_public_key: description kept
@@ -266,6 +311,21 @@ TargetService.UpdateTarget sets host_public_key: updated_at changed
 TargetService.UpdateTarget sets host_public_key: last_sync_at kept
 TargetService.UpdateTarget sets host_public_key: username_expires_at kept
 TargetService.UpdateTarget sets host_public_key: blocked kept
+TargetService.UpdateTarget sets host_public_key: daemon.id kept
+TargetService.UpdateTarget sets host_public_key: daemon.name kept
+TargetService.UpdateTarget sets host_public_key: daemon.online kept
+TargetService.UpdateTarget sets host_public_key: daemon.status kept
+TargetService.UpdateTarget sets host_public_key: daemon.config.record_sessions kept
+TargetService.UpdateTarget sets host_public_key: daemon.config.allow_forwarding kept
+TargetService.UpdateTarget sets host_public_key: daemon.config.allow_agent_forwarding kept
+TargetService.UpdateTarget sets host_public_key: daemon.config.gateway_ports kept
+TargetService.UpdateTarget sets host_public_key: daemon.config.ephemeral kept
+TargetService.UpdateTarget sets host_public_key: daemon.config.idle_timeout kept
+TargetService.UpdateTarget sets host_public_key: daemon.updated_at kept
+TargetService.UpdateTarget sets host_public_key: daemon.created_at kept
+TargetService.UpdateTarget sets host_public_key: daemon.last_seen_at kept
+TargetService.UpdateTarget sets host_public_key: daemon.version kept
+TargetService.UpdateTarget sets host_public_key: daemon.behind_since kept
 TargetService.UpdateTarget sets endpoints: daemon_id kept
 TargetService.UpdateTarget sets endpoints: name kept
 TargetService.UpdateTarget sets endpoints: description kept
@@ -280,6 +340,21 @@ TargetService.UpdateTarget sets endpoints: updated_at changed
 TargetService.UpdateTarget sets endpoints: last_sync_at kept
 TargetService.UpdateTarget sets endpoints: username_expires_at kept
 TargetService.UpdateTarget sets endpoints: blocked kept
+TargetService.UpdateTarget sets endpoints: daemon.id kept
+TargetService.UpdateTarget sets endpoints: daemon.name kept
+TargetService.UpdateTarget sets endpoints: daemon.online kept
+TargetService.UpdateTarget sets endpoints: daemon.status kept
+TargetService.UpdateTarget sets endpoints: daemon.config.record_sessions kept
+TargetService.UpdateTarget sets endpoints: daemon.config.allow_forwarding kept
+TargetService.UpdateTarget sets endpoints: daemon.config.allow_agent_forwarding kept
+TargetService.UpdateTarget sets endpoints: daemon.config.gateway_ports kept
+TargetService.UpdateTarget sets endpoints: daemon.config.ephemeral kept
+TargetService.UpdateTarget sets endpoints: daemon.config.idle_timeout kept
+TargetService.UpdateTarget sets endpoints: daemon.updated_at kept
+TargetService.UpdateTarget sets endpoints: daemon.created_at kept
+TargetService.UpdateTarget sets endpoints: daemon.last_seen_at kept
+TargetService.UpdateTarget sets endpoints: daemon.version kept
+TargetService.UpdateTarget sets endpoints: daemon.behind_since kept
 TargetService.UpdateTarget sets tags: daemon_id kept
 TargetService.UpdateTarget sets tags: name kept
 TargetService.UpdateTarget sets tags: description kept
@@ -294,6 +369,21 @@ TargetService.UpdateTarget sets tags: updated_at changed
 TargetService.UpdateTarget sets tags: last_sync_at kept
 TargetService.UpdateTarget sets tags: username_expires_at kept
 TargetService.UpdateTarget sets tags: blocked kept
+TargetService.UpdateTarget sets tags: daemon.id kept
+TargetService.UpdateTarget sets tags: daemon.name kept
+TargetService.UpdateTarget sets tags: daemon.online kept
+TargetService.UpdateTarget sets tags: daemon.status kept
+TargetService.UpdateTarget sets tags: daemon.config.record_sessions kept
+TargetService.UpdateTarget sets tags: daemon.config.allow_forwarding kept
+TargetService.UpdateTarget sets tags: daemon.config.allow_agent_forwarding kept
+TargetService.UpdateTarget sets tags: daemon.config.gateway_ports kept
+TargetService.UpdateTarget sets tags: daemon.config.ephemeral kept
+TargetService.UpdateTarget sets tags: daemon.config.idle_timeout kept
+TargetService.UpdateTarget sets tags: daemon.updated_at kept
+TargetService.UpdateTarget sets tags: daemon.created_at kept
+TargetService.UpdateTarget sets tags: daemon.last_seen_at kept
+TargetService.UpdateTarget sets tags: daemon.version kept
+TargetService.UpdateTarget sets tags: daemon.behind_since kept
 TargetService.UpdateTarget sets tags to none: daemon_id kept
 TargetService.UpdateTarget sets tags to none: name kept
 TargetService.UpdateTarget sets tags to none: description kept
@@ -308,6 +398,21 @@ TargetService.UpdateTarget sets tags to none: updated_at changed
 TargetService.UpdateTarget sets tags to none: last_sync_at kept
 TargetService.UpdateTarget sets tags to none: username_expires_at kept
 TargetService.UpdateTarget sets tags to none: blocked kept
+TargetService.UpdateTarget sets tags to none: daemon.id kept
+TargetService.UpdateTarget sets tags to none: daemon.name kept
+TargetService.UpdateTarget sets tags to none: daemon.online kept
+TargetService.UpdateTarget sets tags to none: daemon.status kept
+TargetService.UpdateTarget sets tags to none: daemon.config.record_sessions kept
+TargetService.UpdateTarget sets tags to none: daemon.config.allow_forwarding kept
+TargetService.UpdateTarget sets tags to none: daemon.config.allow_agent_forwarding kept
+TargetService.UpdateTarget sets tags to none: daemon.config.gateway_ports kept
+TargetService.UpdateTarget sets tags to none: daemon.config.ephemeral kept
+TargetService.UpdateTarget sets tags to none: daemon.config.idle_timeout kept
+TargetService.UpdateTarget sets tags to none: daemon.updated_at kept
+TargetService.UpdateTarget sets tags to none: daemon.created_at kept
+TargetService.UpdateTarget sets tags to none: daemon.last_seen_at kept
+TargetService.UpdateTarget sets tags to none: daemon.version kept
+TargetService.UpdateTarget sets tags to none: daemon.behind_since kept
 TargetService.UpdateTarget sets endpoints to none: daemon_id kept
 TargetService.UpdateTarget sets endpoints to none: name kept
 TargetService.UpdateTarget sets endpoints to none: description kept
@@ -322,6 +427,21 @@ TargetService.UpdateTarget sets endpoints to none: updated_at changed
 TargetService.UpdateTarget sets endpoints to none: last_sync_at kept
 TargetService.UpdateTarget sets endpoints to none: username_expires_at kept
 TargetService.UpdateTarget sets endpoints to none: blocked kept
+TargetService.UpdateTarget sets endpoints to none: daemon.id kept
+TargetService.UpdateTarget sets endpoints to none: daemon.name kept
+TargetService.UpdateTarget sets endpoints to none: daemon.online kept
+TargetService.UpdateTarget sets endpoints to none: daemon.status kept
+TargetService.UpdateTarget sets endpoints to none: daemon.config.record_sessions kept
+TargetService.UpdateTarget sets endpoints to none: daemon.config.allow_forwarding kept
+TargetService.UpdateTarget sets endpoints to none: daemon.config.allow_agent_forwarding kept
+TargetService.UpdateTarget sets endpoints to none: daemon.config.gateway_ports kept
+TargetService.UpdateTarget sets endpoints to none: daemon.config.ephemeral kept
+TargetService.UpdateTarget sets endpoints to none: daemon.config.idle_timeout kept
+TargetService.UpdateTarget sets endpoints to none: daemon.updated_at kept
+TargetService.UpdateTarget sets endpoints to none: daemon.created_at kept
+TargetService.UpdateTarget sets endpoints to none: daemon.last_seen_at kept
+TargetService.UpdateTarget sets endpoints to none: daemon.version kept
+TargetService.UpdateTarget sets endpoints to none: daemon.behind_since kept
 TargetService.UpdateTarget sets nothing: daemon_id kept
 TargetService.UpdateTarget sets nothing: name kept
 TargetService.UpdateTarget sets nothing: description kept
@@ -336,6 +456,21 @@ TargetService.UpdateTarget sets nothing: updated_at changed
 TargetService.UpdateTarget sets nothing: last_sync_at kept
 TargetService.UpdateTarget sets nothing: username_expires_at kept
 TargetService.UpdateTarget sets nothing: blocked kept
+TargetService.UpdateTarget sets nothing: daemon.id kept
+TargetService.UpdateTarget sets nothing: daemon.name kept
+TargetService.UpdateTarget sets nothing: daemon.online kept
+TargetService.UpdateTarget sets nothing: daemon.status kept
+TargetService.UpdateTarget sets nothing: daemon.config.record_sessions kept
+TargetService.UpdateTarget sets nothing: daemon.config.allow_forwarding kept
+TargetService.UpdateTarget sets nothing: daemon.config.allow_agent_forwarding kept
+TargetService.UpdateTarget sets nothing: daemon.config.gateway_ports kept
+TargetService.UpdateTarget sets nothing: daemon.config.ephemeral kept
+TargetService.UpdateTarget sets nothing: daemon.config.idle_timeout kept
+TargetService.UpdateTarget sets nothing: daemon.updated_at kept
+TargetService.UpdateTarget sets nothing: daemon.created_at kept
+TargetService.UpdateTarget sets nothing: daemon.last_seen_at kept
+TargetService.UpdateTarget sets nothing: daemon.version kept
+TargetService.UpdateTarget sets nothing: daemon.behind_since kept
 AuditStreamService.UpdateAuditStream baseline: empty []
 AuditStreamService.UpdateAuditStream sets url: error invalid_argument "enter the secret again when the URL changes"
 AuditStreamService.UpdateAuditStream sets url: kind kept

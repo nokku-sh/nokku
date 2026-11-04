@@ -40,12 +40,17 @@ func (s *daemonService) GetDaemon(
 	}
 
 	return &nokkuv1.GetDaemonResponse{
-		Daemon: s.withBehind(result.ToProto(s.cfg.Pool.IsConnected(result.ID))),
+		Daemon: liveDaemon(s.cfg.Pool, &result.Daemon, result.Name),
 	}, nil
 }
 
-func (s *daemonService) withBehind(d *nokkuv1.Daemon) *nokkuv1.Daemon {
-	if since := s.cfg.Pool.BehindSince(d.GetId()); !since.IsZero() {
+// liveDaemon adds what only the pool knows: online and since when it is behind.
+func liveDaemon(pool *nokkudaemon.Pool, d *db.Daemon, name string) *nokkuv1.Daemon {
+	return withBehind(pool, d.ToProto(name, pool.IsConnected(d.ID)))
+}
+
+func withBehind(pool *nokkudaemon.Pool, d *nokkuv1.Daemon) *nokkuv1.Daemon {
+	if since := pool.BehindSince(d.GetId()); !since.IsZero() {
 		d.BehindSince = timestamppb.New(since)
 	}
 	return d
@@ -69,12 +74,23 @@ func (s *daemonService) UpdateDaemon(
 			config = cmp.Or(stored, &nokkuv1.DaemonConfig{})
 			mergeSet(config.ProtoReflect(), req.GetConfig().ProtoReflect())
 		}
-		_, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
+		name, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
 			DaemonID: req.GetId(),
 			Status:   req.GetStatus(),
 			Config:   config,
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		audit.Set(ctx, "name", name)
+		//nolint:exhaustive // other statuses stay an UpdateDaemon
+		switch req.GetStatus() {
+		case nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED:
+			audit.SetAction(ctx, "ApproveDaemon")
+		case nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED:
+			audit.SetAction(ctx, "RejectDaemon")
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -104,7 +120,7 @@ func (s *daemonService) ListDaemons(
 
 	daemons := db.DaemonsToProto(result, s.cfg.Pool.IsConnected)
 	for _, d := range daemons {
-		s.withBehind(d)
+		withBehind(s.cfg.Pool, d)
 	}
 	return &nokkuv1.ListDaemonsResponse{Daemons: daemons, Total: &count}, nil
 }
@@ -113,9 +129,11 @@ func (s *daemonService) DeleteDaemon(
 	ctx context.Context,
 	req *nokkuv1.DeleteDaemonRequest,
 ) (*nokkuv1.DeleteDaemonResponse, error) {
-	if _, err := s.cfg.Conn.Tenant().DeleteDaemon(ctx, req.GetId()); err != nil {
+	name, err := s.cfg.Conn.Tenant().DeleteDaemon(ctx, req.GetId())
+	if err != nil {
 		return nil, err
 	}
+	audit.Set(ctx, "name", name)
 
 	return &nokkuv1.DeleteDaemonResponse{}, nil
 }
@@ -128,14 +146,14 @@ func (s *daemonService) CreateSession(
 	// People only, so there is a person's id for the cert principal.
 	userID := actor.UserIDFromContext(ctx)
 
-	var daemon *db.Daemon
+	var daemon *db.GetDaemonRow
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		daemon, err = q.GetDaemon(ctx, req.GetDaemonId())
 		if err != nil {
 			return err
 		}
 		// Same grant sshd asks for, so no ticket for an account they can't use.
-		accounts, err := grantedAccounts(ctx, q, daemon.ID, userID)
+		accounts, err := grantedAccounts(ctx, q, daemon.Daemon.ID, userID)
 		if err != nil {
 			return err
 		}
@@ -143,7 +161,7 @@ func (s *daemonService) CreateSession(
 			return db.ErrPermissionDenied
 		}
 		return q.TouchAccessUsageByDaemon(ctx, &db.TouchAccessUsageByDaemonParams{
-			DaemonID:  &daemon.ID,
+			DaemonID:  &daemon.Daemon.ID,
 			SubjectID: userID,
 		})
 	}); err != nil {
@@ -153,8 +171,8 @@ func (s *daemonService) CreateSession(
 	sessionID := uuid.NewV7().String()
 	username := req.GetUsername()
 	s.tickets.Set(sessionID, sessionTicket{
-		WorkspaceID: daemon.WorkspaceID,
-		DaemonID:    daemon.ID,
+		WorkspaceID: daemon.Daemon.WorkspaceID,
+		DaemonID:    daemon.Daemon.ID,
 		UserID:      userID,
 		Username:    username,
 	})
@@ -214,10 +232,12 @@ func (s *daemonService) Relay(
 	// This pipe passes NAT and holds a pre-auth slot, so it needs a grant too.
 	caller, _ := actor.PrincipalFromContext(ctx)
 	var d *db.Daemon
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if d, err = q.GetDaemon(ctx, daemonID); err != nil {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		row, err := q.GetDaemon(ctx, daemonID)
+		if err != nil {
 			return err
 		}
+		d = &row.Daemon
 		accounts, err := grantedAccounts(ctx, q, d.ID, caller.ID)
 		if err != nil {
 			return err

@@ -34,6 +34,7 @@ SELECT
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
+  LEFT JOIN daemons d ON d.id = t.daemon_id
 WHERE
   (
     sqlc.narg('query')::TEXT IS NULL
@@ -60,6 +61,32 @@ WHERE
     sqlc.narg('tags')::TEXT[] IS NULL
     OR t.tags @> sqlc.narg('tags')::TEXT[]
   )
+  AND (
+    sqlc.narg('ids')::UUID[] IS NULL
+    OR t.id = ANY (sqlc.narg('ids')::UUID[])
+  )
+  -- Online comes from the pool, the caller passes the daemons connected now.
+  AND (
+    sqlc.narg('status')::TEXT IS NULL
+    OR (
+      sqlc.narg('status') = 'pending'
+      AND d.status <> 2 -- accepted
+    )
+    OR (
+      sqlc.narg('status') = 'online'
+      AND d.status = 2
+      AND d.id = ANY (@connected::UUID[])
+    )
+    OR (
+      sqlc.narg('status') = 'offline'
+      AND d.status = 2
+      AND NOT COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
+    )
+    OR (
+      sqlc.narg('status') = 'manual'
+      AND t.daemon_id IS NULL
+    )
+  )
 ORDER BY
   t.id ASC
 LIMIT
@@ -68,19 +95,6 @@ OFFSET
   sqlc.narg('offset');
 
 -- name: UpdateTarget :one
--- A rename reaches the daemon too, sessions and recordings show its name.
-WITH renamed AS (
-  UPDATE daemons d
-  SET
-    name = sqlc.narg('name'),
-    updated_at = NOW()
-  FROM
-    targets t
-  WHERE
-    t.id = @target_id
-    AND d.id = t.daemon_id
-    AND sqlc.narg('name')::TEXT IS NOT NULL
-)
 UPDATE targets
 SET
   name = COALESCE(sqlc.narg('name'), name),

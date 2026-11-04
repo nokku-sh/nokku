@@ -11,13 +11,17 @@
 	import * as Item from '#lib/components/ui/item/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
-	import { AccessRequestStatus, type AccessRequest } from '#lib/gen/nokku/v1/access_request_pb.js';
-	import { confirm } from '#lib/hooks/index.js';
+	import { AccessRequestStatus } from '#lib/gen/nokku/v1/access_request_pb.js';
+	import {
+		lasting,
+		requester,
+		requestState,
+		useRequestAnswers
+	} from '#lib/components/access/requests.svelte.js';
 	import PlanBadge from '#lib/components/blocks/PlanBadge.svelte';
 	import { usePlans } from '#lib/plans.js';
 	import { statusTone } from '#lib/tone.js';
-	import { enumLabel, formatHours, formatTs } from '#lib/utils.js';
-	import { durationMs } from '@bufbuild/protobuf/wkt';
+	import { formatTs } from '#lib/utils.js';
 	import { ArrowRight, Hand, Inbox } from '@lucide/svelte';
 	import RequestModal from './RequestModal.svelte';
 
@@ -44,33 +48,10 @@
 			: (requests.data?.requests ?? []).filter((r) => r.status !== AccessRequestStatus.PENDING)
 	);
 
-	const approve = accessRequests.approve();
-	const deny = accessRequests.deny();
 	const cancel = accessRequests.cancel();
 	const setTags = accessRequests.setTags();
 
-	const statusLabel = (r: AccessRequest) => enumLabel(AccessRequestStatus[r.status]);
-	const lasting = (r: AccessRequest) =>
-		formatHours(r.duration ? durationMs(r.duration) / 3_600_000 : 0);
-
-	function askApprove(r: AccessRequest) {
-		void confirm({
-			title: `Approve ${r.username} on ${r.targetName}?`,
-			description: `${r.requesterName || r.requesterEmail} can log in for ${lasting(r)} from now. It ends by itself.`,
-			confirmText: 'Approve',
-			destructive: false,
-			onConfirm: () => approve.mutateAsync({ id: r.id })
-		});
-	}
-
-	function askDeny(r: AccessRequest) {
-		void confirm({
-			title: 'Deny this request?',
-			description: `${r.requesterName || r.requesterEmail} gets an email that it was denied.`,
-			confirmText: 'Deny',
-			onConfirm: () => deny.mutateAsync({ id: r.id })
-		});
-	}
+	const answer = useRequestAnswers();
 </script>
 
 <RequestModal bind:open={asking} />
@@ -88,7 +69,7 @@
 </PageHeader>
 
 {#if available === false}
-	<Card.Root class="mb-4">
+	<Card.Root>
 		<Card.Header>
 			<Card.Title class="flex items-center gap-2">
 				Access requests
@@ -118,7 +99,7 @@
 {/if}
 
 {#if can.admin && (available || tags.length)}
-	<Card.Root class="mb-4">
+	<Card.Root>
 		<Card.Header>
 			<Card.Title>Servers people may ask for</Card.Title>
 			<Card.Description>
@@ -144,60 +125,62 @@
 		</Tabs.Trigger>
 		<Tabs.Trigger value="answered">Answered</Tabs.Trigger>
 	</Tabs.List>
-</Tabs.Root>
 
-<Item.Group class="mt-4 gap-2">
-	{#each shown as r (r.id)}
-		{@const own = r.requesterId === me.data?.id}
-		<Item.Root variant="outline">
-			<Item.Content>
-				<Item.Title class="flex flex-wrap items-center gap-2">
-					<span class="font-mono">{r.username}@{r.targetName}</span>
-					<span class="text-muted-foreground">for {lasting(r)}</span>
-					{#if r.status !== AccessRequestStatus.PENDING}
-						<Badge variant={statusTone(AccessRequestStatus[r.status])}>{statusLabel(r)}</Badge>
-					{/if}
-				</Item.Title>
-				<Item.Description>
-					{own ? 'You' : r.requesterName || r.requesterEmail}, {formatTs(r.createdAt, 'relative')}:
-					{r.reason}
-				</Item.Description>
-				{#if r.grantedUntil && r.status === AccessRequestStatus.APPROVED}
+	<Item.Group class="gap-2">
+		{#each shown as r (r.id)}
+			{@const own = r.requesterId === me.data?.id}
+			<Item.Root variant="outline">
+				<Item.Content>
+					<Item.Title class="flex flex-wrap items-center gap-2">
+						<span class="font-mono">{r.username}@{r.targetName}</span>
+						<span class="text-muted-foreground">for {lasting(r)}</span>
+						{#if r.status !== AccessRequestStatus.PENDING}
+							<Badge variant={statusTone(AccessRequestStatus[r.status])}>{requestState(r)}</Badge>
+						{/if}
+					</Item.Title>
 					<Item.Description>
-						Approved by {r.deciderName}, until {formatTs(r.grantedUntil, 'withTime')}
+						{own ? 'You' : requester(r)}, {formatTs(r.createdAt, 'relative')}:
+						{r.reason}
 					</Item.Description>
-				{:else if r.deciderName}
-					<Item.Description>{statusLabel(r)} by {r.deciderName}</Item.Description>
-				{/if}
-			</Item.Content>
-			{#if r.status === AccessRequestStatus.PENDING}
-				<Item.Actions>
-					{#if own}
-						<Button variant="ghost" size="sm" onclick={() => cancel.mutate({ id: r.id })}>
-							Cancel
-						</Button>
-					{:else if can.admin}
-						<Button variant="ghost" size="sm" onclick={() => askDeny(r)}>Deny</Button>
-						<Button size="sm" onclick={() => askApprove(r)} disabled={!available}>Approve</Button>
+					{#if r.grantedUntil && r.status === AccessRequestStatus.APPROVED}
+						<Item.Description>
+							Approved by {r.deciderName}, until {formatTs(r.grantedUntil, 'withTime')}
+						</Item.Description>
+					{:else if r.deciderName}
+						<Item.Description>{requestState(r)} by {r.deciderName}</Item.Description>
 					{/if}
-				</Item.Actions>
+				</Item.Content>
+				{#if r.status === AccessRequestStatus.PENDING}
+					<Item.Actions>
+						{#if own}
+							<Button variant="ghost" size="sm" onclick={() => cancel.mutate({ id: r.id })}>
+								Cancel
+							</Button>
+						{:else if can.admin}
+							<Button variant="ghost" size="sm" onclick={() => answer.deny(r)}>Deny</Button>
+							<Button size="sm" onclick={() => answer.approve(r)} disabled={!available}
+								>Approve</Button
+							>
+						{/if}
+					</Item.Actions>
+				{/if}
+			</Item.Root>
+		{:else}
+			{#if !requests.isLoading}
+				<Empty.Root class="border border-dashed">
+					<Empty.Header>
+						<Empty.Media variant="icon"><Inbox /></Empty.Media>
+						<Empty.Title>
+							{view === 'waiting' ? 'Nothing waits for an answer' : 'No answered requests yet'}
+						</Empty.Title>
+						<Empty.Description>
+							{available && tags.length
+								? 'Ask for an account with Request access, or with nk request in a terminal.'
+								: 'No server is open for requests yet.'}
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
 			{/if}
-		</Item.Root>
-	{:else}
-		{#if !requests.isLoading}
-			<Empty.Root class="border border-dashed">
-				<Empty.Header>
-					<Empty.Media variant="icon"><Inbox /></Empty.Media>
-					<Empty.Title>
-						{view === 'waiting' ? 'Nothing waits for an answer' : 'No answered requests yet'}
-					</Empty.Title>
-					<Empty.Description>
-						{available && tags.length
-							? 'Ask for an account with Request access, or with nk request in a terminal.'
-							: 'No server is open for requests yet.'}
-					</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{/if}
-	{/each}
-</Item.Group>
+		{/each}
+	</Item.Group>
+</Tabs.Root>

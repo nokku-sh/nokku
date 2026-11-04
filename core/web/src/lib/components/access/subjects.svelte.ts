@@ -29,7 +29,7 @@ export const grantEnd = (hours: number) =>
 
 export const kindLabels: Record<SubjectKind, { one: string; many: string }> = {
 	[SubjectKind.UNSPECIFIED]: { one: 'subject', many: 'subjects' },
-	[SubjectKind.USER]: { one: 'user', many: 'users' },
+	[SubjectKind.USER]: { one: 'person', many: 'people' },
 	[SubjectKind.TEAM]: { one: 'team', many: 'teams' },
 	[SubjectKind.SERVICE_ACCOUNT]: { one: 'service account', many: 'service accounts' }
 };
@@ -59,7 +59,7 @@ export const fromServiceAccount = (s: ServiceAccount): Subject => ({
 export function subjectHref(kind: SubjectKind, id: string) {
 	switch (kind) {
 		case SubjectKind.USER:
-			return `/access/users?id=${id}`;
+			return `/access/people?id=${id}`;
 		case SubjectKind.TEAM:
 			return `/access/teams?id=${id}`;
 		case SubjectKind.SERVICE_ACCOUNT:

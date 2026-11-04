@@ -90,6 +90,16 @@ WITH
         OR action ILIKE '%' || sqlc.narg('search') || '%'
         OR actor_name ILIKE '%' || sqlc.narg('search') || '%'
         OR target ILIKE '%' || sqlc.narg('search') || '%'
+        -- The names an event stored, so "web-1" finds the grants on it.
+        OR concat_ws(
+          ' ',
+          details ->> 'name',
+          details ->> 'target',
+          details ->> 'username',
+          details ->> 'member',
+          details ->> 'subject',
+          details ->> 'subjects'
+        ) ILIKE '%' || sqlc.narg('search') || '%'
       )
       AND (
         sqlc.narg('start_date')::timestamptz IS NULL
@@ -185,3 +195,17 @@ WHERE
 -- Opts this transaction into the audit_logs delete guard.
 SELECT
   set_config('nokku.audit_retention', 'on', TRUE);
+
+-- name: GetNames :many
+-- Names for audit events in the order of the ids, an id that names nothing here gets an empty one.
+SELECT
+  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, t.name, dt.name, '')::TEXT AS name
+FROM
+  unnest(@ids::UUID[]) WITH ORDINALITY AS i (id, n)
+  LEFT JOIN users u ON u.id = i.id
+  LEFT JOIN teams m ON m.id = i.id
+  LEFT JOIN service_accounts s ON s.id = i.id
+  LEFT JOIN targets t ON t.id = i.id
+  LEFT JOIN targets dt ON dt.daemon_id = i.id -- a daemon goes by its server's name
+ORDER BY
+  i.n;

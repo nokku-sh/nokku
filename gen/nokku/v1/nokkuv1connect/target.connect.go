@@ -49,6 +49,9 @@ const (
 	// TargetServiceListAccessGraphTargetsProcedure is the procedure name of the TargetService's
 	// ListAccessGraphTargets RPC.
 	TargetServiceListAccessGraphTargetsProcedure = "/nokku.v1.TargetService/ListAccessGraphTargets"
+	// TargetServiceGetAccessMatrixProcedure is the procedure name of the TargetService's
+	// GetAccessMatrix RPC.
+	TargetServiceGetAccessMatrixProcedure = "/nokku.v1.TargetService/GetAccessMatrix"
 )
 
 var (
@@ -128,6 +131,14 @@ var (
 			IdempotencyLevel: connect.IdempotencyNoSideEffects,
 		}
 	})
+	targetServiceGetAccessMatrixSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetAccessMatrix"),
+			Procedure:        TargetServiceGetAccessMatrixProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
 )
 
 // TargetServiceClient is a client for the nokku.v1.TargetService service.
@@ -142,6 +153,8 @@ type TargetServiceClient interface {
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
 	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
+	// GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
+	GetAccessMatrix(context.Context, *v1.GetAccessMatrixRequest) (*v1.GetAccessMatrixResponse, error)
 }
 
 // NewTargetServiceClient constructs a client for the nokku.v1.TargetService service. Multiple
@@ -162,6 +175,8 @@ type TargetServiceHandler interface {
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
 	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
+	// GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
+	GetAccessMatrix(context.Context, *v1.GetAccessMatrixRequest) (*v1.GetAccessMatrixResponse, error)
 }
 
 // RegisterTargetServiceHandler registers svc as the nokku.v1.TargetService implementation on
@@ -179,6 +194,7 @@ func RegisterTargetServiceHandler(server *connect.Server, svc TargetServiceHandl
 		connect.Method{Spec: targetServiceSyncTargetUsersSpec(), Handler: adapter.syncTargetUsers},
 		connect.Method{Spec: targetServiceGetAccessGraphSpec(), Handler: adapter.getAccessGraph},
 		connect.Method{Spec: targetServiceListAccessGraphTargetsSpec(), Handler: adapter.listAccessGraphTargets},
+		connect.Method{Spec: targetServiceGetAccessMatrixSpec(), Handler: adapter.getAccessMatrix},
 	)
 }
 
@@ -223,6 +239,10 @@ func (UnimplementedTargetServiceHandler) GetAccessGraph(context.Context, *v1.Get
 
 func (UnimplementedTargetServiceHandler) ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.ListAccessGraphTargets is not implemented")
+}
+
+func (UnimplementedTargetServiceHandler) GetAccessMatrix(context.Context, *v1.GetAccessMatrixRequest) (*v1.GetAccessMatrixResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetAccessMatrix is not implemented")
 }
 
 type targetServiceClient struct {
@@ -304,6 +324,14 @@ func (c *targetServiceClient) GetAccessGraph(ctx context.Context, req *v1.GetAcc
 func (c *targetServiceClient) ListAccessGraphTargets(ctx context.Context, req *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error) {
 	var res v1.ListAccessGraphTargetsResponse
 	if err := c.client.CallUnary(ctx, targetServiceListAccessGraphTargetsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) GetAccessMatrix(ctx context.Context, req *v1.GetAccessMatrixRequest) (*v1.GetAccessMatrixResponse, error) {
+	var res v1.GetAccessMatrixResponse
+	if err := c.client.CallUnary(ctx, targetServiceGetAccessMatrixSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -425,6 +453,18 @@ func (h targetServiceHandler) listAccessGraphTargets(ctx context.Context, _ conn
 		return err
 	}
 	res, err := h.svc.ListAccessGraphTargets(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) getAccessMatrix(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetAccessMatrixRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetAccessMatrix(ctx, &req)
 	if err != nil {
 		return err
 	}

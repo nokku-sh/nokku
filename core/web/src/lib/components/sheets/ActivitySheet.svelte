@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { eventLabel, outcomeLabel, outcomeOf } from '#lib/components/audit/audit.js';
+	import { eventLabel, eventWhat, outcomeLabel, outcomeOf } from '#lib/components/audit/audit.js';
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
@@ -18,7 +18,7 @@
 
 	const actorHref = $derived.by(() => {
 		if (!log?.actorId) return undefined;
-		if (log.actorKind === 'user') return `/access/users?id=${log.actorId}`;
+		if (log.actorKind === 'user') return `/access/people?id=${log.actorId}`;
 		if (log.actorKind === 'service_account') return `/access/service-accounts?id=${log.actorId}`;
 		return undefined;
 	});
@@ -69,6 +69,7 @@
 				<DetailList
 					items={[
 						{ label: 'Action', value: log.action, mono: true },
+						...(eventWhat(log) ? [{ label: 'About', value: eventWhat(log) }] : []),
 						{ label: 'Target', value: log.target, mono: true, copy: true, wide: true },
 						...details
 					]}

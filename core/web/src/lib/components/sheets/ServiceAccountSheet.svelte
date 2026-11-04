@@ -4,7 +4,7 @@
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
-	import { roleLabel, SERVICE_ACCOUNT_MAX_ROLE } from '#lib/roles.js';
+	import { SERVICE_ACCOUNT_MAX_ROLE } from '#lib/roles.js';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
 	import CreateServiceAccountTokenModal from '#lib/components/modals/CreateServiceAccountTokenModal.svelte';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
@@ -28,7 +28,6 @@
 	import {
 		Ban,
 		FileText,
-		Info,
 		KeyRound,
 		Plus,
 		Settings2,
@@ -38,7 +37,6 @@
 		Workflow
 	} from '@lucide/svelte';
 	import DangerZone from './DangerZone.svelte';
-	import DetailList from './DetailList.svelte';
 	import EntitySheet from './EntitySheet.svelte';
 	import Section from './Section.svelte';
 	import ServiceAccountFederations from './ServiceAccountFederations.svelte';
@@ -128,7 +126,6 @@
 		: undefined}
 	detail={entity?.description}
 	tabs={[
-		{ value: 'overview', label: 'Overview', icon: Info },
 		{ value: 'access', label: 'Access', icon: ShieldCheck },
 		{ value: 'ci', label: 'CI jobs', icon: Workflow },
 		{ value: 'tokens', label: 'Tokens', icon: KeyRound },
@@ -157,22 +154,6 @@
 	{/snippet}
 
 	{#if model && entity}
-		<Tabs.Content value="overview" class="flex flex-col divide-y">
-			<Section title="At a glance" icon={Info}>
-				<DetailList
-					items={[
-						{ label: 'Role', value: roleLabel(entity.role) },
-						{
-							label: 'Last used',
-							value: entity.lastUsedAt ? formatTs(entity.lastUsedAt, 'relative') : 'Never'
-						},
-						{ label: 'Tokens', value: tokens.data ? String(tokenList.length) : undefined },
-						{ label: 'Tags', value: entity.tags.join(', ') || undefined, mono: true }
-					]}
-				/>
-			</Section>
-		</Tabs.Content>
-
 		<Tabs.Content value="access" class="flex flex-col gap-5">
 			<SubjectAccess subjectId={entity.id} kind={SubjectKind.SERVICE_ACCOUNT} name={entity.name} />
 		</Tabs.Content>

@@ -42,7 +42,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 	res := &Synced{}
 	var targetID string
 	err := conn.TenantTx(ctx, func(q *db.Queries) error {
-		daemon, err := q.GetDaemon(ctx, in.DaemonID)
+		row, err := q.GetDaemon(ctx, in.DaemonID)
 		// A deleted daemon still serves its cached principals, REJECTED makes
 		// the host drop them. Its token stays until it expires, so a lost
 		// answer comes again, and nothing else takes it.
@@ -53,6 +53,7 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		if err != nil {
 			return err
 		}
+		daemon := &row.Daemon
 		res.Status = &daemon.Status
 		res.Config = daemon.EffectiveConfig()
 

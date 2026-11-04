@@ -1,7 +1,6 @@
-import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
-import { PAGE_PARAM } from '#lib/hooks/index.js';
+import { setFilters } from '#lib/hooks/index.js';
 import {
 	Bot,
 	CircleCheck,
@@ -83,7 +82,7 @@ export const areas: Area[] = [
 	},
 	{
 		value: 'infrastructure',
-		label: 'Infrastructure',
+		label: 'Servers',
 		icon: Server,
 		actions: [
 			'CreateTarget',
@@ -93,7 +92,10 @@ export const areas: Area[] = [
 			'EnrollDaemon',
 			'UpdateDaemon',
 			'DaemonBehind',
-			'DeleteDaemon'
+			'DeleteDaemon',
+			'ApproveDaemon',
+			'RejectDaemon',
+			'UpdateDaemonDefaults'
 		]
 	},
 	{
@@ -199,8 +201,70 @@ const labels: Record<string, string> = {
 	CancelAccessRequest: 'Cancelled a request',
 	AccessRequestExpired: 'Request expired',
 	SetRequestableTags: 'Changed requestable servers',
-	ExportAccessReport: 'Exported the access report'
+	ExportAccessReport: 'Exported the access report',
+	// The API still says target, the UI says server.
+	CreateTarget: 'Added a server',
+	UpdateTarget: 'Changed a server',
+	DeleteTarget: 'Deleted a server',
+	SyncTargetUsers: 'Synced a server',
+	UpdateDaemon: 'Changed a daemon',
+	ApproveDaemon: 'Approved a server',
+	RejectDaemon: 'Rejected a server',
+	DeleteDaemon: 'Deleted a daemon',
+	CreateTeam: 'Created a team',
+	UpdateTeam: 'Changed a team',
+	DeleteTeam: 'Deleted a team',
+	AddTeamMember: 'Added to a team',
+	RemoveTeamMember: 'Removed from a team',
+	UpdateUserRole: 'Changed a role',
+	UpdateDaemonDefaults: 'Changed daemon defaults',
+	DeleteUser: 'Removed a person'
 };
+
+const detail = (log: EventLog, key: string) => {
+	const v = log.details?.[key];
+	return typeof v === 'string' && v ? v : undefined;
+};
+
+const subjectPrefix: Record<string, string> = { team: 'team:', service_account: 'sa:' };
+
+// How a grant event joins the account and the subjects, like "deploy on web-1 to Mia".
+const grantWords: Record<string, string> = {
+	AddSubjects: 'to',
+	RemoveSubjects: 'from',
+	GrantExpired: 'for'
+};
+
+/** What an event touched, in words, from the names it stored. Older events only hold ids and get undefined. */
+export function eventWhat(log: EventLog): string | undefined {
+	const name = detail(log, 'name');
+	const server = detail(log, 'target');
+	const account = detail(log, 'username');
+	const prefix = subjectPrefix[detail(log, 'subject_kind') ?? ''] ?? '';
+	const listed = log.details?.['subjects'];
+	const who = (Array.isArray(listed) ? listed : [])
+		.filter((s): s is string => typeof s === 'string' && s !== '')
+		.map((s) => prefix + s)
+		.join(', ');
+	const on = account && server ? `${account} on ${server}` : undefined;
+
+	if (grantWords[log.action]) return on && (who ? `${on} ${grantWords[log.action]} ${who}` : on);
+	switch (log.action) {
+		case 'RevokeAllAccess':
+			return name && prefix + name;
+		case 'AddTeamMember':
+		case 'RemoveTeamMember': {
+			const member = detail(log, 'member');
+			const to = log.action === 'AddTeamMember' ? 'to' : 'from';
+			return member && name ? `${member} ${to} ${name}` : name;
+		}
+		case 'UpdateUserRole': {
+			const role = detail(log, 'role');
+			return name && role ? `${name} to ${role}` : name;
+		}
+	}
+	return name ?? on;
+}
 
 /** "DeleteTarget" reads as "Delete target". */
 export function eventLabel(action: string) {
@@ -223,16 +287,10 @@ export function outcomeOf(log: EventLog): Outcome {
 export const csv = (param: string) =>
 	page.url.searchParams.get(param)?.split(',').filter(Boolean) ?? [];
 
-// setParams changes filters and goes back to page 1, since the result set moved.
+// setParams can also drop every quick-view filter first.
 export function setParams(params: Record<string, string | undefined>, replaceFilters = false) {
-	const url = new URL(page.url.href);
-	if (replaceFilters) filterParams.forEach((p) => url.searchParams.delete(p));
-	for (const [key, value] of Object.entries(params)) {
-		if (value) url.searchParams.set(key, value);
-		else url.searchParams.delete(key);
-	}
-	url.searchParams.delete(PAGE_PARAM);
-	void goto(url, { replace: true, reset: false });
+	const cleared = replaceFilters ? Object.fromEntries(filterParams.map((p) => [p, undefined])) : {};
+	setFilters({ ...cleared, ...params });
 }
 
 export const kindIcon = (kind: string): LucideIcon => kindOf(kind)?.icon ?? KeyRound;

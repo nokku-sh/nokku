@@ -5,6 +5,8 @@ package nokku.v1;
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 import "nokku/v1/daemon.proto";
+import "nokku/v1/target.proto";
+import "nokku/v1/target_account.proto";
 import "nokku/v1/util.proto";
 
 service DashboardService {
@@ -25,6 +27,21 @@ message LiveSession {
   google.protobuf.Timestamp started_at = 8;
 }
 
+// EndingGrant is a subject's grants on one account that end at the same time, usually given in one go.
+message EndingGrant {
+  message Target {
+    string id = 1;
+    string name = 2;
+  }
+  SubjectKind subject_kind = 1;
+  string subject_id = 2;
+  string subject_name = 3;
+  string username = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  repeated Target targets = 6; // the first 20 by name, target_count has them all
+  int32 target_count = 7;
+}
+
 message GetDashboardRequest {}
 message GetDashboardResponse {
   int32 targets = 1;
@@ -33,7 +50,7 @@ message GetDashboardResponse {
   int32 daemons = 4;
   int32 daemons_online = 5;
   repeated Daemon pending_daemons = 6;
-  repeated Daemon offline_daemons = 7;
+  repeated Target offline_servers = 7; // with their daemons, approved but not connected
   int32 users = 8;
   int64 recording_bytes = 9;
   int64 recording_quota_bytes = 10;
@@ -42,4 +59,6 @@ message GetDashboardResponse {
   repeated int32 failures = 13;
   repeated EventLog recent_changes = 14;
   int32 daemons_behind = 15;
+  repeated EndingGrant ending_grants = 16; // the next five to end within a day
+  int32 ending_grants_total = 17;
 }

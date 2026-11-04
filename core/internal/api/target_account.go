@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -50,14 +53,13 @@ func (s *targetAccountService) AddSubjects(
 	req *nokkuv1.AddSubjectsRequest,
 ) (*nokkuv1.AddSubjectsResponse, error) {
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		// An account of another workspace does not exist here.
-		if _, err := q.GetTargetAccountWorkspace(ctx, req.GetId()); err != nil {
-			return err
-		}
-
 		kind, ok := subjectKind(req.GetKind())
 		if !ok {
 			return errInvalidInput
+		}
+		// Also the check that the account is this workspace's.
+		if err := auditGrant(ctx, q, req.GetId(), kind, req.GetSubjectIds()); err != nil {
+			return err
 		}
 		var expiresAt *time.Time
 		if req.GetExpiresAt() != nil {
@@ -93,6 +95,11 @@ func (s *targetAccountService) RemoveSubjects(
 		if !ok {
 			return errInvalidInput
 		}
+		// Removing from an account that is gone stays a no-op, it just has no names.
+		if err := auditGrant(ctx, q, req.GetId(), kind, req.GetSubjectIds()); err != nil &&
+			!errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
 		for _, subjectID := range req.GetSubjectIds() {
 			if err := q.RemoveGrant(ctx, &db.RemoveGrantParams{
 				AccountID:   req.GetId(),
@@ -120,7 +127,12 @@ func (s *targetAccountService) RevokeAllAccess(
 	if !ok {
 		return nil, errInvalidInput
 	}
-	if err := s.cfg.Conn.Tenant().RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
+	q := s.cfg.Conn.Tenant()
+	audit.Set(ctx, "subject_kind", kind)
+	if err := auditName(ctx, q, "name", req.GetSubjectId()); err != nil {
+		return nil, err
+	}
+	if err := q.RevokeSubjectAccessInWorkspace(ctx, &db.RevokeSubjectAccessInWorkspaceParams{
 		SubjectKind: kind,
 		SubjectID:   req.GetSubjectId(),
 	}); err != nil {
@@ -135,7 +147,12 @@ func (s *targetAccountService) AddTargetAccount(
 	ctx context.Context,
 	req *nokkuv1.AddTargetAccountRequest,
 ) (*nokkuv1.AddTargetAccountResponse, error) {
-	account, err := s.cfg.Conn.Tenant().CreateTargetAccount(ctx, &db.CreateTargetAccountParams{
+	q := s.cfg.Conn.Tenant()
+	audit.Set(ctx, "username", req.GetUsername())
+	if err := auditName(ctx, q, "target", req.GetTargetId()); err != nil {
+		return nil, err
+	}
+	account, err := q.CreateTargetAccount(ctx, &db.CreateTargetAccountParams{
 		TargetID: req.GetTargetId(),
 		Username: req.GetUsername(),
 	})
@@ -150,11 +167,41 @@ func (s *targetAccountService) RemoveTargetAccount(
 	ctx context.Context,
 	req *nokkuv1.RemoveTargetAccountRequest,
 ) (*nokkuv1.RemoveTargetAccountResponse, error) {
-	if err := s.cfg.Conn.Tenant().DeleteTargetAccount(ctx, req.GetId()); err != nil {
+	q := s.cfg.Conn.Tenant()
+	// Removing an account that is gone stays a no-op, it just has no names.
+	if err := auditAccount(ctx, q, req.GetId()); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	if err := q.DeleteTargetAccount(ctx, req.GetId()); err != nil {
 		return nil, err
 	}
 
 	return &nokkuv1.RemoveTargetAccountResponse{}, nil
+}
+
+// auditGrant names a grant change in its audit event: the server, the account and who, as they are called now.
+func auditGrant(ctx context.Context, q *db.Queries, accountID, kind string, subjectIDs []string) error {
+	if err := auditAccount(ctx, q, accountID); err != nil {
+		return err
+	}
+	names, err := q.GetNames(ctx, subjectIDs)
+	if err != nil {
+		return err
+	}
+	audit.Set(ctx, "subject_kind", kind)
+	audit.Set(ctx, "subjects", names)
+	return nil
+}
+
+// auditAccount names a login account by its server and username.
+func auditAccount(ctx context.Context, q *db.Queries, accountID string) error {
+	acc, err := q.GetTargetAccountLabel(ctx, accountID)
+	if err != nil {
+		return err
+	}
+	audit.Set(ctx, "target", acc.TargetName)
+	audit.Set(ctx, "username", acc.Username)
+	return nil
 }
 
 func subjectKind(k nokkuv1.SubjectKind) (string, bool) {

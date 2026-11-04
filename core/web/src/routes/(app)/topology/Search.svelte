@@ -47,7 +47,7 @@
 <SearchPopover
 	bind:open
 	bind:query
-	placeholder="People, teams, targets, tags"
+	placeholder="People, teams, servers, tags"
 	loading={subjects.loading || targets.isLoading}
 >
 	{#snippet trigger(props)}
@@ -73,7 +73,7 @@
 		{/if}
 	{/each}
 	{#if targets.data?.targets.length}
-		<Command.Group heading="Targets">
+		<Command.Group heading="Servers">
 			{#each targets.data.targets as t (t.id)}
 				<Command.Item
 					value={t.id}

@@ -29,7 +29,7 @@ export function useConnect() {
 				// The global mutation handler already toasted it.
 				return;
 			}
-			if (page.url.pathname !== '/sessions') await goto('/sessions');
+			if (page.url.pathname !== '/shell') await goto('/shell');
 		},
 		async copy(t: Pick<Target, 'id' | 'name'>, username: string) {
 			remember(t.id);
@@ -54,6 +54,9 @@ export function useServers(when: () => boolean = () => true) {
 
 	const online = $derived(
 		new Set((access.data?.daemons ?? []).filter((d) => d.online).map((d) => d.id))
+	);
+	const recording = $derived(
+		new Set((access.data?.daemons ?? []).filter((d) => d.config?.recordSessions).map((d) => d.id))
 	);
 	const inactive = $derived(!!plan.data?.inactive);
 	const isOnline = (t: Pick<Target, 'daemonId'>) => !!t.daemonId && online.has(t.daemonId);
@@ -90,6 +93,8 @@ export function useServers(when: () => boolean = () => true) {
 			return inactive;
 		},
 		online: isOnline,
+		/** Whether its daemon records the sessions it serves. */
+		records: (t: Pick<Target, 'daemonId'>) => !!t.daemonId && recording.has(t.daemonId),
 		canShell,
 		why
 	};

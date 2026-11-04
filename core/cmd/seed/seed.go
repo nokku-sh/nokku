@@ -140,9 +140,7 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 		if i%4 == 3 {
 			status = nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING
 		}
-		// The daemon brings its server along. A taken name returns no row.
 		d, err := q.CreateDaemon(ctx, &db.CreateDaemonParams{
-			Name:          fresh(),
 			Status:        status,
 			Config:        config,
 			Version:       "seed",
@@ -151,7 +149,12 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 		if err != nil {
 			return fmt.Errorf("daemon: %w", err)
 		}
-		if err := grant(ctx, q, d.TargetID, who); err != nil {
+		// A taken name returns no row.
+		targetID, err := q.CreateDaemonTarget(ctx, &db.CreateDaemonTargetParams{DaemonID: &d.ID, Name: fresh()})
+		if err != nil {
+			return fmt.Errorf("server: %w", err)
+		}
+		if err := grant(ctx, q, targetID, who); err != nil {
 			return err
 		}
 	}

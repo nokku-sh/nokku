@@ -182,7 +182,7 @@ func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID,
 	if err != nil {
 		return err
 	}
-	if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+	if daemon.Daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		return db.ErrPermissionDenied
 	}
 	return nil

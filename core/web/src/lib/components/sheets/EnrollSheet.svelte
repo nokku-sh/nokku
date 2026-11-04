@@ -391,8 +391,8 @@ runcmd:
 						<Field.Content>
 							<Field.Label for="token-auto-approve">Approve automatically</Field.Label>
 							<Field.Description>
-								Daemons join right away instead of waiting for you in the daemons list. Handy for
-								fleets, keep it off for one-off hosts.
+								Daemons join right away instead of waiting for your approval in the servers list.
+								Handy for fleets, keep it off for one-off hosts.
 							</Field.Description>
 						</Field.Content>
 						<Switch
@@ -410,7 +410,7 @@ runcmd:
 							suggestions={tagFilters.data?.tags}
 							onValueChange={(v) => (tags = v)}
 						/>
-						<Field.Description>Every target the token creates gets these tags.</Field.Description>
+						<Field.Description>Every server the token adds gets these tags.</Field.Description>
 					</Field.Field>
 					<Field.Field>
 						<Field.Label for="token-account">Login accounts</Field.Label>

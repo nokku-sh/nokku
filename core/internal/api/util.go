@@ -90,7 +90,13 @@ func (s *utilService) ListMyActivity(
 	ctx context.Context,
 	req *nokkuv1.ListMyActivityRequest,
 ) (*nokkuv1.ListMyActivityResponse, error) {
-	params := auditParams(nil)
+	f := req.GetFilter()
+	params := auditParams(f)
+	// Your own events have an index of their own, so they go back as far as the log keeps them.
+	if f.GetStartDate() == nil && f.GetEndDate() == nil {
+		params.StartDate, params.EndDate = nil, nil
+	}
+	// After the filter, so it can't widen to someone else's events.
 	params.ActorIds = []string{actor.SubjectFromContext(ctx)}
 	params.Limit, params.Offset = req.GetLimit(), req.GetOffset()
 	events, total, err := s.cfg.Audit.List(ctx, params)
@@ -168,6 +174,9 @@ func auditParams(f *nokkuv1.AuditLogFilter) *db.ListAuditLogsParams {
 	if len(f.GetActions()) > 0 {
 		p.Actions = f.GetActions()
 	}
+	if len(f.GetExcludedActions()) > 0 {
+		p.ExcludedActions = f.GetExcludedActions()
+	}
 	if f.GetTarget() != "" {
 		p.Target = new(f.GetTarget())
 	}
@@ -197,4 +206,14 @@ func optDuration(d *durationpb.Duration) *time.Duration {
 		return nil
 	}
 	return new(d.AsDuration())
+}
+
+// auditName runs before the change, so a delete keeps the name of what it removed.
+func auditName(ctx context.Context, q *db.Queries, key, id string) error {
+	names, err := q.GetNames(ctx, []string{id})
+	if err != nil {
+		return err
+	}
+	audit.Set(ctx, key, names[0])
+	return nil
 }

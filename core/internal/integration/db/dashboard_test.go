@@ -71,7 +71,7 @@ func TestListOpenRecordings(t *testing.T) {
 	rows := list(f.daemon)
 	if assert.Len(t, rows, 1, "online daemon") {
 		assert.Equal(t, open, rows[0].ID)
-		assert.Equal(t, "d", rows[0].DaemonName)
+		assert.Equal(t, "t", rows[0].DaemonName, "the daemon goes by its server's name")
 	}
 }
 
@@ -163,5 +163,5 @@ func TestRecordingOutlivesDaemon(t *testing.T) {
 		return err
 	})
 	assert.Nil(t, rec.DaemonID)
-	assert.Equal(t, "d", rec.DaemonName)
+	assert.Equal(t, "t", rec.DaemonName, "the daemon goes by its server's name")
 }

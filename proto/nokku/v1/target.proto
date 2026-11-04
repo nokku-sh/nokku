@@ -53,6 +53,11 @@ service TargetService {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  // GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
+  rpc GetAccessMatrix(GetAccessMatrixRequest) returns (GetAccessMatrixResponse) {
+    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 }
 
 message SyncTargetUsersRequest {
@@ -75,25 +80,25 @@ message SyncTargetUsersRequest {
 message SyncTargetUsersResponse {}
 
 message Target {
-  reserved 2;
-
   string id = 1;
-  string daemon_id = 3;
-  string name = 4;
-  string description = 5;
-  string host_public_key = 6; // pinned SSH host public key (manual mode)
-  repeated string tags = 7;
-  repeated string endpoints = 8;
-  repeated string usernames = 9;
-  repeated TargetAccount accounts = 10;
-  map<string, string> metadata = 11;
-  google.protobuf.Timestamp created_at = 12;
-  google.protobuf.Timestamp updated_at = 13;
-  google.protobuf.Timestamp last_sync_at = 14;
+  string daemon_id = 2;
+  string name = 3;
+  string description = 4;
+  string host_public_key = 5; // pinned SSH host public key (manual mode)
+  repeated string tags = 6;
+  repeated string endpoints = 7;
+  repeated string usernames = 8;
+  repeated TargetAccount accounts = 9;
+  map<string, string> metadata = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp last_sync_at = 13;
   // username_expires_at holds the usernames the subject asked about may only use until then. The others are for good.
-  map<string, google.protobuf.Timestamp> username_expires_at = 15;
+  map<string, google.protobuf.Timestamp> username_expires_at = 14;
   // blocked says why the subject's grants here let nobody in today. Unset when they work.
-  AccessBlock blocked = 16;
+  AccessBlock blocked = 15;
+  // daemon is the server's daemon with its live state, from ListTargets and GetTarget. Unset for nk sync servers.
+  Daemon daemon = 16;
 }
 
 // AccessBlock is why grants that stand let nobody in today.
@@ -113,37 +118,33 @@ message GetTargetResponse {
 }
 
 message CreateTargetRequest {
-  reserved 1;
-
-  string name = 2 [(buf.validate.field).string = {
+  string name = 1 [(buf.validate.field).string = {
     max_len: 256
     pattern: "^$|^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
   }]; // can be empty
-  string description = 3 [(buf.validate.field).string.max_len = 1000];
-  string host_public_key = 4;
-  repeated string endpoints = 5;
-  repeated string tags = 6;
-  repeated JoinTokenGrant grants = 7 [(buf.validate.field).repeated.max_items = 32];
+  string description = 2 [(buf.validate.field).string.max_len = 1000];
+  string host_public_key = 3;
+  repeated string endpoints = 4;
+  repeated string tags = 5;
+  repeated JoinTokenGrant grants = 6 [(buf.validate.field).repeated.max_items = 32];
 }
 message CreateTargetResponse {
   Target target = 1;
 }
 
 message UpdateTargetRequest {
-  reserved 2;
-
   string id = 1 [(buf.validate.field).string.uuid = true];
-  string name = 3 [(buf.validate.field).string = {
+  string name = 2 [(buf.validate.field).string = {
     min_len: 1
     max_len: 256
     pattern: "^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
   }];
-  string description = 4 [(buf.validate.field).string.max_len = 1000];
-  string host_public_key = 5;
-  repeated string endpoints = 6;
-  repeated string tags = 7;
+  string description = 3 [(buf.validate.field).string.max_len = 1000];
+  string host_public_key = 4;
+  repeated string endpoints = 5;
+  repeated string tags = 6;
   // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-  google.protobuf.FieldMask update_mask = 8 [
+  google.protobuf.FieldMask update_mask = 7 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
@@ -166,8 +167,6 @@ message DeleteTargetRequest {
 message DeleteTargetResponse {}
 
 message ListTargetsRequest {
-  reserved 5;
-
   int32 limit = 1 [(buf.validate.field).int32 = {
     gte: 1
     lte: 100
@@ -175,9 +174,30 @@ message ListTargetsRequest {
   int32 offset = 2 [(buf.validate.field).int32.gte = 0];
   string query = 3;
   string daemon_id = 4;
-  repeated string accounts = 6;
-  repeated string tags = 7;
+  repeated string accounts = 5;
+  repeated string tags = 6;
+  TargetStatus status = 7 [(buf.validate.field).enum = {defined_only: true}];
+  // ids keeps only these servers, like the ones a person picked.
+  repeated string ids = 8 [(buf.validate.field).repeated = {
+    max_items: 100
+    items: {
+      string: {uuid: true}
+    }
+  }];
 }
+
+// TargetStatus is what a server's daemon is up to, or that it has none.
+enum TargetStatus {
+  TARGET_STATUS_UNSPECIFIED = 0;
+  // Its daemon waits for approval or was rejected.
+  TARGET_STATUS_PENDING = 1;
+  TARGET_STATUS_ONLINE = 2;
+  // Its daemon is approved but not connected.
+  TARGET_STATUS_OFFLINE = 3;
+  // Set up with nk sync, no daemon.
+  TARGET_STATUS_MANUAL = 4;
+}
+
 message ListTargetsResponse {
   repeated Target targets = 1;
   int32 total = 2;
@@ -276,4 +296,54 @@ message AccessGraphTarget {
   string id = 1;
   string name = 2;
   bool matched = 3;
+}
+
+message GetAccessMatrixRequest {
+  // query matches the name or email of a row.
+  string query = 1 [(buf.validate.field).string.max_len = 256];
+  // kind keeps only people, teams or service accounts.
+  SubjectKind kind = 2 [(buf.validate.field).enum = {defined_only: true}];
+  // tags are the columns, the biggest ones when empty. An empty tag is the servers with none.
+  repeated string tags = 3 [(buf.validate.field).repeated = {
+    max_items: 20
+    items: {
+      string: {max_len: 256}
+    }
+  }];
+  int32 limit = 4 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 5 [(buf.validate.field).int32.gte = 0];
+}
+
+message GetAccessMatrixResponse {
+  // columns are the tags the cells are for, in order.
+  repeated AccessGraphTag columns = 1;
+  repeated AccessMatrixRow rows = 2;
+  // total counts every row that matches, not only this page.
+  int32 total = 3;
+  // tags is every tag with its servers, to pick other columns from.
+  repeated AccessGraphTag tags = 4;
+}
+
+// AccessMatrixRow is a person, team or service account holding a grant. A team's members get in through its row.
+message AccessMatrixRow {
+  string subject_id = 1;
+  SubjectKind kind = 2;
+  string name = 3;
+  string email = 4; // people only
+  int32 member_count = 5; // teams only
+  int32 targets = 6; // every server the row reaches, any tag
+  repeated AccessMatrixCell cells = 7; // only the columns it reaches, in no order
+}
+
+message AccessMatrixCell {
+  string tag = 1;
+  int32 targets = 2; // servers with the tag it reaches
+  repeated string usernames = 3;
+  // expires_at is when the last of its grants here ends. Unset when one is for good.
+  google.protobuf.Timestamp expires_at = 4;
+  // last_used_at is the newest certificate for one of these servers, by the row or a member of its team.
+  google.protobuf.Timestamp last_used_at = 5;
 }

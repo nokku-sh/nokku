@@ -80,20 +80,18 @@ enum DaemonStatus {
 }
 
 message Daemon {
-  reserved 6;
-
   string id = 1;
   string name = 2;
   bool online = 3;
   DaemonStatus status = 4;
   DaemonConfig config = 5;
-  google.protobuf.Timestamp updated_at = 7;
-  google.protobuf.Timestamp created_at = 8;
-  google.protobuf.Timestamp last_seen_at = 9;
+  google.protobuf.Timestamp updated_at = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp last_seen_at = 8;
   // version is nokkud's, as its last enroll or sync reported it.
-  string version = 10;
+  string version = 9;
   // behind_since is when a connected daemon stopped keeping up with access changes. Unset while it keeps up.
-  google.protobuf.Timestamp behind_since = 11;
+  google.protobuf.Timestamp behind_since = 10;
 }
 
 message DaemonConfig {

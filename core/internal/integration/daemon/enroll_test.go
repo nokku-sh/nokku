@@ -5,6 +5,7 @@ package daemon_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -95,6 +96,33 @@ func TestEnrollSameKeyConcurrently(t *testing.T) {
 		require.NoError(t, errs[i], "enroll %d", i)
 		require.Equal(t, ids[0], ids[i], "enroll %d", i)
 	}
+}
+
+// Twins from one image enroll at once under one hostname. One keeps it, the rest get generated names.
+func TestEnrollSameNameConcurrently(t *testing.T) {
+	f, token := enrollToken(t, nil)
+
+	const n = 8
+	names := make([]string, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() {
+			out, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("web-1")})
+			errs[i] = err
+			if out != nil {
+				names[i] = out.Name
+			}
+		})
+	}
+	wg.Wait()
+
+	for i := range n {
+		require.NoError(t, errs[i], "enroll %d", i)
+	}
+	assert.Contains(t, names, "web-1")
+	slices.Sort(names)
+	assert.Len(t, slices.Compact(names), n, "two daemons got one name")
 }
 
 // A known machine re-enrolls without consulting the quota, a new one does.

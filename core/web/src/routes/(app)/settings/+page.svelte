@@ -168,7 +168,7 @@
 						{#each people as person (person.id)}
 							<Item.Root size="sm" class="rounded-none">
 								{#snippet child({ props })}
-									<a href={`/access/users?id=${person.id}`} {...props}>
+									<a href={`/access/people?id=${person.id}`} {...props}>
 										<Item.Media><UserAvatar user={person} class="size-8" /></Item.Media>
 										<Item.Content class="min-w-0">
 											<Item.Title class="max-w-full">
@@ -186,7 +186,7 @@
 					</Item.Group>
 					{#if moreAdmins > 0}
 						<a
-							href="/access/users?role=admin"
+							href="/access/people?role=admin"
 							class="self-start text-sm text-primary hover:underline"
 						>
 							{moreAdmins} more {moreAdmins === 1 ? 'admin' : 'admins'}
@@ -240,7 +240,7 @@
 				{
 					title: 'Delete workspace',
 					description:
-						'Removes every user, team, target, certificate, recording and the audit log. Active subscriptions are canceled. Export the audit log first if you need a record.',
+						'Removes every person, team, server, certificate, recording and the audit log. Active subscriptions are canceled. Export the audit log first if you need a record.',
 					label: 'Delete',
 					onClick: () =>
 						whenFresh(() =>

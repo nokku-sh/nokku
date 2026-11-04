@@ -28,19 +28,19 @@ const (
 type CertificateAuthority struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	Id                    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	PublicKey             *string                `protobuf:"bytes,4,opt,name=public_key,json=publicKey" json:"public_key,omitempty"`
-	HostPublicKey         *string                `protobuf:"bytes,5,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
-	RotatedAt             *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=rotated_at,json=rotatedAt" json:"rotated_at,omitempty"`
-	UserDefaultTtl        *durationpb.Duration   `protobuf:"bytes,8,opt,name=user_default_ttl,json=userDefaultTtl" json:"user_default_ttl,omitempty"`
-	UserMaxTtl            *durationpb.Duration   `protobuf:"bytes,9,opt,name=user_max_ttl,json=userMaxTtl" json:"user_max_ttl,omitempty"`
-	HostTtl               *durationpb.Duration   `protobuf:"bytes,10,opt,name=host_ttl,json=hostTtl" json:"host_ttl,omitempty"`
-	CreatedAt             *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt             *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	PreviousPublicKey     *string                `protobuf:"bytes,14,opt,name=previous_public_key,json=previousPublicKey" json:"previous_public_key,omitempty"`
-	PreviousHostPublicKey *string                `protobuf:"bytes,15,opt,name=previous_host_public_key,json=previousHostPublicKey" json:"previous_host_public_key,omitempty"`
-	PreviousTrustedUntil  *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=previous_trusted_until,json=previousTrustedUntil" json:"previous_trusted_until,omitempty"`
+	PublicKey             *string                `protobuf:"bytes,2,opt,name=public_key,json=publicKey" json:"public_key,omitempty"`
+	HostPublicKey         *string                `protobuf:"bytes,3,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
+	RotatedAt             *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=rotated_at,json=rotatedAt" json:"rotated_at,omitempty"`
+	UserDefaultTtl        *durationpb.Duration   `protobuf:"bytes,5,opt,name=user_default_ttl,json=userDefaultTtl" json:"user_default_ttl,omitempty"`
+	UserMaxTtl            *durationpb.Duration   `protobuf:"bytes,6,opt,name=user_max_ttl,json=userMaxTtl" json:"user_max_ttl,omitempty"`
+	HostTtl               *durationpb.Duration   `protobuf:"bytes,7,opt,name=host_ttl,json=hostTtl" json:"host_ttl,omitempty"`
+	CreatedAt             *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt             *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	PreviousPublicKey     *string                `protobuf:"bytes,10,opt,name=previous_public_key,json=previousPublicKey" json:"previous_public_key,omitempty"`
+	PreviousHostPublicKey *string                `protobuf:"bytes,11,opt,name=previous_host_public_key,json=previousHostPublicKey" json:"previous_host_public_key,omitempty"`
+	PreviousTrustedUntil  *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=previous_trusted_until,json=previousTrustedUntil" json:"previous_trusted_until,omitempty"`
 	// source_address lists where people log in from. A service account has a list of its own.
-	SourceAddress *string `protobuf:"bytes,18,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
+	SourceAddress *string `protobuf:"bytes,13,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -248,11 +248,11 @@ func (x *GetCertificateAuthorityResponse) GetCertificateAuthority() *Certificate
 
 type UpdateCertificateAuthorityRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserDefaultTtl *durationpb.Duration   `protobuf:"bytes,5,opt,name=user_default_ttl,json=userDefaultTtl" json:"user_default_ttl,omitempty"`
-	UserMaxTtl     *durationpb.Duration   `protobuf:"bytes,6,opt,name=user_max_ttl,json=userMaxTtl" json:"user_max_ttl,omitempty"`
-	HostTtl        *durationpb.Duration   `protobuf:"bytes,7,opt,name=host_ttl,json=hostTtl" json:"host_ttl,omitempty"`
-	SourceAddress  *string                `protobuf:"bytes,10,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
-	UpdateMask     *fieldmaskpb.FieldMask `protobuf:"bytes,11,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
+	UserDefaultTtl *durationpb.Duration   `protobuf:"bytes,1,opt,name=user_default_ttl,json=userDefaultTtl" json:"user_default_ttl,omitempty"`
+	UserMaxTtl     *durationpb.Duration   `protobuf:"bytes,2,opt,name=user_max_ttl,json=userMaxTtl" json:"user_max_ttl,omitempty"`
+	HostTtl        *durationpb.Duration   `protobuf:"bytes,3,opt,name=host_ttl,json=hostTtl" json:"host_ttl,omitempty"`
+	SourceAddress  *string                `protobuf:"bytes,4,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
+	UpdateMask     *fieldmaskpb.FieldMask `protobuf:"bytes,5,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -369,7 +369,7 @@ func (x *UpdateCertificateAuthorityResponse) GetCertificateAuthority() *Certific
 type RolloverCertificateAuthorityRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Distrusts the previous keys at once, for a key that leaked. Otherwise they stay trusted for user_max_ttl.
-	RevokePrevious *bool `protobuf:"varint,2,opt,name=revoke_previous,json=revokePrevious" json:"revoke_previous,omitempty"`
+	RevokePrevious *bool `protobuf:"varint,1,opt,name=revoke_previous,json=revokePrevious" json:"revoke_previous,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -517,9 +517,9 @@ func (x *SignSSHCertificateRequest) GetTargetId() string {
 
 type SignSSHCertificateResponse struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	CaPublicKey       *string                `protobuf:"bytes,3,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
-	SignedCertificate *string                `protobuf:"bytes,4,opt,name=signed_certificate,json=signedCertificate" json:"signed_certificate,omitempty"`
-	ExpiresAt         *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	CaPublicKey       *string                `protobuf:"bytes,1,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
+	SignedCertificate *string                `protobuf:"bytes,2,opt,name=signed_certificate,json=signedCertificate" json:"signed_certificate,omitempty"`
+	ExpiresAt         *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -579,44 +579,42 @@ var File_nokku_v1_certificates_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"\n" +
-	"\x1bnokku/v1/certificates.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xd6\x05\n" +
+	"\x1bnokku/v1/certificates.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xb8\x05\n" +
 	"\x14CertificateAuthority\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
-	"public_key\x18\x04 \x01(\tR\tpublicKey\x12&\n" +
-	"\x0fhost_public_key\x18\x05 \x01(\tR\rhostPublicKey\x129\n" +
+	"public_key\x18\x02 \x01(\tR\tpublicKey\x12&\n" +
+	"\x0fhost_public_key\x18\x03 \x01(\tR\rhostPublicKey\x129\n" +
 	"\n" +
-	"rotated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\trotatedAt\x12C\n" +
-	"\x10user_default_ttl\x18\b \x01(\v2\x19.google.protobuf.DurationR\x0euserDefaultTtl\x12;\n" +
-	"\fuser_max_ttl\x18\t \x01(\v2\x19.google.protobuf.DurationR\n" +
+	"rotated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\trotatedAt\x12C\n" +
+	"\x10user_default_ttl\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\x0euserDefaultTtl\x12;\n" +
+	"\fuser_max_ttl\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\n" +
 	"userMaxTtl\x124\n" +
-	"\bhost_ttl\x18\n" +
-	" \x01(\v2\x19.google.protobuf.DurationR\ahostTtl\x129\n" +
+	"\bhost_ttl\x18\a \x01(\v2\x19.google.protobuf.DurationR\ahostTtl\x129\n" +
 	"\n" +
-	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12.\n" +
-	"\x13previous_public_key\x18\x0e \x01(\tR\x11previousPublicKey\x127\n" +
-	"\x18previous_host_public_key\x18\x0f \x01(\tR\x15previousHostPublicKey\x12P\n" +
-	"\x16previous_trusted_until\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\x14previousTrustedUntil\x12%\n" +
-	"\x0esource_address\x18\x12 \x01(\tR\rsourceAddressJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\a\x10\bJ\x04\b\v\x10\fJ\x04\b\x11\x10\x12\"&\n" +
-	"\x1eGetCertificateAuthorityRequestJ\x04\b\x01\x10\x02\"v\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12.\n" +
+	"\x13previous_public_key\x18\n" +
+	" \x01(\tR\x11previousPublicKey\x127\n" +
+	"\x18previous_host_public_key\x18\v \x01(\tR\x15previousHostPublicKey\x12P\n" +
+	"\x16previous_trusted_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x14previousTrustedUntil\x12%\n" +
+	"\x0esource_address\x18\r \x01(\tR\rsourceAddress\" \n" +
+	"\x1eGetCertificateAuthorityRequest\"v\n" +
 	"\x1fGetCertificateAuthorityResponse\x12S\n" +
-	"\x15certificate_authority\x18\x01 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\"\xec\x03\n" +
+	"\x15certificate_authority\x18\x01 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\"\xc8\x03\n" +
 	"!UpdateCertificateAuthorityRequest\x12V\n" +
-	"\x10user_default_ttl\x18\x05 \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x05\b\x80\xe7\x84\x0f2\x02\b<R\x0euserDefaultTtl\x12N\n" +
-	"\fuser_max_ttl\x18\x06 \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x05\b\x80\xe7\x84\x0f2\x02\b<R\n" +
+	"\x10user_default_ttl\x18\x01 \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x05\b\x80\xe7\x84\x0f2\x02\b<R\x0euserDefaultTtl\x12N\n" +
+	"\fuser_max_ttl\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x05\b\x80\xe7\x84\x0f2\x02\b<R\n" +
 	"userMaxTtl\x12G\n" +
-	"\bhost_ttl\x18\a \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x05\b\x80\xe7\x84\x0f2\x02\b<R\ahostTtl\x12/\n" +
-	"\x0esource_address\x18\n" +
-	" \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\rsourceAddress\x12\x80\x01\n" +
-	"\vupdate_mask\x18\v \x01(\v2\x1a.google.protobuf.FieldMaskBC\xbaH@\xc8\x01\x01\xe2\x01:\x12\x10user_default_ttl\x12\fuser_max_ttl\x12\bhost_ttl\x12\x0esource_addressR\n" +
-	"updateMaskJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\b\x10\tJ\x04\b\t\x10\n" +
-	"\"y\n" +
+	"\bhost_ttl\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x05\b\x80\xe7\x84\x0f2\x02\b<R\ahostTtl\x12/\n" +
+	"\x0esource_address\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\rsourceAddress\x12\x80\x01\n" +
+	"\vupdate_mask\x18\x05 \x01(\v2\x1a.google.protobuf.FieldMaskBC\xbaH@\xc8\x01\x01\xe2\x01:\x12\x10user_default_ttl\x12\fuser_max_ttl\x12\bhost_ttl\x12\x0esource_addressR\n" +
+	"updateMask\"y\n" +
 	"\"UpdateCertificateAuthorityResponse\x12S\n" +
-	"\x15certificate_authority\x18\x01 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\"T\n" +
+	"\x15certificate_authority\x18\x01 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\"N\n" +
 	"#RolloverCertificateAuthorityRequest\x12'\n" +
-	"\x0frevoke_previous\x18\x02 \x01(\bR\x0erevokePreviousJ\x04\b\x01\x10\x02\"{\n" +
+	"\x0frevoke_previous\x18\x01 \x01(\bR\x0erevokePrevious\"{\n" +
 	"$RolloverCertificateAuthorityResponse\x12S\n" +
 	"\x15certificate_authority\x18\x01 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\"\xb0\x01\n" +
 	"\x19SignSSHCertificateRequest\x12)\n" +
@@ -624,18 +622,18 @@ const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"public_key\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x90NR\tpublicKey\x12>\n" +
 	"\x03ttl\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x05\b\x80\xe7\x84\x0f2\x02\b<R\x03ttl\x12(\n" +
-	"\ttarget_id\x18\x03 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\btargetId\"\xb6\x01\n" +
+	"\ttarget_id\x18\x03 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\btargetId\"\xaa\x01\n" +
 	"\x1aSignSSHCertificateResponse\x12\"\n" +
-	"\rca_public_key\x18\x03 \x01(\tR\vcaPublicKey\x12-\n" +
-	"\x12signed_certificate\x18\x04 \x01(\tR\x11signedCertificate\x129\n" +
+	"\rca_public_key\x18\x01 \x01(\tR\vcaPublicKey\x12-\n" +
+	"\x12signed_certificate\x18\x02 \x01(\tR\x11signedCertificate\x129\n" +
 	"\n" +
-	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAtJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x032\x8c\x04\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x8c\x04\n" +
 	"\x12CertificateService\x12y\n" +
 	"\x17GetCertificateAuthority\x12(.nokku.v1.GetCertificateAuthorityRequest\x1a).nokku.v1.GetCertificateAuthorityResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12\x83\x01\n" +
 	"\x1aUpdateCertificateAuthority\x12+.nokku.v1.UpdateCertificateAuthorityRequest\x1a,.nokku.v1.UpdateCertificateAuthorityResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x03(\x010\x01\x12\x89\x01\n" +
+	"\xc2\xf3\x18\x06\x18\x04(\x010\x01\x12\x89\x01\n" +
 	"\x1cRolloverCertificateAuthority\x12-.nokku.v1.RolloverCertificateAuthorityRequest\x1a..nokku.v1.RolloverCertificateAuthorityResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x03(\x010\x01\x12i\n" +
+	"\xc2\xf3\x18\x06\x18\x04(\x010\x01\x12i\n" +
 	"\x12SignSSHCertificate\x12#.nokku.v1.SignSSHCertificateRequest\x1a$.nokku.v1.SignSSHCertificateResponse\"\b\xc2\xf3\x18\x04\x10\x01H\x01B\x92\x01\n" +
 	"\fcom.nokku.v1B\x11CertificatesProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

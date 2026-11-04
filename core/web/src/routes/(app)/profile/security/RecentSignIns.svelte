@@ -9,13 +9,12 @@
 
 	const me = user.self();
 
-	// The first page of the personal log holds the recent sign-ins.
-	const feed = user.activityFeed(() => !!me.data?.id);
-	const signIns = $derived(
-		(feed.data?.pages[0]?.logs ?? [])
-			.filter((e) => e.action === 'Login' || e.action === 'LoginDenied')
-			.slice(0, 5)
+	const feed = user.activity(
+		() => ({ actions: ['Login', 'LoginDenied'] }),
+		() => !!me.data?.id,
+		5
 	);
+	const signIns = $derived(feed.data?.logs ?? []);
 </script>
 
 <Card.Root>

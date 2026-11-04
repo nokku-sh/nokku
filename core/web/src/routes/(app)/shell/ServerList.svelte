@@ -45,7 +45,7 @@
 		{:else}
 			<div class="flex flex-col gap-0.5 p-1.5">
 				{#each filtered as target (target.id)}
-					<ServerRow {target} why={servers.why(target)} />
+					<ServerRow {target} why={servers.why(target)} records={servers.records(target)} />
 				{/each}
 			</div>
 		{/if}

@@ -41,6 +41,13 @@ func SetTarget(ctx context.Context, target string) {
 	}
 }
 
+// SetAction names what a call did, where one RPC does two things, like approving or rejecting a daemon.
+func SetAction(ctx context.Context, action string) {
+	if e, ok := ctx.Value(eventKey{}).(*Event); ok {
+		e.Action = action
+	}
+}
+
 // Set adds a detail to the current request's audit event. Never pass secrets.
 func Set(ctx context.Context, key string, value any) {
 	if e, ok := ctx.Value(eventKey{}).(*Event); ok {
@@ -108,6 +115,7 @@ func (s *Service) Record(ctx context.Context, e *Event) {
 		e.IP = meta.ClientIP()
 		e.UserAgent = meta.UserAgent()
 	}
+	s.nameActor(ctx, e)
 
 	s.write(ctx, e)
 }
@@ -165,10 +173,25 @@ func (s *Service) stamp(ctx context.Context, e *Event, err error) {
 		e.Details["code"] = connect.CodeOf(err).String()
 	}
 
-	if e.ActorName == "" && (p.Kind == actor.KindUser || p.Kind == actor.KindCLI) {
-		if u, err := s.conn.Tenant().GetUser(ctx, p.ID); err == nil {
+	s.nameActor(ctx, e)
+}
+
+// nameActor fills a name the caller had no reason to load. A daemon goes by its server's.
+func (s *Service) nameActor(ctx context.Context, e *Event) {
+	if e.ActorName != "" || e.ActorID == "" {
+		return
+	}
+	switch actor.Kind(e.ActorKind) {
+	case actor.KindUser, actor.KindCLI:
+		if u, err := s.conn.Tenant().GetUser(ctx, e.ActorID); err == nil {
 			e.ActorName = u.Email
 		}
+	case actor.KindDaemon:
+		if names, err := s.conn.Tenant().GetNames(ctx, []string{e.ActorID}); err == nil {
+			e.ActorName = names[0]
+		}
+	case actor.KindServiceAccount, actor.KindSCIM:
+		// A service account's principal has its name already, a SCIM token has none.
 	}
 }
 

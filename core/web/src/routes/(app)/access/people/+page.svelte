@@ -149,7 +149,7 @@
 	<InviteSheet bind:open={create.open} />
 {/if}
 
-<PageHeader title="Users" description="Everyone in this workspace, their role and their teams">
+<PageHeader title="People" description="Everyone in this workspace, their role and their teams">
 	{#if can.view}
 		<AccessReportMenu />
 	{/if}
@@ -174,7 +174,9 @@
 	emptyState={{
 		icon: CircleUser,
 		title: 'Nobody here yet',
-		description: 'Invite people to this workspace.'
+		description: canInvite
+			? 'Invite people to this workspace.'
+			: 'People show up here once they are invited or sign in with single sign-on.'
 	}}
 >
 	{#snippet toolbar(table)}

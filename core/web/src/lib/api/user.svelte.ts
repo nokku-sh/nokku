@@ -4,14 +4,21 @@ import { callUnaryMethod } from '@connectrpc/connect-query-core';
 import { toast } from 'svelte-sonner';
 import { leave, queryClient } from './client';
 import { account } from './account';
-import { useTransport } from '#lib/query/index.js';
-import { UtilService, type ListMyActivityResponse } from '#lib/gen/nokku/v1/util_pb.js';
+import { useQuery, useTransport } from '#lib/query/index.js';
+import {
+	UtilService,
+	type AuditLogFilterSchema,
+	type ListMyActivityResponse
+} from '#lib/gen/nokku/v1/util_pb.js';
+import type { MessageInitShape } from '@bufbuild/protobuf';
 import type { User } from '#lib/gen/nokku/v1/account_pb.js';
 import { atLeast } from '#lib/roles.js';
 
 const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
 const FEED_PAGE = 25;
+
+export type ActivityFilter = MessageInitShape<typeof AuditLogFilterSchema>;
 
 export const user = {
 	self: () =>
@@ -43,15 +50,16 @@ export const user = {
 		};
 	},
 
-	// The caller's own events, newest first. Pages by offset for "Load more".
-	activityFeed: (enabled: () => boolean) => {
+	// The caller's own events, newest first, filtered on the server. Pages by offset for "Load more".
+	activityFeed: (filter: () => ActivityFilter | undefined, enabled: () => boolean) => {
 		const transport = useTransport();
 		return createInfiniteQuery(() => ({
-			queryKey: ['account', 'activity'],
+			queryKey: ['account', 'activity', filter() ?? {}],
 			queryFn: ({ pageParam }: { pageParam: number }) =>
 				callUnaryMethod(transport, UtilService.method.listMyActivity, {
 					limit: FEED_PAGE,
-					offset: pageParam
+					offset: pageParam,
+					filter: filter()
 				}),
 			initialPageParam: 0,
 			getNextPageParam: (last: ListMyActivityResponse, pages: ListMyActivityResponse[]) => {
@@ -63,6 +71,16 @@ export const user = {
 			enabled: enabled()
 		}));
 	},
+
+	// The newest of the caller's events that match, with how many there are.
+	activity: (filter: () => ActivityFilter, enabled: () => boolean, limit = 1) =>
+		useQuery(
+			UtilService.method.listMyActivity,
+			() => ({ limit, filter: filter() }),
+			() => ({
+				enabled: enabled()
+			})
+		),
 
 	updateProfile: () =>
 		createMutation<User, Error, { name?: string }>(() => ({

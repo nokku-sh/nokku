@@ -12,7 +12,7 @@
 	import { goto } from '$app/navigation';
 	import { auth, whenFresh } from '#lib/api/auth.svelte.js';
 	import { useConnect, useServers } from '#lib/api/connect.svelte.js';
-	import { daemon } from '#lib/api/daemons.svelte.js';
+	import { openGrant } from '#lib/components/access/grant.svelte.js';
 	import { serviceAccount } from '#lib/api/service_account.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
 	import { team } from '#lib/api/team.svelte.js';
@@ -23,8 +23,8 @@
 	import * as Kbd from '#lib/components/ui/kbd/index.js';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import {
-		Bot,
 		CircleUser,
+		ShieldCheck,
 		Moon,
 		Rocket,
 		Server,
@@ -77,16 +77,23 @@
 	const actions = $derived(
 		[
 			{
-				title: 'Add target',
+				title: 'Grant access',
+				icon: ShieldCheck,
+				run: () => openGrant(),
+				show: can.edit,
+				keywords: 'give access login account permission'
+			},
+			{
+				title: 'Add a server',
 				icon: Server,
-				url: '/infrastructure/targets?new=1',
+				url: '/servers?new=1',
 				show: can.edit,
 				keywords: 'server host create'
 			},
 			{
-				title: 'Enroll a daemon',
+				title: 'Enroll servers',
 				icon: Rocket,
-				url: '/infrastructure/daemons?new=1',
+				url: '/servers?new=enroll',
 				fresh: true,
 				show: can.admin,
 				keywords: 'nokkud token install'
@@ -94,7 +101,7 @@
 			{
 				title: 'Invite people',
 				icon: UserPlus,
-				url: '/access/users?new=1',
+				url: '/access/people?new=1',
 				fresh: true,
 				show: can.admin && !!options.data?.passkey,
 				keywords: 'user member add'
@@ -125,26 +132,25 @@
 	const foundTargets = target.list(find, () => finding);
 	const foundUsers = users.list(find, () => finding);
 	const foundTeams = team.list(find, () => finding);
-	const foundDaemons = daemon.list(find, { when: () => finding });
 	const foundAccounts = serviceAccount.list(find, () => finding);
 
 	const found = $derived(
 		(finding
 			? [
 					{
-						heading: 'Targets',
+						heading: 'Servers',
 						icon: Server,
 						rows: (foundTargets.data?.targets ?? []).map((t) => ({
-							url: `/infrastructure/targets?id=${t.id}`,
+							url: `/servers?id=${t.id}`,
 							title: t.name,
 							hint: t.metadata?.hostname || t.endpoints[0]
 						}))
 					},
 					{
-						heading: 'Users',
+						heading: 'People',
 						icon: CircleUser,
 						rows: (foundUsers.data?.users ?? []).map((u) => ({
-							url: `/access/users?id=${u.id}`,
+							url: `/access/people?id=${u.id}`,
 							title: u.name || u.email,
 							hint: u.name ? u.email : undefined
 						}))
@@ -156,15 +162,6 @@
 							url: `/access/teams?id=${t.id}`,
 							title: t.name,
 							hint: t.description
-						}))
-					},
-					{
-						heading: 'Daemons',
-						icon: Bot,
-						rows: (foundDaemons.data?.daemons ?? []).map((d) => ({
-							url: `/infrastructure/daemons?id=${d.id}`,
-							title: d.name,
-							hint: d.online ? 'online' : 'offline'
 						}))
 					},
 					{

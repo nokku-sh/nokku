@@ -15,9 +15,11 @@
 		target: Target;
 		/** Why a web shell does not work, unset when it does. The row then copies the ssh command. */
 		why: string | undefined;
+		/** Its daemon records sessions. */
+		records?: boolean;
 	}
 
-	let { target, why }: Props = $props();
+	let { target, why, records = false }: Props = $props();
 
 	const shell = $derived(!why);
 
@@ -48,6 +50,9 @@
 				{shell ? target.metadata?.hostname || target.endpoints[0] : why}
 			</p>
 		</Collapsible.Trigger>
+		{#if records}
+			<Badge variant="destructive" title="Sessions here are recorded">REC</Badge>
+		{/if}
 		{#if mine.length}
 			<Badge variant="secondary">{mine.length}</Badge>
 		{/if}

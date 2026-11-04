@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Badge } from '#lib/components/ext/badge/index.js';
+	import { auditStreams } from '#lib/api/audit-streams.svelte.js';
+	import { plural } from '#lib/api/bulk.js';
 	import ExportMenu from '#lib/components/blocks/ExportMenu.svelte';
 	import AuditStreams from '#lib/components/audit/AuditStreams.svelte';
 	import { page } from '$app/state';
@@ -19,7 +20,7 @@
 	import { usePagination } from '#lib/hooks/index.js';
 	import { auditUTC } from '#lib/store.svelte.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import { Archive, FileClock, Target } from '@lucide/svelte';
+	import { Archive, FileClock, Lock, Radio, Target } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import ActorCell from './ActorCell.svelte';
 	import ActorFilter from './ActorFilter.svelte';
@@ -56,6 +57,9 @@
 	});
 
 	const logs = util.getLogs(() => ({ ...pager.args, filter }));
+	const streams = auditStreams.list();
+	const live = $derived((streams.data ?? []).filter((s) => s.enabled));
+	const failing = $derived(live.some((s) => s.lastError));
 	const exportLogs = util.exportLogs();
 
 	// Exports need both bounds, an open ended range ends now.
@@ -111,12 +115,6 @@
 	title="Audit log"
 	description="Every change and sign-in in this workspace, who did it and from where"
 >
-	{#if logs.data?.retentionDays}
-		<Badge variant="outline">
-			<Archive data-icon="inline-start" />
-			Kept {logs.data.retentionDays} days
-		</Badge>
-	{/if}
 	<AuditStreams />
 	<ExportMenu
 		hint="Exactly what is on screen, up to 90 days"
@@ -125,6 +123,32 @@
 		onExport={exportAs}
 	/>
 </PageHeader>
+
+<ul
+	aria-label="About this log"
+	class="flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-muted-foreground"
+>
+	<li class="flex items-center gap-1.5">
+		<Lock class="size-3.5" />
+		Append-only, an event can't be changed or removed
+	</li>
+	{#if logs.data?.retentionDays}
+		<li class="flex items-center gap-1.5">
+			<Archive class="size-3.5" />
+			Kept {logs.data.retentionDays} days
+		</li>
+	{/if}
+	{#if streams.data}
+		<li class={['flex items-center gap-1.5', failing && 'text-destructive']}>
+			<Radio class="size-3.5" />
+			{failing
+				? 'A stream is failing, open Streaming'
+				: live.length
+					? `Streamed to ${plural(live.length, 'destination')} as it happens`
+					: 'Not streamed anywhere'}
+		</li>
+	{/if}
+</ul>
 
 <div class="flex flex-wrap items-center justify-between gap-3">
 	<ToggleGroup.Root
@@ -179,7 +203,7 @@
 		<TableToolbar
 			{table}
 			search
-			searchPlaceholder="Search events, actors, targets..."
+			searchPlaceholder="Search events, people, servers..."
 			searchResultCount={logs.data?.total}
 			extraParams={['actor', 'target']}
 			filters={[
@@ -193,9 +217,9 @@
 				<Chip
 					label={target}
 					mono
-					title="Only events for this target"
+					title="Only events about this"
 					onRemove={() => setParams({ target: undefined })}
-					removeLabel="Clear target filter"
+					removeLabel="Clear this filter"
 				>
 					{#snippet leading()}
 						<Target class="ml-2 size-3 text-muted-foreground" />

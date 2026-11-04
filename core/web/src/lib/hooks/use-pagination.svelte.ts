@@ -32,3 +32,14 @@ export function usePagination() {
 		}
 	};
 }
+
+/** Changes filters in the URL and goes back to page 1, since the result set moved. */
+export function setFilters(params: Record<string, string | undefined>) {
+	const url = new URL(page.url.href);
+	for (const [key, value] of Object.entries(params)) {
+		if (value) url.searchParams.set(key, value);
+		else url.searchParams.delete(key);
+	}
+	url.searchParams.delete(PAGE_PARAM);
+	void goto(url, { replace: true, reset: false });
+}

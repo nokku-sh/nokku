@@ -2,6 +2,7 @@
 	import { getSessions } from '#lib/api/terminal.svelte.js';
 	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import ServerList from './ServerList.svelte';
+	import SessionBar from './SessionBar.svelte';
 	import TerminalTabs from './TerminalTabs.svelte';
 	import TerminalView from './TerminalView.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -15,7 +16,7 @@
 </script>
 
 <svelte:head>
-	<title>Sessions · Nokku</title>
+	<title>Shell · Nokku</title>
 </svelte:head>
 
 <div class="flex flex-1 overflow-hidden">
@@ -70,5 +71,6 @@
 				{/each}
 			{/if}
 		</div>
+		<SessionBar />
 	</div>
 </div>

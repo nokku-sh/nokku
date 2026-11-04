@@ -8,6 +8,7 @@
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import type { GetAccessGraphResponse } from '#lib/gen/nokku/v1/target_pb.js';
 	import { useSheet } from '#lib/hooks/index.js';
+	import { listNames } from '#lib/utils.js';
 	import { tagLabel, type Focus } from './graph.js';
 
 	interface Props {
@@ -43,14 +44,9 @@
 		}
 	});
 
-	const names = (all: string[]) =>
-		all.length > MAX_NAMES
-			? `${all.slice(0, MAX_NAMES).join(', ')} and ${all.length - MAX_NAMES} more`
-			: all.join(', ');
-
 	const summary = $derived.by(() => {
 		if (!graph) return '';
-		const accounts = names(graph.accounts.map((a) => a.username).sort());
+		const accounts = listNames(graph.accounts.map((a) => a.username).sort(), MAX_NAMES);
 		// The subjects holding a grant, as "2 teams, 3 members".
 		const holders = [SubjectKind.TEAM, SubjectKind.USER, SubjectKind.SERVICE_ACCOUNT]
 			.map((kind) => {
@@ -63,11 +59,11 @@
 		switch (focus.kind) {
 			case 'account':
 				return holders
-					? `Granted on ${plural(graph.targets, 'target')} to ${holders}`
+					? `Granted on ${plural(graph.targets, 'server')} to ${holders}`
 					: 'Granted to nobody';
 			case 'tag': {
 				const total = overview.tags.find((t) => t.tag === focus.id)?.total ?? 0;
-				return `${graph.targets} of ${plural(total, 'target')} have grants`;
+				return `${graph.targets} of ${plural(total, 'server')} have grants`;
 			}
 			case 'target':
 				return holders ? `${holders} can log in as ${accounts}` : 'Nobody can log in yet';
@@ -77,17 +73,17 @@
 					focus.kind === 'user'
 						? graph.subjects.filter((s) => s.kind === SubjectKind.TEAM).map((s) => s.name)
 						: [];
-				const through = teams.length ? `, through ${names(teams)}` : '';
-				return `Can log in to ${plural(graph.targets, 'target')} as ${accounts}${through}`;
+				const through = teams.length ? `, through ${listNames(teams, MAX_NAMES)}` : '';
+				return `Can log in to ${plural(graph.targets, 'server')} as ${accounts}${through}`;
 			}
 		}
 	});
 
 	const listHref = $derived(
 		focus.kind === 'account'
-			? `/infrastructure/targets?accounts=${encodeURIComponent(focus.id)}`
+			? `/servers?accounts=${encodeURIComponent(focus.id)}`
 			: focus.kind === 'tag' && focus.id
-				? `/infrastructure/targets?tags=${encodeURIComponent(focus.id)}`
+				? `/servers?tags=${encodeURIComponent(focus.id)}`
 				: undefined
 	);
 </script>
@@ -121,7 +117,7 @@
 		</Button>
 	{:else if listHref}
 		<Button variant="outline" size="sm" class="ml-auto shrink-0" href={listHref}
-			>View targets</Button
+			>View servers</Button
 		>
 	{/if}
 </div>

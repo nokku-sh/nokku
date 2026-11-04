@@ -22,7 +22,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import StorageQuotaPill from './StorageQuotaPill.svelte';
-	import { usePagination } from '#lib/hooks/index.js';
+	import { usePagination, useSheet } from '#lib/hooks/index.js';
 	import { formatBytes } from '#lib/utils.js';
 	import type { Recording } from '#lib/gen/nokku/v1/recordings_pb.js';
 	import { Bot, Video } from '@lucide/svelte';
@@ -43,9 +43,11 @@
 	const deleteRecording = recordings.delete();
 	const deleteRecordings = recordings.deleteMany();
 
-	// selected stays set after close, so the player can animate out.
-	let selected = $state<Recording>();
-	let playerOpen = $state(false);
+	// The player streams by id alone, so a link plays a recording from any page of the list.
+	const sheet = useSheet();
+	// The id stays after close, so the player can animate out.
+	let lastId = '';
+	const playing = $derived.by(() => (lastId = sheet.id || lastId));
 
 	const bulkActions: BulkAction<Recording>[] = [
 		bulkDelete<Recording>({
@@ -63,7 +65,7 @@
 			cell: ({ row }) => renderComponent(TimeCell, { ts: row.original.startedAt })
 		}),
 		columnHelper.accessor('daemonId', {
-			header: 'Daemon',
+			header: 'Server',
 			cell: ({ row }) =>
 				renderComponent(TextCell, {
 					label: daemonName.get(row.original.daemonId) ?? (row.original.daemonName || '-')
@@ -126,10 +128,7 @@
 	rowLabel={(r) => `recording of ${r.username || 'a session'}`}
 	{columns}
 	bulkActions={can.edit ? bulkActions : []}
-	onRowClick={(r) => {
-		selected = { ...r };
-		playerOpen = true;
-	}}
+	onRowClick={(r) => sheet.show(r.id)}
 	emptyState={{
 		icon: Video,
 		title: 'No recordings yet',
@@ -141,11 +140,9 @@
 			search="user"
 			searchPlaceholder="Exact account, e.g. deploy"
 			{table}
-			filters={[{ title: 'Daemon', options: daemonOptions, param: 'daemon', mode: 'single' }]}
+			filters={[{ title: 'Server', options: daemonOptions, param: 'daemon', mode: 'single' }]}
 		/>
 	{/snippet}
 </DataTable>
 
-{#if selected?.id}
-	<RecordingPlayer recording={selected} open={playerOpen} onOpenChange={(o) => (playerOpen = o)} />
-{/if}
+<RecordingPlayer id={playing} open={sheet.open} onOpenChange={(o) => (sheet.open = o)} />

@@ -49,7 +49,7 @@
 			<Separator orientation="vertical" class="mx-1 h-5" />
 
 			<div class="no-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto">
-				{#each actions as action (action.label)}
+				{#each actions.filter((a) => a.show?.(items) ?? true) as action (action.label)}
 					<Button
 						variant={action.variant ?? 'ghost'}
 						size="sm"
