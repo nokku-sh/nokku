@@ -159,7 +159,7 @@ func TestRotateRefusesARunningServer(t *testing.T) {
 
 	ctx, stop := context.WithCancel(t.Context())
 	defer stop()
-	require.NoError(t, conn.HoldServerLock(ctx))
+	require.NoError(t, db.HoldServerLock(ctx, ctx, func() {}))
 	require.ErrorIs(t, enc.Rotate(t.Context(), "secret:"+secretB), kms.ErrServerRunning)
 	_, err = openKeyset(t, conn, secretA)
 	require.NoError(t, err, "a refused rotation changed the keyset")

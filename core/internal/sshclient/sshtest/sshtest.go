@@ -9,6 +9,7 @@ import (
 	"net"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,6 +26,8 @@ type Server struct {
 	UserPrincipal string
 	// HostPrincipal stands in for the daemon's target id.
 	HostPrincipal string
+	// DropKeepalives leaves keepalives unanswered, like a peer behind a dead path.
+	DropKeepalives atomic.Bool
 
 	mu            sync.Mutex
 	keyID         string
@@ -220,12 +223,13 @@ func (s *Server) serve() {
 				delete(s.conns, c)
 				s.connsMu.Unlock()
 			}()
-			s.handle(c)
+			s.ServeConn(c)
 		}()
 	}
 }
 
-func (s *Server) handle(c net.Conn) {
+// ServeConn serves one connection, like an in-memory one in a synctest bubble.
+func (s *Server) ServeConn(c net.Conn) {
 	cfg := &ssh.ServerConfig{
 		//nolint:gosec // test server, the callback is self-contained and synchronous.
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
@@ -271,7 +275,9 @@ func (s *Server) handle(c net.Conn) {
 func (s *Server) globalReqs(reqs <-chan *ssh.Request) {
 	for req := range reqs {
 		if req.Type == "keepalive@openssh.com" && req.WantReply {
-			_ = req.Reply(true, nil)
+			if !s.DropKeepalives.Load() {
+				_ = req.Reply(true, nil)
+			}
 			continue
 		}
 		if req.WantReply {

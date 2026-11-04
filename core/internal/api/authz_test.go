@@ -262,21 +262,32 @@ func TestAuthorizeUnknownProcedure(t *testing.T) {
 	require.ErrorIs(t, a.authorize(ctx, "/nokku.v1.UnknownService/Unknown", nil), db.ErrPermissionDenied)
 }
 
-// nk adds no way in, or a stolen state file mints credentials for good.
-func TestAuthorizeFreshRefusesNk(t *testing.T) {
+// Only a person adds a way in. A stolen nk state file or service account key
+// would mint credentials for good. The owner role pins it beyond today's caps.
+func TestAuthorizeFreshNeedsAPerson(t *testing.T) {
 	a := &authorizationInterceptor{}
-	ctx := actor.ContextWithPrincipal(
-		t.Context(),
-		actor.Principal{ID: "u1", Kind: actor.KindCLI, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
-	)
-	fresh := 0
-	for _, procedure := range allProcedures(t) {
-		if !procedureAccess[procedure].GetFresh() {
-			continue
+	for _, kind := range []actor.Kind{actor.KindCLI, actor.KindServiceAccount} {
+		ctx := actor.ContextWithPrincipal(
+			t.Context(),
+			actor.Principal{ID: "p1", Kind: kind, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		)
+		fresh := 0
+		for _, procedure := range allProcedures(t) {
+			if !procedureAccess[procedure].GetFresh() {
+				continue
+			}
+			fresh++
+			err := a.authorize(ctx, procedure, nil)
+			assert.Equal(
+				t,
+				connect.CodePermissionDenied,
+				connect.CodeOf(err),
+				"%s on %s: err = %v",
+				kind,
+				procedure,
+				err,
+			)
 		}
-		fresh++
-		err := a.authorize(ctx, procedure, nil)
-		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "nk on %s: err = %v", procedure, err)
+		require.NotZero(t, fresh, "no procedure asks for a fresh sign-in")
 	}
-	require.NotZero(t, fresh, "no procedure asks for a fresh sign-in")
 }

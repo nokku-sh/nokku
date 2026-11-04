@@ -64,24 +64,14 @@ func (s *Service) cleanup(ctx context.Context) {
 		if retentionDays <= 0 {
 			retentionDays = 7
 		}
-		if err := s.expire(ctx, wsID, now.AddDate(0, 0, -int(retentionDays))); err != nil {
+		// The expired recordings' objects go through the delete queue.
+		if err := s.conn.Sys().DeleteRecordingsBefore(ctx, &db.DeleteRecordingsBeforeParams{
+			WorkspaceID: wsID,
+			Cutoff:      now.AddDate(0, 0, -int(retentionDays)),
+		}); err != nil {
 			slog.Error("recording retention failed", "error", err, "workspace_id", wsID)
 		}
 	}
-}
-
-// The expired recordings' objects go through the delete queue.
-func (s *Service) expire(ctx context.Context, wsID string, cutoff time.Time) error {
-	return s.conn.SysTx(ctx, func(q *db.Queries) error {
-		locked, err := q.TryAdvisoryXactLock(ctx, "recording-retention:"+wsID)
-		if err != nil || !locked {
-			return err
-		}
-		return q.DeleteRecordingsBefore(ctx, &db.DeleteRecordingsBeforeParams{
-			WorkspaceID: wsID,
-			Cutoff:      cutoff,
-		})
-	})
 }
 
 // DeleteQueued holds no tx during a bucket call, a repeat delete does no harm.

@@ -50,7 +50,6 @@ service WorkspaceService {
   rpc ClearUserIdentities(ClearUserIdentitiesRequest) returns (ClearUserIdentitiesResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      people_only: true
       fresh: true
     };
   }

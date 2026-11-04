@@ -39,14 +39,15 @@ export type Access = Message<"nokku.v1.Access"> & {
   daemon: boolean;
 
   /**
-   * people_only refuses service accounts, so a leaked token cannot mint more credentials for itself.
+   * people_only refuses service accounts, so a leaked token cannot mint more credentials for itself. fresh implies it.
    *
    * @generated from field: bool people_only = 5;
    */
   peopleOnly: boolean;
 
   /**
-   * fresh needs a browser session from the last 10 minutes and refuses nk, a stolen session cannot add a way in.
+   * fresh needs a person's browser session from the last 10 minutes. It refuses nk and service accounts, so a stolen
+   * session or key cannot add a way in.
    *
    * @generated from field: bool fresh = 6;
    */

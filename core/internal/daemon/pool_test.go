@@ -218,7 +218,6 @@ func TestPool_RelayRequestRace(t *testing.T) {
 	defer p.mu.RUnlock()
 	assert.Empty(t, p.pendingRelays, "pending relay requests left behind")
 	assert.Empty(t, p.relays, "relays left behind")
-	assert.Empty(t, p.relayCounts, "relay slots left held")
 }
 
 // An over-limit request never reaches the daemon, and released slots come back.
@@ -259,6 +258,59 @@ func TestPool_RelayCap(t *testing.T) {
 	require.NotErrorIs(t, err, ErrRelayLimit, "released slots must be reusable")
 }
 
+// Requests the daemon has not answered yet count toward the cap too.
+func TestPool_RelayCapCountsWaitingRequests(t *testing.T) {
+	p := newTestPool(t)
+	c := p.registerDaemon(t.Context(), "d1", "w1")
+	go func() {
+		for {
+			select {
+			case <-c.send:
+			case <-t.Context().Done():
+				return
+			}
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	var wg sync.WaitGroup
+	for i := range maxRelaysPerPrincipal {
+		rid := fmt.Sprintf("r%d", i)
+		wg.Go(func() { _, _ = p.RequestRelay(ctx, "d1", rid, "u1", "") })
+		waitRelayPending(t, p, rid)
+	}
+	_, err := p.RequestRelay(t.Context(), "d1", "over", "u1", "")
+	require.ErrorIs(t, err, ErrRelayLimit, "waiting requests did not count toward the cap")
+
+	cancel()
+	wg.Wait()
+	again, cancelAgain := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancelAgain()
+	_, err = p.RequestRelay(again, "d1", "again", "u1", "")
+	require.NotErrorIs(t, err, ErrRelayLimit, "requests that gave up kept their slots")
+}
+
+// A relay is claimed once, and only by the daemon it was asked of.
+func TestPool_RelayIsClaimedOnce(t *testing.T) {
+	p := newTestPool(t)
+	p.registerDaemon(t.Context(), "d1", "w1")
+	p.registerDaemon(t.Context(), "d2", "w1")
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	res := make(chan error, 1)
+	go func() {
+		_, err := p.RequestRelay(ctx, "d1", "r1", "u1", "")
+		res <- err
+	}()
+	waitRelayPending(t, p, "r1")
+	require.Nil(t, p.registerRelay("r1", "d2"), "another daemon claimed the relay")
+	require.NotNil(t, p.registerRelay("r1", "d1"), "the asked daemon could not claim it")
+	require.NoError(t, <-res, "RequestRelay")
+	require.Nil(t, p.registerRelay("r1", "d1"), "a second Ready claimed a bridged relay")
+	p.UnregisterRelay("r1")
+}
+
 // A request to a stuck daemon ends with its own ctx and leaves nothing held.
 func TestPool_RelayRequestEndsWithItsContext(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -278,7 +330,6 @@ func TestPool_RelayRequestEndsWithItsContext(t *testing.T) {
 		p.mu.RLock()
 		defer p.mu.RUnlock()
 		assert.Empty(t, p.pendingRelays, "the pending request was left behind")
-		assert.Empty(t, p.relayCounts, "the relay slot is still held")
 	})
 }
 
@@ -327,56 +378,39 @@ func TestPool_RelayBridging(t *testing.T) {
 
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	assert.Empty(t, p.relayCounts, "relay slots left held")
+	assert.Empty(t, p.relays, "the relay is still held")
 }
 
-// A daemon disconnect tears down its relays and frees their slots.
-func TestPool_UnregisterDaemonClosesRelays(t *testing.T) {
+// A relay runs on its own stream. nokkud keeps it across a control-stream
+// reconnect, so the core must not cut it either.
+func TestPool_RelayOutlivesTheControlStream(t *testing.T) {
 	p := newTestPool(t)
 	c := p.registerDaemon(t.Context(), "d1", "w1")
 
-	res := make(chan error, 1)
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
+	res := make(chan *Relay, 1)
 	go func() {
-		_, err := p.RequestRelay(ctx, "d1", "r1", "u1", "")
-		res <- err
+		r, err := p.RequestRelay(ctx, "d1", "r1", "u1", "")
+		assert.NoError(t, err, "RequestRelay")
+		res <- r
 	}()
 	waitRelayPending(t, p, "r1")
 	require.NotNil(t, p.registerRelay("r1", "d1"), "relay was not pending")
-	require.NoError(t, <-res, "RequestRelay")
+	relay := <-res
+	require.NotNil(t, relay)
 
+	again := p.registerDaemon(t.Context(), "d1", "w1")
 	p.unregisterDaemon("d1", c)
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	require.Nil(t, p.relays["r1"], "relay outlived its daemon")
-	assert.Empty(t, p.relayCounts, "relay slots left held")
-}
-
-// A disconnect tears down only that daemon's sessions, its index entry too.
-func TestPool_DisconnectDropsOnlyOwnSessions(t *testing.T) {
-	p := newTestPool(t)
-	c1 := p.registerDaemon(t.Context(), "d1", "w1")
-	c2 := p.registerDaemon(t.Context(), "d2", "w1")
-	defer p.unregisterDaemon("d2", c2)
-	// Bare sessions, the teardown only needs the index and close.
-	closed := map[string]bool{}
-	for id, daemonID := range map[string]string{"s1": "d1", "s2": "d2"} {
-		s := &Session{sessionID: id, daemonID: daemonID, close: func() { closed[id] = true }}
-		p.mu.Lock()
-		p.sessions[id] = s
-		p.ownLocked(daemonID).sessions[id] = s
-		p.mu.Unlock()
+	p.unregisterDaemon("d1", again)
+	select {
+	case <-relay.done():
+		t.Fatal("the control stream ending closed the relay")
+	default:
 	}
 
-	p.unregisterDaemon("d1", c1)
-
-	require.True(t, closed["s1"], "session of the disconnected daemon is still running")
-	require.False(t, closed["s2"], "session of another daemon was torn down")
-	require.Nil(t, p.sessions["s1"], "session map out of sync with the teardown")
-	require.NotNil(t, p.sessions["s2"], "session map out of sync with the teardown")
-	require.NotContains(t, p.owned, "d1", "index entry of the disconnected daemon survived")
-	require.Len(t, p.ListSessions("d2"), 1)
+	p.UnregisterRelay("r1")
+	<-relay.done()
 }
 
 // A notification can get lost, so the heartbeat reads the version on its own.

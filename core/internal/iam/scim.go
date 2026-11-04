@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -174,6 +175,26 @@ func (s *Service) scimProvisionUser(
 		}
 	}
 	return u, nil
+}
+
+// requirePlan guards writes that let someone in, offboarding must work off the plan.
+func (s *Service) requirePlan(ctx context.Context) error {
+	if s.hasSCIM == nil {
+		return nil
+	}
+	ok, err := s.hasSCIM(ctx, actor.WorkspaceIDFromContext(ctx))
+	if err != nil {
+		slog.Error("SCIM plan lookup failed", "error", err, "workspace_id", actor.WorkspaceIDFromContext(ctx))
+		// A provider retries a 500, a 403 it does not.
+		return scimerrors.ScimErrorInternal
+	}
+	if !ok {
+		return scimerrors.ScimError{
+			Status: http.StatusForbidden,
+			Detail: "provisioning is not on this workspace's plan, only offboarding goes through",
+		}
+	}
+	return nil
 }
 
 func scimUserError(err error) error {

@@ -4,6 +4,7 @@ package api_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/api"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
@@ -158,6 +160,37 @@ func instanceInfoStatus(t *testing.T, srv *httptest.Server) int {
 	require.NoError(t, err)
 	defer func() { _ = res.Body.Close() }()
 	return res.StatusCode
+}
+
+// A host nobody cached costs a database lookup before any sign-in, so one
+// client gets a bounded number of those. A cached host never counts.
+func TestHostedUnknownHostsAreLimited(t *testing.T) {
+	hostedOnly(t)
+	cfg, _ := newTestAPI(t)
+	// Its own handler, so the misses here spend no other test's budget.
+	handler := api.New(cfg).Handler(t.Context())
+	get := func(host string) int {
+		req := httptest.NewRequest(http.MethodGet, "/_app/version.json", nil)
+		req.Host = host
+		req.RemoteAddr = "127.0.0.1:40000"
+		req.Header.Set("X-Forwarded-Proto", "https")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	limited := 0
+	for i := range 1000 {
+		if get(fmt.Sprintf("nobody%d.%s", i, hostedBase)) == http.StatusTooManyRequests {
+			limited = i
+			break
+		}
+	}
+	require.NotZero(t, limited, "a thousand unknown hosts all reached the database")
+
+	_, err := cfg.Tenant.FromHost(t.Context(), hostedSlug+"."+hostedBase)
+	require.NoError(t, err)
+	assert.NotEqual(t, http.StatusTooManyRequests, get(hostedSlug+"."+hostedBase), "a cached host was counted")
+	assert.NotEqual(t, http.StatusTooManyRequests, get(hostedBase), "the root host was counted")
 }
 
 // Only the root host and real workspaces answer, a health check needs none.

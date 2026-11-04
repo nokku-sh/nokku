@@ -28,6 +28,9 @@ type scimUserHandler struct {
 }
 
 func (h scimUserHandler) Create(r *http.Request, attrs scim.ResourceAttributes) (scim.Resource, error) {
+	if err := h.svc.requirePlan(r.Context()); err != nil {
+		return scim.Resource{}, err
+	}
 	email := scimEmail(attrs)
 	if email == "" {
 		return scim.Resource{}, scimerrors.ScimErrorBadRequest("emails or userName must hold an email address")
@@ -169,6 +172,11 @@ func (h scimUserHandler) apply(
 	active *bool,
 	externalID string,
 ) (scim.Resource, error) {
+	if active == nil || *active {
+		if err := h.svc.requirePlan(ctx); err != nil {
+			return scim.Resource{}, err
+		}
+	}
 	id := before.ID
 	// Only an account SCIM created and still links is renamed. Linking one by
 	// its address hands over no sign-in links.

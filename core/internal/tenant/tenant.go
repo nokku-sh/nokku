@@ -126,15 +126,12 @@ func (r *Resolver) FromHost(ctx context.Context, host string) (actor.Workspace, 
 	if !r.saas {
 		return r.single, nil
 	}
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	host = strings.ToLower(host)
+	host = hostname(host)
 	if host == r.host {
 		return actor.Workspace{}, nil
 	}
-	slug, ok := strings.CutSuffix(host, "."+r.host)
-	if !ok || slug == "" || strings.Contains(slug, ".") || reserved[slug] {
+	slug, ok := r.slug(host)
+	if !ok {
 		return actor.Workspace{}, ErrUnknownWorkspace
 	}
 	if ws, ok := r.slugs.Get(slug); ok {
@@ -150,6 +147,35 @@ func (r *Resolver) FromHost(ctx context.Context, host string) (actor.Workspace, 
 	ws := r.workspace(row)
 	r.slugs.Set(slug, ws)
 	return ws, nil
+}
+
+// Known is whether FromHost can answer host without the database.
+func (r *Resolver) Known(host string) bool {
+	if !r.saas {
+		return true
+	}
+	slug, ok := r.slug(hostname(host))
+	if !ok {
+		return true
+	}
+	_, cached := r.slugs.Get(slug)
+	return cached
+}
+
+func hostname(host string) string {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return strings.ToLower(host)
+}
+
+// slug is false for the root host and for any name no workspace can have.
+func (r *Resolver) slug(host string) (string, bool) {
+	slug, ok := strings.CutSuffix(host, "."+r.host)
+	if !ok || slug == "" || strings.Contains(slug, ".") || reserved[slug] {
+		return "", false
+	}
+	return slug, true
 }
 
 // Middleware runs before every handler but health and provider webhooks.

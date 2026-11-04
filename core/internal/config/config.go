@@ -147,11 +147,15 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	go cfg.Keyset.VaultTokenLoop(ctx)
 
 	deps := iam.Deps{
-		Conn:           cfg.Conn,
-		Keyset:         cfg.Keyset,
-		Audit:          cfg.Audit,
-		Secure:         strings.HasPrefix(cfg.FullURL(), "https://"),
-		CanJoin:        cfg.Entitlements.CanInvite,
+		Conn:    cfg.Conn,
+		Keyset:  cfg.Keyset,
+		Audit:   cfg.Audit,
+		Secure:  strings.HasPrefix(cfg.FullURL(), "https://"),
+		CanJoin: cfg.Entitlements.CanInvite,
+		HasSCIM: func(ctx context.Context, workspaceID string) (bool, error) {
+			st, err := cfg.Entitlements.Status(ctx, workspaceID)
+			return st.Plan.Has(entitlement.FeatureSCIM), err
+		},
 		StrictEmail:    cfg.SaaS,
 		SendNewLogin:   cfg.Email.SendNewLoginEmail,
 		SendNewWayIn:   cfg.Email.SendNewWayInEmail,

@@ -105,6 +105,8 @@ func NewHTTPClient(roots *x509.CertPool, dialTimeout time.Duration) (*http.Clien
 	}
 	t := base.Clone()
 	t.Protocols = proto
+	// TCP keepalive stays quiet with data in flight, the ping ends a dead stream in 90s.
+	t.HTTP2 = &http.HTTP2Config{SendPingTimeout: 60 * time.Second, PingTimeout: 30 * time.Second}
 	t.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}
 	t.DialContext = (&net.Dialer{
 		Timeout:   dialTimeout,

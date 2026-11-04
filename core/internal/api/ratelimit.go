@@ -28,6 +28,9 @@ const (
 	// A signup makes a workspace and a mail. One person needs a few tries.
 	signupsPerWindow = 10
 	signupWindow     = time.Hour
+
+	// Each unknown hosted host costs a lookup before sign-in, a real client misses once a minute.
+	unknownHostsPerMinute = 600
 )
 
 func (s *Server) withRateLimit(next http.Handler) http.Handler {

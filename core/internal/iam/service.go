@@ -74,6 +74,8 @@ type Deps struct {
 	StrictEmail bool
 	// CanJoin gates new users on the seat cap. used is read in the creating tx.
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
+	// HasSCIM gates SCIM writes that let someone in. Unset, every plan has it.
+	HasSCIM func(ctx context.Context, workspaceID string) (bool, error)
 
 	// SendMagicLink mails a sign-in link. Unset, the login page offers none.
 	SendMagicLink func(ctx context.Context, userID, email, link string, expiry time.Duration) error
@@ -92,6 +94,7 @@ type Service struct {
 	secure  bool
 	now     func() time.Time
 	canJoin func(ctx context.Context, workspaceID string, used int64) error
+	hasSCIM func(ctx context.Context, workspaceID string) (bool, error)
 	strict  bool
 	idp     *http.Client // guarded, see egress.NewClient
 	// XChaCha, anyone can start a flow and random nonces must never run out.
@@ -123,6 +126,7 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		secure:         d.Secure,
 		now:            time.Now,
 		canJoin:        d.CanJoin,
+		hasSCIM:        d.HasSCIM,
 		strict:         d.StrictEmail,
 		sendMagicLink:  d.SendMagicLink,
 		sendInvite:     d.SendInvite,

@@ -76,7 +76,7 @@ Point your domain at the host and open ports 80 and 443. Caddy gets the certific
 
 ### Kubernetes
 
-There is no chart. The image runs fine in a cluster with the settings on this page: one replica, a volume or bucket for recordings, and a PostgreSQL of your own. Stop the old pod before the new one starts, the core keeps its connections in memory, so use the `Recreate` strategy.
+There is no chart. The image runs fine in a cluster with the settings on this page: one replica, a volume or bucket for recordings, and a PostgreSQL of your own. Stop the old pod before the new one starts, the core keeps its connections in memory, so use the `Recreate` strategy. A second core waits until the first one stops, so a rolling update stalls instead of running two.
 
 ### Binary
 
@@ -88,6 +88,8 @@ export NOKKU_SECRET=...
 export PGHOST=db.internal PGUSER=nokku PGPASSWORD=...
 ./nokku
 ```
+
+Run it under something that restarts it, like systemd with `Restart=always`. When the database is gone for more than a minute the core exits, and a restart brings it back once the database is up.
 
 It listens on port 3000 and speaks plain HTTP only. A reverse proxy in front holds the certificate. The proxy has to:
 

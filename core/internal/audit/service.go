@@ -75,7 +75,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 			continue
 		}
 		retentionDays = min(retentionDays, maxRetentionDays)
-		err = s.deleteAuditLogs(ctx, "audit-retention:"+wsID, func(q *db.Queries) error {
+		err = s.deleteAuditLogs(ctx, func(q *db.Queries) error {
 			_, err := q.DeleteWorkspaceAuditLogs(ctx, &db.DeleteWorkspaceAuditLogsParams{
 				WorkspaceID: wsID,
 				Cutoff:      now.AddDate(0, 0, -int(retentionDays)),
@@ -88,7 +88,7 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 	}
 
 	// Nothing outlives the longest plan, a deleted workspace's rows included.
-	err = s.deleteAuditLogs(ctx, "audit-retention", func(q *db.Queries) error {
+	err = s.deleteAuditLogs(ctx, func(q *db.Queries) error {
 		_, err := q.DeleteAuditLogsBefore(ctx, now.AddDate(0, 0, -maxRetentionDays))
 		return err
 	})
@@ -98,12 +98,8 @@ func (s *Service) retentionCleanup(ctx context.Context) {
 }
 
 // The audit table refuses DELETE unless the transaction opts in.
-func (s *Service) deleteAuditLogs(ctx context.Context, lock string, del func(*db.Queries) error) error {
+func (s *Service) deleteAuditLogs(ctx context.Context, del func(*db.Queries) error) error {
 	return s.conn.SysTx(ctx, func(q *db.Queries) error {
-		locked, err := q.TryAdvisoryXactLock(ctx, lock)
-		if err != nil || !locked {
-			return err
-		}
 		if err := q.EnableAuditRetention(ctx); err != nil {
 			return err
 		}

@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	crand "crypto/rand"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 	"uuid"
@@ -43,9 +44,7 @@ type SessionConfig struct {
 // Session is one browser terminal. It belongs to the websocket that started it.
 type Session struct {
 	sessionID string
-	daemonID  string
 	username  string
-	userID    string
 
 	term  *sshclient.Terminal
 	close func()
@@ -98,29 +97,17 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	ctx, cancel := context.WithTimeout(ctx, sessionTTL)
 	s := &Session{
 		sessionID: cfg.SessionID,
-		daemonID:  cfg.DaemonID,
 		username:  cfg.Username,
-		userID:    cfg.UserID,
 		term:      term,
 	}
 	s.close = sync.OnceFunc(func() {
 		cancel()
 		term.Close()
 		p.UnregisterRelay(relayID)
-		p.mu.Lock()
-		if p.sessions[s.sessionID] == s {
-			delete(p.sessions, s.sessionID)
-		}
-		if o := p.owned[s.daemonID]; o != nil && o.sessions[s.sessionID] == s {
-			delete(o.sessions, s.sessionID)
-			p.disownLocked(s.daemonID)
-		}
-		p.mu.Unlock()
 	})
 
 	p.mu.Lock()
-	p.sessions[s.sessionID] = s
-	p.ownLocked(s.daemonID).sessions[s.sessionID] = s
+	relay.shell = s
 	p.mu.Unlock()
 	context.AfterFunc(ctx, s.close)
 	return s, nil
@@ -166,9 +153,9 @@ func (p *Pool) SessionDaemons() []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	var ids []string
-	for id, o := range p.owned {
-		if len(o.sessions) > 0 {
-			ids = append(ids, id)
+	for _, r := range p.relays {
+		if r.shell != nil && !slices.Contains(ids, r.daemonID) {
+			ids = append(ids, r.daemonID)
 		}
 	}
 	return ids
@@ -178,12 +165,12 @@ func (p *Pool) ListSessions(daemonID string) []*nokkuv1.DaemonSession {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	var result []*nokkuv1.DaemonSession
-	if o := p.owned[daemonID]; o != nil {
-		for _, s := range o.sessions {
+	for _, r := range p.relays {
+		if s := r.shell; s != nil && r.daemonID == daemonID {
 			result = append(result, &nokkuv1.DaemonSession{
 				SessionId: new(s.sessionID),
 				Username:  new(s.username),
-				UserId:    new(s.userID),
+				UserId:    new(r.userID),
 			})
 		}
 	}

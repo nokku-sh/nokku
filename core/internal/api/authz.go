@@ -149,12 +149,9 @@ func requestedFresh(msg any) bool {
 	return false
 }
 
-// fresh refuses nk outright and ends a browser session past 10 minutes, the web
-// app then asks to sign in. A service account follows people_only.
+// fresh lets only a person's browser session from the last 10 minutes through.
 func (a *authorizationInterceptor) fresh(ctx context.Context, caller actor.Principal) error {
 	switch caller.Kind {
-	case actor.KindCLI:
-		return connect.NewError(connect.CodePermissionDenied, "do this in the web app")
 	case actor.KindUser:
 		if err := a.cfg.IAM.RequireRecentSignIn(ctx); err != nil {
 			if ci, ok := connect.CallInfoForServerContext(ctx); ok {
@@ -162,9 +159,12 @@ func (a *authorizationInterceptor) fresh(ctx context.Context, caller actor.Princ
 			}
 			return connect.NewError(connect.CodeUnauthenticated, "sign in again to continue")
 		}
-	case actor.KindServiceAccount, actor.KindDaemon, actor.KindSCIM:
+		return nil
+	case actor.KindServiceAccount:
+		return connect.NewError(connect.CodePermissionDenied, "only people can do this, not a service account")
+	case actor.KindCLI, actor.KindDaemon, actor.KindSCIM:
 	}
-	return nil
+	return connect.NewError(connect.CodePermissionDenied, "do this in the web app")
 }
 
 // A daemon that is not accepted gets only its status and removing itself.

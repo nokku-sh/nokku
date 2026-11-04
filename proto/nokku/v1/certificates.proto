@@ -17,14 +17,12 @@ service CertificateService {
   rpc UpdateCertificateAuthority(UpdateCertificateAuthorityRequest) returns (UpdateCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      people_only: true
       fresh: true
     };
   }
   rpc RolloverCertificateAuthority(RolloverCertificateAuthorityRequest) returns (RolloverCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      people_only: true
       fresh: true
     };
   }

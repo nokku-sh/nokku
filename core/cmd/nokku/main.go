@@ -21,6 +21,8 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
+var errLockLost = errors.New("lost the server lock")
+
 func main() {
 	cmd := &cli.Command{
 		EnableShellCompletion: true,
@@ -36,14 +38,27 @@ func main() {
 			// Outlives the signal, so draining requests can still audit.
 			running, stop := context.WithCancel(context.WithoutCancel(ctx))
 			defer stop()
+			ctx, lockLost := context.WithCancelCause(ctx)
+			defer lockLost(nil)
+			// First, a second core must not migrate or load keys under this one.
+			if err := db.HoldServerLock(ctx, running, func() { lockLost(errLockLost) }); err != nil {
+				if ctx.Err() != nil {
+					return nil
+				}
+				return err
+			}
 			cfg, err := config.New(running, cmd)
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
-			if err := cfg.Conn.HoldServerLock(running); err != nil {
-				return err
+			// A lock lost or a signal during the load starts nothing.
+			if ctx.Err() == nil {
+				err = api.New(cfg).Start(ctx)
 			}
-			return api.New(cfg).Start(ctx)
+			if errors.Is(context.Cause(ctx), errLockLost) {
+				return errLockLost
+			}
+			return err
 		},
 		Commands: []*cli.Command{
 			{

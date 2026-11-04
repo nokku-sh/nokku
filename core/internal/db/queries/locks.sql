@@ -1,5 +1,5 @@
 -- name: TryAdvisoryXactLock :one
--- Single-flight for background jobs across instances. Released on commit.
+-- False while a core holds the key, rotate-secrets asks it of ServerLock. Released on commit.
 SELECT
   pg_try_advisory_xact_lock(hashtext(@key::TEXT));
 

@@ -87,14 +87,14 @@ func testConn(t *testing.T, p *Pool) *daemonConn {
 	return c
 }
 
-// waitNothingHeld counts the index entries too, so a leak there fails here.
+// waitNothingHeld counts waiting requests too, each one holds a slot.
 func waitNothingHeld(t *testing.T, p *Pool, after string) {
 	t.Helper()
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		p.mu.RLock()
 		defer p.mu.RUnlock()
-		assert.Zero(c, len(p.sessions)+len(p.owned), "sessions held")
-		assert.Empty(c, p.relayCounts, "slots held")
+		assert.Empty(c, p.relays, "relays held")
+		assert.Empty(c, p.pendingRelays, "requests held")
 	}, 2*time.Second, time.Millisecond, "leak after %s", after)
 }
 
@@ -282,4 +282,37 @@ func TestPool_StartSession_ServerDeath(t *testing.T) {
 	waitStdoutClosed(t, s, "the ssh server died")
 	s.Close()
 	waitNothingHeld(t, p, "server death")
+}
+
+// The dashboard lists browser shells, not nk relays to the same server.
+func TestPool_ListSessionsShowsOnlyShells(t *testing.T) {
+	p := newTestPool(t)
+	p.registerDaemon(t.Context(), "d1", "w1")
+	srv := sshtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	res := make(chan error, 1)
+	go func() {
+		_, err := p.RequestRelay(ctx, "d1", "nk1", "u2", "")
+		res <- err
+	}()
+	waitRelayPending(t, p, "nk1")
+	require.NotNil(t, p.registerRelay("nk1", "d1"))
+	require.NoError(t, <-res, "RequestRelay")
+	assert.Empty(t, p.ListSessions("d1"), "an nk relay shows as a browser shell")
+	assert.Empty(t, p.SessionDaemons(), "an nk relay shows as a browser shell")
+
+	s := startTestSession(t, p, srv, "web-1")
+	sessions := p.ListSessions("d1")
+	require.Len(t, sessions, 1)
+	assert.Equal(t, "web-1", sessions[0].GetSessionId())
+	assert.Equal(t, "user", sessions[0].GetUsername())
+	assert.Equal(t, "u1", sessions[0].GetUserId())
+	assert.Equal(t, []string{"d1"}, p.SessionDaemons())
+
+	s.Close()
+	waitStdoutClosed(t, s, "Close")
+	assert.Empty(t, p.ListSessions("d1"), "a closed shell is still listed")
+	p.UnregisterRelay("nk1")
 }

@@ -1542,7 +1542,7 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"%RemoveServiceAccountFederationRequest\x126\n" +
 	"\x12service_account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x10serviceAccountId\x12\x18\n" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"(\n" +
-	"&RemoveServiceAccountFederationResponse2\xea\n" +
+	"&RemoveServiceAccountFederationResponse2\xe3\n" +
 	"\n" +
 	"\x15ServiceAccountService\x12g\n" +
 	"\x11GetServiceAccount\x12\".nokku.v1.GetServiceAccountRequest\x1a#.nokku.v1.GetServiceAccountResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12m\n" +
@@ -1550,16 +1550,13 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\x14CreateServiceAccount\x12%.nokku.v1.CreateServiceAccountRequest\x1a&.nokku.v1.CreateServiceAccountResponse\"\n" +
 	"\xc2\xf3\x18\x06\x18\x03(\x01@\x01\x12o\n" +
 	"\x14UpdateServiceAccount\x12%.nokku.v1.UpdateServiceAccountRequest\x1a&.nokku.v1.UpdateServiceAccountResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12m\n" +
-	"\x14DeleteServiceAccount\x12%.nokku.v1.DeleteServiceAccountRequest\x1a&.nokku.v1.DeleteServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12\x80\x01\n" +
-	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x03(\x010\x01\x12|\n" +
+	"\x14DeleteServiceAccount\x12%.nokku.v1.DeleteServiceAccountRequest\x1a&.nokku.v1.DeleteServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12~\n" +
+	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\b\xc2\xf3\x18\x04\x18\x030\x01\x12|\n" +
 	"\x18ListServiceAccountTokens\x12).nokku.v1.ListServiceAccountTokensRequest\x1a*.nokku.v1.ListServiceAccountTokensResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12|\n" +
-	"\x19RevokeServiceAccountToken\x12*.nokku.v1.RevokeServiceAccountTokenRequest\x1a+.nokku.v1.RevokeServiceAccountTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12\x86\x01\n" +
-	"\x1bAddServiceAccountFederation\x12,.nokku.v1.AddServiceAccountFederationRequest\x1a-.nokku.v1.AddServiceAccountFederationResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x03(\x010\x01\x12\x8b\x01\n" +
-	"\x1dListServiceAccountFederations\x12..nokku.v1.ListServiceAccountFederationsRequest\x1a/.nokku.v1.ListServiceAccountFederationsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12\x8f\x01\n" +
-	"\x1eRemoveServiceAccountFederation\x12/.nokku.v1.RemoveServiceAccountFederationRequest\x1a0.nokku.v1.RemoveServiceAccountFederationResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x03(\x010\x01B\x94\x01\n" +
+	"\x19RevokeServiceAccountToken\x12*.nokku.v1.RevokeServiceAccountTokenRequest\x1a+.nokku.v1.RevokeServiceAccountTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12\x84\x01\n" +
+	"\x1bAddServiceAccountFederation\x12,.nokku.v1.AddServiceAccountFederationRequest\x1a-.nokku.v1.AddServiceAccountFederationResponse\"\b\xc2\xf3\x18\x04\x18\x030\x01\x12\x8b\x01\n" +
+	"\x1dListServiceAccountFederations\x12..nokku.v1.ListServiceAccountFederationsRequest\x1a/.nokku.v1.ListServiceAccountFederationsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12\x8d\x01\n" +
+	"\x1eRemoveServiceAccountFederation\x12/.nokku.v1.RemoveServiceAccountFederationRequest\x1a0.nokku.v1.RemoveServiceAccountFederationResponse\"\b\xc2\xf3\x18\x04\x18\x030\x01B\x94\x01\n" +
 	"\fcom.nokku.v1B\x13ServiceAccountProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

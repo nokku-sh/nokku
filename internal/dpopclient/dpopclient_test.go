@@ -270,6 +270,8 @@ func TestNewHTTPClient(t *testing.T) {
 	require.NotNil(t, tr.TLSClientConfig)
 	assert.EqualValues(t, tls.VersionTLS13, tr.TLSClientConfig.MinVersion, "client must require TLS 1.3")
 	assert.False(t, tr.TLSClientConfig.InsecureSkipVerify, "client must verify the server")
+	require.NotNil(t, tr.HTTP2)
+	assert.Positive(t, tr.HTTP2.SendPingTimeout, "a dead connection must not hold the control stream")
 }
 
 func TestProofBindsToTheConfiguredURL(t *testing.T) {

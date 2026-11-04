@@ -15,9 +15,11 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 )
 
-// ServerLock is held shared by a running core. TryAdvisoryXactLock on it fails
-// while one runs, with the same key space as pg_advisory_lock_shared.
+// ServerLock is held by the running core, rotate-secrets checks it with TryAdvisoryXactLock.
 const ServerLock = "nokku_server"
+
+// ServerLockApp names the session that holds ServerLock in pg_stat_activity.
+const ServerLockApp = "nokku server lock"
 
 var (
 	ErrPermissionDenied   = errors.New("missing required permission")
@@ -35,7 +37,7 @@ type Connection struct {
 	sysPool *pgxpool.Pool
 }
 
-// Migrate alone logs in as the owner role (PGUSER), only the server runs it.
+// Migrate and HoldServerLock log in as the owner role (PGUSER), only the server runs them.
 func Migrate(ctx context.Context) error {
 	c, config, err := settings()
 	if err != nil {
@@ -202,16 +204,82 @@ func (c *Connection) TenantTx(ctx context.Context, fn func(*Queries) error) erro
 	return pgx.BeginFunc(ctx, c.Pool, func(tx pgx.Tx) error { return fn(New(tx)) })
 }
 
-// HoldServerLock marks this process as a running core until ctx ends. A lost
-// connection drops the mark too, it only catches a mistake.
-func (c *Connection) HoldServerLock(ctx context.Context) error {
-	conn, err := pgx.ConnectConfig(ctx, c.sysPool.Config().ConnConfig)
+// HoldServerLock waits while another core runs, then holds the lock until hold ends.
+func HoldServerLock(wait, hold context.Context, lost func()) error {
+	conn, free, err := tryServerLock(wait)
 	if err != nil {
-		return fmt.Errorf("connecting for the server lock: %w", err)
+		return err
 	}
-	context.AfterFunc(ctx, func() { _ = conn.Close(context.WithoutCancel(ctx)) })
-	_, err = conn.Exec(ctx, "SELECT pg_advisory_lock_shared(hashtext($1))", ServerLock)
-	return err
+	if !free {
+		slog.Warn("another core is running, waiting for it to stop")
+		if _, err := conn.Exec(wait, "SELECT pg_advisory_lock(hashtext($1))", ServerLock); err != nil {
+			_ = conn.Close(context.WithoutCancel(wait))
+			return fmt.Errorf("taking the server lock: %w", err)
+		}
+	}
+	go keepServerLock(hold, conn, lost)
+	return nil
+}
+
+// keepServerLock takes the lock back when its connection drops, or calls lost.
+func keepServerLock(ctx context.Context, conn *pgx.Conn, lost func()) {
+	for {
+		// Nothing notifies, the wait ends with the connection.
+		_, err := conn.WaitForNotification(ctx)
+		_ = conn.Close(context.WithoutCancel(ctx))
+		if ctx.Err() != nil {
+			return
+		}
+		slog.Warn("the server lock dropped with its connection, taking it again", "error", err)
+		retake, stop := context.WithTimeout(ctx, time.Minute)
+		var free bool
+		conn, free, err = tryServerLock(retake)
+		for err != nil && retake.Err() == nil {
+			select {
+			case <-retake.Done():
+			case <-time.After(5 * time.Second):
+				conn, free, err = tryServerLock(retake)
+			}
+		}
+		stop()
+		if err != nil {
+			// Unbounded, a core that cannot log in again would run next to the next one.
+			if ctx.Err() == nil {
+				slog.Error("the server lock did not come back within a minute, stopping this core", "error", err)
+				lost()
+			}
+			return
+		}
+		if !free {
+			_ = conn.Close(context.WithoutCancel(ctx))
+			slog.Error("another core took the server lock, stopping this one")
+			lost()
+			return
+		}
+	}
+}
+
+func tryServerLock(ctx context.Context) (*pgx.Conn, bool, error) {
+	_, config, err := settings()
+	if err != nil {
+		return nil, false, err
+	}
+	params := config.ConnConfig.RuntimeParams
+	params["application_name"] = ServerLockApp
+	// The session idles for good, a server-wide idle timeout must not end it.
+	params["idle_session_timeout"] = "0"
+	// The lock of a core whose host vanished goes in a minute, not hours.
+	params["tcp_keepalives_idle"], params["tcp_keepalives_interval"], params["tcp_keepalives_count"] = "30", "10", "3"
+	conn, err := pgx.ConnectConfig(ctx, config.ConnConfig)
+	if err != nil {
+		return nil, false, fmt.Errorf("connecting for the server lock: %w", err)
+	}
+	var free bool
+	if err := conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(hashtext($1))", ServerLock).Scan(&free); err != nil {
+		_ = conn.Close(context.WithoutCancel(ctx))
+		return nil, false, fmt.Errorf("taking the server lock: %w", err)
+	}
+	return conn, free, nil
 }
 
 // Sys runs as nokku_system (BYPASSRLS), for pre-auth lookups and jobs.

@@ -25,7 +25,7 @@ SELECT
   pg_try_advisory_xact_lock(hashtext($1::TEXT))
 `
 
-// Single-flight for background jobs across instances. Released on commit.
+// False while a core holds the key, rotate-secrets asks it of ServerLock. Released on commit.
 func (q *Queries) TryAdvisoryXactLock(ctx context.Context, key string) (bool, error) {
 	row := q.db.QueryRow(ctx, tryAdvisoryXactLock, key)
 	var pg_try_advisory_xact_lock bool

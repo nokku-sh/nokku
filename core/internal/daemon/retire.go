@@ -44,11 +44,7 @@ func Retire(
 	record func(context.Context, *audit.Event),
 ) error {
 	var retired []*db.DeleteRetiredDaemonsRow
-	err := conn.SysTx(ctx, func(q *db.Queries) error {
-		locked, err := q.TryAdvisoryXactLock(ctx, "daemon-retire")
-		if err != nil || !locked {
-			return err
-		}
+	err := conn.SysTx(ctx, func(q *db.Queries) (err error) {
 		if err := q.QuietStateChange(ctx); err != nil {
 			return err
 		}

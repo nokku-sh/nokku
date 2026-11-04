@@ -1,10 +1,14 @@
 package sshclient
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net"
 	"strings"
+	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +16,15 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
+
+// memConn is one end of an in-memory connection. Unlike [net.Pipe] it buffers
+// writes, so both SSH sides can send their version line first.
+type memConn struct {
+	in, out chan []byte
+	buf     []byte
+	done    chan struct{}
+	once    *sync.Once
+}
 
 func testConfig(t *testing.T, srv *sshtest.Server) Config {
 	t.Helper()
@@ -203,3 +216,81 @@ func TestTerminal_TransportDeath(t *testing.T) {
 		}
 	}
 }
+
+// A dead path sends no reset. An answered keepalive keeps the terminal, an
+// unanswered one ends it three intervals later.
+func TestTerminal_KeepaliveNeedsAnAnswer(t *testing.T) {
+	for _, drop := range []bool{false, true} {
+		synctest.Test(t, func(t *testing.T) {
+			// Made in the bubble, so the certificates are valid in its clock.
+			srv := sshtest.NewServer(t)
+			srv.Close()
+			srv.DropKeepalives.Store(drop)
+			cfg := testConfig(t, srv)
+			client, server := memPipe()
+			go srv.ServeConn(server)
+			term, err := DialTerminal(t.Context(), client, cfg)
+			require.NoError(t, err, "DialTerminal")
+			defer term.Close()
+
+			start := time.Now()
+			ended := make(chan struct{})
+			go func() {
+				for range term.Stdout() {
+				}
+				close(ended)
+			}()
+			select {
+			case <-ended:
+				assert.True(t, drop, "an answered keepalive ended the terminal")
+				assert.Equal(
+					t,
+					(1+keepaliveMisses)*keepaliveInterval,
+					time.Since(start),
+					"the end came off the deadline",
+				)
+			case <-time.After(10 * keepaliveInterval):
+				assert.False(t, drop, "an unanswered keepalive kept the terminal")
+			}
+		})
+	}
+}
+
+func memPipe() (net.Conn, net.Conn) {
+	a, b := make(chan []byte, 64), make(chan []byte, 64)
+	done, once := make(chan struct{}), new(sync.Once)
+	return &memConn{in: a, out: b, done: done, once: once}, &memConn{in: b, out: a, done: done, once: once}
+}
+
+func (c *memConn) Read(p []byte) (int, error) {
+	if len(c.buf) == 0 {
+		select {
+		case c.buf = <-c.in:
+		case <-c.done:
+			return 0, io.EOF
+		}
+	}
+	n := copy(p, c.buf)
+	c.buf = c.buf[n:]
+	return n, nil
+}
+
+func (c *memConn) Write(p []byte) (int, error) {
+	select {
+	case c.out <- bytes.Clone(p):
+		return len(p), nil
+	case <-c.done:
+		return 0, net.ErrClosed
+	}
+}
+
+func (c *memConn) Close() error {
+	c.once.Do(func() { close(c.done) })
+	return nil
+}
+
+func (c *memConn) LocalAddr() net.Addr              { return &net.TCPAddr{} }
+func (c *memConn) RemoteAddr() net.Addr             { return &net.TCPAddr{} }
+func (c *memConn) SetDeadline(time.Time) error      { return nil }
+func (c *memConn) SetReadDeadline(time.Time) error  { return nil }
+func (c *memConn) SetWriteDeadline(time.Time) error { return nil }

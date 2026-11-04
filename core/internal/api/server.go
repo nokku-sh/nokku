@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
 	"connectrpc.com/validate"
+	"github.com/go-chi/httprate"
 
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
@@ -45,6 +47,12 @@ func (s *Server) Start(ctx context.Context) error {
 		// Not in config.New, the hosted tests boot through it on loopback.
 		if err := egress.CheckHosted(); err != nil {
 			return err
+		}
+		// Unset, any private peer could set the address source limits check.
+		if !slices.ContainsFunc(s.cfg.TrustedProxies, func(p string) bool { return strings.TrimSpace(p) != "" }) {
+			return errors.New(
+				"NOKKU_TRUSTED_PROXIES is not set, the hosted service must name the proxies in front of it",
+			)
 		}
 		go runLifecycle(ctx, s.cfg)
 	}
@@ -170,12 +178,16 @@ func (s *Server) withRequestMeta(h http.Handler) http.Handler {
 // withTenant skips /healthz and webhooks, they have no workspace host.
 func (s *Server) withTenant(h http.Handler) http.Handler {
 	resolved := s.cfg.Tenant.Middleware(h)
+	lookup := httprate.LimitBy(unknownHostsPerMinute, time.Minute, clientIP)(resolved)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" || strings.HasPrefix(r.URL.Path, "/webhooks/") {
+		switch {
+		case r.URL.Path == "/healthz" || strings.HasPrefix(r.URL.Path, "/webhooks/"):
 			h.ServeHTTP(w, r)
-			return
+		case s.cfg.Tenant.Known(r.Host):
+			resolved.ServeHTTP(w, r)
+		default:
+			lookup.ServeHTTP(w, r)
 		}
-		resolved.ServeHTTP(w, r)
 	})
 }
 

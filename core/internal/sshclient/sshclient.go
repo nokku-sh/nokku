@@ -20,6 +20,8 @@ const (
 	chunkSize     = 32 * 1024
 	// Matches the daemon's sshd, which answers keepalive@openssh.com.
 	keepaliveInterval = 30 * time.Second
+	// Like OpenSSH and the daemon, three missed intervals mean the peer is dead.
+	keepaliveMisses = 3
 )
 
 type Config struct {
@@ -206,7 +208,7 @@ func (t *Terminal) drainRequests() {
 	}
 }
 
-// keepalive treats a failed keepalive@openssh.com as a dead relay or sshd.
+// keepalive ends the terminal on a failed or unanswered keepalive@openssh.com.
 func (t *Terminal) keepalive() {
 	ticker := time.NewTicker(keepaliveInterval)
 	defer ticker.Stop()
@@ -217,10 +219,14 @@ func (t *Terminal) keepalive() {
 		case <-t.done:
 			return
 		case <-ticker.C:
-			if _, _, err := t.client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
-				t.Close()
-				return
-			}
+		}
+		// A dead path sends no reset, Close unblocks the request.
+		dead := time.AfterFunc(keepaliveMisses*keepaliveInterval, t.Close)
+		_, _, err := t.client.SendRequest("keepalive@openssh.com", true, nil)
+		dead.Stop()
+		if err != nil {
+			t.Close()
+			return
 		}
 	}
 }

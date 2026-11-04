@@ -105,6 +105,58 @@ func TestSCIMAuth(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, ca.do(http.MethodGet, "/Users", nil, nil), "bogus token")
 }
 
+// A workspace off the plan keeps its token for offboarding. Nothing that lets
+// someone in goes through, a plan that could not be read is a 500, which a
+// provider retries, and a bad token still hears 401 first.
+func TestSCIMOffThePlanOnlyOffboards(t *testing.T) {
+	onPlan, lookup := true, error(nil)
+	e := newTestEnvWith(t, iam.Deps{
+		HasSCIM: func(context.Context, string) (bool, error) { return onPlan, lookup },
+	})
+	o := e.org(t)
+	c := e.scim(t, o)
+	domain := testDomain()
+	var leaving, other scimResource
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", scimUser("leaving@"+domain, "1"), &leaving))
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", scimUser("other@"+domain, "2"), &other))
+
+	onPlan = false
+	var refused map[string]any
+	assert.Equal(t, http.StatusForbidden, c.do(http.MethodPost, "/Users", scimUser("new@"+domain, "3"), &refused))
+	assert.Contains(t, refused["detail"], "not on this workspace's plan")
+	assert.Equal(t, http.StatusForbidden, c.do(http.MethodPost, "/Groups", map[string]any{
+		"schemas":     []string{"urn:ietf:params:scim:schemas:core:2.0:Group"},
+		"displayName": "ops",
+	}, nil), "a group changed")
+	assert.Equal(t, http.StatusOK, c.do(http.MethodGet, "/Users", nil, nil), "reads stopped")
+
+	deactivate, reactivate := patchOp("replace", "active", false), patchOp("replace", "active", true)
+	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, "/Users/"+leaving.ID, deactivate, nil))
+	assert.Equal(t, http.StatusForbidden, c.do(http.MethodPatch, "/Users/"+leaving.ID, reactivate, nil),
+		"a person came back")
+	gone := scimUser("other@"+domain, "2")
+	gone["active"] = false
+	require.Equal(t, http.StatusOK, c.do(http.MethodPut, "/Users/"+other.ID, gone, nil))
+	assert.False(t, e.userByEmail(t, o.ws, "leaving@"+domain).Active)
+	assert.False(t, e.userByEmail(t, o.ws, "other@"+domain).Active)
+	require.Equal(t, http.StatusNoContent, c.do(http.MethodDelete, "/Users/"+leaving.ID, nil, nil))
+
+	bad := *c
+	bad.token = "nk_scim_bogus"
+	assert.Equal(
+		t,
+		http.StatusUnauthorized,
+		bad.do(http.MethodGet, "/Users", nil, nil),
+		"a bad token got past the door",
+	)
+
+	lookup = errors.New("the database is away")
+	assert.Equal(t, http.StatusInternalServerError, c.do(http.MethodPost, "/Users", scimUser("blip@"+domain, "4"), nil),
+		"a lookup blip told the provider to give up")
+	assert.Equal(t, http.StatusNoContent, c.do(http.MethodDelete, "/Users/"+other.ID, nil, nil),
+		"offboarding waited on the plan")
+}
+
 // A big group is a real request, past that the provider hears why it was
 // refused. Nothing without a token gets read.
 func TestSCIMBodyLimit(t *testing.T) {

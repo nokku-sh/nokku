@@ -25,6 +25,9 @@ type scimGroupHandler struct {
 }
 
 func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes) (scim.Resource, error) {
+	if err := h.svc.requirePlan(r.Context()); err != nil {
+		return scim.Resource{}, err
+	}
 	name := scimAttrString(attrs["displayName"])
 	if name == "" {
 		return scim.Resource{}, scimerrors.ScimErrorBadRequest("displayName is required")
@@ -97,6 +100,9 @@ func (h scimGroupHandler) GetAll(r *http.Request, params scim.ListRequestParams)
 }
 
 func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.ResourceAttributes) (scim.Resource, error) {
+	if err := h.svc.requirePlan(r.Context()); err != nil {
+		return scim.Resource{}, err
+	}
 	ctx := r.Context()
 	var res scim.Resource
 	err := h.tx(ctx, id, func(q *db.Queries) error {
@@ -122,6 +128,9 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 }
 
 func (h scimGroupHandler) Delete(r *http.Request, id string) error {
+	if err := h.svc.requirePlan(r.Context()); err != nil {
+		return err
+	}
 	return h.tx(r.Context(), id, func(q *db.Queries) error {
 		_, err := q.DeleteSCIMTeam(r.Context(), id)
 		return err
@@ -129,6 +138,9 @@ func (h scimGroupHandler) Delete(r *http.Request, id string) error {
 }
 
 func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
+	if err := h.svc.requirePlan(r.Context()); err != nil {
+		return scim.Resource{}, err
+	}
 	ctx := r.Context()
 	var res scim.Resource
 	changed := false

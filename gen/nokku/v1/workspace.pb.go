@@ -1501,7 +1501,7 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x18TransferOwnershipRequest\x12*\n" +
 	"\fnew_owner_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
 	"newOwnerId\"\x1b\n" +
-	"\x19TransferOwnershipResponse2\xf9\b\n" +
+	"\x19TransferOwnershipResponse2\xf7\b\n" +
 	"\x10WorkspaceService\x12X\n" +
 	"\fGetWorkspace\x12\x1d.nokku.v1.GetWorkspaceRequest\x1a\x1e.nokku.v1.GetWorkspaceResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12^\n" +
 	"\x0fUpdateWorkspace\x12 .nokku.v1.UpdateWorkspaceRequest\x1a!.nokku.v1.UpdateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12m\n" +
@@ -1512,9 +1512,8 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x0eUpdateUserRole\x12\x1f.nokku.v1.UpdateUserRoleRequest\x1a .nokku.v1.UpdateUserRoleResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12X\n" +
 	"\rSetUserActive\x12\x1e.nokku.v1.SetUserActiveRequest\x1a\x1f.nokku.v1.SetUserActiveResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12O\n" +
 	"\n" +
-	"DeleteUser\x12\x1b.nokku.v1.DeleteUserRequest\x1a\x1c.nokku.v1.DeleteUserResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12n\n" +
-	"\x13ClearUserIdentities\x12$.nokku.v1.ClearUserIdentitiesRequest\x1a%.nokku.v1.ClearUserIdentitiesResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x04(\x010\x01\x12f\n" +
+	"DeleteUser\x12\x1b.nokku.v1.DeleteUserRequest\x1a\x1c.nokku.v1.DeleteUserResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12l\n" +
+	"\x13ClearUserIdentities\x12$.nokku.v1.ClearUserIdentitiesRequest\x1a%.nokku.v1.ClearUserIdentitiesResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12f\n" +
 	"\x11TransferOwnership\x12\".nokku.v1.TransferOwnershipRequest\x1a#.nokku.v1.TransferOwnershipResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12^\n" +
 	"\x0fCreateWorkspace\x12 .nokku.v1.CreateWorkspaceRequest\x1a!.nokku.v1.CreateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\b\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eWorkspaceProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"

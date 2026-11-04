@@ -86,9 +86,10 @@ type Access struct {
 	Self   *bool                  `protobuf:"varint,2,opt,name=self" json:"self,omitempty"`
 	Role   *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
 	Daemon *bool                  `protobuf:"varint,4,opt,name=daemon" json:"daemon,omitempty"`
-	// people_only refuses service accounts, so a leaked token cannot mint more credentials for itself.
+	// people_only refuses service accounts, so a leaked token cannot mint more credentials for itself. fresh implies it.
 	PeopleOnly *bool `protobuf:"varint,5,opt,name=people_only,json=peopleOnly" json:"people_only,omitempty"`
-	// fresh needs a browser session from the last 10 minutes and refuses nk, a stolen session cannot add a way in.
+	// fresh needs a person's browser session from the last 10 minutes. It refuses nk and service accounts, so a stolen
+	// session or key cannot add a way in.
 	Fresh *bool `protobuf:"varint,6,opt,name=fresh" json:"fresh,omitempty"`
 	// feature is the plan feature the call needs.
 	Feature *string `protobuf:"bytes,7,opt,name=feature" json:"feature,omitempty"`

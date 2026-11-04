@@ -44,21 +44,13 @@ type connection interface {
 	TenantTx(ctx context.Context, fn func(*db.Queries) error) error
 }
 
-// owned lets a disconnect find a daemon's sessions without a scan.
-type owned struct {
-	sessions map[string]*Session
-	relays   map[string]struct{}
-}
-
+// Pool holds the connected daemons and their relays, a relay ends only with its own stream.
 type Pool struct {
 	mu            sync.RWMutex
 	byID          map[string]*daemonConn
 	byWksp        map[string]map[string]struct{}
-	owned         map[string]*owned
-	sessions      map[string]*Session
 	relays        map[string]*Relay
 	pendingRelays map[string]*relayPending
-	relayCounts   map[string]int
 	conn          connection
 	// Record is told when a daemon falls behind. Set before the server starts.
 	Record func(context.Context, *audit.Event)
@@ -80,11 +72,8 @@ func New(conn connection) *Pool {
 	return &Pool{
 		byID:          make(map[string]*daemonConn),
 		byWksp:        make(map[string]map[string]struct{}),
-		owned:         make(map[string]*owned),
-		sessions:      make(map[string]*Session),
 		relays:        make(map[string]*Relay),
 		pendingRelays: make(map[string]*relayPending),
-		relayCounts:   make(map[string]int),
 		conn:          conn,
 	}
 }
@@ -155,21 +144,6 @@ func (p *Pool) markSeen(ctx context.Context, daemonID string) {
 	}
 }
 
-func (p *Pool) ownLocked(daemonID string) *owned {
-	o := p.owned[daemonID]
-	if o == nil {
-		o = &owned{sessions: make(map[string]*Session), relays: make(map[string]struct{})}
-		p.owned[daemonID] = o
-	}
-	return o
-}
-
-func (p *Pool) disownLocked(daemonID string) {
-	if o := p.owned[daemonID]; o != nil && len(o.sessions) == 0 && len(o.relays) == 0 {
-		delete(p.owned, daemonID)
-	}
-}
-
 func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string) *daemonConn {
 	ctx, cancel := context.WithCancel(ctx)
 	c := &daemonConn{
@@ -182,7 +156,6 @@ func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string)
 	}
 	p.mu.Lock()
 	previous := p.byID[daemonID]
-	staleSessions, staleRelays := p.dropOwnedLocked(daemonID)
 	if previous != nil && previous.workspaceID != workspaceID {
 		if daemons := p.byWksp[previous.workspaceID]; daemons != nil {
 			delete(daemons, daemonID)
@@ -200,28 +173,7 @@ func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string)
 	if previous != nil {
 		previous.cancel()
 	}
-	for _, session := range staleSessions {
-		session.close()
-	}
-	for _, relayID := range staleRelays {
-		p.UnregisterRelay(relayID)
-	}
 	return c
-}
-
-// dropOwnedLocked returns what to tear down outside the lock.
-func (p *Pool) dropOwnedLocked(daemonID string) ([]*Session, []string) {
-	o := p.owned[daemonID]
-	if o == nil {
-		return nil, nil
-	}
-	sessions := slices.Collect(maps.Values(o.sessions))
-	relays := slices.Collect(maps.Keys(o.relays))
-	for _, s := range sessions {
-		delete(p.sessions, s.sessionID)
-	}
-	delete(p.owned, daemonID)
-	return sessions, relays
 }
 
 func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
@@ -244,16 +196,7 @@ func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 			delete(p.byWksp, wksp)
 		}
 	}
-	// The stream handlers may not have noticed the drop yet.
-	sessions, relayIDs := p.dropOwnedLocked(daemonID)
 	p.mu.Unlock()
-
-	for _, s := range sessions {
-		s.close()
-	}
-	for _, id := range relayIDs {
-		p.UnregisterRelay(id)
-	}
 	c.cancel()
 }
 

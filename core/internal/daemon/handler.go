@@ -55,6 +55,8 @@ func (p *Pool) Connect(
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
+		// A failed Send must end the connection, or it stays online and deaf.
+		defer conn.cancel()
 		for {
 			select {
 			case <-conn.ctx.Done():
