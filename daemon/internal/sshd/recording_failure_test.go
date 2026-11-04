@@ -121,6 +121,8 @@ func TestWriteErrorMidSessionIsOnTheAuditTrail(t *testing.T) {
 	defer sess.Close()
 
 	const fileLimit = 64 << 10
+	// base64 never emits a dash, so the marker can't turn up in the random output.
+	const marker = "all-done"
 	var limit syscall.Rlimit
 	must.NoError(syscall.Getrlimit(syscall.RLIMIT_FSIZE, &limit))
 	lowered := limit
@@ -130,11 +132,11 @@ func TestWriteErrorMidSessionIsOnTheAuditTrail(t *testing.T) {
 	restore := sync.OnceFunc(func() { _ = syscall.Setrlimit(syscall.RLIMIT_FSIZE, &limit) })
 	t.Cleanup(restore)
 
-	out, err := sess.Output("head -c 200000 /dev/urandom | base64 -w0; echo; echo done")
+	out, err := sess.Output("head -c 200000 /dev/urandom | base64 -w0; echo; echo " + marker)
 	restore()
 	must.NoError(err, "the session did not finish")
-	is.Len(out, 266668+len("\ndone\n"), "output went missing after the failed write")
-	is.True(bytes.HasSuffix(out, []byte("\ndone\n")))
+	is.Len(out, 266668+len("\n"+marker+"\n"), "output went missing after the failed write")
+	is.True(bytes.HasSuffix(out, []byte("\n"+marker+"\n")))
 
 	files, err := filepath.Glob(filepath.Join(paths.RecordsDir(), "*"))
 	must.NoError(err)
@@ -150,7 +152,7 @@ func TestWriteErrorMidSessionIsOnTheAuditTrail(t *testing.T) {
 	must.NoError(err)
 	text, err := io.ReadAll(zr)
 	must.ErrorIs(err, io.ErrUnexpectedEOF, "the cut file has no gzip footer")
-	is.NotContains(string(text), "done")
+	is.NotContains(string(text), marker)
 
 	must.Eventually(func() bool { return countEvents(audit(), eventSessionEnd) == 1 },
 		5*time.Second, 20*time.Millisecond, "the session never ended on the audit trail")
