@@ -212,12 +212,13 @@ func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.C
 }
 
 // ReportTarget also stamps the target's last sync.
-func (c *Client) ReportTarget(ctx context.Context, t *state.Target, accounts []string, hostKey string) error {
+func (c *Client) ReportTarget(ctx context.Context, t *state.Target, accounts []string, hostKey, caKey string) error {
 	_, err := c.targets.SyncTargetUsers(ctx, &nokkuv1.SyncTargetUsersRequest{
 		TargetId:      new(t.ID),
 		Usernames:     accounts,
 		HostPublicKey: new(hostKey),
 		Endpoints:     t.Endpoints,
+		CaPublicKey:   new(caKey),
 	})
 	return err
 }

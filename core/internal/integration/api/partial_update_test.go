@@ -228,6 +228,9 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 		require.NoError(t, err)
 		return res.GetCertificateAuthority()
 	}
+	// Other tests roll the shared CA over, so do it here too for one baseline.
+	_, err := certs.RolloverCertificateAuthority(t.Context(), &nokkuv1.RolloverCertificateAuthorityRequest{})
+	require.NoError(t, err)
 	// One CA, so each case sets the baseline and the test restores it.
 	before := read()
 	t.Cleanup(func() {

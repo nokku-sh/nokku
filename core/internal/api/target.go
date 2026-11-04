@@ -322,6 +322,17 @@ func (s *targetService) SyncTargetUsers(
 	}
 
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		// The stamp says the host has the current key, so check it under the lock.
+		ca, err := q.GetWorkspaceCAForShare(ctx)
+		if err != nil {
+			return err
+		}
+		if ca.PublicKey != req.GetCaPublicKey() {
+			return connect.NewError(
+				connect.CodeFailedPrecondition,
+				"the certificate authority was rolled over during this sync",
+			)
+		}
 		if err := q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
 			TargetID:    req.GetTargetId(),
 			Usernames:   nokkudaemon.ValidUsers(req.GetUsernames()),

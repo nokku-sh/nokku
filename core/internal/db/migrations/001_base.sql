@@ -39,7 +39,10 @@ CREATE TABLE workspace_subscriptions (
   deletion_warning INTEGER NOT NULL DEFAULT 0, -- days before the deletion of the last warning, 0 for none
   deletion_warned_at TIMESTAMPTZ, -- a late warning pushes the deletion back
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (source <> 'trial' OR current_period_end IS NOT NULL)
+  CHECK (
+    source <> 'trial'
+    OR current_period_end IS NOT NULL
+  )
 );
 
 -- Subjects -------------------------------------------------------------------
@@ -51,7 +54,10 @@ CREATE TABLE users (
   picture TEXT,
   role INTEGER NOT NULL DEFAULT 1 CHECK (role BETWEEN 1 AND 5), -- 1=member, 2=viewer, 3=editor, 4=admin, 5=owner
   active BOOLEAN NOT NULL DEFAULT TRUE,
-  CHECK (role <> 5 OR active), -- the owner can't be switched off
+  CHECK (
+    role <> 5
+    OR active
+  ), -- the owner can't be switched off
   scim_external_id TEXT,
   scim_managed BOOLEAN NOT NULL DEFAULT FALSE, -- SCIM created it, so the identity provider owns the address
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -148,7 +154,13 @@ CREATE TABLE credentials (
   subject TEXT NOT NULL DEFAULT '',
   data BYTEA NOT NULL DEFAULT '',
   label TEXT NOT NULL DEFAULT '',
-  CHECK (type <> 'oidc' OR (provider <> '' AND subject <> '')),
+  CHECK (
+    type <> 'oidc'
+    OR (
+      provider <> ''
+      AND subject <> ''
+    )
+  ),
   last_used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -227,7 +239,10 @@ CREATE TABLE device_grants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, user_code),
   CHECK ((status = 'pending') = (user_id IS NULL)),
-  CHECK (status <> 'approved' OR approved_method IS NOT NULL),
+  CHECK (
+    status <> 'approved'
+    OR approved_method IS NOT NULL
+  ),
   FOREIGN KEY (workspace_id, user_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE
 );
 
@@ -261,8 +276,17 @@ CREATE TABLE access_tokens (
   CHECK ((kind IN ('user', 'cli')) = (user_id IS NOT NULL)),
   CHECK ((kind = 'daemon') = (daemon_id IS NOT NULL)),
   CHECK ((kind = 'service_account') = (service_account_id IS NOT NULL)),
-  CHECK (kind <> 'service_account' OR expires_at IS NOT NULL),
-  CHECK (workload_jti IS NULL OR (kind = 'service_account' AND binding <> ''))
+  CHECK (
+    kind <> 'service_account'
+    OR expires_at IS NOT NULL
+  ),
+  CHECK (
+    workload_jti IS NULL
+    OR (
+      kind = 'service_account'
+      AND binding <> ''
+    )
+  )
 );
 
 CREATE INDEX idx_access_tokens_subject ON access_tokens (subject_id);
@@ -286,11 +310,7 @@ CREATE TABLE ssh_cas (
   -- The user key signs logins, the host key the daemons' host certificates. Private halves are in ssh_ca_keys.
   public_key TEXT NOT NULL,
   host_public_key TEXT NOT NULL,
-  -- The keys before the last rollover, trusted until previous_trusted_until.
-  previous_public_key TEXT,
-  previous_host_public_key TEXT,
-  previous_trusted_until TIMESTAMPTZ,
-  rotated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  rotated_at TIMESTAMPTZ, -- NULL until the first rollover
   -- No defaults here, ssh.NewCA holds the settings a new CA starts with.
   user_default_ttl INTERVAL NOT NULL,
   user_max_ttl INTERVAL NOT NULL,
@@ -301,8 +321,10 @@ CREATE TABLE ssh_cas (
   UNIQUE (workspace_id),
   UNIQUE (workspace_id, id),
   CHECK (user_default_ttl <= user_max_ttl),
-  CHECK (user_default_ttl > INTERVAL '0' AND host_ttl > INTERVAL '0'),
-  CHECK (num_nonnulls (previous_public_key, previous_host_public_key, previous_trusted_until) IN (0, 3))
+  CHECK (
+    user_default_ttl > INTERVAL '0'
+    AND host_ttl > INTERVAL '0'
+  )
 );
 
 -- Apart so reading a CA never touches a private key. Only GetCASigningKey reads one.
@@ -463,7 +485,10 @@ CREATE TABLE access_requests (
   decided_by UUID,
   decided_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (status NOT IN ('approved', 'denied') OR decided_at IS NOT NULL),
+  CHECK (
+    status NOT IN ('approved', 'denied')
+    OR decided_at IS NOT NULL
+  ),
   FOREIGN KEY (workspace_id, requester_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, account_id) REFERENCES target_accounts (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, decided_by) REFERENCES users (workspace_id, id) ON DELETE SET NULL (decided_by)
@@ -591,7 +616,10 @@ CREATE TABLE recordings (
   ended_at TIMESTAMPTZ, -- when the session ended, as the daemon says. A broken upload leaves it NULL
   size_bytes BIGINT NOT NULL DEFAULT 0 CHECK (size_bytes >= 0), -- of the stored copy
   complete BOOLEAN NOT NULL DEFAULT FALSE, -- FALSE when the upload stream ended abruptly
-  CHECK (NOT complete OR object_id IS NOT NULL),
+  CHECK (
+    NOT complete
+    OR object_id IS NOT NULL
+  ),
   CHECK (ended_at >= started_at),
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE SET NULL (daemon_id)
 );

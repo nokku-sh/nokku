@@ -11,9 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
@@ -43,58 +40,17 @@ func TestSetAccessTrust(t *testing.T) {
 	is.False(trustsCA(srv, second), "a target without a CA still trusts one")
 }
 
-// A restart trusts no CA if the active key does not parse, nor may a sync.
-func TestUnreadableActiveCATrustsNone(t *testing.T) {
+// A sync with a CA key that does not parse trusts no CA.
+func TestUnreadableCATrustsNone(t *testing.T) {
 	is := assert.New(t)
-	active, retired := newTestCA(t), newTestCA(t)
+	ca := newTestCA(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 	srv, err := New(nil)
 	require.NoError(t, err)
 
-	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(active.pub))})
-	srv.SetAccess(&state.Access{
-		CA: "garbage",
-		RetiredCAs: []*nokkuv1.RetiredCAKey{{
-			PublicKey:    new(string(ssh.MarshalAuthorizedKey(retired.pub))),
-			TrustedUntil: timestamppb.New(time.Now().Add(time.Hour)),
-		}},
-	})
-	is.False(trustsCA(srv, active), "an unreadable CA kept the previous trust")
-	is.False(trustsCA(srv, retired), "an unreadable CA still trusts the retired ones")
-}
-
-// An empty retired list, sent after an emergency rollover, drops the old CA.
-func TestRetiredCATrustedUntilDeadline(t *testing.T) {
-	is := assert.New(t)
-	active := newTestCA(t)
-	retired := newTestCA(t)
-	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-
-	srv, err := New(nil)
-	require.NoError(t, err)
-
-	activeKey := string(ssh.MarshalAuthorizedKey(active.pub))
-	withRetired := func(until time.Time) *state.Access {
-		return &state.Access{CA: activeKey, RetiredCAs: []*nokkuv1.RetiredCAKey{
-			{PublicKey: new(string(ssh.MarshalAuthorizedKey(retired.pub))), TrustedUntil: timestamppb.New(until)},
-			{PublicKey: new("garbage"), TrustedUntil: timestamppb.New(until)},
-		}}
-	}
-
-	srv.SetAccess(&state.Access{CA: activeKey})
-	is.False(trustsCA(srv, retired), "no retired CA synced yet")
-
-	srv.SetAccess(withRetired(time.Now().Add(time.Hour)))
-	is.True(trustsCA(srv, retired), "retired CA must be trusted before its deadline")
-	is.True(trustsCA(srv, active), "active CA must stay trusted")
-
-	srv.SetAccess(withRetired(time.Now().Add(-time.Minute)))
-	is.False(trustsCA(srv, retired), "retired CA must not be trusted past its deadline")
-
-	srv.SetAccess(withRetired(time.Now().Add(time.Hour)))
-	srv.SetAccess(&state.Access{CA: activeKey})
-	is.False(trustsCA(srv, retired), "an empty list must drop the retired CA at once")
-	is.True(trustsCA(srv, active), "active CA must stay trusted")
+	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(ca.pub))})
+	srv.SetAccess(&state.Access{CA: "garbage"})
+	is.False(trustsCA(srv, ca), "an unreadable CA kept the previous trust")
 }
 
 func TestServerReloadRefreshesHostCerts(t *testing.T) {

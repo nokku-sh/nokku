@@ -66,6 +66,16 @@ WHERE
   workspace_id = current_workspace_id ()
 FOR UPDATE;
 
+-- name: GetWorkspaceCAForShare :one
+-- A sync report holds a rollover back until it commits.
+SELECT
+  *
+FROM
+  ssh_cas
+WHERE
+  workspace_id = current_workspace_id ()
+FOR SHARE;
+
 -- name: UpdateCA :one
 UPDATE ssh_cas
 SET
@@ -79,27 +89,13 @@ WHERE
 RETURNING
   *;
 
--- The replaced user key stays trusted for as long as a certificate it signed can live, unless revoke_previous drops
--- it. The replaced host key gets the same time, a daemon asks for a new host certificate at its next sync. The
--- private keys go with PutCAKey in the same transaction.
 -- name: ReplaceCA :one
+-- Nothing keeps the old keys. clock_timestamp is after any sync report that held the row.
 UPDATE ssh_cas
 SET
-  previous_public_key = CASE
-    WHEN @revoke_previous::BOOLEAN THEN NULL
-    ELSE public_key
-  END,
-  previous_host_public_key = CASE
-    WHEN @revoke_previous::BOOLEAN THEN NULL
-    ELSE host_public_key
-  END,
-  previous_trusted_until = CASE
-    WHEN @revoke_previous::BOOLEAN THEN NULL
-    ELSE NOW() + user_max_ttl
-  END,
   public_key = @public_key,
   host_public_key = @host_public_key,
-  rotated_at = NOW(),
+  rotated_at = clock_timestamp(),
   updated_at = NOW()
 WHERE
   id = @ca_id

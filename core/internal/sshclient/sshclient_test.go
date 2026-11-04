@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/ssh"
 
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
@@ -20,7 +19,7 @@ func testConfig(t *testing.T, srv *sshtest.Server) Config {
 		HostPrincipal: srv.HostPrincipal,
 		Username:      "user",
 		Signer:        srv.UserSigner(t, srv.UserPrincipal, "user"),
-		HostCAs:       []ssh.PublicKey{srv.HostCAKey()},
+		HostCA:        srv.HostCAKey(),
 	}
 }
 
@@ -87,7 +86,7 @@ func TestDialTerminal_WrongCA(t *testing.T) {
 	rogue := sshtest.NewServer(t)
 
 	cfg := testConfig(t, srv)
-	cfg.HostCAs = []ssh.PublicKey{rogue.HostCAKey()}
+	cfg.HostCA = rogue.HostCAKey()
 
 	conn, err := net.Dial("tcp", srv.Addr())
 	require.NoError(t, err, "dial test server")

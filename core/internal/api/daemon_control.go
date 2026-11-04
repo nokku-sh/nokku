@@ -150,7 +150,6 @@ func (s *daemonControlService) SyncDaemon(
 		Config:          res.Config,
 		Principals:      res.Principals,
 		CaPublicKey:     &res.CAPublicKey,
-		RetiredCaKeys:   res.RetiredCAs,
 		HostCaPublicKey: &res.HostCAPublicKey,
 		StateVersion:    &res.Version,
 	}, nil

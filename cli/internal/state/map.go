@@ -46,14 +46,11 @@ func MapCA(ca *nokkuv1.CertificateAuthority) *CA {
 	if ca == nil {
 		return nil
 	}
-	out := &CA{PublicKey: ca.GetPublicKey(), HostPublicKey: ca.GetHostPublicKey()}
-	// AsTime turns an unset timestamp into 1970, not the zero time.
-	if ca.GetPreviousTrustedUntil() != nil {
-		out.PreviousPublicKey = ca.GetPreviousPublicKey()
-		out.PreviousHostPublicKey = ca.GetPreviousHostPublicKey()
-		out.PreviousTrustedUntil = ca.GetPreviousTrustedUntil().AsTime()
+	return &CA{
+		PublicKey:     ca.GetPublicKey(),
+		HostPublicKey: ca.GetHostPublicKey(),
+		RotatedAt:     timeOf(ca.GetRotatedAt()),
 	}
-	return out
 }
 
 func MapTarget(t *nokkuv1.Target) Target {
@@ -65,7 +62,16 @@ func MapTarget(t *nokkuv1.Target) Target {
 		Usernames:     plainAll(t.GetUsernames()),
 		Until:         untilAll(t.GetUsernameExpiresAt()),
 		HostPublicKey: t.GetHostPublicKey(),
+		LastSyncAt:    timeOf(t.GetLastSyncAt()),
 	}
+}
+
+// timeOf keeps an unset timestamp zero, AsTime would make it 1970.
+func timeOf(ts *timestamppb.Timestamp) time.Time {
+	if ts == nil {
+		return time.Time{}
+	}
+	return ts.AsTime()
 }
 
 func untilAll(ends map[string]*timestamppb.Timestamp) map[string]time.Time {

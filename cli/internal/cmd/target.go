@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	connectrpc "connectrpc.com/connect/v2"
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/cli/internal/client"
@@ -135,7 +136,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 		created = true
 		fmt.Fprintf(progress, "Added target %s\n", ui.Bold(target.Name))
 	}
-	plan, err := manual.NewPlan(strings.Join(ca.TrustedKeys(), "\n"), target.ID)
+	plan, err := manual.NewPlan(ca.PublicKey, target.ID)
 	if err != nil {
 		return err
 	}
@@ -252,18 +253,11 @@ func applyPlan(
 		}
 		return fmt.Errorf("writing to %s failed, the new target %s was removed again: %w", dest.host, target.Name, err)
 	}
-	// A report clears the rollover warning, so the keys must still be current.
-	current, err := c.WorkspaceCA(ctx)
-	if err != nil {
-		return fmt.Errorf(
-			"the host was written, but reading the certificate authority failed, run nk sync again: %w",
-			err,
-		)
-	}
-	if current == nil || current.PublicKey != ca.PublicKey {
+	err = c.ReportTarget(ctx, target, h.Accounts, h.HostKey, ca.PublicKey)
+	if connectrpc.CodeOf(err) == connectrpc.CodeFailedPrecondition {
 		return errors.New("the keys of the certificate authority changed during this sync, run nk sync again")
 	}
-	if err = c.ReportTarget(ctx, target, h.Accounts, h.HostKey); err != nil {
+	if err != nil {
 		return fmt.Errorf("the host is up to date, but reporting to Nokku failed, run nk sync again: %w", err)
 	}
 

@@ -75,6 +75,11 @@ message SyncTargetUsersRequest {
       string: {max_len: 255}
     }
   }];
+  // The CA key nk sync wrote. A report for a key a rollover replaced fails.
+  string ca_public_key = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 1024
+  }];
 }
 
 message SyncTargetUsersResponse {}

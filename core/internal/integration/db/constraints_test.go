@@ -35,7 +35,6 @@ func TestInvalidRowsAreRefused(t *testing.T) {
 			`INSERT INTO workspace_subscriptions (workspace_id, source, plan, status) VALUES ($1, 'trial', 'pro', 'trial')`,
 			[]any{f.ws},
 		},
-		"half of a previous CA key": {`UPDATE ssh_cas SET previous_public_key = 'old' WHERE id = $1`, []any{f.ca}},
 		"a certificate lifetime of nothing": {
 			`UPDATE ssh_cas SET user_default_ttl = '0' WHERE id = $1`, []any{f.ca},
 		},

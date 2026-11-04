@@ -147,7 +147,7 @@ What it does:
 - It checks the result with `sshd -t` and rolls every file back if sshd rejects it, or if the run breaks off halfway.
 - Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
 
-Access changes need no new sync. Nokku decides who gets a certificate for the server, so a new grant works at once. A revoke stops new logins within an hour: certificates for these servers last an hour at most, and the core signs no new one without the grant. An open session stays until it ends, and these servers have no recording and no relay. A workspace has one CA, so a rotation reaches every server: run `nk sync` again on each one you set up this way. `nk sync` and `nk rm` find a server by its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
+Access changes need no new sync. Nokku decides who gets a certificate for the server, so a new grant works at once. A revoke stops new logins within an hour: certificates for these servers last an hour at most, and the core signs no new one without the grant. An open session stays until it ends, and these servers have no recording and no relay. A workspace has one CA, so a rollover reaches every server: run `nk sync` again right away on each one you set up this way. `nk sync` and `nk rm` find a server by its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
 
 A new server can start with access in place, so nobody has to open the web app after the first sync:
 

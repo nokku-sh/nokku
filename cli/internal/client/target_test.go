@@ -30,6 +30,8 @@ type captureTargetService struct {
 
 type workspaceCAService struct {
 	nokkuv1connect.UnimplementedCertificateServiceHandler
+
+	rotatedAt time.Time
 }
 
 type pagedTargetService struct {
@@ -111,15 +113,14 @@ func TestDeleteTarget(t *testing.T) {
 	assert.Equal(t, "target-1", svc.deleted.GetId())
 }
 
-func (workspaceCAService) GetCertificateAuthority(
+func (s workspaceCAService) GetCertificateAuthority(
 	context.Context,
 	*nokkuv1.GetCertificateAuthorityRequest,
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
 	return &nokkuv1.GetCertificateAuthorityResponse{
 		CertificateAuthority: &nokkuv1.CertificateAuthority{
-			PublicKey:            new("ssh-ed25519 AAAA"),
-			PreviousPublicKey:    new("ssh-ed25519 BBBB"),
-			PreviousTrustedUntil: timestamppb.New(time.Now().Add(time.Hour)),
+			PublicKey: new("ssh-ed25519 AAAA"),
+			RotatedAt: timestamppb.New(s.rotatedAt),
 		},
 	}, nil
 }
@@ -130,7 +131,8 @@ func TestWorkspaceCA(t *testing.T) {
 
 	mux := http.NewServeMux()
 	srv := connect.NewServer()
-	nokkuv1connect.RegisterCertificateServiceHandler(srv, workspaceCAService{})
+	rotatedAt := time.Now().Add(-time.Hour).Truncate(time.Second)
+	nokkuv1connect.RegisterCertificateServiceHandler(srv, workspaceCAService{rotatedAt: rotatedAt})
 	connecthttp.Mount(mux, srv)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
@@ -142,7 +144,8 @@ func TestWorkspaceCA(t *testing.T) {
 
 	ca, err := c.WorkspaceCA(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, []string{"ssh-ed25519 AAAA", "ssh-ed25519 BBBB"}, ca.TrustedKeys(), "nk sync writes both")
+	assert.Equal(t, "ssh-ed25519 AAAA", ca.PublicKey)
+	assert.True(t, rotatedAt.Equal(ca.RotatedAt))
 }
 
 func (s pagedTargetService) ListTargets(

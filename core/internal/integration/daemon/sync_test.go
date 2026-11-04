@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,8 +32,7 @@ func (c *reportFails) TenantTx(ctx context.Context, fn func(*db.Queries) error) 
 	return c.Connection.TenantTx(ctx, fn)
 }
 
-// One rollover reaches every daemon at its next sync. A routine one keeps the
-// old key trusted for a while, an emergency one drops it at once.
+// One rollover reaches every daemon at its next sync, with the new keys only.
 func TestRolloverReachesTheNextSync(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.AutoApprove = true })
 	daemons := make([]string, 0, 2)
@@ -45,41 +43,27 @@ func TestRolloverReachesTheNextSync(t *testing.T) {
 	}
 	keys, err := kms.Ephemeral()
 	require.NoError(t, err)
-	rollover := func(revoke bool) (replaced, next *db.SSHCA) {
-		require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) (err error) {
-			if replaced, err = q.GetWorkspaceCA(f.ctx); err != nil {
-				return err
-			}
-			next, err = ssh.Rollover(f.ctx, q, keys, replaced, revoke)
-			return err
-		}))
-		return replaced, next
-	}
-	syncAll := func(check func(*daemon.Synced)) {
-		for _, id := range daemons {
-			res, err := daemon.Sync(f.ctx, f.conn, daemon.SyncInput{DaemonID: id})
-			require.NoError(t, err)
-			check(res)
-		}
-	}
-	var version int64
-	syncAll(func(res *daemon.Synced) { version = res.Version })
+	// The state version is the workspace's, so one sync reads it for both.
+	before, err := daemon.Sync(f.ctx, f.conn, daemon.SyncInput{DaemonID: daemons[0]})
+	require.NoError(t, err)
 
-	replaced, next := rollover(false)
-	syncAll(func(res *daemon.Synced) {
-		assert.Greater(t, res.Version, version, "a rollover must wake the daemons")
+	var next *db.SSHCA
+	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
+		current, err := q.GetWorkspaceCA(f.ctx)
+		if err != nil {
+			return err
+		}
+		next, err = ssh.Rollover(f.ctx, q, keys, current)
+		return err
+	}))
+
+	for _, id := range daemons {
+		res, err := daemon.Sync(f.ctx, f.conn, daemon.SyncInput{DaemonID: id})
+		require.NoError(t, err)
+		assert.Greater(t, res.Version, before.Version, "a rollover must wake the daemons")
 		assert.Equal(t, next.PublicKey, res.CAPublicKey)
 		assert.Equal(t, next.HostPublicKey, res.HostCAPublicKey)
-		require.Len(t, res.RetiredCAs, 1, "a routine rollover keeps the old key trusted")
-		assert.Equal(t, replaced.PublicKey, res.RetiredCAs[0].GetPublicKey())
-		assert.WithinDuration(t, *next.PreviousTrustedUntil, res.RetiredCAs[0].GetTrustedUntil().AsTime(), time.Second)
-	})
-
-	_, next = rollover(true)
-	syncAll(func(res *daemon.Synced) {
-		assert.Equal(t, next.PublicKey, res.CAPublicKey)
-		assert.Empty(t, res.RetiredCAs, "an emergency rollover ends the old trust at the next sync")
-	})
+	}
 }
 
 // A server always gets its principals. Its report is saved after, a failed save

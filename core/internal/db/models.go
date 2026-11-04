@@ -271,20 +271,17 @@ type RecordingDelete struct {
 }
 
 type SSHCA struct {
-	ID                    string        `json:"id"`
-	WorkspaceID           string        `json:"workspaceId"`
-	PublicKey             string        `json:"publicKey"`
-	HostPublicKey         string        `json:"hostPublicKey"`
-	PreviousPublicKey     *string       `json:"previousPublicKey"`
-	PreviousHostPublicKey *string       `json:"previousHostPublicKey"`
-	PreviousTrustedUntil  *time.Time    `json:"previousTrustedUntil"`
-	RotatedAt             time.Time     `json:"rotatedAt"`
-	UserDefaultTtl        time.Duration `json:"userDefaultTtl"`
-	UserMaxTtl            time.Duration `json:"userMaxTtl"`
-	HostTtl               time.Duration `json:"hostTtl"`
-	SourceAddress         string        `json:"sourceAddress"`
-	CreatedAt             time.Time     `json:"createdAt"`
-	UpdatedAt             time.Time     `json:"updatedAt"`
+	ID             string        `json:"id"`
+	WorkspaceID    string        `json:"workspaceId"`
+	PublicKey      string        `json:"publicKey"`
+	HostPublicKey  string        `json:"hostPublicKey"`
+	RotatedAt      *time.Time    `json:"rotatedAt"`
+	UserDefaultTtl time.Duration `json:"userDefaultTtl"`
+	UserMaxTtl     time.Duration `json:"userMaxTtl"`
+	HostTtl        time.Duration `json:"hostTtl"`
+	SourceAddress  string        `json:"sourceAddress"`
+	CreatedAt      time.Time     `json:"createdAt"`
+	UpdatedAt      time.Time     `json:"updatedAt"`
 }
 
 type SSHCAKey struct {

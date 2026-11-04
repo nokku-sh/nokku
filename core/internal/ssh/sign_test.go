@@ -120,6 +120,7 @@ func TestSourceAddresses(t *testing.T) {
 		" , ":                         "",
 		"10.0.0.0/8, 192.168.1.10":    "10.0.0.0/8,192.168.1.10",
 		" 2001:db8::/32 ,2001:db8::1": "2001:db8::/32,2001:db8::1",
+		"10.0.0.1,10.0.0.1":           "10.0.0.1",
 	} {
 		got, err := SourceAddresses(in)
 		if assert.NoError(t, err, "SourceAddresses(%q)", in) {

@@ -3,7 +3,6 @@ package state
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/mizuchilabs/kata/fsutil"
@@ -26,10 +25,8 @@ type CA struct {
 	// PublicKey signs logins, HostPublicKey the host certificates of daemons.
 	PublicKey     string `json:"public_key"`
 	HostPublicKey string `json:"host_public_key,omitempty"`
-	// The keys before the last rollover, trusted until PreviousTrustedUntil.
-	PreviousPublicKey     string    `json:"previous_public_key,omitempty"`
-	PreviousHostPublicKey string    `json:"previous_host_public_key,omitempty"`
-	PreviousTrustedUntil  time.Time `json:"previous_trusted_until,omitzero"`
+	// RotatedAt is zero until the first rollover.
+	RotatedAt time.Time `json:"rotated_at,omitzero"`
 }
 
 type Target struct {
@@ -43,6 +40,8 @@ type Target struct {
 	Until map[string]time.Time `json:"until,omitempty"`
 	// HostPublicKey pins the host key of a manual target.
 	HostPublicKey string `json:"host_public_key,omitempty"`
+	// LastSyncAt is when nk sync last wrote the CA key to a manual target.
+	LastSyncAt time.Time `json:"last_sync_at,omitzero"`
 }
 
 // Config keeps a session with the API that issued it.
@@ -79,25 +78,12 @@ type State struct {
 	RequireTPM bool
 }
 
-// TrustedKeys is the user key and, while still trusted, the one it replaced.
-func (ca CA) TrustedKeys() []string {
-	return ca.trusted(ca.PublicKey, ca.PreviousPublicKey)
-}
-
-// TrustedHostKeys is [CA.TrustedKeys] for the host key.
-func (ca CA) TrustedHostKeys() []string {
-	return ca.trusted(ca.HostPublicKey, ca.PreviousHostPublicKey)
-}
-
-func (ca CA) trusted(current, previous string) []string {
-	keys := []string{strings.TrimSpace(current)}
-	if prev := strings.TrimSpace(previous); prev != "" && time.Now().Before(ca.PreviousTrustedUntil) {
-		keys = append(keys, prev)
-	}
-	return keys
-}
-
 func (t Target) Manual() bool { return t.DaemonID == "" }
+
+// Behind is a manual target last synced before a rollover, so it still takes only the old key.
+func (t Target) Behind(ca CA) bool {
+	return t.Manual() && !t.LastSyncAt.IsZero() && t.LastSyncAt.Before(ca.RotatedAt)
+}
 
 // Load starts empty on a missing or corrupt file.
 func Load() *State {

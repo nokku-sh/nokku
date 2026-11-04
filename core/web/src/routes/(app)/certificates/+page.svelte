@@ -1,29 +1,44 @@
 <script lang="ts">
 	import { whenFresh } from '#lib/api/auth.svelte.js';
-	import { ca, manualKeyState } from '#lib/api/certificates.svelte.js';
 	import { plural } from '#lib/api/bulk.js';
+	import { ca, missedRollover } from '#lib/api/certificates.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
+	import { util, workspace } from '#lib/api/workspaces.svelte.js';
+	import Chip from '#lib/components/blocks/Chip.svelte';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
 	import LoadError from '#lib/components/blocks/LoadError.svelte';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
+	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
+	import * as Alert from '#lib/components/ext/alert/index.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
-	import DangerZone from '#lib/components/sheets/DangerZone.svelte';
-	import DetailList from '#lib/components/sheets/DetailList.svelte';
-	import Section from '#lib/components/sheets/Section.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
-	import { Input } from '#lib/components/ui/input/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { CertificateAuthoritySchema } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { TargetStatus } from '#lib/gen/nokku/v1/target_pb.js';
+	import { AuditOutcome } from '#lib/gen/nokku/v1/util_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
-	import { formatTs, listNames, toDate } from '#lib/utils.js';
-	import type { Duration } from '@bufbuild/protobuf/wkt';
-	import { Clock, Fingerprint, History, KeyRound, RefreshCw, Server } from '@lucide/svelte';
+	import { UseClipboard } from '#lib/hooks/use-clipboard.svelte.js';
+	import type { Tone } from '#lib/tone.js';
+	import { cn, formatTs, listNames, toDate } from '#lib/utils.js';
+	import { timestampFromMs, type Duration } from '@bufbuild/protobuf/wkt';
+	import { Check, Copy, Plus, ShieldAlert, TriangleAlert } from '@lucide/svelte';
+
+	// Ansible fills in the braces, so they stay out of the markup.
+	const PLAYBOOK = `- name: Trust the Nokku CA, run it again after a rollover
+  ansible.builtin.command: nk sync {{ inventory_hostname }}
+  delegate_to: localhost`;
+	const MAX_ADDRESSES = 1024;
+	const IPV4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 
 	const can = user.can();
+	const ws = workspace.get();
 	const query = ca.get();
 	const entity = $derived(query.data);
 	const draft = useDraft(CertificateAuthoritySchema, () => query.data);
@@ -64,51 +79,175 @@
 	const manualList = target.list(() => ({ status: TargetStatus.MANUAL }));
 	const manual = $derived(manualList.data?.targets ?? []);
 	const manualCount = $derived(manualList.data?.total ?? 0);
-	const missingKey = $derived(
-		manual.filter((t) => manualKeyState(entity, t.lastSyncAt).rotated).map((t) => t.name)
-	);
-	const keepsOldKey = $derived(
-		manual.filter((t) => manualKeyState(entity, t.lastSyncAt).oldKeyUntil).map((t) => t.name)
-	);
-	const syncCommands = (names: string[]) => names.map((name) => `nk sync ${name}`).join('\n');
 	const manualNames = $derived(manual.map((t) => t.name));
-	// Shown before a rotation, so the commands are at hand when it happens.
-	const syncNeeded = $derived(missingKey.length > 0 || keepsOldKey.length > 0);
+	const missingKey = $derived(
+		manual.filter((t) => missedRollover(entity?.rotatedAt, t.lastSyncAt)).map((t) => t.name)
+	);
+	const missingText = $derived(
+		`${plural(missingKey.length, 'server')} ${missingKey.length === 1 ? 'misses' : 'miss'} the new key`
+	);
 	const unchecked = $derived(manualCount - manual.length);
+	const syncCommands = (names: string[]) => names.map((name) => `nk sync ${name}`).join('\n');
 
-	const previousTrusted = $derived(
-		!!entity?.previousPublicKey &&
-			!!entity.previousTrustedUntil &&
-			toDate(entity.previousTrustedUntil).getTime() > Date.now()
+	const midnight = timestampFromMs(new Date().setHours(0, 0, 0, 0));
+	const signedToday = util.getLogs(() => ({
+		filter: {
+			actions: ['SignSSHCertificate'],
+			outcome: AuditOutcome.SUCCEEDED,
+			startDate: midnight
+		},
+		limit: 1
+	}));
+	// The rollover's own audit row, looked up by its time, not by scanning back.
+	const rotatedMs = $derived(entity?.rotatedAt ? toDate(entity.rotatedAt).getTime() : 0);
+	const rollovers = util.getLogs(
+		() => ({
+			filter: {
+				actions: ['RolloverCertificateAuthority'],
+				outcome: AuditOutcome.SUCCEEDED,
+				startDate: timestampFromMs(rotatedMs - 60_000),
+				endDate: timestampFromMs(rotatedMs + 60_000)
+			},
+			limit: 1
+		}),
+		() => rotatedMs > 0
 	);
 
-	// Both run the same call, marked fresh. Only daemons learn the new keys on their own.
-	function askRotate() {
-		void whenFresh(() =>
-			confirm({
-				title: 'Rotate the keys?',
-				description:
-					'New keys replace both, for every server in this workspace. Servers with the daemon take them at their next sync, and certificates already signed keep working until they run out. A server set up with nk sync still trusts only the old key, so run nk sync on it right away. Until you do, people there keep the certificate they hold, an hour at most, and then get refused.' +
-					(manualCount
-						? ` That is ${plural(manualCount, 'server')} here: ${listNames(manualNames, 5, manualCount)}.`
-						: ''),
-				confirmText: 'Rotate',
-				onConfirm: () => rollover.mutateAsync({ revokePrevious: false })
-			})
-		);
+	// Only what we can tell. A daemon that is offline may still miss a new key.
+	const status = $derived.by((): { tone: Tone; text: string } => {
+		if (missingKey.length) return { tone: 'destructive', text: missingText };
+		if (unchecked > 0) return { tone: 'muted', text: `${plural(unchecked, 'server')} not checked` };
+		return {
+			tone: 'success',
+			text: `In use since ${formatTs(entity?.rotatedAt ?? entity?.createdAt, 'short')}`
+		};
+	});
+
+	const facts = $derived([
+		{ label: 'Algorithm', value: 'Ed25519' },
+		{ label: 'Made', value: formatTs(entity?.createdAt, 'short') },
+		...(signedToday.data
+			? [{ label: 'Certificates today', value: String(signedToday.data.total) }]
+			: [])
+	]);
+
+	const keys = $derived(
+		entity
+			? [
+					{ name: 'User key', key: entity.publicKey, print: entity.publicKeyFingerprint },
+					{ name: 'Host key', key: entity.hostPublicKey, print: entity.hostPublicKeyFingerprint }
+				]
+			: []
+	);
+	const clipboard = new UseClipboard({ delay: 1500 });
+	let copiedKey = $state('');
+	// Plain http has no clipboard, so the whole key shows up to select instead.
+	let shownKey = $state('');
+	async function copyKey(key: string) {
+		copiedKey = key;
+		if ((await clipboard.copy(key)) === 'failure') shownKey = key;
 	}
+
+	const history = $derived.by(() => {
+		if (!entity) return [];
+		if (!entity.rotatedAt) {
+			return [
+				{
+					title: 'Current keys',
+					detail: `Made with the workspace, ${formatTs(entity.createdAt, 'short')}`
+				}
+			];
+		}
+		const actor = rollovers.data?.logs[0]?.actorName;
+		const by = actor ? `, by ${actor}` : '';
+		return [
+			{ title: 'Current keys', detail: `Since ${formatTs(entity.rotatedAt, 'short')}${by}` },
+			{ title: 'Previous keys', detail: 'Not trusted any more' }
+		];
+	});
+
+	const callout = $derived.by(() => {
+		if (missingKey.length) {
+			return {
+				tone: 'destructive' as const,
+				title: missingText,
+				text: 'They refuse new certificates until you run this on your own machine. A certificate from before the rollover still gets you in, for an hour at most.',
+				names: missingKey
+			};
+		}
+		if (manual.length) {
+			return {
+				tone: 'warning' as const,
+				title: 'Before you roll over',
+				text: `${plural(manualCount, 'server')} ${manualCount === 1 ? 'was' : 'were'} set up with nk sync and ${manualCount === 1 ? 'has' : 'have'} no daemon. Run this right after a rollover, new logins there fail until you do.`,
+				names: manualNames
+			};
+		}
+		return undefined;
+	});
 
 	function askRollover() {
 		void whenFresh(() =>
 			confirm({
-				title: 'Emergency rollover?',
+				title: 'Roll over the keys?',
 				description:
-					'New keys replace both, for every server in this workspace, and the old ones stop being trusted at once. Servers with the daemon drop them at their next sync, and people get a new certificate at their next connection. A server set up with nk sync goes on trusting the old key and refuses every new certificate until someone reaches it another way and runs nk sync.',
+					'New keys replace both, for every server in this workspace, and nothing trusts the old ones any more. Servers with the daemon take the new keys at their next sync, within a minute, and close sessions that started on the old ones. People get a new certificate when they next connect. A server set up with nk sync trusts only the old key until you run nk sync on it, so do that right away. Until then, people there keep the certificate they hold, an hour at most.' +
+					(manualCount
+						? ` That is ${plural(manualCount, 'server')} here: ${listNames(manualNames, 5, manualCount)}.`
+						: ''),
 				confirmText: 'Roll over',
-				typeToConfirm: 'emergency rollover',
-				onConfirm: () => rollover.mutateAsync({ revokePrevious: true })
+				typeToConfirm: 'roll over',
+				onConfirm: () => rollover.mutateAsync({})
 			})
 		);
+	}
+
+	// The server takes addresses and CIDRs split by commas, the same check runs here first.
+	const addresses = $derived([
+		...new Set(
+			(model?.sourceAddress ?? '')
+				.split(',')
+				.map((a) => a.trim())
+				.filter(Boolean)
+		)
+	]);
+	let typedAddress = $state('');
+	let addressError = $state('');
+
+	// A pasted list goes in at once, what does not parse stays in the box.
+	function addAddress() {
+		const typed = typedAddress.split(/[\s,]+/).filter(Boolean);
+		if (!typed.length || !model) return;
+		const bad = typed.filter((a) => !validAddress(a));
+		const next = [...new Set([...addresses, ...typed.filter(validAddress)])].join(',');
+		if (next.length > MAX_ADDRESSES) {
+			addressError = `The list holds up to ${MAX_ADDRESSES} characters.`;
+			return;
+		}
+		typedAddress = bad.join(' ');
+		addressError = bad.length
+			? `${listNames(bad)} ${bad.length === 1 ? 'is' : 'are'} neither an address nor a CIDR.`
+			: '';
+		if (next === addresses.join(',')) return;
+		model.sourceAddress = next;
+		save();
+	}
+
+	function removeAddress(value: string) {
+		if (!model) return;
+		model.sourceAddress = addresses.filter((a) => a !== value).join(',');
+		save();
+	}
+
+	// Follows Go's net.ParseIP, the URL parser has the same IPv6 rules.
+	function validAddress(value: string): boolean {
+		const [ip, prefix, ...rest] = value.split('/');
+		if (rest.length) return false;
+		const v4 = IPV4.test(ip);
+		const v6 = !v4 && ip.includes(':') && URL.canParse(`http://[${ip}]`);
+		if (!v4 && !v6) return false;
+		if (prefix === undefined) return true;
+		return /^\d{1,3}$/.test(prefix) && Number(prefix) <= (v4 ? 32 : 128);
 	}
 </script>
 
@@ -135,183 +274,245 @@
 		class="h-[25vh] rounded-xl border-solid bg-card text-card-foreground"
 	/>
 {:else if !model || !entity}
-	<Skeleton class="h-56 w-full rounded-xl" />
-	<Skeleton class="h-36 w-full rounded-xl" />
+	<Skeleton class="h-80 w-full rounded-xl" />
+	<div class="grid gap-6 lg:grid-cols-2">
+		<Skeleton class="h-64 w-full rounded-xl" />
+		<Skeleton class="h-40 w-full rounded-xl" />
+	</div>
 {:else}
-	{#if syncNeeded}
+	<Card.Root class="gap-0 overflow-hidden py-0">
+		<div class="grid lg:grid-cols-2">
+			<section aria-labelledby="ca-keys" class="flex min-w-0 flex-col gap-5 p-6 lg:border-r">
+				<div class="flex flex-wrap items-start justify-between gap-3">
+					<div class="flex min-w-0 flex-col">
+						<h2 id="ca-keys" class="truncate font-semibold">
+							{ws.data?.name ? `${ws.data.name} CA` : 'Workspace CA'}
+						</h2>
+						<p class="text-sm text-muted-foreground">The private halves never leave the core.</p>
+					</div>
+					<Badge variant={status.tone} class="gap-1.5">
+						<StatusDot tone={status.tone} />
+						{status.text}
+					</Badge>
+				</div>
+
+				<dl class="grid grid-cols-3 gap-4">
+					{#each facts as f (f.label)}
+						<div class="flex min-w-0 flex-col gap-1">
+							<dt class="spec-label">{f.label}</dt>
+							<dd class="truncate font-medium">{f.value}</dd>
+						</div>
+					{/each}
+				</dl>
+
+				<ul class="flex flex-col gap-2" aria-label="Public keys">
+					{#each keys as k (k.name)}
+						{@const copied = clipboard.copied && copiedKey === k.key}
+						<li
+							class="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2"
+						>
+							<span class="text-sm font-medium">{k.name}</span>
+							<Button
+								variant="outline"
+								size="xs"
+								aria-label={`Copy the ${k.name.toLowerCase()}`}
+								onclick={() => copyKey(k.key)}
+							>
+								{#if copied}
+									<Check data-icon="inline-start" />
+									Copied
+								{:else}
+									<Copy data-icon="inline-start" />
+									Copy key
+								{/if}
+							</Button>
+							<code
+								class="col-span-2 font-mono text-xs break-all text-muted-foreground select-all"
+								title={k.key}
+							>
+								{shownKey === k.key ? k.key : k.print}
+							</code>
+						</li>
+					{/each}
+				</ul>
+				<p class="text-xs text-muted-foreground">
+					The user key is what sshd's TrustedUserCAKeys holds. People trust a daemon whose host
+					certificate the host key signed.
+				</p>
+			</section>
+
+			<section
+				aria-labelledby="ca-rollover"
+				class="flex min-w-0 flex-col gap-4 border-t bg-muted/40 p-6 lg:border-t-0"
+			>
+				<div class="flex flex-col gap-1">
+					<h2 id="ca-rollover" class="font-semibold">Rollover</h2>
+					<p class="text-sm text-muted-foreground">
+						For keys that may have leaked. If the core's secret or KMS key leaked, rotate that
+						first, then roll over here. Nothing trusts the old keys after a rollover.
+					</p>
+				</div>
+
+				<ol aria-label="Key history" class="flex flex-col">
+					{#each history as h, i (h.title)}
+						<li class="flex gap-3">
+							<span aria-hidden="true" class="flex w-3 shrink-0 flex-col items-center">
+								<span
+									class={cn(
+										'mt-1 size-3 rounded-full border-2',
+										i === 0 ? 'border-primary bg-primary' : 'border-muted-foreground/50 bg-card'
+									)}
+								></span>
+								{#if i < history.length - 1}
+									<span class="w-0.5 flex-1 bg-border"></span>
+								{/if}
+							</span>
+							<span class="flex min-w-0 flex-col pb-4">
+								<span class="text-sm font-medium">{h.title}</span>
+								<span class="text-xs text-muted-foreground">{h.detail}</span>
+							</span>
+						</li>
+					{/each}
+				</ol>
+
+				{#if callout}
+					<Alert.Root variant={callout.tone}>
+						<TriangleAlert />
+						<Alert.Title>{callout.title}</Alert.Title>
+						<Alert.Description class="flex flex-col gap-2">
+							<p>{callout.text}</p>
+							<CodeSnippet code={syncCommands(callout.names)} language="bash" wrap class="w-full" />
+							{#if unchecked > 0}
+								<p>
+									{plural(unchecked, 'more server')}
+									{unchecked === 1 ? 'was' : 'were'} not checked,
+									<a href="/servers?status=manual" class="underline">find them under Servers</a>.
+								</p>
+							{/if}
+						</Alert.Description>
+					</Alert.Root>
+				{/if}
+
+				{#if can.admin}
+					<div>
+						<Button variant="destructive" onclick={askRollover}>
+							<ShieldAlert data-icon="inline-start" />
+							Roll over keys
+						</Button>
+					</div>
+				{/if}
+			</section>
+		</div>
+	</Card.Root>
+
+	<div class="grid gap-6 lg:grid-cols-2 lg:items-start">
 		<Card.Root>
 			<Card.Header>
-				<Card.Title><h2>Servers to sync</h2></Card.Title>
+				<Card.Title><h2>How long certificates last</h2></Card.Title>
 				<Card.Description>
-					These servers were set up with nk sync, so they only learn a key when you run it.
-					{#if unchecked > 0}
-						{unchecked} more servers were not checked, open them under Servers.
-					{/if}
+					Shorter is safer. nk renews them in the background, so people don't notice.
 				</Card.Description>
 			</Card.Header>
-			<Card.Content class="flex flex-col divide-y">
-				{#if missingKey.length}
-					<Section
-						title="Missing the new key"
-						icon={RefreshCw}
-						description="They refuse new certificates until you run this on your own machine."
-					>
-						<CodeSnippet code={syncCommands(missingKey)} language="bash" wrap />
-					</Section>
-				{/if}
-				{#if keepsOldKey.length}
-					<Section
-						title="Still trusting the old key"
-						icon={Clock}
-						description="They can't drop it on their own. Run this after {formatTs(
-							entity.previousTrustedUntil
-						)}."
-					>
-						<CodeSnippet code={syncCommands(keepsOldKey)} language="bash" wrap />
-					</Section>
-				{/if}
+			<Card.Content class="flex flex-col gap-3" onfocusin={askFresh}>
+				<Item.Group class="gap-3">
+					{#each lifetimes as l (l.key)}
+						<Item.Root variant="outline">
+							<Item.Content>
+								<Item.Title><label for="ca-{l.key}">{l.label}</label></Item.Title>
+								<Item.Description>{l.hint}</Item.Description>
+							</Item.Content>
+							<Item.Actions class="w-full sm:w-auto">
+								<DurationInput
+									id="ca-{l.key}"
+									class="w-full sm:w-44"
+									value={model[l.key]}
+									disabled={!can.admin}
+									onchange={(v) => setLifetime(l.key, v)}
+								/>
+							</Item.Actions>
+						</Item.Root>
+					{/each}
+				</Item.Group>
+				<p class="text-xs text-muted-foreground">
+					A server without the daemon only drops access when a certificate runs out. There, and for
+					service accounts, a certificate lasts an hour at most whatever is set here.
+				</p>
 			</Card.Content>
 		</Card.Root>
-	{/if}
 
-	<Card.Root>
-		<Card.Header>
-			<Card.Title><h2>Certificate lifetime</h2></Card.Title>
-			<Card.Description>One setting for every server in this workspace</Card.Description>
-		</Card.Header>
-		<Card.Content class="flex flex-col gap-4" onfocusin={askFresh}>
-			<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-				{#each lifetimes as l (l.key)}
-					<Field.Field>
-						<Field.Label for="ca-{l.key}">{l.label}</Field.Label>
-						<DurationInput
-							id="ca-{l.key}"
-							value={model[l.key]}
-							disabled={!can.admin}
-							onchange={(v) => setLifetime(l.key, v)}
-						/>
-						<Field.Description>{l.hint}</Field.Description>
+		<div class="flex min-w-0 flex-col gap-6">
+			<Card.Root>
+				<Card.Header>
+					<Card.Title><h2>Where people log in from</h2></Card.Title>
+					<Card.Description>
+						Goes on every person's certificate and on browser terminals. Service accounts have
+						limits of their own, so this never blocks a CI runner.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content onfocusin={askFresh}>
+					<Field.Field data-invalid={addressError ? true : undefined}>
+						<Field.Label for="ca-source-address">Allowed addresses</Field.Label>
+						{#if addresses.length}
+							<div class="flex flex-wrap gap-1.5">
+								{#each addresses as a (a)}
+									<Chip label={a} mono onRemove={can.admin ? () => removeAddress(a) : undefined} />
+								{/each}
+							</div>
+						{/if}
+						{#if can.admin}
+							<InputGroup.Root>
+								<InputGroup.Input
+									id="ca-source-address"
+									class="font-mono"
+									bind:value={typedAddress}
+									aria-invalid={addressError ? true : undefined}
+									placeholder="10.0.0.0/8"
+									oninput={() => (addressError = '')}
+									onkeydown={(e) => {
+										if (e.key !== 'Enter' && e.key !== ',') return;
+										e.preventDefault();
+										addAddress();
+									}}
+									onblur={addAddress}
+								/>
+								<InputGroup.Addon align="inline-end">
+									<InputGroup.Button
+										type="button"
+										variant="secondary"
+										size="xs"
+										onclick={addAddress}
+									>
+										<Plus data-icon="inline-start" />
+										Add
+									</InputGroup.Button>
+								</InputGroup.Addon>
+							</InputGroup.Root>
+						{/if}
+						<Field.Description>
+							{#if addressError}
+								{addressError}
+							{:else if addresses.length}
+								Logins from anywhere else are refused.
+							{:else}
+								Empty, so any address can log in.
+							{/if}
+						</Field.Description>
 					</Field.Field>
-				{/each}
-			</div>
-			<p class="text-sm text-muted-foreground">
-				Short login certificates are the safest, a server without the daemon only drops access when
-				they expire. There, and for service accounts, a certificate lasts an hour at most whatever
-				you set here. nk renews them on its own.
-			</p>
-		</Card.Content>
-	</Card.Root>
+				</Card.Content>
+			</Card.Root>
 
-	<Card.Root>
-		<Card.Header>
-			<Card.Title><h2>Where people log in from</h2></Card.Title>
-			<Card.Description>
-				It goes on every person's certificate and on browser terminals. A service account has limits
-				of its own, set on the account, so this list never blocks a CI runner.
-			</Card.Description>
-		</Card.Header>
-		<Card.Content onfocusin={askFresh}>
-			<Field.Field>
-				<Field.Label for="ca-source-address">Allowed source IPs</Field.Label>
-				<Input
-					id="ca-source-address"
-					class="font-mono"
-					bind:value={model.sourceAddress}
-					disabled={!can.admin}
-					oninput={save}
-					placeholder="10.0.0.0/8, 192.168.1.10"
-				/>
-				<Field.Description>
-					Addresses and CIDRs, separated by commas. Leave empty to allow any.
-				</Field.Description>
-			</Field.Field>
-		</Card.Content>
-	</Card.Root>
-
-	<Card.Root>
-		<Card.Header>
-			<Card.Title><h2>Public keys</h2></Card.Title>
-			<Card.Description>The private halves never leave the core</Card.Description>
-		</Card.Header>
-		<Card.Content class="flex flex-col divide-y">
-			<Section
-				title="User key"
-				icon={KeyRound}
-				description="Servers let in logins whose certificate this key signed. It is what sshd's TrustedUserCAKeys holds."
-			>
-				<CodeSnippet code={entity.publicKey} language="openssh" wrap />
-			</Section>
-
-			<Section
-				title="Host key"
-				icon={Server}
-				description="People trust a daemon whose host certificate this key signed. It never signs a login."
-			>
-				<CodeSnippet code={entity.hostPublicKey} language="openssh" wrap />
-			</Section>
-
-			{#if previousTrusted}
-				<Section
-					title="Previous keys"
-					icon={History}
-					description="Replaced by a rotation. Still trusted until {formatTs(
-						entity.previousTrustedUntil
-					)}."
-				>
-					<CodeSnippet code={entity.previousPublicKey ?? ''} language="openssh" wrap />
-					{#if entity.previousHostPublicKey}
-						<CodeSnippet code={entity.previousHostPublicKey} language="openssh" wrap />
-					{/if}
-				</Section>
-			{/if}
-
-			<Section title="Identity" icon={Fingerprint}>
-				<DetailList
-					items={[
-						{ label: 'Algorithm', value: 'Ed25519' },
-						{ label: 'Keys made', value: formatTs(entity.rotatedAt) }
-					]}
-				/>
-			</Section>
-		</Card.Content>
-	</Card.Root>
-
-	{#if manual.length && !syncNeeded}
-		<Card.Root>
-			<Card.Header>
-				<Card.Title><h2>Servers set up with nk sync</h2></Card.Title>
-				<Card.Description>
-					They have no daemon, so they only learn new keys when you run nk sync. Keep this at hand
-					for a rotation.
-					{#if unchecked > 0}
-						{unchecked} more servers were not checked, open them under Servers.
-					{/if}
-				</Card.Description>
-			</Card.Header>
-			<Card.Content>
-				<CodeSnippet code={syncCommands(manualNames)} language="bash" wrap />
-			</Card.Content>
-		</Card.Root>
-	{/if}
-
-	<DangerZone
-		actions={can.admin
-			? [
-					{
-						title: 'Rotate keys',
-						description:
-							'Replace both keys. Daemons take the new ones on their own, run nk sync on every other server.',
-						label: 'Rotate',
-						onClick: askRotate
-					},
-					{
-						title: 'Emergency rollover',
-						description:
-							'Distrust the keys now and replace them, for keys that may have leaked. Servers set up with nk sync lock out until you reach them another way.',
-						label: 'Roll over',
-						onClick: askRollover
-					}
-				]
-			: []}
-	/>
+			<Card.Root>
+				<Card.Header>
+					<Card.Title><h2>For Ansible</h2></Card.Title>
+					<Card.Description>
+						nk sync runs on your machine with your nk login, reaches the server as root with your
+						own ssh, and is safe to run again.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<CodeSnippet code={PLAYBOOK} language="yaml" />
+				</Card.Content>
+			</Card.Root>
+		</div>
+	</div>
 {/if}

@@ -7,10 +7,8 @@ import (
 	"log/slog"
 	"net/netip"
 	"slices"
-	"time"
 
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/login"
@@ -32,7 +30,6 @@ type Synced struct {
 	Config      *nokkuv1.DaemonConfig
 	Principals  []*nokkuv1.AccountPrincipals
 	CAPublicKey string
-	RetiredCAs  []*nokkuv1.RetiredCAKey
 	// HostCAPublicKey is what the daemon's host certificate must come from.
 	HostCAPublicKey string
 }
@@ -89,13 +86,6 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		}
 		res.CAPublicKey = ca.PublicKey
 		res.HostCAPublicKey = ca.HostPublicKey
-		if ca.PreviousPublicKey != nil && ca.PreviousTrustedUntil != nil &&
-			time.Now().Before(*ca.PreviousTrustedUntil) {
-			res.RetiredCAs = []*nokkuv1.RetiredCAKey{{
-				PublicKey:    ca.PreviousPublicKey,
-				TrustedUntil: timestamppb.New(*ca.PreviousTrustedUntil),
-			}}
-		}
 
 		result, err := q.ListAccountSubjectsForTarget(ctx, target.ID)
 		if err != nil {

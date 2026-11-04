@@ -145,8 +145,7 @@ func TestMachinesDoNotChangeTheirLimits(t *testing.T) {
 	_, err = authority.UpdateCertificateAuthority(t.Context(),
 		masked(&nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("")}))
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "clearing the list of people: %v", err)
-	_, err = authority.RolloverCertificateAuthority(t.Context(),
-		&nokkuv1.RolloverCertificateAuthorityRequest{RevokePrevious: new(true)})
+	_, err = authority.RolloverCertificateAuthority(t.Context(), &nokkuv1.RolloverCertificateAuthorityRequest{})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "rolling the CA over: %v", err)
 
 	got, err := accounts.GetServiceAccount(t.Context(), &nokkuv1.GetServiceAccountRequest{Id: id})

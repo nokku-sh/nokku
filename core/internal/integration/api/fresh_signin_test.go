@@ -106,10 +106,9 @@ func TestFreshSignInMatrix(t *testing.T) {
 				&nokkuv1.CreateInvitationRequest{Email: new(newMailAddress())})
 			return refusedRPC(err)
 		}},
-		// The emergency kind, no later test may trust a replaced shared key.
 		{"CertificateService.RolloverCertificateAuthority", admin, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewCertificateServiceClient(rpc(s)).RolloverCertificateAuthority(t.Context(),
-				&nokkuv1.RolloverCertificateAuthorityRequest{RevokePrevious: new(true)})
+				&nokkuv1.RolloverCertificateAuthorityRequest{})
 			return refusedRPC(err)
 		}},
 		{"CertificateService.UpdateCertificateAuthority", admin, func(s login) (string, bool) {

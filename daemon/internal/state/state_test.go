@@ -4,11 +4,9 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -32,7 +30,6 @@ func TestAccessFromDropsInvalidAccounts(t *testing.T) {
 		},
 		CaPublicKey:     new("ssh-ed25519 BBBB"),
 		HostCaPublicKey: new("ssh-ed25519 HHHH"),
-		RetiredCaKeys:   []*nokkuv1.RetiredCAKey{{PublicKey: new("ssh-ed25519 AAAA")}},
 		Config:          &nokkuv1.DaemonConfig{RecordSessions: new(true)},
 		StateVersion:    new(int64(7)),
 	})
@@ -40,7 +37,6 @@ func TestAccessFromDropsInvalidAccounts(t *testing.T) {
 	is.Equal(map[string][]string{"alice": {"uuid-1", "uuid-2"}}, a.Principals)
 	is.Equal("ssh-ed25519 BBBB", a.CA)
 	is.Equal("ssh-ed25519 HHHH", a.HostCA, "the host CA is kept apart from the login CA")
-	is.Len(a.RetiredCAs, 1)
 	is.True(a.DaemonConfig.GetRecordSessions())
 	is.EqualValues(7, a.StateVersion)
 }
@@ -51,15 +47,11 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 
-	until := time.Now().Add(time.Hour).Truncate(time.Second)
 	s := New(Config{TargetID: "tgt-1", DaemonID: "daemon-1", APIURL: "https://api.example.com", SessionToken: "tok"})
 	s.SetAccess(&Access{
 		Principals:   map[string][]string{"alice": {"uuid-1", "uuid-2"}, "bob": {"uuid-3"}},
 		DaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(true)},
 		CA:           "ssh-ed25519 BBBB",
-		RetiredCAs: []*nokkuv1.RetiredCAKey{
-			{PublicKey: new("ssh-ed25519 AAAA"), TrustedUntil: timestamppb.New(until)},
-		},
 		HostCA:       "ssh-ed25519 HHHH",
 		StateVersion: 7,
 	})
@@ -73,9 +65,6 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	is.True(a.DaemonConfig.GetRecordSessions())
 	is.Equal("ssh-ed25519 BBBB", a.CA)
 	is.Equal("ssh-ed25519 HHHH", a.HostCA)
-	must.Len(a.RetiredCAs, 1)
-	is.Equal("ssh-ed25519 AAAA", a.RetiredCAs[0].GetPublicKey())
-	is.True(until.Equal(a.RetiredCAs[0].GetTrustedUntil().AsTime()))
 	is.EqualValues(7, a.StateVersion)
 	is.EqualValues(7, loaded.SavedVersion(), "the version on disk is the one to report")
 }

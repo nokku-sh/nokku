@@ -30,7 +30,8 @@ type SessionConfig struct {
 	SessionID string
 	Username  string
 	UserID    string
-	CA        *db.SSHCA
+	// HostCA is the CA host key, the daemon's host certificate must come from it.
+	HostCA string
 	// Signer holds the certificate from MintSessionCert.
 	Signer ssh.Signer
 	// HostPrincipal is the daemon's target id.
@@ -70,9 +71,9 @@ func (s *Session) Close() { s.close() }
 
 // StartSession ends with ctx, the shell, the daemon, Close or the TTL.
 func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, error) {
-	hostCAs, err := hostCAKeys(cfg.CA)
+	hostCA, err := nokkussh.ParsePublicKey(cfg.HostCA)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse host CA public key: %w", err)
 	}
 
 	relayID := uuid.NewV7().String()
@@ -87,7 +88,7 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 		HostPrincipal: cfg.HostPrincipal,
 		Username:      cfg.Username,
 		Signer:        cfg.Signer,
-		HostCAs:       hostCAs,
+		HostCA:        hostCA,
 	})
 	if err != nil {
 		p.UnregisterRelay(relayID)
@@ -123,24 +124,6 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 	p.mu.Unlock()
 	context.AfterFunc(ctx, s.close)
 	return s, nil
-}
-
-// During a rollover the old host key counts too, daemons renew at next sync.
-func hostCAKeys(ca *db.SSHCA) ([]ssh.PublicKey, error) {
-	current, err := nokkussh.ParsePublicKey(ca.HostPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("parse host CA public key: %w", err)
-	}
-	keys := []ssh.PublicKey{current}
-	if ca.PreviousHostPublicKey != nil && ca.PreviousTrustedUntil != nil &&
-		time.Now().Before(*ca.PreviousTrustedUntil) {
-		previous, err := nokkussh.ParsePublicKey(*ca.PreviousHostPublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("parse previous host CA public key: %w", err)
-		}
-		keys = append(keys, previous)
-	}
-	return keys, nil
 }
 
 // MintSessionCert signs a key for one browser terminal. caSigner is CA's user key.

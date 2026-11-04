@@ -132,7 +132,7 @@ func startTestSession(t *testing.T, p *Pool, srv *sshtest.Server, sessionID stri
 			SessionID:     sessionID,
 			Username:      "user",
 			UserID:        "u1",
-			CA:            srv.CA(),
+			HostCA:        srv.CA().HostPublicKey,
 			Signer:        signer,
 			HostPrincipal: srv.HostPrincipal,
 		})
@@ -181,7 +181,7 @@ func TestPool_StartSession_EndsWithContext(t *testing.T) {
 		SessionID:     "web-ctx",
 		Username:      "user",
 		UserID:        "u1",
-		CA:            srv.CA(),
+		HostCA:        srv.CA().HostPublicKey,
 		Signer:        sessionSigner(t, srv.CA(), srv.CASigner(), srv.HostPrincipal, "web-ctx"),
 		HostPrincipal: srv.HostPrincipal,
 	})
@@ -252,7 +252,7 @@ func TestPool_StartSession_HandshakeFailure(t *testing.T) {
 			SessionID:     "web-2",
 			Username:      "user",
 			UserID:        "u1",
-			CA:            rogue,
+			HostCA:        rogue.HostPublicKey,
 			Signer:        signer,
 			HostPrincipal: srv.HostPrincipal,
 		})

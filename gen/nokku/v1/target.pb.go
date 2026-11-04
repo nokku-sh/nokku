@@ -141,6 +141,8 @@ type SyncTargetUsersRequest struct {
 	HostPublicKey *string                `protobuf:"bytes,2,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
 	Usernames     []string               `protobuf:"bytes,3,rep,name=usernames" json:"usernames,omitempty"`
 	Endpoints     []string               `protobuf:"bytes,4,rep,name=endpoints" json:"endpoints,omitempty"`
+	// The CA key nk sync wrote. A report for a key a rollover replaced fails.
+	CaPublicKey   *string `protobuf:"bytes,5,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -201,6 +203,13 @@ func (x *SyncTargetUsersRequest) GetEndpoints() []string {
 		return x.Endpoints
 	}
 	return nil
+}
+
+func (x *SyncTargetUsersRequest) GetCaPublicKey() string {
+	if x != nil && x.CaPublicKey != nil {
+		return *x.CaPublicKey
+	}
+	return ""
 }
 
 type SyncTargetUsersResponse struct {
@@ -2250,13 +2259,15 @@ var File_nokku_v1_target_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_target_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/target.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x15nokku/v1/daemon.proto\x1a\x19nokku/v1/join_token.proto\x1a\x1enokku/v1/service_account.proto\x1a\x1dnokku/v1/target_account.proto\"\xc6\x01\n" +
+	"\x15nokku/v1/target.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\x1a\x1bnokku/v1/certificates.proto\x1a\x15nokku/v1/daemon.proto\x1a\x19nokku/v1/join_token.proto\x1a\x1enokku/v1/service_account.proto\x1a\x1dnokku/v1/target_account.proto\"\xf6\x01\n" +
 	"\x16SyncTargetUsersRequest\x12%\n" +
 	"\ttarget_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12&\n" +
 	"\x0fhost_public_key\x18\x02 \x01(\tR\rhostPublicKey\x12.\n" +
 	"\tusernames\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\xc8\x01\"\x05r\x03\x18\x80\x02R\tusernames\x12-\n" +
-	"\tendpoints\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\x10\x10\"\x05r\x03\x18\xff\x01R\tendpoints\"\x19\n" +
+	"\tendpoints\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\x10\x10\"\x05r\x03\x18\xff\x01R\tendpoints\x12.\n" +
+	"\rca_public_key\x18\x05 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\bR\vcaPublicKey\"\x19\n" +
 	"\x17SyncTargetUsersResponse\"\xdb\x06\n" +
 	"\x06Target\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +

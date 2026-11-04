@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -307,20 +308,28 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 	}
 
 	return &nokkuv1.CertificateAuthority{
-		Id:                    &r.ID,
-		PublicKey:             &r.PublicKey,
-		HostPublicKey:         &r.HostPublicKey,
-		RotatedAt:             SafeTimestamp(&r.RotatedAt),
-		CreatedAt:             SafeTimestamp(&r.CreatedAt),
-		UpdatedAt:             SafeTimestamp(&r.UpdatedAt),
-		UserDefaultTtl:        durationpb.New(r.UserDefaultTtl),
-		UserMaxTtl:            durationpb.New(r.UserMaxTtl),
-		SourceAddress:         &r.SourceAddress,
-		HostTtl:               durationpb.New(r.HostTtl),
-		PreviousPublicKey:     r.PreviousPublicKey,
-		PreviousHostPublicKey: r.PreviousHostPublicKey,
-		PreviousTrustedUntil:  SafeTimestamp(r.PreviousTrustedUntil),
+		Id:                       &r.ID,
+		PublicKey:                &r.PublicKey,
+		PublicKeyFingerprint:     new(fingerprint(r.PublicKey)),
+		HostPublicKey:            &r.HostPublicKey,
+		HostPublicKeyFingerprint: new(fingerprint(r.HostPublicKey)),
+		RotatedAt:                SafeTimestamp(r.RotatedAt),
+		CreatedAt:                SafeTimestamp(&r.CreatedAt),
+		UpdatedAt:                SafeTimestamp(&r.UpdatedAt),
+		UserDefaultTtl:           durationpb.New(r.UserDefaultTtl),
+		UserMaxTtl:               durationpb.New(r.UserMaxTtl),
+		SourceAddress:            &r.SourceAddress,
+		HostTtl:                  durationpb.New(r.HostTtl),
 	}
+}
+
+// fingerprint is what ssh-keygen -lf prints, empty for a key that does not parse.
+func fingerprint(key string) string {
+	pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
+	if err != nil {
+		return ""
+	}
+	return ssh.FingerprintSHA256(pub)
 }
 
 func (p *ListTargetAccountsRow) ToProto() *nokkuv1.TargetAccount {

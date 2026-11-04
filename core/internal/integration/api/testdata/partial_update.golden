@@ -17,7 +17,7 @@ AccountService.UpdateAccount sets nothing: pending_email kept
 AccountService.UpdateAccount sets nothing: created_at kept
 AccountService.UpdateAccount sets nothing: updated_at changed
 AccountService.UpdateAccount sets nothing: scim_managed kept
-CertificateService.UpdateCertificateAuthority baseline: empty [previous_public_key previous_host_public_key previous_trusted_until]
+CertificateService.UpdateCertificateAuthority baseline: empty []
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: public_key kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: rotated_at kept
@@ -26,10 +26,9 @@ CertificateService.UpdateCertificateAuthority sets user_default_ttl: user_max_tt
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: host_ttl kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: created_at kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: updated_at changed
-CertificateService.UpdateCertificateAuthority sets user_default_ttl: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets user_default_ttl: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets user_default_ttl: previous_trusted_until kept
 CertificateService.UpdateCertificateAuthority sets user_default_ttl: source_address kept
+CertificateService.UpdateCertificateAuthority sets user_default_ttl: public_key_fingerprint kept
+CertificateService.UpdateCertificateAuthority sets user_default_ttl: host_public_key_fingerprint kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: public_key kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: rotated_at kept
@@ -38,10 +37,9 @@ CertificateService.UpdateCertificateAuthority sets user_max_ttl: user_max_ttl ch
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: host_ttl kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: created_at kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: updated_at changed
-CertificateService.UpdateCertificateAuthority sets user_max_ttl: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets user_max_ttl: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets user_max_ttl: previous_trusted_until kept
 CertificateService.UpdateCertificateAuthority sets user_max_ttl: source_address kept
+CertificateService.UpdateCertificateAuthority sets user_max_ttl: public_key_fingerprint kept
+CertificateService.UpdateCertificateAuthority sets user_max_ttl: host_public_key_fingerprint kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: public_key kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: rotated_at kept
@@ -50,10 +48,9 @@ CertificateService.UpdateCertificateAuthority sets host_ttl: user_max_ttl kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: host_ttl changed
 CertificateService.UpdateCertificateAuthority sets host_ttl: created_at kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: updated_at changed
-CertificateService.UpdateCertificateAuthority sets host_ttl: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets host_ttl: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets host_ttl: previous_trusted_until kept
 CertificateService.UpdateCertificateAuthority sets host_ttl: source_address kept
+CertificateService.UpdateCertificateAuthority sets host_ttl: public_key_fingerprint kept
+CertificateService.UpdateCertificateAuthority sets host_ttl: host_public_key_fingerprint kept
 CertificateService.UpdateCertificateAuthority sets source_address: public_key kept
 CertificateService.UpdateCertificateAuthority sets source_address: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets source_address: rotated_at kept
@@ -62,10 +59,9 @@ CertificateService.UpdateCertificateAuthority sets source_address: user_max_ttl 
 CertificateService.UpdateCertificateAuthority sets source_address: host_ttl kept
 CertificateService.UpdateCertificateAuthority sets source_address: created_at kept
 CertificateService.UpdateCertificateAuthority sets source_address: updated_at changed
-CertificateService.UpdateCertificateAuthority sets source_address: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets source_address: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets source_address: previous_trusted_until kept
 CertificateService.UpdateCertificateAuthority sets source_address: source_address changed
+CertificateService.UpdateCertificateAuthority sets source_address: public_key_fingerprint kept
+CertificateService.UpdateCertificateAuthority sets source_address: host_public_key_fingerprint kept
 CertificateService.UpdateCertificateAuthority sets nothing: public_key kept
 CertificateService.UpdateCertificateAuthority sets nothing: host_public_key kept
 CertificateService.UpdateCertificateAuthority sets nothing: rotated_at kept
@@ -74,10 +70,9 @@ CertificateService.UpdateCertificateAuthority sets nothing: user_max_ttl kept
 CertificateService.UpdateCertificateAuthority sets nothing: host_ttl kept
 CertificateService.UpdateCertificateAuthority sets nothing: created_at kept
 CertificateService.UpdateCertificateAuthority sets nothing: updated_at changed
-CertificateService.UpdateCertificateAuthority sets nothing: previous_public_key kept
-CertificateService.UpdateCertificateAuthority sets nothing: previous_host_public_key kept
-CertificateService.UpdateCertificateAuthority sets nothing: previous_trusted_until kept
 CertificateService.UpdateCertificateAuthority sets nothing: source_address kept
+CertificateService.UpdateCertificateAuthority sets nothing: public_key_fingerprint kept
+CertificateService.UpdateCertificateAuthority sets nothing: host_public_key_fingerprint kept
 DaemonService.UpdateDaemon baseline: empty [config.idle_timeout last_seen_at version behind_since]
 DaemonService.UpdateDaemon sets status: name kept
 DaemonService.UpdateDaemon sets status: online kept

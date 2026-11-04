@@ -144,7 +144,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		SessionID:     sessionID,
 		Username:      ticket.Username,
 		UserID:        ticket.UserID,
-		CA:            ca,
+		HostCA:        ca.HostPublicKey,
 		Signer:        sessionSigner,
 		HostPrincipal: targetID,
 		ClientAddr:    realip.Client(r.Header, r.RemoteAddr),

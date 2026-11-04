@@ -83,7 +83,7 @@ func (s *certificateService) UpdateCertificateAuthority(
 
 func (s *certificateService) RolloverCertificateAuthority(
 	ctx context.Context,
-	req *nokkuv1.RolloverCertificateAuthorityRequest,
+	_ *nokkuv1.RolloverCertificateAuthorityRequest,
 ) (*nokkuv1.RolloverCertificateAuthorityResponse, error) {
 	var result *db.SSHCA
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
@@ -91,13 +91,12 @@ func (s *certificateService) RolloverCertificateAuthority(
 		if err != nil {
 			return err
 		}
-		result, err = ssh.Rollover(ctx, q, s.cfg.Keyset, ca, req.GetRevokePrevious())
+		result, err = ssh.Rollover(ctx, q, s.cfg.Keyset, ca)
 		return err
 	}); err != nil {
 		return nil, err
 	}
 	audit.SetTarget(ctx, result.ID)
-	audit.Set(ctx, "revoke_previous", req.GetRevokePrevious())
 
 	return &nokkuv1.RolloverCertificateAuthorityResponse{
 		CertificateAuthority: result.ToProto(),

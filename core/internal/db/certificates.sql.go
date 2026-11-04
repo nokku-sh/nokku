@@ -30,7 +30,7 @@ VALUES
     $5
   )
 RETURNING
-  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 `
 
 type CreateCAParams struct {
@@ -56,9 +56,6 @@ func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, er
 		&i.WorkspaceID,
 		&i.PublicKey,
 		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
 		&i.RotatedAt,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
@@ -116,7 +113,7 @@ func (q *Queries) GetCASigningKey(ctx context.Context, arg *GetCASigningKeyParam
 
 const getWorkspaceCA = `-- name: GetWorkspaceCA :one
 SELECT
-  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -132,9 +129,36 @@ func (q *Queries) GetWorkspaceCA(ctx context.Context) (*SSHCA, error) {
 		&i.WorkspaceID,
 		&i.PublicKey,
 		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
+		&i.RotatedAt,
+		&i.UserDefaultTtl,
+		&i.UserMaxTtl,
+		&i.HostTtl,
+		&i.SourceAddress,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
+const getWorkspaceCAForShare = `-- name: GetWorkspaceCAForShare :one
+SELECT
+  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+FROM
+  ssh_cas
+WHERE
+  workspace_id = current_workspace_id ()
+FOR SHARE
+`
+
+// A sync report holds a rollover back until it commits.
+func (q *Queries) GetWorkspaceCAForShare(ctx context.Context) (*SSHCA, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceCAForShare)
+	var i SSHCA
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.PublicKey,
+		&i.HostPublicKey,
 		&i.RotatedAt,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
@@ -148,7 +172,7 @@ func (q *Queries) GetWorkspaceCA(ctx context.Context) (*SSHCA, error) {
 
 const getWorkspaceCAForUpdate = `-- name: GetWorkspaceCAForUpdate :one
 SELECT
-  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -164,9 +188,6 @@ func (q *Queries) GetWorkspaceCAForUpdate(ctx context.Context) (*SSHCA, error) {
 		&i.WorkspaceID,
 		&i.PublicKey,
 		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
 		&i.RotatedAt,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
@@ -203,54 +224,31 @@ func (q *Queries) PutCAKey(ctx context.Context, arg *PutCAKeyParams) error {
 const replaceCA = `-- name: ReplaceCA :one
 UPDATE ssh_cas
 SET
-  previous_public_key = CASE
-    WHEN $1::BOOLEAN THEN NULL
-    ELSE public_key
-  END,
-  previous_host_public_key = CASE
-    WHEN $1::BOOLEAN THEN NULL
-    ELSE host_public_key
-  END,
-  previous_trusted_until = CASE
-    WHEN $1::BOOLEAN THEN NULL
-    ELSE NOW() + user_max_ttl
-  END,
-  public_key = $2,
-  host_public_key = $3,
-  rotated_at = NOW(),
+  public_key = $1,
+  host_public_key = $2,
+  rotated_at = clock_timestamp(),
   updated_at = NOW()
 WHERE
-  id = $4
+  id = $3
 RETURNING
-  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 `
 
 type ReplaceCAParams struct {
-	RevokePrevious bool   `json:"revokePrevious"`
-	PublicKey      string `json:"publicKey"`
-	HostPublicKey  string `json:"hostPublicKey"`
-	CaID           string `json:"caId"`
+	PublicKey     string `json:"publicKey"`
+	HostPublicKey string `json:"hostPublicKey"`
+	CaID          string `json:"caId"`
 }
 
-// The replaced user key stays trusted for as long as a certificate it signed can live, unless revoke_previous drops
-// it. The replaced host key gets the same time, a daemon asks for a new host certificate at its next sync. The
-// private keys go with PutCAKey in the same transaction.
+// Nothing keeps the old keys. clock_timestamp is after any sync report that held the row.
 func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, error) {
-	row := q.db.QueryRow(ctx, replaceCA,
-		arg.RevokePrevious,
-		arg.PublicKey,
-		arg.HostPublicKey,
-		arg.CaID,
-	)
+	row := q.db.QueryRow(ctx, replaceCA, arg.PublicKey, arg.HostPublicKey, arg.CaID)
 	var i SSHCA
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.PublicKey,
 		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
 		&i.RotatedAt,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,
@@ -273,7 +271,7 @@ SET
 WHERE
   workspace_id = current_workspace_id ()
 RETURNING
-  id, workspace_id, public_key, host_public_key, previous_public_key, previous_host_public_key, previous_trusted_until, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
 `
 
 type UpdateCAParams struct {
@@ -296,9 +294,6 @@ func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, er
 		&i.WorkspaceID,
 		&i.PublicKey,
 		&i.HostPublicKey,
-		&i.PreviousPublicKey,
-		&i.PreviousHostPublicKey,
-		&i.PreviousTrustedUntil,
 		&i.RotatedAt,
 		&i.UserDefaultTtl,
 		&i.UserMaxTtl,

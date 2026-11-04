@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ca, manualKeyState } from '#lib/api/certificates.svelte.js';
+	import { ca, missedRollover } from '#lib/api/certificates.svelte.js';
 	import { daemon as daemonApi, useDaemonReview } from '#lib/api/daemons.svelte.js';
 	import { useConnect } from '#lib/api/connect.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
@@ -76,7 +76,7 @@
 	const accounts = $derived(entity?.accounts ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
 	const lastSynced = $derived(formatTs(entity?.lastSyncAt, 'relative-short'));
-	const keyState = $derived(manualKeyState(authority.data, entity?.lastSyncAt));
+	const behind = $derived(missedRollover(authority.data?.rotatedAt, entity?.lastSyncAt));
 	const syncCommand = $derived(`nk sync ${model?.name ?? '<name>'}`);
 	const systemInfo = $derived(
 		Object.entries(entity?.metadata ?? {})
@@ -302,16 +302,10 @@
 					icon={RefreshCw}
 					description={lastSynced ? `Last synced ${lastSynced}.` : 'Not synced yet.'}
 				>
-					{#if keyState.rotated}
+					{#if behind}
 						<p class="text-sm text-warning">
-							The certificate authority was rotated after the last sync. Sync again, or this server
-							rejects new certificates.
-						</p>
-					{:else if keyState.oldKeyUntil}
-						<p class="text-sm text-warning">
-							This server still trusts the previous key of the certificate authority. Sync again
-							after
-							{formatTs(keyState.oldKeyUntil)}, it can't drop that key on its own.
+							The certificate authority was rolled over after the last sync. Sync again, or this
+							server refuses new certificates.
 						</p>
 					{/if}
 					<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">

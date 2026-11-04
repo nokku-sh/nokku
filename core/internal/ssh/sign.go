@@ -7,6 +7,7 @@ import (
 	"maps"
 	"math"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
@@ -126,7 +127,7 @@ func SourceAddresses(list string) (string, error) {
 	var entries []string
 	for entry := range strings.SplitSeq(list, ",") {
 		entry = strings.TrimSpace(entry)
-		if entry == "" {
+		if entry == "" || slices.Contains(entries, entry) {
 			continue
 		}
 		if net.ParseIP(entry) == nil {

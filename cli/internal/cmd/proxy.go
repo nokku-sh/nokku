@@ -76,7 +76,7 @@ func proxyCMD() *cli.Command {
 					return noCertificate(target.Name, cerr)
 				}
 				warnf("certificate for %s renewed, if ssh fails run it again", target.Name)
-			} else if !ssh.CertCovers(*target) {
+			} else if !ssh.CertCovers(*target) && !target.Behind(*s.CA) {
 				// The old certificate still works for the accounts it names.
 				if c, cerr := core(); cerr == nil && c.EnsureCert(ctx, *target, *s.CA) == nil {
 					warnf("certificate for %s renewed for a new account, if ssh fails run it again", target.Name)

@@ -358,7 +358,6 @@ func TestNewWithoutTrustedCA(t *testing.T) {
 	srv, err := New(nil)
 	must.NoError(err, "expected server to start without a trusted CA")
 	is.Empty(srv.access.Load().ca)
-	is.Empty(srv.access.Load().retired)
 }
 
 func TestServerLivePrincipals(t *testing.T) {

@@ -10,9 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
-	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
 func TestServerMaxConnections(t *testing.T) {
@@ -386,22 +383,7 @@ func TestDropRevokedCA(t *testing.T) {
 		close(gone)
 	}()
 
-	// A rollover that keeps the old key trusted leaves the connection alone.
-	next := newTestCA(t)
-	rolled := testAccess(t, next)
-	rolled.RetiredCAs = []*nokkuv1.RetiredCAKey{{
-		PublicKey:    new(string(ssh.MarshalAuthorizedKey(ca.pub))),
-		TrustedUntil: timestamppb.New(time.Now().Add(time.Hour)),
-	}}
-	srv.SetAccess(rolled)
-	srv.DropRevoked()
-	select {
-	case <-gone:
-		t.Fatal("a connection signed by a still trusted CA was closed")
-	case <-time.After(200 * time.Millisecond):
-	}
-
-	srv.SetAccess(testAccess(t, next))
+	srv.SetAccess(testAccess(t, newTestCA(t)))
 	srv.DropRevoked()
 	select {
 	case <-gone:

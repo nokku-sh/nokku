@@ -96,35 +96,36 @@ func TestCertFresh(t *testing.T) {
 }
 
 // A server with no daemon trusts the old key until nk sync, which needs a cert.
-func TestCertFreshKeepsTheOldKeyOnAServerWithNoDaemon(t *testing.T) {
+func TestCertKeepsTheOldKeyOnAServerThatMissedARollover(t *testing.T) {
 	setupSSHDir(t)
 	old, current := newSigner(t), newSigner(t)
-	ca := state.CA{
-		PublicKey:            string(ssh.MarshalAuthorizedKey(current.PublicKey())),
-		PreviousPublicKey:    string(ssh.MarshalAuthorizedKey(old.PublicKey())),
-		PreviousTrustedUntil: time.Now().Add(time.Hour),
-	}
-	manual := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003"}
-	withDaemon := manual
-	withDaemon.DaemonID = "0199a0a0-0000-7000-8000-000000000004"
 	now := time.Now()
+	ca := state.CA{PublicKey: string(ssh.MarshalAuthorizedKey(current.PublicKey())), RotatedAt: now.Add(-time.Minute)}
+	behind := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003", LastSyncAt: now.Add(-time.Hour)}
+	withDaemon := behind
+	withDaemon.DaemonID = "0199a0a0-0000-7000-8000-000000000004"
+	synced := behind
+	synced.LastSyncAt = now
 	require.NoError(t, os.WriteFile(
-		paths.SSHCertificate(manual.ID), signCert(t, old, now.Add(-50*time.Minute), now.Add(10*time.Minute)), 0o600,
+		paths.SSHCertificate(behind.ID), signCert(t, old, now.Add(-50*time.Minute), now.Add(10*time.Minute)), 0o600,
 	))
 
-	assert.True(t, CertFresh(manual, ca), "nk swapped a certificate the server takes for one it refuses")
+	assert.True(t, CertFresh(behind, ca), "nk swapped a certificate the server takes for one it refuses")
+	assert.True(t, CertValid(behind, ca, 0))
 	assert.False(t, CertFresh(withDaemon, ca), "a daemon learns the new key at its next sync, so nk moves on")
+	assert.False(t, CertValid(withDaemon, ca, 0))
+	assert.False(t, CertFresh(synced, ca), "after nk sync the server takes the new key only")
+	assert.False(t, CertValid(synced, ca, 0))
+
+	granted := behind
+	granted.Usernames = []string{"deploy"}
+	assert.True(t, CertFresh(granted, ca), "a new grant swapped the only cert the server takes")
 
 	require.NoError(t, os.WriteFile(
-		paths.SSHCertificate(manual.ID), signCert(t, old, now.Add(-2*time.Hour), now.Add(-time.Hour)), 0o600,
+		paths.SSHCertificate(behind.ID), signCert(t, old, now.Add(-2*time.Hour), now.Add(-time.Hour)), 0o600,
 	))
-	assert.False(t, CertFresh(manual, ca), "an expired certificate of the old key")
-
-	ca.PreviousTrustedUntil = time.Time{}
-	require.NoError(t, os.WriteFile(
-		paths.SSHCertificate(manual.ID), signCert(t, old, now.Add(-50*time.Minute), now.Add(10*time.Minute)), 0o600,
-	))
-	assert.False(t, CertFresh(manual, ca), "an emergency rollover distrusts the old key at once")
+	assert.False(t, CertFresh(behind, ca), "an expired certificate of the old key")
+	assert.False(t, CertValid(behind, ca, 0))
 }
 
 // A certificate from before a grant misses the new account, so it is stale.
@@ -175,15 +176,6 @@ func TestCertValidAndCleanup(t *testing.T) {
 
 	assert.True(t, CertValid(keep, ca, 0))
 	assert.False(t, CertValid(drop, ca, 0))
-
-	rotated := state.CA{
-		PublicKey:            string(ssh.MarshalAuthorizedKey(newSigner(t).PublicKey())),
-		PreviousPublicKey:    ca.PublicKey,
-		PreviousTrustedUntil: now.Add(time.Hour),
-	}
-	assert.True(t, CertValid(keep, rotated, 0), "the server still trusts the replaced key, offline ssh keeps working")
-	rotated.PreviousTrustedUntil = now.Add(-time.Minute)
-	assert.False(t, CertValid(keep, rotated, 0), "after the grace period")
 
 	require.NoError(t, CleanupCerts([]state.Target{keep}))
 	files, err := paths.SSHCertificates()

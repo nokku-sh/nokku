@@ -85,47 +85,31 @@ func newPublicKey(t *testing.T) string {
 	return key
 }
 
-func TestRolloverKeepsOrRevokesPreviousKey(t *testing.T) {
+func TestRolloverReplacesBothKeys(t *testing.T) {
 	conn, keys := rotationConn(t)
 	ca := seedCA(t, conn, keys, seedWorkspace(t, conn))
+	require.Nil(t, ca.RotatedAt, "a new CA has never been rotated")
 
-	rollover := func(revoke bool) *db.SSHCA {
-		var next *db.SSHCA
-		require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
-			current, err := q.GetWorkspaceCAForUpdate(t.Context())
-			if err != nil {
-				return err
-			}
-			next, err = ssh.Rollover(t.Context(), q, keys, current, revoke)
+	var next *db.SSHCA
+	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
+		current, err := q.GetWorkspaceCAForUpdate(t.Context())
+		if err != nil {
 			return err
-		}))
-		return next
-	}
-
-	planned := rollover(false)
-	assert.NotEqual(t, ca.PublicKey, planned.PublicKey)
-	assert.NotEqual(t, ca.HostPublicKey, planned.HostPublicKey, "a rollover replaces both keys")
-	assert.True(t, planned.RotatedAt.After(ca.RotatedAt), "the rotation time moves")
-	require.NotNil(t, planned.PreviousPublicKey, "a planned rollover keeps the replaced key")
-	assert.Equal(t, ca.PublicKey, *planned.PreviousPublicKey)
-	require.NotNil(t, planned.PreviousHostPublicKey)
-	assert.Equal(t, ca.HostPublicKey, *planned.PreviousHostPublicKey)
-	require.NotNil(t, planned.PreviousTrustedUntil)
-	assert.WithinDuration(t, time.Now().Add(planned.UserMaxTtl), *planned.PreviousTrustedUntil, time.Minute,
-		"the replaced key is trusted for as long as its certificates can live")
+		}
+		next, err = ssh.Rollover(t.Context(), q, keys, current)
+		return err
+	}))
+	assert.NotEqual(t, ca.PublicKey, next.PublicKey)
+	assert.NotEqual(t, ca.HostPublicKey, next.HostPublicKey, "a rollover replaces both keys")
+	require.NotNil(t, next.RotatedAt, "a rollover sets the rotation time")
+	assert.WithinDuration(t, time.Now(), *next.RotatedAt, time.Minute)
 
 	// The key rows follow, the CA signs with the new keys only.
-	for certType, want := range map[uint32]string{gossh.UserCert: planned.PublicKey, gossh.HostCert: planned.HostPublicKey} {
-		s, err := signer(t, conn, keys, planned, certType)
+	for certType, want := range map[uint32]string{gossh.UserCert: next.PublicKey, gossh.HostCert: next.HostPublicKey} {
+		s, err := signer(t, conn, keys, next, certType)
 		require.NoError(t, err, "the CA does not sign after the rollover")
 		assert.Equal(t, want, ssh.MarshalKey(s.PublicKey()), "the rollover did not replace the key row")
 	}
-
-	emergency := rollover(true)
-	assert.NotEqual(t, planned.PublicKey, emergency.PublicKey)
-	assert.Nil(t, emergency.PreviousPublicKey, "an emergency rollover trusts no older key")
-	assert.Nil(t, emergency.PreviousHostPublicKey)
-	assert.Nil(t, emergency.PreviousTrustedUntil)
 }
 
 // The user key signs logins, the host key servers. ssh-keygen reads what they

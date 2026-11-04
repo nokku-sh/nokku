@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,10 +27,10 @@ type Config struct {
 	HostPrincipal string
 	Username      string
 	Signer        ssh.Signer
-	// HostCAs are the keys the daemon's host certificate may come from.
-	HostCAs []ssh.PublicKey
-	Width   uint32
-	Height  uint32
+	// HostCA is the key the daemon's host certificate must come from.
+	HostCA ssh.PublicKey
+	Width  uint32
+	Height uint32
 }
 
 // Terminal is safe to Resize concurrently with Write.
@@ -99,9 +98,7 @@ func dial(conn net.Conn, cfg Config) (*Terminal, error) {
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(cfg.Signer)},
 		HostKeyCallback: (&ssh.CertChecker{
 			IsHostAuthority: func(auth ssh.PublicKey, _ string) bool {
-				return slices.ContainsFunc(cfg.HostCAs, func(ca ssh.PublicKey) bool {
-					return bytes.Equal(auth.Marshal(), ca.Marshal())
-				})
+				return bytes.Equal(auth.Marshal(), cfg.HostCA.Marshal())
 			},
 		}).CheckHostKey,
 	}

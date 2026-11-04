@@ -40,17 +40,18 @@ message CertificateAuthority {
   string id = 1;
   string public_key = 2;
   string host_public_key = 3;
+  // Unset until the first rollover.
   google.protobuf.Timestamp rotated_at = 4;
   google.protobuf.Duration user_default_ttl = 5;
   google.protobuf.Duration user_max_ttl = 6;
   google.protobuf.Duration host_ttl = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
-  string previous_public_key = 10;
-  string previous_host_public_key = 11;
-  google.protobuf.Timestamp previous_trusted_until = 12;
   // source_address lists where people log in from. A service account has a list of its own.
-  string source_address = 13;
+  string source_address = 10;
+  // What ssh-keygen -lf prints for each key.
+  string public_key_fingerprint = 11;
+  string host_public_key_fingerprint = 12;
 }
 
 message GetCertificateAuthorityRequest {}
@@ -88,10 +89,8 @@ message UpdateCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;
 }
 
-message RolloverCertificateAuthorityRequest {
-  // Distrusts the previous keys at once, for a key that leaked. Otherwise they stay trusted for user_max_ttl.
-  bool revoke_previous = 1;
-}
+// New keys replace both, and nothing trusts the old ones any more.
+message RolloverCertificateAuthorityRequest {}
 message RolloverCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;
 }

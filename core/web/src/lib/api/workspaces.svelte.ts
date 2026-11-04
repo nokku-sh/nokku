@@ -135,7 +135,7 @@ export const util = {
 			refetchInterval: false
 		})),
 	// Each page counts the whole filtered log, too heavy for the poll. Focus and new filters refresh it.
-	getLogs: (opts?: () => AuditQuery) =>
+	getLogs: (opts?: () => AuditQuery, when?: () => boolean) =>
 		useQuery(
 			UtilService.method.listAuditLogs,
 			() => {
@@ -146,7 +146,7 @@ export const util = {
 					filter: cleanFilters(filter) as AuditFilter
 				};
 			},
-			{ refetchInterval: false }
+			() => ({ refetchInterval: false, enabled: when?.() ?? true })
 		),
 
 	exportLogs: () =>

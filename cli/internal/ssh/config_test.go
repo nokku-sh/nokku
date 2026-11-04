@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,10 +63,7 @@ func TestConfigValueQuotesPaths(t *testing.T) {
 func TestRenderKnownHosts(t *testing.T) {
 	t.Parallel()
 	st := &state.State{
-		CA: &state.CA{
-			PublicKey: "ssh-ed25519 AAAAUser1==", HostPublicKey: "ssh-ed25519 AAAACa1== production",
-			PreviousHostPublicKey: "ssh-ed25519 AAAAOld1==", PreviousTrustedUntil: time.Now().Add(time.Hour),
-		},
+		CA: &state.CA{PublicKey: "ssh-ed25519 AAAAUser1==", HostPublicKey: "ssh-ed25519 AAAACa1== production"},
 		Targets: []state.Target{
 			{ID: "t-1", DaemonID: "d-1"},
 			{ID: "t-3", HostPublicKey: "ssh-ed25519 AAAAhost== host"},
@@ -79,20 +75,11 @@ func TestRenderKnownHosts(t *testing.T) {
 
 	assert.Contains(t, out, "@cert-authority t-1 ssh-ed25519 AAAACa1== production\n")
 	assert.Contains(t, out, "@cert-authority t-5 ssh-ed25519 AAAACa1== production\n", "every daemon trusts the one CA")
-	assert.Contains(
-		t,
-		out,
-		"@cert-authority t-1 ssh-ed25519 AAAAOld1==\n",
-		"a replaced key stays trusted until its deadline",
-	)
 	assert.Contains(t, out, "t-3 ssh-ed25519 AAAAhost== host\n")
 	assert.NotContains(t, out, "@cert-authority t-3", "manual targets are pinned, not CA trusted")
 	assert.NotContains(t, out, "t-4", "nothing to pin without a host key")
 	assert.NotContains(t, out, "AAAAstray", "daemon targets are never pinned by a raw key")
 	assert.NotContains(t, out, "AAAAUser1", "the user CA never vouches for a host")
-
-	st.CA.PreviousTrustedUntil = time.Now().Add(-time.Hour)
-	assert.NotContains(t, string(renderKnownHosts(st)), "AAAAOld1", "a replaced key past its deadline is dropped")
 
 	st.CA = &state.CA{HostPublicKey: "ssh-ed25519 AAAA==\nHost *\n    ProxyCommand curl evil"}
 	assert.NotContains(t, string(renderKnownHosts(st)), "curl evil")

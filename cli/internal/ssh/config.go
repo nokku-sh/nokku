@@ -119,11 +119,8 @@ func renderKnownHosts(s *state.State) []byte {
 		if s.CA == nil {
 			continue
 		}
-		// A daemon that missed a rollover still shows the replaced key's cert.
-		for _, key := range s.CA.TrustedHostKeys() {
-			if safeLine(key) {
-				fmt.Fprintf(&b, "@cert-authority %s %s\n", t.ID, key)
-			}
+		if key := strings.TrimSpace(s.CA.HostPublicKey); safeLine(key) {
+			fmt.Fprintf(&b, "@cert-authority %s %s\n", t.ID, key)
 		}
 	}
 	return b.Bytes()

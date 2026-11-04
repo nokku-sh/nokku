@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -21,44 +20,26 @@ var errNoCertificates = errors.New("sshd: only certificate authentication is sup
 type access struct {
 	principals map[string][]string
 	policy     policy
-	// The CA keys are in wire form. An empty active key trusts none.
-	ca      string
-	retired map[string]time.Time
+	// The CA key in wire form. Empty trusts none.
+	ca string
 }
 
 func (a *access) trusts(wire string) bool {
-	if a.ca != "" && wire == a.ca {
-		return true
-	}
-	until, ok := a.retired[wire]
-	return ok && time.Now().Before(until)
+	return a.ca != "" && wire == a.ca
 }
 
-// SetAccess applies a sync to new logins, DropRevoked to open connections. An
-// active CA key that does not parse trusts no CA, retired ones included. An
-// emergency rollover sends no retired key.
+// SetAccess gates new logins, DropRevoked open ones. A CA key that does not parse trusts none.
 func (s *Server) SetAccess(sa *state.Access) {
 	a := &access{
 		principals: sa.Principals,
 		policy:     policyFrom(sa.DaemonConfig),
-		retired:    make(map[string]time.Time, len(sa.RetiredCAs)),
 	}
 	if sa.CA != "" {
-		pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sa.CA))
-		if err != nil {
+		if pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sa.CA)); err != nil {
 			slog.Warn("unreadable CA public key, trusting no CA", "error", err)
-			s.access.Store(a)
-			return
+		} else {
+			a.ca = string(pub.Marshal())
 		}
-		a.ca = string(pub.Marshal())
-	}
-	for _, k := range sa.RetiredCAs {
-		pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(k.GetPublicKey()))
-		if err != nil {
-			slog.Warn("skipping unreadable retired CA", "error", err)
-			continue
-		}
-		a.retired[string(pub.Marshal())] = k.GetTrustedUntil().AsTime()
 	}
 	s.access.Store(a)
 }

@@ -31,11 +31,10 @@ type Config struct {
 
 // Access is one sync's outcome. Never change a stored one, reads take no lock.
 type Access struct {
-	Principals   map[string][]string     `json:"principals,omitempty"`
-	DaemonConfig *nokkuv1.DaemonConfig   `json:"daemon_config,omitempty"`
-	CA           string                  `json:"ca,omitempty"`
-	RetiredCAs   []*nokkuv1.RetiredCAKey `json:"retired_cas,omitempty"`
-	// HostCA signs the host cert. Logins only ever check CA and RetiredCAs.
+	Principals   map[string][]string   `json:"principals,omitempty"`
+	DaemonConfig *nokkuv1.DaemonConfig `json:"daemon_config,omitempty"`
+	CA           string                `json:"ca,omitempty"`
+	// HostCA signs the host cert. Logins only ever check CA.
 	HostCA       string `json:"host_ca,omitempty"`
 	StateVersion int64  `json:"state_version,omitzero"`
 }
@@ -68,7 +67,6 @@ func AccessFrom(res *nokkuv1.SyncDaemonResponse) *Access {
 		Principals:   validAccounts(principals),
 		DaemonConfig: res.GetConfig(),
 		CA:           res.GetCaPublicKey(),
-		RetiredCAs:   res.GetRetiredCaKeys(),
 		HostCA:       res.GetHostCaPublicKey(),
 		StateVersion: res.GetStateVersion(),
 	}
