@@ -91,6 +91,7 @@ func TestRecordingThatCannotStartLeavesTheSessionRunning(t *testing.T) {
 			out, runErr := sess.Output("echo still-here")
 			require.NoError(t, runErr, "the session must run unrecorded")
 			assert.Contains(t, string(out), "still-here")
+			assert.NotContains(t, string(out), recordedNotice, "an unrecorded session must not claim it is")
 		})
 	}
 

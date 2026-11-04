@@ -130,6 +130,8 @@ On OpenRC or another init system, use [packaging/openrc/nokkud.openrc](packaging
 
 Session rules like recording and port forwarding are set in the web app, per daemon or as a workspace default.
 
+When recording is on, every session with a terminal starts with `nokkud: this session is recorded`, and the web terminal shows a REC badge. The daemon also sends an SSH login banner, but most clients hide it, ssh through nk too, since its config sets `LogLevel ERROR`. Sessions without a terminal, like scp, rsync and git, get no line. Text in their stream would break them.
+
 ## Operations
 
 ```bash

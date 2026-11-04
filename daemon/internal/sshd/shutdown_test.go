@@ -118,7 +118,11 @@ func TestShutdownWithALiveSessionUploadsTheRecording(t *testing.T) {
 	stdout, err := sess.StdoutPipe()
 	must.NoError(err)
 	must.NoError(sess.Start("echo still-running; exec sleep 60"))
-	line, err := bufio.NewReader(stdout).ReadString('\n')
+	out := bufio.NewReader(stdout)
+	notice, err := out.ReadString('\n')
+	must.NoError(err)
+	must.Equal(recordedNotice, notice)
+	line, err := out.ReadString('\n')
 	must.NoError(err)
 	must.Contains(line, "still-running")
 

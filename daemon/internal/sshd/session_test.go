@@ -520,6 +520,34 @@ func TestNoTermWithoutPTY(t *testing.T) {
 	assert.Equal(t, "unset\n", string(out))
 }
 
+// ssh -q hides the login banner, so a recorded terminal says it itself.
+func TestRecordedTerminalSaysSo(t *testing.T) {
+	ca := newTestCA(t)
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{Record: true}), func(*Server) {
+		require.NoError(t, paths.Verify(), "verify paths")
+	})
+	defer closeFn()
+	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	require.NoError(t, err, "dial")
+	defer client.Close()
+
+	term, err := client.NewSession()
+	require.NoError(t, err, "new session")
+	defer term.Close()
+	require.NoError(t, term.RequestPty("xterm", 80, 24, ssh.TerminalModes{}), "request pty")
+	out, err := term.Output("echo hi")
+	require.NoError(t, err, "pty session")
+	assert.True(t, strings.HasPrefix(string(out), recordedNotice), "the notice must come first, got %q", out)
+
+	// A line in an exec stream would corrupt scp, rsync and git.
+	plain, err := client.NewSession()
+	require.NoError(t, err, "new session")
+	defer plain.Close()
+	out, err = plain.Output("echo hi")
+	require.NoError(t, err, "exec session")
+	assert.Equal(t, "hi\n", string(out), "exec output must stay untouched")
+}
+
 // It ends at the cap, or a flood would leave what is typed next unrecorded.
 func TestFullRecordingEndsAnInteractiveSession(t *testing.T) {
 	ca := newTestCA(t)

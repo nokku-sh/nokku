@@ -31,6 +31,7 @@ const (
 	hangupGrace = 5 * time.Second
 	// A tenth of a shell's cap, so nightly dumps can't fill a workspace.
 	maxExecRecording = 5 << 20
+	recordedNotice   = "nokkud: this session is recorded\r\n"
 )
 
 type session struct {
@@ -419,6 +420,10 @@ func (sess *session) runPTY() {
 	})
 
 	out := recOut{w: sess, rec: sess.rec}
+	// nk's ssh config, ssh -q and most IDEs hide the login banner, this line shows.
+	if sess.rec != nil {
+		_, _ = io.WriteString(out, recordedNotice)
+	}
 	if notice != "" {
 		_, _ = io.WriteString(out, notice+"\r\n")
 	}
