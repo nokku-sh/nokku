@@ -144,7 +144,10 @@ Unit tests live next to the code and never open a connection. Tests
 that need PostgreSQL, Keycloak or Vault live in `core/internal/integration`
 behind the `integration` build tag and start their own containers, so nothing
 has to run on your machine first. The TPM tests in `internal/tpm` run against
-the go-tpm simulator and skip when it cannot start. CI runs all of them.
+the go-tpm simulator, which is C code built with cgo. With a C compiler it
+needs the OpenSSL headers (`libssl-dev` or `openssl-devel`), or the build
+fails. Without one, or with `CGO_ENABLED=0`, the TPM tests skip. CI runs all
+of them.
 
 `NOKKU_TEST_HOSTED=1` runs the API tests the way the hosted service runs: with
 `NOKKU_SAAS`, a Vault KMS and workspace hosts. A test that only means something
