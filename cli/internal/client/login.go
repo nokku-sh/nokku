@@ -207,11 +207,11 @@ func (t *deviceTransport) send(req *http.Request, body io.ReadCloser) (*http.Res
 	if err != nil {
 		return nil, nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
 	if t.dpop != nil {
 		t.dpop.Learn(resp.Header.Get("DPoP-Nonce"))
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxDeviceResponse))
+	_ = resp.Body.Close()
 	if err != nil {
 		return nil, nil, err
 	}
