@@ -82,7 +82,7 @@ func proxyCMD() *cli.Command {
 					warnf("certificate for %s renewed for a new account, if ssh fails run it again", target.Name)
 				}
 			}
-			if err = ssh.EnsureAgent(ctx, s.RequireTPM); err != nil {
+			if err = ssh.EnsureAgent(ctx, s); err != nil {
 				return err
 			}
 			relay := func(ctx context.Context, t *state.Target) (io.ReadWriteCloser, error) {

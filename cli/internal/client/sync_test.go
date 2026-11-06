@@ -94,6 +94,11 @@ func setTestDirs(t *testing.T) {
 	require.NoError(t, paths.EnsureDirs())
 }
 
+func setupKey(t *testing.T) {
+	t.Helper()
+	require.NoError(t, ssh.SetupKey(&state.State{}))
+}
+
 func newSyncTestClient(t *testing.T, core *fakeCore) *Client {
 	t.Helper()
 	mux := http.NewServeMux()
@@ -241,7 +246,7 @@ func TestSyncOrCacheWithoutCacheFails(t *testing.T) {
 func TestEnsureCertFreshIsNoOp(t *testing.T) {
 	setTestDirs(t)
 	ca := newFakeCA(t)
-	require.NoError(t, ssh.SetupKey(false))
+	setupKey(t)
 	cliPub, err := ssh.PubKey()
 	require.NoError(t, err)
 
@@ -261,7 +266,7 @@ func TestEnsureCertFreshIsNoOp(t *testing.T) {
 func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 	setTestDirs(t)
 	ca := newFakeCA(t)
-	require.NoError(t, ssh.SetupKey(false))
+	setupKey(t)
 	cliPub, err := ssh.PubKey()
 	require.NoError(t, err)
 	pub, _, _, _, err := cryptossh.ParseAuthorizedKey([]byte(cliPub))
@@ -291,7 +296,7 @@ func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	setTestDirs(t)
 	ca := newFakeCA(t)
-	require.NoError(t, ssh.SetupKey(false))
+	setupKey(t)
 	cliPub, err := ssh.PubKey()
 	require.NoError(t, err)
 	pub, _, _, _, err := cryptossh.ParseAuthorizedKey([]byte(cliPub))

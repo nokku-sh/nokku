@@ -22,6 +22,7 @@ INSERT INTO
     daemon_id,
     method,
     binding,
+    ssh_key,
     label,
     user_agent,
     ip,
@@ -49,10 +50,11 @@ VALUES
     $8,
     $9,
     $10,
-    $11
+    $11,
+    $12
   )
 RETURNING
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 `
 
 type CreateAccessTokenParams struct {
@@ -61,6 +63,7 @@ type CreateAccessTokenParams struct {
 	SubjectID   *string            `json:"subjectId"`
 	Method      string             `json:"method"`
 	Binding     string             `json:"binding"`
+	SshKey      string             `json:"sshKey"`
 	Label       string             `json:"label"`
 	UserAgent   string             `json:"userAgent"`
 	Ip          string             `json:"ip"`
@@ -77,6 +80,7 @@ func (q *Queries) CreateAccessToken(ctx context.Context, arg *CreateAccessTokenP
 		arg.SubjectID,
 		arg.Method,
 		arg.Binding,
+		arg.SshKey,
 		arg.Label,
 		arg.UserAgent,
 		arg.Ip,
@@ -96,6 +100,7 @@ func (q *Queries) CreateAccessToken(ctx context.Context, arg *CreateAccessTokenP
 		&i.SubjectID,
 		&i.Method,
 		&i.Binding,
+		&i.SshKey,
 		&i.Label,
 		&i.Ip,
 		&i.UserAgent,
@@ -222,7 +227,7 @@ func (q *Queries) DeleteSubjectTokens(ctx context.Context, subjectID string) (in
 
 const getAccessToken = `-- name: GetAccessToken :one
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 FROM
   access_tokens
 WHERE
@@ -243,6 +248,7 @@ func (q *Queries) GetAccessToken(ctx context.Context, tokenHash crypto.HashedTok
 		&i.SubjectID,
 		&i.Method,
 		&i.Binding,
+		&i.SshKey,
 		&i.Label,
 		&i.Ip,
 		&i.UserAgent,
@@ -256,7 +262,7 @@ func (q *Queries) GetAccessToken(ctx context.Context, tokenHash crypto.HashedTok
 
 const listSCIMTokens = `-- name: ListSCIMTokens :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 FROM
   access_tokens
 WHERE
@@ -285,6 +291,7 @@ func (q *Queries) ListSCIMTokens(ctx context.Context) ([]*AccessToken, error) {
 			&i.SubjectID,
 			&i.Method,
 			&i.Binding,
+			&i.SshKey,
 			&i.Label,
 			&i.Ip,
 			&i.UserAgent,
@@ -305,7 +312,7 @@ func (q *Queries) ListSCIMTokens(ctx context.Context) ([]*AccessToken, error) {
 
 const listServiceAccountTokens = `-- name: ListServiceAccountTokens :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 FROM
   access_tokens
 WHERE
@@ -336,6 +343,7 @@ func (q *Queries) ListServiceAccountTokens(ctx context.Context, serviceAccountID
 			&i.SubjectID,
 			&i.Method,
 			&i.Binding,
+			&i.SshKey,
 			&i.Label,
 			&i.Ip,
 			&i.UserAgent,
@@ -356,7 +364,7 @@ func (q *Queries) ListServiceAccountTokens(ctx context.Context, serviceAccountID
 
 const listUserSessions = `-- name: ListUserSessions :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
 FROM
   access_tokens
 WHERE
@@ -386,6 +394,7 @@ func (q *Queries) ListUserSessions(ctx context.Context, userID string) ([]*Acces
 			&i.SubjectID,
 			&i.Method,
 			&i.Binding,
+			&i.SshKey,
 			&i.Label,
 			&i.Ip,
 			&i.UserAgent,

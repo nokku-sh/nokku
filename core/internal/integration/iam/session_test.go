@@ -30,9 +30,11 @@ import (
 
 func (e *testEnv) session(t *testing.T, ws actor.Workspace, u *db.User, kind actor.Kind) (*db.AccessToken, string) {
 	t.Helper()
-	sess, token, err := e.svc.IssueSignIn(anon(t.Context(), ws), u, iam.TokenParams{
-		Kind: kind, Method: iam.MethodPasskey, TTL: time.Hour,
-	})
+	p := iam.TokenParams{Kind: kind, Method: iam.MethodPasskey, TTL: time.Hour}
+	if kind == actor.KindCLI {
+		p.SSHKey = testSSHKey
+	}
+	sess, token, err := e.svc.IssueSignIn(anon(t.Context(), ws), u, p)
 	require.NoError(t, err)
 	return sess, token
 }
@@ -41,7 +43,7 @@ func TestMiddlewareOnlyTrustsCookieSessions(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	_, cliToken, err := e.svc.IssueSignIn(anon(t.Context(), o.ws), o.owner, iam.TokenParams{
-		Kind: actor.KindCLI, Method: iam.MethodDevice, Binding: "jkt", TTL: time.Hour,
+		Kind: actor.KindCLI, Method: iam.MethodDevice, Binding: "jkt", SSHKey: testSSHKey, TTL: time.Hour,
 	})
 	require.NoError(t, err)
 	_, userToken := e.session(t, o.ws, o.owner, actor.KindUser)
@@ -109,7 +111,7 @@ func TestLogoutRevokesBoundSession(t *testing.T) {
 	tp, err := (&jose.JSONWebKey{Key: &key.PublicKey}).Thumbprint(crypto.SHA256)
 	require.NoError(t, err)
 	_, token, err := e.svc.IssueSignIn(ctx, o.owner, iam.TokenParams{
-		Kind: actor.KindCLI, Method: iam.MethodDevice,
+		Kind: actor.KindCLI, Method: iam.MethodDevice, SSHKey: testSSHKey,
 		Binding: base64.RawURLEncoding.EncodeToString(tp), TTL: time.Hour,
 	})
 	require.NoError(t, err)

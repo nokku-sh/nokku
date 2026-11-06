@@ -1,6 +1,11 @@
 package sshd
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"io"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,6 +13,59 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
+
+const skApplication = "ssh:nokku"
+
+// skSigner signs like an ed25519-sk security key, x/crypto has no such signer.
+type skSigner struct {
+	pub     ssh.PublicKey
+	priv    ed25519.PrivateKey
+	touched bool
+}
+
+func newSKSigner(t *testing.T, touched bool) skSigner {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	key, err := ssh.ParsePublicKey(ssh.Marshal(struct {
+		Name        string
+		Key         []byte
+		Application string
+	}{ssh.KeyAlgoSKED25519, pub, skApplication}))
+	require.NoError(t, err)
+	return skSigner{pub: key, priv: priv, touched: touched}
+}
+
+func (s skSigner) PublicKey() ssh.PublicKey { return s.pub }
+
+// The key signs its flags and counter along with the data, the touch is flag 0x01.
+func (s skSigner) Sign(_ io.Reader, data []byte) (*ssh.Signature, error) {
+	var flags byte
+	if s.touched {
+		flags = 0x01
+	}
+	flagsAndCounter := []byte{flags, 0, 0, 0, 1}
+	app, digest := sha256.Sum256([]byte(skApplication)), sha256.Sum256(data)
+	return &ssh.Signature{
+		Format: ssh.KeyAlgoSKED25519,
+		Blob:   ed25519.Sign(s.priv, slices.Concat(app[:], flagsAndCounter, digest[:])),
+		Rest:   flagsAndCounter,
+	}, nil
+}
+
+// nk's security keys: x/crypto refuses a signature nobody touched the key for.
+func TestServerSecurityKeyNeedsATouch(t *testing.T) {
+	ca := newTestCA(t)
+	addr, closeFn := startTestServer(t, ca)
+	defer closeFn()
+
+	client, err := dial(t, addr, currentUser(t), certAuth(t, ca, newSKSigner(t, true), nil, testPrincipal))
+	require.NoError(t, err, "a touched security key")
+	_ = client.Close()
+
+	_, err = dial(t, addr, currentUser(t), certAuth(t, ca, newSKSigner(t, false), nil, testPrincipal))
+	assert.Error(t, err, "a security key signed without a touch")
+}
 
 func TestServerSourceAddress(t *testing.T) {
 	is := assert.New(t)

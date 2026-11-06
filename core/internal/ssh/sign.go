@@ -57,12 +57,9 @@ func SignCertificate(
 			maxPrincipals, len(principals))}
 	}
 
-	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubKey))
+	key, err := parseUserKey(pubKey)
 	if err != nil {
-		return nil, &RefusedError{"failed to parse public key: " + err.Error()}
-	}
-	if err := acceptedKey(key); err != nil {
-		return nil, &RefusedError{err.Error()}
+		return nil, err
 	}
 
 	var serial uint64
@@ -138,6 +135,26 @@ func SourceAddresses(list string) (string, error) {
 		entries = append(entries, entry)
 	}
 	return strings.Join(entries, ","), nil
+}
+
+// NormalizeKey drops options and comment, so two lines of one key compare equal.
+func NormalizeKey(authorizedKey string) (string, error) {
+	key, err := parseUserKey(authorizedKey)
+	if err != nil {
+		return "", err
+	}
+	return MarshalKey(key), nil
+}
+
+func parseUserKey(authorizedKey string) (ssh.PublicKey, error) {
+	key, err := ParsePublicKey(authorizedKey)
+	if err != nil {
+		return nil, &RefusedError{"failed to parse public key: " + err.Error()}
+	}
+	if err := acceptedKey(key); err != nil {
+		return nil, &RefusedError{err.Error()}
+	}
+	return key, nil
 }
 
 // acceptedKey takes what nk and nokkud make and hardware keys, no RSA or DSA.

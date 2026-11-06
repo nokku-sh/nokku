@@ -26,7 +26,10 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-const testAPI = "https://nokku.example.com"
+const (
+	testAPI    = "https://nokku.example.com"
+	testSSHKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnqlkEEgnnAYIr5pXed65L5FfJ5iwFb/dx4g0LI+YJe"
+)
 
 // fakeDeviceFlow mirrors iam.DeviceFlow, DPoP checks and replay store included.
 type fakeDeviceFlow struct {
@@ -39,6 +42,8 @@ type fakeDeviceFlow struct {
 	expiresIn  int
 	violations map[string]int
 	lastPoll   map[string]time.Time
+	// sshKeys are the keys sessions were issued for.
+	sshKeys []string
 }
 
 type fakeGrant struct {
@@ -96,6 +101,11 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 		writeOAuthErr(w, "expired_token")
 		return
 	}
+	sshKey := r.FormValue("ssh_public_key")
+	if sshKey == "" {
+		writeOAuthErr(w, "invalid_request")
+		return
+	}
 	switch g.status {
 	case "pending":
 		// Like tooFast, each early poll adds 5s to the interval.
@@ -121,6 +131,7 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		delete(f.grants, code)
+		f.sshKeys = append(f.sshKeys, sshKey)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"access_token": "tok-for-" + jkt,
 			"token_type":   "DPoP",
@@ -225,7 +236,7 @@ func runDeviceLogin(t *testing.T, c *Client, f *fakeDeviceFlow) (string, error) 
 		time.Sleep(3 * time.Second)
 		f.approve(d.DeviceCode)
 	}()
-	tok, err := pollDeviceToken(ctx, cfg, d)
+	tok, err := pollDeviceToken(ctx, cfg, d, testSSHKey)
 	if err != nil {
 		return "", err
 	}
@@ -250,6 +261,7 @@ func TestDeviceFlowTwoConsecutiveLogins(t *testing.T) {
 		for _, agent := range f.agents {
 			assert.True(t, strings.HasPrefix(agent, "nk/"), "device request user agent = %q", agent)
 		}
+		assert.Equal(t, []string{testSSHKey, testSSHKey}, f.sshKeys, "each session is issued for the key nk sent")
 	})
 }
 
@@ -281,7 +293,7 @@ func TestDeviceFlowSlowsDown(t *testing.T) {
 		require.NoError(t, err)
 		start := time.Now()
 
-		tok, err := pollDeviceToken(ctx, cfg, d)
+		tok, err := pollDeviceToken(ctx, cfg, d, testSSHKey)
 		require.NoError(t, err)
 		assert.Equal(t, "tok", tok.AccessToken)
 		require.Len(t, polls, 3)
@@ -303,7 +315,7 @@ func TestDeviceFlowExpires(t *testing.T) {
 		require.NoError(t, err)
 		start := time.Now()
 
-		_, err = pollDeviceToken(ctx, cfg, d)
+		_, err = pollDeviceToken(ctx, cfg, d, testSSHKey)
 		require.EqualError(t, err, "sign-in code expired, run nk login again")
 		assert.Equal(t, 30*time.Second, time.Since(start))
 	})
@@ -339,7 +351,7 @@ func pollAnswers(t *testing.T, answers ...func(w http.ResponseWriter)) (int32, e
 	c := testClient(t, mux)
 	ctx, cfg, err := c.deviceFlow(t.Context())
 	require.NoError(t, err)
-	_, err = pollDeviceToken(ctx, cfg, &oauth2.DeviceAuthResponse{DeviceCode: "dev", Interval: 1})
+	_, err = pollDeviceToken(ctx, cfg, &oauth2.DeviceAuthResponse{DeviceCode: "dev", Interval: 1}, testSSHKey)
 	return polls.Load(), err
 }
 
@@ -430,6 +442,8 @@ func TestPollDeviceTokenGivesUpOnARejectedProof(t *testing.T) {
 func TestDeviceLoginRefusesAServerAtAnotherURL(t *testing.T) {
 	f, h := newFakeDeviceFlow()
 	f.baseURL = "https://other.example.com"
+	setTestDirs(t)
+	setupKey(t)
 	c := testClient(t, h)
 
 	err := c.deviceLogin(t.Context())

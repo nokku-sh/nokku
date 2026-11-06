@@ -20,6 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 const (
@@ -151,6 +152,14 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		writeOAuthError(w, "expired_token")
 		return
 	}
+	// The session only ever gets certificates for this key.
+	sshKey, err := ssh.NormalizeKey(r.FormValue("ssh_public_key"))
+	if err != nil {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "invalid_request", "error_description": "no usable SSH public key, update nk",
+		})
+		return
+	}
 
 	g, err := h.svc.conn.Tenant().GetDeviceGrant(ctx, hash)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -229,6 +238,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 				Kind:    actor.KindCLI,
 				Method:  Method(cmp.Or(deref(g.ApprovedMethod), string(MethodDevice))),
 				Binding: binding,
+				SSHKey:  sshKey,
 				Label:   cmp.Or(truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel), "Terminal"),
 				TTL:     deviceSessionTTL,
 			})

@@ -64,7 +64,7 @@ func Root() *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:    "require-tpm",
-				Usage:   "Require a TPM 2.0 and refuse the software key fallback",
+				Usage:   "Refuse software keys. Keys live in a TPM 2.0, the ssh key may be on a security key instead",
 				Sources: cli.EnvVars("NK_REQUIRE_TPM"),
 			},
 			&cli.StringFlag{
@@ -118,8 +118,8 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 			nktoken.KindServiceAccount + "_. A key of the older format no longer works, create a new one")
 	}
 	if api := cmd.String("api"); s.APIURL != api && (s.APIURL == "" || cmd.IsSet("api")) {
-		// Another server never gets this session or shows its targets.
-		s.Config = state.Config{APIURL: api}
+		// Another server never gets this session or shows its targets. The key belongs to the machine.
+		s.Config = state.Config{APIURL: api, SecurityKey: s.SecurityKey}
 		s.Cache = state.Cache{}
 	}
 	if cmd.IsSet("ttl") {
@@ -144,7 +144,7 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 
 // nk logout uses client.New, it has no use for an ssh identity.
 func newClient(s *state.State) (*client.Client, error) {
-	if err := ssh.SetupKey(s.RequireTPM); err != nil {
+	if err := ssh.SetupKey(s); err != nil {
 		return nil, err
 	}
 	return client.New(s)

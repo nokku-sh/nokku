@@ -179,7 +179,7 @@ func TestAgentSSHDInteropSoftwareKey(t *testing.T) {
 	require.NoError(t, soft.Close())
 
 	// SetupKey loads the soft state and never consults the TPM.
-	require.NoError(t, SetupKey(false))
+	setupKey(t, false)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
@@ -302,7 +302,7 @@ func TestAgentSignOnlyAndShutdown(t *testing.T) {
 	}
 	must := require.New(t)
 	setupSSHDir(t)
-	must.NoError(SetupKey(false))
+	setupKey(t, false)
 
 	done := make(chan error, 1)
 	go func() { done <- RunAgent(t.Context(), false) }()

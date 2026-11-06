@@ -30,6 +30,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
@@ -40,6 +41,9 @@ const (
 	maxOpenUploads  = 64
 
 	wsShellExited websocket.StatusCode = 4000
+
+	// An nk session must name the SSH key it signed in with.
+	testSSHKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnqlkEEgnnAYIr5pXed65L5FfJ5iwFb/dx4g0LI+YJe"
 )
 
 // accessTokens is every kind, for a test that takes whichever it got.
@@ -213,13 +217,15 @@ func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 	return token
 }
 
-// cliSessionFor is an nk session with no key bound, so no proof is asked.
-func cliSessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
+// cliSessionFor is an nk session for sshKey with no DPoP key bound, so no proof is asked.
+func cliSessionFor(t *testing.T, cfg *config.Config, u *db.User, sshKey string) string {
 	t.Helper()
+	key, err := ssh.NormalizeKey(sshKey)
+	require.NoError(t, err)
 	_, token, err := cfg.IAM.IssueSignIn(
 		wsCtx(t),
 		u,
-		iam.TokenParams{Kind: actor.KindCLI, Method: iam.MethodPasskey},
+		iam.TokenParams{Kind: actor.KindCLI, Method: iam.MethodPasskey, SSHKey: key},
 	)
 	require.NoError(t, err)
 	return token

@@ -32,6 +32,7 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 - The local state it writes under `~/.config/nk/`:
   - `config.json` and `cache.json`
   - `ssh-signer.json`, the SSH signing identity, and `signer.json`, the DPoP signing identity
+  - `security-key` and `security-key.pub`, the handle of a security key from `nk login --security-key`
   - `agent.sock`, the local agent socket `ssh` uses for signing
   - `ssh_config`, `known_hosts` and `nokku.pub`
   - `certs/`, the SSH certificates the core signed
@@ -52,10 +53,23 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 - **With a TPM 2.0**, on Linux and Windows, your SSH private key is created inside the TPM and never leaves it. The TPM wraps it to itself, and `nk` keeps that blob as a TSS2 key file in `~/.config/nk`. Using the key takes the file and the TPM, so another user on the machine cannot use it even when they may use the TPM. `nk` uses a TPM automatically when it finds one.
 - **Signing happens in a small background agent.** `nk` starts it on the first SSH connection and stops it after 30 idle minutes. `ssh` reads the key only through the agent socket, never directly.
 - **Without a TPM**, `nk` falls back to a software ECDSA P-256 key, wrapped with a key derived from the machine fingerprint. The state file is useless on another machine, unless that machine's ID is copied along, as a full backup or a VM clone does. On the machine itself it is only as safe as its file permissions.
-- **`--require-tpm` refuses the fallback.** Use it where a TPM is expected.
+- **`--require-tpm` refuses software keys.** The SSH key may then be in the TPM or on a security key, the key `nk` signs in to Nokku with must be in the TPM. Use it where a TPM is expected.
 - **On macOS** there is no TPM, so the key is the software key above. `--require-tpm` refuses it.
+- **With `nk login --security-key`** the key lives on a FIDO2 security key. `ssh` talks to it directly, not through the agent, and the key signs only after a touch. The handle file `nk` keeps is useless without the key.
 
 `nk doctor` shows which of these is in use.
+
+### What a compromised machine can do
+
+A sign-in registers your SSH public key with the core, and the core signs certificates for that key only. A new key needs a new sign-in. So malware that uses your session can't get a certificate for a key of its own and carry it off.
+
+| Key                  | Malware takes your access off the machine | Malware uses ssh on the machine without you |
+| -------------------- | ----------------------------------------- | ------------------------------------------- |
+| Software key (macOS) | yes, it can copy the key file             | yes                                         |
+| TPM                  | no                                        | yes, through the agent                      |
+| Security key         | no                                        | no, every login needs a touch               |
+
+None of these stops malware that rides along on a session you opened yourself.
 
 ### Your local state
 
@@ -64,7 +78,7 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 
 ### Service account tokens
 
-- Sessions from `nk login` are bound to your machine key. A service account token is not, it is a plain bearer token. Treat it like a password.
+- Sessions from `nk login` are bound to your machine key, and get certificates only for the SSH key they signed in with. A service account token is not bound, it is a plain bearer token. Treat it like a password.
 - Pass it as `NK_TOKEN`. It is never accepted as a flag.
 - Keep it out of source control, and use your CI system's secret store.
 

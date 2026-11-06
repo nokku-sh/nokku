@@ -120,13 +120,13 @@ func seedMatrix(t *testing.T) *matrixFixture {
 	f.seedDaemonTarget(t, "rejected", nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)
 	f.seedDaemonlessTarget(t, "daemonless")
 
-	f.seedSubjects(t)
-
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	sshPub, err := gossh.NewPublicKey(pub)
 	require.NoError(t, err)
 	f.publicKey = string(gossh.MarshalAuthorizedKey(sshPub))
+
+	f.seedSubjects(t)
 
 	pairs := make([]string, 0, 2*len(f.labels))
 	for _, raw := range slices.Sorted(maps.Keys(f.labels)) {
@@ -260,7 +260,8 @@ func (f *matrixFixture) seedSubjects(t *testing.T) {
 
 	for _, c := range []matrixSubject{{"alice", alice}, {"bob", bob}, {"carol", carol}, {"dave", dave}, {"eve", eve}} {
 		u := &db.User{ID: c.id, Active: true}
-		f.callers = append(f.callers, matrixCaller{c.label, sessionFor(t, f.cfg, u), cliSessionFor(t, f.cfg, u)})
+		f.callers = append(f.callers,
+			matrixCaller{c.label, sessionFor(t, f.cfg, u), cliSessionFor(t, f.cfg, u, f.publicKey)})
 	}
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(f.adminClient())
 	key := serviceAccountToken(t, accounts, ci, nil)

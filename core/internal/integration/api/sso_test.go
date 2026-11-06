@@ -320,7 +320,11 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	ws := testWorkspace.ID
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	issue := func(u *db.User, kind actor.Kind, method iam.Method) string {
-		_, token, err := cfg.IAM.IssueSignIn(wsCtx(t), u, iam.TokenParams{Kind: kind, Method: method})
+		p := iam.TokenParams{Kind: kind, Method: method}
+		if kind == actor.KindCLI {
+			p.SSHKey = testSSHKey
+		}
+		_, token, err := cfg.IAM.IssueSignIn(wsCtx(t), u, p)
 		require.NoError(t, err)
 		return token
 	}

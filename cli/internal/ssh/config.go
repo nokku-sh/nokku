@@ -71,6 +71,11 @@ func hostAliases(s *state.State, own ownHosts) map[string]string {
 func renderSSHConfig(s *state.State, aliases map[string]string, nk string) []byte {
 	var b bytes.Buffer
 	b.WriteString(header)
+	identity, agent := configValue(paths.PubKeyFile()), configValue(paths.AgentSocket())
+	if s.SecurityKey {
+		// ssh talks to the key itself and asks for the touch, the handle is no secret.
+		identity, agent = configValue(paths.SecurityKeyFile()), "none"
+	}
 	for _, t := range s.Targets {
 		host, ok := aliases[t.ID]
 		if !ok {
@@ -98,8 +103,7 @@ Host %s
     LogLevel ERROR
 
 `, host, configValue(nk+" prepare "+t.ID), host, t.Usernames[0], nk, t.ID, t.ID,
-			configValue(paths.SSHCertificate(t.ID)), configValue(paths.PubKeyFile()),
-			configValue(paths.AgentSocket()), configValue(paths.KnownHostsFile()))
+			configValue(paths.SSHCertificate(t.ID)), identity, agent, configValue(paths.KnownHostsFile()))
 	}
 	return b.Bytes()
 }

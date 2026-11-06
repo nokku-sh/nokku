@@ -113,6 +113,17 @@ func (s *certificateService) SignSSHCertificate(
 	if caller.Kind == actor.KindUser {
 		return nil, connect.NewError(connect.CodePermissionDenied, "sign certificates with nk or a service account")
 	}
+	// Someone with this machine's session must not mint a cert for a key they carry off.
+	if caller.Kind == actor.KindCLI {
+		key, err := ssh.NormalizeKey(req.GetPublicKey())
+		if err != nil {
+			return nil, err
+		}
+		if tok, ok := iam.CurrentToken(ctx); !ok || tok.SshKey != key {
+			return nil, connect.NewError(connect.CodePermissionDenied,
+				"this key is not the one this nk session signed in with, run nk logout, then nk login")
+		}
+	}
 
 	var ca *db.SSHCA
 	var signer gossh.Signer

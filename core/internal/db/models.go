@@ -54,6 +54,7 @@ type AccessToken struct {
 	SubjectID        *string            `json:"subjectId"`
 	Method           string             `json:"method"`
 	Binding          string             `json:"binding"`
+	SshKey           string             `json:"sshKey"`
 	Label            string             `json:"label"`
 	Ip               string             `json:"ip"`
 	UserAgent        string             `json:"userAgent"`

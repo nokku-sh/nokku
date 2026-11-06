@@ -47,7 +47,8 @@ func (c *Client) LoginCI(ctx context.Context, account string) error {
 	if err != nil {
 		return fmt.Errorf("sign in as %s: %w", account, err)
 	}
-	c.State.SessionToken = res.GetAccessToken()
+	// A job's session is not tied to an ssh key, the core signs any for a service account.
+	c.State.SessionToken, c.State.SessionKey = res.GetAccessToken(), ""
 	c.State.SessionExpiresAt = res.GetExpiresAt().AsTime()
 	// A job whose first sync fails must still never reach the device flow.
 	c.State.Cache = state.Cache{Server: c.State.APIURL, ServiceAccount: &state.ServiceAccount{Name: account}}

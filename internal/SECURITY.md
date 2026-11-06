@@ -53,7 +53,9 @@ The following are in scope for security reports:
 - The Nokku core, `nokkud`, and `nk` themselves (each has its own
   policy), except where the issue is in how they call these packages.
 - A process on the same machine that can read a state file and open the TPM
-  device. The README's trust model covers why the key has no auth value.
+  device. The README's trust model covers why the key has no auth value. `nk`
+  limits what such a process gets, see "What a compromised machine can do" in
+  `cli/SECURITY.md`.
 - Reading the software fallback key file on the machine it belongs to. The
   wrap only stops a copied file from working elsewhere.
 - Vulnerabilities in the TPM hardware, firmware, or go-tpm itself.

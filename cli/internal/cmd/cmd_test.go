@@ -66,7 +66,7 @@ func TestLoadStateKeepsStoredAPI(t *testing.T) {
 func TestLoadStateNewAPIDropsSession(t *testing.T) {
 	setHome(t)
 	require.NoError(t, (&state.State{
-		APIURL: "https://a.example", SessionToken: "sess",
+		APIURL: "https://a.example", SessionToken: "sess", SecurityKey: true,
 		Targets: []state.Target{{ID: "t"}},
 	}).Save())
 
@@ -75,6 +75,7 @@ func TestLoadStateNewAPIDropsSession(t *testing.T) {
 	assert.Equal(t, "https://b.example", s.APIURL)
 	assert.Empty(t, s.SessionToken, "a session never goes to another server")
 	assert.Empty(t, s.Targets)
+	assert.True(t, s.SecurityKey, "another server must not quietly drop the security key")
 }
 
 // Plain http would carry the session or a service account token in the clear.

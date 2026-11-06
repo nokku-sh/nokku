@@ -48,7 +48,9 @@ type TokenParams struct {
 	Method    Method
 	// Binding is the DPoP jkt, empty for cookie sessions and keys.
 	Binding string
-	Label   string
+	// SSHKey is the normalized key nk signed in with, required for KindCLI.
+	SSHKey string
+	Label  string
 	// TTL zero never expires, the token must be revoked explicitly.
 	TTL time.Duration
 	// NotAfter cuts the TTL short when set.
@@ -118,6 +120,7 @@ func (s *Service) issue(ctx context.Context, q *db.Queries, p TokenParams) (*db.
 		Kind:      string(p.Kind),
 		Method:    string(p.Method),
 		Binding:   p.Binding,
+		SshKey:    p.SSHKey,
 		Label:     p.Label,
 	}
 	// A login is a use, a key made by hand is not used until a call carries it.

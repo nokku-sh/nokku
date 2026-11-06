@@ -41,6 +41,9 @@ func SSHCertDir() string      { return filepath.Join(ConfigDir(), "certs") }
 func SignerStateFile() string { return filepath.Join(ConfigDir(), "signer.json") }
 func SSHSignerFile() string   { return filepath.Join(ConfigDir(), "ssh-signer.json") }
 
+// SecurityKeyFile is the key handle ssh-keygen wrote, useless without the key.
+func SecurityKeyFile() string { return filepath.Join(ConfigDir(), "security-key") }
+
 // AgentSocket is a pipe on Windows, OpenSSH speaks to agents only over pipes.
 func AgentSocket() string {
 	if runtime.GOOS == "windows" {

@@ -325,9 +325,10 @@ func TestAccessTokenTakesTheSubjectOfItsKind(t *testing.T) {
 	insert := func(kind string, user, serviceAccount, daemon *string) error {
 		_, err := c.sysPool.Exec(t.Context(), `
 			INSERT INTO access_tokens (
-				token_hash, workspace_id, kind, method, user_id, service_account_id, daemon_id, expires_at
+				token_hash, workspace_id, kind, method, user_id, service_account_id, daemon_id, expires_at, ssh_key
 			)
-			VALUES (uuidv7()::TEXT, $1, $2, 'test', $3, $4, $5, NOW() + INTERVAL '1 hour')`,
+			VALUES (uuidv7()::TEXT, $1, $2, 'test', $3, $4, $5, NOW() + INTERVAL '1 hour',
+				CASE WHEN $2 = 'cli' THEN 'ssh-ed25519 AAAA' ELSE '' END)`,
 			f.ws, kind, user, serviceAccount, daemon)
 		return err
 	}
@@ -358,6 +359,27 @@ func TestAccessTokenTakesTheSubjectOfItsKind(t *testing.T) {
 	} {
 		assert.NoError(t, insert(tok.kind, tok.user, tok.serviceAccount, tok.daemon), "a %s token", name)
 	}
+}
+
+// The SSH key an nk session gets certificates for, no other kind has one.
+func TestOnlyAnNKSessionCarriesAnSSHKey(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	insert := func(kind, sshKey string) error {
+		_, err := c.sysPool.Exec(t.Context(), `
+			INSERT INTO access_tokens (token_hash, workspace_id, kind, method, user_id, ssh_key)
+			VALUES (uuidv7()::TEXT, $1, $2, 'test', $3, $4)`,
+			f.ws, kind, f.u, sshKey)
+		return err
+	}
+
+	assert.Equal(t, pgerrcode.CheckViolation, pgCode(insert("cli", "")), "an nk session without its key")
+	assert.Equal(
+		t,
+		pgerrcode.CheckViolation,
+		pgCode(insert("user", "ssh-ed25519 AAAA")),
+		"a browser session with a key",
+	)
 }
 
 // A service account token always ends, only a bound one can spend a job token.

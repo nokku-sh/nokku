@@ -61,6 +61,18 @@ func TestAWrongDeviceCodeNeverReachesTheDatabase(t *testing.T) {
 	}
 }
 
+func TestAPollWithoutSSHKeyNeverReachesTheDatabase(t *testing.T) {
+	flow := &DeviceFlow{svc: &Service{}}
+	code, _ := crypto.NewToken(crypto.TokenDeviceCode)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/device/token",
+		strings.NewReader(url.Values{"device_code": {code}}.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	flow.Poll(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "update nk")
+}
+
 // typo changes the last character, so only the checksum can tell.
 func typo(raw string) string {
 	last := byte('A')

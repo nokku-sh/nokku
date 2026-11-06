@@ -51,8 +51,12 @@ type Config struct {
 	APICA            string    `json:"api_ca,omitempty"`
 	SessionToken     string    `json:"session_token,omitempty"`
 	SessionExpiresAt time.Time `json:"session_expires_at,omitzero"`
+	// SessionKey is the nokku.pub a sign-in sent, the only key its session gets certificates for.
+	SessionKey string `json:"session_key,omitempty"`
 	// TTL is kept from --ttl, ssh runs nk proxy and nk prepare without flags.
 	TTL time.Duration `json:"ttl,omitzero"`
+	// SecurityKey is kept from nk login --security-key, for the same reason.
+	SecurityKey bool `json:"security_key,omitzero"`
 }
 
 // Cache is the last access snapshot, kept in cache.json for offline use.

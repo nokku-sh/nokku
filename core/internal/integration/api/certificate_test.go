@@ -42,7 +42,11 @@ func TestSignSSHCertificate(t *testing.T) {
 	member, _, err := cfg.IAM.AuthenticateToken(wsCtx(t), memberToken, accessTokens...)
 	require.NoError(t, err)
 	wantPrincipal := member.ID + "@" + targetID + ":root"
-	nkToken := cliSessionFor(t, cfg, &db.User{ID: member.ID, Active: true})
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	sshPub, err := gossh.NewPublicKey(pub)
+	require.NoError(t, err)
+	nkToken := cliSessionFor(t, cfg, &db.User{ID: member.ID, Active: true}, string(gossh.MarshalAuthorizedKey(sshPub)))
 
 	targetAccounts := nokkuv1connect.NewTargetAccountServiceClient(
 		clientOn(srv, adminAuth),
@@ -60,10 +64,6 @@ func TestSignSSHCertificate(t *testing.T) {
 	_, err = targetAccounts.AddSubjects(t.Context(), grant)
 	require.NoError(t, err)
 
-	pub, _, err := ed25519.GenerateKey(rand.Reader)
-	require.NoError(t, err)
-	sshPub, err := gossh.NewPublicKey(pub)
-	require.NoError(t, err)
 	sign := func(target string) ([]string, error) {
 		res, err := nokkuv1connect.NewCertificateServiceClient(clientOn(srv, header("Authorization", "Bearer "+nkToken))).
 			SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{

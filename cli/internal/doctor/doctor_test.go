@@ -23,6 +23,29 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
+func TestCheckSecurityKey(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	require.NoError(t, paths.EnsureDirs())
+	identity := func() Check {
+		var r Report
+		checkSecurityKey(&r)
+		require.NotEmpty(t, r.Checks)
+		return r.Checks[0]
+	}
+
+	assert.Equal(t, statusFail, identity().Status, "no handle file")
+
+	require.NoError(t, os.WriteFile(paths.SecurityKeyFile(), []byte("handle"), 0o600))
+	require.NoError(t, os.WriteFile(paths.SecurityKeyFile()+".pub", []byte("sk-ssh-ed25519@openssh.com "+
+		"AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIFnqlkEEgnnAYIr5pXed65L5FfJ5iwFb/dx4g0LI+YJeAAAACXNzaDpub2trdQ== x\n"),
+		0o600))
+	got := identity()
+	assert.Equal(t, statusOK, got.Status, got.Detail)
+	assert.Contains(t, got.Detail, "sk-ssh-ed25519@openssh.com")
+}
+
 // A missing cache leaves no CA, which must not make every certificate stale.
 func TestRepairKeepsCertsWithoutCache(t *testing.T) {
 	home := t.TempDir()

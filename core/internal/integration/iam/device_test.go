@@ -24,6 +24,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 const (
@@ -75,11 +76,11 @@ func pollDevice(
 ) *httptest.ResponseRecorder {
 	t.Helper()
 	const pollPath = "/auth/device/token"
-	poll := httptest.NewRequest(
-		http.MethodPost,
-		pollPath,
-		strings.NewReader(url.Values{"device_code": {grant.DeviceCode}}.Encode()),
-	)
+	form := url.Values{
+		"device_code":    {grant.DeviceCode},
+		"ssh_public_key": {sshKeyOf(t, key)},
+	}
+	poll := httptest.NewRequest(http.MethodPost, pollPath, strings.NewReader(form.Encode()))
 	poll.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	poll.Header.Set("User-Agent", terminalAgent)
 	poll.Header.Set("DPoP", signProof(t, key, testBaseURL+pollPath, "", e.svc.DPoP.CurrentNonce(), time.Now()))
@@ -307,17 +308,27 @@ func TestCLISessionKeepsTheApproversMethod(t *testing.T) {
 	require.Equal(t, http.StatusOK, approved.Code, approved.Body.String())
 	require.Equal(t, http.StatusOK, pollDevice(t, e, o.ws, grant, key).Code)
 
-	var methods []string
+	var methods, sshKeys []string
 	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
 		rows, err := q.ListUserSessions(t.Context(), o.owner.ID)
 		for _, row := range rows {
 			if row.Kind == string(actor.KindCLI) {
 				methods = append(methods, row.Method)
+				sshKeys = append(sshKeys, row.SshKey)
 			}
 		}
 		return err
 	}))
 	assert.Equal(t, []string{string(iam.MethodPasskey)}, methods)
+	assert.Equal(t, []string{sshKeyOf(t, key)}, sshKeys, "the session keeps the key nk signed in with")
+}
+
+// sshKeyOf is a test terminal's SSH key. nk keeps it apart from the DPoP key, a test reuses that.
+func sshKeyOf(t *testing.T, key *ecdsa.PrivateKey) string {
+	t.Helper()
+	line, err := ssh.MarshalPubKey(&key.PublicKey)
+	require.NoError(t, err)
+	return line
 }
 
 // The rules apply when the token is issued. Enforcing SSO after the approval

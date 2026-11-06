@@ -26,7 +26,7 @@ func TestSetupTPMKey(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(paths.SSHCertDir(), 0o700))
 
-	require.NoError(t, SetupKey(true), "SetupKey(true)")
+	setupKey(t, true)
 	assert.Equal(t, tpm.MethodTPM, tpm.IdentityMethod(paths.SSHSignerFile()), "expected a TPM identity")
 	pub, err := os.ReadFile(paths.PubKeyFile())
 	require.NoError(t, err)
@@ -34,7 +34,7 @@ func TestSetupTPMKey(t *testing.T) {
 		"unexpected TPM public key format: %q", pub)
 
 	// The key file in the state brings the same key back.
-	require.NoError(t, SetupKey(true), "SetupKey(true) again")
+	setupKey(t, true)
 	pub2, err := os.ReadFile(paths.PubKeyFile())
 	require.NoError(t, err)
 	assert.Equal(t, string(pub), string(pub2), "TPM public key changed across runs")

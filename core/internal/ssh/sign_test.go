@@ -95,6 +95,49 @@ func TestAcceptedKey(t *testing.T) {
 	}
 }
 
+// newSecurityKey builds the public half of an ed25519-sk key, x/crypto can't make one.
+func newSecurityKey(t *testing.T) string {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	key, err := ssh.ParsePublicKey(ssh.Marshal(struct {
+		Name        string
+		Key         []byte
+		Application string
+	}{ssh.KeyAlgoSKED25519, pub, "ssh:nokku"}))
+	require.NoError(t, err)
+	return MarshalKey(key)
+}
+
+func TestNormalizeKey(t *testing.T) {
+	key := newTestKey(t)
+
+	got, err := NormalizeKey(`command="x" ` + key + " alice@laptop\n")
+	require.NoError(t, err)
+	assert.Equal(t, key, got, "options and comment are dropped")
+
+	_, err = NormalizeKey("ssh-ed25519 not-base64")
+	assert.ErrorAs(t, err, new(*RefusedError))
+}
+
+func TestSignCertificateSecurityKey(t *testing.T) {
+	ca := newTestCA(t)
+
+	cert, err := SignCertificate(
+		ca.row,
+		ca.user,
+		newSecurityKey(t),
+		[]string{"alice"},
+		"k",
+		time.Hour,
+		ssh.UserCert,
+		Limits{},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, ssh.KeyAlgoSKED25519, cert.Key.Type())
+	assert.NotContains(t, cert.Permissions.Extensions, "no-touch-required", "every login needs a touch")
+}
+
 // A forced command is all a login may do. Others keep what the host allows.
 func TestUserPermissions_ForcedCommandEndsForwarding(t *testing.T) {
 	forced := userPermissions(Limits{ForceCommand: "/usr/local/bin/backup"}).Extensions

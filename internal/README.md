@@ -68,9 +68,11 @@ log in.
 The software fallback wraps the key with a key derived from the machine's
 public fingerprint (`id.MachineID`). That stops a key file copied to another
 machine from working. It is not encryption against anyone who can read the
-file on the machine itself. Leave `SignerOptions.Recreate` unset where the
-identity is bound to a server-side registration, so a TPM clear or a re-image
-makes the caller re-enroll instead of silently presenting a new key.
+file on the machine itself. Where the identity is bound to a server-side
+registration, a TPM clear or a re-image must never silently present a new key.
+Leave `SignerOptions.Recreate` unset so the caller fails and re-enrolls, or set
+it and treat a new public key as a new enrollment, the way `nk` signs in again
+when its SSH key changes.
 
 ## Testing
 

@@ -30,6 +30,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 // nkSync is an admin who hands out grants and a key that asks for certificates.
@@ -100,16 +101,21 @@ func (n *nkSync) revoke(t *testing.T, accountID, userID string) {
 func (n *nkSync) person(t *testing.T) (id, token string) {
 	t.Helper()
 	u := seedUser(t, n.cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	return u.ID, cliSessionFor(t, n.cfg, u)
+	return u.ID, cliSessionFor(t, n.cfg, u, n.publicKey(t))
+}
+
+func (n *nkSync) publicKey(t *testing.T) string {
+	t.Helper()
+	line, err := ssh.MarshalPubKey(n.key.Public())
+	require.NoError(t, err)
+	return line
 }
 
 func (n *nkSync) sign(t *testing.T, token, targetID string, ttl time.Duration) (*gossh.Certificate, error) {
 	t.Helper()
-	pub, err := gossh.NewPublicKey(n.key.Public())
-	require.NoError(t, err)
 	req := &nokkuv1.SignSSHCertificateRequest{
 		TargetId:  &targetID,
-		PublicKey: new(string(gossh.MarshalAuthorizedKey(pub))),
+		PublicKey: new(n.publicKey(t)),
 	}
 	if ttl > 0 {
 		req.Ttl = durationpb.New(ttl)
@@ -130,6 +136,45 @@ func (n *nkSync) sign(t *testing.T, token, targetID string, ttl time.Duration) (
 func lifetime(cert *gossh.Certificate) time.Duration {
 	// The certificate is backdated a minute for clock skew.
 	return time.Unix(int64(cert.ValidBefore), 0).Sub(time.Unix(int64(cert.ValidAfter), 0)) - time.Minute
+}
+
+// Malware with the session must not get a certificate for a key it can carry off.
+func TestSignSSHCertificateOnlyForTheSignInKey(t *testing.T) {
+	n := newNKSync(t)
+	u := seedUser(t, n.cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	targetID, accountID := n.target(t, "deploy")
+	n.grant(t, accountID, u.ID)
+	nk := deviceLogin(t, n.cfg, n.srv, u)
+	certs := nokkuv1connect.NewCertificateServiceClient(clientOn(n.srv, signedIn(t, n.cfg, nk)))
+	sign := func(key string) error {
+		_, err := certs.SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
+			TargetId: &targetID, PublicKey: &key,
+		})
+		return err
+	}
+
+	signInKey := sshKeyOf(t, nk.key)
+	require.NoError(t, sign(signInKey+" alice@laptop"), "the key nk signed in with, under another comment")
+	err := sign(n.publicKey(t))
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
+		"a key the session never signed in with got a certificate, %v", err)
+
+	refused := func() bool {
+		var rows []*db.ListAuditLogsRow
+		inWorkspace(t, n.cfg, testWorkspace.ID, func(q *db.Queries) (err error) {
+			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+				Actions: []string{"SignSSHCertificate"}, ActorIds: []string{u.ID}, Limit: 10,
+			})
+			return err
+		})
+		for _, row := range rows {
+			if !row.Ok && strings.Contains(string(row.Details), "permission_denied") {
+				return true
+			}
+		}
+		return false
+	}
+	assert.Eventually(t, refused, 5*time.Second, 50*time.Millisecond, "the refusal is the trace of the attack")
 }
 
 // An nk sync server hears of no revoke, so certificates end within the hour.

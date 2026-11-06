@@ -65,11 +65,21 @@ Prefer to add the package repository yourself? The [package repository](https://
 
 ## Where your key lives
 
-On Linux and Windows, `nk` keeps your SSH key in a TPM 2.0 when the machine has one. The key never leaves the chip. Without a TPM it falls back to a software key that only works on this machine. Pass `--require-tpm` to refuse that fallback.
+On Linux and Windows, `nk` keeps your SSH key in a TPM 2.0 when the machine has one. The key never leaves the chip. Without a TPM it falls back to a software key that only works on this machine. Pass `--require-tpm` to refuse software keys. A security key is hardware too, so it passes.
 
-A Mac has no TPM, so it always uses the software key, and `--require-tpm` refuses to run there.
+A Mac has no TPM, so it uses a software key, and `--require-tpm` refuses to run there. That holds with a security key too, because the key `nk` signs in to Nokku with still needs a TPM.
 
-`nk doctor` shows whether a TPM is in use.
+### On a security key
+
+`nk login --security-key` puts the key on a FIDO2 security key, like a YubiKey, instead. `nk` runs `ssh-keygen` once and you touch the key. From then on `ssh` talks to the key itself, and every login needs a touch. Malware on your machine can't copy the key or use it behind your back. This is the hardware option on a Mac.
+
+- Each machine makes its own key on the same security key. Nothing is stored on the security key, so it never runs out of room. The file `nk` keeps is useless without the key.
+- `ssh` and `ssh-keygen` must support security keys. Most Linux distributions and Windows do. Apple's built-in `ssh` does not, install OpenSSH from Homebrew and put it first in `PATH`. IDEs often run `/usr/bin/ssh`, point them at the Homebrew one.
+- A server set up with `nk sync` needs OpenSSH 8.2 or newer to take a security key. RHEL 8 and older releases ship less.
+- A lost or new security key: run `nk logout`, then `nk login --security-key`.
+- To go back to the TPM or software key, run `nk logout`, then `nk login`.
+
+`nk doctor` shows which key is in use.
 
 > [!NOTE]
 > On most Linux distributions `/dev/tpmrm0` belongs to `root:tss`, so a regular user cannot use the TPM by default. Run `sudo usermod -aG tss $USER` and log in again. A udev rule that grants your user access works too.
@@ -187,26 +197,26 @@ It checks the pinned host key first, then removes the drop-in and the CA over th
 
 ### Command flags
 
-| Command      | Flags                                                                                            |
-| ------------ | ------------------------------------------------------------------------------------------------ |
-| `nk login`   | `--ci <service account>` to sign in a CI job with its platform's token                           |
-| `nk ls`      | `--json` for machine-readable output, with the `host` ssh knows each server by                   |
-| `nk doctor`  | `--fix` to repair permissions and regenerate files, `--json` for output                          |
-| `nk sync`    | `--name`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`               |
-| `nk request` | `--reason` (required), `--for` from `15m` to `168h`, default `1h`, `--no-wait` to return at once |
-| `nk rm`      | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                       |
+| Command      | Flags                                                                                                                                                 |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nk login`   | `--ci <service account>` to sign in a CI job with its platform's token, `--security-key` to keep the key on a FIDO2 security key, kept for later runs |
+| `nk ls`      | `--json` for machine-readable output, with the `host` ssh knows each server by                                                                        |
+| `nk doctor`  | `--fix` to repair permissions and regenerate files, `--json` for output                                                                               |
+| `nk sync`    | `--name`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`                                                                    |
+| `nk request` | `--reason` (required), `--for` from `15m` to `168h`, default `1h`, `--no-wait` to return at once                                                      |
+| `nk rm`      | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                                                                            |
 
 ## Configuration
 
-| Flag            | Environment         | Purpose                                                                                         |
-| --------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
-| `--api`         | `NK_API_URL`        | Address of the core                                                                             |
-|                 | `NK_TOKEN`          | Service account key (`nk_sa_...`) for scripts. Environment only, never a flag                   |
-|                 | `NK_ID_TOKEN`       | The job's signed token for `nk login --ci`, anywhere but GitHub Actions                         |
-| `--ttl`         | `NK_TTL`            | Requested SSH certificate lifetime, kept for later connections. `0` goes back to the CA default |
-| `--require-tpm` | `NK_REQUIRE_TPM`    | Require a TPM 2.0, refuse the software key fallback                       |
-| `--ca-file`     | `NK_CA_FILE`        | PEM file with the core's private CA, kept for later runs                                        |
-| `--debug`       | `NK_DEBUG`          | Debug logging                                                                                   |
+| Flag            | Environment      | Purpose                                                                                                   |
+| --------------- | ---------------- | --------------------------------------------------------------------------------------------------------- |
+| `--api`         | `NK_API_URL`     | Address of the core                                                                                       |
+|                 | `NK_TOKEN`       | Service account key (`nk_sa_...`) for scripts. Environment only, never a flag                             |
+|                 | `NK_ID_TOKEN`    | The job's signed token for `nk login --ci`, anywhere but GitHub Actions                                   |
+| `--ttl`         | `NK_TTL`         | Requested SSH certificate lifetime, kept for later connections. `0` goes back to the CA default           |
+| `--require-tpm` | `NK_REQUIRE_TPM` | Refuse software keys. The SSH key may be in a TPM 2.0 or on a security key, the sign-in key needs the TPM |
+| `--ca-file`     | `NK_CA_FILE`     | PEM file with the core's private CA, kept for later runs                                                  |
+| `--debug`       | `NK_DEBUG`       | Debug logging                                                                                             |
 
 `--api` is remembered after the first use. Switching to another core drops the old session. The other flags apply to one run only.
 

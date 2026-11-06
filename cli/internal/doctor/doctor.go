@@ -140,6 +140,8 @@ func checkSSH(r *Report, s *state.State) {
 	}
 
 	switch method := tpm.IdentityMethod(paths.SSHSignerFile()); {
+	case s.SecurityKey:
+		checkSecurityKey(r)
 	case method == tpm.MethodTPM:
 		r.add(sec, "identity", statusOK, "TPM key, never leaves the chip")
 	case method == tpm.MethodSoft && tpm.Available() == nil:
@@ -148,6 +150,9 @@ func checkSSH(r *Report, s *state.State) {
 			"software key although this machine can keep it in hardware, run nk logout and nk login to move it")
 	case method == tpm.MethodSoft:
 		r.add(sec, "identity", statusOK, "machine-wrapped key, tied to this machine's ID")
+		// Malware on this machine can copy a software key, it can't copy a security key.
+		r.add(sec, "security key", statusInfo,
+			"a security key keeps your key in hardware, see nk login --security-key")
 	default:
 		r.add(sec, "identity", statusWarn, "none yet, run nk login")
 	}
@@ -182,6 +187,20 @@ func checkSSH(r *Report, s *state.State) {
 	}
 	if certs == 0 {
 		r.add(sec, "certificates", statusInfo, "none yet, fetched on the first ssh to a server")
+	}
+}
+
+func checkSecurityKey(r *Report) {
+	const sec = "SSH"
+	pub, err := ssh.SecurityKey()
+	if err != nil {
+		r.add(sec, "identity", statusFail, err.Error())
+		return
+	}
+	r.add(sec, "identity", statusOK, "security key ("+pub.Type()+"), every login needs a touch")
+	if path, _ := exec.LookPath("ssh"); runtime.GOOS == "darwin" && path == "/usr/bin/ssh" {
+		r.add(sec, "ssh", statusWarn,
+			"Apple's ssh can't use security keys, install OpenSSH from Homebrew and put it first in PATH")
 	}
 }
 

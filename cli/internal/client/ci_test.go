@@ -19,7 +19,6 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 	"github.com/nokku-sh/nokku/internal/dpop"
 
-	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
@@ -318,7 +317,7 @@ func TestEnsureCertNamesAnEndedCISession(t *testing.T) {
 	c := newSyncTestClient(t, core)
 	c.State.ServiceAccount = &state.ServiceAccount{ID: "sa", Name: "deploy"}
 	ca := newFakeCA(t)
-	require.NoError(t, ssh.SetupKey(false))
+	setupKey(t)
 
 	err := c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{PublicKey: ca.pubKey})
 	require.ErrorIs(t, err, ErrCISessionEnded)

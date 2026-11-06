@@ -18,6 +18,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 
 	"github.com/nokku-sh/nokku/cli/internal/paths"
+	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
 const (
@@ -42,8 +43,9 @@ type signOnly struct {
 }
 
 // EnsureAgent starts a shared agent that outlives every ssh session.
-func EnsureAgent(ctx context.Context, requireTPM bool) error {
-	if agentAlive(ctx) {
+func EnsureAgent(ctx context.Context, s *state.State) error {
+	// With a security key ssh signs through the key itself.
+	if s.SecurityKey || agentAlive(ctx) {
 		return nil
 	}
 	exe, err := os.Executable()
@@ -51,7 +53,7 @@ func EnsureAgent(ctx context.Context, requireTPM bool) error {
 		return err
 	}
 	args := []string{"agent"}
-	if requireTPM {
+	if s.RequireTPM {
 		args = []string{"--require-tpm", "agent"}
 	}
 	//nolint:noctx // the agent must outlive this ssh session

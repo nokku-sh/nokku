@@ -71,10 +71,20 @@ func userCertOpts(
 	require.NoError(t, err, "generate user key")
 	userSigner, err := ssh.NewSignerFromKey(priv)
 	require.NoError(t, err, "user signer")
-	pub, err := ssh.NewPublicKey(priv.Public())
-	require.NoError(t, err, "user public key")
+	return certAuth(t, ca, userSigner, opts, principals...)
+}
+
+// certAuth logs in with a certificate the CA signed for the signer's key.
+func certAuth(
+	t *testing.T,
+	ca testCA,
+	signer ssh.Signer,
+	opts func(*ssh.Certificate),
+	principals ...string,
+) ssh.AuthMethod {
+	t.Helper()
 	cert := &ssh.Certificate{
-		Key:             pub,
+		Key:             signer.PublicKey(),
 		CertType:        ssh.UserCert,
 		KeyId:           "test-user",
 		ValidPrincipals: principals,
@@ -86,7 +96,7 @@ func userCertOpts(
 		opts(cert)
 	}
 	require.NoError(t, cert.SignCert(rand.Reader, ca.signer), "sign cert")
-	certSigner, err := ssh.NewCertSigner(cert, userSigner)
+	certSigner, err := ssh.NewCertSigner(cert, signer)
 	require.NoError(t, err, "cert signer")
 	return ssh.PublicKeys(certSigner)
 }

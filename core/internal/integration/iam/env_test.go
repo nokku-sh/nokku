@@ -29,6 +29,8 @@ const (
 	sessionCookieName = "nokku_session"
 	loginVerifyURL    = "/login/verify?token="
 	inviteURL         = "/invite?token="
+	// An nk session must name the SSH key it signed in with.
+	testSSHKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnqlkEEgnnAYIr5pXed65L5FfJ5iwFb/dx4g0LI+YJe"
 )
 
 // accessTokens are all kinds, for a test that takes whichever it got.

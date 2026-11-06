@@ -262,6 +262,8 @@ CREATE TABLE access_tokens (
   subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, service_account_id, daemon_id)) STORED,
   method TEXT NOT NULL, -- passkey, magic_link, oidc, device, token, federation, scim
   binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions and keys
+  -- The SSH key nk signed in with, the only key the session gets certificates for. Empty for every other kind.
+  ssh_key TEXT NOT NULL DEFAULT '',
   label TEXT NOT NULL DEFAULT '',
   ip TEXT NOT NULL DEFAULT '',
   user_agent TEXT NOT NULL DEFAULT '',
@@ -276,6 +278,7 @@ CREATE TABLE access_tokens (
   CHECK ((kind IN ('user', 'cli')) = (user_id IS NOT NULL)),
   CHECK ((kind = 'daemon') = (daemon_id IS NOT NULL)),
   CHECK ((kind = 'service_account') = (service_account_id IS NOT NULL)),
+  CHECK ((kind = 'cli') = (ssh_key <> '')),
   CHECK (
     kind <> 'service_account'
     OR expires_at IS NOT NULL

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/urfave/cli/v3"
@@ -9,6 +10,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/client"
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 	"github.com/nokku-sh/nokku/cli/internal/ssh"
+	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 )
 
@@ -22,11 +24,20 @@ func loginCMD() *cli.Command {
 				Name:  "ci",
 				Usage: "Sign in a CI job as this service account, with the job's token from its platform",
 			},
+			&cli.BoolFlag{
+				Name:  "security-key",
+				Usage: "Keep the ssh key on a FIDO2 security key, every ssh login then needs a touch",
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			s, err := loadState(cmd)
 			if err != nil {
 				return err
+			}
+			if cmd.Bool("security-key") {
+				if err = useSecurityKey(ctx, cmd, s); err != nil {
+					return err
+				}
 			}
 			c, err := newClient(s)
 			if err != nil {
@@ -54,6 +65,22 @@ func loginCMD() *cli.Command {
 			return nil
 		},
 	}
+}
+
+// The new key reaches the core with the sign-in that follows, ensureSession ends the old session.
+func useSecurityKey(ctx context.Context, cmd *cli.Command, s *state.State) error {
+	if cmd.IsSet("ci") || s.IsServiceAccount() {
+		return errors.New("a security key needs a person to touch it, it is not for CI or NK_TOKEN")
+	}
+	if err := ssh.EnrollSecurityKey(ctx); err != nil {
+		return err
+	}
+	s.SecurityKey = true
+	if err := s.Save(); err != nil {
+		return err
+	}
+	// ssh must use the key even if the sync that follows fails.
+	return ssh.WriteConfigs(s)
 }
 
 func logoutCMD() *cli.Command {

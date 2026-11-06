@@ -29,6 +29,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
+	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
 var sessionCookie = cookieNamed("nokku_session")
@@ -246,9 +247,18 @@ func pollDevice(
 ) reply {
 	t.Helper()
 	const path = "/auth/device/token"
-	return send(t, srv, http.MethodPost, path, url.Values{"device_code": {deviceCode}}, func(h http.Header) {
+	form := url.Values{"device_code": {deviceCode}, "ssh_public_key": {sshKeyOf(t, key)}}
+	return send(t, srv, http.MethodPost, path, form, func(h http.Header) {
 		h.Set("DPoP", dpopProof(t, cfg, key, path, ""))
 	})
+}
+
+// sshKeyOf is a test terminal's SSH key. nk keeps it apart from the DPoP key, a test reuses that.
+func sshKeyOf(t *testing.T, key *ecdsa.PrivateKey) string {
+	t.Helper()
+	line, err := ssh.MarshalPubKey(&key.PublicKey)
+	require.NoError(t, err)
+	return line
 }
 
 // deviceLogin signs nk in as u by the device flow, approved in u's browser.

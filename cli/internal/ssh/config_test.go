@@ -52,6 +52,19 @@ func TestRenderSSHConfig(t *testing.T) {
 	}
 }
 
+// ssh signs through the key itself, the nk agent holds nothing for it.
+func TestRenderSSHConfigSecurityKey(t *testing.T) {
+	setupSSHDir(t)
+	st := &state.State{
+		SecurityKey: true,
+		Targets:     []state.Target{{ID: "t-1", Name: "web", Usernames: []string{"alice"}}},
+	}
+	out := string(renderSSHConfig(st, hostAliases(st, nil), "nk"))
+
+	assert.Contains(t, out, "    IdentityFile "+configValue(paths.SecurityKeyFile())+"\n")
+	assert.Contains(t, out, "    IdentityAgent none\n")
+}
+
 func TestConfigValueQuotesPaths(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, `"/Users/Jane Doe/.config/nk/ssh_config"`, configValue("/Users/Jane Doe/.config/nk/ssh_config"))
