@@ -1,0 +1,25 @@
+set -e
+{{template "requireRoot"}}
+if [ -f {{.DropIn}} ]; then
+  rm -f {{.DropIn}}.nokku-bak
+  trap 'if [ -f {{.DropIn}}.nokku-bak ]; then mv -f {{.DropIn}}.nokku-bak {{.DropIn}}; fi' EXIT
+  # Signals run the EXIT trap. A dropped connection hits PIPE at the next echo.
+  trap 'exit 1' HUP INT TERM PIPE
+  mv -f {{.DropIn}} {{.DropIn}}.nokku-bak
+  if ! sshd -t; then
+    echo 'sshd rejects its config without the Nokku drop-in, nothing was removed' >&2
+    exit 1
+  fi
+  trap - EXIT HUP INT TERM PIPE
+  rm -f {{.DropIn}}.nokku-bak
+  echo "removed   {{.DropIn}}"
+fi
+if [ -f {{.CA}} ]; then
+  rm -f {{.CA}}
+  echo "removed   {{.CA}}"
+fi
+if [ -d {{.OldPrincipals}} ]; then
+  rm -rf {{.OldPrincipals}}
+  echo "removed   {{.OldPrincipals}}"
+fi
+{{template "reloadSSHD" .}}

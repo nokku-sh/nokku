@@ -1,0 +1,13 @@
+# Writing /etc/ssh needs root, so the script stops early with a clear message.
+{{define "requireRoot"}}[ "$(id -u)" = 0 ] || { echo "nk must connect as root" >&2; exit 1; }{{end}}
+
+# sshd on RHEL, ssh on Debian, and the pid file for hosts without systemd.
+{{define "reloadSSHD" -}}
+nk_reloaded=''
+if systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null ||
+  { [ -f /run/sshd.pid ] && kill -HUP "$(cat /run/sshd.pid)"; } ||
+  { [ -f /var/run/sshd.pid ] && kill -HUP "$(cat /var/run/sshd.pid)"; }; then
+  nk_reloaded=1
+  echo '{{.ReloadMarker}}'
+fi
+{{- end}}

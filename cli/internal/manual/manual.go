@@ -21,19 +21,8 @@ const (
 	sectionHostKey = "#nk hostkey"
 )
 
-// Writing /etc/ssh needs root, so the script stops early with a clear message.
-const requireRoot = `[ "$(id -u)" = 0 ] || { echo "nk must connect as root" >&2; exit 1; }` + "\n"
-
 // ProbeCommand gathers accounts and the host key in one ssh round trip.
-const ProbeCommand = requireRoot +
-	`echo '` + sectionPasswd + `'
-getent passwd 2>/dev/null || cat /etc/passwd
-echo '` + sectionHostKey + `'
-for t in ed25519 ecdsa rsa; do
-  f=/etc/ssh/ssh_host_${t}_key.pub
-  if [ -r "$f" ]; then cat "$f"; break; fi
-done
-`
+var ProbeCommand = render("probe.sh.tmpl", shared)
 
 type Host struct {
 	Accounts []string

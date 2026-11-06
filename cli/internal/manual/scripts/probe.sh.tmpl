@@ -1,0 +1,8 @@
+{{template "requireRoot"}}
+echo '{{.PasswdSection}}'
+getent passwd 2>/dev/null || cat /etc/passwd
+echo '{{.HostKeySection}}'
+for t in ed25519 ecdsa rsa; do
+  f=/etc/ssh/ssh_host_${t}_key.pub
+  if [ -r "$f" ]; then cat "$f"; break; fi
+done

@@ -1,0 +1,48 @@
+set -e
+{{template "requireRoot"}}
+sshd -t || { echo 'the sshd config on this host is already invalid, fix it first' >&2; exit 1; }
+mkdir -p {{q .DropInDir}}
+# A backup from a run that died early would restore a stale file.
+for f in {{.Paths}}; do rm -f "$f.nokku-bak"; done
+nk_new=''
+nk_restore() {
+  set +e
+  for f in {{.Paths}}; do
+    if [ -f "$f.nokku-bak" ]; then mv -f "$f.nokku-bak" "$f"; fi
+  done
+  for f in $nk_new; do rm -f "$f"; done
+}
+# Any exit before sshd accepts the result rolls back, Ctrl-C included.
+trap nk_restore EXIT
+# Signals run the EXIT trap. A dropped connection hits PIPE at the next echo.
+trap 'exit 1' HUP INT TERM PIPE
+# Each file is staged then renamed, so sshd never reads a torn file.
+{{range .Files -}}
+nk_path={{q .Path}}
+if [ -f "$nk_path" ] && printf '%s' {{q .Content}} | cmp -s - "$nk_path"; then
+  echo "unchanged $nk_path"
+else
+  if [ -f "$nk_path" ]; then cp -p "$nk_path" "$nk_path.nokku-bak"; else nk_new="$nk_new $nk_path"; fi
+  printf '%s' {{q .Content}} > "$nk_path.nokku-tmp"
+  chmod 0644 "$nk_path.nokku-tmp"
+  mv -f "$nk_path.nokku-tmp" "$nk_path"
+  echo "written   $nk_path"
+fi
+{{end -}}
+if ! sshd -t; then
+  echo 'sshd rejected the new config, every file was rolled back' >&2
+  exit 1
+fi
+trap - EXIT HUP INT TERM PIPE
+for f in {{.Paths}}; do rm -f "$f.nokku-bak"; done
+{{template "reloadSSHD" .}}
+# A running sshd may still read the old files until it reloads.
+if [ -n "$nk_reloaded" ] && [ -d {{q .OldPrincipals}} ]; then
+  rm -rf {{q .OldPrincipals}}
+  echo "removed   {{.OldPrincipals}}"
+fi
+# A config without the Include line reloads fine and ignores the drop-in.
+nk_cfg=$(sshd -T 2>/dev/null || true)
+if echo "$nk_cfg" | grep -qi '^trustedusercakeys {{.CA}}' && echo "$nk_cfg" | grep -qi {{q .CommandPattern}}; then
+  echo '{{.VerifyMarker}}'
+fi
