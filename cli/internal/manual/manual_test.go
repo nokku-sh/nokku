@@ -32,6 +32,38 @@ func TestParseProbeWithoutHostKey(t *testing.T) {
 	assert.ErrorContains(t, err, "no ssh host key")
 }
 
+// The probe runs on a fake /etc, so its sections must be the ones ParseProbe reads.
+func TestProbeCommand(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not available")
+	}
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "ssh"), 0o755))
+	require.NoError(t, os.Mkdir(bin, 0o755))
+	for name, body := range map[string]string{
+		"bin/id":                     "#!/bin/sh\necho 0\n",
+		"bin/getent":                 "#!/bin/sh\nexit 2\n",
+		"passwd":                     "root:x:0:0:root:/root:/bin/sh\nalice:x:1000:1000::/home/alice:/bin/sh\n",
+		"ssh/ssh_host_ecdsa_key.pub": "ecdsa-sha2-nistp256 AAAAecdsa root@web\n",
+		"ssh/ssh_host_rsa_key.pub":   "ssh-rsa AAAArsa root@web\n",
+	} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o755))
+	}
+
+	cmd := exec.Command("sh", "-s")
+	cmd.Stdin = strings.NewReader(strings.ReplaceAll(ProbeCommand, "/etc", dir))
+	cmd.Env = []string{"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH")}
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", out)
+
+	h, err := ParseProbe(string(out))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"alice", "root"}, h.Accounts, "read from /etc/passwd when getent fails")
+	assert.Equal(t, "ecdsa-sha2-nistp256 AAAAecdsa root@web", h.HostKey, "without ed25519 the probe takes ecdsa")
+}
+
 func TestNewPlan(t *testing.T) {
 	t.Parallel()
 	p, err := NewPlan("ca-key\n", testTargetID)
