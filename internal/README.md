@@ -32,10 +32,11 @@ exactly one implementation. The core uses `dpop`, `login` and `nktoken` only.
   The operator hands the client that CA as a PEM file, and the client
   verifies against the system roots plus that CA. There is no way to skip
   verification.
-- **id** - stable machine fingerprint from the hardware machine ID, HMAC'd so
-  the raw identifier is never exposed. The hostname stands in only on a
-  machine that has no ID or a placeholder one. An ID that cannot be read is
-  an error, never a guess. Used only as the software signing key's wrap
+- **id** - stable machine fingerprint from the OS machine ID, or the
+  hardware UUID where that is missing, HMAC'd so the raw identifier is never
+  exposed. The hostname stands in only when every source is missing, a
+  placeholder or unreadable for lack of permission. Any other read error
+  fails, it never guesses. Used only as the software signing key's wrap
   password.
 - **tpm** - machine-bound ECDSA P-256 signing identities. `Signer` is a
   persisted identity, TPM-backed when a TPM 2.0 is usable with a

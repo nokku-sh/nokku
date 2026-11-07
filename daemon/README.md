@@ -30,7 +30,7 @@ Install it. The installer also sets up the systemd or OpenRC service:
 curl -fsSL https://get.nokku.sh/nokkud | sudo sh
 ```
 
-Create an enrollment token in the Nokku web app, under **Infrastructure, Daemons**. Then enroll the server and start the daemon:
+Create an enrollment token in the Nokku web app, on the **Servers** page. Then enroll the server and start the daemon:
 
 ```bash
 sudo nokkud enroll
@@ -85,11 +85,11 @@ docker run -d --hostname alice -e NOKKUD_ENROLL_TOKEN=... ghcr.io/nokku-sh/nokku
 ssh dev@alice
 ```
 
-The image ships one login account, `dev`. Build on it with `FROM ghcr.io/nokku-sh/nokkud` to add your tools and users. The container has to run as root, which is the default.
+Besides root, the image ships one login account, `dev`. Build on it with `FROM ghcr.io/nokku-sh/nokkud` to add your tools and users. The container has to run as root, which is the default.
 
-- **Ephemeral tokens** are made for this. A container enrolled with one is approved right away, deletes itself when it stops, and is removed by the core once it has been offline for a while. A new container of the same name takes over from one that went away.
+- **Ephemeral tokens** are made for this. A container enrolled with one is approved right away, deletes itself when it stops, and is removed by the core once it has been offline for a while. A new container of the same name and token takes over from one that went offline.
 - **Names:** a hostname a person chose becomes the server's name in Nokku. A random Docker hostname gets a generated name instead, so pass `--hostname`.
-- **A persistent devbox** mounts `/var/lib/nokkud` and keeps its hostname fixed. The identity is bound to the host, so a new hostname on an old volume fails to start.
+- **A persistent devbox** mounts `/var/lib/nokkud` and keeps its hostname fixed. Without a TPM the identity is bound to the machine, so a volume moved to another host fails to start.
 
 ## Install options
 
@@ -122,13 +122,13 @@ On OpenRC or another init system, use [packaging/openrc/nokkud.openrc](packaging
 
 | Flag            | Environment          | Purpose                                       |
 | --------------- | -------------------- | --------------------------------------------- |
-| `--api`         | `NOKKUD_API_URL`     | Address of the core, `https` only             |
+| `--api`         | `NOKKUD_API_URL`     | Address of the core, `https` unless localhost |
 | `--ca-file`     | `NOKKUD_CA_FILE`     | PEM file with the core's private CA           |
 | `--ssh-addr`    | `NOKKUD_SSH_ADDR`    | Where the SSH server listens. Default `:4022` |
 | `--require-tpm` | `NOKKUD_REQUIRE_TPM` | Require a TPM 2.0 and refuse the software key |
 | `--debug`       | `NOKKUD_DEBUG`       | Debug logging                                 |
 
-Session rules like recording and port forwarding are set in the web app, per daemon or as a workspace default.
+Session rules like recording and port forwarding are set per daemon in the web app. A new daemon starts with the workspace defaults, a later change of the defaults leaves enrolled daemons alone. The idle timeout is the exception, it is one setting for every daemon.
 
 When recording is on, every session with a terminal starts with `nokkud: this session is recorded`, and the web terminal shows a REC badge. The daemon also sends an SSH login banner, but most clients hide it, ssh through nk too, since its config sets `LogLevel ERROR`. Sessions without a terminal, like scp, rsync and git, get no line. Text in their stream would break them.
 
@@ -155,11 +155,12 @@ Reset the daemon first. This removes the server from Nokku and deletes all local
 sudo nokkud reset
 ```
 
-Then remove the package (`apt remove nokkud`, `dnf remove nokkud` or `apk del nokkud`). After a manual install, stop the service and remove the binary instead:
+Then remove the package (`apt remove nokkud`, `dnf remove nokkud` or `apk del nokkud`). After a manual install, stop the service and remove what the installer put down instead:
 
 ```bash
 sudo systemctl disable --now nokkud
-sudo rm -f /usr/bin/nokkud
+sudo rm -rf /usr/bin/nokkud /usr/share/nokkud /usr/lib/systemd/system/nokkud.service \
+  /etc/init.d/nokkud /etc/ufw/applications.d/nokkud /usr/lib/firewalld/services/nokkud.xml
 ```
 
 ## More

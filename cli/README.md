@@ -57,10 +57,10 @@ Prefer to add the package repository yourself? The [package repository](https://
 ## How access stays current
 
 - Every `nk ls` refreshes what you can reach.
-- An SSH connection refreshes it too, when the last sync is more than a minute old.
+- An SSH connection refreshes it too, when the last sync is a little old.
 - A revoke applies at once, because the server enforces it. On a server set up with `nk sync` it lands within an hour, see [below](#servers-without-the-daemon).
 - When the core is unreachable, `nk` fails fast and works from cached data and the certificates you still hold.
-- Direct addresses and the Nokku relay are tried in parallel, so an unreachable private address never slows a connection down.
+- Direct addresses are tried in parallel, and the Nokku relay joins a moment later, so an unreachable private address barely slows a connection down.
 - When there is another way in, a private address must show the server's own host key first. Another machine at that address on your network, like a NAS at home, is skipped.
 
 ## Where your key lives
@@ -82,7 +82,7 @@ A Mac has no TPM, so it uses a software key, and `--require-tpm` refuses to run 
 `nk doctor` shows which key is in use.
 
 > [!NOTE]
-> On most Linux distributions `/dev/tpmrm0` belongs to `root:tss`, so a regular user cannot use the TPM by default. Run `sudo usermod -aG tss $USER` and log in again. A udev rule that grants your user access works too.
+> On most Linux distributions `/dev/tpmrm0` belongs to `root:tss`, so a regular user cannot use the TPM by default. Run `sudo usermod -aG tss $USER` and log in again. A udev rule that grants your user access works too. Do it before your first `nk login`. A machine that already signed in with a software key keeps it until you run `nk logout`, then `nk login`.
 
 The details are in [SECURITY.md](./SECURITY.md#how-nk-protects-your-key).
 
@@ -127,7 +127,7 @@ deploy:
 Any other platform with signed tokens works the same way: put the job's token in `NK_ID_TOKEN`, with the address of the core as its audience.
 
 - The session lasts an hour at most and never past the job's token. It is bound to a key `nk` holds on the runner, so a session token in a log is worth nothing alone.
-- A job token works once, so a retry needs a new one. On GitHub Actions `nk login --ci` fetches a new token each time, so a long job can run it again. On GitLab the token is fixed for the job, so a job over an hour can't renew.
+- A job token works once, so a retry needs a new one. On GitHub Actions `nk login --ci` fetches a new token each time, so a long job can run it again. On GitLab the token is fixed for the job and is refused once it is about an hour old, so sign in early in the job and don't count on renewing.
 - When the session ends, `nk` fails and says to run `nk login --ci` again. It never waits on a browser.
 - A forced command and a source list set on the service account go on its certificates. A forced command also turns off port and agent forwarding.
 
@@ -152,8 +152,8 @@ nk sync web --dry-run       # show what would change on a known target
 
 What it does:
 
-- It connects as root with your own `ssh`, so your keys and SSH config apply and a password is asked at most once.
-- It writes the keys of the workspace's CA, the current one and a replaced one that is still trusted, and an sshd drop-in with one fixed rule: let in a certificate Nokku signed for this server and the account asked for.
+- It connects as root with your own `ssh`, so your keys and SSH config apply. On Linux and macOS a password is asked at most once.
+- It writes the workspace's CA key to `/etc/ssh/nokku_ca.pub`, and an sshd drop-in, `/etc/ssh/sshd_config.d/60-nokku.conf`, with one fixed rule: let in a certificate Nokku signed for this server and the account asked for.
 - It checks the result with `sshd -t` and rolls every file back if sshd rejects it, or if the run breaks off halfway.
 - Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
 
@@ -166,14 +166,14 @@ nk sync 10.0.0.5 --grant root=me --grant deploy=team:ops,alice@example.com --tag
 ```
 
 - A `--grant` is `account=subject,subject`. A subject is `me`, an email, `team:<name>` or `sa:<name>`. An id works in place of an email or a name.
-- The account has to exist on the server. If it does not, the sync stops and writes nothing.
+- The account has to be a login account on the server, root or a regular user with a shell. If it is not, the sync stops and writes nothing.
 - Grants and tags are set once, with the new target. On a server Nokku already knows, both are ignored with a warning, so the web app stays the place to change access.
 
 The first sync trusts the server the way your own `ssh` does. When `ssh` asks about the host key, answer as you would for any server. Without a terminal, as in CI, connect once with `ssh root@host` first.
 
 From then on the sync pins the host key it saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key` to pin the new one.
 
-For scripts, `--json` prints one object with the target and the files written. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server has no target id yet, so the drop-in shows `<target-id>` in its place and `grants` lists the subjects per account as you typed them.
+For scripts, `--json` prints one object with the target and the files `nk sync` manages. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server has no target id yet, so the drop-in shows `<target-id>` in its place and `grants` lists the subjects per account as you typed them.
 
 `nk rm` undoes it:
 
@@ -218,9 +218,9 @@ It checks the pinned host key first, then removes the drop-in and the CA over th
 | `--ca-file`     | `NK_CA_FILE`     | PEM file with the core's private CA, kept for later runs                                                  |
 | `--debug`       | `NK_DEBUG`       | Debug logging                                                                                             |
 
-`--api` is remembered after the first use. Switching to another core drops the old session. The other flags apply to one run only.
+`--api`, `--ttl` and `--ca-file` are remembered after the first use. Switching to another core drops the old session and its CA. `--require-tpm` and `--debug` apply to one run only, so set `NK_REQUIRE_TPM` in your environment to make it stick.
 
-Local state lives under `~/.config/nk/` on every OS.
+Local state lives under `~/.config/nk/` on every OS. On Windows the agent listens on a named pipe instead of a socket in that folder. Outside it, `nk` only adds one `Include` line to your `~/.ssh/config`.
 
 ## Uninstall
 

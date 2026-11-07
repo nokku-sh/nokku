@@ -30,11 +30,11 @@ That is the whole workflow. No new SSH client and no `authorized_keys` to clean 
 - **Plain OpenSSH.** `ssh`, `scp`, `rsync` and your editor's remote mode work as before. Nokku only keeps your certificate fresh.
 - **No passwords anywhere.** People sign in with a passkey, Google, Microsoft or any OIDC provider.
 - **Access you can read.** This person or team, on this server, as this account. A revoke applies at once and closes open sessions. On a server set up with `nk sync` it stops new logins within the hour.
-- **Access that runs out.** On the paid plans, grant a server for an hour or a week, or let people ask and an admin approve. It ends by itself.
-- **Keys that stay in hardware.** On Linux and Windows your SSH key lives in a TPM 2.0 when the machine has one and never leaves the chip. On any machine, a Mac included, it can live on a FIDO2 security key, and then every login needs a touch. A Mac without one uses a software key tied to the machine. Either way a sign-in gets certificates only for its own key.
+- **Access that runs out.** Grant a server for a while, or let people ask and an admin approve. It ends by itself.
+- **Keys that stay in hardware.** On Linux and Windows your SSH key lives in a TPM 2.0 when the machine has one and never leaves the chip. On any machine, a Mac included, it can live on a FIDO2 security key, and then every login needs a touch. A Mac without one uses a software key tied to the machine. Either way your sign-in gets certificates only for its own key.
 - **No bastion in the path.** Every server serves its own SSH connections. When the core is down, a direct connection works with a certificate you already hold. A new certificate and a relayed connection need the core.
 - **No open ports needed.** A server behind NAT is reached through the relay, and a connection from `nk` stays encrypted end to end.
-- **Recorded sessions and an audit log.** Recordings are encrypted before they are stored. On the paid plans, stream the log to your SIEM and export who can reach what for your auditor.
+- **Recorded sessions and an audit log.** Recordings are encrypted before they are stored. Stream the log to your SIEM and export who can reach what for your auditor.
 - **A terminal in the browser**, for the day you only have a tablet. It runs through the core, which sees what is on the screen.
 - **Made for machines too.** CI jobs sign in with their platform's own token, so no key is stored. Service accounts carry their own forced command and source list, dated keys cover Ansible and scripts, and containers enroll themselves and clean up when they stop.
 
@@ -50,7 +50,7 @@ Each one has its own README. Pick where you want to start.
 
 Don't want a daemon on a server? [`nk sync`](./cli#servers-without-the-daemon) sets up its `sshd` over plain SSH. Certificates for such a server last an hour at most, so a revoke stops new logins there within the hour. An open session stays until it ends, and such a server has no recording and no relay.
 
-The guides are at [nokku.sh/docs](https://nokku.sh/docs).
+Use the hosted service, or run the core yourself for free. The guides are at [nokku.sh/docs](https://nokku.sh/docs).
 
 ## Development
 
@@ -63,7 +63,7 @@ task test    # unit tests
 task --list  # the rest, tasks of one part are prefixed (core:dev, cli:build)
 ```
 
-Next to the three parts, [`proto`](./proto) is the API schema they all speak, `gen` is the Go code generated from it, and [`internal`](./internal) holds what `nk` and `nokkud` share. [CONTRIBUTING.md](./CONTRIBUTING.md) has the setup.
+Next to the three parts, [`proto`](./proto) is the API schema they all speak, `gen` is the Go code generated from it, and [`internal`](./internal) holds what `nk`, `nokkud` and the core share. [CONTRIBUTING.md](./CONTRIBUTING.md) has the setup.
 
 ## License
 

@@ -2,8 +2,9 @@
 
 ## Supported Versions
 
-These packages ship inside `nokkud` and `nk`. Only the latest release of
-those is supported for security fixes.
+These packages ship inside `nokkud` and `nk`, and `dpop`, `login` and
+`nktoken` inside the core too. Only the latest release is supported for
+security fixes.
 
 ## Reporting a Vulnerability
 
@@ -39,6 +40,7 @@ The following are in scope for security reports:
   replay check.
 - `login`: the principal formats a certificate carries, the sshd rule
   `nk sync` writes, the account name rule and the passwd parser.
+- `nktoken`: the format and checksum of every token the core hands out.
 - `dpopclient`: the DPoP interceptors, nonce learning, the binding of proofs
   to the configured API URL, the retry on a stale nonce, and the TLS 1.3
   HTTP/2 transport.
@@ -63,4 +65,5 @@ The following are in scope for security reports:
 ## Security Notes / Threat Model
 
 These packages hold the crypto `nokkud` and `nk` share, so a flaw here affects
-both. The README describes the machine identity trust model.
+both, and the core where it uses them. The README describes the machine
+identity trust model.

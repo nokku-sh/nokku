@@ -31,9 +31,9 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 - The `nk` binary: the browser sign-in, service account tokens, requesting SSH certificates and the OpenSSH `ProxyCommand`
 - The local state it writes under `~/.config/nk/`:
   - `config.json` and `cache.json`
-  - `ssh-signer.json`, the SSH signing identity, and `signer.json`, the DPoP signing identity
+  - `ssh-signer.json`, the SSH signing identity, and `signer.json`, the DPoP signing identity, each with a `.lock` file next to it
   - `security-key` and `security-key.pub`, the handle of a security key from `nk login --security-key`
-  - `agent.sock`, the local agent socket `ssh` uses for signing
+  - `agent.sock`, the local agent socket `ssh` uses for signing. On Windows it is a named pipe instead
   - `ssh_config`, `known_hosts` and `nokku.pub`
   - `certs/`, the SSH certificates the core signed
 
@@ -50,8 +50,8 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 
 ### How nk protects your key
 
-- **With a TPM 2.0**, on Linux and Windows, your SSH private key is created inside the TPM and never leaves it. The TPM wraps it to itself, and `nk` keeps that blob as a TSS2 key file in `~/.config/nk`. Using the key takes the file and the TPM, so another user on the machine cannot use it even when they may use the TPM. `nk` uses a TPM automatically when it finds one.
-- **Signing happens in a small background agent.** `nk` starts it on the first SSH connection and stops it after 30 idle minutes. `ssh` reads the key only through the agent socket, never directly.
+- **With a TPM 2.0**, on Linux and Windows, your SSH private key is created inside the TPM and never leaves it. The TPM wraps it to itself, and `nk` keeps that blob, in the TSS2 key format, in its state file in `~/.config/nk`. Using the key takes the file and the TPM, so another user on the machine cannot use it even when they may use the TPM. `nk` uses a TPM automatically when it finds one.
+- **Signing happens in a small background agent.** `nk` starts it on the first SSH connection and stops it after a while without use. `ssh` reads the key only through the agent socket, never directly.
 - **Without a TPM**, `nk` falls back to a software ECDSA P-256 key, wrapped with a key derived from the machine fingerprint. The state file is useless on another machine, unless that machine's ID is copied along, as a full backup or a VM clone does. On the machine itself it is only as safe as its file permissions.
 - **`--require-tpm` refuses software keys.** The SSH key may then be in the TPM or on a security key, the key `nk` signs in to Nokku with must be in the TPM. Use it where a TPM is expected.
 - **On macOS** there is no TPM, so the key is the software key above. `--require-tpm` refuses it.
@@ -61,7 +61,7 @@ Only the latest release gets security fixes. Older releases are not patched, so 
 
 ### What a compromised machine can do
 
-A sign-in registers your SSH public key with the core, and the core signs certificates for that key only. A new key needs a new sign-in. So malware that uses your session can't get a certificate for a key of its own and carry it off.
+A person's sign-in registers their SSH public key with the core, and the core signs certificates for that key only. A new key needs a new sign-in. So malware that uses your session can't get a certificate for a key of its own and carry it off.
 
 | Key                  | Malware takes your access off the machine | Malware uses ssh on the machine without you |
 | -------------------- | ----------------------------------------- | ------------------------------------------- |
@@ -78,7 +78,8 @@ None of these stops malware that rides along on a session you opened yourself.
 
 ### Service account tokens
 
-- Sessions from `nk login` are bound to your machine key, and get certificates only for the SSH key they signed in with. A service account token is not bound, it is a plain bearer token. Treat it like a password.
+- Sessions from `nk login` are bound to your machine key. A person's session gets certificates only for the SSH key it signed in with. A session from `nk login --ci` is bound to the runner's key too, but like any service account it may get certificates for any key it sends.
+- A service account key is not bound, it is a plain bearer token. Treat it like a password.
 - Pass it as `NK_TOKEN`. It is never accepted as a flag.
 - Keep it out of source control, and use your CI system's secret store.
 
@@ -86,7 +87,7 @@ None of these stops malware that rides along on a session you opened yourself.
 
 TLS verification cannot be turned off. An `http://` API URL is refused, unless it points at this machine.
 
-A core whose certificate comes from a private CA is trusted through that CA, and only for that core. Pass the CA with `--ca-file` or `NK_CA_FILE`. `nk` never fetches a CA from the server and never asks whether to trust one. A certificate from a CA it does not know fails with an error that names `--ca-file`.
+A core whose certificate comes from a private CA is trusted through that CA, and only for that core. Pass the CA with `--ca-file` or `NK_CA_FILE`. `nk` never fetches a CA from the server and never asks whether to trust one. A certificate from a CA it does not know is refused.
 
 The CA is stored in `~/.config/nk/config.json` and dropped when `--api` changes. Every request is verified the normal way, against the system roots plus that CA. `nk` installs it nowhere else, so the browser sign-in needs it in the browser or the system trust store.
 

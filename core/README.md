@@ -20,11 +20,11 @@ This folder is the core: one Go binary with the API, the web app and the certifi
 
 Your servers keep working when the core is down. They enforce what they last synced, and a valid certificate still logs in directly. A new certificate and a relayed connection need the core.
 
-| Part       | Folder                | What it does                                           |
-| ---------- | --------------------- | ------------------------------------------------------ |
-| **Core**   | `core` (this one)     | Users, access, one CA per workspace, SSO, audit log    |
-| **Daemon** | [`daemon`](../daemon) | Runs on a server and keeps its SSH access in sync      |
-| **CLI**    | [`cli`](../cli)       | Signs you in on your machine, then plain `ssh` works   |
+| Part       | Folder                | What it does                                         |
+| ---------- | --------------------- | ---------------------------------------------------- |
+| **Core**   | `core` (this one)     | Users, access, one CA per workspace, SSO, audit log  |
+| **Daemon** | [`daemon`](../daemon) | Runs on a server and keeps its SSH access in sync    |
+| **CLI**    | [`cli`](../cli)       | Signs you in on your machine, then plain `ssh` works |
 
 ## Quick start
 
@@ -51,9 +51,9 @@ docker compose -f compose.min.yml up -d
 docker compose -f compose.min.yml exec nokku nokku admin-link
 ```
 
-Open the link. You are signed in as the owner. Add a passkey under **Profile, Security**, and the dashboard walks you through your first server.
+Open the link. You are signed in as the owner. Add a passkey on your profile, and the dashboard walks you through your first server.
 
-There is no password. Until the owner has a passkey, `admin-link` prints a fresh link that works for 24 hours. The log only says that one is needed, so the link never ends up where your logs go.
+There is no password. `admin-link` prints a fresh sign-in link for the owner whenever you run it, and it replaces the ones before. Until the owner has a passkey or a linked provider, the log reminds you to run it. It never logs the link itself, so the link never ends up where your logs go.
 
 ## Deploy
 
@@ -115,11 +115,11 @@ Behind more than one proxy, your own proxy has to trust the outer one too, or it
 
 A wrong setting does not stop Nokku from working. It gets addresses wrong:
 
-| Setting                                                               | What happens                                                                                                                                                      |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Setting                                                               | What happens                                                                                                                                                                  |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Your proxy is not trusted                                             | Every client shows up as the proxy. They all share one rate limit, and a `source-address` on a certificate refuses browser and relayed sessions. The core logs a warning once |
-| A CDN or load balancer in front is not trusted, here or by your proxy | Every client shows up as the CDN, the load balancer or your proxy, with the same effects                                                                          |
-| The list covers your users too, like `10.0.0.0/8` with users in it    | They are taken for proxies. They show up as your proxy, or behind a proxy that keeps what the client sent, like plain nginx, they can claim any address           |
+| A CDN or load balancer in front is not trusted, here or by your proxy | Every client shows up as the CDN, the load balancer or your proxy, with the same effects                                                                                      |
+| The list covers your users too, like `10.0.0.0/8` with users in it    | They are taken for proxies. They show up as your proxy, or behind a proxy that keeps what the client sent, like plain nginx, they can claim any address                       |
 
 ### Traefik
 
@@ -192,7 +192,7 @@ nk --api https://nokku.example.com login
 sudo nokkud --api https://nokku.example.com enroll
 ```
 
-The web app shows the exact commands, with a token, under **Infrastructure, Daemons**.
+The web app shows the exact commands, with a token, when you enroll servers on the **Servers** page.
 
 A CI job signs in with its platform's own token, so no secret is stored. Add a rule under **CI jobs** on a service account and run `nk login --ci <name>` in the job, see [CI and headless machines](../cli#ci-and-headless-machines). A service account key stays the answer for Ansible and scripts, and always has an end date. What the exchange checks is in [SECURITY.md](./SECURITY.md#what-to-know-about-the-design).
 
@@ -214,31 +214,31 @@ The rest is below, grouped by topic. Open what you need.
 <details>
 <summary><b>Core</b></summary>
 
-| Variable                | Default          | Purpose                                                                         |
-| ----------------------- | ---------------- | ------------------------------------------------------------------------------- |
-| `NOKKU_SECRET`          |                  | **Required** without `KMS_URI`, at least 32 characters                          |
-| `NOKKU_BASE_URL`        | `localhost:3000` | Public host name, for links, cookies and passkeys. Never an IP                  |
-| `NOKKU_PORT`            | `3000`           | Port the core listens on, plain HTTP for the reverse proxy                      |
-| `NOKKU_TRUSTED_PROXIES` | private networks | Comma-separated proxy IPs or CIDRs that may name the client, see above          |
-| `NOKKU_DEBUG`           | `false`          | Debug logging, same as `--debug`                                                |
-| `NOKKU_LICENSE_KEY`     |                  | License key. It can also be activated in the web app                            |
-| `NOKKU_LICENSE_OFFLINE` | `false`          | Never ask `license.nokku.sh` for the renewed key                                |
+| Variable                | Default          | Purpose                                                                |
+| ----------------------- | ---------------- | ---------------------------------------------------------------------- |
+| `NOKKU_SECRET`          |                  | **Required** without `KMS_URI`, at least 32 characters                 |
+| `NOKKU_BASE_URL`        | `localhost:3000` | Public host name, for links, cookies and passkeys. Never an IP         |
+| `NOKKU_PORT`            | `3000`           | Port the core listens on, plain HTTP for the reverse proxy             |
+| `NOKKU_TRUSTED_PROXIES` | private networks | Comma-separated proxy IPs or CIDRs that may name the client, see above |
+| `NOKKU_DEBUG`           | `false`          | Debug logging, same as `--debug`                                       |
+| `NOKKU_LICENSE_KEY`     |                  | License key. It can also be activated in the web app                   |
+| `NOKKU_LICENSE_OFFLINE` | `false`          | Never ask `license.nokku.sh` for the renewed key                       |
 
 </details>
 
 <details>
 <summary><b>Database</b></summary>
 
-| Variable                | Default      | Purpose                                                  |
-| ----------------------- | ------------ | -------------------------------------------------------- |
-| `PGHOST`                | `localhost`  | Host                                                     |
-| `PGPORT`                | `5432`       | Port                                                     |
-| `PGDATABASE`            | `nokku`      | Database name                                            |
-| `PGUSER`                | `postgres`   | User. It owns the schema and runs the migrations         |
-| `PGPASSWORD`            | `postgres`   | Password                                                 |
-| `PGSSLMODE`             | `disable`    | libpq SSL mode                                           |
-| `NOKKU_DB_APP_PASSWORD` | `PGPASSWORD` | Password of the two runtime roles, set at start          |
-| `NOKKU_DB_MAX_CONNS`    | `20`         | Largest pool size                                        |
+| Variable                | Default      | Purpose                                          |
+| ----------------------- | ------------ | ------------------------------------------------ |
+| `PGHOST`                | `localhost`  | Host                                             |
+| `PGPORT`                | `5432`       | Port                                             |
+| `PGDATABASE`            | `nokku`      | Database name                                    |
+| `PGUSER`                | `postgres`   | User. It owns the schema and runs the migrations |
+| `PGPASSWORD`            | `postgres`   | Password                                         |
+| `PGSSLMODE`             | `disable`    | libpq SSL mode                                   |
+| `NOKKU_DB_APP_PASSWORD` | `PGPASSWORD` | Password of the two runtime roles, set at start  |
+| `NOKKU_DB_MAX_CONNS`    | `20`         | Largest pool size                                |
 
 Connect directly, or through a pooler in session mode. A pooler in transaction mode, like PgBouncer with `pool_mode = transaction`, does not work. Nokku keeps state on the connection.
 
@@ -247,19 +247,19 @@ Connect directly, or through a pooler in session mode. A pooler in transaction m
 <details>
 <summary><b>First start: workspace, owner and sign-in providers</b></summary>
 
-A self-hosted core is one workspace. It is created on the first start, together with the owner.
+A self-hosted core is one workspace. It is created on the first start. The owner is created on any start that finds none.
 
-| Variable                                                                | Purpose                                                       |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `NOKKU_WORKSPACE_NAME`                                                  | Name on the sign-in page. Default `Nokku`                     |
-| `NOKKU_ADMIN_EMAIL`                                                     | Creates the owner while the workspace has no users            |
-| `NOKKU_ADMIN_NAME`                                                      | The owner's name                                              |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                              | Adds Google for existing users. New accounts need an invite   |
-| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` | Adds Microsoft. The tenant must be yours, `common` is refused |
+| Variable                                                                | Purpose                                                                                   |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `NOKKU_WORKSPACE_NAME`                                                  | Name on the sign-in page. Default `Nokku`                                                 |
+| `NOKKU_ADMIN_EMAIL`                                                     | Creates the owner while the workspace has none                                            |
+| `NOKKU_ADMIN_NAME`                                                      | The owner's name                                                                          |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                              | Adds Google for existing users. New accounts need an invite                               |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` | Adds Microsoft for your tenant, `common` is refused. Anyone in the tenant gets an account |
 
 Other OIDC providers are added in the web app.
 
-Lost every passkey? Run `./nokku admin-link` on the server, with the same environment the server runs with, or `docker compose exec nokku nokku admin-link`. It prints a fresh sign-in link for the owner. The link works even when single sign-on is required, see [SECURITY.md](./SECURITY.md#the-owner-account) for every way into the owner account.
+Lost every passkey? Run `./nokku admin-link` on the server, with the same environment the server runs with, or `docker compose -f compose.prod.yml exec nokku nokku admin-link`. It prints a fresh sign-in link for the owner. The link works even when single sign-on is required, see [SECURITY.md](./SECURITY.md#the-owner-account) for every way into the owner account.
 
 </details>
 
@@ -293,7 +293,7 @@ A folder is `file:///var/lib/nokku/recordings`, created when it is missing. The 
 
 Stores other than AWS often want `request_checksum_calculation=when_required`, which leaves out the checksums newer AWS SDKs add by default. Recordings are authenticated by their encryption either way. On Scaleway Object Storage that is `s3://nokku?region=fr-par&endpoint=https%3A%2F%2Fs3.fr-par.scw.cloud&request_checksum_calculation=when_required`, with an API key in `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 
-On a bucket, add two lifecycle rules on `videos/`: expire objects after 400 days, past the longest retention of 365 days, and abort incomplete multipart uploads after 7 days. The core deletes recordings itself, these only catch what a crash leaves behind, which is also an object no row names yet. Raise the 400 if a plan ever keeps recordings longer. Check that your store really applies the abort rule, recordings over 16 MiB go up as multipart.
+On a bucket, add two lifecycle rules on `videos/`: expire objects after 400 days, longer than any recording is kept, and abort incomplete multipart uploads after a few days. The core deletes recordings itself, these only catch what a crash leaves behind, which is also an object no row names yet. Check that your store really applies the abort rule, all but small recordings go up as multipart.
 
 </details>
 
@@ -317,13 +317,13 @@ Who runs this server. The web app footer, the sign-up consent line and the email
 <details>
 <summary><b>Telemetry</b></summary>
 
-The log only carries warnings and errors. Traces, metrics and request logs go to your collector.
+The log stays quiet: a line at start, then warnings and errors. Traces, metrics and the warnings go to your collector.
 
-| Variable                      | Purpose                                                              |
-| ----------------------------- | -------------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Turns on OTLP export of traces, metrics and logs                     |
-| `OTEL_EXPORTER_OTLP_HEADERS`  | Extra headers for the exporter                                       |
-| `OTEL_TRACES_SAMPLER`         | Every request is traced by default, see below for a share            |
+| Variable                      | Purpose                                               |
+| ----------------------------- | ----------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Turns on OTLP export of traces, metrics and logs      |
+| `OTEL_EXPORTER_OTLP_HEADERS`  | Extra headers for the exporter                        |
+| `OTEL_TRACES_SAMPLER`         | Requests are traced by default, see below for a share |
 
 The other standard `OTEL_*` variables work too. To trace one request in ten, set `OTEL_TRACES_SAMPLER=parentbased_traceidratio` and `OTEL_TRACES_SAMPLER_ARG=0.1`.
 
@@ -333,23 +333,19 @@ Three things live in [SECURITY.md](./SECURITY.md#running-nokku-securely) instead
 
 ## Before you go live
 
-- **Back up PostgreSQL, `NOKKU_STORAGE_URL` and `NOKKU_SECRET` together.** The database holds the encrypted CA keys and the secret unlocks them. Losing the secret means losing the CAs. With `KMS_URI`, the KMS key takes the place of the secret. Recordings live in the storage, and their keys live in the database, so one is no use without the other.
+- **Back up PostgreSQL, `NOKKU_STORAGE_URL` and `NOKKU_SECRET` together.** The database holds the encrypted CA keys and the secret unlocks them. Losing the secret means losing the CA. With `KMS_URI`, the KMS key takes the place of the secret. Recordings live in the storage, and their keys live in the database, so one is no use without the other.
 - **Know how to restore.** Stop the core, put back the database and the storage, set the same `NOKKU_SECRET` or `KMS_URI`, and start it. Daemons reconnect and take the state they find. Everything since the backup is gone: a revoke made after it is undone, so check access first, and a server enrolled after it enrolls again.
 - **Run one instance.** The core keeps daemon connections, relays and half-finished sign-ins in memory. A restart ends open browser terminals, relayed `nk` sessions and sign-ins in progress. A direct `ssh` is untouched. People stay signed in and daemons reconnect by themselves.
 - **Set up email**, or make sure everyone has a passkey or an identity provider.
 - **Watch `/healthz`.** It answers while the core is up, and only once it has fully started.
-- **Deploy with `docker compose pull nokku`, then `docker compose up -d --no-deps nokku`.** The pull then happens while the old core still serves, and a new version is up in about a second. Pin `NOKKU_IMAGE` to a version so going back means changing the tag. That only holds while the schema stays the same. An older image refuses to start on a database a newer one migrated, so back up before an upgrade and restore that backup to go back. Leave Caddy out of it, a new Caddy ends every web terminal.
+- **Deploy with `docker compose -f compose.prod.yml pull nokku`, then `docker compose -f compose.prod.yml up -d --no-deps nokku`.** The pull then happens while the old core still serves, and the new version is up quickly. Pin `NOKKU_IMAGE` to a version so going back means changing the tag. That only holds while the schema stays the same. An older image refuses to start on a database a newer one migrated, so back up before an upgrade and restore that backup to go back. Leave Caddy out of it, a new Caddy ends every web terminal.
 - **Read [SECURITY.md](./SECURITY.md#running-nokku-securely)** for the settings worth a second look.
 
-## Plans
+## License key
 
-Nokku has three plans: Community (free), Pro and Enterprise. What each includes is on the [pricing page](https://nokku.sh/pricing).
+A self-hosted core is free to run and needs no key. A license key turns on more features and raises the limits. Activate it in the web app on the **Billing** settings page, or set `NOKKU_LICENSE_KEY`. Keys are checked offline, so this works without internet access. An expired key never stops the core.
 
-Community is self-hosted only, for up to 5 members with no cap on servers or recording storage. Hosted Nokku has no free plan, a workspace starts on a 30 day trial of Pro and then needs a subscription.
-
-A self-hosted core starts on Community. A license key unlocks the rest. Activate it in the web app under **Settings, Billing**, or set `NOKKU_LICENSE_KEY`. Keys are checked offline, so this works without internet access. An expired key never stops the core.
-
-A core that holds a key asks `license.nokku.sh` once a day for the renewed one. It sends the key and nothing else. A core without a key never asks. Set `NOKKU_LICENSE_OFFLINE=true` to turn it off and paste the renewed key yourself.
+A core that holds a key asks `license.nokku.sh` about once a day for the renewed one. It sends the key and nothing else. A core without a key never asks. Set `NOKKU_LICENSE_OFFLINE=true` to turn it off and paste the renewed key yourself.
 
 ## More
 

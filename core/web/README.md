@@ -52,4 +52,4 @@ The look is terminal-native: compliance paper in light mode, a console at night 
 
 Sentence case everywhere. No trailing period on page descriptions. Use the domain verb when there is one (Invite, Enroll, Sign, Add target), otherwise Create. Machine values like IDs, hostnames, principals and fingerprints are set in mono.
 
-[CONTRIBUTING.md](../../../CONTRIBUTING.md) in the repo root has the setup and the project conventions.
+[CONTRIBUTING.md](../../CONTRIBUTING.md) in the repo root has the setup and the project conventions.

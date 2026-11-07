@@ -9,7 +9,7 @@ one pull request.
 | `core/`     | Backend and web application, binary `nokku`         |
 | `daemon/`   | The daemon for servers, `nokkud`                    |
 | `cli/`      | The CLI, `nk`                                       |
-| `internal/` | Go packages `nokkud` and `nk` share                 |
+| `internal/` | Go packages `nk`, `nokkud` and the core share       |
 | `proto/`    | The API schema, `gen/` is the Go code built from it |
 
 ## Prerequisites
@@ -17,14 +17,14 @@ one pull request.
 - Go 1.x (see `go.mod`)
 - [Task](https://taskfile.dev)
 - [`golangci-lint`](https://golangci-lint.run), [`govulncheck`](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck)
-- [`buf`](https://buf.build) with the `protoc-gen-go` and `protoc-gen-es` plugins, for changes in `proto/`. `protoc-gen-connect-go` comes from `go tool`.
+- [`buf`](https://buf.build), `protoc`, and the `protoc-gen-go` and `protoc-gen-es` plugins, for changes in `proto/`. `protoc-gen-connect-go` comes from `go tool`.
 - [GoReleaser](https://goreleaser.com) (snapshots/releases only)
 
-The core ships backend and frontends together, so it needs a bit more:
+The core ships backend and frontend together, so it needs a bit more:
 
 - PostgreSQL 18 or newer, `docker compose -f compose.dev.yml up -d` in `core/` brings up a dev instance
 - Docker, for the integration tests
-- Node.js + `pnpm` (frontends)
+- Node.js + `pnpm` (frontend)
 - [`sqlc`](https://sqlc.dev) (codegen)
 
 ## Tasks
@@ -44,8 +44,8 @@ task daemon:build
 Both are static (`CGO_ENABLED=0`). The move of `nokkud` needs root, so the task
 calls `sudo`.
 
-`internal/` holds what the two share. Every change there ships in both
-binaries. Never change the state file format of `internal/tpm` without a
+`internal/` holds what the two share, and the core uses some of it. Every
+change there ships in both binaries. Never change the state file format of `internal/tpm` without a
 migration. A key that no longer loads means every machine re-enrolls.
 
 ## The core
@@ -127,10 +127,11 @@ Follow the conventions already in the codebase. Before opening a PR, run:
 task lint
 ```
 
-which runs `go mod tidy`, `buf lint`, `go fmt`, `go vet`, a dead code check,
-`govulncheck`, the Go unit tests with the race detector and
+which runs `go mod tidy`, `buf format` and `buf lint`, `go fmt`, `go vet`, a
+dead code check, `govulncheck`, the Go unit tests with the race detector and
 `golangci-lint run --fix` (the config enables golines formatting).
-`task core:lint` adds `pnpm fmt` and `pnpm lint` for the frontend.
+`task core:lint` is the core on its own, with `pnpm fmt` and `pnpm lint` for
+the frontend. It reports problems but never fails.
 
 ## Tests
 
