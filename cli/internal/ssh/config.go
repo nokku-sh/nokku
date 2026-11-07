@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"text/template"
 
 	"github.com/mizuchilabs/kata/fsutil"
 
@@ -24,6 +26,17 @@ const header = "# Managed by Nokku. nk regenerates this file, do not edit it.\n\
 
 // What the core allows. Anything wider could claim github.com or reach a shell.
 var targetName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
+
+//go:embed ssh_config.tmpl
+var sshConfigText string
+
+var sshConfig = template.Must(template.New("ssh_config").Parse(sshConfigText))
+
+// Every value is ready for ssh_config, quoted where it needs to be.
+type hostBlock struct {
+	Host, User, ID                                        string
+	Prepare, NK, Certificate, Identity, Agent, KnownHosts string
+}
 
 func WriteConfigs(s *state.State) error {
 	config := renderSSHConfig(s, HostAliases(s), nkCommand())
@@ -69,41 +82,37 @@ func hostAliases(s *state.State, own ownHosts) map[string]string {
 }
 
 func renderSSHConfig(s *state.State, aliases map[string]string, nk string) []byte {
-	var b bytes.Buffer
-	b.WriteString(header)
 	identity, agent := configValue(paths.PubKeyFile()), configValue(paths.AgentSocket())
 	if s.SecurityKey {
 		// ssh talks to the key itself and asks for the touch, the handle is no secret.
 		identity, agent = configValue(paths.SecurityKeyFile()), "none"
 	}
+	var hosts []hostBlock
 	for _, t := range s.Targets {
 		host, ok := aliases[t.ID]
 		if !ok {
 			continue
 		}
+		hosts = append(hosts, hostBlock{
+			Host: host,
+			User: t.Usernames[0],
+			ID:   t.ID,
+			// ssh loads CertificateFile before ProxyCommand, so Match exec renews
+			// first. It lowercases %h, hence the id.
+			Prepare:     configValue(nk + " prepare " + t.ID),
+			NK:          nk,
+			Certificate: configValue(paths.SSHCertificate(t.ID)),
+			Identity:    identity,
+			Agent:       agent,
+			KnownHosts:  configValue(paths.KnownHostsFile()),
+		})
+	}
 
-		// ssh loads CertificateFile before ProxyCommand, so Match exec renews
-		// first. It lowercases %h, hence the id.
-		fmt.Fprintf(&b, `Match originalhost %s exec %s
-
-Host %s
-    User %s
-    ProxyCommand %s proxy %s %%p
-    HostKeyAlias %s
-    CertificateFile %s
-    IdentityFile %s
-    IdentityAgent %s
-    UserKnownHostsFile %s
-    IdentitiesOnly yes
-    PasswordAuthentication no
-    StrictHostKeyChecking yes
-    ForwardAgent no
-    ForwardX11 no
-    ServerAliveInterval 60
-    LogLevel ERROR
-
-`, host, configValue(nk+" prepare "+t.ID), host, t.Usernames[0], nk, t.ID, t.ID,
-			configValue(paths.SSHCertificate(t.ID)), identity, agent, configValue(paths.KnownHostsFile()))
+	var b bytes.Buffer
+	b.WriteString(header)
+	// The template is fixed and the tests run it, so only a bug can fail here.
+	if err := sshConfig.Execute(&b, hosts); err != nil {
+		panic(err)
 	}
 	return b.Bytes()
 }

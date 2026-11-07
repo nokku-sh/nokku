@@ -1,0 +1,20 @@
+{{range . -}}
+Match originalhost {{.Host}} exec {{.Prepare}}
+
+Host {{.Host}}
+    User {{.User}}
+    ProxyCommand {{.NK}} proxy {{.ID}} %p
+    HostKeyAlias {{.ID}}
+    CertificateFile {{.Certificate}}
+    IdentityFile {{.Identity}}
+    IdentityAgent {{.Agent}}
+    UserKnownHostsFile {{.KnownHosts}}
+    IdentitiesOnly yes
+    PasswordAuthentication no
+    StrictHostKeyChecking yes
+    ForwardAgent no
+    ForwardX11 no
+    ServerAliveInterval 60
+    LogLevel ERROR
+
+{{end -}}
