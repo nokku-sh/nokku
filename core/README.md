@@ -12,23 +12,19 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-FCL--1.0--ALv2-blue" alt="License"></a>
 </p>
 
-# Nokku
+# Nokku core
 
-Nokku gives people short-lived SSH certificates instead of long-lived keys. You decide who may log in to which server as which account, and Nokku signs a certificate for exactly that.
-
-This folder is the core: one Go binary with the API, the web app and the certificate authorities. It needs PostgreSQL and nothing else.
-
-Your servers keep working when the core is down. They enforce what they last synced, and a valid certificate still logs in directly. A new certificate and a relayed connection need the core.
+The core decides who may log in to which server, and signs short-lived SSH certificates for exactly that. It is one Go binary with the API, the web app and the certificate authority. It needs PostgreSQL and nothing else.
 
 | Part       | Folder                | What it does                                         |
 | ---------- | --------------------- | ---------------------------------------------------- |
-| **Core**   | `core` (this one)     | Users, access, one CA per workspace, SSO, audit log  |
+| **Core**   | `core` (this one)     | Users, access, the CA, SSO, audit log, web app       |
 | **Daemon** | [`daemon`](../daemon) | Runs on a server and keeps its SSH access in sync    |
 | **CLI**    | [`cli`](../cli)       | Signs you in on your machine, then plain `ssh` works |
 
 ## Quick start
 
-Try it on your machine with Docker. This runs the core on port 3000, with PostgreSQL and Caddy next to it.
+Try it on your machine with Docker:
 
 ```bash
 git clone https://github.com/nokku-sh/nokku && cd nokku/core
@@ -51,178 +47,97 @@ docker compose -f compose.min.yml up -d
 docker compose -f compose.min.yml exec nokku nokku admin-link
 ```
 
-Open the link. You are signed in as the owner. Add a passkey on your profile, and the dashboard walks you through your first server.
+Open the link and you are signed in as the owner. There is no password. Add a passkey on your profile, and the dashboard walks you through your first server.
 
-There is no password. `admin-link` prints a fresh sign-in link for the owner whenever you run it, and it replaces the ones before. Until the owner has a passkey or a linked provider, the log reminds you to run it. It never logs the link itself, so the link never ends up where your logs go.
+## What it does
+
+- Keeps your people, teams, service accounts and who may log in where.
+- Signs a short-lived SSH certificate for one person, one server and the accounts they were granted.
+- Keeps every daemon's access list in sync, and relays SSH to servers behind NAT. The relay can't read sessions.
+- Serves the web app, with a terminal in the browser, the audit log and session recordings.
+- Is not needed for a login. Servers check logins on their own, so a short outage locks nobody out. A new certificate and the relay do need it.
 
 ## Deploy
 
-All three options need the same three things:
+You need three things:
 
 - **PostgreSQL 18 or newer.** The core creates and updates its tables on start.
-- **`NOKKU_SECRET`.** At least 32 characters. It protects the CA keys at rest. With a [KMS](./SECURITY.md#using-a-kms), set `KMS_URI` instead.
-- **`NOKKU_BASE_URL`.** The public host name, like `nokku.example.com`, with the port when it is not 443. No scheme, the core is always reached over https. It ends up in links, cookies and passkeys, so pick it before you invite anyone. Passkeys are bound to the name, so it has to be a name and not an IP address, and renaming it later means everyone registers a new passkey.
+- **`NOKKU_SECRET`**, at least 32 characters. It protects the CA keys at rest. With a [KMS](./SECURITY.md#using-a-kms), set `KMS_URI` instead.
+- **`NOKKU_BASE_URL`**, the public host name, like `nokku.example.com`. No scheme, add the port only when it is not 443. Passkeys are bound to it, so it must be a name, not an IP address. Pick it before you invite anyone.
 
-### Docker Compose
-
-`compose.prod.yml` runs the core, PostgreSQL and Caddy with automatic HTTPS.
+**Docker Compose.** `compose.prod.yml` runs the core, PostgreSQL and Caddy with automatic HTTPS. Point your domain at the host, open ports 80 and 443, and run:
 
 ```bash
-cp .env.prod.example .env    # set NOKKU_BASE_URL to your domain, plus the values above
 docker compose -f compose.prod.yml up -d
 ```
 
-Point your domain at the host and open ports 80 and 443. Caddy gets the certificate by itself.
+**Kubernetes.** There is no chart. Run one replica with the `Recreate` strategy, a volume or bucket for recordings, and a PostgreSQL of your own. Let only your ingress reach the core, see [Client addresses](#client-addresses).
 
-### Kubernetes
-
-There is no chart. The image runs fine in a cluster with the settings on this page: one replica, a volume or bucket for recordings, and a PostgreSQL of your own. Stop the old pod before the new one starts, the core keeps its connections in memory, so use the `Recreate` strategy. A second core waits until the first one stops, so a rolling update stalls instead of running two.
-
-### Binary
-
-Download it from the [releases page](https://github.com/nokku-sh/nokku/releases).
+**Binary.** Download it from the [releases page](https://github.com/nokku-sh/nokku/releases) and run it under something that restarts it, like systemd:
 
 ```bash
-export NOKKU_BASE_URL=nokku.example.com
-export NOKKU_SECRET=...
+export NOKKU_BASE_URL=nokku.example.com NOKKU_SECRET=...
 export PGHOST=db.internal PGUSER=nokku PGPASSWORD=...
 ./nokku
 ```
 
-Run it under something that restarts it, like systemd with `Restart=always`. When the database is gone for more than a minute the core exits, and a restart brings it back once the database is up.
+The core listens on port 3000 and speaks plain HTTP. Put a reverse proxy in front that:
 
-It listens on port 3000 and speaks plain HTTP only. A reverse proxy in front holds the certificate. The proxy has to:
+- holds the TLS certificate and sends `X-Forwarded-Proto`
+- forwards with HTTP/2 without TLS (h2c), because `nk` and `nokkud` speak gRPC
+- allows WebSockets, for the terminal in the browser
 
-- send `X-Forwarded-Proto`, which Caddy and Traefik do by themselves
-- forward with HTTP/2 without TLS (h2c), because `nk` and `nokkud` speak gRPC
-- allow WebSockets, for the terminal in the browser
-
-The [Caddyfile](./Caddyfile) is a working example.
-
-### Client addresses
-
-Nokku takes the client's address from `X-Forwarded-For`. Out of the box it trusts a proxy on the same machine or on a private network, like a Docker network or the pod network of a cluster, and takes the address that proxy added. Docker and Kubernetes need nothing set.
-
-That address goes into the audit log, sessions, sign-in mails and rate limits, and the `source-address` on a certificate is checked against it. Anything on a private network that reaches port 3000 directly could claim any address. So let only the proxy reach Nokku: keep the port on the proxy's Docker network, as `compose.prod.yml` does, or use a NetworkPolicy in a cluster.
-
-To tighten it, set `NOKKU_TRUSTED_PROXIES` to your proxies, as IPs or CIDRs. That replaces the default, and only those may name the client. Set it when:
-
-- you want only your proxy trusted, not every private address
-- your proxy reaches Nokku from a public address, like a Docker network or cluster on public IPv6, or from `100.64.0.0/10` like over Tailscale
-- more than one proxy sits in front, like a CDN or a cloud load balancer before your ingress
-
-Behind more than one proxy, your own proxy has to trust the outer one too, or it drops the client address the outer one sent. That is `trusted_proxies` in Caddy and `forwardedHeaders.trustedIPs` in Traefik. Then list all of them here, the CDN's published ranges and your own proxy too, since the list replaces the default. In Docker, give the proxy's network a fixed subnet and list that. In a cluster, list the pod network.
-
-A wrong setting does not stop Nokku from working. It gets addresses wrong:
-
-| Setting                                                               | What happens                                                                                                                                                                  |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Your proxy is not trusted                                             | Every client shows up as the proxy. They all share one rate limit, and a `source-address` on a certificate refuses browser and relayed sessions. The core logs a warning once |
-| A CDN or load balancer in front is not trusted, here or by your proxy | Every client shows up as the CDN, the load balancer or your proxy, with the same effects                                                                                      |
-| The list covers your users too, like `10.0.0.0/8` with users in it    | They are taken for proxies. They show up as your proxy, or behind a proxy that keeps what the client sent, like plain nginx, they can claim any address                       |
-
-### Traefik
-
-Traefik sends `X-Forwarded-Proto` and `X-Forwarded-For` by itself. It drops those headers when a client sends them, as long as you leave `forwardedHeaders.insecure` off on the entrypoint. Leave it off, unless another proxy you control sits in front.
-
-**Docker.** Put Traefik and Nokku on one network and keep anything else off it. Nothing else to set.
-
-```yaml
-networks:
-  proxy:
-
-services:
-  nokku:
-    networks: [proxy]
-    labels:
-      traefik.enable: "true"
-      traefik.http.routers.nokku.rule: Host(`nokku.example.com`)
-      traefik.http.routers.nokku.tls.certresolver: letsencrypt
-      traefik.http.services.nokku.loadbalancer.server.port: "3000"
-      traefik.http.services.nokku.loadbalancer.server.scheme: h2c
-```
-
-**Kubernetes.** Nokku sees the address of the Traefik pod. It is on the pod network, so it is trusted as it is. Every other pod is on that network too, so let only Traefik reach Nokku with a NetworkPolicy. It needs a network plugin that enforces policies.
-
-Name the namespace Traefik runs in. A wrong one cuts Nokku off, and Traefik answers 502 or 504. The same works with a gateway: name the namespace its proxy pods run in. Anything else in the cluster that calls Nokku directly, like a scraper, needs a rule of its own. The health probes come from the node, most plugins let them through.
-
-Two setups need more than a namespace. A controller on the host network, common for ingress-nginx on bare metal, comes from the node's address. Add the nodes as an `ipBlock`, if your plugin matches node addresses that way. Cilium's own ingress and gateway reach pods as Cilium's `ingress` identity, which a NetworkPolicy cannot name. Use a CiliumNetworkPolicy there.
-
-Traefik has to speak h2c to Nokku, so annotate the Service with `traefik.ingress.kubernetes.io/service.serversscheme: h2c`.
-
-Traefik only sees real client addresses when its own Service keeps them, with `externalTrafficPolicy: Local` on a LoadBalancer or NodePort. Otherwise every client shows up as a node address.
-
-### Without a domain
-
-To try Nokku on other machines without a domain, `compose.min.yml` runs Caddy with a CA of its own, `tls internal`. Give the host a name that every machine resolves, through DNS, the router or `/etc/hosts`, and leave out the port:
-
-```bash
-NOKKU_BASE_URL=nokku.lan
-```
-
-Start it and copy Caddy's root certificate out of the container:
-
-```bash
-docker compose -f compose.min.yml up -d
-docker compose -f compose.min.yml cp caddy:/data/caddy/pki/authorities/local/root.crt nokku-ca.crt
-```
-
-Give that file to every machine that talks to Nokku:
-
-```bash
-nk --api https://nokku.lan --ca-file nokku-ca.crt login
-sudo NOKKUD_API_URL=https://nokku.lan NOKKUD_CA_FILE=nokku-ca.crt nokkud enroll
-```
-
-Both keep the CA, so this is needed once per machine. Add it to your browser too, in its certificate settings or the system trust store. A passkey does not work on a page with a certificate warning.
-
-> [!WARNING]
-> This is for trying Nokku out. Caddy's root can vouch for any site, not only for Nokku, and its key sits in the `caddy-data` volume. Add it only to machines you test with, and remove it afterwards. For real use, give Nokku a domain and run `compose.prod.yml`.
-
-### A proxy with a certificate from your own CA
-
-When the proxy's certificate comes from a private CA, like a company CA, machines that do not have that CA refuse the connection. Give it to `nk` with `--ca-file` and to `nokkud` with `NOKKUD_CA_FILE`. Both keep it. Browsers read it from the system trust store.
+The [Caddyfile](./Caddyfile) is a working example. No domain? See [Without a domain](#without-a-domain).
 
 ## Connect a server and your terminal
 
-Both tools talk to the hosted service unless told otherwise. Point them at your core once:
+`nk` and `nokkud` talk to the hosted service unless told otherwise. Point them at your core once:
 
 ```bash
 nk --api https://nokku.example.com login
 sudo nokkud --api https://nokku.example.com enroll
 ```
 
-The web app shows the exact commands, with a token, when you enroll servers on the **Servers** page.
+The web app shows these commands with a token when you enroll servers on the **Servers** page. If your proxy's certificate comes from a private CA, pass it with `--ca-file` to `nk` and `NOKKUD_CA_FILE` to `nokkud`. Both keep it.
 
-A CI job signs in with its platform's own token, so no secret is stored. Add a rule under **CI jobs** on a service account and run `nk login --ci <name>` in the job, see [CI and headless machines](../cli#ci-and-headless-machines). A service account key stays the answer for Ansible and scripts, and always has an end date. What the exchange checks is in [SECURITY.md](./SECURITY.md#what-to-know-about-the-design).
+## Before you go live
 
-## Configuration
+- **Back up PostgreSQL, the recordings storage and `NOKKU_SECRET` together.** One is no use without the others. Losing the secret means losing the CA. With a KMS, its key takes the place of the secret.
+- **Run one instance.** The core keeps connections in memory. A restart ends browser terminals and relayed sessions. Direct `ssh` is untouched.
+- **Set up email**, or make sure everyone has a passkey or an identity provider.
+- **Watch `/healthz`.** It answers once the core is fully up.
+- **Pin the image version** and back up before an upgrade. A restore undoes every revoke made after the backup, so check access after one. See [Upgrade and restore](#upgrade-and-restore).
+- **Read [SECURITY.md](./SECURITY.md#running-nokku-securely)** for the settings worth a second look.
+
+## Reference
+
+### Configuration
 
 Everything is set with environment variables. Most installs only touch these:
 
-| Variable                                       | Purpose                                                          |
-| ---------------------------------------------- | ---------------------------------------------------------------- |
-| `NOKKU_SECRET`                                 | **Required** without `KMS_URI`. At least 32 characters           |
-| `NOKKU_BASE_URL`                               | Public host name, with the port if the proxy uses an unusual one |
-| `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | Where PostgreSQL is                                              |
-| `NOKKU_ADMIN_EMAIL`                            | Creates the owner account on the first start                     |
-| `NOKKU_TRUSTED_PROXIES`                        | Your reverse proxies as IPs or CIDRs, to tighten the default     |
-| `NOKKU_SMTP_HOST`, `NOKKU_EMAIL_SENDER`        | Turns on email sign-in links and mailed invitations              |
+| Variable                                       | Purpose                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `NOKKU_SECRET`                                 | **Required** without `KMS_URI`. At least 32 characters       |
+| `NOKKU_BASE_URL`                               | Public host name, with the port when it is not 443           |
+| `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | Where PostgreSQL is                                          |
+| `NOKKU_ADMIN_EMAIL`                            | Creates the owner account                                    |
+| `NOKKU_TRUSTED_PROXIES`                        | Your reverse proxies as IPs or CIDRs, to tighten the default |
+| `NOKKU_SMTP_HOST`, `NOKKU_EMAIL_SENDER`        | Turns on email sign-in links and mailed invitations          |
 
-The rest is below, grouped by topic. Open what you need.
+The rest, grouped by topic. Key management, rotating the secret and `NOKKU_ALLOW_PRIVATE_NETWORKS` are in [SECURITY.md](./SECURITY.md#running-nokku-securely).
 
 <details>
 <summary><b>Core</b></summary>
 
-| Variable                | Default          | Purpose                                                                |
-| ----------------------- | ---------------- | ---------------------------------------------------------------------- |
-| `NOKKU_SECRET`          |                  | **Required** without `KMS_URI`, at least 32 characters                 |
-| `NOKKU_BASE_URL`        | `localhost:3000` | Public host name, for links, cookies and passkeys. Never an IP         |
-| `NOKKU_PORT`            | `3000`           | Port the core listens on, plain HTTP for the reverse proxy             |
-| `NOKKU_TRUSTED_PROXIES` | private networks | Comma-separated proxy IPs or CIDRs that may name the client, see above |
-| `NOKKU_DEBUG`           | `false`          | Debug logging, same as `--debug`                                       |
-| `NOKKU_LICENSE_KEY`     |                  | License key. It can also be activated in the web app                   |
-| `NOKKU_LICENSE_OFFLINE` | `false`          | Never ask `license.nokku.sh` for the renewed key                       |
+| Variable                | Default              | Purpose                                                                                     |
+| ----------------------- | -------------------- | ------------------------------------------------------------------------------------------- |
+| `NOKKU_SECRET`          |                      | **Required** without `KMS_URI`, at least 32 characters                                      |
+| `NOKKU_BASE_URL`        | `localhost` and port | Public host name, for links, cookies and passkeys. Never an IP                              |
+| `NOKKU_PORT`            | `3000`               | Port the core listens on, plain HTTP for the reverse proxy                                  |
+| `NOKKU_TRUSTED_PROXIES` | private networks     | Comma-separated proxy IPs or CIDRs that may name the client, see [below](#client-addresses) |
+| `NOKKU_DEBUG`           | `false`              | Debug logging, same as `--debug`                                                            |
+| `NOKKU_LICENSE_KEY`     |                      | License key. It can also be activated in the web app                                        |
+| `NOKKU_LICENSE_OFFLINE` | `false`              | Never ask `license.nokku.sh` for the renewed key                                            |
 
 </details>
 
@@ -242,12 +157,14 @@ The rest is below, grouped by topic. Open what you need.
 
 Connect directly, or through a pooler in session mode. A pooler in transaction mode, like PgBouncer with `pool_mode = transaction`, does not work. Nokku keeps state on the connection.
 
+When the database is gone for more than a minute the core exits, so run it under something that restarts it.
+
 </details>
 
 <details>
-<summary><b>First start: workspace, owner and sign-in providers</b></summary>
+<summary><b>Workspace, owner and sign-in providers</b></summary>
 
-A self-hosted core is one workspace. It is created on the first start. The owner is created on any start that finds none.
+A self-hosted core is one workspace, created on the first start. The owner is created on any start that finds none.
 
 | Variable                                                                | Purpose                                                                                   |
 | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -259,7 +176,7 @@ A self-hosted core is one workspace. It is created on the first start. The owner
 
 Other OIDC providers are added in the web app.
 
-Lost every passkey? Run `./nokku admin-link` on the server, with the same environment the server runs with, or `docker compose -f compose.prod.yml exec nokku nokku admin-link`. It prints a fresh sign-in link for the owner. The link works even when single sign-on is required, see [SECURITY.md](./SECURITY.md#the-owner-account) for every way into the owner account.
+`nokku admin-link` prints a fresh sign-in link for the owner whenever you run it, with the same environment the server runs with. It replaces the links before and works even when single sign-on is required. The log reminds you to run it until the owner has a passkey or a linked provider, but never logs the link itself. [SECURITY.md](./SECURITY.md#the-owner-account) lists every way into the owner account.
 
 </details>
 
@@ -274,7 +191,7 @@ Lost every passkey? Run `./nokku admin-link` on the server, with the same enviro
 | `NOKKU_SMTP_PASSWORD` |         | Password. A login the relay rejects fails the start |
 | `NOKKU_EMAIL_SENDER`  |         | From address, required with SMTP                    |
 
-Any SMTP relay works. Without email, people sign in with passkeys or an identity provider. Invites still work: an admin gets the invite link to hand over instead of Nokku mailing it, and vouches for whoever opens it.
+Any SMTP relay works. Without email, people sign in with passkeys or an identity provider. Invites still work: an admin gets the invite link to hand over, and vouches for whoever opens it.
 
 </details>
 
@@ -289,11 +206,11 @@ Session recordings go to a local folder by default. They are encrypted before th
 | `AWS_ACCESS_KEY_ID`     |                 | S3 access key, with an `s3://` URL        |
 | `AWS_SECRET_ACCESS_KEY` |                 | S3 secret key                             |
 
-A folder is `file:///var/lib/nokku/recordings`, created when it is missing. The image runs as user 65532, so that user must own the folder. The core starts while a bucket can't be reached and logs a warning, daemons keep their recordings until it is back. A bucket that refuses the credentials stops the start. A bucket is `s3://nokku?region=auto&endpoint=https%3A%2F%2Fs3.example.com&use_path_style=true`. Leave out `endpoint` for AWS itself, `use_path_style` is for MinIO. The URL takes the parameters of [gocloud's S3 driver](https://gocloud.dev/howto/blob/#s3).
-
-Stores other than AWS often want `request_checksum_calculation=when_required`, which leaves out the checksums newer AWS SDKs add by default. Recordings are authenticated by their encryption either way. On Scaleway Object Storage that is `s3://nokku?region=fr-par&endpoint=https%3A%2F%2Fs3.fr-par.scw.cloud&request_checksum_calculation=when_required`, with an API key in `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-
-On a bucket, add two lifecycle rules on `videos/`: expire objects after 400 days, longer than any recording is kept, and abort incomplete multipart uploads after a few days. The core deletes recordings itself, these only catch what a crash leaves behind, which is also an object no row names yet. Check that your store really applies the abort rule, all but small recordings go up as multipart.
+- **A folder** is `file:///var/lib/nokku/recordings`, created when it is missing. The image runs as user 65532, so that user must own it.
+- **A bucket** is `s3://nokku?region=auto&endpoint=https%3A%2F%2Fs3.example.com&use_path_style=true`. Leave out `endpoint` for AWS itself, `use_path_style` is for MinIO. The URL takes the parameters of [gocloud's S3 driver](https://gocloud.dev/howto/blob/#s3).
+- **Stores other than AWS** often want `request_checksum_calculation=when_required`. On Scaleway that is `s3://nokku?region=fr-par&endpoint=https%3A%2F%2Fs3.fr-par.scw.cloud&request_checksum_calculation=when_required`.
+- **Startup.** The core starts while a bucket can't be reached and logs a warning, daemons keep their recordings until it is back. A bucket that refuses the credentials stops the start.
+- **Lifecycle rules.** Add two on `videos/`: expire objects after 400 days, longer than any recording is kept, and abort incomplete multipart uploads after a few days. The core deletes recordings itself, these only catch what a crash leaves behind.
 
 </details>
 
@@ -329,26 +246,118 @@ The other standard `OTEL_*` variables work too. To trace one request in ten, set
 
 </details>
 
-Three things live in [SECURITY.md](./SECURITY.md#running-nokku-securely) instead: key management with a KMS, rotating the secret, and `NOKKU_ALLOW_PRIVATE_NETWORKS`, which you need when your identity provider is on a private address.
+### Client addresses
 
-## Before you go live
+Nokku takes the client's address from `X-Forwarded-For`. By default it trusts a proxy on the same machine or on a private network, like a Docker network or a cluster's pod network. Docker and Kubernetes need nothing set.
 
-- **Back up PostgreSQL, `NOKKU_STORAGE_URL` and `NOKKU_SECRET` together.** The database holds the encrypted CA keys and the secret unlocks them. Losing the secret means losing the CA. With `KMS_URI`, the KMS key takes the place of the secret. Recordings live in the storage, and their keys live in the database, so one is no use without the other.
-- **Know how to restore.** Stop the core, put back the database and the storage, set the same `NOKKU_SECRET` or `KMS_URI`, and start it. Daemons reconnect and take the state they find. Everything since the backup is gone: a revoke made after it is undone, so check access first, and a server enrolled after it enrolls again.
-- **Run one instance.** The core keeps daemon connections, relays and half-finished sign-ins in memory. A restart ends open browser terminals, relayed `nk` sessions and sign-ins in progress. A direct `ssh` is untouched. People stay signed in and daemons reconnect by themselves.
-- **Set up email**, or make sure everyone has a passkey or an identity provider.
-- **Watch `/healthz`.** It answers while the core is up, and only once it has fully started.
-- **Deploy with `docker compose -f compose.prod.yml pull nokku`, then `docker compose -f compose.prod.yml up -d --no-deps nokku`.** The pull then happens while the old core still serves, and the new version is up quickly. Pin `NOKKU_IMAGE` to a version so going back means changing the tag. That only holds while the schema stays the same. An older image refuses to start on a database a newer one migrated, so back up before an upgrade and restore that backup to go back. Leave Caddy out of it, a new Caddy ends every web terminal.
-- **Read [SECURITY.md](./SECURITY.md#running-nokku-securely)** for the settings worth a second look.
+That address goes into the audit log, rate limits and sign-in mails, and a certificate's `source-address` is checked against it. So **let only the proxy reach port 3000**: keep the port on the proxy's Docker network, as `compose.prod.yml` does, or use a NetworkPolicy in a cluster.
 
-## License key
+<details>
+<summary><b>When to set <code>NOKKU_TRUSTED_PROXIES</code></b></summary>
 
-A self-hosted core is free to run and needs no key. A license key turns on more features and raises the limits. Activate it in the web app on the **Billing** settings page, or set `NOKKU_LICENSE_KEY`. Keys are checked offline, so this works without internet access. An expired key never stops the core.
+Set it to your proxies, as IPs or CIDRs. It replaces the default, and only those may name the client. Set it when:
+
+- you want only your proxy trusted, not every private address
+- your proxy reaches Nokku from a public address, like a Docker network or cluster on public IPv6, or from `100.64.0.0/10` like over Tailscale
+- more than one proxy sits in front, like a CDN or a cloud load balancer before your ingress
+
+Behind more than one proxy, your own proxy has to trust the outer one too, or it drops the client address. That is `trusted_proxies` in Caddy and `forwardedHeaders.trustedIPs` in Traefik. Then list all of them here, the CDN's published ranges and your own proxy too. In Docker, give the proxy's network a fixed subnet and list that. In a cluster, list the pod network.
+
+A wrong setting does not stop Nokku from working. It gets addresses wrong:
+
+| Setting                                                               | What happens                                                                                                                                                                  |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Your proxy is not trusted                                             | Every client shows up as the proxy. They all share one rate limit, and a `source-address` on a certificate refuses browser and relayed sessions. The core logs a warning once |
+| A CDN or load balancer in front is not trusted, here or by your proxy | Every client shows up as the CDN, the load balancer or your proxy, with the same effects                                                                                      |
+| The list covers your users too, like `10.0.0.0/8` with users in it    | They are taken for proxies. They show up as your proxy, or behind a proxy that keeps what the client sent, like plain nginx, they can claim any address                       |
+
+</details>
+
+<details>
+<summary><b>Traefik, in Docker and Kubernetes</b></summary>
+
+Traefik sends `X-Forwarded-Proto` and `X-Forwarded-For` by itself, and drops those headers when a client sends them, as long as `forwardedHeaders.insecure` stays off on the entrypoint. Leave it off, unless another proxy you control sits in front.
+
+**Docker.** Put Traefik and Nokku on one network and keep anything else off it:
+
+```yaml
+networks:
+  proxy:
+
+services:
+  nokku:
+    networks: [proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.nokku.rule: Host(`nokku.example.com`)
+      traefik.http.routers.nokku.tls.certresolver: letsencrypt
+      traefik.http.services.nokku.loadbalancer.server.port: "3000"
+      traefik.http.services.nokku.loadbalancer.server.scheme: h2c
+```
+
+**Kubernetes.** Nokku sees the Traefik pod's address, which is trusted as it is. Every other pod is on that network too, so let only Traefik reach Nokku with a NetworkPolicy. It needs a network plugin that enforces policies.
+
+- Name the namespace Traefik runs in, or the one a gateway's proxy pods run in. A wrong one cuts Nokku off, and Traefik answers 502 or 504.
+- Anything else that calls Nokku directly, like a scraper, needs a rule of its own. Health probes come from the node, most plugins let them through.
+- A controller on the host network, common for ingress-nginx on bare metal, comes from the node's address. Add the nodes as an `ipBlock`, if your plugin matches node addresses that way.
+- Cilium's own ingress and gateway reach pods as Cilium's `ingress` identity, which a NetworkPolicy cannot name. Use a CiliumNetworkPolicy there.
+- Annotate the Service with `traefik.ingress.kubernetes.io/service.serversscheme: h2c`.
+- Traefik only sees real client addresses when its own Service keeps them, with `externalTrafficPolicy: Local` on a LoadBalancer or NodePort.
+
+</details>
+
+### Without a domain
+
+To try Nokku on other machines without a domain, `compose.min.yml` runs Caddy with a CA of its own. Give the host a name every machine resolves, through DNS, the router or `/etc/hosts`, and leave out the port:
+
+```bash
+NOKKU_BASE_URL=nokku.lan
+```
+
+Start it, copy Caddy's root certificate out, and give it to every machine that talks to Nokku:
+
+```bash
+docker compose -f compose.min.yml up -d
+docker compose -f compose.min.yml cp caddy:/data/caddy/pki/authorities/local/root.crt nokku-ca.crt
+
+nk --api https://nokku.lan --ca-file nokku-ca.crt login
+sudo NOKKUD_API_URL=https://nokku.lan NOKKUD_CA_FILE=nokku-ca.crt nokkud enroll
+```
+
+Both keep the CA, so this is needed once per machine. Add it to your browser too, a passkey does not work on a page with a certificate warning.
+
+> [!WARNING]
+> This is for trying Nokku out. Caddy's root can vouch for any site, not only for Nokku, and its key sits in the `caddy-data` volume. Add it only to machines you test with, and remove it afterwards. For real use, give Nokku a domain and run `compose.prod.yml`.
+
+### Upgrade and restore
+
+<details>
+<summary><b>Upgrade</b></summary>
+
+```bash
+docker compose -f compose.prod.yml pull nokku
+docker compose -f compose.prod.yml up -d --no-deps nokku
+```
+
+The pull happens while the old core still serves, and the new version is up quickly. Pin `NOKKU_IMAGE` to a version so going back means changing the tag. That only holds while the schema stays the same. An older image refuses to start on a database a newer one migrated, so back up before an upgrade and restore that backup to go back. Leave Caddy out of it, a new Caddy ends every web terminal.
+
+</details>
+
+<details>
+<summary><b>Restore</b></summary>
+
+Stop the core, put back the database and the storage, set the same `NOKKU_SECRET` or `KMS_URI`, and start it. Daemons reconnect and take the state they find. Everything since the backup is gone: a revoke made after it is undone, so check access first, and a server enrolled after it enrolls again.
+
+</details>
+
+### License key
+
+A self-hosted core is free to run and needs no key. A license key turns on more features and raises the limits. Activate it in the web app on the **Billing** settings page, or set `NOKKU_LICENSE_KEY`. Keys are checked offline, and an expired key never stops the core.
 
 A core that holds a key asks `license.nokku.sh` about once a day for the renewed one. It sends the key and nothing else. A core without a key never asks. Set `NOKKU_LICENSE_OFFLINE=true` to turn it off and paste the renewed key yourself.
 
 ## More
 
-- [Documentation](https://nokku.sh/docs), with guides for servers, access, SSO and certificates
-- [SECURITY.md](./SECURITY.md), for hardening and for reporting a vulnerability
+- [Documentation](https://nokku.sh/docs), with guides for servers, access, SSO and the CA
+- [SECURITY.md](./SECURITY.md), for running Nokku safely and how it is built
 - [CONTRIBUTING.md](../CONTRIBUTING.md), for building from source

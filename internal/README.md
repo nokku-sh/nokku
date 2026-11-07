@@ -1,12 +1,20 @@
 # Shared packages
 
 Go packages the daemon (`nokkud`) and the CLI (`nk`) share, and the few the
-core shares with them. They hold the security primitives and the contracts
-all sides need so they cannot drift apart: both binaries keep their
-identities in the same machine TPM, so the crypto that does this must have
-exactly one implementation. The core uses `dpop`, `login` and `nktoken` only.
+core uses too. They hold the security code and the contracts every side must
+agree on, so there is exactly one implementation of each.
 
-## Packages
+| Package      | What it is                                                | Used by           |
+| ------------ | --------------------------------------------------------- | ----------------- |
+| `dpop`       | DPoP proofs, signed and verified                          | all three         |
+| `login`      | Principal formats, the `nk sync` sshd rule, account names | all three         |
+| `nktoken`    | The format of every token the core hands out              | all three         |
+| `dpopclient` | The DPoP-authenticated API client and its TLS transport   | `nk` and `nokkud` |
+| `trust`      | Trust in a core whose certificate comes from a private CA | `nk` and `nokkud` |
+| `id`         | A stable, hashed machine fingerprint                      | `nk` and `nokkud` |
+| `tpm`        | Machine-bound signing keys, in the TPM or wrapped         | `nk` and `nokkud` |
+
+## Packages in depth
 
 - **dpop** - DPoP (RFC 9449) proofs, signed and verified. `Proofer` signs
   compact `dpop+jwt` proofs with an ECDSA P-256 signer, embedding the public

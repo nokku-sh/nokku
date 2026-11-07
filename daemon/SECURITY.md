@@ -1,145 +1,133 @@
-# Security
+# Security of nokkud
 
-This file has three parts. The first is for reporting a vulnerability. The second is for people who run `nokkud`. The third describes how its SSH server behaves, for anyone who has to assess it.
+`nokkud` is a privileged daemon. It serves SSH on its own port, `:4022` by default, and keeps an authenticated outbound connection to the core. This file is for people who run it and for anyone who has to assess it.
 
-## Reporting a vulnerability
+Found a vulnerability? Don't open a public issue. See [SECURITY.md](../SECURITY.md) for how to report it.
 
-Please do not open a public issue for a suspected vulnerability. Use GitHub's private reporting instead:
+## In short
 
-1. Open the repository's **Security** tab.
-2. Select **Report a vulnerability**.
-3. Tell us as much of this as you can:
-   - The `nokkud` version and your platform or distribution
-   - What the issue is and what an attacker gains
-   - Steps to reproduce, or a minimal proof of concept
-   - Logs that help, with secrets removed
+- **Keep `/var/lib/nokkud` to root.** It holds the server's identity in Nokku and its SSH host key.
+- **Logins need a certificate.** No passwords, no plain keys, no PAM.
+- **A revoke closes open sessions** as soon as the daemon syncs.
+- **Your own `sshd` on port 22 is never touched.** It is your way back in, and outside Nokku's checks.
+- **Recordings are not redacted.** Treat them like the server they come from.
 
-Reports are handled confidentially. If you would like credit in the advisory or the changelog, say so.
+## Scope
 
-What to expect:
+In scope:
 
-- **Acknowledgement** within 48 hours
-- **Triage** and a severity within 5 business days
-- **A fix or clear guidance** within 30 days, depending on complexity and impact
-
-### Supported versions
-
-Only the latest release gets security fixes. Older releases are not patched, so upgrade to the newest release. Under systemd an upgrade goes live once the last session on the server ends, an hour later at most. Under OpenRC it waits for a restart. Restart `nokkud` by hand when a fix can't wait.
-
-### In scope
-
-- The `nokkud` binary: enrollment token handling, generating and renewing SSH host certificates, the SSH server's certificate authentication and session handling, and the authenticated outbound control stream to the core
-- The local state it writes, all under `/var/lib/nokkud/`:
+- The `nokkud` binary: enrollment, SSH host certificates, the SSH server's certificate checks and session handling, and the connection to the core
+- The local state it writes under `/var/lib/nokkud/`:
   - `daemon.json`, the enrollment and the synced access. The trusted CA keys are part of it
   - `state.json`, the daemon's signing identity toward the core, with a `.lock` file next to it
   - `ssh_host_ecdsa_key`, the SSH host key, with its public key and host certificate
   - `recordings/`
 
-### Out of scope
+Out of scope:
 
-- The Nokku core and web app, which have their own [policy](../core/SECURITY.md)
+- The core and web app, which have [their own file](../core/SECURITY.md)
 - The SSH protocol itself, and vulnerabilities in OpenSSH or `sshd`
 - Operating system and package manager issues
-- The infrastructure that hosts the Nokku core
+- The infrastructure that hosts the core
 
 ## Running nokkud securely
 
-`nokkud` is a privileged daemon. It serves SSH on its own port, `:4022` by default, and keeps an authenticated outbound control stream to the core.
-
 ### The machine key
 
-Every signing identity is ECDSA P-256. The daemon authenticates to the core with DPoP, and its session token is bound to that key.
+The daemon authenticates to the core with DPoP, so its session token is bound to an ECDSA P-256 key on the machine.
 
-- **With a TPM 2.0**, or a vTPM on AWS, GCP, Azure, Proxmox and others, the key is generated inside the TPM and never leaves it. The TPM wraps it to itself, and that blob is kept, in the TSS2 key format, in `state.json` under `/var/lib/nokkud`, readable by root only. Using the key takes the blob and the TPM. A blob copied to another machine does not load there.
-- **Keep `/var/lib/nokkud` to root.** The key has no auth value or PCR policy, so a process that can read the state files and open `/dev/tpmrm0` can use the identity. Access to the TPM alone is not enough.
-- **Without a TPM**, the daemon uses a software key wrapped with a key derived from the machine fingerprint (`/etc/machine-id` and friends). That only stops someone from copying the state file to another machine. It is not encryption against anyone who can read the file, because the fingerprint is public. The key is only as strong as the file permissions.
-- **Run with `--require-tpm` on servers that have a TPM.** The daemon then refuses to fall back to the software key.
+- **With a TPM 2.0**, or a vTPM on AWS, GCP, Azure, Proxmox and others, the key is made inside the TPM and never leaves it. The TPM's wrapped copy sits in `state.json`, readable by root only. It does not load on another machine.
+- **Run with `--require-tpm`** on servers that have a TPM, so the daemon never falls back to a software key.
+- **Without a TPM**, the key is a software key wrapped with a key derived from the machine's ID. That only stops a copy from working on another machine. The ID is no secret, so the key is only as strong as the file permissions.
+- **The key has no auth value or PCR policy.** A process that can read the state files and open `/dev/tpmrm0` can use the identity. The TPM alone is not enough, so keep the folder to root.
 
 ### The SSH host key
 
-- **The host key is a file under `/var/lib/nokkud`, readable by root only**, like sshd's `/etc/ssh/ssh_host_*`. It is an OpenSSH key file, `ssh_host_ecdsa_key`, mode 0600, made at every enrollment. The daemon refuses a host key that others can read.
-- **The TPM holds only the daemon's identity toward the core.** Every handshake signs with the host key before the client logs in, and a TPM signs far slower than the CPU. In the TPM, a flood of connections that never log in would queue up in front of real logins and of the daemon's own calls to the core.
+- **It is a normal OpenSSH key file**, `ssh_host_ecdsa_key`, mode 0600, made at every enrollment. The daemon refuses a host key that others can read.
+- **It is not in the TPM.** Every handshake signs with the host key before the client logs in, and a TPM signs far slower than the CPU. A flood of connections would queue up in front of real logins.
 - **A copied host key works elsewhere.** Someone who copies `/var/lib/nokkud` to another machine can pose as this server until its host certificate expires. They need root on this server for that.
 
-### The connection to the core
+### Everything else
 
-The daemon talks to the core over TLS 1.3 and verifies its certificate. There is no switch to turn that off. A plain `http` API URL is refused unless it points at localhost, which is meant for development. The core's answers carry the CA the daemon trusts, so nobody may be able to change them in transit.
-
-### Local state
-
-Enrollment state and the cached access list live under `/var/lib/nokkud/`, protected by the daemon's privileges. Treat the directory as sensitive.
-
-### Your own sshd
-
-System `sshd` on port 22 is never touched. It is your way back in if Nokku misbehaves, and it is outside `nokkud`'s scope. Logins through it bypass Nokku's checks, audit and recording, so secure and monitor it by your own rules.
-
-### Recordings on the server
-
-- Recordings are written to `/var/lib/nokkud/recordings/` and uploaded to the core. Nothing is redacted, by the daemon or the core. A secret printed on the terminal is in the recording. Typed passwords are not, input is only recorded while the terminal echoes.
-- Anyone with access to the recordings directory can read what was on the terminal. On the core every recording is encrypted with a key of its own.
-
-### Account limits
-
-Sessions never go through PAM. A granted user runs with their own OS privileges and no session resource cap. Bound them with systemd slices or per-user limits if that matters for your threat model.
+- **The connection to the core** uses TLS 1.3 and always verifies the core's certificate. A plain `http` URL is refused unless it points at localhost, for development.
+- **Your own `sshd`** is outside `nokkud`'s scope. Logins through it bypass Nokku's checks, audit and recording, so secure and monitor it by your own rules.
+- **Recordings** wait in `/var/lib/nokkud/recordings/` until the core has them. Anyone who can read that folder can read what was on the terminal. On the core every recording is encrypted with a key of its own.
+- **Account limits.** Sessions never go through PAM. A granted user runs with their own OS privileges and no resource cap. Bound them with systemd slices or per-user limits if that matters to you.
+- **Upgrades.** Under systemd an upgrade goes live once the last session ends, an hour later at most. Under OpenRC it waits for a restart. Restart `nokkud` by hand when a fix can't wait.
 
 ### Releases
 
 - Releases are built with GoReleaser. Each one publishes `checksums.txt`, a cosign signature bundle for it (`checksums.txt.sigstore.json`) and a CycloneDX SBOM per binary.
-- `install.sh` checks the SHA-256 of the tarball against the manifest. It verifies the manifest with cosign when cosign is available, and stops on a mismatch.
-- You can check the manifest by hand with `cosign verify-blob`, against the bundle and the GitHub Actions OIDC issuer.
+- `install.sh` checks the SHA-256 of the tarball against the checksums. It verifies them with cosign when cosign is available, and stops on a mismatch. You can check by hand with `cosign verify-blob`, against the bundle and the GitHub Actions OIDC issuer.
 - The deb, rpm and apk packages come from the Cloudsmith repository. The package manager checks them against the repository key.
 
 ## How the SSH server behaves
 
 ### Who gets in
 
-- **Certificates only.** No passwords, no keyboard-interactive, no PAM. A login needs a user certificate signed by the workspace CA, with a principal that the daemon's cache maps to the requested local user.
-- **A certificate is for one server and its accounts.** The core signs a user certificate for one server, with one principal per account the user is granted there at that moment. The daemon compares principals as whole strings, so a certificate for another server or account opens nothing.
-- **`/etc/nologin` is honored.** When the file exists, logins are refused for every user except root, like OpenSSH does. That lets you put a machine into maintenance.
-- **An account expiry date is honored.** A user past the day set with `chage -E` is refused, as OpenSSH does through `pam_unix`. Root is not exempt.
-- **Account lock is the OS's job.** Because sessions skip PAM, the daemon does not enforce `pam_limits`, `pam_access`, locked passwords or password expiry. The login shell from the password database is used as it is, so a `nologin` or `false` shell still ends the session. SFTP starts through that shell as well, like sshd's `sftp-server`, so a lock shell or a restricted one also stops file transfer. A port forward needs no shell, as in sshd.
+- **Certificates only.** No passwords, no keyboard-interactive, no PAM. A login needs a user certificate signed by the workspace CA's user key, with a principal the daemon's access list maps to the requested user. The CA's host key never signs a login.
+- **A certificate is for one server and its accounts.** It names one principal per account the user was granted there, and the daemon compares them as whole strings. A certificate for another server or account opens nothing.
+- **`/etc/nologin` is honored.** When the file exists, logins are refused for everyone but root, like OpenSSH does.
+- **An account expiry date is honored.** A user past the day set with `chage -E` is refused, like OpenSSH does through `pam_unix`. Root is not exempt.
+- **Account lock is the OS's job.** Because sessions skip PAM, the daemon does not enforce `pam_limits`, `pam_access`, locked passwords or password expiry. The login shell is used as it is, so a `nologin` or `false` shell still ends the session, and stops SFTP too. A port forward needs no shell, as in sshd.
 
-### When the core is away, and when access is revoked
+### Revokes and outages
 
-- **The offline window for new logins is bounded by the certificate lifetime.** When the core is unreachable, logins still work against the cached CA key and principal map. New access changes and certificate renewals need a reconnect. The daemon does not end a session when its certificate ends, so an open session runs on until a sync that revokes it, or until it ends.
-- **A revoke that never reaches the daemon still stops new logins** once the user's last certificate expires, since the core signs no new one without the grant. A connection that is already open stays open until the daemon syncs again. A relayed one ends after 8 hours at most.
 - **A daemon that syncs applies a revoke at once** and closes the connections that were open on it.
-- **An approval can be taken back.** A daemon set back to pending drops its principals and its CA at the next sync. The core signs no certificates for its server until it is approved again.
-- **A rollover ends the old CA at the next sync.** A workspace has one CA, so a rollover reaches every daemon at its next sync. From then on the daemon trusts only the new key, and it closes the connections still open on a certificate of the old one.
-- **A sync never waits for the host certificate.** Principals and trusted CA keys are applied as soon as they arrive. The host certificate is renewed apart from them, at half of its lifetime or when the CA's host key changes. A signing failure cannot hold back a revoke.
-- **Logins and host certificates use different keys.** The CA has a user key, which signs logins, and a host key, which signs the daemon's host certificate. The daemon checks logins against the user key only.
+- **When the core is unreachable**, logins still work against the cached CA key and access list. An open session runs on until a sync that revokes it, or until it ends.
+- **A revoke that never reaches the daemon** still stops new logins once the user's last certificate expires, since the core signs no new one without the grant. A relayed connection ends after 8 hours at most.
+- **An approval can be taken back.** A daemon set back to pending drops its access list and its CA at the next sync. The core signs nothing for its server until it is approved again.
+- **A rollover ends the old CA at the next sync.** From then on the daemon trusts only the new key, and closes the connections still open on a certificate of the old one.
+- **A sync never waits for the host certificate.** The access list and CA keys apply as soon as they arrive. The host certificate is renewed apart from them, at half of its lifetime or when the CA's host key changes, so a signing failure can't hold back a revoke.
 
 ### What a session may do
 
-- **Sessions run as the target OS user.** The daemon has to run as root so it can drop privileges. It refuses to serve SSH unprivileged, so it never runs a session as the wrong user. A test that runs as root in a container checks that the shell, exec, file transfer, both kinds of port forward, the agent socket and signals all reach the OS as the user.
-- **The client environment is an allowlist.** Sessions accept only locale and terminal variables from clients (`TERM`, `LANG`, `LC_*`, `TZ` and the like). They never accept variables that affect the shell or the loader (`PATH`, `LD_*`, `BASH_ENV`, `ENV`), or connection metadata (`SSH_*`). A certificate with a `force-command` critical option, which only a service account's can have, refuses all client-supplied environment. The command the client asked for is passed to the forced one as `SSH_ORIGINAL_COMMAND`, like sshd does, so restricted wrappers such as `git-shell` work.
-- **Only modern algorithms are offered.** Key exchange, MACs and client key signatures are limited to the modern set Go's SSH library supports. SHA-1 key exchange, `hmac-sha1-96`, `ssh-rsa` signatures and DSA keys are refused.
-- **Remote forwards are loopback-only by default**, like OpenSSH's `GatewayPorts=no`. An authorized user cannot expose services on the server's external interfaces. Direct forwards (outbound `-L`) are written to the audit log with their destination.
-- **Forwards are opened as the session user.** A helper that runs as the user dials direct forwards and binds remote ones, then hands the socket to the daemon. Firewall rules that match on the user (nftables `meta skuid`, the iptables `owner` match) see the session's user. Connections that arrive on a remote forward are accepted by the daemon, so those still count as root's.
-- **Signals from the client are sent as the session user.** A process that became privileged, like a `sudo` the user started, cannot be signaled this way. A forced command and SFTP take no signals from the client, like in sshd.
-- **Channels are capped per connection.** Sessions, port forwards and agent forwards count against one fixed cap for the life of each channel. The listener of a remote forward takes a slot as well, for as long as it is open. One authorized connection cannot exhaust the daemon's file descriptors or goroutines.
-- **Relayed connections carry the user's address.** A connection through the core's relay is served in process, not over loopback. Audit events, `SSH_CLIENT` and `source-address` certificate options see the address the core reported for the user.
-- **The daemon is not sandboxed.** Sessions are its children and would inherit any systemd, AppArmor or SELinux confinement, which would stop a root session from doing normal admin work. Like in OpenSSH, the user boundary isolates sessions. Every connection lives in the daemon process, so a restart ends live sessions. Under systemd a package upgrade waits for them first, see the README.
+- **Sessions run as the target OS user.** The daemon runs as root only so it can drop privileges, and refuses to serve SSH without root. A test running as root in a container checks that the shell, exec, file transfer, both kinds of port forward, the agent socket and signals all reach the OS as the user.
+- **The client environment is an allowlist.** Only locale and terminal variables are accepted, like `TERM`, `LANG`, `LC_*` and `TZ`. Never `PATH`, `LD_*`, `BASH_ENV`, `ENV` or `SSH_*`.
+- **Only modern algorithms are offered.** The modern set Go's SSH library supports. SHA-1 key exchange, `hmac-sha1-96`, `ssh-rsa` signatures and DSA keys are refused.
+- **Remote forwards are loopback-only by default**, like OpenSSH's `GatewayPorts=no`. Direct forwards are written to the audit log with their destination.
+
+<details>
+<summary><b>Forced commands, forwards, signals and limits</b></summary>
+
+- **A forced command**, which only a service account's certificate can carry, refuses all client-supplied environment. The command the client asked for is passed along as `SSH_ORIGINAL_COMMAND`, like sshd does, so wrappers such as `git-shell` work.
+- **Forwards are opened as the session user.** A helper that runs as the user dials direct forwards and binds remote ones, then hands the socket to the daemon. Firewall rules that match on the user, like nftables `meta skuid` or the iptables `owner` match, see the session's user. Connections that arrive on a remote forward are accepted by the daemon, so those still count as root's.
+- **Signals from the client are sent as the session user.** A process that became privileged, like a `sudo` the user started, can't be signaled this way. A forced command and SFTP take no signals from the client, like in sshd.
+- **Channels are capped per connection.** Sessions, port forwards, agent forwards and remote forward listeners all count against one fixed cap, so one connection can't exhaust the daemon's file descriptors.
+- **Relayed connections carry the user's address.** A connection through the relay is served in process, not over loopback. Audit events, `SSH_CLIENT` and a certificate's `source-address` see the address the core reported for the user.
+- **The daemon is not sandboxed.** Sessions are its children and would inherit any systemd, AppArmor or SELinux confinement, which would stop a root session from doing normal admin work. Like in OpenSSH, the user boundary isolates sessions.
+
+</details>
 
 ### Audit and recording
 
-- **Audit events go to the daemon's log.** Logins, sessions, commands, subsystems, forwards and idle timeouts are written as `audit` lines with a `type`. Under systemd that is journald, under OpenRC it is `/var/log/nokkud.log`. Retention is the log's own.
-- **Sessions with a terminal are recorded** as gzipped asciicast under `/var/lib/nokkud/recordings/`. A direct session's recording shares its `session_id` with the audit events. Input is recorded only while the PTY has echo enabled, so password prompts are left out.
-- **A web terminal session is recorded under the core's session id.** The core puts it in the key id of the certificate it mints for the session, which the CA signs. Nothing a client sends can label a recording, so a direct login cannot claim another session's id.
-- **Sessions without a terminal**, like `ssh host command`, are captured as `command` audit events (command line and user, the exit code is on `session_end`) and as recordings of their output. They have no echo signal, so only output is captured.
-- **SFTP**, and so modern `scp`, is audited as a `subsystem` event. File contents are not recorded, since normal clients ask for no terminal.
-- **Recordings go to the core from their file, while the session runs.** The recorder writes `recordings/<id>.part`, and only a recording that closed whole is synced and renamed to `<id>.cast.gz`. One upload per recording reads the file as it grows. After a break (core offline, a deploy, an upload error) it starts again from the first byte, during the session and after it, until the core holds all of the file. Then the local file is deleted. The core then holds the only copy and its retention applies.
-- **A stop or a crash keeps what was recorded.** Stopping the daemon ends its sessions like a hangup and waits a few seconds for their uploads. What a crash or a stop leaves on disk goes to the core at the next start. An ephemeral host normally removes itself when it stops. With recordings still unsent it stays enrolled and keeps them, so they go up if the same host starts again, and the core retires it after its `retire_after`. A container that loses its disk loses them, so keep `/var/lib/nokkud` on a volume if that matters. A crash of the daemon loses at most the last second of output.
-- **The core marks a recording complete only when it is whole.** The last upload message carries the size of the file, when the session ended and, for a cut recording, why it stops early. A crash, a write error and the size cap all leave a recording the console shows as incomplete, with the reason in the core's audit log. Every try goes to an object of its own, and of two copies of one recording the core keeps the larger one.
-- **A recording that waits too long is dropped** when the next recording starts, with a warning in the log: after 30 days, or oldest first once the waiting ones pass 1 GiB.
-- **Recording fails open, except for sessions with a terminal at the size cap.** A session that cannot be recorded (under 512 MiB free, a file error) still runs, so a full disk never locks admins out. A disk that fills in the middle of a session stops the recording there and the session runs on. Every gap raises a `recording_degraded` audit event with the reason.
-- **At its cap, 50 MiB of compressed recording, a session with a terminal ends** with a notice, so flooding output cannot switch recording off for what is typed next. **A session without a terminal is capped at 5 MiB and runs on** with the rest of its output unrecorded, so `git clone`, `rsync` or `pg_dump` over ssh finish and their binary output does not fill the workspace's recording storage. Its command line is in the audit log either way. Such a recording closes at the cap, so the console stops listing the session as live and the recording has no exit code.
+- **Audit events go to the daemon's log** as `audit` lines with a `type`: logins, sessions, commands, subsystems, forwards and idle timeouts. Under systemd that is journald, under OpenRC `/var/log/nokkud.log`.
+- **Sessions with a terminal are recorded**, when recording is on for the daemon. Input is recorded only while the terminal echoes, so password prompts are left out.
+- **Sessions without a terminal**, like `ssh host command`, are logged as `command` events, and their output is recorded.
+- **SFTP**, and so modern `scp`, is logged as a `subsystem` event. File contents are not recorded.
+- **Recording fails open.** A session that can't be recorded, like on a nearly full disk, still runs, so a full disk never locks admins out. Every gap raises a `recording_degraded` event.
+- **A recording has a size cap.** At 50 MiB of compressed recording, a session with a terminal ends with a notice, so flooding output can't switch recording off. A session without a terminal is capped at 5 MiB and runs on, unrecorded past the cap, so `git clone` or `pg_dump` over ssh still finish.
+
+<details>
+<summary><b>How recordings reach the core</b></summary>
+
+- **Files.** Recordings are gzipped asciicast. The recorder writes `recordings/<id>.part`, and only a recording that closed whole is synced and renamed to `<id>.cast.gz`. A direct session's recording shares its `session_id` with the audit events.
+- **Web terminal sessions** are recorded under the core's session id, which the core puts in the key id of the certificate it signs for the session. Nothing a client sends can label a recording.
+- **Upload while the session runs.** One upload per recording reads the file as it grows. After a break, like the core being offline, it starts again from the first byte until the core holds all of the file. Then the local file is deleted, and the core's retention applies.
+- **A stop or a crash keeps what was recorded.** Stopping the daemon ends its sessions like a hangup and waits a few seconds for their uploads. What is left on disk goes to the core at the next start. A crash loses at most the last second of output.
+- **Ephemeral hosts** normally remove themselves when they stop. With recordings still unsent, one stays enrolled and keeps them, until the core retires it. A container that loses its disk loses them, so keep `/var/lib/nokkud` on a volume if that matters.
+- **Complete or not.** The last upload says how big the file is and, for a cut recording, why it stops early. A crash, a write error or the size cap leave a recording the console shows as incomplete, with the reason in the core's audit log.
+- **Old leftovers are dropped** when the next recording starts, with a warning: after 30 days, or oldest first once the waiting ones pass 1 GiB.
+- **The disk floor.** A session isn't recorded when less than 512 MiB is free. A disk that fills in the middle of a session stops the recording there, and the session runs on.
+- **A capped command** closes its recording at the cap, so the console stops listing it as live, and the recording has no exit code. The exit code is on the `session_end` audit event.
+
+</details>
 
 ### What sshd does that nokkud does not
 
 `nokkud` is its own SSH server and never goes through PAM or the login machinery of the OS. Tools that rely on it see no session.
 
-- **No login records.** Sessions are not written to utmp, wtmp or lastlog, so `who`, `w`, `last` and `lastlog` do not show them. The daemon's `audit` lines are the record of who logged in.
-- **No loginuid.** `pam_loginuid` never runs, so `/proc/<pid>/loginuid` stays unset in a session. The kernel audit subsystem and `auditd` rules cannot tie what a session does to its login, only to the daemon.
-- **No logind session.** systemd-logind does not know the session. `loginctl` does not list it, it gets no session scope and no `XDG_RUNTIME_DIR`, and `systemctl --user` does not work in it. Its processes stay in the daemon's own service cgroup.
-- **No other PAM modules either**, see [Account limits](#account-limits): no `pam_limits`, `pam_access`, `pam_env` or `pam_systemd`. The daemon checks `/etc/nologin` and the account expiry itself.
+- **No login records.** `who`, `w`, `last` and `lastlog` don't show these sessions. The daemon's `audit` lines are the record of who logged in.
+- **No loginuid.** `/proc/<pid>/loginuid` stays unset, so `auditd` rules can tie what a session does only to the daemon.
+- **No logind session.** `loginctl` doesn't list it, there is no `XDG_RUNTIME_DIR`, and `systemctl --user` doesn't work in it.
+- **No other PAM modules either**: no `pam_limits`, `pam_access`, `pam_env` or `pam_systemd`. The daemon checks `/etc/nologin` and the account expiry itself.
