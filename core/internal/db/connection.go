@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"strings"
 	"time"
 	"uuid"
 
@@ -67,26 +68,28 @@ func settings() (*Connection, *pgxpool.Config, error) {
 		return nil, nil, err
 	}
 
-	defaults := map[string]string{
-		"PGHOST":     "localhost",
-		"PGPORT":     "5432",
-		"PGDATABASE": "nokku",
-		"PGUSER":     "postgres",
-		"PGPASSWORD": "postgres",
-		"PGSSLMODE":  "disable",
+	defaults := []struct{ env, key, value string }{
+		{"PGHOST", "host", "localhost"},
+		{"PGPORT", "port", "5432"},
+		{"PGDATABASE", "dbname", "nokku"},
+		{"PGUSER", "user", "postgres"},
+		{"PGPASSWORD", "password", "postgres"},
+		{"PGSSLMODE", "sslmode", "disable"},
 	}
 
-	for key, fallback := range defaults {
-		if os.Getenv(key) != "" {
+	// pgx reads the environment first, so only the unset keys go in.
+	var fallbacks []string
+	for _, d := range defaults {
+		if os.Getenv(d.env) != "" {
 			continue
 		}
-		_ = os.Setenv(key, fallback)
-		if key == "PGPASSWORD" || key == "PGSSLMODE" {
-			slog.Warn(key + " is not set, the default is only fit for a local try")
+		fallbacks = append(fallbacks, d.key+"="+d.value)
+		if d.env == "PGPASSWORD" || d.env == "PGSSLMODE" {
+			slog.Warn(d.env + " is not set, the default is only fit for a local try")
 		}
 	}
 
-	config, err := c.poolConfig()
+	config, err := c.poolConfig(strings.Join(fallbacks, " "))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -97,8 +100,8 @@ func settings() (*Connection, *pgxpool.Config, error) {
 	return &c, config, nil
 }
 
-func (c *Connection) poolConfig() (*pgxpool.Config, error) {
-	config, err := pgxpool.ParseConfig("")
+func (c *Connection) poolConfig(connString string) (*pgxpool.Config, error) {
+	config, err := pgxpool.ParseConfig(connString)
 	if err != nil {
 		return nil, fmt.Errorf("parsing pool config: %w", err)
 	}
