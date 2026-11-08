@@ -49,7 +49,7 @@ const (
 	// Keeps one hosted workspace from taking the others' share.
 	maxWorkspaceUploadMemory = 512 << 20
 
-	// storeTimeout bounds the commit and the transaction after it, each alone.
+	// storeTimeout bounds the commit and each transaction after it, each alone.
 	storeTimeout = 30 * time.Second
 )
 
@@ -452,8 +452,18 @@ func (s *daemonControlService) storeUpload(
 		return nil
 	})
 	if err != nil && stored {
-		// The rollback left the committed object in no row.
+		// A rollback leaves the object in no row. A COMMIT whose answer got
+		// lost may have kept it though, so the row decides.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), storeTimeout)
+		defer cancel()
 		err = errors.Join(err, s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+			row, err := q.LockRecording(ctx, opened.ID)
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+			if row != nil && row.ObjectID != nil && *row.ObjectID == *upload.ObjectID {
+				return nil
+			}
 			return q.QueueLostRecordingObject(ctx, *upload.ObjectID)
 		}))
 	}
