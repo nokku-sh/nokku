@@ -89,4 +89,4 @@ WHERE
   id = @id
   AND scim_managed
 RETURNING
-  id;
+  name;

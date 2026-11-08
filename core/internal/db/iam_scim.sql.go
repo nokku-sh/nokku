@@ -43,14 +43,14 @@ WHERE
   id = $1
   AND scim_managed
 RETURNING
-  id
+  name
 `
 
 func (q *Queries) DeleteSCIMTeam(ctx context.Context, id string) (string, error) {
 	row := q.db.QueryRow(ctx, deleteSCIMTeam, id)
-	var id_2 string
-	err := row.Scan(&id_2)
-	return id_2, err
+	var name string
+	err := row.Scan(&name)
+	return name, err
 }
 
 const getSCIMTeam = `-- name: GetSCIMTeam :one

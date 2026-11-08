@@ -4,12 +4,15 @@ package iam_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,7 +22,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/entitlement"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
@@ -622,6 +627,95 @@ func TestSCIMGroupAdoptsAnUnlinkedTeam(t *testing.T) {
 	)
 	require.Equal(t, http.StatusOK, c.do(http.MethodGet, "/Groups/"+team.ID, nil, &got))
 	assert.Equal(t, "pid-1", got.ExternalID, "the refused create relinked the team")
+}
+
+// A group change writes the rows the same change made by hand would, marked
+// as SCIM's, and only for what it changed.
+func TestSCIMGroupChangesAreAudited(t *testing.T) {
+	e := newTestEnv(t)
+	plans, err := entitlement.New(t.Context(), e.conn, "", true)
+	require.NoError(t, err)
+	trail, err := audit.New(t.Context(), e.conn, e.keys, plans)
+	require.NoError(t, err)
+	e.svc, err = iam.New(t.Context(), iam.Deps{Conn: e.conn, Keyset: e.keys, Audit: trail})
+	require.NoError(t, err)
+	o := e.org(t)
+	c := e.scim(t, o)
+	user := func(name string) scimResource {
+		body := scimUser(strings.ToLower(name)+"@"+testDomain(), "")
+		body["displayName"] = name
+		var u scimResource
+		require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", body, &u))
+		return u
+	}
+	alice, bob, carol := user("Alice"), user("Bob"), user("Carol")
+	refs := func(us ...scimResource) []any {
+		out := []any{}
+		for _, u := range us {
+			out = append(out, map[string]any{"value": u.ID})
+		}
+		return out
+	}
+	group := func(name string, members ...scimResource) map[string]any {
+		return map[string]any{
+			"schemas":     []string{"urn:ietf:params:scim:schemas:core:2.0:Group"},
+			"displayName": name,
+			"members":     refs(members...),
+		}
+	}
+	var platform *db.Team
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
+		if platform, err = q.CreateTeam(t.Context(), &db.CreateTeamParams{Name: "platform"}); err != nil {
+			return err
+		}
+		return q.AddTeamMember(t.Context(), &db.AddTeamMemberParams{TeamID: platform.ID, UserID: alice.ID})
+	}))
+
+	var ops scimResource
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Groups", group("platform", bob), nil), "take over")
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Groups", group("ops", alice), &ops), "create")
+	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, "/Groups/"+ops.ID, patchOps(
+		map[string]any{"op": "add", "path": "members", "value": refs(alice, bob)},
+		map[string]any{"op": "replace", "path": "displayName", "value": "sre"},
+	), nil), "patch")
+	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, "/Groups/"+ops.ID,
+		patchOp("remove", `members[value eq "`+carol.ID+`"]`, nil), nil), "remove a non-member")
+	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, "/Groups/"+ops.ID,
+		patchOp("replace", "externalId", "pid-1"), nil), "link")
+	require.Equal(t, http.StatusOK, c.do(http.MethodPut, "/Groups/"+ops.ID, group("sre", carol), nil), "replace")
+	require.Equal(t, http.StatusNoContent, c.do(http.MethodDelete, "/Groups/"+ops.ID, nil, nil), "delete")
+
+	var rows []*db.ListAuditLogsRow
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
+		rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+			ActorKinds: []string{string(actor.KindSCIM)},
+			Actions:    []string{"CreateTeam", "UpdateTeam", "DeleteTeam", "AddTeamMember", "RemoveTeamMember"},
+			Limit:      100,
+		})
+		return err
+	}))
+	got := make([]string, 0, len(rows))
+	for _, r := range rows {
+		var details map[string]any
+		require.NoError(t, json.Unmarshal(r.Details, &details))
+		assert.Equal(t, "scim", details["method"], "%s is not marked as SCIM's", r.Action)
+		assert.True(t, r.Ok, "%s", r.Action)
+		got = append(got, strings.TrimSpace(fmt.Sprintf("%s %s %v %v", r.Action, r.Target,
+			cmp.Or(details["name"], ""), cmp.Or(details["member"], ""))))
+	}
+	assert.ElementsMatch(t, []string{
+		"UpdateTeam " + platform.ID + " platform",
+		"AddTeamMember " + platform.ID + " platform Bob",
+		"RemoveTeamMember " + platform.ID + " platform Alice",
+		"CreateTeam ops",
+		"AddTeamMember " + ops.ID + " ops Alice",
+		"UpdateTeam " + ops.ID + " sre",
+		"AddTeamMember " + ops.ID + " sre Bob",
+		"AddTeamMember " + ops.ID + " sre Carol",
+		"RemoveTeamMember " + ops.ID + " sre Alice",
+		"RemoveTeamMember " + ops.ID + " sre Bob",
+		"DeleteTeam " + ops.ID + " sre",
+	}, got)
 }
 
 // Switching an account back on takes a seat like a join does.

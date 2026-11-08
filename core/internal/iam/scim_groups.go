@@ -3,8 +3,10 @@ package iam
 // SCIM sees only the teams it made or took over, IdPs delete unknown groups.
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"maps"
 	"net/http"
 	"slices"
 	"uuid"
@@ -16,7 +18,17 @@ import (
 	filter "github.com/scim2/filter-parser/v2"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/db"
+)
+
+// The team RPC names, so a SCIM change reads like the same change made by hand.
+const (
+	actionCreateTeam       = "CreateTeam"
+	actionUpdateTeam       = "UpdateTeam"
+	actionDeleteTeam       = "DeleteTeam"
+	actionAddTeamMember    = "AddTeamMember"
+	actionRemoveTeamMember = "RemoveTeamMember"
 )
 
 type scimGroupHandler struct {
@@ -34,6 +46,7 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 	}
 	ctx := r.Context()
 	var res scim.Resource
+	var events []*audit.Event
 	err := h.tx(ctx, "", func(q *db.Queries) error {
 		// A hand-made team is taken over, keeping its id and grants. Its
 		// members are the group's from now on.
@@ -43,11 +56,18 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 			if team, err = q.CreateTeam(ctx, &db.CreateTeamParams{Name: name}); err != nil {
 				return err
 			}
+			events = append(events, groupEvent(actionCreateTeam, name, map[string]any{}))
 		case err != nil:
 			return err
 		case team.ScimManaged:
 			// Another group holds it, the two would overwrite each other.
 			return scimerrors.ScimErrorUniqueness
+		default:
+			events = append(events, groupEvent(actionUpdateTeam, team.ID, map[string]any{"name": team.Name}))
+		}
+		before, err := teamMembers(ctx, q, team.ID)
+		if err != nil {
+			return err
 		}
 		if team, err = q.AdoptTeamSCIM(ctx, team.ID); err != nil {
 			return err
@@ -58,9 +78,17 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 		if err := setTeamMembers(ctx, q, team.ID, scimMemberRefs(attrs["members"])); err != nil {
 			return err
 		}
+		changes, err := memberEvents(ctx, q, team, before)
+		if err != nil {
+			return err
+		}
+		events = append(events, changes...)
 		res, err = groupResource(ctx, q, h.ws, team)
 		return err
 	})
+	if err == nil {
+		h.log(ctx, events)
+	}
 	return res, err
 }
 
@@ -105,8 +133,13 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 	}
 	ctx := r.Context()
 	var res scim.Resource
+	var events []*audit.Event
 	err := h.tx(ctx, id, func(q *db.Queries) error {
 		team, err := q.GetSCIMTeam(ctx, id)
+		if err != nil {
+			return err
+		}
+		before, err := teamMembers(ctx, q, id)
 		if err != nil {
 			return err
 		}
@@ -114,6 +147,7 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 			if team, err = q.UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, Name: &name}); err != nil {
 				return err
 			}
+			events = append(events, groupEvent(actionUpdateTeam, id, map[string]any{"name": team.Name}))
 		}
 		if team, err = linkTeamSCIM(ctx, q, team, scimAttrString(attrs["externalId"])); err != nil {
 			return err
@@ -121,9 +155,17 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 		if err := setTeamMembers(ctx, q, id, scimMemberRefs(attrs["members"])); err != nil {
 			return err
 		}
+		changes, err := memberEvents(ctx, q, team, before)
+		if err != nil {
+			return err
+		}
+		events = append(events, changes...)
 		res, err = groupResource(ctx, q, h.ws, team)
 		return err
 	})
+	if err == nil {
+		h.log(ctx, events)
+	}
 	return res, err
 }
 
@@ -131,10 +173,15 @@ func (h scimGroupHandler) Delete(r *http.Request, id string) error {
 	if err := h.svc.requirePlan(r.Context()); err != nil {
 		return err
 	}
-	return h.tx(r.Context(), id, func(q *db.Queries) error {
-		_, err := q.DeleteSCIMTeam(r.Context(), id)
+	var name string
+	err := h.tx(r.Context(), id, func(q *db.Queries) (err error) {
+		name, err = q.DeleteSCIMTeam(r.Context(), id)
 		return err
 	})
+	if err == nil {
+		h.log(r.Context(), []*audit.Event{groupEvent(actionDeleteTeam, id, map[string]any{"name": name})})
+	}
+	return err
 }
 
 func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
@@ -143,9 +190,14 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 	}
 	ctx := r.Context()
 	var res scim.Resource
+	var events []*audit.Event
 	changed := false
 	err := h.tx(ctx, id, func(q *db.Queries) error {
 		team, err := q.GetSCIMTeam(ctx, id)
+		if err != nil {
+			return err
+		}
+		before, err := teamMembers(ctx, q, id)
 		if err != nil {
 			return err
 		}
@@ -157,8 +209,11 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 					return nil
 				}
 				changed = true
-				team, err = q.UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, Name: &name})
-				return err
+				if team, err = q.UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, Name: &name}); err != nil {
+					return err
+				}
+				events = append(events, groupEvent(actionUpdateTeam, id, map[string]any{"name": team.Name}))
+				return nil
 			case "externalId":
 				changed = true
 				team, err = linkTeamSCIM(ctx, q, team, scimAttrString(value))
@@ -190,9 +245,17 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 		if err != nil || !changed {
 			return err
 		}
+		changes, err := memberEvents(ctx, q, team, before)
+		if err != nil {
+			return err
+		}
+		events = append(events, changes...)
 		res, err = groupResource(ctx, q, h.ws, team)
 		return err
 	})
+	if err == nil {
+		h.log(ctx, events)
+	}
 	return res, err
 }
 
@@ -223,6 +286,57 @@ func setTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs [
 		}
 	}
 	return q.AddTeamMembers(ctx, &db.AddTeamMembersParams{TeamID: teamID, UserIds: userIDs})
+}
+
+// teamMembers maps member ids to the names the audit log shows for them.
+func teamMembers(ctx context.Context, q *db.Queries, teamID string) (map[string]string, error) {
+	rows, err := q.ListTeamMembers(ctx, teamID)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[string]string, len(rows))
+	for _, m := range rows {
+		names[m.User.ID] = cmp.Or(m.User.Name, m.User.Email)
+	}
+	return names, nil
+}
+
+// memberEvents compares with the members read at the start, so an id that
+// changed nothing writes no row.
+func memberEvents(ctx context.Context, q *db.Queries, team *db.Team, before map[string]string) ([]*audit.Event, error) {
+	after, err := teamMembers(ctx, q, team.ID)
+	if err != nil {
+		return nil, err
+	}
+	var events []*audit.Event
+	for _, id := range slices.Sorted(maps.Keys(after)) {
+		if _, ok := before[id]; !ok {
+			events = append(events, groupEvent(actionAddTeamMember, team.ID,
+				map[string]any{"name": team.Name, "member": after[id]}))
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(before)) {
+		if _, ok := after[id]; !ok {
+			events = append(events, groupEvent(actionRemoveTeamMember, team.ID,
+				map[string]any{"name": team.Name, "member": before[id]}))
+		}
+	}
+	return events, nil
+}
+
+func groupEvent(action, target string, details map[string]any) *audit.Event {
+	details["method"] = string(MethodSCIM)
+	return &audit.Event{Action: action, Target: target, Details: details}
+}
+
+// log runs after the commit, so a change that rolled back writes no row.
+func (h scimGroupHandler) log(ctx context.Context, events []*audit.Event) {
+	if h.svc.audit == nil {
+		return
+	}
+	for _, e := range events {
+		h.svc.audit.Log(ctx, e)
+	}
 }
 
 func groupResource(
