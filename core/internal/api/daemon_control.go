@@ -451,6 +451,12 @@ func (s *daemonControlService) storeUpload(
 		}
 		return nil
 	})
+	if err != nil && stored {
+		// The rollback left the committed object in no row.
+		err = errors.Join(err, s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+			return q.QueueLostRecordingObject(ctx, *upload.ObjectID)
+		}))
+	}
 	if err != nil {
 		return nil, err
 	}

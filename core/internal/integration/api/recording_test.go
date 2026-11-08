@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -354,6 +355,40 @@ func TestFailedCommitLeavesTheRowToTheNextTry(t *testing.T) {
 	assert.Nil(t, rec.ObjectID, "the row names an object that was never stored")
 	assert.False(t, rec.Complete)
 	assert.Zero(t, rec.SizeBytes, "nothing was stored")
+}
+
+// A closing transaction that fails after the commit leaves the object in no
+// row, so the delete queue must take it.
+func TestFailedCloseQueuesTheStoredObject(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	workspaceID := testWorkspace.ID
+	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	id := uuid.NewV7().String()
+
+	// Only the owner role may add a trigger.
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = owner.Close(context.WithoutCancel(t.Context())) })
+	fail := "fail_" + strings.ReplaceAll(id, "-", "")
+	_, err = owner.Exec(t.Context(), fmt.Sprintf(`
+		CREATE FUNCTION %[1]s() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'no close'; END $$;
+		CREATE TRIGGER %[1]s BEFORE UPDATE ON recordings FOR EACH ROW WHEN (OLD.id = '%[2]s') EXECUTE FUNCTION %[1]s();`,
+		fail, id))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := owner.Exec(context.WithoutCancel(t.Context()),
+			fmt.Sprintf("DROP TRIGGER %[1]s ON recordings; DROP FUNCTION %[1]s();", fail))
+		assert.NoError(t, err)
+	})
+
+	require.NoError(t, cfg.Record.DeleteQueued(t.Context()))
+	before := storedObjects(t, workspaceID)
+	err = uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, 1)
+	require.Equal(t, connect.CodeInternal, connect.CodeOf(err), "the row closed despite the trigger: %v", err)
+	require.Len(t, storedObjects(t, workspaceID), len(before)+1, "the upload stored no object")
+
+	require.NoError(t, cfg.Record.DeleteQueued(t.Context()))
+	assert.ElementsMatch(t, before, storedObjects(t, workspaceID), "the stored object is in no row and not queued")
 }
 
 func (cappedStorage) RecordingStorageBytes(context.Context, string) (int64, error) {
