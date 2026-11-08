@@ -52,8 +52,8 @@ type Pool struct {
 	relays        map[string]*Relay
 	pendingRelays map[string]*relayPending
 	conn          connection
-	// Record is told when a daemon falls behind. Set before the server starts.
-	Record func(context.Context, *audit.Event)
+	// record is told when a daemon falls behind.
+	record func(context.Context, *audit.Event)
 }
 
 // heartbeat checks against the core's version one heartbeat ago, so a daemon
@@ -68,13 +68,14 @@ func (c *daemonConn) heartbeat(applied, current int64) (fell bool) {
 	return c.behindSince.CompareAndSwap(nil, new(time.Now()))
 }
 
-func New(conn connection) *Pool {
+func New(conn connection, record func(context.Context, *audit.Event)) *Pool {
 	return &Pool{
 		byID:          make(map[string]*daemonConn),
 		byWksp:        make(map[string]map[string]struct{}),
 		relays:        make(map[string]*Relay),
 		pendingRelays: make(map[string]*relayPending),
 		conn:          conn,
+		record:        record,
 	}
 }
 
@@ -125,10 +126,10 @@ func (p *Pool) BehindIn(workspaceID string) int32 {
 
 func (p *Pool) reportBehind(c *daemonConn, name string, applied, current int64) {
 	slog.Warn("daemon is behind", "daemon_id", c.daemonID, "applied", applied, "current", current)
-	if p.Record == nil {
+	if p.record == nil {
 		return
 	}
-	p.Record(actor.WithWorkspace(c.ctx, actor.Workspace{ID: c.workspaceID}), &audit.Event{
+	p.record(actor.WithWorkspace(c.ctx, actor.Workspace{ID: c.workspaceID}), &audit.Event{
 		Action:  "DaemonBehind",
 		Target:  c.daemonID,
 		OK:      true,

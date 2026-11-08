@@ -62,7 +62,7 @@ func (r versionRow) Scan(dest ...any) error {
 
 func newTestPool(t *testing.T) *Pool {
 	t.Helper()
-	return New(stubConn{})
+	return New(stubConn{}, nil)
 }
 
 // waitRelayPending stops registerRelay winning a race the test isn't about.
@@ -455,7 +455,7 @@ func TestPool_RelayOutlivesTheControlStream(t *testing.T) {
 func TestPool_StateVersionNeedsNoListener(t *testing.T) {
 	conn := &versionConn{}
 	conn.version.Store(1)
-	p := New(conn)
+	p := New(conn, nil)
 
 	v, err := p.stateVersion(t.Context(), "w1")
 	require.NoError(t, err)
