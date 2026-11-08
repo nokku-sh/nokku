@@ -525,6 +525,15 @@ func TestDaemonThatFallsBehindShows(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	// A fresh hosted workspace is still at version 0, where nothing is behind.
+	member := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
+		team, err := q.CreateTeam(t.Context(), &db.CreateTeamParams{Name: uniq("behind")})
+		if err != nil {
+			return err
+		}
+		return q.AddTeamMember(t.Context(), &db.AddTeamMemberParams{TeamID: team.ID, UserID: member.ID})
+	})
 	token := enrolled.GetAccessToken()
 	ctx, call := connect.NewClientContext(t.Context())
 	call.RequestHeader().Set("Authorization", "DPoP "+token)
