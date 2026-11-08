@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"time"
+	"uuid"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5"
@@ -18,7 +20,8 @@ import (
 // ServerLock is held by the running core, rotate-secrets checks it with TryAdvisoryXactLock.
 const ServerLock = "nokku_server"
 
-// ServerLockApp names the session that holds ServerLock in pg_stat_activity.
+// ServerLockApp starts the name of the session that holds ServerLock in
+// pg_stat_activity, each core adds its own id.
 const ServerLockApp = "nokku server lock"
 
 var (
@@ -206,7 +209,8 @@ func (c *Connection) TenantTx(ctx context.Context, fn func(*Queries) error) erro
 
 // HoldServerLock waits while another core runs, then holds the lock until hold ends.
 func HoldServerLock(wait, hold context.Context, lost func()) error {
-	conn, free, err := tryServerLock(wait)
+	session := ServerLockApp + " " + uuid.New().String()
+	conn, free, err := tryServerLock(wait, session)
 	if err != nil {
 		return err
 	}
@@ -217,12 +221,12 @@ func HoldServerLock(wait, hold context.Context, lost func()) error {
 			return fmt.Errorf("taking the server lock: %w", err)
 		}
 	}
-	go keepServerLock(hold, conn, lost)
+	go keepServerLock(hold, conn, session, lost)
 	return nil
 }
 
 // keepServerLock takes the lock back when its connection drops, or calls lost.
-func keepServerLock(ctx context.Context, conn *pgx.Conn, lost func()) {
+func keepServerLock(ctx context.Context, conn *pgx.Conn, session string, lost func()) {
 	for {
 		// Nothing notifies, the wait ends with the connection.
 		_, err := conn.WaitForNotification(ctx)
@@ -233,12 +237,12 @@ func keepServerLock(ctx context.Context, conn *pgx.Conn, lost func()) {
 		slog.Warn("the server lock dropped with its connection, taking it again", "error", err)
 		retake, stop := context.WithTimeout(ctx, time.Minute)
 		var free bool
-		conn, free, err = tryServerLock(retake)
+		conn, free, err = tryServerLock(retake, session)
 		for err != nil && retake.Err() == nil {
 			select {
 			case <-retake.Done():
 			case <-time.After(5 * time.Second):
-				conn, free, err = tryServerLock(retake)
+				conn, free, err = tryServerLock(retake, session)
 			}
 		}
 		stop()
@@ -259,20 +263,38 @@ func keepServerLock(ctx context.Context, conn *pgx.Conn, lost func()) {
 	}
 }
 
-func tryServerLock(ctx context.Context) (*pgx.Conn, bool, error) {
+func tryServerLock(ctx context.Context, session string) (*pgx.Conn, bool, error) {
 	_, config, err := settings()
 	if err != nil {
 		return nil, false, err
 	}
 	params := config.ConnConfig.RuntimeParams
-	params["application_name"] = ServerLockApp
+	params["application_name"] = session
 	// The session idles for good, a server-wide idle timeout must not end it.
 	params["idle_session_timeout"] = "0"
 	// The lock of a core whose host vanished goes in a minute, not hours.
 	params["tcp_keepalives_idle"], params["tcp_keepalives_interval"], params["tcp_keepalives_count"] = "30", "10", "3"
+	// The core notices a dead path when Postgres does. Go's default takes
+	// 2.5 minutes, the next core would run next to this one meanwhile.
+	dialer := &net.Dialer{
+		Timeout: config.ConnConfig.ConnectTimeout,
+		KeepAliveConfig: net.KeepAliveConfig{
+			Enable:   true,
+			Idle:     30 * time.Second,
+			Interval: 10 * time.Second,
+			Count:    3,
+		},
+	}
+	config.ConnConfig.DialFunc = dialer.DialContext
 	conn, err := pgx.ConnectConfig(ctx, config.ConnConfig)
 	if err != nil {
 		return nil, false, fmt.Errorf("connecting for the server lock: %w", err)
+	}
+	// When the core noticed first, its own old session still holds the lock.
+	if _, err := conn.Exec(ctx, `SELECT pg_terminate_backend(pid, 5000) FROM pg_stat_activity
+		WHERE application_name = $1 AND pid <> pg_backend_pid()`, session); err != nil {
+		_ = conn.Close(context.WithoutCancel(ctx))
+		return nil, false, fmt.Errorf("ending a stale server lock session: %w", err)
 	}
 	var free bool
 	if err := conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(hashtext($1))", ServerLock).Scan(&free); err != nil {

@@ -4,10 +4,14 @@ package db_test
 
 import (
 	"context"
+	"io"
+	"net"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -55,7 +59,7 @@ func lockSessions(t *testing.T, owner *pgx.Conn, granted bool) int {
 	var n int
 	require.NoError(t, owner.QueryRow(t.Context(), `
 		SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
-		WHERE l.locktype = 'advisory' AND l.granted = $1 AND a.application_name = $2`,
+		WHERE l.locktype = 'advisory' AND l.granted = $1 AND a.application_name LIKE $2 || '%'`,
 		granted, db.ServerLockApp).Scan(&n))
 	return n
 }
@@ -66,9 +70,53 @@ func terminateLockHolder(t *testing.T, owner *pgx.Conn) {
 	var n int
 	require.NoError(t, owner.QueryRow(t.Context(), `
 		SELECT count(pg_terminate_backend(l.pid, 5000)) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
-		WHERE l.locktype = 'advisory' AND l.granted AND a.application_name = $1`,
+		WHERE l.locktype = 'advisory' AND l.granted AND a.application_name LIKE $1 || '%'`,
 		db.ServerLockApp).Scan(&n))
 	require.Equal(t, 1, n, "no session held the server lock")
+}
+
+func lockHolder(t *testing.T, owner *pgx.Conn) int32 {
+	t.Helper()
+	var pid int32
+	require.NoError(t, owner.QueryRow(t.Context(), `
+		SELECT l.pid FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+		WHERE l.locktype = 'advisory' AND l.granted AND a.application_name LIKE $1 || '%'`,
+		db.ServerLockApp).Scan(&pid))
+	return pid
+}
+
+// proxyPostgres sends new connections through a proxy. cut closes the core's
+// side of the first one and keeps Postgres's side open, a dead path only the
+// core noticed so far.
+func proxyPostgres(t *testing.T) (cut func()) {
+	t.Helper()
+	upstream := net.JoinHostPort(os.Getenv("PGHOST"), os.Getenv("PGPORT"))
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+	accepted := make(chan net.Conn, 16)
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			u, err := net.Dial("tcp", upstream)
+			if err != nil {
+				_ = c.Close()
+				continue
+			}
+			t.Cleanup(func() { _ = u.Close() })
+			go func() { _, _ = io.Copy(u, c) }()
+			go func() { _, _ = io.Copy(c, u) }()
+			accepted <- c
+		}
+	}()
+	host, port, err := net.SplitHostPort(ln.Addr().String())
+	require.NoError(t, err)
+	t.Setenv("PGHOST", host)
+	t.Setenv("PGPORT", port)
+	return func() { _ = (<-accepted).Close() }
 }
 
 func ownerConn(t *testing.T) *pgx.Conn {
@@ -95,6 +143,28 @@ func TestTheServerLockComesBack(t *testing.T) {
 		t.Fatal("the core stopped though nobody else held the lock")
 	default:
 	}
+}
+
+// The core noticed a dead path before Postgres did, so its own old session
+// still holds the lock. It ends that session and goes on, a lone core must not
+// stop for it.
+func TestTheServerLockOutlivesItsOwnStaleSession(t *testing.T) {
+	owner := ownerConn(t)
+	cut := proxyPostgres(t)
+	hold, stop := context.WithCancel(t.Context())
+	defer stop()
+	lost := make(chan struct{}, 1)
+	require.NoError(t, db.HoldServerLock(t.Context(), hold, func() { lost <- struct{}{} }))
+	stale := lockHolder(t, owner)
+
+	cut()
+	select {
+	case <-lost:
+		t.Fatal("the core stopped, though only its own stale session held the lock")
+	case <-time.After(3 * time.Second):
+	}
+	assert.Equal(t, 1, lockSessions(t, owner, true), "one session holds the lock")
+	assert.NotEqual(t, stale, lockHolder(t, owner), "the stale session still holds the lock")
 }
 
 // A core that waited in line gets the lock when the holder's session ends.
