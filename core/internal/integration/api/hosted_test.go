@@ -296,6 +296,27 @@ func TestHostedSignup(t *testing.T) {
 	assert.NotNil(t, row.ClaimedAt, "the first sign-in claims the workspace")
 }
 
+// A request racing the purge can cache the freed slug again, the signup that
+// takes it must still win the host.
+func TestHostedSignupTakesAFreedSlug(t *testing.T) {
+	hostedOnly(t)
+	cfg, _ := newTestAPI(t)
+	squat := newHostedWorkspace(t, cfg)
+	_, err := cfg.Conn.Sys().DeleteUnclaimedWorkspace(t.Context(), squat.ID)
+	require.NoError(t, err)
+
+	_, err = workspacesOn(onHost(t, hostedBase)).CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{
+		Slug: &squat.Slug, Name: new("Signup"), OwnerEmail: new(newMailAddress()),
+	})
+	require.NoError(t, err)
+
+	row, err := cfg.Conn.Sys().GetWorkspaceBySlug(t.Context(), squat.Slug)
+	require.NoError(t, err)
+	ws, err := cfg.Tenant.FromHost(t.Context(), squat.Slug+"."+hostedBase)
+	require.NoError(t, err)
+	assert.Equal(t, row.ID, ws.ID, "the host still serves the purged workspace")
+}
+
 // A deleted workspace leaves its host at once, the host cache must not keep it.
 func TestHostedDeleteWorkspace(t *testing.T) {
 	hostedOnly(t)

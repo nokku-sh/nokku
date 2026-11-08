@@ -183,6 +183,8 @@ func (s *workspaceService) CreateWorkspace(
 	if err != nil {
 		return nil, err
 	}
+	// A request racing the purge may have cached the slug's last owner.
+	s.cfg.Tenant.Forget(ws.Slug)
 
 	wsCtx := actor.WithWorkspace(ctx, actor.Workspace{
 		ID: ws.ID, Slug: ws.Slug, BaseURL: s.cfg.Tenant.BaseURL(ws.Slug),
