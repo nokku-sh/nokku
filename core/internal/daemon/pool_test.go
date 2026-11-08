@@ -186,6 +186,44 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 	}
 }
 
+// The lookup can return a connection a reconnect closes before the send. Its
+// buffer may have room, a message there is never read.
+func TestPool_SendSkipsAClosedConnection(t *testing.T) {
+	p := newTestPool(t)
+	c := p.registerDaemon(t.Context(), "d1", "w1")
+	c.cancel()
+	rid := "r1"
+	relayOpen := &nokkuv1.ConnectResponse{
+		Msg: &nokkuv1.ConnectResponse_RelayOpen{RelayOpen: &nokkuv1.RelayOpen{RelayId: &rid}},
+	}
+	for range 20 {
+		require.Error(t, p.sendToDaemonWait(t.Context(), "d1", relayOpen, time.Second),
+			"a closed connection took the message")
+	}
+}
+
+// A reconnect while the send waits hands the message to the new connection.
+func TestPool_SendFollowsAReconnect(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPool(t)
+		old := p.registerDaemon(t.Context(), "d1", "w1")
+		for range sendBufferSize {
+			old.send <- stateUpdate
+		}
+		rid := "r1"
+		relayOpen := &nokkuv1.ConnectResponse{
+			Msg: &nokkuv1.ConnectResponse_RelayOpen{RelayOpen: &nokkuv1.RelayOpen{RelayId: &rid}},
+		}
+		sent := make(chan error, 1)
+		go func() { sent <- p.sendToDaemonWait(t.Context(), "d1", relayOpen, 5*time.Second) }()
+		synctest.Wait()
+
+		renewed := p.registerDaemon(t.Context(), "d1", "w1")
+		require.NoError(t, <-sent, "the send gave up on the reconnect")
+		require.NotNil(t, (<-renewed.send).GetRelayOpen(), "the new connection did not get the message")
+	})
+}
+
 // RequestRelay may time out while registerRelay closes the pending channel.
 func TestPool_RelayRequestRace(t *testing.T) {
 	p := newTestPool(t)

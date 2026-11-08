@@ -275,29 +275,35 @@ func (c *daemonConn) poke() {
 	}
 }
 
-// A caller that is gone must not wait behind a daemon that reads nothing.
+// A caller that is gone must not wait behind a daemon that reads nothing. A
+// reconnect can close the connection under the send, the new one gets a try.
 func (p *Pool) sendToDaemonWait(
 	ctx context.Context,
 	daemonID string,
 	msg *nokkuv1.ConnectResponse,
 	timeout time.Duration,
 ) error {
-	p.mu.RLock()
-	c, ok := p.byID[daemonID]
-	p.mu.RUnlock()
-	if !ok {
-		return fmt.Errorf("daemon %s not connected", daemonID)
-	}
 	t := time.NewTimer(timeout)
 	defer t.Stop()
-	select {
-	case c.send <- msg:
-		return nil
-	case <-t.C:
-		return fmt.Errorf("daemon %s send timeout", daemonID)
-	case <-c.ctx.Done():
-		return fmt.Errorf("daemon %s disconnected", daemonID)
-	case <-ctx.Done():
-		return ctx.Err()
+	for range 2 {
+		p.mu.RLock()
+		c, ok := p.byID[daemonID]
+		p.mu.RUnlock()
+		if !ok {
+			return fmt.Errorf("daemon %s not connected", daemonID)
+		}
+		select {
+		case c.send <- msg:
+			// A closed connection's buffer can still have room, nobody reads it.
+			if c.ctx.Err() == nil {
+				return nil
+			}
+		case <-t.C:
+			return fmt.Errorf("daemon %s send timeout", daemonID)
+		case <-c.ctx.Done():
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
+	return fmt.Errorf("daemon %s disconnected", daemonID)
 }
