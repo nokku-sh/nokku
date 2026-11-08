@@ -24,7 +24,6 @@ internal/crypto/kms/kms.go Keyset.Rotate SysTx LockKeyset,TryAdvisoryXactLock,Up
 internal/crypto/kms/kms.go Keyset.load Sys GetKeysetData
 internal/crypto/kms/kms.go Keyset.load Sys GetKeysetData
 internal/crypto/kms/kms.go Keyset.load Sys InsertKeyset
-internal/daemon/pool.go Pool.stateVersion SysTx GetWorkspaceStateVersion
 internal/daemon/retire.go Retire SysTx DeleteRetiredDaemons,QuietStateChange
 internal/entitlement/license.go Service.loadLicense Sys GetInstanceLicense
 internal/entitlement/license.go Service.storeLicense Sys SetInstanceLicense

@@ -250,7 +250,7 @@ func (p *Pool) poke(workspaceID string) {
 // Read every time, so a lost notification only waits for the next heartbeat.
 func (p *Pool) stateVersion(ctx context.Context, workspaceID string) (int64, error) {
 	var v int64
-	if err := p.conn.SysTx(ctx, func(q *db.Queries) (err error) {
+	if err := p.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		v, err = q.GetWorkspaceStateVersion(ctx, workspaceID)
 		return err
 	}); err != nil {

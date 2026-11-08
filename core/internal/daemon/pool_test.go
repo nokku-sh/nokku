@@ -39,7 +39,7 @@ func (stubConn) TenantTx(context.Context, func(*db.Queries) error) error {
 	return nil
 }
 
-func (c *versionConn) SysTx(_ context.Context, fn func(*db.Queries) error) error {
+func (c *versionConn) TenantTx(_ context.Context, fn func(*db.Queries) error) error {
 	return fn(db.New(c))
 }
 
