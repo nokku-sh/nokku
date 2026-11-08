@@ -57,9 +57,14 @@ var InlineScriptHashes = sync.OnceValue(func() []string {
 	return hashes
 })
 
+// DevUI is the Vite dev server the UI comes from, empty for the embedded one.
+func DevUI() string {
+	return os.Getenv("NOKKU_DEV_UI")
+}
+
 // Handler serves the embedded SPA, or proxies the Vite dev server.
 func Handler() http.Handler {
-	if dev := os.Getenv("NOKKU_DEV_UI"); dev != "" {
+	if dev := DevUI(); dev != "" {
 		return devProxy(dev)
 	}
 	pinMimeTypes()

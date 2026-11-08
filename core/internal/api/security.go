@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/nokku-sh/nokku/core/web"
@@ -78,7 +77,7 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 	// Only the bootstrap runs inline, injected code would reach the terminal.
 	pinned := web.InlineScriptHashes()
 	workers := ""
-	if os.Getenv("NOKKU_DEV_UI") != "" {
+	if web.DevUI() != "" {
 		// The pages of the Vite dev server change with every edit.
 		pinned = []string{"'unsafe-inline'"}
 		// Vite pings from a blob worker, to reload once the server is back.
