@@ -23,9 +23,8 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 	protected := cop.Handler(h)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// External senders. Webhooks are signed, SSO has single-use state.
-		if r.URL.Path == "/oidc/callback" ||
-			strings.HasPrefix(r.URL.Path, "/webhooks/") {
+		// An external sender. SSO has single-use state.
+		if r.URL.Path == "/oidc/callback" {
 			h.ServeHTTP(w, r)
 			return
 		}

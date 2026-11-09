@@ -22,7 +22,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/entitlement"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
@@ -98,7 +97,7 @@ func New(ctx context.Context, conn *db.Connection, keys *kms.Keyset, baseURL str
 	}
 	ws, err := conn.Sys().GetFirstWorkspace(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
-		ws, err = Create(ctx, conn, keys, "default", cfg.WorkspaceName)
+		ws, err = Create(ctx, conn, keys, "default", cfg.WorkspaceName, 0)
 	}
 	if err != nil {
 		return nil, err
@@ -178,7 +177,7 @@ func (r *Resolver) slug(host string) (string, bool) {
 	return slug, true
 }
 
-// Middleware runs before every handler but health and provider webhooks.
+// Middleware runs before every handler but health.
 func (r *Resolver) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ws, err := r.FromHost(req.Context(), req.Host)
@@ -253,8 +252,14 @@ func (r *Resolver) PurgeUnclaimed(ctx context.Context, cutoff time.Time) error {
 	})
 }
 
-// Create pins the tx to the new id, so it runs under RLS with no system role.
-func Create(ctx context.Context, conn *db.Connection, keys *kms.Keyset, slug, name string) (*db.Workspace, error) {
+// Create pins the tx to the new id, so it runs under RLS with no system role. trialDays 0 starts no trial.
+func Create(
+	ctx context.Context,
+	conn *db.Connection,
+	keys *kms.Keyset,
+	slug, name string,
+	trialDays int32,
+) (*db.Workspace, error) {
 	id := uuid.NewV7().String()
 	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: id})
 
@@ -269,11 +274,10 @@ func Create(ctx context.Context, conn *db.Connection, keys *kms.Keyset, slug, na
 		if err != nil {
 			return err
 		}
-		if err := q.StartTrial(ctx, &db.StartTrialParams{
-			Plan: entitlement.PlanPro,
-			Days: entitlement.TrialDays,
-		}); err != nil {
-			return err
+		if trialDays > 0 {
+			if err := q.StartTrial(ctx, &db.StartTrialParams{WorkspaceID: id, Days: trialDays}); err != nil {
+				return err
+			}
 		}
 		_, err = ssh.CreateCA(ctx, q, keys, ssh.NewCA())
 		return err

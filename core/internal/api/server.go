@@ -175,13 +175,13 @@ func (s *Server) withRequestMeta(h http.Handler) http.Handler {
 	})
 }
 
-// withTenant skips /healthz and webhooks, they have no workspace host.
+// withTenant skips /healthz, it has no workspace host.
 func (s *Server) withTenant(h http.Handler) http.Handler {
 	resolved := s.cfg.Tenant.Middleware(h)
 	lookup := httprate.LimitBy(unknownHostsPerMinute, time.Minute, clientIP)(resolved)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/healthz" || strings.HasPrefix(r.URL.Path, "/webhooks/"):
+		case r.URL.Path == "/healthz":
 			h.ServeHTTP(w, r)
 		case s.cfg.Tenant.Known(r.Host):
 			resolved.ServeHTTP(w, r)
@@ -240,10 +240,6 @@ func (s *Server) registerServices(ctx context.Context) {
 		defer release()
 		terminal.handleWebSocket(w, r.WithContext(rctx))
 	}))
-
-	if s.cfg.SaaS {
-		s.mux.Handle("POST /webhooks/stripe", s.cfg.Billing.WebhookHandler())
-	}
 
 	s.mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

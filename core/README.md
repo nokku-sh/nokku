@@ -354,7 +354,7 @@ Stop the core, put back the database and the storage, set the same `NOKKU_SECRET
 
 A self-hosted core is free to run and needs no key. A license key turns on more features and raises the limits. Activate it in the web app on the **Billing** settings page, or set `NOKKU_LICENSE_KEY`. Keys are checked offline, and an expired key never stops the core.
 
-A core that holds a key asks `license.nokku.sh` about once a day for the renewed one. It sends the key and nothing else. A core without a key never asks. Set `NOKKU_LICENSE_OFFLINE=true` to turn it off and paste the renewed key yourself.
+A core that holds a key asks `license.nokku.sh` for the renewed one about once a day, and again when an admin opens the **Billing** page, at most every 30 seconds. It sends the key and nothing else. A core without a key never asks. Set `NOKKU_LICENSE_OFFLINE=true` to turn it off and paste the renewed key yourself.
 
 ## More
 

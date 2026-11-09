@@ -17,7 +17,6 @@ func TestInvalidRowsAreRefused(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 	id := func() string { return uuid.NewV7().String() }
-	subscription := `INSERT INTO workspace_subscriptions (workspace_id, source, plan, status) VALUES ($1, $2, $3, 'active')`
 	joinToken := `INSERT INTO join_tokens (workspace_id, token_hash, max_uses, uses, retire_after)
 		VALUES ($1, $2, $3, $4, $5::INTERVAL)`
 	request := `INSERT INTO access_requests (workspace_id, requester_id, account_id, duration, reason, status)
@@ -29,12 +28,7 @@ func TestInvalidRowsAreRefused(t *testing.T) {
 		sql  string
 		args []any
 	}{
-		"a subscription from nowhere": {subscription, []any{f.ws, "gift", "pro"}},
-		"a plan that does not exist":  {subscription, []any{f.ws, "stripe", "gold"}},
-		"a trial with no end": {
-			`INSERT INTO workspace_subscriptions (workspace_id, source, plan, status) VALUES ($1, 'trial', 'pro', 'trial')`,
-			[]any{f.ws},
-		},
+		"a trial with no end": {`INSERT INTO workspace_licenses (workspace_id) VALUES ($1)`, []any{f.ws}},
 		"a certificate lifetime of nothing": {
 			`UPDATE ssh_cas SET user_default_ttl = '0' WHERE id = $1`, []any{f.ca},
 		},

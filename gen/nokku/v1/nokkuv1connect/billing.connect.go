@@ -26,15 +26,6 @@ const (
 const (
 	// BillingServiceGetBillingProcedure is the procedure name of the BillingService's GetBilling RPC.
 	BillingServiceGetBillingProcedure = "/nokku.v1.BillingService/GetBilling"
-	// BillingServiceCreatePortalProcedure is the procedure name of the BillingService's CreatePortal
-	// RPC.
-	BillingServiceCreatePortalProcedure = "/nokku.v1.BillingService/CreatePortal"
-	// BillingServiceCreateCheckoutProcedure is the procedure name of the BillingService's
-	// CreateCheckout RPC.
-	BillingServiceCreateCheckoutProcedure = "/nokku.v1.BillingService/CreateCheckout"
-	// BillingServiceCancelSubscriptionProcedure is the procedure name of the BillingService's
-	// CancelSubscription RPC.
-	BillingServiceCancelSubscriptionProcedure = "/nokku.v1.BillingService/CancelSubscription"
 	// BillingServiceGetLicenseProcedure is the procedure name of the BillingService's GetLicense RPC.
 	BillingServiceGetLicenseProcedure = "/nokku.v1.BillingService/GetLicense"
 	// BillingServiceActivateLicenseProcedure is the procedure name of the BillingService's
@@ -49,27 +40,6 @@ var (
 			Schema:           v1.File_nokku_v1_billing_proto.Services().ByName("BillingService").Methods().ByName("GetBilling"),
 			Procedure:        BillingServiceGetBillingProcedure,
 			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
-	billingServiceCreatePortalSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_billing_proto.Services().ByName("BillingService").Methods().ByName("CreatePortal"),
-			Procedure:  BillingServiceCreatePortalProcedure,
-		}
-	})
-	billingServiceCreateCheckoutSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_billing_proto.Services().ByName("BillingService").Methods().ByName("CreateCheckout"),
-			Procedure:  BillingServiceCreateCheckoutProcedure,
-		}
-	})
-	billingServiceCancelSubscriptionSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_billing_proto.Services().ByName("BillingService").Methods().ByName("CancelSubscription"),
-			Procedure:  BillingServiceCancelSubscriptionProcedure,
 		}
 	})
 	billingServiceGetLicenseSpec = sync.OnceValue(func() connect.Spec {
@@ -91,10 +61,8 @@ var (
 
 // BillingServiceClient is a client for the nokku.v1.BillingService service.
 type BillingServiceClient interface {
+	// GetBilling also asks the license server for the current key, so new seats show up at once.
 	GetBilling(context.Context, *v1.GetBillingRequest) (*v1.GetBillingResponse, error)
-	CreatePortal(context.Context, *v1.CreatePortalRequest) (*v1.CreatePortalResponse, error)
-	CreateCheckout(context.Context, *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error)
-	CancelSubscription(context.Context, *v1.CancelSubscriptionRequest) (*v1.CancelSubscriptionResponse, error)
 	GetLicense(context.Context, *v1.GetLicenseRequest) (*v1.GetLicenseResponse, error)
 	ActivateLicense(context.Context, *v1.ActivateLicenseRequest) (*v1.ActivateLicenseResponse, error)
 }
@@ -107,10 +75,8 @@ func NewBillingServiceClient(client *connect.Client) BillingServiceClient {
 
 // BillingServiceHandler is an implementation of the nokku.v1.BillingService service.
 type BillingServiceHandler interface {
+	// GetBilling also asks the license server for the current key, so new seats show up at once.
 	GetBilling(context.Context, *v1.GetBillingRequest) (*v1.GetBillingResponse, error)
-	CreatePortal(context.Context, *v1.CreatePortalRequest) (*v1.CreatePortalResponse, error)
-	CreateCheckout(context.Context, *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error)
-	CancelSubscription(context.Context, *v1.CancelSubscriptionRequest) (*v1.CancelSubscriptionResponse, error)
 	GetLicense(context.Context, *v1.GetLicenseRequest) (*v1.GetLicenseResponse, error)
 	ActivateLicense(context.Context, *v1.ActivateLicenseRequest) (*v1.ActivateLicenseResponse, error)
 }
@@ -121,9 +87,6 @@ func RegisterBillingServiceHandler(server *connect.Server, svc BillingServiceHan
 	adapter := billingServiceHandler{svc: svc}
 	server.Register(
 		connect.Method{Spec: billingServiceGetBillingSpec(), Handler: adapter.getBilling},
-		connect.Method{Spec: billingServiceCreatePortalSpec(), Handler: adapter.createPortal},
-		connect.Method{Spec: billingServiceCreateCheckoutSpec(), Handler: adapter.createCheckout},
-		connect.Method{Spec: billingServiceCancelSubscriptionSpec(), Handler: adapter.cancelSubscription},
 		connect.Method{Spec: billingServiceGetLicenseSpec(), Handler: adapter.getLicense},
 		connect.Method{Spec: billingServiceActivateLicenseSpec(), Handler: adapter.activateLicense},
 	)
@@ -134,18 +97,6 @@ type UnimplementedBillingServiceHandler struct{}
 
 func (UnimplementedBillingServiceHandler) GetBilling(context.Context, *v1.GetBillingRequest) (*v1.GetBillingResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.BillingService.GetBilling is not implemented")
-}
-
-func (UnimplementedBillingServiceHandler) CreatePortal(context.Context, *v1.CreatePortalRequest) (*v1.CreatePortalResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.BillingService.CreatePortal is not implemented")
-}
-
-func (UnimplementedBillingServiceHandler) CreateCheckout(context.Context, *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.BillingService.CreateCheckout is not implemented")
-}
-
-func (UnimplementedBillingServiceHandler) CancelSubscription(context.Context, *v1.CancelSubscriptionRequest) (*v1.CancelSubscriptionResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.BillingService.CancelSubscription is not implemented")
 }
 
 func (UnimplementedBillingServiceHandler) GetLicense(context.Context, *v1.GetLicenseRequest) (*v1.GetLicenseResponse, error) {
@@ -163,30 +114,6 @@ type billingServiceClient struct {
 func (c *billingServiceClient) GetBilling(ctx context.Context, req *v1.GetBillingRequest) (*v1.GetBillingResponse, error) {
 	var res v1.GetBillingResponse
 	if err := c.client.CallUnary(ctx, billingServiceGetBillingSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *billingServiceClient) CreatePortal(ctx context.Context, req *v1.CreatePortalRequest) (*v1.CreatePortalResponse, error) {
-	var res v1.CreatePortalResponse
-	if err := c.client.CallUnary(ctx, billingServiceCreatePortalSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *billingServiceClient) CreateCheckout(ctx context.Context, req *v1.CreateCheckoutRequest) (*v1.CreateCheckoutResponse, error) {
-	var res v1.CreateCheckoutResponse
-	if err := c.client.CallUnary(ctx, billingServiceCreateCheckoutSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *billingServiceClient) CancelSubscription(ctx context.Context, req *v1.CancelSubscriptionRequest) (*v1.CancelSubscriptionResponse, error) {
-	var res v1.CancelSubscriptionResponse
-	if err := c.client.CallUnary(ctx, billingServiceCancelSubscriptionSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -216,42 +143,6 @@ func (h billingServiceHandler) getBilling(ctx context.Context, _ connect.Spec, s
 		return err
 	}
 	res, err := h.svc.GetBilling(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h billingServiceHandler) createPortal(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.CreatePortalRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.CreatePortal(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h billingServiceHandler) createCheckout(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.CreateCheckoutRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.CreateCheckout(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h billingServiceHandler) cancelSubscription(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.CancelSubscriptionRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.CancelSubscription(ctx, &req)
 	if err != nil {
 		return err
 	}

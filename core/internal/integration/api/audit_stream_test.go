@@ -147,8 +147,8 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 
 // A secret that does not open fails its own stream, no other workspace's.
 func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
-	cfg, _ := enterprise(t)
-	broken, good := seedOtherWorkspace(t, cfg), testWorkspace.ID
+	broken, good := seedOtherWorkspace(t, testCfg), testWorkspace.ID
+	cfg, _ := enterprise(t, broken)
 
 	got := make(chan struct{}, 1)
 	siem := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {

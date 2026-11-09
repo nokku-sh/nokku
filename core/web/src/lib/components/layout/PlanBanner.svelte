@@ -12,12 +12,12 @@
 	const next = $derived.by(() => {
 		if (can.own) {
 			return deleteAt
-				? `Subscribe before ${deleteAt} or the workspace is deleted`
-				: 'Subscribe to turn signing back on';
+				? `Activate a license key before ${deleteAt} or the workspace is deleted`
+				: 'Activate a license key to turn signing back on';
 		}
 		return deleteAt
-			? `The workspace is deleted on ${deleteAt} unless the owner subscribes`
-			: 'Ask the workspace owner to subscribe';
+			? `The workspace is deleted on ${deleteAt} unless the owner activates a license key`
+			: 'Ask the workspace owner to activate a license key';
 	});
 </script>
 

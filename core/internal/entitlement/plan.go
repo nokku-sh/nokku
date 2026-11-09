@@ -22,6 +22,7 @@ const (
 	PlanInactive = "inactive"
 )
 
+// TrialDays is how long a hosted signup runs on Pro before it needs a key.
 const TrialDays = 30
 
 const unlimited int64 = -1
@@ -74,12 +75,15 @@ var plans = []Plan{
 }
 
 // inactive keeps Community's features and data limits, so the owner can SSO in
-// to subscribe. It signs no user certificates and takes nothing new.
+// to activate a key. It signs no user certificates and takes nothing new.
 var inactive = func() Plan {
 	p := resolvePlan(PlanCommunity)
 	p.Name, p.SeatCap, p.ResourceCap = PlanInactive, 0, 0
 	return p
 }()
+
+// trial is what a hosted signup gets until its first key.
+var trial = resolvePlan(PlanPro)
 
 type Feature struct {
 	Code  string

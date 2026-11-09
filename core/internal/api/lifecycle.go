@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/billing"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/email"
@@ -68,10 +67,10 @@ func remindTrials(ctx context.Context, cfg *config.Config) {
 			UserID:     row.OwnerID,
 			Email:      row.OwnerEmail,
 			Workspace:  row.WorkspaceName,
-			BillingURL: billing.Page(cfg.Tenant.BaseURL(row.Slug)),
+			BillingURL: billingPage(cfg.Tenant.BaseURL(row.Slug)),
 			Next:       nextReminder(due, trialReminders),
 			Ends:       row.TrialEnd,
-			Deleted:    deleteAfter(entitlement.SourceTrial, row.TrialEnd),
+			Deleted:    entitlement.HoldEnd(row.TrialEnd),
 		})
 		if err != nil && !errors.Is(err, email.ErrCooldown) {
 			slog.Warn("trial reminder not sent", "error", err, "workspace_id", row.WorkspaceID)
@@ -93,35 +92,35 @@ func purgeLapsed(ctx context.Context, cfg *config.Config) {
 		return
 	}
 	for _, row := range rows {
-		sub := &row.WorkspaceSubscription
+		lic := &row.WorkspaceLicense
 		mails := cfg.Email.HasSMTP() && row.OwnerEmail != nil
-		step, due, deleteAt := lapseStep(sub, mails, time.Now())
+		step, due, deleteAt := lapseStep(lic, mails, time.Now())
 		switch step {
 		case lapseWait:
 		case lapseWarn:
 			warnDeletion(ctx, cfg, row, due, deleteAt)
 		case lapseDelete:
-			ws := actor.Workspace{ID: sub.WorkspaceID, Slug: row.Slug}
+			ws := actor.Workspace{ID: lic.WorkspaceID, Slug: row.Slug}
 			if err := deleteWorkspace(ctx, cfg, ws); err != nil {
 				slog.Error("deleting a lapsed workspace failed", "error", err, "workspace_id", ws.ID)
 				continue
 			}
 			slog.Info("deleted a workspace that stopped paying",
-				"workspace_id", ws.ID, "slug", ws.Slug, "source", sub.Source)
+				"workspace_id", ws.ID, "slug", ws.Slug, "trial", entitlement.OnTrial(lic))
 		}
 	}
 }
 
 // With mail, nobody goes before the last warning, which gets its full days.
-func lapseStep(sub *db.WorkspaceSubscription, mails bool, now time.Time) (lapseAction, int32, time.Time) {
-	ends := deletionDate(sub)
+func lapseStep(lic *db.WorkspaceLicense, mails bool, now time.Time) (lapseAction, int32, time.Time) {
+	ends := deletionDate(lic)
 	if ends == nil {
 		return lapseWait, 0, time.Time{}
 	}
-	deleteAt, last := *ends, lastWarning(sub)
+	deleteAt, last := *ends, lastWarning(lic)
 
 	left := deleteAt.Sub(now)
-	if due := reminderDue(left, sub.DeletionWarning, deletionWarnings(sub)); due != 0 && mails {
+	if due := reminderDue(left, lic.DeletionWarning, deletionWarnings(lic)); due != 0 && mails {
 		if due == last {
 			deleteAt = later(deleteAt, now.Add(days(last)))
 		}
@@ -133,38 +132,38 @@ func lapseStep(sub *db.WorkspaceSubscription, mails bool, now time.Time) (lapseA
 	return lapseDelete, 0, deleteAt
 }
 
-// deletionDate is nil while the workspace runs and for a manual plan, which the
-// operator ends by hand. A late last warning pushes it out.
-func deletionDate(sub *db.WorkspaceSubscription) *time.Time {
-	ended := entitlement.Ended(sub)
-	if ended == nil || (sub.Source != entitlement.SourceTrial && sub.Source != entitlement.SourceStripe) {
+// deletionDate is nil while the workspace runs or its key never expires, a late last warning pushes it out.
+func deletionDate(lic *db.WorkspaceLicense) *time.Time {
+	ended := entitlement.Ended(lic)
+	if ended == nil {
 		return nil
 	}
-	ends := deleteAfter(sub.Source, *ended)
-	if last := lastWarning(sub); sub.DeletionWarning == last && sub.DeletionWarnedAt != nil {
-		ends = later(ends, sub.DeletionWarnedAt.Add(days(last)))
+	// A trial goes when its hold ends, a key that ran out waits half a year.
+	ends := ended.Add(days(lapsedKeepDays))
+	if entitlement.OnTrial(lic) {
+		ends = entitlement.HoldEnd(*ended)
+	}
+	if last := lastWarning(lic); lic.DeletionWarning == last && lic.DeletionWarnedAt != nil {
+		ends = later(ends, lic.DeletionWarnedAt.Add(days(last)))
 	}
 	return &ends
 }
 
-// deleteAfter is the date before a late warning moves it.
-func deleteAfter(source string, ended time.Time) time.Time {
-	if source == entitlement.SourceTrial {
-		return entitlement.HoldEnd(ended)
-	}
-	return ended.Add(days(lapsedKeepDays))
-}
-
-func deletionWarnings(sub *db.WorkspaceSubscription) []int32 {
-	if sub.Source == entitlement.SourceTrial {
+func deletionWarnings(lic *db.WorkspaceLicense) []int32 {
+	if entitlement.OnTrial(lic) {
 		return trialDeletionWarnings
 	}
 	return paidDeletionWarnings
 }
 
-func lastWarning(sub *db.WorkspaceSubscription) int32 {
-	w := deletionWarnings(sub)
+func lastWarning(lic *db.WorkspaceLicense) int32 {
+	w := deletionWarnings(lic)
 	return w[len(w)-1]
+}
+
+// billingPage is on the workspace host, the hosted root host has no workspace.
+func billingPage(baseURL string) string {
+	return baseURL + "/settings/billing"
 }
 
 func warnDeletion(
@@ -174,27 +173,27 @@ func warnDeletion(
 	due int32,
 	deleteAt time.Time,
 ) {
-	sub := &row.WorkspaceSubscription
+	lic := &row.WorkspaceLicense
 	err := cfg.Email.SendDeletionWarningEmail(ctx, email.DeletionWarning{
 		UserID:     *row.OwnerID,
 		Email:      *row.OwnerEmail,
 		Workspace:  row.WorkspaceName,
 		Slug:       row.Slug,
-		BillingURL: billing.Page(cfg.Tenant.BaseURL(row.Slug)),
-		Trial:      sub.Source == entitlement.SourceTrial,
-		Next:       nextReminder(due, deletionWarnings(sub)),
-		Ended:      *entitlement.Ended(sub),
+		BillingURL: billingPage(cfg.Tenant.BaseURL(row.Slug)),
+		Trial:      entitlement.OnTrial(lic),
+		Next:       nextReminder(due, deletionWarnings(lic)),
+		Ended:      *entitlement.Ended(lic),
 		Deleted:    deleteAt,
 	})
 	if err != nil && !errors.Is(err, email.ErrCooldown) {
-		slog.Warn("deletion warning not sent", "error", err, "workspace_id", sub.WorkspaceID)
+		slog.Warn("deletion warning not sent", "error", err, "workspace_id", lic.WorkspaceID)
 		return
 	}
 	if err := cfg.Conn.Sys().SetDeletionWarning(ctx, &db.SetDeletionWarningParams{
 		Days:        due,
-		WorkspaceID: sub.WorkspaceID,
+		WorkspaceID: lic.WorkspaceID,
 	}); err != nil {
-		slog.Warn("deletion warning not recorded", "error", err, "workspace_id", sub.WorkspaceID)
+		slog.Warn("deletion warning not recorded", "error", err, "workspace_id", lic.WorkspaceID)
 	}
 }
 

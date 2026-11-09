@@ -47,27 +47,25 @@ func TestNextReminder(t *testing.T) {
 func TestLapseStep(t *testing.T) {
 	now := time.Now()
 	day := 24 * time.Hour
-	// A paid plan that ended this long ago is deleted 180 days after it ended.
-	paid := func(endedAgo time.Duration, warned int32, warnedAgo time.Duration) *db.WorkspaceSubscription {
-		sub := &db.WorkspaceSubscription{
-			Source: "stripe", Status: "canceled", EndedAt: new(now.Add(-endedAgo)), DeletionWarning: warned,
-		}
+	// A key that ran out this long ago is deleted 180 days after it did.
+	paid := func(endedAgo time.Duration, warned int32, warnedAgo time.Duration) *db.WorkspaceLicense {
+		lic := &db.WorkspaceLicense{Key: "NOKKU-KEY", EndsAt: new(now.Add(-endedAgo)), DeletionWarning: warned}
 		if warned != 0 {
-			sub.DeletionWarnedAt = new(now.Add(-warnedAgo))
+			lic.DeletionWarnedAt = new(now.Add(-warnedAgo))
 		}
-		return sub
+		return lic
 	}
 	tests := []struct {
 		name       string
-		sub        *db.WorkspaceSubscription
+		lic        *db.WorkspaceLicense
 		mails      bool
 		want       lapseAction
 		wantDue    int32
 		wantDelete time.Time
 	}{
 		{
-			"a running plan",
-			&db.WorkspaceSubscription{Source: "stripe", Status: "active"},
+			"a running key",
+			&db.WorkspaceLicense{Key: "NOKKU-KEY", EndsAt: new(now.Add(30 * day))},
 			true,
 			lapseWait,
 			0,
@@ -89,13 +87,13 @@ func TestLapseStep(t *testing.T) {
 		{"no mail to send waits for the date", paid(170*day, 0, 0), false, lapseWait, 0, now.Add(10 * day)},
 		{
 			"a trial gets one warning",
-			&db.WorkspaceSubscription{Source: entitlement.SourceTrial, CurrentPeriodEnd: new(now.Add(-25 * day))},
+			&db.WorkspaceLicense{EndsAt: new(now.Add(-25 * day))},
 			true, lapseWarn, 7, now.Add(7 * day),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, due, deleteAt := lapseStep(tt.sub, tt.mails, now)
+			got, due, deleteAt := lapseStep(tt.lic, tt.mails, now)
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.wantDue, due)
 			assert.WithinDuration(t, tt.wantDelete, deleteAt, time.Minute)
@@ -109,35 +107,26 @@ func TestDeletionDate(t *testing.T) {
 	trialEnd, paidEnd := now.Add(-time.Hour), now.Add(-10*day)
 	tests := []struct {
 		name string
-		sub  *db.WorkspaceSubscription
+		lic  *db.WorkspaceLicense
 		want *time.Time
 	}{
-		{
-			"a running trial",
-			&db.WorkspaceSubscription{Source: entitlement.SourceTrial, CurrentPeriodEnd: new(now.Add(day))},
-			nil,
-		},
+		{"a running trial", &db.WorkspaceLicense{EndsAt: new(now.Add(day))}, nil},
 		{
 			"an ended trial waits out the hold",
-			&db.WorkspaceSubscription{Source: entitlement.SourceTrial, CurrentPeriodEnd: &trialEnd},
+			&db.WorkspaceLicense{EndsAt: &trialEnd},
 			new(entitlement.HoldEnd(trialEnd)),
 		},
-		{"a paid plan", &db.WorkspaceSubscription{Source: "stripe", Status: "active"}, nil},
+		{"a running key", &db.WorkspaceLicense{Key: "NOKKU-KEY", EndsAt: new(now.Add(day))}, nil},
 		{
-			"a lapsed paid plan waits half a year",
-			&db.WorkspaceSubscription{Source: "stripe", Status: "canceled", EndedAt: &paidEnd},
+			"an expired key waits half a year",
+			&db.WorkspaceLicense{Key: "NOKKU-KEY", EndsAt: &paidEnd},
 			new(paidEnd.Add(180 * day)),
 		},
-		{
-			"an abandoned checkout never ended",
-			&db.WorkspaceSubscription{Source: "stripe", Status: "incomplete_expired"},
-			nil,
-		},
-		{"a manual plan", &db.WorkspaceSubscription{Source: "manual", Status: "canceled", EndedAt: &paidEnd}, nil},
+		{"a key that never expires", &db.WorkspaceLicense{Key: "NOKKU-KEY"}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := deletionDate(tt.sub)
+			got := deletionDate(tt.lic)
 			if tt.want == nil {
 				assert.Nil(t, got)
 				return

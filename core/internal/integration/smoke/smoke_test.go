@@ -576,7 +576,7 @@ func startCore(t *testing.T, bin, smtpHost, smtpPort, platformCert string) core 
 		binary: filepath.Join(bin, "nokku"),
 		url:    "http://localhost:" + port,
 		// Nothing comes from the developer's shell, so it cannot point the core
-		// at real mail, Stripe, KMS or SSO.
+		// at real mail, a license server, KMS or SSO.
 		env: []string{
 			"HOME=" + t.TempDir(),
 			"NOKKU_BASE_URL=localhost:" + port,

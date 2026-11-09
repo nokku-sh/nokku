@@ -240,14 +240,14 @@
 				{
 					title: 'Delete workspace',
 					description:
-						'Removes every person, team, server, certificate, recording and the audit log. Active subscriptions are canceled. Export the audit log first if you need a record.',
+						'Removes every person, team, server, certificate, recording and the audit log. A license keeps running, cancel it in the billing portal. Export the audit log first if you need a record.',
 					label: 'Delete',
 					onClick: () =>
 						whenFresh(() =>
 							confirm({
 								title: 'Delete workspace?',
 								description:
-									'This permanently deletes the workspace with its recordings and audit log, and cancels any active subscription. Enrolled servers keep what they last synced, so certificates already signed work until they expire. Remove nokkud from them afterwards. This cannot be undone.',
+									'This permanently deletes the workspace with its recordings and audit log. A license keeps running until you cancel it in the billing portal. Enrolled servers keep what they last synced, so certificates already signed work until they expire. Remove nokkud from them afterwards. This cannot be undone.',
 								confirmText: 'Delete workspace',
 								typeToConfirm: ws.data?.name,
 								onConfirm: () => remove.mutateAsync({})

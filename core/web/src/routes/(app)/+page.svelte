@@ -20,7 +20,7 @@
 
 	const me = user.self();
 	const ws = workspace.get();
-	// Without a plan nothing signs, so the ways in stay hidden until the owner subscribes.
+	// Without a plan nothing signs, so the ways in stay hidden until the owner activates a license key.
 	const plan = workspace.plan();
 	const inactive = $derived(!!plan.data?.inactive);
 	const role = $derived(me.data?.role);

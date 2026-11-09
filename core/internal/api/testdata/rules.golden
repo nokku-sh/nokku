@@ -28,9 +28,6 @@
 /nokku.v1.AuthService/Logout public=true self=false role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.AuthService/RequestMagicLink public=true self=false role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.BillingService/ActivateLicense public=false self=false role=OWNER daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
-/nokku.v1.BillingService/CancelSubscription public=false self=false role=OWNER daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
-/nokku.v1.BillingService/CreateCheckout public=false self=false role=OWNER daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
-/nokku.v1.BillingService/CreatePortal public=false self=false role=OWNER daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.BillingService/GetBilling public=false self=false role=ADMIN daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.BillingService/GetLicense public=false self=true role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.CertificateService/GetCertificateAuthority public=false self=false role=MEMBER daemon=false cli=true people_only=false fresh=false feature= capped=false signs=false audited=false

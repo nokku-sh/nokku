@@ -87,11 +87,6 @@ tasks:
       - go generate ./core/web
       - goreleaser build --snapshot --clean {{.CLI_ARGS}}
 
-  stripe:
-    desc: Listen webhook test
-    cmds:
-      - stripe listen -f http://localhost:3000/webhooks/stripe --events customer.subscription.created,customer.subscription.updated,customer.subscription.deleted
-
   seed:
     desc: Fill the dev database with fake data, flags go after --
     cmds:

@@ -26,7 +26,7 @@ func (s *Service) CanInvite(ctx context.Context, workspaceID string, used int64)
 
 func errInactive() error {
 	return connect.NewError(connect.CodeFailedPrecondition,
-		"this workspace has no active plan, the owner can subscribe under Billing")
+		"this workspace has no active plan, the owner can activate a license key under Billing")
 }
 
 // CheckResources fails open, a count that can't be read allows the create.

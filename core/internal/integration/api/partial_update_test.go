@@ -54,21 +54,21 @@ type partialResource struct {
 
 // TestPartialUpdates pins what each update does to the fields it was not sent.
 func TestPartialUpdates(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	admin := partialConn(srv, seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
+	cfg, _ := newTestAPI(t)
 	// Idle timeout and audit streams are paid, the shared server has neither.
-	_, paid := enterprise(t)
+	_, srv := enterprise(t)
+	admin := partialConn(srv, seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
 
 	resources := []partialResource{
 		partialAccount(t, cfg, srv),
 		partialCA(t, admin),
 		partialDaemon(t, cfg, srv, admin),
 	}
-	resources = append(resources, partialWorkspace(t, cfg, paid)...)
+	resources = append(resources, partialWorkspace(t, cfg, srv)...)
 	resources = append(resources,
 		partialTeam(t, cfg, admin),
 		partialTarget(t, admin),
-		partialAuditStream(t, cfg, paid),
+		partialAuditStream(t, cfg, srv),
 		partialServiceAccount(t, admin),
 	)
 

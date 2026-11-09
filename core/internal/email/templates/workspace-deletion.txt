@@ -5,15 +5,15 @@ Workspace deletion
 
 {{ .Workspace }} is deleted on {{ .DeleteDate }}.
 
-Its {{ if .Trial }}trial{{ else }}plan{{ end }} ended on {{ .EndDate }} and nobody subscribed since. Subscribe before the deletion and everything stays as it is.
+Its {{ if .Trial }}trial{{ else }}plan{{ end }} ended on {{ .EndDate }} and no license key was activated since. Activate one before the deletion and everything stays as it is.
 
 What goes: the servers and their access rules, the certificate authority, the audit log and the recordings.
 
 The name: {{ .Slug }} becomes free for anyone to sign up with.
 
-Pro is billed per member, at least 5. Stripe shows the total before you pay.
+Buy a license on our website, the key comes by email. Paste it under Billing.
 
-Subscribe to Pro {{ .BillingURL }}
+Open billing {{ .BillingURL }}
 
 You get this because you own this workspace.{{ if .Next }} One more warning comes {{ .Next }} before the deletion.{{ end }}
 

@@ -28,11 +28,12 @@ func enterpriseServer(t *testing.T) *httptest.Server {
 	return srv
 }
 
-// enterprise is enterpriseServer with its config, for what runs beside it.
-func enterprise(t *testing.T) (*config.Config, *httptest.Server) {
+// enterprise licenses the shared workspace and each of also, hosted the shared server reads it as inactive meanwhile.
+func enterprise(t *testing.T, also ...string) (*config.Config, *httptest.Server) {
 	t.Helper()
 	cfg, _ := newTestAPI(t)
-	pubHex, key := issueLicense(t, entitlement.PlanEnterprise)
+	pubHex, key := issueLicense(t)
+	keepLicense(t, cfg)
 
 	local := *cfg
 	var err error
@@ -45,6 +46,9 @@ func enterprise(t *testing.T) (*config.Config, *httptest.Server) {
 	_, err = nokkuv1connect.NewBillingServiceClient(clientOn(srv, header("Authorization", "Bearer "+owner))).
 		ActivateLicense(t.Context(), &nokkuv1.ActivateLicenseRequest{Key: &key})
 	require.NoError(t, err)
+	for _, ws := range also {
+		require.NoError(t, local.Entitlements.ActivateLicense(t.Context(), ws, key))
+	}
 	return &local, srv
 }
 

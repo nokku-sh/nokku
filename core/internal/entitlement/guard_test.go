@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -83,29 +82,12 @@ func TestRequestedFeatures(t *testing.T) {
 	}
 }
 
-func TestCheckFeaturesDeniesAFeatureThePlanLacks(t *testing.T) {
-	sut := selfHosted(t)
-	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
-
-	err := sut.CheckFeatures(ctx, []string{FeatureAuditExport})
-
-	require.Error(t, err)
-	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
-	assert.ErrorContains(t, err, "Audit log export is not available on the Community plan")
-}
-
-func TestCheckFeaturesAllowsPaidPlanAndUnpinnedContext(t *testing.T) {
+// The plan lookups are in internal/integration/api, the access matrix gates every feature.
+func TestCheckFeaturesPassesWithoutALookup(t *testing.T) {
 	pinned := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "ws1"})
 
-	licensed := selfHosted(t, issue(t, PlanEnterprise, time.Hour))
-	require.NoError(t, licensed.CheckFeatures(pinned, []string{FeatureAuditExport}))
-
 	// The authz interceptor owns that boundary.
-	community := selfHosted(t)
-	require.NoError(
-		t,
-		community.CheckFeatures(t.Context(), []string{FeatureAuditExport}),
-		"an unpinned context must pass",
-	)
-	assert.NoError(t, community.CheckFeatures(pinned, nil), "a call that needs no feature must pass")
+	require.NoError(t, selfHosted.CheckFeatures(t.Context(), []string{FeatureAuditExport}),
+		"an unpinned context must pass")
+	assert.NoError(t, selfHosted.CheckFeatures(pinned, nil), "a call that needs no feature must pass")
 }

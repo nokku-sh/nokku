@@ -32,7 +32,6 @@ require (
 	github.com/scaleway/tink-go-scwkms v0.1.2
 	github.com/scim2/filter-parser/v2 v2.3.1
 	github.com/stretchr/testify v1.12.1
-	github.com/stripe/stripe-go/v87 v87.1.0
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/tink-crypto/tink-go-hcvault/v2 v2.5.0
 	github.com/tink-crypto/tink-go/v2 v2.9.0

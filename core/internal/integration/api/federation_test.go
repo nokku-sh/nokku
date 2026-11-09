@@ -695,19 +695,9 @@ func TestExchangeFollowsThePlan(t *testing.T) {
 	stopped := httptest.NewServer(serving(api.New(&local).Handler(t.Context())))
 	t.Cleanup(stopped.Close)
 
-	// The shared workspace's trial ended an hour ago, for this server only.
-	ws := testWorkspace.ID
-	sub, err := f.cfg.Conn.Sys().GetSubscription(t.Context(), ws)
-	require.NoError(t, err)
-	setEnd := func(source string, end time.Time) error {
-		return f.cfg.Conn.Sys().UpsertSubscription(context.WithoutCancel(t.Context()), &db.UpsertSubscriptionParams{
-			WorkspaceID: ws, Source: source, Plan: sub.Plan, Status: sub.Status,
-			CurrentPeriodEnd: &end,
-		})
-	}
-	restore := func() error { return setEnd(sub.Source, *sub.CurrentPeriodEnd) }
-	t.Cleanup(func() { _ = restore() })
-	require.NoError(t, setEnd(entitlement.SourceTrial, time.Now().Add(-time.Hour)))
+	// A hosted server reads no plan as inactive, a hosted trial is ended for it.
+	restore := withoutAPlan(t, f.cfg)
+	t.Cleanup(restore)
 
 	inactive := federation{cfg: f.cfg, srv: stopped}
 	token := f.issuer.sign(t, f.issuer.claims())
@@ -717,7 +707,7 @@ func TestExchangeFollowsThePlan(t *testing.T) {
 	require.NotEmpty(t, rows)
 	assert.Contains(t, string(rows[0].Details), "does not sign")
 
-	require.NoError(t, restore())
+	restore()
 	_, err = f.exchange(t, f.account.GetName(), token, f.proof(t))
 	require.NoError(t, err, "a plan refusal must not spend the job token")
 }

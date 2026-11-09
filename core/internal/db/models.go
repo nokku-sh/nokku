@@ -172,12 +172,6 @@ type Grant struct {
 	ExpiresAt        *time.Time `json:"expiresAt"`
 }
 
-type InstanceLicense struct {
-	ID        int32     `json:"id"`
-	Key       string    `json:"key"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
 type JoinToken struct {
 	ID          string             `json:"id"`
 	WorkspaceID string             `json:"workspaceId"`
@@ -396,24 +390,18 @@ type Workspace struct {
 	UpdatedAt       time.Time                `json:"updatedAt"`
 }
 
+type WorkspaceLicense struct {
+	WorkspaceID      string     `json:"workspaceId"`
+	Key              string     `json:"key"`
+	LicenseID        *string    `json:"licenseId"`
+	EndsAt           *time.Time `json:"endsAt"`
+	TrialReminder    int32      `json:"trialReminder"`
+	DeletionWarning  int32      `json:"deletionWarning"`
+	DeletionWarnedAt *time.Time `json:"deletionWarnedAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
+}
+
 type WorkspaceState struct {
 	WorkspaceID string `json:"workspaceId"`
 	Version     int64  `json:"version"`
-}
-
-type WorkspaceSubscription struct {
-	WorkspaceID       string     `json:"workspaceId"`
-	Source            string     `json:"source"`
-	Plan              string     `json:"plan"`
-	Status            string     `json:"status"`
-	CustomerID        string     `json:"customerId"`
-	SubscriptionID    string     `json:"subscriptionId"`
-	CurrentPeriodEnd  *time.Time `json:"currentPeriodEnd"`
-	CancelAtPeriodEnd bool       `json:"cancelAtPeriodEnd"`
-	Seats             int64      `json:"seats"`
-	EndedAt           *time.Time `json:"endedAt"`
-	TrialReminder     int32      `json:"trialReminder"`
-	DeletionWarning   int32      `json:"deletionWarning"`
-	DeletionWarnedAt  *time.Time `json:"deletionWarnedAt"`
-	UpdatedAt         time.Time  `json:"updatedAt"`
 }

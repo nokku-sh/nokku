@@ -34,10 +34,6 @@ var (
 		connect.CodePermissionDenied,
 		"you don't have permission to do that",
 	)
-	errBillingDisabled = connect.NewError(
-		connect.CodeUnimplemented,
-		"billing is disabled",
-	)
 	errInviteInvalid = connect.NewError(
 		connect.CodeFailedPrecondition,
 		"invalid or expired invitation",

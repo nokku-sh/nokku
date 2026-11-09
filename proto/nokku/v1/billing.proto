@@ -7,18 +7,10 @@ import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
 service BillingService {
+  // GetBilling also asks the license server for the current key, so new seats show up at once.
   rpc GetBilling(GetBillingRequest) returns (GetBillingResponse) {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
     option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc CreatePortal(CreatePortalRequest) returns (CreatePortalResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
-  }
-  rpc CreateCheckout(CreateCheckoutRequest) returns (CreateCheckoutResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
-  }
-  rpc CancelSubscription(CancelSubscriptionRequest) returns (CancelSubscriptionResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
   }
   rpc GetLicense(GetLicenseRequest) returns (GetLicenseResponse) {
     option (access) = {self: true};
@@ -37,9 +29,15 @@ message GetBillingResponse {
   Quotas quotas = 4;
   int64 user_count = 5;
   int64 resource_count = 6;
-  Subscription subscription = 7;
+  reserved 7;
   Quotas held_quotas = 8;
   google.protobuf.Timestamp held_until = 9;
+  // The end of a hosted trial, set until the first key is activated.
+  google.protobuf.Timestamp trial_ends_at = 10;
+  // When a hosted workspace whose plan ended is deleted.
+  google.protobuf.Timestamp delete_at = 11;
+  // The key this response was resolved from, after the refresh.
+  GetLicenseResponse license = 12;
 }
 
 message Quotas {
@@ -49,33 +47,6 @@ message Quotas {
   int64 resource_cap = 4;
   int64 recording_retention_days = 5;
 }
-
-message Subscription {
-  string status = 1;
-  bool cancel_at_period_end = 2;
-  google.protobuf.Timestamp current_period_end = 3;
-  bool trial = 4;
-  google.protobuf.Timestamp delete_at = 5;
-  google.protobuf.Timestamp ended_at = 6;
-}
-
-message CreatePortalRequest {}
-message CreatePortalResponse {
-  string url = 1;
-}
-
-message CreateCheckoutRequest {
-  bool yearly = 1;
-}
-message CreateCheckoutResponse {
-  string url = 1;
-}
-
-message CancelSubscriptionRequest {
-  bool immediate = 1;
-  string reason = 2 [(buf.validate.field).string.max_len = 1000];
-}
-message CancelSubscriptionResponse {}
 
 message GetLicenseRequest {}
 message GetLicenseResponse {

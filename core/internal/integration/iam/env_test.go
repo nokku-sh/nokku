@@ -85,7 +85,7 @@ func testDomain() string {
 func (e *testEnv) workspace(t *testing.T) actor.Workspace {
 	t.Helper()
 	slug := "w" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[:12]
-	ws, err := tenant.Create(t.Context(), e.conn, e.keys, slug, "Test")
+	ws, err := tenant.Create(t.Context(), e.conn, e.keys, slug, "Test", 0)
 	require.NoError(t, err, "create workspace")
 	return actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: testBaseURL}
 }

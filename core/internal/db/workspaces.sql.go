@@ -261,31 +261,6 @@ func (q *Queries) ListUnclaimedWorkspaces(ctx context.Context, cutoff time.Time)
 	return items, nil
 }
 
-const startTrial = `-- name: StartTrial :exec
-INSERT INTO
-  workspace_subscriptions (source, plan, status, current_period_end)
-VALUES
-  (
-    'trial',
-    $1,
-    'trial',
-    NOW() + make_interval(days => $2::int)
-  )
-ON CONFLICT (workspace_id) DO NOTHING
-`
-
-type StartTrialParams struct {
-	Plan string `json:"plan"`
-	Days int32  `json:"days"`
-}
-
-// A hosted workspace starts on a trial, the first checkout replaces the row. Its status is none of Stripe's, so
-// entitlement.Active never reads it as paid.
-func (q *Queries) StartTrial(ctx context.Context, arg *StartTrialParams) error {
-	_, err := q.db.Exec(ctx, startTrial, arg.Plan, arg.Days)
-	return err
-}
-
 const updateWorkspace = `-- name: UpdateWorkspace :one
 UPDATE workspaces
 SET

@@ -25,7 +25,6 @@ func TestRateLimited(t *testing.T) {
 		{"/passkey/login/begin", true},
 		{"/auth/device", true},
 		{"/terminal/ws", true},
-		{"/webhooks/stripe", true},
 		{"/", true},
 		{"/login", true},
 		{"/totally/unknown", true},

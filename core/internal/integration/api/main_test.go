@@ -73,10 +73,6 @@ func TestMain(m *testing.M) {
 		stopKMS = testenv.KMS(storageDir)
 		os.Setenv("NOKKU_SAAS", "true")
 		os.Setenv("NOKKU_BASE_URL", hostedBase)
-		os.Setenv("STRIPE_SECRET_KEY", "sk_test_never_called")
-		os.Setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
-		os.Setenv("STRIPE_PRO_MONTHLY_PRICE_ID", "price_monthly")
-		os.Setenv("STRIPE_PRO_YEARLY_PRICE_ID", "price_yearly")
 	} else {
 		os.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
 	}
@@ -148,7 +144,7 @@ func workspaceName(ctx context.Context, conn *db.Connection) (string, error) {
 // seedOtherWorkspace makes a workspace no request can reach or see.
 func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 	t.Helper()
-	ws, err := tenant.Create(t.Context(), cfg.Conn, cfg.Keyset, uuid.NewV7().String(), "other")
+	ws, err := tenant.Create(t.Context(), cfg.Conn, cfg.Keyset, uuid.NewV7().String(), "other", 0)
 	require.NoError(t, err)
 	return ws.ID
 }

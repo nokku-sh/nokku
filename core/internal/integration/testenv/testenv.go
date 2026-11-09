@@ -115,10 +115,6 @@ func pointEnvAt(ctx context.Context, c *testcontainers.DockerContainer) error {
 		"NOKKU_TRUSTED_PROXIES",
 		"NOKKU_WORKSPACE_NAME",
 		"OTEL_EXPORTER_OTLP_ENDPOINT",
-		"STRIPE_PRO_MONTHLY_PRICE_ID",
-		"STRIPE_PRO_YEARLY_PRICE_ID",
-		"STRIPE_SECRET_KEY",
-		"STRIPE_WEBHOOK_SECRET",
 	} {
 		_ = os.Unsetenv(key)
 	}

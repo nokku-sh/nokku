@@ -7,7 +7,7 @@
 	import { formatBytes, formatTs } from '#lib/utils.js';
 	import { Check, Lock } from '@lucide/svelte';
 
-	let { billing, mode }: { billing: GetBillingResponse; mode: string } = $props();
+	let { billing }: { billing: GetBillingResponse } = $props();
 	const plans = usePlans();
 
 	// -1 is unlimited. int64 fields arrive as number | bigint.
@@ -70,11 +70,9 @@
 			{/if}
 			{#if full}
 				<p class="text-xs text-muted-foreground">
-					{!paidSeats
-						? 'The plan is full. Pro lifts the cap.'
-						: mode === 'saas'
-							? 'Every seat is taken. Add seats under Manage plan and payment to invite more people.'
-							: 'Every seat is taken. A license with more seats lets you invite more people.'}
+					{paidSeats
+						? 'Every seat is taken. Add seats under Manage seats and payment to invite more people.'
+						: 'The plan is full. Pro lifts the cap.'}
 				</p>
 			{/if}
 		</div>

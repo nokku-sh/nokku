@@ -70,7 +70,7 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		)
 		INSERT INTO join_token_grants (workspace_id, token_id, username, user_id) SELECT $1, id, 'dev', $2 FROM t;
 		INSERT INTO recordings (workspace_id, daemon_name, username, key) VALUES ($1, 'd', 'deploy', 'key');
-		INSERT INTO workspace_subscriptions (workspace_id, source, plan) VALUES ($1, 'stripe', 'pro');
+		INSERT INTO workspace_licenses (workspace_id, key) VALUES ($1, 'NOKKU-KEY');
 		INSERT INTO access_usage (workspace_id, target_id, subject_id) VALUES ($1, $3, $2);
 		INSERT INTO access_requests (workspace_id, requester_id, account_id, duration, reason)
 		VALUES ($1, $2, $4, '1 hour', 'fix');

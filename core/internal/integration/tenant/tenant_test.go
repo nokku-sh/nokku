@@ -82,7 +82,7 @@ func TestSelfHostBootCreatesTheWorkspaceOnce(t *testing.T) {
 // The CA comes with the workspace and stays the only one.
 func TestWorkspaceHasOneCA(t *testing.T) {
 	c, keys := testConnection(t)
-	ws, err := tenant.Create(t.Context(), c, keys, "w"+uuid.New().String()[:8], "Acme")
+	ws, err := tenant.Create(t.Context(), c, keys, "w"+uuid.New().String()[:8], "Acme", 0)
 	require.NoError(t, err)
 
 	err = c.TenantTx(actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws.ID}), func(q *db.Queries) error {
@@ -98,7 +98,7 @@ func TestSaaSResolvesBySlug(t *testing.T) {
 	require.NoError(t, err)
 
 	slug := "w" + uuid.New().String()[:8]
-	created, err := tenant.Create(t.Context(), c, keys, slug, "Acme")
+	created, err := tenant.Create(t.Context(), c, keys, slug, "Acme", 0)
 	require.NoError(t, err)
 
 	ws, err := r.FromHost(t.Context(), slug+".nokku.test")
@@ -117,7 +117,7 @@ func TestPurgeUnclaimed(t *testing.T) {
 	require.NoError(t, err)
 
 	slug := "w" + uuid.New().String()[:8]
-	_, err = tenant.Create(t.Context(), c, keys, slug, "Squat")
+	_, err = tenant.Create(t.Context(), c, keys, slug, "Squat", 0)
 	require.NoError(t, err)
 	_, err = r.FromHost(t.Context(), slug+".nokku.test")
 	require.NoError(t, err, "the fresh signup resolves")
@@ -139,7 +139,7 @@ func TestPurgeKeepsAClaimedWorkspace(t *testing.T) {
 	require.NoError(t, err)
 
 	slug := "w" + uuid.New().String()[:8]
-	ws, err := tenant.Create(t.Context(), c, keys, slug, "Claimed")
+	ws, err := tenant.Create(t.Context(), c, keys, slug, "Claimed", 0)
 	require.NoError(t, err)
 	require.NoError(t, c.Tenant().ClaimWorkspace(actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws.ID})))
 

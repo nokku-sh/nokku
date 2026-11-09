@@ -5,15 +5,15 @@ Trial ending
 
 Your trial ends in {{ .Left }}.
 
-The Pro trial of {{ .Workspace }} ends on {{ .EndDate }}. Subscribe before then and nothing changes. You keep the rest of the trial, the first charge comes when it ends.
+The Pro trial of {{ .Workspace }} ends on {{ .EndDate }}. Activate a license key before then and nothing changes.
 
 After the trial: Nokku signs no certificates for this workspace. Servers keep their access rules.
 
 On {{ .DeleteDate }}: the workspace is deleted, with its audit log and recordings.
 
-Pro is billed per member, at least 5. Stripe shows the total before you pay.
+Buy a license on our website, the key comes by email. Paste it under Billing.
 
-Subscribe to Pro {{ .BillingURL }}
+Open billing {{ .BillingURL }}
 
 You get this because you own this workspace.{{ if .Next }} One more reminder comes {{ .Next }} before the end.{{ end }}
 

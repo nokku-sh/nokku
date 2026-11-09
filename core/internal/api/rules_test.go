@@ -34,8 +34,6 @@ var uncappedCreates = map[string]string{
 	"/nokku.v1.DaemonService/CreateSession":                     "no lasting row, recording storage evicts",
 	"/nokku.v1.AccessRequestService/CreateAccessRequest":        "handler: maxDailyRequests per person",
 	"/nokku.v1.AuditStreamService/CreateAuditStream":            "handler: maxAuditStreams per workspace",
-	"/nokku.v1.BillingService/CreateCheckout":                   "a Stripe session, no row",
-	"/nokku.v1.BillingService/CreatePortal":                     "a Stripe session, no row",
 	"/nokku.v1.InvitationService/CreateInvitation":              "one row per address, gone in 7 days, the seat cap refuses it",
 	"/nokku.v1.JoinTokenService/CreateJoinToken":                "a token, enrolling counts against the cap",
 	"/nokku.v1.ServiceAccountService/CreateServiceAccountToken": "a token on a capped account",

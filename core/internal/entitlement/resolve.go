@@ -6,27 +6,25 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/jackc/pgx/v5"
 	"github.com/mizuchilabs/inkan/license"
 
+	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// holdDays keeps an ended plan's limits, a lapsed card deletes nothing at once.
+// holdDays keeps an ended plan's limits, a lapsed license deletes nothing at once.
 const holdDays = 30
-
-// A trial row's current_period_end is when the trial ends.
-const (
-	SourceTrial  = "trial"
-	SourceStripe = "stripe"
-)
 
 type Service struct {
 	conn *db.Connection
 	saas bool
 	// publicKey verifies license keys. A build without one takes no key.
 	publicKey string
-	license   *license.Keeper
+	envKey    string
+	offline   bool
+	refreshed *cache.TTL[string, struct{}]
 }
 
 // Status is what a workspace may do now, and the limits purge jobs honor.
@@ -35,15 +33,20 @@ type Status struct {
 	// Keep differs from Plan during the hold, which ends at HeldUntil.
 	Keep      Plan
 	HeldUntil *time.Time
-	Sub       *db.WorkspaceSubscription // hosted only, nil without a row
+	// License is nil without a key that verifies. It may be expired.
+	License *license.Claims
+	Row     *db.WorkspaceLicense // nil without one
 }
 
 func New(ctx context.Context, conn *db.Connection, publicKey string, saas bool) (*Service, error) {
-	s := newService(conn, publicKey, saas)
-	if saas {
-		return s, nil
+	cfg, err := env.ParseAs[licenseConfig]()
+	if err != nil {
+		return nil, err
 	}
-	return s, s.loadLicense(ctx)
+	s := newService(conn, publicKey, saas)
+	s.envKey, s.offline = cfg.Key, cfg.Offline
+	go s.renewLoop(ctx)
+	return s, nil
 }
 
 func newService(conn *db.Connection, publicKey string, saas bool) *Service {
@@ -51,7 +54,7 @@ func newService(conn *db.Connection, publicKey string, saas bool) *Service {
 		conn:      conn,
 		saas:      saas,
 		publicKey: publicKey,
-		license:   license.NewKeeper(licenseApp, publicKey, ""),
+		refreshed: cache.New[string, struct{}](refreshEntries, refreshGap),
 	}
 }
 
@@ -59,73 +62,71 @@ func newService(conn *db.Connection, publicKey string, saas bool) *Service {
 func (s *Service) Resolve(ctx context.Context, workspaceID string) Plan {
 	st, err := s.Status(ctx, workspaceID)
 	if err != nil {
-		slog.Warn("entitlement subscription lookup failed", "error", err, "workspace_id", workspaceID)
+		slog.Warn("entitlement license lookup failed", "error", err, "workspace_id", workspaceID)
 	}
 	return st.Plan
 }
 
 // Status falls back to Community next to the error, like Resolve.
 func (s *Service) Status(ctx context.Context, workspaceID string) (Status, error) {
-	if s.saas {
-		return fromSubscription(s.conn.Sys().GetSubscription(ctx, workspaceID))
-	}
-	st := fromLicense(s.License())
-	// These caps protect SaaS infrastructure only, licensed plans included.
-	st.Plan.RecordingStorageBytes, st.Plan.ResourceCap = unlimited, unlimited
-	st.Keep.RecordingStorageBytes, st.Keep.ResourceCap = unlimited, unlimited
-	return st, nil
-}
-
-func fromSubscription(sub *db.WorkspaceSubscription, err error) (Status, error) {
+	row, err := s.conn.Sys().GetLicense(ctx, workspaceID)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		return Status{Plan: inactive, Keep: inactive}, nil
+		row = nil
 	case err != nil:
+		// An outage hands out no paid feature and never stops signing.
 		free := resolvePlan(PlanCommunity)
-		return Status{Plan: free, Keep: free}, err
-	case running(sub):
-		plan := resolvePlan(sub.Plan)
-		if sub.Seats > 0 {
-			plan.SeatCap = sub.Seats
-		}
-		return Status{Plan: plan, Keep: plan, Sub: sub}, nil
+		return s.uncapped(Status{Plan: free, Keep: free}), err
 	}
-	st := after(inactive, resolvePlan(sub.Plan), Ended(sub))
-	st.Sub = sub
-	return st, nil
+	return s.fromRow(row), nil
 }
 
-func running(sub *db.WorkspaceSubscription) bool {
-	if sub.Source == SourceTrial {
-		return sub.CurrentPeriodEnd != nil && time.Now().Before(*sub.CurrentPeriodEnd)
+// fromRow reads no plan as inactive on the hosted service, as Community self-hosted.
+func (s *Service) fromRow(row *db.WorkspaceLicense) Status {
+	none := resolvePlan(PlanCommunity)
+	if s.saas {
+		none = inactive
 	}
-	return Active(sub.Status)
-}
-
-// Ended is when sub stopped paying, nil while it runs or if it never paid.
-func Ended(sub *db.WorkspaceSubscription) *time.Time {
+	var st Status
 	switch {
-	case running(sub):
-		return nil
-	case sub.Source == SourceTrial:
-		return sub.CurrentPeriodEnd
+	case row == nil:
+		st = Status{Plan: none, Keep: none}
+	case !OnTrial(row):
+		st = s.fromKey(row.Key, none)
+	case Ended(row) == nil:
+		st = Status{Plan: trial, Keep: trial}
+	default:
+		st = after(none, trial, row.EndsAt)
 	}
-	return sub.EndedAt
+	st.Row = row
+	return s.uncapped(st)
 }
 
-func fromLicense(c *license.Claims) Status {
-	free := resolvePlan(PlanCommunity)
-	switch {
-	case c == nil:
-		return Status{Plan: free, Keep: free}
-	case !c.IsExpired():
-		plan := resolvePlan(c.Plan)
-		if seats, _ := licenseSeats(c); seats > 0 {
-			plan.SeatCap = seats
-		}
-		return Status{Plan: plan, Keep: plan}
+// uncapped lifts the caps that only protect SaaS infrastructure, on a self-hosted server.
+func (s *Service) uncapped(st Status) Status {
+	if !s.saas {
+		st.Plan.RecordingStorageBytes, st.Plan.ResourceCap = unlimited, unlimited
+		st.Keep.RecordingStorageBytes, st.Keep.ResourceCap = unlimited, unlimited
 	}
-	return after(free, resolvePlan(c.Plan), new(time.Unix(c.ExpiresAt, 0)))
+	return st
+}
+
+// fromKey reads a key this build cannot verify as no plan, the daily renewal logs it.
+func (s *Service) fromKey(key string, none Plan) Status {
+	c, err := s.verifyLicense(key)
+	if err != nil {
+		return Status{Plan: none, Keep: none}
+	}
+	plan := resolvePlan(c.Plan)
+	if c.Plan == PlanPro {
+		plan.SeatCap, _ = licenseSeats(c)
+	}
+	st := Status{Plan: plan, Keep: plan}
+	if c.IsExpired() {
+		st = after(none, plan, new(time.Unix(c.ExpiresAt, 0)))
+	}
+	st.License = c
+	return st
 }
 
 // after puts next in force and holds ended's data limits for holdDays.
@@ -136,13 +137,17 @@ func after(next, ended Plan, endedAt *time.Time) Status {
 	return Status{Plan: next, Keep: ended, HeldUntil: new(HoldEnd(*endedAt))}
 }
 
-// Active takes past_due as a grace period, an unknown status fails closed.
-func Active(status string) bool {
-	switch status {
-	case "active", "trialing", "past_due":
-		return true
+// OnTrial is a hosted workspace that has activated no key yet.
+func OnTrial(row *db.WorkspaceLicense) bool {
+	return row.Key == ""
+}
+
+// Ended is when the trial or key ran out, nil while it runs or for a key that never expires.
+func Ended(row *db.WorkspaceLicense) *time.Time {
+	if row.EndsAt == nil || time.Now().Before(*row.EndsAt) {
+		return nil
 	}
-	return false
+	return row.EndsAt
 }
 
 func HoldEnd(endedAt time.Time) time.Time {

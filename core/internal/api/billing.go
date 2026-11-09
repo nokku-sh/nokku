@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
+	"github.com/mizuchilabs/inkan/license"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/billing"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
@@ -26,6 +26,10 @@ func (s *billingService) GetBilling(
 	_ *nokkuv1.GetBillingRequest,
 ) (*nokkuv1.GetBillingResponse, error) {
 	ws := actor.WorkspaceIDFromContext(ctx)
+	// Seats bought in the portal count once the owner is back on this page.
+	if err := s.cfg.Entitlements.RefreshLicense(ctx, ws); err != nil {
+		slog.Warn("license refresh failed", "error", err, "workspace_id", ws)
+	}
 	var userCount int64
 	var resourceCount int64
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
@@ -41,7 +45,7 @@ func (s *billingService) GetBilling(
 
 	st, err := s.cfg.Entitlements.Status(ctx, ws)
 	if err != nil {
-		slog.Warn("entitlement subscription lookup failed", "error", err, "workspace_id", ws)
+		slog.Warn("entitlement license lookup failed", "error", err, "workspace_id", ws)
 	}
 	plan := st.Plan
 	resp := &nokkuv1.GetBillingResponse{
@@ -51,116 +55,56 @@ func (s *billingService) GetBilling(
 		Quotas:        quotasProto(plan),
 		UserCount:     new(userCount),
 		ResourceCount: new(resourceCount),
+		License:       licenseProto(st.License),
 	}
 	if st.HeldUntil != nil {
 		resp.HeldQuotas, resp.HeldUntil = quotasProto(st.Keep), db.SafeTimestamp(st.HeldUntil)
 	}
-
-	// Self-hosted workspaces have no subscription row.
-	if sub := st.Sub; sub != nil {
-		resp.Subscription = &nokkuv1.Subscription{
-			Status:            new(sub.Status),
-			CancelAtPeriodEnd: new(sub.CancelAtPeriodEnd),
-			CurrentPeriodEnd:  db.SafeTimestamp(sub.CurrentPeriodEnd),
-			Trial:             new(sub.Source == entitlement.SourceTrial),
-			DeleteAt:          db.SafeTimestamp(deletionDate(sub)),
-			EndedAt:           db.SafeTimestamp(entitlement.Ended(sub)),
+	// Only the hosted service has trials and deletes a workspace.
+	if row := st.Row; row != nil && s.cfg.SaaS {
+		if entitlement.OnTrial(row) {
+			resp.TrialEndsAt = db.SafeTimestamp(row.EndsAt)
 		}
+		resp.DeleteAt = db.SafeTimestamp(deletionDate(row))
 	}
-
 	return resp, nil
-}
-
-func (s *billingService) CreateCheckout(
-	ctx context.Context,
-	req *nokkuv1.CreateCheckoutRequest,
-) (*nokkuv1.CreateCheckoutResponse, error) {
-	if !s.cfg.SaaS {
-		return nil, errBillingDisabled
-	}
-	user, err := s.cfg.IAM.GetUser(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	ws, _ := actor.WorkspaceFromContext(ctx)
-	url, err := s.cfg.Billing.Checkout(ctx, ws, user.Email, req.GetYearly())
-	if errors.Is(err, billing.ErrActiveSubscription) {
-		return nil, connect.NewError(
-			connect.CodeFailedPrecondition,
-			"This workspace already has an active subscription. Manage it in the billing portal.",
-		)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &nokkuv1.CreateCheckoutResponse{
-		Url: &url,
-	}, nil
-}
-
-func (s *billingService) CreatePortal(
-	ctx context.Context,
-	_ *nokkuv1.CreatePortalRequest,
-) (*nokkuv1.CreatePortalResponse, error) {
-	if !s.cfg.SaaS {
-		return nil, errBillingDisabled
-	}
-	ws, _ := actor.WorkspaceFromContext(ctx)
-	url, err := s.cfg.Billing.Portal(ctx, ws)
-	if err != nil {
-		return nil, err
-	}
-	return &nokkuv1.CreatePortalResponse{
-		Url: &url,
-	}, nil
-}
-
-func (s *billingService) CancelSubscription(
-	ctx context.Context,
-	req *nokkuv1.CancelSubscriptionRequest,
-) (*nokkuv1.CancelSubscriptionResponse, error) {
-	if !s.cfg.SaaS {
-		return nil, errBillingDisabled
-	}
-	if err := s.cfg.Billing.Cancel(
-		ctx,
-		actor.WorkspaceIDFromContext(ctx),
-		req.GetImmediate(),
-		req.GetReason(),
-	); err != nil {
-		return nil, err
-	}
-	return &nokkuv1.CancelSubscriptionResponse{}, nil
 }
 
 // GetLicense still reports an expired license, so the UI can ask to renew.
 func (s *billingService) GetLicense(
-	_ context.Context,
+	ctx context.Context,
 	_ *nokkuv1.GetLicenseRequest,
 ) (*nokkuv1.GetLicenseResponse, error) {
-	license := s.cfg.Entitlements.License()
-	active := !s.cfg.SaaS && license != nil && !license.IsExpired()
+	st, err := s.cfg.Entitlements.Status(ctx, actor.WorkspaceIDFromContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return licenseProto(st.License), nil
+}
+
+// licenseProto is Community unless the key is active, an expired one still names its end.
+func licenseProto(c *license.Claims) *nokkuv1.GetLicenseResponse {
+	active := c != nil && !c.IsExpired()
 	plan := entitlement.PlanCommunity
 	if active {
-		plan = license.Plan
+		plan = c.Plan
 	}
 	var expiry *time.Time
-	if license != nil && license.ExpiresAt != 0 {
-		expiry = new(time.Unix(license.ExpiresAt, 0))
+	if c != nil && c.ExpiresAt != 0 {
+		expiry = new(time.Unix(c.ExpiresAt, 0))
 	}
 	return &nokkuv1.GetLicenseResponse{
 		Plan:      new(plan),
 		Active:    new(active),
 		ExpiresAt: db.SafeTimestamp(expiry),
-	}, nil
+	}
 }
 
 func (s *billingService) ActivateLicense(
 	ctx context.Context,
 	req *nokkuv1.ActivateLicenseRequest,
 ) (*nokkuv1.ActivateLicenseResponse, error) {
-	err := s.cfg.Entitlements.ActivateLicense(ctx, req.GetKey())
+	err := s.cfg.Entitlements.ActivateLicense(ctx, actor.WorkspaceIDFromContext(ctx), req.GetKey())
 	switch {
 	case errors.Is(err, entitlement.ErrLicenseInvalid):
 		return nil, connect.NewError(connect.CodeInvalidArgument,
@@ -171,8 +115,10 @@ func (s *billingService) ActivateLicense(
 	case errors.Is(err, entitlement.ErrLicenseShorter):
 		return nil, connect.NewError(connect.CodeFailedPrecondition,
 			"The active license is valid for longer than this key.")
-	case errors.Is(err, entitlement.ErrNotSelfHosted),
-		errors.Is(err, entitlement.ErrLicenseUnsupported):
+	case errors.Is(err, entitlement.ErrLicenseInUse):
+		return nil, connect.NewError(connect.CodeAlreadyExists,
+			"This license is already active in another workspace.")
+	case errors.Is(err, entitlement.ErrLicenseUnsupported):
 		return nil, connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	case err != nil:
 		return nil, err

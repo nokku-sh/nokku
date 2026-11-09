@@ -14,6 +14,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -65,41 +66,45 @@ func selfHostedOnly(t *testing.T, why string) {
 	}
 }
 
-// withoutAPlan ends a hosted trial until restore, self-hosted has no plan.
+// withoutAPlan ends the hosted trial until restore, self-hosted has no plan.
 func withoutAPlan(t *testing.T, cfg *config.Config) (restore func()) {
 	t.Helper()
 	if !hosted {
 		return func() {}
 	}
-	sub, err := cfg.Conn.Sys().GetSubscription(t.Context(), testWorkspace.ID)
+	sys := cfg.Conn.Sys()
+	row, err := sys.GetLicense(t.Context(), testWorkspace.ID)
 	require.NoError(t, err)
-	put := func(ctx context.Context, source string, end *time.Time) {
-		require.NoError(t, cfg.Conn.Sys().UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
-			WorkspaceID:      sub.WorkspaceID,
-			Source:           source,
-			Plan:             sub.Plan,
-			Status:           sub.Status,
-			CurrentPeriodEnd: end,
-		}))
+	require.True(t, entitlement.OnTrial(row), "the shared workspace runs on a trial")
+	end := func(ctx context.Context, at *time.Time) {
+		require.NoError(t, sys.SetLicense(ctx, &db.SetLicenseParams{WorkspaceID: testWorkspace.ID, EndsAt: at}))
 	}
-	put(t.Context(), entitlement.SourceTrial, new(time.Now().Add(-time.Hour)))
-	return func() { put(context.WithoutCancel(t.Context()), sub.Source, sub.CurrentPeriodEnd) }
+	end(t.Context(), new(time.Now().Add(-time.Hour)))
+	return func() { end(context.WithoutCancel(t.Context()), row.EndsAt) }
 }
 
-// hostedWorkspace is the shared workspace, on a plan with no limits.
-func hostedWorkspace(ctx context.Context, cfg *config.Config) (actor.Workspace, error) {
-	ws, err := tenant.Create(ctx, cfg.Conn, cfg.Keyset, hostedSlug, "test")
-	if err != nil {
-		return actor.Workspace{}, err
-	}
-	err = cfg.Conn.Sys().UpsertSubscription(ctx, &db.UpsertSubscriptionParams{
-		WorkspaceID:      ws.ID,
-		Source:           entitlement.SourceStripe,
-		Plan:             entitlement.PlanEnterprise,
-		Status:           "active",
-		CurrentPeriodEnd: new(time.Now().AddDate(1, 0, 0)),
+// keepLicense drops a test's key from the shared workspace afterwards, hosted it goes back on a trial.
+func keepLicense(t *testing.T, cfg *config.Config) {
+	t.Helper()
+	t.Cleanup(func() {
+		ctx := context.WithoutCancel(t.Context())
+		// No query deletes the row, the owner role does.
+		conn, err := pgx.Connect(ctx, "")
+		require.NoError(t, err)
+		defer func() { _ = conn.Close(ctx) }()
+		_, err = conn.Exec(ctx, "DELETE FROM workspace_licenses WHERE workspace_id = $1", testWorkspace.ID)
+		require.NoError(t, err)
+		if hosted {
+			require.NoError(t, cfg.Conn.Sys().StartTrial(ctx, &db.StartTrialParams{
+				WorkspaceID: testWorkspace.ID, Days: entitlement.TrialDays,
+			}))
+		}
 	})
-	if err != nil {
+}
+
+// hostedWorkspace is the shared workspace, on the trial a signup gets.
+func hostedWorkspace(ctx context.Context, cfg *config.Config) (actor.Workspace, error) {
+	if _, err := tenant.Create(ctx, cfg.Conn, cfg.Keyset, hostedSlug, "test", entitlement.TrialDays); err != nil {
 		return actor.Workspace{}, err
 	}
 	return cfg.Tenant.FromHost(ctx, hostedSlug+"."+hostedBase)
@@ -139,7 +144,7 @@ func onHost(t *testing.T, host string) *httptest.Server {
 func newHostedWorkspace(t *testing.T, cfg *config.Config) actor.Workspace {
 	t.Helper()
 	slug := "t" + strings.ReplaceAll(uuid.New().String(), "-", "")[:12]
-	_, err := tenant.Create(t.Context(), cfg.Conn, cfg.Keyset, slug, "other")
+	_, err := tenant.Create(t.Context(), cfg.Conn, cfg.Keyset, slug, "other", entitlement.TrialDays)
 	require.NoError(t, err)
 	ws, err := cfg.Tenant.FromHost(t.Context(), slug+"."+hostedBase)
 	require.NoError(t, err)

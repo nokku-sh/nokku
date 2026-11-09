@@ -225,9 +225,10 @@ type GetWorkspaceResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Workspace *Workspace             `protobuf:"bytes,1,opt,name=workspace" json:"workspace,omitempty"`
 	BaseUrl   *string                `protobuf:"bytes,2,opt,name=base_url,json=baseUrl" json:"base_url,omitempty"`
-	// inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner subscribes.
+	// inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner activates a
+	// license key.
 	Inactive *bool `protobuf:"varint,3,opt,name=inactive" json:"inactive,omitempty"`
-	// delete_at is when an inactive workspace is deleted, unless the owner subscribes before.
+	// delete_at is when an inactive workspace is deleted, unless the owner activates a license key before.
 	DeleteAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=delete_at,json=deleteAt" json:"delete_at,omitempty"`
 	// features is what every member may see, so any page can show a lock. GetBilling has the rest.
 	Features map[string]bool `protobuf:"bytes,5,rep,name=features" json:"features,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`

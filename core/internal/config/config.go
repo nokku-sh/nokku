@@ -15,7 +15,6 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/access"
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/billing"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -54,7 +53,6 @@ type Config struct {
 	Email        *email.Service
 	Pool         *daemon.Pool
 	Record       *recording.Service
-	Billing      *billing.Stripe
 	Entitlements *entitlement.Service
 	Tenant       *tenant.Resolver
 
@@ -119,11 +117,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Billing, err = billing.New(ctx, cfg.Conn, cfg.SaaS)
-	if err != nil {
-		return nil, err
-	}
-
 	cfg.Entitlements, err = entitlement.New(ctx, cfg.Conn, licensePublicKey, cfg.SaaS)
 	if err != nil {
 		return nil, err
@@ -170,6 +163,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	if !cfg.SaaS {
+		cfg.Entitlements.UseEnvKey(ctx, cfg.Tenant.Single().ID)
 		if cfg.OwnerNeedsLink, err = cfg.IAM.Bootstrap(ctx, cfg.Tenant.Single()); err != nil {
 			return nil, err
 		}

@@ -44,8 +44,8 @@ func (s *workspaceService) GetWorkspace(
 		Catalog:   catalogProto(),
 		PlanNames: entitlement.PlanNames,
 	}
-	if st.Sub != nil {
-		resp.DeleteAt = db.SafeTimestamp(deletionDate(st.Sub))
+	if st.Row != nil && s.cfg.SaaS {
+		resp.DeleteAt = db.SafeTimestamp(deletionDate(st.Row))
 	}
 	return resp, nil
 }
@@ -135,9 +135,6 @@ func (s *workspaceService) DeleteWorkspace(
 		return nil, errSingleWorkspace
 	}
 	ws, _ := actor.WorkspaceFromContext(ctx)
-	if err := s.cfg.Billing.Cancel(ctx, ws.ID, true, ""); err != nil {
-		return nil, err
-	}
 	if err := deleteWorkspace(ctx, s.cfg, ws); err != nil {
 		return nil, err
 	}
@@ -176,7 +173,8 @@ func (s *workspaceService) CreateWorkspace(
 	if err := email.Verify(ctx, addr, true); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "please enter a valid email address")
 	}
-	ws, err := tenant.Create(ctx, s.cfg.Conn, s.cfg.Keyset, req.GetSlug(), strings.TrimSpace(req.GetName()))
+	ws, err := tenant.Create(ctx, s.cfg.Conn, s.cfg.Keyset, req.GetSlug(), strings.TrimSpace(req.GetName()),
+		entitlement.TrialDays)
 	if db.IsUniqueViolation(err) {
 		return nil, connect.NewError(connect.CodeAlreadyExists, "this name is taken")
 	}

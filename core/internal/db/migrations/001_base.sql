@@ -24,24 +24,19 @@ CREATE TABLE workspace_state (
   version BIGINT NOT NULL DEFAULT 0
 );
 
-CREATE TABLE workspace_subscriptions (
+-- The license key of a workspace. Hosted signup starts a trial row without a key, self-hosted has none until a key.
+CREATE TABLE workspace_licenses (
   workspace_id UUID PRIMARY KEY DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  source TEXT NOT NULL CHECK (source IN ('stripe', 'trial', 'manual')),
-  plan TEXT NOT NULL CHECK (plan IN ('pro', 'enterprise')),
-  status TEXT NOT NULL DEFAULT '', -- stripe's own, or trial. Free text, a value Stripe adds must not fail its webhook
-  customer_id TEXT NOT NULL DEFAULT '',
-  subscription_id TEXT NOT NULL DEFAULT '',
-  current_period_end TIMESTAMPTZ,
-  cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
-  seats BIGINT NOT NULL DEFAULT 0, -- 0 is the plan's own cap
-  ended_at TIMESTAMPTZ, -- starts the retention hold
+  key TEXT NOT NULL DEFAULT '', -- empty during a hosted trial, kept once expired for the retention hold
+  license_id TEXT UNIQUE, -- the id signed into the key, so one license unlocks one workspace
+  ends_at TIMESTAMPTZ, -- the trial end until a key, then the key's expiry. NULL for a key that never expires
   trial_reminder INTEGER NOT NULL DEFAULT 0, -- days before the trial end of the last reminder, 0 for none
   deletion_warning INTEGER NOT NULL DEFAULT 0, -- days before the deletion of the last warning, 0 for none
   deletion_warned_at TIMESTAMPTZ, -- a late warning pushes the deletion back
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK (
-    source <> 'trial'
-    OR current_period_end IS NOT NULL
+    key <> ''
+    OR ends_at IS NOT NULL
   )
 );
 
@@ -682,12 +677,6 @@ CREATE TABLE keysets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE instance_license (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  key TEXT NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 -- Triggers -------------------------------------------------------------------
 CREATE FUNCTION create_workspace_state () RETURNS TRIGGER AS $$
 BEGIN
@@ -918,7 +907,7 @@ DECLARE
   t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'workspace_subscriptions',
+    'workspace_licenses',
     'users',
     'teams',
     'team_members',
@@ -965,10 +954,6 @@ WITH
 ALTER TABLE keysets ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE keysets FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE instance_license ENABLE ROW LEVEL SECURITY;
-
-ALTER TABLE instance_license FORCE ROW LEVEL SECURITY;
 
 -- Audit log ------------------------------------------------------------------
 CREATE SCHEMA audit;

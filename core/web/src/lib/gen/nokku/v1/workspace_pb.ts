@@ -128,14 +128,15 @@ export type GetWorkspaceResponse = Message<"nokku.v1.GetWorkspaceResponse"> & {
   baseUrl: string;
 
   /**
-   * inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner subscribes.
+   * inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner activates a
+   * license key.
    *
    * @generated from field: bool inactive = 3;
    */
   inactive: boolean;
 
   /**
-   * delete_at is when an inactive workspace is deleted, unless the owner subscribes before.
+   * delete_at is when an inactive workspace is deleted, unless the owner activates a license key before.
    *
    * @generated from field: google.protobuf.Timestamp delete_at = 4;
    */
