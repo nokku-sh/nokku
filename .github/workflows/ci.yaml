@@ -170,4 +170,4 @@ jobs:
       id-token: write
     uses: nokku-sh/.github/.github/workflows/go-nightly.yaml@main
     secrets:
-      NOKKU_LICENSE_PUBLIC_KEY: ${{ secrets.NOKKU_LICENSE_PUBLIC_KEY }}
+      BUILD_ENV: NOKKU_LICENSE_PUBLIC_KEY=${{ secrets.NOKKU_LICENSE_PUBLIC_KEY }}
