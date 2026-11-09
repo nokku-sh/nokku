@@ -105,6 +105,9 @@ func (s *Server) forwardingAllowed(conn *ssh.ServerConn) bool {
 }
 
 func (s *Server) handleGlobalRequests(ctx context.Context, st *connState, reqs <-chan *ssh.Request) {
+	// After a panic nothing reads the requests, which would stall the connection.
+	defer st.conn.Close()
+	defer recoverPanic("global request")
 	for req := range reqs {
 		switch req.Type {
 		case "tcpip-forward":
@@ -184,6 +187,9 @@ func forwardAddr(f tcpipForwardData, gateway bool) string {
 // bindAddr is echoed so the client matches its -R forward.
 func (s *Server) acceptForwarded(st *connState, ln net.Listener, bindAddr string) {
 	defer st.releaseChannel()
+	// A listener nobody accepts on would hold the port until the connection ends.
+	defer ln.Close()
+	defer recoverPanic("remote forward")
 	for {
 		c, err := ln.Accept()
 		if err != nil {
