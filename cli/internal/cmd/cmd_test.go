@@ -13,6 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/cli/internal/paths"
+	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/internal/nktoken"
 )
@@ -175,4 +176,26 @@ func TestLoadStateKeepsTTL(t *testing.T) {
 	s, err = runFlags(t, "--ttl", "2h", "ls")
 	require.NoError(t, err)
 	assert.Equal(t, 2*time.Hour, s.TTL, "a root flag before a subcommand counts")
+}
+
+func TestDropSecurityKey(t *testing.T) {
+	setHome(t)
+	handle := paths.SecurityKeyFile()
+	require.NoError(t, os.WriteFile(handle, []byte("handle"), 0o600))
+	require.NoError(t, os.WriteFile(handle+".pub", []byte("sk-ssh-ed25519@openssh.com AAAA x@nokku\n"), 0o600))
+	s := &state.State{
+		SecurityKey: true,
+		Targets:     []state.Target{{ID: "t-1", Name: "web", Usernames: []string{"root"}}},
+	}
+	require.NoError(t, s.Save())
+	require.NoError(t, ssh.WriteConfigs(s))
+
+	require.NoError(t, dropSecurityKey(s))
+	assert.False(t, state.Load().SecurityKey, "kept for later runs")
+	assert.NoFileExists(t, handle, "a later --security-key makes a new key")
+	assert.NoFileExists(t, handle+".pub")
+	config, err := os.ReadFile(paths.SSHConfigFile())
+	require.NoError(t, err)
+	assert.NotContains(t, string(config), "security-key")
+	assert.NotContains(t, string(config), "IdentityAgent none", "ssh signs through the nk agent again")
 }

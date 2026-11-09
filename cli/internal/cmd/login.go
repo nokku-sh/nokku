@@ -25,8 +25,9 @@ func loginCMD() *cli.Command {
 				Usage: "Sign in a CI job as this service account, with the job's token from its platform",
 			},
 			&cli.BoolFlag{
-				Name:  "security-key",
-				Usage: "Keep the ssh key on a FIDO2 security key, every ssh login then needs a touch",
+				Name: "security-key",
+				Usage: "Keep the ssh key on a FIDO2 security key, every ssh login then needs a touch. " +
+					"--security-key=false goes back to the key on this machine",
 			},
 			&cli.BoolFlag{
 				Name:  "headless",
@@ -38,10 +39,14 @@ func loginCMD() *cli.Command {
 			if err != nil {
 				return err
 			}
-			if cmd.Bool("security-key") {
-				if err = useSecurityKey(ctx, cmd, s); err != nil {
-					return err
-				}
+			switch {
+			case cmd.Bool("security-key"):
+				err = useSecurityKey(ctx, cmd, s)
+			case cmd.IsSet("security-key") && s.SecurityKey:
+				err = dropSecurityKey(s)
+			}
+			if err != nil {
+				return err
 			}
 			c, err := newClient(s)
 			if err != nil {
@@ -86,6 +91,19 @@ func useSecurityKey(ctx context.Context, cmd *cli.Command, s *state.State) error
 	}
 	// ssh must use the key even if the sync that follows fails.
 	return ssh.WriteConfigs(s)
+}
+
+// Like useSecurityKey, the sign-in that follows ends the session of the key that goes.
+func dropSecurityKey(s *state.State) error {
+	s.SecurityKey = false
+	if err := s.Save(); err != nil {
+		return err
+	}
+	// ssh moves off the handle before it is gone.
+	if err := ssh.WriteConfigs(s); err != nil {
+		return err
+	}
+	return ssh.RemoveSecurityKey()
 }
 
 func logoutCMD() *cli.Command {

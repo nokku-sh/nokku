@@ -92,3 +92,16 @@ func TestEnrollSecurityKeyWithoutFIDOSupport(t *testing.T) {
 	assert.Len(t, calls(), 1, "another key type would fail the same way")
 	assert.NoFileExists(t, paths.SecurityKeyFile()+".pub")
 }
+
+func TestRemoveSecurityKey(t *testing.T) {
+	calls := useFakeKeygen(t, "ok")
+	require.NoError(t, EnrollSecurityKey(t.Context()))
+
+	require.NoError(t, RemoveSecurityKey())
+	assert.NoFileExists(t, paths.SecurityKeyFile())
+	assert.NoFileExists(t, paths.SecurityKeyFile()+".pub")
+	require.NoError(t, RemoveSecurityKey(), "nothing left to remove is fine")
+
+	require.NoError(t, EnrollSecurityKey(t.Context()))
+	assert.Len(t, calls(), 2, "a new key, maybe on another security key")
+}

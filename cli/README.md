@@ -52,14 +52,14 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 <details>
 <summary><b>Flags per command</b></summary>
 
-| Command      | Flags                                                                                                                                                                                                |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nk login`   | `--ci <service account>` to sign in a CI job with its platform's token, `--security-key` to keep the key on a FIDO2 security key, kept for later runs, `--headless` to type a code on another device |
-| `nk ls`      | `--json` for machine-readable output, with the `host` ssh knows each server by                                                                                                                       |
-| `nk doctor`  | `--fix` to repair permissions and regenerate files, `--json` for output                                                                                                                              |
-| `nk sync`    | `--name`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`                                                                                                                   |
-| `nk request` | `--reason` (required), `--for` from `15m` to `168h`, default `1h`, `--no-wait` to return at once                                                                                                     |
-| `nk rm`      | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                                                                                                                           |
+| Command      | Flags                                                                                                                                                                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `nk login`   | `--ci <service account>` to sign in a CI job with its platform's token, `--security-key` to keep the key on a FIDO2 security key, kept for later runs, `--security-key=false` to go back to the key on this machine, `--headless` to type a code on another device |
+| `nk ls`      | `--json` for machine-readable output, with the `host` ssh knows each server by                                                                                                                                                                                     |
+| `nk doctor`  | `--fix` to repair permissions and regenerate files, `--json` for output                                                                                                                                                                                            |
+| `nk sync`    | `--name`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`                                                                                                                                                                                 |
+| `nk request` | `--reason` (required), `--for` from `15m` to `168h`, default `1h`, `--no-wait` to return at once                                                                                                                                                                   |
+| `nk rm`      | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                                                                                                                                                                                         |
 
 </details>
 
@@ -69,7 +69,7 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 - **As a software key** tied to this machine, without a TPM. This is the default on a Mac.
 - **On a FIDO2 security key**, like a YubiKey, on any machine. Sign in with `nk login --security-key`, and every login needs a touch.
 
-Your sign-in only ever gets certificates for that one key. `nk doctor` shows which one is in use. To switch, run `nk logout`, then sign in again.
+Your sign-in only ever gets certificates for that one key. `nk doctor` shows which one is in use. `nk login --security-key` moves the key to a security key and `nk login --security-key=false` moves it back. Both sign this machine in again. A software key moves to the TPM only with `nk logout` and a new sign-in.
 
 > [!NOTE]
 > On most Linux distributions a regular user can't use the TPM by default. Run `sudo usermod -aG tss $USER` and log in again, before your first `nk login`. A machine that already signed in with a software key keeps it until you sign out and in again.
@@ -82,7 +82,7 @@ Your sign-in only ever gets certificates for that one key. `nk doctor` shows whi
 - Each machine makes its own key on the same security key. Nothing is stored on the security key, so it never runs out of room. The file `nk` keeps is useless without the key.
 - `ssh` and `ssh-keygen` must support security keys. Most Linux distributions and Windows do. Apple's built-in `ssh` does not, install OpenSSH from Homebrew and put it first in `PATH`. IDEs often run `/usr/bin/ssh`, point them at the Homebrew one.
 - A server set up with `nk sync` needs OpenSSH 8.2 or newer to take a security key. RHEL 8 and older releases ship less.
-- A lost or new security key: run `nk logout`, then `nk login --security-key`.
+- A lost security key: `nk login --security-key=false` goes back to the key on this machine. For a new one, run `nk logout`, then `nk login --security-key`.
 
 </details>
 
@@ -186,6 +186,7 @@ nk sync 10.0.0.5 --grant root=me --grant deploy=team:ops,alice@example.com --tag
 
 - A `--grant` is `account=subject,subject`. A subject is `me`, an email, `team:<name>` or `sa:<name>`. An id works in place of an email or a name.
 - The account has to be a login account on the server, root or a regular user with a shell. If it is not, the sync stops and writes nothing.
+- You get `root` on a new server, unless a `--grant` already names you. You have root there already, this only lets you in through Nokku too. A service account gets only the grants it asks for.
 - Grants and tags are set once, with the new target. On a server Nokku already knows they are ignored with a warning, so the web app stays the place to change access.
 
 <details>
@@ -196,7 +197,7 @@ nk sync 10.0.0.5 --grant root=me --grant deploy=team:ops,alice@example.com --tag
 - **Later syncs** pin the host key the first one saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key`. That drops the pin and your own `ssh` checks the host, as on the first sync, so a key it remembers from before shows its usual warning until you remove it with `ssh-keygen -R`.
 - **Your ssh config applies, but not its forwards.** The root `ssh` runs without an agent, X11 or port forwarding, whatever `ForwardAgent` or `LocalForward` your config sets.
 - **Order.** Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
-- **For scripts**, `--json` prints one object with the target and the files `nk sync` manages. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server has no target id yet, so the drop-in shows `<target-id>` in its place and `grants` lists the subjects per account as you typed them.
+- **For scripts**, `--json` prints one object with the target and the files `nk sync` manages. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server has no target id yet, so the drop-in shows `<target-id>` in its place and `grants` lists the subjects per account as you typed them, with your default `root` as `me`.
 - **`nk rm`** checks the pinned host key first, then removes the drop-in and the CA over the same root `ssh`, reloads sshd, and only then deletes the target in Nokku. If sshd rejects its config without the drop-in, everything is put back and the target stays. Pass `--keep-host` when the server is already gone.
 
 </details>

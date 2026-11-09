@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"runtime"
@@ -39,6 +40,18 @@ func EnrollSecurityKey(ctx context.Context) error {
 		err = runKeygen(ctx, keygen, "ecdsa-sk", file)
 	}
 	return err
+}
+
+// RemoveSecurityKey drops the handle, so a later enrollment makes a new key, also on another security key.
+func RemoveSecurityKey() error {
+	file := paths.SecurityKeyFile()
+	var errs []error
+	for _, f := range []string{file, file + ".pub"} {
+		if err := os.Remove(f); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func runKeygen(ctx context.Context, keygen, keyType, file string) error {

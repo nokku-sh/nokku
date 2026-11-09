@@ -138,6 +138,58 @@ func TestSyncResultJSON(t *testing.T) {
 	assert.Contains(t, string(b), `"grants":{"root":["me","team:ops"]}`, "as typed, ids stay out")
 }
 
+func TestWithCreator(t *testing.T) {
+	t.Parallel()
+	person := &state.State{User: &state.User{ID: "me-id"}}
+	ops := client.Grant{Account: "deploy", Subjects: []string{"team:ops"}, Teams: []string{"ops-id"}}
+	tests := []struct {
+		name  string
+		as    *state.State
+		seeds []client.Grant
+		want  []client.Grant
+	}{
+		{
+			"no grants",
+			person,
+			nil,
+			[]client.Grant{{Account: "root", Subjects: []string{"me"}, Users: []string{"me-id"}}},
+		},
+		{
+			"grants for others only",
+			person,
+			[]client.Grant{ops},
+			[]client.Grant{ops, {Account: "root", Subjects: []string{"me"}, Users: []string{"me-id"}}},
+		},
+		{
+			"root for others only",
+			person,
+			[]client.Grant{{Account: "root", Subjects: []string{"team:ops"}, Teams: []string{"ops-id"}}},
+			[]client.Grant{{
+				Account: "root", Subjects: []string{"team:ops", "me"},
+				Users: []string{"me-id"}, Teams: []string{"ops-id"},
+			}},
+		},
+		{
+			"named by email on another account",
+			person,
+			[]client.Grant{{Account: "deploy", Subjects: []string{"me@example.com"}, Users: []string{"me-id"}}},
+			[]client.Grant{{Account: "deploy", Subjects: []string{"me@example.com"}, Users: []string{"me-id"}}},
+		},
+		{
+			"a service account",
+			&state.State{ServiceAccount: &state.ServiceAccount{ID: "sa-id"}},
+			[]client.Grant{ops},
+			[]client.Grant{ops},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, withCreator(tt.seeds, tt.as))
+		})
+	}
+}
+
 // urfave splits slice flags at commas unless told, tearing a grant apart.
 func TestSyncKeepsTheSubjectsOfAGrantTogether(t *testing.T) {
 	t.Parallel()

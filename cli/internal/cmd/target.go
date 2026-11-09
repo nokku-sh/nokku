@@ -25,6 +25,8 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 )
 
+const rootAccount = "root"
+
 var portFlag = &cli.StringFlag{Name: "port", Usage: "SSH port of the server, defaults to your ssh config or 22"}
 
 type syncResult struct {
@@ -62,7 +64,7 @@ func syncCMD() *cli.Command {
 			&cli.StringSliceFlag{
 				Name: "grant",
 				Usage: "Who may log in to a new target, as account=subject,subject. " +
-					"A subject is me, an email, team:<name>, or sa:<name>",
+					"A subject is me, an email, team:<name>, or sa:<name>. You get root unless a grant names you",
 			},
 			&cli.StringSliceFlag{Name: "tag", Usage: "Tag for a new target"},
 			portFlag,
@@ -108,13 +110,13 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	}
 	var seeds []client.Grant
 	if target == nil {
-		target = newTarget(ctx, cmd, dest)
-		if seeds, err = c.ResolveGrants(ctx, cmd.StringSlice("grant")); err != nil {
+		if target, seeds, err = newTarget(ctx, c, cmd, dest); err != nil {
 			return err
 		}
 	} else if cmd.IsSet("grant") || cmd.IsSet("tag") {
 		// The web app owns access after the first sync, so a rerun leaves it.
-		warnf("%s is already a target, --grant and --tag only apply to a new one", target.Name)
+		warnf("%s is already a target, --grant and --tag only apply to a new one. "+
+			"Change its access in the web app", target.Name)
 	}
 
 	if dest, err = dest.trust(target, cmd.Bool("accept-host-key")); err != nil {
@@ -136,6 +138,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 		}
 		created = true
 		fmt.Fprintf(progress, "Added target %s\n", ui.Bold(target.Name))
+		printGrants(progress, seeds)
 	}
 	plan, err := manual.NewPlan(ca.PublicKey, target.ID)
 	if err != nil {
@@ -175,7 +178,8 @@ func probe(
 		return h, err
 	}
 	for _, g := range seeds {
-		if !slices.Contains(h.Accounts, g.Account) {
+		// The probe ran as root, so root can log in even past the account cap.
+		if g.Account != rootAccount && !slices.Contains(h.Accounts, g.Account) {
 			return h, fmt.Errorf(
 				"%s has no login account %s, nothing was written. It has: %s",
 				dest.host, g.Account, strings.Join(h.Accounts, ", "),
@@ -209,9 +213,33 @@ func printPlan(plan manual.Plan, seeds []client.Grant) {
 	if len(seeds) > 0 {
 		fmt.Println("\nThe new target starts with these grants:")
 	}
+	printGrants(os.Stdout, seeds)
+}
+
+func printGrants(w io.Writer, seeds []client.Grant) {
 	for _, g := range seeds {
-		fmt.Printf("  %s: %s\n", g.Account, strings.Join(g.Subjects, ", "))
+		fmt.Fprintf(w, "  %s: %s\n", g.Account, strings.Join(g.Subjects, ", "))
 	}
+}
+
+// withCreator gives a person adding a server root on it, which they hold already.
+func withCreator(seeds []client.Grant, s *state.State) []client.Grant {
+	if s.User == nil || s.ServiceAccount != nil {
+		return seeds
+	}
+	me := s.User.ID
+	for _, g := range seeds {
+		if slices.Contains(g.Users, me) {
+			return seeds
+		}
+	}
+	i := slices.IndexFunc(seeds, func(g client.Grant) bool { return g.Account == rootAccount })
+	if i < 0 {
+		return append(seeds, client.Grant{Account: rootAccount, Subjects: []string{"me"}, Users: []string{me}})
+	}
+	seeds[i].Subjects = append(seeds[i].Subjects, "me")
+	seeds[i].Users = append(seeds[i].Users, me)
+	return seeds
 }
 
 func newSyncResult(target *state.Target, plan manual.Plan, seeds []client.Grant, dryRun bool) syncResult {
@@ -360,7 +388,7 @@ func rootHost(cmd *cli.Command) (string, error) {
 		return "", fmt.Errorf("which server? For example: %s 10.0.0.5", cmd.FullName())
 	}
 	user, host, found := strings.Cut(arg, "@")
-	if found && user != "root" {
+	if found && user != rootAccount {
 		return "", fmt.Errorf("%s connects as root, use root@%s", cmd.FullName(), host)
 	}
 	if !found {
@@ -431,18 +459,28 @@ func endpointMatch(t *state.Target, dest remote) (remote, bool) {
 	return remote{}, false
 }
 
-// Created on the core only once the host key is read.
-func newTarget(ctx context.Context, cmd *cli.Command, dest remote) *state.Target {
+// Created on the core only once the host key is read, with the grants it starts with.
+func newTarget(
+	ctx context.Context,
+	c *client.Client,
+	cmd *cli.Command,
+	dest remote,
+) (*state.Target, []client.Grant, error) {
+	seeds, err := c.ResolveGrants(ctx, cmd.StringSlice("grant"))
+	if err != nil {
+		return nil, nil, err
+	}
 	// Users dial the endpoint, so store the real address behind an ssh alias.
 	addr := dest.resolve(ctx)
 	endpoint := addr.host
 	if addr.port != "" && addr.port != "22" {
 		endpoint = net.JoinHostPort(addr.host, addr.port)
 	}
-	return &state.Target{
+	target := &state.Target{
 		Name:      strings.TrimSpace(cmd.String("name")),
 		Endpoints: []string{endpoint},
 	}
+	return target, withCreator(seeds, c.State), nil
 }
 
 func endpointRemote(ep, port string) remote {
@@ -527,7 +565,7 @@ func (r remote) controlPath() string {
 }
 
 func (r remote) run(ctx context.Context, command, stdin string) (string, error) {
-	args := append(r.portArgs(), "-l", "root")
+	args := append(r.portArgs(), "-l", rootAccount)
 	// Whatever the operator's config says, root on a server being set up gets no agent and no forwards.
 	args = append(args, "-T", "-o", "ForwardAgent=no", "-o", "ForwardX11=no",
 		"-o", "ClearAllForwardings=yes", "-o", "PermitLocalCommand=no")
