@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,7 +28,12 @@ import (
 const (
 	maxDeviceResponse = 64 << 10
 	pollRetries       = 3
+	// The browser only loads a small page from nk, a slow client is not it.
+	callbackTimeout = 5 * time.Second
 )
+
+const callbackPage = `<!doctype html><meta charset="utf-8"><title>nk</title>` +
+	`<p style="font:16px system-ui;margin:3em auto;max-width:30em">%s You can close this tab.</p>`
 
 // deviceTransport signs each request with a proof for its URL. A stale nonce is
 // retried at once, the rejection came with a fresh one (RFC 9449 section 8).
@@ -75,7 +81,8 @@ func (c *Client) endStaleSession(ctx context.Context) error {
 	return c.State.Save()
 }
 
-// RFC 8628 device flow. The library handles slow_down and the code's expiry.
+// deviceLogin signs in with a browser on this machine, so a link sent to
+// someone else signs nobody in. Headless, the code is typed on another device.
 func (c *Client) deviceLogin(ctx context.Context) error {
 	slog.Debug("starting device flow", "api", c.State.APIURL)
 	ctx, cfg, err := c.deviceFlow(ctx)
@@ -88,16 +95,12 @@ func (c *Client) deviceLogin(ctx context.Context) error {
 		return fmt.Errorf("read the ssh key: %w", err)
 	}
 
-	d, err := beginDeviceAuth(ctx, cfg)
-	if err != nil {
-		return err
+	var tok *oauth2.Token
+	if c.Headless || !hasBrowser() {
+		tok, err = headlessLogin(ctx, cfg, sshKey)
+	} else {
+		tok, err = loopbackLogin(ctx, cfg, sshKey)
 	}
-	// The link has the code, it is shown to compare. Stderr keeps --json clean.
-	fmt.Fprintf(os.Stderr, "\nSign in to Nokku in your browser. If it does not open, visit:\n  %s\n", d.VerificationURI)
-	fmt.Fprintf(os.Stderr, "Confirm the code %s there. Waiting...\n", d.UserCode)
-	_ = openBrowser(d.VerificationURI)
-
-	tok, err := pollDeviceToken(ctx, cfg, d, sshKey)
 	if err != nil {
 		return err
 	}
@@ -107,6 +110,120 @@ func (c *Client) deviceLogin(ctx context.Context) error {
 	}
 	// Identity comes from the access sync that runs after login.
 	return c.State.Save()
+}
+
+// RFC 8628 as it is. The library handles slow_down and the code's expiry.
+func headlessLogin(ctx context.Context, cfg *oauth2.Config, sshKey string) (*oauth2.Token, error) {
+	d, err := beginDeviceAuth(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	// Stderr keeps --json clean.
+	fmt.Fprintf(os.Stderr, "\nOn a device where you are signed in to Nokku, open:\n  %s\n", d.VerificationURI)
+	fmt.Fprintf(os.Stderr, "and type the code %s. Waiting...\n", d.UserCode)
+	return pollDeviceToken(ctx, cfg, d, sshKey)
+}
+
+// The approval sends its answer to 127.0.0.1, and only nk here can use it.
+func loopbackLogin(ctx context.Context, cfg *oauth2.Config, sshKey string) (*oauth2.Token, error) {
+	var lc net.ListenConfig
+	l, err := lc.Listen(ctx, "tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, fmt.Errorf("listen for the browser: %w", err)
+	}
+	defer func() { _ = l.Close() }()
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	if err != nil {
+		return nil, err
+	}
+
+	d, err := beginDeviceAuth(ctx, cfg, oauth2.SetAuthURLParam("loopback_port", port))
+	if err != nil {
+		return nil, err
+	}
+	// The link has the code, it is shown to compare.
+	fmt.Fprintf(os.Stderr, "\nSign in to Nokku in your browser. If it does not open, visit:\n  %s\n", d.VerificationURI)
+	fmt.Fprintf(os.Stderr, "Confirm the code %s there. Waiting...\n", d.UserCode)
+	fmt.Fprintf(os.Stderr, "Signing in on another device? Press Ctrl-C and run nk login --headless.\n")
+	_ = openBrowser(d.VerificationURI)
+
+	code, err := awaitBrowser(ctx, l, d.Expiry)
+	if err != nil {
+		return nil, err
+	}
+	return exchangeLoopback(ctx, cfg, d, code, sshKey)
+}
+
+// awaitBrowser serves the one request the approval sends. A denial carries no code.
+func awaitBrowser(ctx context.Context, l net.Listener, expiry time.Time) (string, error) {
+	answers := make(chan string, 1)
+	srv := &http.Server{
+		ReadHeaderTimeout: callbackTimeout,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet || r.URL.Path != "/callback" {
+				http.NotFound(w, r)
+				return
+			}
+			code := r.URL.Query().Get("code")
+			msg := "Nokku signed nk in."
+			if code == "" {
+				msg = "The sign-in was denied."
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-store")
+			_, _ = fmt.Fprintf(w, callbackPage, msg)
+			select {
+			case answers <- code:
+			default:
+			}
+		}),
+	}
+	go func() { _ = srv.Serve(l) }()
+	defer func() {
+		// Shutdown lets the page reach the browser before the socket goes.
+		sctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), callbackTimeout)
+		defer cancel()
+		_ = srv.Shutdown(sctx)
+	}()
+
+	wait := time.Until(expiry)
+	if expiry.IsZero() {
+		wait = 15 * time.Minute
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case code := <-answers:
+		return code, nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case <-timer.C:
+		return "", errors.New("sign-in code expired, run nk login again")
+	}
+}
+
+// The token takes the device code nk holds and the code the browser brought.
+func exchangeLoopback(
+	ctx context.Context,
+	cfg *oauth2.Config,
+	d *oauth2.DeviceAuthResponse,
+	code, sshKey string,
+) (*oauth2.Token, error) {
+	opts := []oauth2.AuthCodeOption{
+		oauth2.SetAuthURLParam("device_code", d.DeviceCode),
+		oauth2.SetAuthURLParam("ssh_public_key", sshKey),
+	}
+	for failures := 0; ; failures++ {
+		tok, err := cfg.Exchange(ctx, code, opts...)
+		if err == nil {
+			return tok, nil
+		}
+		slog.Debug("loopback exchange", "api", cfg.Endpoint.TokenURL, "err", err)
+		if ctx.Err() == nil && failures < pollRetries && transient(err) {
+			continue
+		}
+		return nil, deviceError(err)
+	}
 }
 
 // Signing every request stops a core at another URL before a code exists.
@@ -129,8 +246,12 @@ func (c *Client) deviceFlow(ctx context.Context) (context.Context, *oauth2.Confi
 	return context.WithValue(ctx, oauth2.HTTPClient, httpc), cfg, nil
 }
 
-func beginDeviceAuth(ctx context.Context, cfg *oauth2.Config) (*oauth2.DeviceAuthResponse, error) {
-	d, err := cfg.DeviceAuth(ctx)
+func beginDeviceAuth(
+	ctx context.Context,
+	cfg *oauth2.Config,
+	opts ...oauth2.AuthCodeOption,
+) (*oauth2.DeviceAuthResponse, error) {
+	d, err := cfg.DeviceAuth(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("device authorization: %w", err)
 	}
@@ -194,6 +315,8 @@ func deviceError(err error) error {
 		return errors.New("sign-in was denied in the browser")
 	case re.ErrorCode == "expired_token":
 		return errors.New("sign-in code expired, run nk login again")
+	case re.ErrorCode == "invalid_grant":
+		return errors.New("sign-in failed, the answer from the browser did not match, run nk login again")
 	case re.ErrorCode == "use_dpop_nonce":
 		return errors.New("sign-in failed, Nokku rejected the retry with a fresh nonce, run nk login again")
 	case re.ErrorCode == "invalid_dpop_proof":

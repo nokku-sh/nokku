@@ -235,9 +235,16 @@ CREATE TABLE device_grants (
   user_agent TEXT NOT NULL DEFAULT '',
   polled_at TIMESTAMPTZ,
   violations INTEGER NOT NULL DEFAULT 0, -- polls that came too fast, each widens the interval
+  -- nk listens on 127.0.0.1 here. The approval hands the browser a code for it, the token needs that code.
+  loopback_port INTEGER CHECK (loopback_port BETWEEN 1024 AND 65535),
+  loopback_code_hash TEXT UNIQUE,
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, user_code),
+  CHECK (
+    loopback_code_hash IS NULL
+    OR loopback_port IS NOT NULL
+  ),
   CHECK ((status = 'pending') = (user_id IS NULL)),
   CHECK (
     status <> 'approved'

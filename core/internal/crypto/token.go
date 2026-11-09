@@ -17,7 +17,8 @@ const (
 	TokenEmailRevert    TokenKind = "revert" // takes the old address back
 	TokenInvite         TokenKind = "invite"
 	TokenEnroll         TokenKind = nktoken.KindEnroll
-	TokenDeviceCode     TokenKind = "device" // nk login polls with it
+	TokenDeviceCode     TokenKind = "device"   // nk login polls with it
+	TokenLoopback       TokenKind = "loopback" // the approval hands it to nk on the same machine
 )
 
 // TokenKind is the part between "nk_" and the random body. A token used where

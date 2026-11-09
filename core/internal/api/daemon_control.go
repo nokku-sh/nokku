@@ -92,6 +92,7 @@ func (s *daemonControlService) EnrollDaemon(
 		Version:     daemonVersion(ci.RequestHeader().Get("User-Agent")),
 		ReqMetadata: req.GetMetadata(),
 		Connected:   s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
+		Settled:     s.cfg.Pool.Settled(),
 		// Not in the guard, only a verified token may spend on the cap.
 		CanCreate: func(ctx context.Context, workspaceID string) error {
 			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)

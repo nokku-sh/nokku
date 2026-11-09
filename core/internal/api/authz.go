@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
@@ -23,7 +24,7 @@ import (
 var procedureAccess = loadProcedureAccess()
 
 // authorizationInterceptor applies the (access) option in this order: daemon,
-// role or self, people only, fresh sign-in, plan feature, signing, cap.
+// nk, role or self, people only, fresh sign-in, plan feature, signing, cap.
 type authorizationInterceptor struct {
 	cfg *config.Config
 }
@@ -91,6 +92,10 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 		}
 		return a.daemonAccepted(ctx, caller.ID, procedure)
 	}
+	// nk gets what nk needs, so a phished or infected nk session can't run the workspace.
+	if caller.Kind == actor.KindCLI && !access.GetCli() {
+		return connect.NewError(connect.CodePermissionDenied, "do this in the web app")
+	}
 	// An RPC that names no role stays denied.
 	required := access.GetRole()
 	if !access.GetSelf() && (required == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || caller.Role < required) {
@@ -144,7 +149,12 @@ func requestedFresh(msg any) bool {
 	case *nokkuv1.UpdateWorkspaceRequest:
 		return req.GetSettings() != nil && req.GetSettings().EnforceSso != nil
 	case *nokkuv1.UpdateServiceAccountRequest:
-		return req.ForceCommand != nil || req.SourceAddress != nil
+		return req.ForceCommand != nil || req.SourceAddress != nil ||
+			slices.Contains(req.GetUpdateMask().GetPaths(), "role")
+	case *nokkuv1.SetUserActiveRequest:
+		return req.GetActive()
+	case *nokkuv1.UpdateDaemonRequest:
+		return slices.Contains(req.GetUpdateMask().GetPaths(), "config.record_sessions")
 	}
 	return false
 }

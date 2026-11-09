@@ -98,7 +98,10 @@ type Access struct {
 	// signs issues a user certificate, an inactive workspace gets none.
 	Signs *bool `protobuf:"varint,9,opt,name=signs" json:"signs,omitempty"`
 	// quiet changes something, but the handler records what matters, so the audit log skips the call.
-	Quiet         *bool `protobuf:"varint,10,opt,name=quiet" json:"quiet,omitempty"`
+	Quiet *bool `protobuf:"varint,10,opt,name=quiet" json:"quiet,omitempty"`
+	// cli lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
+	// nothing else, so a phished or infected nk session can't change who may do what.
+	Cli           *bool `protobuf:"varint,11,opt,name=cli" json:"cli,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -203,6 +206,13 @@ func (x *Access) GetQuiet() bool {
 	return false
 }
 
+func (x *Access) GetCli() bool {
+	if x != nil && x.Cli != nil {
+		return *x.Cli
+	}
+	return false
+}
+
 var file_nokku_v1_access_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
@@ -224,7 +234,7 @@ var File_nokku_v1_access_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_access_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\x8e\x02\n" +
+	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\xa0\x02\n" +
 	"\x06Access\x12\x16\n" +
 	"\x06public\x18\x01 \x01(\bR\x06public\x12\x12\n" +
 	"\x04self\x18\x02 \x01(\bR\x04self\x12+\n" +
@@ -237,7 +247,8 @@ const file_nokku_v1_access_proto_rawDesc = "" +
 	"\x06capped\x18\b \x01(\bR\x06capped\x12\x14\n" +
 	"\x05signs\x18\t \x01(\bR\x05signs\x12\x14\n" +
 	"\x05quiet\x18\n" +
-	" \x01(\bR\x05quiet*\xb4\x01\n" +
+	" \x01(\bR\x05quiet\x12\x10\n" +
+	"\x03cli\x18\v \x01(\bR\x03cli*\xb4\x01\n" +
 	"\rWorkspaceRole\x12\x1e\n" +
 	"\x1aWORKSPACE_ROLE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15WORKSPACE_ROLE_MEMBER\x10\x01\x12\x19\n" +

@@ -131,18 +131,20 @@ type Daemon struct {
 }
 
 type DeviceGrant struct {
-	DeviceCodeHash crypto.HashedToken `json:"deviceCodeHash"`
-	WorkspaceID    string             `json:"workspaceId"`
-	UserCode       string             `json:"userCode"`
-	Status         string             `json:"status"`
-	UserID         *string            `json:"userId"`
-	ApprovedMethod *string            `json:"approvedMethod"`
-	Ip             string             `json:"ip"`
-	UserAgent      string             `json:"userAgent"`
-	PolledAt       *time.Time         `json:"polledAt"`
-	Violations     int32              `json:"violations"`
-	ExpiresAt      time.Time          `json:"expiresAt"`
-	CreatedAt      time.Time          `json:"createdAt"`
+	DeviceCodeHash   crypto.HashedToken  `json:"deviceCodeHash"`
+	WorkspaceID      string              `json:"workspaceId"`
+	UserCode         string              `json:"userCode"`
+	Status           string              `json:"status"`
+	UserID           *string             `json:"userId"`
+	ApprovedMethod   *string             `json:"approvedMethod"`
+	Ip               string              `json:"ip"`
+	UserAgent        string              `json:"userAgent"`
+	PolledAt         *time.Time          `json:"polledAt"`
+	Violations       int32               `json:"violations"`
+	LoopbackPort     *int32              `json:"loopbackPort"`
+	LoopbackCodeHash *crypto.HashedToken `json:"loopbackCodeHash"`
+	ExpiresAt        time.Time           `json:"expiresAt"`
+	CreatedAt        time.Time           `json:"createdAt"`
 }
 
 type EffectiveAccess struct {

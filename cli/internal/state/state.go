@@ -57,6 +57,8 @@ type Config struct {
 	TTL time.Duration `json:"ttl,omitzero"`
 	// SecurityKey is kept from nk login --security-key, for the same reason.
 	SecurityKey bool `json:"security_key,omitzero"`
+	// RequireTPM is kept from --require-tpm or NK_REQUIRE_TPM until nk logout.
+	RequireTPM bool `json:"require_tpm,omitzero"`
 }
 
 // Cache is the last access snapshot, kept in cache.json for offline use.
@@ -78,8 +80,7 @@ type State struct {
 	Cache
 
 	// NK_TOKEN only, never argv, so it stays out of history and process lists.
-	Token      string
-	RequireTPM bool
+	Token string
 }
 
 func (t Target) Manual() bool { return t.DaemonID == "" }

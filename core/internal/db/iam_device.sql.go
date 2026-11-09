@@ -18,7 +18,7 @@ WHERE
   device_code_hash = $1
   AND status = $2
 RETURNING
-  device_code_hash, workspace_id, user_code, status, user_id, approved_method, ip, user_agent, polled_at, violations, expires_at, created_at
+  device_code_hash, workspace_id, user_code, status, user_id, approved_method, ip, user_agent, polled_at, violations, loopback_port, loopback_code_hash, expires_at, created_at
 `
 
 type ConsumeDeviceGrantParams struct {
@@ -41,6 +41,8 @@ func (q *Queries) ConsumeDeviceGrant(ctx context.Context, arg *ConsumeDeviceGran
 		&i.UserAgent,
 		&i.PolledAt,
 		&i.Violations,
+		&i.LoopbackPort,
+		&i.LoopbackCodeHash,
 		&i.ExpiresAt,
 		&i.CreatedAt,
 	)
@@ -49,9 +51,9 @@ func (q *Queries) ConsumeDeviceGrant(ctx context.Context, arg *ConsumeDeviceGran
 
 const createDeviceGrant = `-- name: CreateDeviceGrant :exec
 INSERT INTO
-  device_grants (device_code_hash, user_code, ip, user_agent, expires_at)
+  device_grants (device_code_hash, user_code, ip, user_agent, loopback_port, expires_at)
 VALUES
-  ($1, $2, $3, $4, $5)
+  ($1, $2, $3, $4, $5, $6)
 `
 
 type CreateDeviceGrantParams struct {
@@ -59,6 +61,7 @@ type CreateDeviceGrantParams struct {
 	UserCode       string             `json:"userCode"`
 	Ip             string             `json:"ip"`
 	UserAgent      string             `json:"userAgent"`
+	LoopbackPort   *int32             `json:"loopbackPort"`
 	ExpiresAt      time.Time          `json:"expiresAt"`
 }
 
@@ -68,6 +71,7 @@ func (q *Queries) CreateDeviceGrant(ctx context.Context, arg *CreateDeviceGrantP
 		arg.UserCode,
 		arg.Ip,
 		arg.UserAgent,
+		arg.LoopbackPort,
 		arg.ExpiresAt,
 	)
 	return err
@@ -78,33 +82,39 @@ UPDATE device_grants
 SET
   status = $1,
   user_id = $2,
-  approved_method = $3
+  approved_method = $3,
+  loopback_code_hash = CASE
+    WHEN loopback_port IS NULL THEN NULL
+    ELSE $4
+  END
 WHERE
-  user_code = $4
+  user_code = $5
   AND status = 'pending'
   AND expires_at > NOW()
 RETURNING
-  status
+  loopback_port
 `
 
 type DecideDeviceGrantParams struct {
-	Status         string  `json:"status"`
-	UserID         *string `json:"userId"`
-	ApprovedMethod *string `json:"approvedMethod"`
-	UserCode       string  `json:"userCode"`
+	Status           string              `json:"status"`
+	UserID           *string             `json:"userId"`
+	ApprovedMethod   *string             `json:"approvedMethod"`
+	LoopbackCodeHash *crypto.HashedToken `json:"loopbackCodeHash"`
+	UserCode         string              `json:"userCode"`
 }
 
-// Only a pending grant changes, so a code is decided once.
-func (q *Queries) DecideDeviceGrant(ctx context.Context, arg *DecideDeviceGrantParams) (string, error) {
+// Only a pending grant changes, so a code is decided once. Only a loopback grant keeps the code.
+func (q *Queries) DecideDeviceGrant(ctx context.Context, arg *DecideDeviceGrantParams) (*int32, error) {
 	row := q.db.QueryRow(ctx, decideDeviceGrant,
 		arg.Status,
 		arg.UserID,
 		arg.ApprovedMethod,
+		arg.LoopbackCodeHash,
 		arg.UserCode,
 	)
-	var status string
-	err := row.Scan(&status)
-	return status, err
+	var loopback_port *int32
+	err := row.Scan(&loopback_port)
+	return loopback_port, err
 }
 
 const deleteExpiredDeviceGrants = `-- name: DeleteExpiredDeviceGrants :execrows
@@ -123,7 +133,7 @@ func (q *Queries) DeleteExpiredDeviceGrants(ctx context.Context, now time.Time) 
 
 const getDeviceGrant = `-- name: GetDeviceGrant :one
 SELECT
-  device_code_hash, workspace_id, user_code, status, user_id, approved_method, ip, user_agent, polled_at, violations, expires_at, created_at
+  device_code_hash, workspace_id, user_code, status, user_id, approved_method, ip, user_agent, polled_at, violations, loopback_port, loopback_code_hash, expires_at, created_at
 FROM
   device_grants
 WHERE
@@ -145,6 +155,8 @@ func (q *Queries) GetDeviceGrant(ctx context.Context, deviceCodeHash crypto.Hash
 		&i.UserAgent,
 		&i.PolledAt,
 		&i.Violations,
+		&i.LoopbackPort,
+		&i.LoopbackCodeHash,
 		&i.ExpiresAt,
 		&i.CreatedAt,
 	)
@@ -154,7 +166,8 @@ func (q *Queries) GetDeviceGrant(ctx context.Context, deviceCodeHash crypto.Hash
 const getPendingDeviceGrant = `-- name: GetPendingDeviceGrant :one
 SELECT
   ip,
-  user_agent
+  user_agent,
+  (loopback_port IS NOT NULL)::BOOLEAN AS loopback
 FROM
   device_grants
 WHERE
@@ -166,13 +179,14 @@ WHERE
 type GetPendingDeviceGrantRow struct {
 	Ip        string `json:"ip"`
 	UserAgent string `json:"userAgent"`
+	Loopback  bool   `json:"loopback"`
 }
 
 // For the approval page. It does not spend the code.
 func (q *Queries) GetPendingDeviceGrant(ctx context.Context, userCode string) (*GetPendingDeviceGrantRow, error) {
 	row := q.db.QueryRow(ctx, getPendingDeviceGrant, userCode)
 	var i GetPendingDeviceGrantRow
-	err := row.Scan(&i.Ip, &i.UserAgent)
+	err := row.Scan(&i.Ip, &i.UserAgent, &i.Loopback)
 	return &i, err
 }
 

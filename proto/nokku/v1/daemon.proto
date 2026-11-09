@@ -14,6 +14,7 @@ service DaemonService {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  // Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
   rpc UpdateDaemon(UpdateDaemonRequest) returns (UpdateDaemonResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
@@ -35,6 +36,7 @@ service DaemonService {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
       quiet: true
+      cli: true
     };
   }
 }

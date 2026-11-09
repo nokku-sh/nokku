@@ -20,10 +20,14 @@ service AccessRequestService {
       role: WORKSPACE_ROLE_MEMBER
       feature: "access_requests"
       people_only: true
+      cli: true
     };
   }
   rpc GetAccessRequest(GetAccessRequestRequest) returns (GetAccessRequestResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      cli: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListAccessRequests(ListAccessRequestsRequest) returns (ListAccessRequestsResponse) {

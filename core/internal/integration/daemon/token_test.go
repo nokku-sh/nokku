@@ -136,7 +136,7 @@ func TestEnrollEphemeralReplacesOffline(t *testing.T) {
 	assert.Equal(t, "alice", first.Name)
 	assert.True(t, first.Config.GetEphemeral())
 
-	second, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	second, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice"), Settled: true})
 	require.NoError(t, err)
 	assert.Equal(t, "alice", second.Name)
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
@@ -146,7 +146,7 @@ func TestEnrollEphemeralReplacesOffline(t *testing.T) {
 	}))
 
 	third, err := enroll(t, f, daemon.EnrollInput{
-		Token: token, ReqMetadata: hostname("alice"), Connected: []string{second.DaemonID},
+		Token: token, ReqMetadata: hostname("alice"), Connected: []string{second.DaemonID}, Settled: true,
 	})
 	require.NoError(t, err)
 	assert.Regexp(t, generatedName, third.Name, "an online daemon keeps its name")
@@ -154,6 +154,23 @@ func TestEnrollEphemeralReplacesOffline(t *testing.T) {
 		_, err := q.GetDaemon(f.ctx, second.DaemonID)
 		return err
 	}))
+}
+
+// Right after a core start no daemon has reconnected yet, so every one looks
+// offline. Nothing is replaced until the pool has settled.
+func TestEnrollEphemeralWaitsForReconnects(t *testing.T) {
+	f, token := ephemeralToken(t, 10*time.Minute)
+
+	first, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	require.NoError(t, err)
+
+	second, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	require.NoError(t, err)
+	assert.Regexp(t, generatedName, second.Name, "a newcomer took a name before daemons could reconnect")
+	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
+		_, err := q.GetDaemon(f.ctx, first.DaemonID)
+		return err
+	}), "a daemon that may still reconnect was deleted")
 }
 
 // A container coming or going wakes nobody, or a busy fleet would sync without
@@ -195,7 +212,7 @@ func TestContainerChurnWakesNobody(t *testing.T) {
 	assert.Greater(t, version(), before, "the version must move, the heartbeat is the backstop")
 
 	before = version()
-	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice"), Settled: true})
 	require.NoError(t, err)
 	assert.False(t, woken(), "a container replacing its offline self woke the fleet")
 	assert.Greater(t, version(), before)
@@ -219,7 +236,7 @@ func TestSpentTokenReplacesNothing(t *testing.T) {
 	first, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
 	require.NoError(t, err)
 
-	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
+	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice"), Settled: true})
 	require.ErrorIs(t, err, daemon.ErrEnrollToken, "a spent token enrolled a daemon")
 	assert.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
 		_, err := q.GetDaemon(f.ctx, first.DaemonID)

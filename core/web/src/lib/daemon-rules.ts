@@ -5,13 +5,22 @@ export type DaemonRule = keyof Pick<
 	'recordSessions' | 'allowForwarding' | 'allowAgentForwarding' | 'gatewayPorts'
 >;
 
-/** The SSH rules a daemon follows, named the same on the daemon and in the defaults new ones start with. */
-export const daemonRules: { key: DaemonRule; title: string; description: string }[] = [
+/**
+ * The SSH rules a daemon follows, named the same on the daemon and in the defaults new ones start with. A fresh rule
+ * takes a recent sign-in to change on a daemon.
+ */
+export const daemonRules: {
+	key: DaemonRule;
+	title: string;
+	description: string;
+	fresh?: boolean;
+}[] = [
 	{
 		key: 'recordSessions',
 		title: 'Record sessions',
 		description:
-			'Keep an encrypted recording of every SSH session for playback. People who log in are told.'
+			'Keep an encrypted recording of every SSH session for playback. People who log in are told.',
+		fresh: true
 	},
 	{
 		key: 'allowForwarding',

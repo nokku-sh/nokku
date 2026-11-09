@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -51,9 +52,18 @@ func TestRulesGolden(t *testing.T) {
 		md, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		require.NoError(t, err, procedure)
 		lines = append(lines, fmt.Sprintf(
-			"%s public=%t self=%t role=%s daemon=%t people_only=%t fresh=%t feature=%s capped=%t signs=%t audited=%t",
-			procedure, a.GetPublic(), a.GetSelf(), strings.TrimPrefix(a.GetRole().String(), "WORKSPACE_ROLE_"),
-			a.GetDaemon(), a.GetPeopleOnly(), a.GetFresh(), a.GetFeature(), a.GetCapped(), a.GetSigns(),
+			"%s public=%t self=%t role=%s daemon=%t cli=%t people_only=%t fresh=%t feature=%s capped=%t signs=%t audited=%t",
+			procedure,
+			a.GetPublic(),
+			a.GetSelf(),
+			strings.TrimPrefix(a.GetRole().String(), "WORKSPACE_ROLE_"),
+			a.GetDaemon(),
+			a.GetCli(),
+			a.GetPeopleOnly(),
+			a.GetFresh(),
+			a.GetFeature(),
+			a.GetCapped(),
+			a.GetSigns(),
 			audit.Records(md),
 		))
 	}
@@ -109,6 +119,8 @@ func TestSignInAndAuditChangesAreFresh(t *testing.T) {
 		nokkuv1connect.AuditStreamServiceDeleteAuditStreamProcedure,
 		nokkuv1connect.WorkspaceServiceTransferOwnershipProcedure,
 		nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure,
+		nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure,
+		nokkuv1connect.RecordingServiceDeleteRecordingProcedure,
 	} {
 		assert.True(t, procedureAccess[procedure].GetFresh(), "%s needs a recent sign-in", procedure)
 	}
@@ -123,6 +135,21 @@ func TestRequestedFresh(t *testing.T) {
 	assert.False(t, requestedFresh(update(nil)), "a rename stays free")
 	assert.False(t, requestedFresh(update(&nokkuv1.WorkspaceSettings{})), "other settings stay free")
 	assert.False(t, requestedFresh(&nokkuv1.GetVersionRequest{}), "another call")
+
+	assert.True(t, requestedFresh(&nokkuv1.SetUserActiveRequest{Active: new(true)}), "reactivating")
+	assert.False(t, requestedFresh(&nokkuv1.SetUserActiveRequest{Active: new(false)}), "deactivating stays quick")
+
+	sa := func(paths ...string) *nokkuv1.UpdateServiceAccountRequest {
+		return &nokkuv1.UpdateServiceAccountRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}}
+	}
+	assert.True(t, requestedFresh(sa("role")), "a service account's role")
+	assert.False(t, requestedFresh(sa("name", "tags")), "a service account's name and tags stay free")
+
+	daemon := func(paths ...string) *nokkuv1.UpdateDaemonRequest {
+		return &nokkuv1.UpdateDaemonRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}}
+	}
+	assert.True(t, requestedFresh(daemon("config.record_sessions")), "turning recording off")
+	assert.False(t, requestedFresh(daemon("status", "config.allow_forwarding")), "other daemon settings stay free")
 }
 
 // An uncapped create is unbounded when hosted, so each is capped or named here.

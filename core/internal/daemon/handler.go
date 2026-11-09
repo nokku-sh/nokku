@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/time/rate"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -17,7 +18,12 @@ import (
 )
 
 // heartbeatDeadline allows three missed 30s heartbeats.
-const heartbeatDeadline = 2 * time.Minute
+const (
+	heartbeatDeadline = 2 * time.Minute
+	// nokkud beats every 30s. A burst passes, a flood would cost a transaction per message.
+	heartbeatEvery = 10 * time.Second
+	heartbeatBurst = 5
+)
 
 func (p *Pool) Connect(
 	ctx context.Context,
@@ -84,6 +90,7 @@ func (p *Pool) Connect(
 	defer silence.Stop()
 	recvErr := make(chan error, 1)
 	go func() {
+		beats := rate.NewLimiter(rate.Every(heartbeatEvery), heartbeatBurst)
 		for {
 			req, err := stream.Receive()
 			if err != nil {
@@ -92,7 +99,7 @@ func (p *Pool) Connect(
 			}
 			silence.Reset(heartbeatDeadline)
 			hb := req.GetHeartbeat()
-			if hb == nil {
+			if hb == nil || !beats.Allow() {
 				continue
 			}
 			version, err := p.stateVersion(conn.ctx, daemon.Daemon.WorkspaceID)

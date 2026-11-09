@@ -3,6 +3,7 @@
 	import { daemon as daemonApi, useDaemonReview } from '#lib/api/daemons.svelte.js';
 	import { useConnect } from '#lib/api/connect.svelte.js';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { grantsOf } from '#lib/components/access/subjects.svelte.js';
 	import TargetAccess from '#lib/components/access/TargetAccess.svelte';
@@ -386,7 +387,10 @@
 									<Switch
 										id={`rule-${rule.key}`}
 										checked={ruleOn(rule.key)}
-										onCheckedChange={(v) => void applyRule(rule.key, v)}
+										onCheckedChange={(v) =>
+											rule.fresh
+												? whenFresh(() => void applyRule(rule.key, v))
+												: void applyRule(rule.key, v)}
 										disabled={!can.edit || rule.key in flipped}
 									/>
 								</Item.Actions>

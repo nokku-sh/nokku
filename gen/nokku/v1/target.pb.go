@@ -2436,16 +2436,17 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x15TARGET_STATUS_PENDING\x10\x01\x12\x18\n" +
 	"\x14TARGET_STATUS_ONLINE\x10\x02\x12\x19\n" +
 	"\x15TARGET_STATUS_OFFLINE\x10\x03\x12\x18\n" +
-	"\x14TARGET_STATUS_MANUAL\x10\x042\xa5\b\n" +
+	"\x14TARGET_STATUS_MANUAL\x10\x042\xaf\b\n" +
 	"\rTargetService\x12O\n" +
-	"\tGetTarget\x12\x1a.nokku.v1.GetTargetRequest\x1a\x1b.nokku.v1.GetTargetResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12U\n" +
-	"\vListTargets\x12\x1c.nokku.v1.ListTargetsRequest\x1a\x1d.nokku.v1.ListTargetsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12W\n" +
-	"\fCreateTarget\x12\x1d.nokku.v1.CreateTargetRequest\x1a\x1e.nokku.v1.CreateTargetResponse\"\b\xc2\xf3\x18\x04\x18\x03@\x01\x12U\n" +
-	"\fUpdateTarget\x12\x1d.nokku.v1.UpdateTargetRequest\x1a\x1e.nokku.v1.UpdateTargetResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12U\n" +
-	"\fDeleteTarget\x12\x1d.nokku.v1.DeleteTargetRequest\x1a\x1e.nokku.v1.DeleteTargetResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12d\n" +
-	"\x10GetSubjectAccess\x12!.nokku.v1.GetSubjectAccessRequest\x1a\".nokku.v1.GetSubjectAccessResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12d\n" +
-	"\x10GetTargetFilters\x12!.nokku.v1.GetTargetFiltersRequest\x1a\".nokku.v1.GetTargetFiltersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12^\n" +
-	"\x0fSyncTargetUsers\x12 .nokku.v1.SyncTargetUsersRequest\x1a!.nokku.v1.SyncTargetUsersResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12^\n" +
+	"\tGetTarget\x12\x1a.nokku.v1.GetTargetRequest\x1a\x1b.nokku.v1.GetTargetResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12W\n" +
+	"\vListTargets\x12\x1c.nokku.v1.ListTargetsRequest\x1a\x1d.nokku.v1.ListTargetsResponse\"\v\xc2\xf3\x18\x04\x18\x02X\x01\x90\x02\x01\x12Y\n" +
+	"\fCreateTarget\x12\x1d.nokku.v1.CreateTargetRequest\x1a\x1e.nokku.v1.CreateTargetResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x03@\x01X\x01\x12U\n" +
+	"\fUpdateTarget\x12\x1d.nokku.v1.UpdateTargetRequest\x1a\x1e.nokku.v1.UpdateTargetResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12W\n" +
+	"\fDeleteTarget\x12\x1d.nokku.v1.DeleteTargetRequest\x1a\x1e.nokku.v1.DeleteTargetResponse\"\b\xc2\xf3\x18\x04\x18\x03X\x01\x12f\n" +
+	"\x10GetSubjectAccess\x12!.nokku.v1.GetSubjectAccessRequest\x1a\".nokku.v1.GetSubjectAccessResponse\"\v\xc2\xf3\x18\x04\x10\x01X\x01\x90\x02\x01\x12d\n" +
+	"\x10GetTargetFilters\x12!.nokku.v1.GetTargetFiltersRequest\x1a\".nokku.v1.GetTargetFiltersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12`\n" +
+	"\x0fSyncTargetUsers\x12 .nokku.v1.SyncTargetUsersRequest\x1a!.nokku.v1.SyncTargetUsersResponse\"\b\xc2\xf3\x18\x04\x18\x03X\x01\x12^\n" +
 	"\x0eGetAccessGraph\x12\x1f.nokku.v1.GetAccessGraphRequest\x1a .nokku.v1.GetAccessGraphResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12v\n" +
 	"\x16ListAccessGraphTargets\x12'.nokku.v1.ListAccessGraphTargetsRequest\x1a(.nokku.v1.ListAccessGraphTargetsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12a\n" +
 	"\x0fGetAccessMatrix\x12 .nokku.v1.GetAccessMatrixRequest\x1a!.nokku.v1.GetAccessMatrixResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01B\x8c\x01\n" +

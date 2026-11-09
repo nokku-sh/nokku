@@ -22,6 +22,9 @@ message Access {
   bool signs = 9;
   // quiet changes something, but the handler records what matters, so the audit log skips the call.
   bool quiet = 10;
+  // cli lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
+  // nothing else, so a phished or infected nk session can't change who may do what.
+  bool cli = 11;
 }
 
 enum WorkspaceRole {

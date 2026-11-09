@@ -42,7 +42,7 @@ func (c *Client) syncDaemon(ctx context.Context) error {
 		return nil
 	}
 
-	access := state.AccessFrom(res)
+	access := state.AccessFrom(res, c.state.TargetID)
 	previousHostCA := c.state.Access().HostCA
 	c.state.SetAccess(access)
 	c.srv.SetAccess(access)

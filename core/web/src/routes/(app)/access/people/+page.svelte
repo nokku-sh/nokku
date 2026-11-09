@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { page } from '$app/state';
-	import { auth } from '#lib/api/auth.svelte.js';
+	import { auth, whenFresh } from '#lib/api/auth.svelte.js';
 	import { users } from '#lib/api/workspaces.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { roles } from '#lib/api/roles.svelte.js';
@@ -125,7 +125,10 @@
 									{
 										label: u.active ? 'Deactivate' : 'Reactivate',
 										icon: UserRoundX,
-										onClick: () => setActive.mutate({ userId: u.id, active: !u.active })
+										onClick: () =>
+											u.active
+												? setActive.mutate({ userId: u.id, active: false })
+												: whenFresh(() => setActive.mutate({ userId: u.id, active: true }))
 									}
 								])
 					],

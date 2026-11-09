@@ -68,8 +68,9 @@ func syncCMD() *cli.Command {
 			portFlag,
 			&cli.BoolFlag{Name: "dry-run", Usage: "Show what would be written and change nothing"},
 			&cli.BoolFlag{
-				Name:  "accept-host-key",
-				Usage: "Go on when the host key changed since the last sync and pin the new one",
+				Name: "accept-host-key",
+				Usage: "Go on when the host key changed since the last sync. " +
+					"Your own ssh checks the host, then the key it shows is pinned",
 			},
 			jsonFlag,
 		},
@@ -294,7 +295,7 @@ func rmCMD() *cli.Command {
 			&cli.BoolFlag{Name: "keep-host", Usage: "Delete the target only and leave the server as it is"},
 			&cli.BoolFlag{
 				Name:  "accept-host-key",
-				Usage: "Go on when the host key changed since the last sync",
+				Usage: "Go on when the host key changed since the last sync, your own ssh checks the host",
 			},
 		},
 		Action: targetDelete,
@@ -485,8 +486,8 @@ func (r remote) portArgs() []string {
 	return []string{"-p", r.port}
 }
 
-// trust sets how this run checks the host: only the pinned key, whatever the
-// host shows with accept, or the operator's own known_hosts for a new target.
+// trust sets how this run checks the host: only the pinned key, or the
+// operator's own known_hosts for a new target and with accept, as plain ssh does.
 func (r remote) trust(target *state.Target, accept bool) (remote, error) {
 	dir, err := os.MkdirTemp("", "nk-sync-")
 	if err != nil {
@@ -495,9 +496,7 @@ func (r remote) trust(target *state.Target, accept bool) (remote, error) {
 	r.dir = dir
 	knownHosts := filepath.Join(dir, "known_hosts")
 	switch {
-	case target.ID == "" || target.HostPublicKey == "":
-	case accept:
-		r.opts = ssh.AcceptHostOptions(target, knownHosts)
+	case target.ID == "" || target.HostPublicKey == "" || accept:
 	default:
 		if r.opts, err = ssh.PinnedHostOptions(target, knownHosts); err != nil {
 			_ = os.RemoveAll(dir)
@@ -529,6 +528,9 @@ func (r remote) controlPath() string {
 
 func (r remote) run(ctx context.Context, command, stdin string) (string, error) {
 	args := append(r.portArgs(), "-l", "root")
+	// Whatever the operator's config says, root on a server being set up gets no agent and no forwards.
+	args = append(args, "-T", "-o", "ForwardAgent=no", "-o", "ForwardX11=no",
+		"-o", "ClearAllForwardings=yes", "-o", "PermitLocalCommand=no")
 	args = append(args, r.opts...)
 	if runtime.GOOS != "windows" && r.dir != "" {
 		// Share one connection, so a password or key prompt comes only once.

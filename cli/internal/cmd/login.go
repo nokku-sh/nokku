@@ -28,6 +28,10 @@ func loginCMD() *cli.Command {
 				Name:  "security-key",
 				Usage: "Keep the ssh key on a FIDO2 security key, every ssh login then needs a touch",
 			},
+			&cli.BoolFlag{
+				Name:  "headless",
+				Usage: "Sign in by typing a code on another device, for a machine without a browser",
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			s, err := loadState(cmd)
@@ -43,6 +47,7 @@ func loginCMD() *cli.Command {
 			if err != nil {
 				return err
 			}
+			c.Headless = cmd.Bool("headless")
 			if cmd.IsSet("ci") {
 				if err = c.LoginCI(ctx, cmd.String("ci")); err != nil {
 					return err
@@ -97,6 +102,8 @@ func logoutCMD() *cli.Command {
 				if err != nil {
 					warnf("the session could not be revoked on the server, it stays valid until it expires: %v", err)
 				}
+			} else {
+				warnf("the session was not revoked on the server, it stays valid until it expires: %v", loadErr)
 			}
 			ssh.StopAgent(ctx)
 			if err := ssh.RemoveInclude(); err != nil {

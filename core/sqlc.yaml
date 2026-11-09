@@ -101,6 +101,12 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "HashedToken"
+          - column: "device_grants.loopback_code_hash"
+            nullable: true
+            go_type:
+              import: "github.com/nokku-sh/nokku/core/internal/crypto"
+              type: "HashedToken"
+              pointer: true
           - column: "join_tokens.token_hash"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"

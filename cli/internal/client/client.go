@@ -36,6 +36,9 @@ type Client struct {
 	proofer *dpop.Proofer
 	dpop    *dpopclient.Client
 
+	// Headless signs in by typing a code on another device, not a browser here.
+	Headless bool
+
 	auth            nokkuv1connect.AuthServiceClient
 	certs           nokkuv1connect.CertificateServiceClient
 	targets         nokkuv1connect.TargetServiceClient

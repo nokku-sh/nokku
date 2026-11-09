@@ -19,7 +19,13 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-const sendBufferSize = 64
+const (
+	sendBufferSize = 64
+	// behindReportGap keeps a daemon that flaps between behind and caught up from flooding the audit log.
+	behindReportGap = 10 * time.Minute
+	// reconnectWindow outlasts nokkud's longest reconnect backoff, a minute plus jitter.
+	reconnectWindow = 2 * time.Minute
+)
 
 var stateUpdate = &nokkuv1.ConnectResponse{
 	Msg: &nokkuv1.ConnectResponse_StateUpdate{StateUpdate: &nokkuv1.StateUpdate{}},
@@ -36,6 +42,7 @@ type daemonConn struct {
 	// wanted is the core's version at the last heartbeat.
 	wanted      int64
 	behindSince atomic.Pointer[time.Time]
+	reportedAt  time.Time
 }
 
 // connection lets tests stub db.Connection without Postgres.
@@ -53,7 +60,8 @@ type Pool struct {
 	pendingRelays map[string]*relayPending
 	conn          connection
 	// record is told when a daemon falls behind.
-	record func(context.Context, *audit.Event)
+	record  func(context.Context, *audit.Event)
+	started time.Time
 }
 
 // heartbeat checks against the core's version one heartbeat ago, so a daemon
@@ -65,7 +73,11 @@ func (c *daemonConn) heartbeat(applied, current int64) (fell bool) {
 		c.behindSince.Store(nil)
 		return false
 	}
-	return c.behindSince.CompareAndSwap(nil, new(time.Now()))
+	if !c.behindSince.CompareAndSwap(nil, new(time.Now())) || time.Since(c.reportedAt) < behindReportGap {
+		return false
+	}
+	c.reportedAt = time.Now()
+	return true
 }
 
 func New(conn connection, record func(context.Context, *audit.Event)) *Pool {
@@ -76,6 +88,7 @@ func New(conn connection, record func(context.Context, *audit.Event)) *Pool {
 		pendingRelays: make(map[string]*relayPending),
 		conn:          conn,
 		record:        record,
+		started:       time.Now(),
 	}
 }
 
@@ -84,6 +97,11 @@ func (p *Pool) Connected() []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return slices.Collect(maps.Keys(p.byID))
+}
+
+// Settled says Connected is complete. After a start, daemons are still on their way back.
+func (p *Pool) Settled() bool {
+	return time.Since(p.started) > reconnectWindow
 }
 
 func (p *Pool) ConnectedIn(workspaceID string) []string {

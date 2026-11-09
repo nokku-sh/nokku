@@ -3,6 +3,7 @@
 package client
 
 import (
+	"os"
 	"os/exec"
 	"runtime"
 	"syscall"
@@ -30,4 +31,15 @@ func openBrowser(url string) error {
 		return nil
 	}
 	return exec.ErrNotFound
+}
+
+// hasBrowser guesses if a browser here can reach nk on 127.0.0.1. Plain ssh can't.
+func hasBrowser() bool {
+	if os.Getenv("SSH_CONNECTION") != "" && os.Getenv("DISPLAY") == "" {
+		return false
+	}
+	if runtime.GOOS == "darwin" || os.Getenv("WSL_DISTRO_NAME") != "" {
+		return true
+	}
+	return os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != ""
 }

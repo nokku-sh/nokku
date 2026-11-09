@@ -243,10 +243,11 @@
 					value={model.role}
 					max={SERVICE_ACCOUNT_MAX_ROLE}
 					disabled={!can.edit}
-					onChange={(role) => {
-						model.role = role;
-						save();
-					}}
+					onChange={(role) =>
+						whenFresh(() => {
+							model.role = role;
+							save();
+						})}
 				/>
 			</Section>
 

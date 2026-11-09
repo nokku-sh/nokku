@@ -22,10 +22,16 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 	"github.com/nokku-sh/nokku/daemon/internal/sshd"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
+)
+
+const (
+	testTarget  = "6f1c2b4e-8a3d-4c5e-9f70-1a2b3c4d5e6f"
+	testSubject = "11111111-2222-4333-8444-555555555555"
 )
 
 // fakeCore won't sign host certificates, like a core whose CA is deactivated.
@@ -49,7 +55,7 @@ func (b *fakeCore) EnrollDaemon(
 	b.enrolled.Store(req)
 	return &nokkuv1.EnrollDaemonResponse{
 		Id:          new("daemon-1"),
-		TargetId:    new("target-1"),
+		TargetId:    new(testTarget),
 		Status:      nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
 		Config:      &nokkuv1.DaemonConfig{Ephemeral: new(true)},
 		AccessToken: new("session"),
@@ -73,7 +79,7 @@ func (b *fakeCore) accepted() *nokkuv1.SyncDaemonResponse {
 		HostCaPublicKey: &b.hostCA,
 		StateVersion:    new(int64(7)),
 		Principals: []*nokkuv1.AccountPrincipals{
-			{Username: new("deploy"), CertPrincipals: []string{"subject-1"}},
+			{Username: new("deploy"), CertPrincipals: []string{principal("deploy")}},
 		},
 	}
 }
@@ -137,7 +143,7 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 	})
 
 	return &Client{
-		state: state.New(state.Config{TargetID: "target-1"}),
+		state: state.New(state.Config{TargetID: testTarget}),
 		ctl: nokkuv1connect.NewDaemonControlServiceClient(
 			connect.NewClient(connecthttp.NewTransport(api.Client(), api.URL)),
 		),
@@ -155,7 +161,7 @@ func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	c := newSyncClient(t, core)
 
 	must.NoError(c.syncDaemon(t.Context()), "a sync must not fail on the host certificate")
-	is.Equal([]string{"subject-1"}, c.state.Access().Principals["deploy"], "the grant did not land")
+	is.Equal([]string{principal("deploy")}, c.state.Access().Principals["deploy"], "the grant did not land")
 	is.Equal(core.ca, c.state.Access().CA, "the CA did not land")
 	is.EqualValues(7, c.state.SavedVersion())
 	is.Zero(core.signs.Load(), "the sync signed a host certificate itself")
@@ -180,7 +186,7 @@ func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	loaded, err := state.Load()
 	must.NoError(err)
 	is.Equal(core.ca, loaded.Access().CA)
-	is.Equal([]string{"subject-1"}, loaded.Access().Principals["deploy"])
+	is.Equal([]string{principal("deploy")}, loaded.Access().Principals["deploy"])
 }
 
 // An approval taken back must not leave the host serving its old grants.
@@ -228,10 +234,10 @@ func TestEnrollRestartReEnroll(t *testing.T) {
 	restarted, err := state.Load()
 	must.NoError(err)
 	is.Equal("daemon-1", restarted.DaemonID)
-	is.Equal("target-1", restarted.TargetID)
+	is.Equal(testTarget, restarted.TargetID)
 	is.Equal("session", restarted.SessionToken)
 	is.Equal(core.ca, restarted.Access().CA)
-	is.Equal([]string{"subject-1"}, restarted.Access().Principals["deploy"])
+	is.Equal([]string{principal("deploy")}, restarted.Access().Principals["deploy"])
 	is.EqualValues(7, restarted.SavedVersion())
 
 	must.NoError(c.enroll(t.Context(), "token"))
@@ -309,7 +315,9 @@ func TestSyncWithUnreadableCAClosesTheOldCA(t *testing.T) {
 	grant := func(caKey string) *nokkuv1.SyncDaemonResponse {
 		res := core.accepted()
 		res.CaPublicKey = &caKey
-		res.Principals = []*nokkuv1.AccountPrincipals{{Username: &cur.Username, CertPrincipals: []string{"subject-1"}}}
+		res.Principals = []*nokkuv1.AccountPrincipals{
+			{Username: &cur.Username, CertPrincipals: []string{principal(cur.Username)}},
+		}
 		return res
 	}
 	core.answer.Store(grant(string(ssh.MarshalAuthorizedKey(caSigner.PublicKey()))))
@@ -322,7 +330,7 @@ func TestSyncWithUnreadableCAClosesTheOldCA(t *testing.T) {
 	cert := &ssh.Certificate{
 		Key:             userSigner.PublicKey(),
 		CertType:        ssh.UserCert,
-		ValidPrincipals: []string{"subject-1"},
+		ValidPrincipals: []string{principal(cur.Username)},
 		ValidBefore:     ssh.CertTimeInfinity,
 	}
 	must.NoError(cert.SignCert(rand.Reader, caSigner))
@@ -360,3 +368,6 @@ func TestSyncWithUnreadableCAClosesTheOldCA(t *testing.T) {
 	_, err = login()
 	must.Error(err, "the old CA still logs in")
 }
+
+// A sync keeps only principals for this server and the account, so tests use real ones.
+func principal(username string) string { return login.Principal(testSubject, testTarget, username) }

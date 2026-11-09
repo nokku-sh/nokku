@@ -13,6 +13,13 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
+const (
+	ownTarget   = "6f1c2b4e-8a3d-4c5e-9f70-1a2b3c4d5e6f"
+	otherTarget = "0d9e8f7a-6b5c-4d3e-8f21-a0b1c2d3e4f5"
+	subject1    = "11111111-2222-4333-8444-555555555555"
+	subject2    = "66666666-7777-4888-9999-aaaaaaaaaaaa"
+)
+
 func newTestDataDir(t *testing.T) {
 	t.Helper()
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
@@ -21,24 +28,46 @@ func newTestDataDir(t *testing.T) {
 func TestAccessFromDropsInvalidAccounts(t *testing.T) {
 	t.Parallel()
 	is := assert.New(t)
+	alice1, alice2 := subject1+"@"+ownTarget+":alice", subject2+"@"+ownTarget+":alice"
 	a := AccessFrom(&nokkuv1.SyncDaemonResponse{
 		Principals: []*nokkuv1.AccountPrincipals{
-			{Username: new("alice"), CertPrincipals: []string{"uuid-1", "uuid-2"}},
-			{Username: new("../../etc"), CertPrincipals: []string{"uuid-1"}},
-			{Username: new("0start"), CertPrincipals: []string{"uuid-1"}},
-			{Username: new(""), CertPrincipals: []string{"uuid-1"}},
+			{Username: new("alice"), CertPrincipals: []string{alice1, alice2}},
+			{Username: new("../../etc"), CertPrincipals: []string{alice1}},
+			{Username: new("0start"), CertPrincipals: []string{alice1}},
+			{Username: new(""), CertPrincipals: []string{alice1}},
 		},
 		CaPublicKey:     new("ssh-ed25519 BBBB"),
 		HostCaPublicKey: new("ssh-ed25519 HHHH"),
 		Config:          &nokkuv1.DaemonConfig{RecordSessions: new(true)},
 		StateVersion:    new(int64(7)),
-	})
+	}, ownTarget)
 
-	is.Equal(map[string][]string{"alice": {"uuid-1", "uuid-2"}}, a.Principals)
+	is.Equal([]string{alice1, alice2}, a.Principals["alice"])
+	is.Len(a.Principals, 1, "only alice is a valid account")
 	is.Equal("ssh-ed25519 BBBB", a.CA)
 	is.Equal("ssh-ed25519 HHHH", a.HostCA, "the host CA is kept apart from the login CA")
 	is.True(a.DaemonConfig.GetRecordSessions())
 	is.EqualValues(7, a.StateVersion)
+}
+
+// Even if the core sent a wrong list, a principal opens only this server and
+// the account it is listed under.
+func TestAccessFromKeepsOnlyThisServerAndAccount(t *testing.T) {
+	t.Parallel()
+	own := subject1 + "@" + ownTarget + ":deploy"
+	a := AccessFrom(&nokkuv1.SyncDaemonResponse{
+		Principals: []*nokkuv1.AccountPrincipals{{
+			Username: new("deploy"),
+			CertPrincipals: []string{
+				own,
+				subject1 + "@" + otherTarget + ":deploy",
+				subject1 + "@" + ownTarget + ":root",
+				ownTarget + ":deploy",
+				"deploy",
+			},
+		}},
+	}, ownTarget)
+	assert.Equal(t, []string{own}, a.Principals["deploy"])
 }
 
 // Enrollment and access share a file, so a restart sees both from one moment.

@@ -1042,10 +1042,10 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\x17ListTeamsForUserRequest\x12!\n" +
 	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"@\n" +
 	"\x18ListTeamsForUserResponse\x12$\n" +
-	"\x05teams\x18\x01 \x03(\v2\x0e.nokku.v1.TeamR\x05teams2\xa4\x06\n" +
+	"\x05teams\x18\x01 \x03(\v2\x0e.nokku.v1.TeamR\x05teams2\xa6\x06\n" +
 	"\vTeamService\x12I\n" +
-	"\aGetTeam\x12\x18.nokku.v1.GetTeamRequest\x1a\x19.nokku.v1.GetTeamResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12O\n" +
-	"\tListTeams\x12\x1a.nokku.v1.ListTeamsRequest\x1a\x1b.nokku.v1.ListTeamsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12Q\n" +
+	"\aGetTeam\x12\x18.nokku.v1.GetTeamRequest\x1a\x19.nokku.v1.GetTeamResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12Q\n" +
+	"\tListTeams\x12\x1a.nokku.v1.ListTeamsRequest\x1a\x1b.nokku.v1.ListTeamsResponse\"\v\xc2\xf3\x18\x04\x18\x02X\x01\x90\x02\x01\x12Q\n" +
 	"\n" +
 	"CreateTeam\x12\x1b.nokku.v1.CreateTeamRequest\x1a\x1c.nokku.v1.CreateTeamResponse\"\b\xc2\xf3\x18\x04\x18\x03@\x01\x12O\n" +
 	"\n" +

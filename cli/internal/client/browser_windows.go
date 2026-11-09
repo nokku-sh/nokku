@@ -3,6 +3,8 @@
 package client
 
 import (
+	"os"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -12,4 +14,9 @@ func openBrowser(url string) error {
 		return err
 	}
 	return windows.ShellExecute(0, nil, ptr, nil, nil, windows.SW_SHOWNORMAL)
+}
+
+// hasBrowser is false over ssh, where the browser would open on another desktop.
+func hasBrowser() bool {
+	return os.Getenv("SSH_CONNECTION") == ""
 }

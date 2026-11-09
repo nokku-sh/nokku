@@ -56,9 +56,18 @@ A person's sign-in registers their SSH public key with the core, and the core si
 
 None of these stops malware that rides along on a session you opened yourself.
 
+The table holds until your next `nk login`. Malware that runs as you can replace `nk` or its files with ones that use a software key, then wait for you to sign in again. The core can't tell which kind of key it is asked to certify, so a sign-in on an infected machine hands over that sign-in. `--require-tpm` is kept until `nk logout`, but it lives in a file that malware can edit too. Treat an infected machine as lost: end its sessions from another device on **Profile, Security**, or have an admin deactivate your account, and set the machine up again before you sign in on it.
+
+### Signing in
+
+- **The browser hands its answer to `nk` on this machine.** `nk login` waits on `127.0.0.1`, and approving in the browser sends a one-time code there. The session needs that code and the device code `nk` holds. So a sign-in link someone sends you approves nothing for them: the answer lands on your machine, where their `nk` isn't.
+- **A headless code is typed, never clicked.** With `--headless` the approval page refuses a code that came in a link and asks you to type it. Type only a code your own terminal shows.
+- **Never copy the address the browser lands on after you approve.** It holds the one-time code. Nobody, IT included, needs it.
+
 ### Sessions and service account keys
 
 - **A session from `nk login`** is bound to a machine key with DPoP, so a copied session token is useless elsewhere. A person's session gets certificates only for the SSH key it signed in with.
+- **It makes only the calls `nk` needs**: certificates, the list of what you reach, the relay, access requests and `nk sync`. Roles, grants, recordings and tokens are changed in the web app only, also by an owner.
 - **A session from `nk login --ci`** is bound to the runner's key too, but like any service account it may get certificates for any key it sends.
 - **A service account key** is not bound, it is a plain bearer token. Treat it like a password. Pass it as `NK_TOKEN`, it is never accepted as a flag. Keep it out of source control.
 

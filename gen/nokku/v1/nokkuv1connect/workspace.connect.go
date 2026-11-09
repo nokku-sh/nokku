@@ -160,6 +160,7 @@ type WorkspaceServiceClient interface {
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
+	// Reactivating takes a fresh sign-in. Deactivating does not, it is the emergency brake.
 	SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error)
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
 	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
@@ -185,6 +186,7 @@ type WorkspaceServiceHandler interface {
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
+	// Reactivating takes a fresh sign-in. Deactivating does not, it is the emergency brake.
 	SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error)
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
 	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave

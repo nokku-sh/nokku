@@ -16,14 +16,17 @@
 
 	const currentUser = user.self();
 
-	type DeviceVerifyResponse = { status?: string; message?: string };
-	type DeviceRequester = { ip: string; user_agent: string };
+	type DeviceVerifyResponse = { status?: string; message?: string; redirect?: string };
+	// loopback: nk waits on 127.0.0.1 and only a browser on its machine can hand it the answer.
+	type DeviceRequester = { ip: string; user_agent: string; loopback: boolean };
 
 	const initialCode = (page.url.searchParams.get('user_code') ?? '').toUpperCase().trim();
 
 	let code = $state(initialCode);
 	// The OTP input holds the 8 characters, the dash is only for display.
-	let input = $state(initialCode.replace(/[^A-Z0-9]/g, ''));
+	let input = $state('');
+	// A headless code is approved only when typed here, a link can come from anyone.
+	let typed = $state(false);
 	const formatted = $derived(input.length > 4 ? `${input.slice(0, 4)}-${input.slice(4)}` : input);
 	let submitting = $state(false);
 	let result = $state<'success' | 'error' | 'denied' | null>(null);
@@ -53,6 +56,7 @@
 
 	function review() {
 		code = formatted;
+		typed = true;
 		history.replaceState(null, '', `/device?user_code=${code}`);
 	}
 
@@ -60,8 +64,11 @@
 		result = null;
 		code = '';
 		input = '';
+		typed = false;
 		history.replaceState(null, '', '/device');
 	}
+
+	const showCode = $derived(!!code && (!requester.data || requester.data.loopback || typed));
 
 	function submit(path = '/auth/device/verify') {
 		if (!code || submitting) return;
@@ -86,6 +93,10 @@
 				const body = (await response.json()) as DeviceVerifyResponse;
 				if (response.ok) {
 					pendingDeviceCode.current = null;
+					// The answer goes to nk on this machine. On another one nothing listens there.
+					if (body.redirect?.startsWith('http://127.0.0.1:')) {
+						window.location.assign(body.redirect);
+					}
 					if (denied) {
 						result = 'denied';
 						message = 'Authorization request denied.';
@@ -119,7 +130,7 @@
 
 <AuthCard
 	title="Authorize a device"
-	description={code && currentUser.data && !result
+	description={showCode && currentUser.data && !result
 		? 'A terminal wants to sign in to your Nokku account.'
 		: 'Enter the code your terminal shows.'}
 	icon={MonitorSmartphone}
@@ -153,7 +164,7 @@
 			<Alert.Description>{message}</Alert.Description>
 		</Alert.Root>
 		<Button variant="outline" onclick={reset}>Try again</Button>
-	{:else if code}
+	{:else if showCode}
 		<div class="flex flex-col items-center gap-1 rounded-lg border bg-terminal p-5">
 			<span class="spec-label">Device code</span>
 			<span class="font-mono text-3xl font-bold tracking-widest text-terminal-accent">
@@ -201,6 +212,16 @@
 			</div>
 		{/if}
 	{:else}
+		{#if code}
+			<Alert.Root variant="warning">
+				<ShieldAlert />
+				<Alert.Title>Type the code yourself</Alert.Title>
+				<Alert.Description>
+					This sign-in came from a machine without a browser, so a link can't approve it. Type the
+					code your terminal shows. If you didn't start a sign-in, close this tab.
+				</Alert.Description>
+			</Alert.Root>
+		{/if}
 		<form
 			class="flex flex-col gap-4"
 			onsubmit={(e) => {

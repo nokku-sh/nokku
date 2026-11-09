@@ -132,7 +132,7 @@ Requiring single sign-on closes passkeys and email links for everyone else, and 
 ### Identity providers
 
 - **An account links by address only when the provider vouches for it.** A provider that sends `email_verified: true` links to the account with that address. One that sends `false` never does. Entra sends nothing, so it only links when the owner turns on **Trust addresses it does not verify** for that provider. Do that only for a directory you run, never for one where people pick their own address. A Microsoft provider from `MICROSOFT_*` is your own tenant, so it starts with that setting on, and with accounts created on first sign-in.
-- **New ways in need a fresh sign-in**, a browser session from the last 10 minutes. That covers adding a passkey or provider, approving `nk` on a device, changing the email address, inviting someone, handing out tokens, changing CI rules, SSO, audit streams or the CA, transferring ownership and deleting the workspace. `core/internal/api/testdata/rules.golden` marks every such call with `fresh=true`. A service account and `nk` can do none of these.
+- **New ways in and more power need a fresh sign-in**, a browser session from the last 10 minutes. That covers adding a passkey or provider, approving `nk` on a device, changing the email address, inviting someone, handing out tokens, changing CI rules, SSO, audit streams or the CA, changing a role, reactivating an account, transferring ownership and deleting the workspace. `core/internal/api/testdata/rules.golden` marks every such call with `fresh=true`, and `requestedFresh` adds the ones a single field decides. A service account and `nk` can do none of these. Deactivating an account stays quick, it is the emergency brake.
 - **Every new way in is mailed**, when SMTP is set up. A sign-in from a new device, a new passkey, a linked provider and a changed email address each send the account a mail. Someone who got hold of a session can't add a way in without the mailbox owner seeing it.
 
 ### Network
@@ -182,6 +182,10 @@ cosign verify ghcr.io/nokku-sh/nokku:<version> \
 
 **A person's `nk` session certifies one key.** `nk login` sends the machine's SSH public key, and the session gets certificates for that key only. Whoever uses the session on the machine, malware included, can't get a certificate for a key of their own and carry it off. A new key needs a new sign-in. A service account signs whatever key it sends. A certificate never carries `no-touch-required`, so a security key login always needs a touch.
 
+**`nk login` can't be approved from a link someone sends.** `nk` waits on `127.0.0.1` and tells the core its port. The approval hands the browser a one-time code for that port, and the token takes it together with the device code `nk` holds. Approve on another machine and the code lands where no `nk` waits. `nk login --headless` is the old device code, and the approval page only takes it typed, never from a link. `core/internal/integration/api/device_loopback_test.go` pins both.
+
+**An `nk` session makes only the calls `nk` makes.** It signs certificates, lists the servers, teams and people it may reach, relays, asks for access and runs `nk sync`. Everything else, like changing a role, a grant, a recording setting or a token, takes the web app, whatever the person's role. `rules.golden` marks the calls open to `nk` with `cli=true`. So an `nk` session that was phished or sits on an infected machine can reach servers, but can't change who may do what.
+
 **CI signs in with no stored secret.** An admin adds a rule to a service account: an issuer and the exact claims a job must hold. `nk login --ci` trades the job's signed token for a session of at most an hour, never past the job token's own expiry, bound by DPoP to a key on the runner. A job token works once. The role of the account applies to the session, up to editor, so keep a CI account low and give it only the servers it deploys to.
 
 A rule has to name the job. It can't be empty or match on `aud`, `iss`, `exp`, `iat`, `nbf` or `jti`.
@@ -205,11 +209,11 @@ What a rule can't check is how the platform is set up. An `environment` only lim
 
 </details>
 
-**Service account keys have an end date.** A key can't be made without one. It is a plain bearer token with no key binding, so it is for Ansible and scripts that run somewhere without a signed token. CI should not hold one.
+**Service account keys have an end date, a year away at most.** A key can't be made without one. It is a plain bearer token with no key binding, so it is for Ansible and scripts that run somewhere without a signed token. CI should not hold one.
 
 **The relay and the browser terminal.** A connection from `nk` through the relay stays encrypted end to end, the core only carries SSH ciphertext. In the browser terminal the core is the SSH client, so what is on the screen passes through it in the clear.
 
-**Session recordings.** Daemons stream recordings to the core, where each is encrypted with a key of its own. Nothing is redacted, so a secret printed on the terminal is in the recording. Typed passwords are not, the daemon records input only while the terminal echoes. Every playback is written to the audit log.
+**Session recordings.** Daemons stream recordings to the core, where each is encrypted with a key of its own. Nothing is redacted, so a secret printed on the terminal is in the recording. Typed passwords are not, the daemon records input only while the terminal echoes. Every playback is written to the audit log. Deleting a recording and switching recording on or off for a server take a person with a fresh sign-in, never a service account, so a stolen session or a CI job can't hide what it does.
 
 <details>
 <summary><b>How secrets and recordings are encrypted</b></summary>

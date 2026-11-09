@@ -14,7 +14,10 @@ service TeamService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListTeams(ListTeamsRequest) returns (ListTeamsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      cli: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse) {

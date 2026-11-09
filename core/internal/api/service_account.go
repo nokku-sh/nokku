@@ -20,7 +20,11 @@ import (
 )
 
 // Past any real use. Every public exchange loads the account's rules.
-const maxRulesPerAccount = 32
+const (
+	maxRulesPerAccount = 32
+	// maxKeyLife is a year and a day, so the web app's one year preset fits in any time zone.
+	maxKeyLife = 366 * 24 * time.Hour
+)
 
 type serviceAccountService struct {
 	cfg *config.Config
@@ -317,6 +321,13 @@ func keyTTL(ts *timestamppb.Timestamp) (time.Duration, error) {
 	ttl := time.Until(ts.AsTime())
 	if ttl <= 0 {
 		return 0, connect.NewError(connect.CodeInvalidArgument, "expires_at must be in the future")
+	}
+	// A key is a bearer token with no binding, it must roll over.
+	if ttl > maxKeyLife {
+		return 0, connect.NewError(
+			connect.CodeInvalidArgument,
+			"a key lives a year at most, pick an earlier expires_at",
+		)
 	}
 	return ttl, nil
 }

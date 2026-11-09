@@ -78,6 +78,23 @@ func TestLoadStateNewAPIDropsSession(t *testing.T) {
 	assert.True(t, s.SecurityKey, "another server must not quietly drop the security key")
 }
 
+// ssh runs nk proxy without flags, so a TPM asked for once must stay asked for.
+func TestLoadStateKeepsRequireTPM(t *testing.T) {
+	setHome(t)
+	s, err := runFlags(t, "--api", "https://a.example", "--require-tpm")
+	require.NoError(t, err)
+	require.True(t, s.RequireTPM)
+	require.NoError(t, s.Save())
+
+	s, err = runFlags(t)
+	require.NoError(t, err)
+	assert.True(t, s.RequireTPM, "a run without the flag dropped it")
+
+	s, err = runFlags(t, "--api", "https://b.example")
+	require.NoError(t, err)
+	assert.True(t, s.RequireTPM, "another server must not quietly drop it")
+}
+
 // Plain http would carry the session or a service account token in the clear.
 func TestLoadStateRefusesPlainHTTP(t *testing.T) {
 	setHome(t)

@@ -1,6 +1,8 @@
 package iam
 
-// RFC 8628 device flow. The CLI asks, a browser approves, the CLI polls.
+// RFC 8628 device flow. The CLI asks, a browser approves, the CLI polls. With a
+// loopback port the approval also hands the browser a code for nk on 127.0.0.1,
+// and the token needs it, so only a browser on nk's machine can sign nk in.
 
 import (
 	"cmp"
@@ -10,6 +12,8 @@ import (
 	"log/slog"
 	"math/big"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +57,18 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var port *int32
+	if v := r.FormValue("loopback_port"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 32)
+		if err != nil || n < 1024 || n > 65535 {
+			WriteJSON(w, http.StatusBadRequest, map[string]string{
+				"error": "invalid_request", "error_description": "loopback_port must be a port from 1024 to 65535",
+			})
+			return
+		}
+		port = new(int32(n))
+	}
+
 	deviceCode, deviceHash := crypto.NewToken(crypto.TokenDeviceCode)
 	meta := actor.RequestMeta{Header: r.Header, RemoteAddr: r.RemoteAddr}
 	var userCode string
@@ -67,6 +83,7 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 			UserCode:       userCode,
 			Ip:             meta.ClientIP(),
 			UserAgent:      meta.UserAgent(),
+			LoopbackPort:   port,
 			ExpiresAt:      h.svc.now().Add(grantTTL),
 		})
 		if !db.IsUniqueViolation(err) {
@@ -79,14 +96,18 @@ func (h *DeviceFlow) Begin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := baseURL(ctx)
-	WriteJSON(w, http.StatusOK, map[string]any{
-		"device_code":               deviceCode,
-		"user_code":                 userCode,
-		"verification_uri":          base + "/device",
-		"verification_uri_complete": base + "/device?user_code=" + userCode,
-		"expires_in":                int(grantTTL.Seconds()),
-		"interval":                  int(deviceInterval.Seconds()),
-	})
+	resp := map[string]any{
+		"device_code":      deviceCode,
+		"user_code":        userCode,
+		"verification_uri": base + "/device",
+		"expires_in":       int(grantTTL.Seconds()),
+		"interval":         int(deviceInterval.Seconds()),
+	}
+	// A link is safe to approve only for a loopback grant. A headless code is typed.
+	if port != nil {
+		resp["verification_uri_complete"] = base + "/device?user_code=" + userCode
+	}
+	WriteJSON(w, http.StatusOK, resp)
 }
 
 // Info tells the approver who asked for a code. It does not spend the code.
@@ -97,7 +118,7 @@ func (h *DeviceFlow) Info(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "invalid or expired code")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]string{"ip": g.Ip, "user_agent": g.UserAgent})
+	WriteJSON(w, http.StatusOK, map[string]any{"ip": g.Ip, "user_agent": g.UserAgent, "loopback": g.Loopback})
 }
 
 func (h *DeviceFlow) Verify(w http.ResponseWriter, r *http.Request) {
@@ -124,19 +145,30 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 	}
 
 	status := grantDenied
+	answer := url.Values{"error": {"access_denied"}}
+	var codeHash *crypto.HashedToken
 	if approve {
 		status = grantApproved
+		code, hash := crypto.NewToken(crypto.TokenLoopback)
+		answer, codeHash = url.Values{"code": {code}}, &hash
 	}
-	if _, err := h.svc.conn.Tenant().DecideDeviceGrant(r.Context(), &db.DecideDeviceGrantParams{
-		Status:         status,
-		UserID:         &p.ID,
-		ApprovedMethod: new(tok.Method),
-		UserCode:       userCode,
-	}); err != nil {
+	port, err := h.svc.conn.Tenant().DecideDeviceGrant(r.Context(), &db.DecideDeviceGrantParams{
+		Status:           status,
+		UserID:           &p.ID,
+		ApprovedMethod:   new(tok.Method),
+		LoopbackCodeHash: codeHash,
+		UserCode:         userCode,
+	})
+	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid or expired code")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	resp := map[string]string{"status": "ok"}
+	// The browser carries the answer to nk. On another machine nothing listens there.
+	if port != nil {
+		resp["redirect"] = "http://127.0.0.1:" + strconv.Itoa(int(*port)) + "/callback?" + answer.Encode()
+	}
+	WriteJSON(w, http.StatusOK, resp)
 }
 
 func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +233,19 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 		)
 		writeOAuthError(w, "access_denied")
 	case grantApproved:
+		// Whoever started a loopback grant elsewhere has the device code, not the browser's code.
+		if g.LoopbackPort != nil {
+			code := r.FormValue("code")
+			if code == "" {
+				writeOAuthError(w, "authorization_pending")
+				return
+			}
+			if hash, ok := crypto.TokenHash(code, crypto.TokenLoopback); !ok || g.LoopbackCodeHash == nil ||
+				hash != *g.LoopbackCodeHash {
+				writeOAuthError(w, "invalid_grant")
+				return
+			}
+		}
 		u, err := h.svc.getUser(ctx, deref(g.UserID))
 		if errors.Is(err, ErrNotFound) {
 			writeOAuthError(w, "access_denied")

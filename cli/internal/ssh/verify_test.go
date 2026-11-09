@@ -182,19 +182,3 @@ func TestPinnedHostOptionsRefusesAnUnusableKey(t *testing.T) {
 	_, err := PinnedHostOptions(target, filepath.Join(t.TempDir(), "known_hosts"))
 	require.Error(t, err)
 }
-
-func TestAcceptHostOptions(t *testing.T) {
-	t.Parallel()
-	if _, err := exec.LookPath("ssh"); err != nil {
-		t.Skip("ssh not available")
-	}
-	host := newSigner(t)
-	addr := sshServer(t, host)
-	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
-
-	out := pinnedSSH(t, addr, AcceptHostOptions(&state.Target{ID: verifyTargetID}, knownHosts))
-	assert.Contains(t, out, "Permission denied", out)
-	written, err := os.ReadFile(knownHosts)
-	require.NoError(t, err)
-	assert.Contains(t, string(written), verifyTargetID+" ", "the key is stored under the target id")
-}

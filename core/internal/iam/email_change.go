@@ -117,8 +117,11 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 		if err != nil {
 			return err
 		}
-		u, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: row.UserID, Email: row.Email})
-		return mapUserError(err)
+		if u, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: row.UserID, Email: row.Email}); err != nil {
+			return mapUserError(err)
+		}
+		// A sign-in link mailed to the old address must not outlive the move.
+		return q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{UserID: &u.ID, Purpose: tokenLogin})
 	})
 	if err != nil {
 		return err

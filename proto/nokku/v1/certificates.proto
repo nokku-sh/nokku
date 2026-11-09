@@ -11,7 +11,10 @@ import "nokku/v1/access.proto";
 // A workspace has one CA, made with it. A server has no tie to it, so every call here is about that one.
 service CertificateService {
   rpc GetCertificateAuthority(GetCertificateAuthorityRequest) returns (GetCertificateAuthorityResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      cli: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateCertificateAuthority(UpdateCertificateAuthorityRequest) returns (UpdateCertificateAuthorityResponse) {
@@ -30,6 +33,7 @@ service CertificateService {
     option (access) = {
       self: true
       signs: true
+      cli: true
     };
   }
 }

@@ -112,6 +112,7 @@ var (
 // DaemonServiceClient is a client for the nokku.v1.DaemonService service.
 type DaemonServiceClient interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
+	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
@@ -164,6 +165,7 @@ func (s DaemonServiceRelayClientStream) Close() error {
 // DaemonServiceHandler is an implementation of the nokku.v1.DaemonService service.
 type DaemonServiceHandler interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
+	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)

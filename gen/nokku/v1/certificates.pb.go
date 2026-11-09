@@ -602,12 +602,13 @@ const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"\x1aSignSSHCertificateResponse\x12-\n" +
 	"\x12signed_certificate\x18\x01 \x01(\tR\x11signedCertificate\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x88\x04\n" +
-	"\x12CertificateService\x12y\n" +
-	"\x17GetCertificateAuthority\x12(.nokku.v1.GetCertificateAuthorityRequest\x1a).nokku.v1.GetCertificateAuthorityResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12\x81\x01\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x8c\x04\n" +
+	"\x12CertificateService\x12{\n" +
+	"\x17GetCertificateAuthority\x12(.nokku.v1.GetCertificateAuthorityRequest\x1a).nokku.v1.GetCertificateAuthorityResponse\"\v\xc2\xf3\x18\x04\x18\x01X\x01\x90\x02\x01\x12\x81\x01\n" +
 	"\x1aUpdateCertificateAuthority\x12+.nokku.v1.UpdateCertificateAuthorityRequest\x1a,.nokku.v1.UpdateCertificateAuthorityResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12\x87\x01\n" +
-	"\x1cRolloverCertificateAuthority\x12-.nokku.v1.RolloverCertificateAuthorityRequest\x1a..nokku.v1.RolloverCertificateAuthorityResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12i\n" +
-	"\x12SignSSHCertificate\x12#.nokku.v1.SignSSHCertificateRequest\x1a$.nokku.v1.SignSSHCertificateResponse\"\b\xc2\xf3\x18\x04\x10\x01H\x01B\x92\x01\n" +
+	"\x1cRolloverCertificateAuthority\x12-.nokku.v1.RolloverCertificateAuthorityRequest\x1a..nokku.v1.RolloverCertificateAuthorityResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12k\n" +
+	"\x12SignSSHCertificate\x12#.nokku.v1.SignSSHCertificateRequest\x1a$.nokku.v1.SignSSHCertificateResponse\"\n" +
+	"\xc2\xf3\x18\x06\x10\x01H\x01X\x01B\x92\x01\n" +
 	"\fcom.nokku.v1B\x11CertificatesProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

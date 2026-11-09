@@ -10,7 +10,7 @@ import (
 
 var allKinds = []TokenKind{
 	TokenSession, TokenCLI, TokenDaemon, TokenServiceAccount, TokenSCIM, TokenLogin,
-	TokenEmailChange, TokenEmailRevert, TokenInvite, TokenEnroll, TokenDeviceCode,
+	TokenEmailChange, TokenEmailRevert, TokenInvite, TokenEnroll, TokenDeviceCode, TokenLoopback,
 }
 
 func TestNewTokenRoundTrips(t *testing.T) {

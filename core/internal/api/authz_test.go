@@ -245,7 +245,7 @@ func TestAuthorizePeopleOnly(t *testing.T) {
 		{actor.KindServiceAccount, nokkuv1connect.ServiceAccountServiceListServiceAccountsProcedure, true},
 		{actor.KindServiceAccount, nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
 		{actor.KindUser, nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, true},
-		{actor.KindCLI, nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure, true},
+		{actor.KindCLI, nokkuv1connect.AccessRequestServiceCreateAccessRequestProcedure, true},
 	}
 	for _, tt := range tests {
 		err := a.authorize(as(tt.kind), tt.procedure, nil)
@@ -260,6 +260,31 @@ func TestAuthorizeUnknownProcedure(t *testing.T) {
 		actor.Principal{ID: "u1", Kind: actor.KindUser, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 	)
 	require.ErrorIs(t, a.authorize(ctx, "/nokku.v1.UnknownService/Unknown", nil), db.ErrPermissionDenied)
+}
+
+// nk gets the calls nk makes and nothing else, whatever the person's role, so a
+// phished or infected nk session can't change roles, grants or recordings.
+func TestAuthorizeCLIOnlyWhatNkNeeds(t *testing.T) {
+	a := &authorizationInterceptor{}
+	ctx := actor.ContextWithPrincipal(
+		t.Context(),
+		actor.Principal{ID: "u1", Kind: actor.KindCLI, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+	)
+	allowed := 0
+	for _, procedure := range allProcedures(t) {
+		access := procedureAccess[procedure]
+		if access.GetPublic() || access.GetDaemon() {
+			continue
+		}
+		err := a.authorize(ctx, procedure, nil)
+		if access.GetCli() {
+			allowed++
+			assert.NoError(t, err, "nk needs %s", procedure)
+			continue
+		}
+		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "nk reached %s: %v", procedure, err)
+	}
+	require.NotZero(t, allowed, "no call is open to nk")
 }
 
 // Only a person adds a way in. A stolen nk state file or service account key

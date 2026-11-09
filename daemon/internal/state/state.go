@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -58,10 +59,26 @@ type file struct {
 	Access *Access `json:"access,omitempty"`
 }
 
-func AccessFrom(res *nokkuv1.SyncDaemonResponse) *Access {
+// AccessFrom keeps only principals that name this server and the account they
+// sit under, so a wrong list from the core can't open another account.
+func AccessFrom(res *nokkuv1.SyncDaemonResponse, targetID string) *Access {
 	principals := make(map[string][]string, len(res.GetPrincipals()))
 	for _, p := range res.GetPrincipals() {
-		principals[p.GetUsername()] = p.GetCertPrincipals()
+		username := p.GetUsername()
+		principals[username] = slices.DeleteFunc(slices.Clone(p.GetCertPrincipals()), func(principal string) bool {
+			parts, ok := login.ParsePrincipal(principal)
+			if ok && parts.TargetID == targetID && parts.Username == username {
+				return false
+			}
+			slog.Warn(
+				"skipping a principal for another server or account",
+				"username",
+				username,
+				"principal",
+				principal,
+			)
+			return true
+		})
 	}
 	return &Access{
 		Principals:   validAccounts(principals),

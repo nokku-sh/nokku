@@ -110,7 +110,8 @@ func connect(ctx context.Context, cmd *cli.Command) (*client.Client, error) {
 func loadState(cmd *cli.Command) (*state.State, error) {
 	s := state.Load()
 	s.Token = os.Getenv("NK_TOKEN")
-	s.RequireTPM = cmd.Bool("require-tpm")
+	// Sticks, or the nk proxy ssh starts without flags would take a software key.
+	s.RequireTPM = s.RequireTPM || cmd.Bool("require-tpm")
 
 	// A cut, mistyped or old key gets a clear answer before any call.
 	if s.Token != "" && !nktoken.Valid(s.Token, nktoken.KindServiceAccount) {
@@ -119,7 +120,7 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	}
 	if api := cmd.String("api"); s.APIURL != api && (s.APIURL == "" || cmd.IsSet("api")) {
 		// Another server never gets this session or shows its targets. The key belongs to the machine.
-		s.Config = state.Config{APIURL: api, SecurityKey: s.SecurityKey}
+		s.Config = state.Config{APIURL: api, SecurityKey: s.SecurityKey, RequireTPM: s.RequireTPM}
 		s.Cache = state.Cache{}
 	}
 	if cmd.IsSet("ttl") {

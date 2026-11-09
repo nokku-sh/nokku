@@ -72,7 +72,7 @@ ssh dev@alice
 ```
 
 - **Accounts.** Besides root, the image ships one login account, `dev`. Build on it with `FROM ghcr.io/nokku-sh/nokkud` to add your tools and users. The container has to run as root, which is the default.
-- **Ephemeral tokens** are made for this. A container enrolled with one is approved right away, deletes itself when it stops, and is removed by the core once it has been offline for a while. A new container of the same name and token takes over from one that went offline.
+- **Ephemeral tokens** are made for this. A container enrolled with one is approved right away, deletes itself when it stops, and is removed by the core once it has been offline for a while. A new container of the same name and token takes over from one that went offline. In the first two minutes after the core starts it gets a generated name instead, while the others are still reconnecting.
 - **Names.** A hostname a person chose becomes the server's name in Nokku. A random Docker hostname gets a generated name, so pass `--hostname`.
 - **A persistent devbox** mounts `/var/lib/nokkud` and keeps its hostname fixed. Without a TPM the identity is bound to the machine, so a volume moved to another host fails to start.
 

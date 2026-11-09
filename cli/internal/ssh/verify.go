@@ -117,11 +117,6 @@ func PinnedHostOptions(target *state.Target, knownHosts string) ([]string, error
 	return opts, nil
 }
 
-// AcceptHostOptions trusts any key, known_hosts may still hold the old one.
-func AcceptHostOptions(target *state.Target, knownHosts string) []string {
-	return append(knownHostsOptions(target.ID, knownHosts), "-o", "StrictHostKeyChecking=accept-new")
-}
-
 // Leaves ssh no trust but the file: no DNS, no command from the user's config.
 func knownHostsOptions(alias, knownHosts string) []string {
 	file := configValue(knownHosts)

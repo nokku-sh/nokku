@@ -38,10 +38,11 @@ func TestEveryTokenHashIsUnique(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]bool{
-		"access_tokens.token_hash":       true,
-		"device_grants.device_code_hash": true,
-		"join_tokens.token_hash":         true,
-		"one_time_tokens.token_hash":     true,
+		"access_tokens.token_hash":         true,
+		"device_grants.device_code_hash":   true,
+		"device_grants.loopback_code_hash": true,
+		"join_tokens.token_hash":           true,
+		"one_time_tokens.token_hash":       true,
 	}, unique, "a hash column without a unique index of its own")
 }
 

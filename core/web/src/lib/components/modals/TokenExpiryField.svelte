@@ -70,6 +70,7 @@
 					type="single"
 					bind:value={expiry.custom}
 					minValue={today(getLocalTimeZone()).add({ days: 1 })}
+					maxValue={today(getLocalTimeZone()).add({ days: 365 })}
 					onValueChange={() => (calendarOpen = false)}
 				/>
 			</Popover.Content>

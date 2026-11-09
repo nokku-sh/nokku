@@ -31,7 +31,7 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 
 ## What it does
 
-- Signs you in through your browser, the way you sign in to the web app.
+- Signs you in through your browser, the way you sign in to the web app. On a machine without one, `nk login --headless` gives you a code to type on another device.
 - Gets a short-lived certificate per server right before `ssh` needs it, and renews it on its own.
 - Writes an SSH config for your servers and adds one `Include` line to your `~/.ssh/config`. Your own settings stay untouched.
 - Connects directly when it can, and through the Nokku relay when it can't.
@@ -52,14 +52,14 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 <details>
 <summary><b>Flags per command</b></summary>
 
-| Command      | Flags                                                                                                                                                 |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nk login`   | `--ci <service account>` to sign in a CI job with its platform's token, `--security-key` to keep the key on a FIDO2 security key, kept for later runs |
-| `nk ls`      | `--json` for machine-readable output, with the `host` ssh knows each server by                                                                        |
-| `nk doctor`  | `--fix` to repair permissions and regenerate files, `--json` for output                                                                               |
-| `nk sync`    | `--name`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`                                                                    |
-| `nk request` | `--reason` (required), `--for` from `15m` to `168h`, default `1h`, `--no-wait` to return at once                                                      |
-| `nk rm`      | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                                                                            |
+| Command      | Flags                                                                                                                                                                                                |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nk login`   | `--ci <service account>` to sign in a CI job with its platform's token, `--security-key` to keep the key on a FIDO2 security key, kept for later runs, `--headless` to type a code on another device |
+| `nk ls`      | `--json` for machine-readable output, with the `host` ssh knows each server by                                                                                                                       |
+| `nk doctor`  | `--fix` to repair permissions and regenerate files, `--json` for output                                                                                                                              |
+| `nk sync`    | `--name`, `--grant`, `--tag`, `--port`, `--dry-run`, `--accept-host-key`, `--json`                                                                                                                   |
+| `nk request` | `--reason` (required), `--for` from `15m` to `168h`, default `1h`, `--no-wait` to return at once                                                                                                     |
+| `nk rm`      | `--port`, `--keep-host` to leave the server untouched, `--accept-host-key`                                                                                                                           |
 
 </details>
 
@@ -96,6 +96,8 @@ Your sign-in only ever gets certificates for that one key. `nk doctor` shows whi
 [SECURITY.md](./SECURITY.md#how-nk-protects-your-key) has what each option protects against.
 
 ## CI and headless machines
+
+On a server you `ssh` into, there is no browser to open. `nk login --headless` prints a link and a code. Open the link on any device where you are signed in to Nokku and type the code there. `nk` picks this by itself over plain `ssh`, when no display is set.
 
 A CI job needs no stored secret. GitHub Actions, GitLab and others give every job a signed token, and `nk login --ci` trades it for a short session of a service account. First add a rule under **CI jobs** on the service account in the web app. The rule says which jobs may sign in.
 
@@ -158,7 +160,7 @@ nk login
 ssh user@target
 ```
 
-`nk` only takes a key that starts with `nk_sa_`. A key always has an end date, so it needs rolling over.
+`nk` only takes a key that starts with `nk_sa_`. A key ends within a year at most, so it needs rolling over.
 
 ## Servers without the daemon
 
@@ -191,7 +193,8 @@ nk sync 10.0.0.5 --grant root=me --grant deploy=team:ops,alice@example.com --tag
 
 - **Finding a server.** `nk sync` and `nk rm` take its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
 - **The first sync** trusts the server the way your own `ssh` does. When `ssh` asks about the host key, answer as you would for any server. Without a terminal, as in CI, connect once with `ssh root@host` first.
-- **Later syncs** pin the host key the first one saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key`.
+- **Later syncs** pin the host key the first one saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key`. That drops the pin and your own `ssh` checks the host, as on the first sync, so a key it remembers from before shows its usual warning until you remove it with `ssh-keygen -R`.
+- **Your ssh config applies, but not its forwards.** The root `ssh` runs without an agent, X11 or port forwarding, whatever `ForwardAgent` or `LocalForward` your config sets.
 - **Order.** Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
 - **For scripts**, `--json` prints one object with the target and the files `nk sync` manages. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server has no target id yet, so the drop-in shows `<target-id>` in its place and `grants` lists the subjects per account as you typed them.
 - **`nk rm`** checks the pinned host key first, then removes the drop-in and the CA over the same root `ssh`, reloads sshd, and only then deletes the target in Nokku. If sshd rejects its config without the drop-in, everything is put back and the target stays. Pass `--keep-host` when the server is already gone.
@@ -223,7 +226,7 @@ Every binary download is checked against the release checksums, and against the 
 | `--ca-file`     | `NK_CA_FILE`     | PEM file with the core's private CA, kept for later runs                                                  |
 | `--debug`       | `NK_DEBUG`       | Debug logging                                                                                             |
 
-`--api`, `--ttl` and `--ca-file` are remembered after the first use. Switching to another core drops the old session and its CA. `--require-tpm` and `--debug` apply to one run only, so set `NK_REQUIRE_TPM` in your environment to make it stick.
+`--api`, `--ttl` and `--ca-file` are remembered after the first use. Switching to another core drops the old session and its CA. `--require-tpm` is remembered until `nk logout`, also when you switch cores. `--debug` applies to one run only.
 
 Local state lives under `~/.config/nk/` on every OS. On Windows the agent listens on a named pipe instead of a socket in that folder.
 

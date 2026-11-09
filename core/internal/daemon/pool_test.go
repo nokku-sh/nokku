@@ -482,4 +482,7 @@ func TestHeartbeatFindsADaemonThatFellBehind(t *testing.T) {
 
 	assert.False(t, c.heartbeat(7, 9), "a daemon that caught up")
 	assert.Nil(t, c.behindSince.Load())
+
+	assert.False(t, c.heartbeat(8, 9), "flapping back behind right away is not reported again")
+	require.NotNil(t, c.behindSince.Load(), "the console still sees it as behind")
 }

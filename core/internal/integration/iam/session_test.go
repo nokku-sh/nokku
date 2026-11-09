@@ -219,7 +219,12 @@ func TestEmailChange(t *testing.T) {
 		"the cancel link is not a confirm link",
 	)
 
+	// A sign-in link that went to the old address dies with the move.
+	oldInbox, err := e.svc.IssueBootstrapLink(ctx, u)
+	require.NoError(t, err)
 	require.NoError(t, e.svc.ConfirmEmailChange(ctx, confirm))
+	_, _, err = e.svc.ConsumeMagicLink(ctx, linkToken(t, oldInbox))
+	require.ErrorIs(t, err, iam.ErrInvalidToken, "a link mailed to the old address signed in after the change")
 	got := e.userByEmail(t, o.ws, newEmail)
 	require.NotNil(t, got)
 	assert.Equal(t, u.ID, got.ID)

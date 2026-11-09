@@ -1542,11 +1542,11 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"%RemoveServiceAccountFederationRequest\x126\n" +
 	"\x12service_account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x10serviceAccountId\x12\x18\n" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"(\n" +
-	"&RemoveServiceAccountFederationResponse2\xe3\n" +
+	"&RemoveServiceAccountFederationResponse2\xe5\n" +
 	"\n" +
 	"\x15ServiceAccountService\x12g\n" +
-	"\x11GetServiceAccount\x12\".nokku.v1.GetServiceAccountRequest\x1a#.nokku.v1.GetServiceAccountResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12m\n" +
-	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12q\n" +
+	"\x11GetServiceAccount\x12\".nokku.v1.GetServiceAccountRequest\x1a#.nokku.v1.GetServiceAccountResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12o\n" +
+	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\v\xc2\xf3\x18\x04\x18\x02X\x01\x90\x02\x01\x12q\n" +
 	"\x14CreateServiceAccount\x12%.nokku.v1.CreateServiceAccountRequest\x1a&.nokku.v1.CreateServiceAccountResponse\"\n" +
 	"\xc2\xf3\x18\x06\x18\x03(\x01@\x01\x12o\n" +
 	"\x14UpdateServiceAccount\x12%.nokku.v1.UpdateServiceAccountRequest\x1a&.nokku.v1.UpdateServiceAccountResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12m\n" +

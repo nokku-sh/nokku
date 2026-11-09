@@ -148,7 +148,7 @@
 								confirmText: 'Deactivate',
 								onConfirm: () => setActive.mutateAsync({ userId: person.id, active: false })
 							})
-						: setActive.mutate({ userId: person.id, active: true })
+						: whenFresh(() => setActive.mutate({ userId: person.id, active: true }))
 			});
 			actions.push({
 				title: 'Unlink sign-in providers',
@@ -239,7 +239,7 @@
 						<RolePicker
 							value={person.role}
 							disabled={!canManage || updateRole.isPending}
-							onChange={changeRole}
+							onChange={(role) => whenFresh(() => changeRole(role))}
 						/>
 					{/key}
 				{/if}

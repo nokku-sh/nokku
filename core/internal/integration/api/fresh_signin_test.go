@@ -121,6 +121,26 @@ func TestFreshSignInMatrix(t *testing.T) {
 				masked(&nokkuv1.UpdateServiceAccountRequest{Id: sa.GetServiceAccount().Id, ForceCommand: new("")}))
 			return refusedRPC(err)
 		}},
+		{"ServiceAccountService.UpdateServiceAccount role", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).UpdateServiceAccount(t.Context(),
+				masked(&nokkuv1.UpdateServiceAccountRequest{
+					Id: sa.GetServiceAccount().Id, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER.Enum(),
+				}))
+			return refusedRPC(err)
+		}},
+		// No user has these ids, a call past the fresh check answers not_found.
+		{"WorkspaceService.UpdateUserRole", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).UpdateUserRole(t.Context(),
+				&nokkuv1.UpdateUserRoleRequest{
+					UserId: new(uuid.NewV7().String()), Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN.Enum(),
+				})
+			return refusedRPC(err)
+		}},
+		{"WorkspaceService.SetUserActive reactivate", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).SetUserActive(t.Context(),
+				&nokkuv1.SetUserActiveRequest{UserId: new(uuid.NewV7().String()), Active: new(true)})
+			return refusedRPC(err)
+		}},
 		{"JoinTokenService.CreateJoinToken", admin, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewJoinTokenServiceClient(rpc(s)).CreateJoinToken(t.Context(),
 				&nokkuv1.CreateJoinTokenRequest{})
@@ -234,5 +254,8 @@ func TestSessionsSayHowLongTheyStayFresh(t *testing.T) {
 	assert.Greater(t, fresh, 9*time.Minute)
 	assert.LessOrEqual(t, fresh, 10*time.Minute)
 	assert.Zero(t, freshFor(browserSession(t, cfg, owner, oldSignIn)))
-	assert.Zero(t, freshFor(deviceLogin(t, cfg, srv, owner)), "nk never makes a fresh call")
+
+	nk := nokkuv1connect.NewAccountServiceClient(clientOn(srv, signedIn(t, cfg, deviceLogin(t, cfg, srv, owner))))
+	_, err := nk.ListAccountSessions(t.Context(), &nokkuv1.ListAccountSessionsRequest{})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "nk reached a call it never makes: %v", err)
 }

@@ -65,6 +65,7 @@ var (
 type RecordingServiceClient interface {
 	GetRecording(context.Context, *v1.GetRecordingRequest) (RecordingServiceGetRecordingClientStream, error)
 	ListRecordings(context.Context, *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error)
+	// A person deletes evidence, never a CI job, and only right after a sign-in.
 	DeleteRecording(context.Context, *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error)
 }
 
@@ -99,6 +100,7 @@ func (s RecordingServiceGetRecordingClientStream) Close() error {
 type RecordingServiceHandler interface {
 	GetRecording(context.Context, *v1.GetRecordingRequest, RecordingServiceGetRecordingServerStream) error
 	ListRecordings(context.Context, *v1.ListRecordingsRequest) (*v1.ListRecordingsResponse, error)
+	// A person deletes evidence, never a CI job, and only right after a sign-in.
 	DeleteRecording(context.Context, *v1.DeleteRecordingRequest) (*v1.DeleteRecordingResponse, error)
 }
 

@@ -2330,15 +2330,16 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\x19DAEMON_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15DAEMON_STATUS_PENDING\x10\x01\x12\x1a\n" +
 	"\x16DAEMON_STATUS_ACCEPTED\x10\x02\x12\x1a\n" +
-	"\x16DAEMON_STATUS_REJECTED\x10\x032\x8b\x04\n" +
+	"\x16DAEMON_STATUS_REJECTED\x10\x032\x8d\x04\n" +
 	"\rDaemonService\x12O\n" +
 	"\tGetDaemon\x12\x1a.nokku.v1.GetDaemonRequest\x1a\x1b.nokku.v1.GetDaemonResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12U\n" +
 	"\fUpdateDaemon\x12\x1d.nokku.v1.UpdateDaemonRequest\x1a\x1e.nokku.v1.UpdateDaemonResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12U\n" +
 	"\fDeleteDaemon\x12\x1d.nokku.v1.DeleteDaemonRequest\x1a\x1e.nokku.v1.DeleteDaemonResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12U\n" +
 	"\vListDaemons\x12\x1c.nokku.v1.ListDaemonsRequest\x1a\x1d.nokku.v1.ListDaemonsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12\\\n" +
 	"\rCreateSession\x12\x1e.nokku.v1.CreateSessionRequest\x1a\x1f.nokku.v1.CreateSessionResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x01(\x01H\x01\x12F\n" +
-	"\x05Relay\x12\x16.nokku.v1.RelayRequest\x1a\x17.nokku.v1.RelayResponse\"\b\xc2\xf3\x18\x04\x18\x01P\x01(\x010\x012\x93\x05\n" +
+	"\xc2\xf3\x18\x06\x18\x01(\x01H\x01\x12H\n" +
+	"\x05Relay\x12\x16.nokku.v1.RelayRequest\x1a\x17.nokku.v1.RelayResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x01P\x01X\x01(\x010\x012\x93\x05\n" +
 	"\x14DaemonControlService\x12U\n" +
 	"\fEnrollDaemon\x12\x1d.nokku.v1.EnrollDaemonRequest\x1a\x1e.nokku.v1.EnrollDaemonResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12Q\n" +
 	"\n" +

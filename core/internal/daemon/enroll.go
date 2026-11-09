@@ -28,8 +28,10 @@ type EnrollInput struct {
 	ReqMetadata map[string]string
 	// CanCreate only runs for new machines, so re-enrolling works at the cap.
 	CanCreate func(ctx context.Context, workspaceID string) error
-	// An ephemeral enrollment never takes the name of a Connected daemon.
+	// An ephemeral enrollment never takes the name of a Connected daemon, and
+	// none until Settled, while Connected still misses daemons reconnecting.
 	Connected []string
+	Settled   bool
 }
 
 type Enrolled struct {
@@ -47,10 +49,13 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		return nil, ErrEnrollToken
 	}
 
+	wanted, named := namegen.FromHostname(in.ReqMetadata["hostname"])
 	var (
 		token     *db.JoinToken
 		workspace *db.Workspace
 		out       *Enrolled
+		// oldID is the offline daemon a returning ephemeral box takes over.
+		oldID string
 	)
 	err := conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		token, err = q.GetLiveJoinToken(ctx, hash)
@@ -64,7 +69,10 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		if err != nil {
 			return err
 		}
-		out, err = enrolledDaemon(ctx, q, in.Binding)
+		if out, err = enrolledDaemon(ctx, q, in.Binding); err != nil || out != nil {
+			return err
+		}
+		oldID, err = offlineNamesake(ctx, q, token, wanted, &in)
 		return err
 	})
 	if err != nil || out != nil {
@@ -76,15 +84,8 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		return nil, ErrEnrollToken
 	}
 
-	// A returning ephemeral box replaces its old self, which frees quota first.
-	wanted, named := namegen.FromHostname(in.ReqMetadata["hostname"])
-	if token.RetireAfter != nil && named {
-		if err := replaceOffline(ctx, conn, token.ID, wanted, in.Connected); err != nil {
-			return nil, err
-		}
-	}
-
-	if in.CanCreate != nil {
+	// Taking over an old self frees its slot, so only a new machine spends one.
+	if in.CanCreate != nil && oldID == "" {
 		if err := in.CanCreate(ctx, token.WorkspaceID); err != nil {
 			return nil, err
 		}
@@ -115,6 +116,10 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 			name := namegen.Generate()
 			if attempt == 0 && named {
 				name = wanted
+				// Here and not before, so an enrollment that fails keeps the old self.
+				if err := dropDaemon(ctx, q, oldID); err != nil {
+					return err
+				}
 			}
 			daemonID, targetID, err := createDaemon(ctx, q, name, &db.CreateDaemonParams{
 				Version:       in.Version,
@@ -202,26 +207,38 @@ func seedTarget(ctx context.Context, q *db.Queries, token *db.JoinToken, targetI
 	})
 }
 
-// A live daemon keeps its name, the newcomer then gets a generated one.
-func replaceOffline(ctx context.Context, conn connection, tokenID, name string, connected []string) error {
-	return conn.TenantTx(ctx, func(q *db.Queries) error {
-		if err := q.QuietStateChange(ctx); err != nil {
-			return err
-		}
-		oldID, err := q.GetOfflineDaemonByTokenAndName(ctx, &db.GetOfflineDaemonByTokenAndNameParams{
-			JoinTokenID: &tokenID,
-			Name:        name,
-			Connected:   connected,
-		})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		_, err = q.DeleteDaemon(ctx, oldID)
-		return err
+// offlineNamesake is the daemon a returning ephemeral box takes over, if any.
+// A name from a generic hostname is empty.
+func offlineNamesake(
+	ctx context.Context,
+	q *db.Queries,
+	token *db.JoinToken,
+	name string,
+	in *EnrollInput,
+) (string, error) {
+	if token.RetireAfter == nil || name == "" || !in.Settled {
+		return "", nil
+	}
+	id, err := q.GetOfflineDaemonByTokenAndName(ctx, &db.GetOfflineDaemonByTokenAndNameParams{
+		JoinTokenID: &token.ID,
+		Name:        name,
+		Connected:   in.Connected,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}
+
+// dropDaemon deletes id when set. The retire sweep may have taken it already.
+func dropDaemon(ctx context.Context, q *db.Queries, id string) error {
+	if id == "" {
+		return nil
+	}
+	if _, err := q.DeleteDaemon(ctx, id); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	return nil
 }
 
 // enrolledDaemon returns nil for an unknown key, the machine's identity.

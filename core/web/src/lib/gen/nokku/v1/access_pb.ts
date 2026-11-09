@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/access.proto.
  */
 export const file_nokku_v1_access: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIsABCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEgwKBHNlbGYYAiABKAgSJQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGUSDgoGZGFlbW9uGAQgASgIEhMKC3Blb3BsZV9vbmx5GAUgASgIEg0KBWZyZXNoGAYgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEg0KBXNpZ25zGAkgASgIEg0KBXF1aWV0GAogASgIKrQBCg1Xb3Jrc3BhY2VSb2xlEh4KGldPUktTUEFDRV9ST0xFX1VOU1BFQ0lGSUVEEAASGQoVV09SS1NQQUNFX1JPTEVfTUVNQkVSEAESGQoVV09SS1NQQUNFX1JPTEVfVklFV0VSEAISGQoVV09SS1NQQUNFX1JPTEVfRURJVE9SEAMSGAoUV09SS1NQQUNFX1JPTEVfQURNSU4QBBIYChRXT1JLU1BBQ0VfUk9MRV9PV05FUhAFOkoKBmFjY2VzcxIeLmdvb2dsZS5wcm90b2J1Zi5NZXRob2RPcHRpb25zGLiOAyABKAsyEC5ub2trdS52MS5BY2Nlc3NSBmFjY2Vzc0KMAQoMY29tLm5va2t1LnYxQgtBY2Nlc3NQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_descriptor]);
+  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIs0BCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEgwKBHNlbGYYAiABKAgSJQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGUSDgoGZGFlbW9uGAQgASgIEhMKC3Blb3BsZV9vbmx5GAUgASgIEg0KBWZyZXNoGAYgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEg0KBXNpZ25zGAkgASgIEg0KBXF1aWV0GAogASgIEgsKA2NsaRgLIAEoCCq0AQoNV29ya3NwYWNlUm9sZRIeChpXT1JLU1BBQ0VfUk9MRV9VTlNQRUNJRklFRBAAEhkKFVdPUktTUEFDRV9ST0xFX01FTUJFUhABEhkKFVdPUktTUEFDRV9ST0xFX1ZJRVdFUhACEhkKFVdPUktTUEFDRV9ST0xFX0VESVRPUhADEhgKFFdPUktTUEFDRV9ST0xFX0FETUlOEAQSGAoUV09SS1NQQUNFX1JPTEVfT1dORVIQBTpKCgZhY2Nlc3MSHi5nb29nbGUucHJvdG9idWYuTWV0aG9kT3B0aW9ucxi4jgMgASgLMhAubm9ra3UudjEuQWNjZXNzUgZhY2Nlc3NCjAEKDGNvbS5ub2trdS52MUILQWNjZXNzUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_google_protobuf_descriptor]);
 
 /**
  * @generated from message nokku.v1.Access
@@ -80,6 +80,14 @@ export type Access = Message<"nokku.v1.Access"> & {
    * @generated from field: bool quiet = 10;
    */
   quiet: boolean;
+
+  /**
+   * cli lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
+   * nothing else, so a phished or infected nk session can't change who may do what.
+   *
+   * @generated from field: bool cli = 11;
+   */
+  cli: boolean;
 };
 
 /**

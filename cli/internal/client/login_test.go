@@ -7,8 +7,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -50,6 +52,9 @@ type fakeGrant struct {
 	deviceCode string
 	userCode   string
 	status     string
+	// port is where nk waits for the browser, code what the approval hands it.
+	port string
+	code string
 }
 
 // inMemory has no socket, so a synctest bubble can skip the poll interval.
@@ -79,6 +84,7 @@ func (f *fakeDeviceFlow) begin(w http.ResponseWriter, r *http.Request) {
 		deviceCode: fmt.Sprintf("dev-%d", len(f.grants)),
 		userCode:   fmt.Sprintf("USER-%d", len(f.grants)),
 		status:     "pending",
+		port:       r.FormValue("loopback_port"),
 	}
 	f.grants[g.deviceCode] = g
 	f.agents = append(f.agents, r.Header.Get("User-Agent"))
@@ -122,6 +128,14 @@ func (f *fakeDeviceFlow) poll(w http.ResponseWriter, r *http.Request) {
 		delete(f.grants, code)
 		writeOAuthErr(w, "access_denied")
 	case "approved":
+		if g.port != "" && r.FormValue("code") != g.code {
+			if r.FormValue("code") == "" {
+				writeOAuthErr(w, "authorization_pending")
+			} else {
+				writeOAuthErr(w, "invalid_grant")
+			}
+			return
+		}
 		jkt, derr := f.verifyProof(r)
 		if derr != "" {
 			// Like the server, every proof failure carries the URL and nonce.
@@ -188,6 +202,34 @@ func (f *fakeDeviceFlow) approve(deviceCode string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.grants[deviceCode].status = "approved"
+}
+
+// decide is the approval page: it answers in the browser, and for a loopback
+// grant the browser carries that answer to nk on 127.0.0.1.
+func (f *fakeDeviceFlow) decide(t *testing.T, deviceCode string, approve bool) {
+	t.Helper()
+	f.mu.Lock()
+	g := f.grants[deviceCode]
+	answer := url.Values{"error": {"access_denied"}}
+	g.status = "denied"
+	if approve {
+		g.status, g.code = "approved", "nk_loopback_"+deviceCode
+		answer = url.Values{"code": {g.code}}
+	}
+	port := g.port
+	f.mu.Unlock()
+	// Runs beside the test, so it reports and never stops it.
+	if port == "" {
+		t.Error("nk sent no loopback port")
+		return
+	}
+	resp, err := http.Get("http://127.0.0.1:" + port + "/callback?" + answer.Encode())
+	if err != nil {
+		t.Errorf("the browser could not reach nk: %v", err)
+		return
+	}
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
 func writeOAuthErr(w http.ResponseWriter, code string) {
@@ -490,4 +532,76 @@ func TestDeviceAuthRejectsHostileAnswers(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+// loopbackSteps runs loopbackLogin without the browser: listen, begin, then the
+// page decides and the browser brings the answer.
+func loopbackSteps(t *testing.T, decide func(f *fakeDeviceFlow, deviceCode string)) (*oauth2.Token, error) {
+	t.Helper()
+	f, h := newFakeDeviceFlow()
+	c := testClient(t, h)
+	ctx, cfg, err := c.deviceFlow(t.Context())
+	require.NoError(t, err)
+	var lc net.ListenConfig
+	l, err := lc.Listen(ctx, "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = l.Close() }()
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	require.NoError(t, err)
+
+	d, err := beginDeviceAuth(ctx, cfg, oauth2.SetAuthURLParam("loopback_port", port))
+	require.NoError(t, err)
+	go decide(f, d.DeviceCode)
+	code, err := awaitBrowser(ctx, l, d.Expiry)
+	require.NoError(t, err)
+	return exchangeLoopback(ctx, cfg, d, code, testSSHKey)
+}
+
+func TestLoopbackLoginTakesTheBrowsersAnswer(t *testing.T) {
+	tok, err := loopbackSteps(t, func(f *fakeDeviceFlow, deviceCode string) { f.decide(t, deviceCode, true) })
+	require.NoError(t, err)
+	assert.Equal(t, "tok-for-jkt", tok.AccessToken)
+}
+
+func TestLoopbackLoginDenied(t *testing.T) {
+	_, err := loopbackSteps(t, func(f *fakeDeviceFlow, deviceCode string) { f.decide(t, deviceCode, false) })
+	require.ErrorContains(t, err, "denied in the browser")
+}
+
+// Whoever started the grant holds the device code. Without the browser's code
+// an approval somewhere else signs them in nowhere.
+func TestLoopbackGrantNeedsTheBrowsersCode(t *testing.T) {
+	f, h := newFakeDeviceFlow()
+	c := testClient(t, h)
+	ctx, cfg, err := c.deviceFlow(t.Context())
+	require.NoError(t, err)
+	d, err := beginDeviceAuth(ctx, cfg, oauth2.SetAuthURLParam("loopback_port", "40123"))
+	require.NoError(t, err)
+	f.approve(d.DeviceCode)
+	f.mu.Lock()
+	f.grants[d.DeviceCode].code = "nk_loopback_real"
+	f.mu.Unlock()
+
+	_, err = exchangeLoopback(ctx, cfg, d, "", testSSHKey)
+	require.ErrorContains(t, err, "authorization_pending", "a missing code got a session")
+	_, err = exchangeLoopback(ctx, cfg, d, "nk_loopback_guess", testSSHKey)
+	require.ErrorContains(t, err, "did not match", "a wrong code got a session")
+}
+
+// A page that is not the callback, like a probe from a web page, ends nothing.
+func TestAwaitBrowserIgnoresOtherRequests(t *testing.T) {
+	var lc net.ListenConfig
+	l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	base := "http://" + l.Addr().String()
+	go func() {
+		for _, path := range []string{"/", "/favicon.ico", "/callback?code=nk_loopback_x"} {
+			if resp, getErr := http.Get(base + path); getErr == nil {
+				_ = resp.Body.Close()
+			}
+		}
+	}()
+	code, err := awaitBrowser(t.Context(), l, time.Now().Add(time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, "nk_loopback_x", code)
 }

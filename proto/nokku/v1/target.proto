@@ -19,23 +19,33 @@ service TargetService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      cli: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateTarget(CreateTargetRequest) returns (CreateTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
       capped: true
+      cli: true
     };
   }
   rpc UpdateTarget(UpdateTargetRequest) returns (UpdateTargetResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc DeleteTarget(DeleteTargetRequest) returns (DeleteTargetResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      cli: true
+    };
   }
   rpc GetSubjectAccess(GetSubjectAccessRequest) returns (GetSubjectAccessResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      cli: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetTargetFilters(GetTargetFiltersRequest) returns (GetTargetFiltersResponse) {
@@ -43,7 +53,10 @@ service TargetService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc SyncTargetUsers(SyncTargetUsersRequest) returns (SyncTargetUsersResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      cli: true
+    };
   }
   rpc GetAccessGraph(GetAccessGraphRequest) returns (GetAccessGraphResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};

@@ -29,7 +29,10 @@ service WorkspaceService {
     };
   }
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      cli: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetUser(GetUserRequest) returns (GetUserResponse) {
@@ -37,8 +40,12 @@ service WorkspaceService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      fresh: true
+    };
   }
+  // Reactivating takes a fresh sign-in. Deactivating does not, it is the emergency brake.
   rpc SetUserActive(SetUserActiveRequest) returns (SetUserActiveResponse) {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
   }

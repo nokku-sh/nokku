@@ -47,6 +47,11 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 - **It is not in the TPM.** Every handshake signs with the host key before the client logs in, and a TPM signs far slower than the CPU. A flood of connections would queue up in front of real logins.
 - **A copied host key works elsewhere.** Someone who copies `/var/lib/nokkud` to another machine can pose as this server until its host certificate expires. They need root on this server for that.
 
+### Enrollment tokens
+
+- **An enrollment token is a key to the servers it makes.** A server it enrolls gets the token's grants and tags, so whoever holds the token can add a machine that people with those grants log in to. Give it a use limit and an end date, and delete it once the rollout is done.
+- **An ephemeral token can also take over names.** A new container of the same hostname replaces an offline one that the same token enrolled, so people who `ssh` by name reach the newcomer. That is what makes devboxes work across `docker rm -f`, and it means a leaked ephemeral token can claim the name of any of its servers while that one is offline. Keep these tokens in a secret store, never baked into an image.
+
 ### Everything else
 
 - **The connection to the core** uses TLS 1.3 and always verifies the core's certificate. A plain `http` URL is refused unless it points at localhost, for development.

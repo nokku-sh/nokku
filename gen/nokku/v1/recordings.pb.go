@@ -843,11 +843,12 @@ const file_nokku_v1_recordings_proto_rawDesc = "" +
 	"\x03msg\"E\n" +
 	"\x16DeleteRecordingRequest\x12+\n" +
 	"\frecording_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vrecordingId\"\x19\n" +
-	"\x17DeleteRecordingResponse2\xae\x02\n" +
+	"\x17DeleteRecordingResponse2\xb2\x02\n" +
 	"\x10RecordingService\x12Z\n" +
 	"\fGetRecording\x12\x1d.nokku.v1.GetRecordingRequest\x1a\x1e.nokku.v1.GetRecordingResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x010\x01\x12^\n" +
-	"\x0eListRecordings\x12\x1f.nokku.v1.ListRecordingsRequest\x1a .nokku.v1.ListRecordingsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12^\n" +
-	"\x0fDeleteRecording\x12 .nokku.v1.DeleteRecordingRequest\x1a!.nokku.v1.DeleteRecordingResponse\"\x06\xc2\xf3\x18\x02\x18\x03B\x90\x01\n" +
+	"\x0eListRecordings\x12\x1f.nokku.v1.ListRecordingsRequest\x1a .nokku.v1.ListRecordingsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12b\n" +
+	"\x0fDeleteRecording\x12 .nokku.v1.DeleteRecordingRequest\x1a!.nokku.v1.DeleteRecordingResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x03(\x010\x01B\x90\x01\n" +
 	"\fcom.nokku.v1B\x0fRecordingsProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

@@ -25,6 +25,15 @@ CertificateService.UpdateCertificateAuthority | cli | refused | permission_denie
 ServiceAccountService.UpdateServiceAccount limits | browser fresh | accepted | ok | session kept
 ServiceAccountService.UpdateServiceAccount limits | browser old | refused | unauthenticated: sign in again to continue | session ended
 ServiceAccountService.UpdateServiceAccount limits | cli | refused | permission_denied: do this in the web app | session kept
+ServiceAccountService.UpdateServiceAccount role | browser fresh | accepted | ok | session kept
+ServiceAccountService.UpdateServiceAccount role | browser old | refused | unauthenticated: sign in again to continue | session ended
+ServiceAccountService.UpdateServiceAccount role | cli | refused | permission_denied: do this in the web app | session kept
+WorkspaceService.UpdateUserRole | browser fresh | accepted | not_found: the requested resource was not found | session kept
+WorkspaceService.UpdateUserRole | browser old | refused | unauthenticated: sign in again to continue | session ended
+WorkspaceService.UpdateUserRole | cli | refused | permission_denied: do this in the web app | session kept
+WorkspaceService.SetUserActive reactivate | browser fresh | accepted | not_found: the requested resource was not found | session kept
+WorkspaceService.SetUserActive reactivate | browser old | refused | unauthenticated: sign in again to continue | session ended
+WorkspaceService.SetUserActive reactivate | cli | refused | permission_denied: do this in the web app | session kept
 JoinTokenService.CreateJoinToken | browser fresh | accepted | ok | session kept
 JoinTokenService.CreateJoinToken | browser old | refused | unauthenticated: sign in again to continue | session ended
 JoinTokenService.CreateJoinToken | cli | refused | permission_denied: do this in the web app | session kept

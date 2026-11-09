@@ -117,12 +117,12 @@ func terminalSignIn(t *testing.T, e *testEnv, ws actor.Workspace, u *db.User, ke
 func TestDeviceFlowShowsRequester(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
-	info := func(userCode string) (int, map[string]string) {
+	info := func(userCode string) (int, map[string]any) {
 		t.Helper()
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/auth/device/info?user_code="+userCode, nil)
 		e.svc.Device.Info(w, r.WithContext(anon(r.Context(), o.ws)))
-		var body map[string]string
+		var body map[string]any
 		if w.Code == http.StatusOK {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 		}
@@ -140,7 +140,7 @@ func TestDeviceFlowShowsRequester(t *testing.T) {
 
 	status, requester := info(strings.ToLower(grant.UserCode))
 	require.Equal(t, http.StatusOK, status)
-	assert.Equal(t, map[string]string{"ip": "203.0.113.7", "user_agent": terminalAgent}, requester)
+	assert.Equal(t, map[string]any{"ip": "203.0.113.7", "user_agent": terminalAgent, "loopback": false}, requester)
 	status, _ = info("BCDF-GHJK")
 	assert.Equal(t, http.StatusNotFound, status, "an unknown code")
 

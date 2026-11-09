@@ -11,6 +11,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"io"
 	"maps"
@@ -314,11 +315,21 @@ func (s *smoke) loginNK(t *testing.T) {
 		return m != nil
 	}, "nk printed no code to confirm: %s", &out)
 
-	// What the device page posts when the owner approves the code.
+	// What the device page posts when the owner approves the code, then where it sends the browser.
 	res, err := s.browser.PostForm(s.core.url+"/auth/device/verify", url.Values{"user_code": {code}})
 	require.NoError(t, err)
+	var approved struct {
+		Redirect string `json:"redirect"`
+	}
+	err = json.NewDecoder(res.Body).Decode(&approved)
 	_ = res.Body.Close()
+	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, res.StatusCode, "the approval was refused")
+	require.True(t, strings.HasPrefix(approved.Redirect, "http://127.0.0.1:"), "no way back to nk: %q", approved.Redirect)
+	back, err := http.Get(approved.Redirect) //nolint:noctx // nk answers at once
+	require.NoError(t, err)
+	_ = back.Body.Close()
+	require.Equal(t, http.StatusOK, back.StatusCode, "nk did not take the browser's answer")
 
 	require.NoError(t, nk.Wait(), "nk login: %s", &out)
 	assert.Contains(t, out.String(), "Signed in as "+ownerEmail+", 1 servers available")
@@ -613,6 +624,8 @@ func newNKHome(t *testing.T, bin, sshBinary string) nkHome {
 		"XDG_RUNTIME_DIR=" + runtimeDir,
 		// The binaries alone. xdg-open from PATH would open a real browser.
 		"PATH=" + bin,
+		// A display makes nk sign in through 127.0.0.1, the path people take.
+		"DISPLAY=:99",
 		// ssh runs ProxyCommand and Match exec through it.
 		"SHELL=/bin/sh",
 	}}
