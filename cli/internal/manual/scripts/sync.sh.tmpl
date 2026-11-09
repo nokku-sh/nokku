@@ -43,6 +43,8 @@ if [ -n "$nk_reloaded" ] && [ -d {{q .OldPrincipals}} ]; then
 fi
 # A config without the Include line reloads fine and ignores the drop-in.
 nk_cfg=$(sshd -T 2>/dev/null || true)
+# A key a user adds at home outlives a revoke, nk warns about it.
+printf '%s\n' "$nk_cfg" | grep '^authorizedkeysfile ' | sed 's/^/{{.KeysMarker}} /'
 if echo "$nk_cfg" | grep -qi '^trustedusercakeys {{.CA}}' && echo "$nk_cfg" | grep -qi {{q .CommandPattern}}; then
   echo '{{.VerifyMarker}}'
 fi

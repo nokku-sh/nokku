@@ -135,3 +135,34 @@ func TestAccountsPastTheCap(t *testing.T) {
 	assert.Equal(t, "user000", got[0])
 	assert.Equal(t, "user199", got[199])
 }
+
+func TestHomeKeyFiles(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		config string
+		want   []string
+	}{
+		{
+			"the default",
+			"port 22\nauthorizedkeysfile .ssh/authorized_keys .ssh/authorized_keys2\npasswordauthentication yes\n",
+			[]string{".ssh/authorized_keys", ".ssh/authorized_keys2"},
+		},
+		{"none", "authorizedkeysfile none\n", nil},
+		{"root-owned", "authorizedkeysfile /etc/ssh/authorized_keys/%u\n", nil},
+		{"an absolute home path", "authorizedkeysfile %h/.ssh/authorized_keys\n", []string{"%h/.ssh/authorized_keys"}},
+		{
+			"mixed",
+			"authorizedkeysfile /etc/ssh/authorized_keys/%u .ssh/authorized_keys\n",
+			[]string{".ssh/authorized_keys"},
+		},
+		{"not in the output", "port 22\n", nil},
+		{"a lookalike keyword", "authorizedkeyscommand /usr/bin/keys\n", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, HomeKeyFiles(tt.config))
+		})
+	}
+}

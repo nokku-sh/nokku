@@ -97,3 +97,22 @@ func noLoginShell(shell string) bool {
 		strings.HasSuffix(shell, "false") ||
 		strings.HasSuffix(shell, "sync")
 }
+
+// HomeKeyFiles picks the AuthorizedKeysFile entries out of sshd -T output that
+// live in home directories, where a granted user can add a key of their own.
+func HomeKeyFiles(sshdConfig string) []string {
+	var files []string
+	for line := range strings.Lines(sshdConfig) {
+		key, value, _ := strings.Cut(strings.TrimSpace(line), " ")
+		if key != "authorizedkeysfile" {
+			continue
+		}
+		// sshd reads a relative path from the user's home.
+		for f := range strings.FieldsSeq(value) {
+			if f != "none" && (!strings.HasPrefix(f, "/") || strings.Contains(f, "%h")) {
+				files = append(files, f)
+			}
+		}
+	}
+	return files
+}

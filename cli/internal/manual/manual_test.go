@@ -134,7 +134,8 @@ func runPlan(t *testing.T, p Plan, existing map[string]string, reject, reload bo
 		"bin/id":        "#!/bin/sh\necho 0\n",
 		"bin/systemctl": fmt.Sprintf("#!/bin/sh\nexit %d\n", reloadCode),
 		"bin/sshd": fmt.Sprintf(
-			"#!/bin/sh\n[ \"$1\" = -t ] || exit 0\n[ -f %[1]s/checked ] && exit %[2]d\ntouch %[1]s/checked\n",
+			"#!/bin/sh\n[ \"$1\" = -T ] && { cat %[1]s/sshd-T 2>/dev/null; exit 0; }\n"+
+				"[ \"$1\" = -t ] || exit 0\n[ -f %[1]s/checked ] && exit %[2]d\ntouch %[1]s/checked\n",
 			dir, code,
 		),
 	}
@@ -306,6 +307,20 @@ func TestRemoveScriptRollsBack(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, "nokku_ca.pub"))
 	assert.FileExists(t, filepath.Join(dir, "nokku_principals/root"))
 	assert.False(t, ParseResult(out).Reloaded, "a rejected config is never reloaded")
+}
+
+func TestScriptReportsHomeKeys(t *testing.T) {
+	t.Parallel()
+	_, out, err := runPlan(t, testPlan(t), map[string]string{
+		"sshd-T": "port 22\nauthorizedkeysfile .ssh/authorized_keys /etc/ssh/authorized_keys/%u\n",
+	}, false, true)
+	require.NoError(t, err, out)
+	assert.Equal(t, []string{".ssh/authorized_keys"}, ParseResult(out).HomeKeys)
+	assert.NotContains(t, Output(out), "authorizedkeysfile", "nk prints the warning, not the raw line")
+
+	_, out, err = runPlan(t, testPlan(t), map[string]string{"sshd-T": "authorizedkeysfile none\n"}, false, true)
+	require.NoError(t, err, out)
+	assert.Empty(t, ParseResult(out).HomeKeys)
 }
 
 func TestParseResult(t *testing.T) {

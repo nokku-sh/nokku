@@ -34,11 +34,11 @@ The server shows up in the web app. Unless the token approves it automatically, 
 
 ## What it does
 
-- Checks Nokku certificates and keeps the list of who may log in up to date. A revoke closes open sessions as soon as the daemon syncs.
+- Checks Nokku certificates and keeps the list of who may log in up to date. A revoke closes open connections as soon as the daemon syncs.
 - Serves every SSH connection itself. There is no proxy in the path.
 - Keeps working when the core is down, from the last synced access list.
 - Records sessions, when recording is on, and sends the recordings to the core.
-- Never touches your `sshd`. It stays on port 22 as your way back in.
+- Never touches your `sshd`. It stays on port 22 as your way back in. [Keep its keys out of home directories](./SECURITY.md#your-own-sshd), or a revoked user can come back through it.
 
 ## Network
 

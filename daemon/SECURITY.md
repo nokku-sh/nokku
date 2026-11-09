@@ -8,8 +8,8 @@ Found a vulnerability? Don't open a public issue. See [SECURITY.md](../SECURITY.
 
 - **Keep `/var/lib/nokkud` to root.** It holds the server's identity in Nokku and its SSH host key.
 - **Logins need a certificate.** No passwords, no plain keys, no PAM.
-- **A revoke closes open sessions** as soon as the daemon syncs.
-- **Your own `sshd` on port 22 is never touched.** It is your way back in, and outside Nokku's checks.
+- **A revoke closes open connections** as soon as the daemon syncs. Processes a user detached, like `nohup` or a tmux server, keep running.
+- **Your own `sshd` on port 22 is never touched.** It is your way back in, and outside Nokku's checks. [Keep its keys out of home directories](#your-own-sshd), or a revoked user can come back through it.
 - **Recordings are not redacted.** Treat them like the server they come from.
 
 ## Scope
@@ -52,10 +52,34 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 - **An enrollment token is a key to the servers it makes.** A server it enrolls gets the token's grants and tags, so whoever holds the token can add a machine that people with those grants log in to. Give it a use limit and an end date, and delete it once the rollout is done.
 - **An ephemeral token can also take over names.** A new container of the same hostname replaces an offline one that the same token enrolled, so people who `ssh` by name reach the newcomer. That is what makes devboxes work across `docker rm -f`, and it means a leaked ephemeral token can claim the name of any of its servers while that one is offline. Keep these tokens in a secret store, never baked into an image.
 
+### Your own sshd
+
+`nokkud` never changes the `sshd` on port 22. It is your way back in when the daemon is down. Logins through it skip Nokku's checks, audit and recording.
+
+- **Keys in home directories outlive a revoke.** Out of the box, sshd reads `~/.ssh/authorized_keys`. Anyone granted an account through Nokku can add their own key there and keep logging in on port 22 after you revoke them. `nokkud enroll` and `nk sync` warn when sshd's global settings still do this.
+- **Keep the break-glass key where only root writes.** Put your master key in `/etc/ssh/authorized_keys/<account>`, owned by root, and point sshd there. Turn off passwords while you are at it:
+
+  ```
+  # /etc/ssh/sshd_config.d/10-break-glass.conf
+  AuthorizedKeysFile /etc/ssh/authorized_keys/%u
+  PasswordAuthentication no
+  KbdInteractiveAuthentication no
+  ```
+
+  ```bash
+  sudo install -d -m 0755 /etc/ssh/authorized_keys
+  sudo install -m 0644 master_key.pub /etc/ssh/authorized_keys/root
+  sudo sshd -t && sudo systemctl reload sshd    # the unit is ssh on Debian and Ubuntu
+  ```
+
+- **Other accounts with their own keys stop working too.** A `git` user, a deploy or backup account. Copy their keys to `/etc/ssh/authorized_keys/<account>` before you reload.
+- **Give the file a low number.** sshd keeps the first value it reads, so a later `50-cloud-init.conf` that turns passwords on can't undo it.
+- **Test before you log out.** Log in with the master key from a second terminal before you close the one you are in.
+- **A root grant is never fully undone.** Root can leave a way back anywhere, like a cron job or another account's keys. No revoke removes that.
+
 ### Everything else
 
 - **The connection to the core** uses TLS 1.3 and always verifies the core's certificate. A plain `http` URL is refused unless it points at localhost, for development.
-- **Your own `sshd`** is outside `nokkud`'s scope. Logins through it bypass Nokku's checks, audit and recording, so secure and monitor it by your own rules.
 - **Recordings** wait in `/var/lib/nokkud/recordings/` until the core has them. Anyone who can read that folder can read what was on the terminal. On the core every recording is encrypted with a key of its own.
 - **Account limits.** Sessions never go through PAM. A granted user runs with their own OS privileges and no resource cap. Bound them with systemd slices or per-user limits if that matters to you.
 - **Upgrades.** Under systemd an upgrade goes live once the last session ends, an hour later at most. Under OpenRC it waits for a restart. Restart `nokkud` by hand when a fix can't wait.
@@ -78,7 +102,7 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 
 ### Revokes and outages
 
-- **A daemon that syncs applies a revoke at once** and closes the connections that were open on it.
+- **A daemon that syncs applies a revoke at once** and closes the connections that were open on it. Processes the user detached from the session keep running, like `nohup`, `setsid` or a tmux server, as with sshd.
 - **When the core is unreachable**, logins still work against the cached CA key and access list. An open session runs on until a sync that revokes it, or until it ends.
 - **A revoke that never reaches the daemon** still stops new logins once the user's last certificate expires, since the core signs no new one without the grant. A relayed connection ends after 8 hours at most.
 - **An approval can be taken back.** A daemon set back to pending drops its access list and its CA at the next sync. The core signs nothing for its server until it is approved again.

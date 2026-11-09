@@ -298,6 +298,12 @@ func applyPlan(
 		warnf("sshd is not using the Nokku drop-in. Make sure /etc/ssh/sshd_config has\n" +
 			"  Include /etc/ssh/sshd_config.d/*.conf\nnear the top, then run nk sync again")
 	}
+	if len(res.HomeKeys) > 0 {
+		warnf("sshd reads keys from home directories (%s), so a user granted an account here can add one "+
+			"and keep access after a revoke. Move them to a root-owned file: "+
+			"https://github.com/nokku-sh/nokku/blob/main/daemon/SECURITY.md#your-own-sshd",
+			strings.Join(res.HomeKeys, " "))
+	}
 
 	// Refresh locally so nk ls, ssh_config, and the host key pin match at once.
 	if err = c.SyncOrCache(ctx, false); err != nil {

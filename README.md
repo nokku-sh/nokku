@@ -23,7 +23,7 @@ nk login           # opens your browser, once
 ssh deploy@web-1   # the ssh you already know
 ```
 
-That is the whole workflow. No new SSH client and no `authorized_keys` to clean up when someone leaves.
+That is the whole workflow. No new SSH client and no `authorized_keys` to clean up when someone leaves, once your `sshd` [stops reading them from home directories](./daemon/SECURITY.md#your-own-sshd).
 
 ## Three parts
 

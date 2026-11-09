@@ -12,6 +12,7 @@ import (
 const (
 	reloadMarker = "#nk reloaded"
 	verifyMarker = "#nk verified"
+	keysMarker   = "#nk keys"
 )
 
 //go:embed scripts/*.tmpl
@@ -30,6 +31,7 @@ var shared = scriptData{
 	HostKeySection: sectionHostKey,
 	ReloadMarker:   reloadMarker,
 	VerifyMarker:   verifyMarker,
+	KeysMarker:     keysMarker,
 }
 
 // RemoveScript restores the drop-in if sshd -t fails or the run dies first.
@@ -39,6 +41,7 @@ type scriptData struct {
 	CA, DropInDir, DropIn, OldPrincipals string
 	PasswdSection, HostKeySection        string
 	ReloadMarker, VerifyMarker           string
+	KeysMarker                           string
 
 	// Only the sync script reads these.
 	Files          []File
@@ -61,6 +64,8 @@ type Plan struct {
 type Result struct {
 	Reloaded bool
 	Verified bool
+	// HomeKeys are the authorized keys files sshd reads from home directories.
+	HomeKeys []string
 }
 
 // NewPlan takes an empty targetID for a new server, which only a dry run shows.
@@ -96,9 +101,16 @@ func (p Plan) Script() string {
 }
 
 func ParseResult(out string) Result {
+	var keys strings.Builder
+	for line := range strings.Lines(out) {
+		if rest, ok := strings.CutPrefix(line, keysMarker+" "); ok {
+			keys.WriteString(rest)
+		}
+	}
 	return Result{
 		Reloaded: strings.Contains(out, reloadMarker),
 		Verified: strings.Contains(out, verifyMarker),
+		HomeKeys: login.HomeKeyFiles(keys.String()),
 	}
 }
 

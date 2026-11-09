@@ -178,6 +178,8 @@ nk rm web                   # undo it and delete the target
 
 **Access changes need no new sync.** A new grant works at once. A revoke stops new logins within an hour, because certificates for these servers last an hour at most. An open session stays until it ends, and these servers have no recording and no relay. **After a CA rollover, run `nk sync` again** on each of them right away.
 
+**Keys in home directories outlive a revoke.** The server's `sshd` still reads `~/.ssh/authorized_keys`, so someone granted an account can add a key there and keep access after a revoke. `nk sync` warns while it does. It logs in with your own root key, so move keys to a root-owned file instead of turning them off. [The daemon's SECURITY.md](../daemon/SECURITY.md#your-own-sshd) shows how.
+
 A new server can start with access in place:
 
 ```bash

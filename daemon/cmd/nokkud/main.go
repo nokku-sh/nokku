@@ -291,7 +291,21 @@ func enrollHost(ctx context.Context, cmd *cli.Command, token string, st *state.S
 			err,
 		)
 	}
+	if err == nil && token != "" {
+		warnHomeKeys(ctx)
+	}
 	return cl, err
+}
+
+// Port 22 is the way back in, so it is never changed, only flagged.
+func warnHomeKeys(ctx context.Context) {
+	files := sysutil.SSHDHomeKeyFiles(ctx)
+	if len(files) == 0 {
+		return
+	}
+	slog.Warn("sshd reads keys from home directories, so a user granted an account here "+
+		"can add one and keep logging in on port 22 after a revoke",
+		"files", files, "fix", "https://github.com/nokku-sh/nokku/blob/main/daemon/SECURITY.md#your-own-sshd")
 }
 
 func reset(ctx context.Context, cmd *cli.Command) error {
