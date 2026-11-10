@@ -22,8 +22,8 @@ type ServiceAccount struct {
 }
 
 type CA struct {
-	// PublicKey signs logins, HostPublicKey the host certificates of daemons.
-	PublicKey     string `json:"public_key"`
+	// UserPublicKey signs logins, HostPublicKey the host certificates of daemons.
+	UserPublicKey string `json:"user_public_key"`
 	HostPublicKey string `json:"host_public_key,omitempty"`
 	// RotatedAt is zero until the first rollover.
 	RotatedAt time.Time `json:"rotated_at,omitzero"`

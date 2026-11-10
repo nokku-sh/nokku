@@ -119,8 +119,8 @@ func (s workspaceCAService) GetCertificateAuthority(
 ) (*nokkuv1.GetCertificateAuthorityResponse, error) {
 	return &nokkuv1.GetCertificateAuthorityResponse{
 		CertificateAuthority: &nokkuv1.CertificateAuthority{
-			PublicKey: new("ssh-ed25519 AAAA"),
-			RotatedAt: timestamppb.New(s.rotatedAt),
+			UserPublicKey: new("ssh-ed25519 AAAA"),
+			RotatedAt:     timestamppb.New(s.rotatedAt),
 		},
 	}, nil
 }
@@ -144,7 +144,7 @@ func TestWorkspaceCA(t *testing.T) {
 
 	ca, err := c.WorkspaceCA(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, "ssh-ed25519 AAAA", ca.PublicKey)
+	assert.Equal(t, "ssh-ed25519 AAAA", ca.UserPublicKey)
 	assert.True(t, rotatedAt.Equal(ca.RotatedAt))
 }
 

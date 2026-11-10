@@ -42,7 +42,7 @@ func CreateCA(ctx context.Context, q *db.Queries, keys *kms.Keyset, p *db.Create
 	if err != nil {
 		return nil, err
 	}
-	p.PublicKey, p.HostPublicKey = user.public, host.public
+	p.UserPublicKey, p.HostPublicKey = user.public, host.public
 	ca, err := q.CreateCA(ctx, p)
 	if err != nil {
 		return nil, err

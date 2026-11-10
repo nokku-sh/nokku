@@ -311,7 +311,7 @@ CREATE TABLE ssh_cas (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
   -- The user key signs logins, the host key the daemons' host certificates. Private halves are in ssh_ca_keys.
-  public_key TEXT NOT NULL,
+  user_public_key TEXT NOT NULL,
   host_public_key TEXT NOT NULL,
   rotated_at TIMESTAMPTZ, -- NULL until the first rollover
   -- What a person's certificate lasts, ssh.NewCA holds what a new CA starts with. The ceiling is login.MaxCertTTL.
@@ -782,9 +782,9 @@ EXECUTE FUNCTION notify_state_change ();
 
 CREATE TRIGGER notify_state_change_update
 AFTER
-UPDATE OF public_key,
+UPDATE OF user_public_key,
 host_public_key ON ssh_cas FOR EACH ROW WHEN (
-  OLD.public_key IS DISTINCT FROM NEW.public_key
+  OLD.user_public_key IS DISTINCT FROM NEW.user_public_key
   OR OLD.host_public_key IS DISTINCT FROM NEW.host_public_key
 )
 EXECUTE FUNCTION notify_state_change ();

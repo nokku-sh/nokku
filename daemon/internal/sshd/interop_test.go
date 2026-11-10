@@ -207,7 +207,7 @@ func TestBinaryInterop(t *testing.T) {
 func writeStateFile(configDir string, ca ssh.PublicKey, username string, uuids []string) error {
 	data, err := json.MarshalIndent(map[string]any{"access": map[string]any{
 		"principals": map[string][]string{username: uuids},
-		"ca":         string(ssh.MarshalAuthorizedKey(ca)),
+		"user_ca":    string(ssh.MarshalAuthorizedKey(ca)),
 	}}, "", "  ")
 	if err != nil {
 		return err

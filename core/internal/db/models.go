@@ -270,7 +270,7 @@ type RecordingDelete struct {
 type SSHCA struct {
 	ID            string        `json:"id"`
 	WorkspaceID   string        `json:"workspaceId"`
-	PublicKey     string        `json:"publicKey"`
+	UserPublicKey string        `json:"userPublicKey"`
 	HostPublicKey string        `json:"hostPublicKey"`
 	RotatedAt     *time.Time    `json:"rotatedAt"`
 	UserTtl       time.Duration `json:"userTtl"`

@@ -47,7 +47,7 @@ func MapCA(ca *nokkuv1.CertificateAuthority) *CA {
 		return nil
 	}
 	return &CA{
-		PublicKey:     ca.GetPublicKey(),
+		UserPublicKey: ca.GetUserPublicKey(),
 		HostPublicKey: ca.GetHostPublicKey(),
 		RotatedAt:     timeOf(ca.GetRotatedAt()),
 	}

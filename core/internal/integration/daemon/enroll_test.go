@@ -49,7 +49,7 @@ func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, 
 		}
 		// Every workspace has its CA. Enroll and sync read its public keys.
 		ca := ssh.NewCA()
-		ca.PublicKey, ca.HostPublicKey = "pub", "host-pub"
+		ca.UserPublicKey, ca.HostPublicKey = "pub", "host-pub"
 		if _, err := q.CreateCA(ctx, ca); err != nil {
 			return err
 		}

@@ -34,7 +34,7 @@ func newTestCA(t *testing.T) testCA {
 	}
 	return testCA{
 		row: &db.SSHCA{
-			PublicKey:     user.public,
+			UserPublicKey: user.public,
 			HostPublicKey: host.public,
 			UserTtl:       24 * time.Hour,
 		},
@@ -63,7 +63,7 @@ func parseKey(t *testing.T, line string) ssh.PublicKey {
 // checkCert verifies cert as sshd and ssh do, against the key of its kind.
 func checkCert(t *testing.T, ca *db.SSHCA, cert *ssh.Certificate, principal string) error {
 	t.Helper()
-	user, host := parseKey(t, ca.PublicKey), parseKey(t, ca.HostPublicKey)
+	user, host := parseKey(t, ca.UserPublicKey), parseKey(t, ca.HostPublicKey)
 	checker := ssh.CertChecker{
 		IsUserAuthority: func(auth ssh.PublicKey) bool {
 			return bytes.Equal(auth.Marshal(), user.Marshal())

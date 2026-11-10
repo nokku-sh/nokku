@@ -311,8 +311,8 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 
 	return &nokkuv1.CertificateAuthority{
 		Id:                       &r.ID,
-		PublicKey:                &r.PublicKey,
-		PublicKeyFingerprint:     new(fingerprint(r.PublicKey)),
+		UserPublicKey:            &r.UserPublicKey,
+		UserPublicKeyFingerprint: new(fingerprint(r.UserPublicKey)),
 		HostPublicKey:            &r.HostPublicKey,
 		HostPublicKeyFingerprint: new(fingerprint(r.HostPublicKey)),
 		RotatedAt:                SafeTimestamp(r.RotatedAt),

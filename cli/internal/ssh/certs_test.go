@@ -68,7 +68,7 @@ func TestCertFresh(t *testing.T) {
 	setupSSHDir(t)
 	signer := newSigner(t)
 	ca := state.CA{
-		PublicKey: string(ssh.MarshalAuthorizedKey(signer.PublicKey())),
+		UserPublicKey: string(ssh.MarshalAuthorizedKey(signer.PublicKey())),
 	}
 	target := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003"}
 	assert.False(t, CertFresh(target, ca), "no certificate yet")
@@ -100,7 +100,10 @@ func TestCertKeepsTheOldKeyOnAServerThatMissedARollover(t *testing.T) {
 	setupSSHDir(t)
 	old, current := newSigner(t), newSigner(t)
 	now := time.Now()
-	ca := state.CA{PublicKey: string(ssh.MarshalAuthorizedKey(current.PublicKey())), RotatedAt: now.Add(-time.Minute)}
+	ca := state.CA{
+		UserPublicKey: string(ssh.MarshalAuthorizedKey(current.PublicKey())),
+		RotatedAt:     now.Add(-time.Minute),
+	}
 	behind := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003", LastSyncAt: now.Add(-time.Hour)}
 	withDaemon := behind
 	withDaemon.DaemonID = "0199a0a0-0000-7000-8000-000000000004"
@@ -132,7 +135,7 @@ func TestCertKeepsTheOldKeyOnAServerThatMissedARollover(t *testing.T) {
 func TestCertFreshNeedsEveryGrantedAccount(t *testing.T) {
 	setupSSHDir(t)
 	signer := newSigner(t)
-	ca := state.CA{PublicKey: string(ssh.MarshalAuthorizedKey(signer.PublicKey()))}
+	ca := state.CA{UserPublicKey: string(ssh.MarshalAuthorizedKey(signer.PublicKey()))}
 	target := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003", Usernames: []string{"deploy"}}
 	now := time.Now()
 	cert := &ssh.Certificate{
@@ -160,7 +163,7 @@ func TestCertFreshNeedsEveryGrantedAccount(t *testing.T) {
 func TestCertValidAndCleanup(t *testing.T) {
 	setupSSHDir(t)
 	signer := newSigner(t)
-	ca := state.CA{PublicKey: string(ssh.MarshalAuthorizedKey(signer.PublicKey()))}
+	ca := state.CA{UserPublicKey: string(ssh.MarshalAuthorizedKey(signer.PublicKey()))}
 	keep := state.Target{ID: "0199a0a0-0000-7000-8000-000000000002"}
 	drop := state.Target{ID: "0199a0a0-0000-7000-8000-000000000009"}
 	now := time.Now()

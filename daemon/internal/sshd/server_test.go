@@ -128,7 +128,7 @@ func testAccess(t *testing.T, ca testCA) *state.Access {
 	off := new(false)
 	return &state.Access{
 		Principals:   map[string][]string{currentUser(t): {testPrincipal}},
-		CA:           string(ssh.MarshalAuthorizedKey(ca.pub)),
+		UserCA:       string(ssh.MarshalAuthorizedKey(ca.pub)),
 		DaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: off, AllowForwarding: off, AllowAgentForwarding: off},
 		SyncedAt:     time.Now(),
 	}
@@ -379,7 +379,7 @@ func TestServerLivePrincipals(t *testing.T) {
 	srv, err := New(nil, nil)
 	must.NoError(err, "new server")
 	granted := testAccess(t, ca)
-	srv.SetAccess(&state.Access{CA: granted.CA, DaemonConfig: granted.DaemonConfig, SyncedAt: granted.SyncedAt})
+	srv.SetAccess(&state.Access{UserCA: granted.UserCA, DaemonConfig: granted.DaemonConfig, SyncedAt: granted.SyncedAt})
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	must.NoError(err, "listen")
 	go srv.Serve(t.Context(), l)

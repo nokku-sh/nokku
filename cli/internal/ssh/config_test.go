@@ -76,7 +76,7 @@ func TestConfigValueQuotesPaths(t *testing.T) {
 func TestRenderKnownHosts(t *testing.T) {
 	t.Parallel()
 	st := &state.State{
-		CA: &state.CA{PublicKey: "ssh-ed25519 AAAAUser1==", HostPublicKey: "ssh-ed25519 AAAACa1== production"},
+		CA: &state.CA{UserPublicKey: "ssh-ed25519 AAAAUser1==", HostPublicKey: "ssh-ed25519 AAAACa1== production"},
 		Targets: []state.Target{
 			{ID: "t-1", DaemonID: "d-1"},
 			{ID: "t-3", HostPublicKey: "ssh-ed25519 AAAAhost== host"},

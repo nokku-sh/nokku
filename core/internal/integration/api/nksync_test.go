@@ -240,7 +240,7 @@ func TestNKSyncServerWithOpenSSH(t *testing.T) {
 	n.grant(t, otherAccount, alice)
 
 	dir := t.TempDir()
-	port := startNKSyncSSHD(t, sshd, dir, ca.GetPublicKey(), targetID)
+	port := startNKSyncSSHD(t, sshd, dir, ca.GetUserPublicKey(), targetID)
 	keyFile := filepath.Join(dir, "id_ed25519")
 	block, err := gossh.MarshalPrivateKey(n.key, "")
 	require.NoError(t, err)

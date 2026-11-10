@@ -355,7 +355,7 @@ func (s *targetService) SyncTargetUsers(
 		if err != nil {
 			return err
 		}
-		if ca.PublicKey != req.GetCaPublicKey() {
+		if ca.UserPublicKey != req.GetUserCaPublicKey() {
 			return connect.NewError(
 				connect.CodeFailedPrecondition,
 				"the certificate authority was rolled over during this sync",

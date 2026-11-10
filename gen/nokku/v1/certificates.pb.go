@@ -28,7 +28,7 @@ const (
 type CertificateAuthority struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	PublicKey     *string                `protobuf:"bytes,2,opt,name=public_key,json=publicKey" json:"public_key,omitempty"`
+	UserPublicKey *string                `protobuf:"bytes,2,opt,name=user_public_key,json=userPublicKey" json:"user_public_key,omitempty"`
 	HostPublicKey *string                `protobuf:"bytes,3,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
 	// Unset until the first rollover.
 	RotatedAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=rotated_at,json=rotatedAt" json:"rotated_at,omitempty"`
@@ -39,7 +39,7 @@ type CertificateAuthority struct {
 	// source_address lists where people log in from. A service account has a list of its own.
 	SourceAddress *string `protobuf:"bytes,10,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
 	// What ssh-keygen -lf prints for each key.
-	PublicKeyFingerprint     *string `protobuf:"bytes,11,opt,name=public_key_fingerprint,json=publicKeyFingerprint" json:"public_key_fingerprint,omitempty"`
+	UserPublicKeyFingerprint *string `protobuf:"bytes,11,opt,name=user_public_key_fingerprint,json=userPublicKeyFingerprint" json:"user_public_key_fingerprint,omitempty"`
 	HostPublicKeyFingerprint *string `protobuf:"bytes,12,opt,name=host_public_key_fingerprint,json=hostPublicKeyFingerprint" json:"host_public_key_fingerprint,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
@@ -82,9 +82,9 @@ func (x *CertificateAuthority) GetId() string {
 	return ""
 }
 
-func (x *CertificateAuthority) GetPublicKey() string {
-	if x != nil && x.PublicKey != nil {
-		return *x.PublicKey
+func (x *CertificateAuthority) GetUserPublicKey() string {
+	if x != nil && x.UserPublicKey != nil {
+		return *x.UserPublicKey
 	}
 	return ""
 }
@@ -131,9 +131,9 @@ func (x *CertificateAuthority) GetSourceAddress() string {
 	return ""
 }
 
-func (x *CertificateAuthority) GetPublicKeyFingerprint() string {
-	if x != nil && x.PublicKeyFingerprint != nil {
-		return *x.PublicKeyFingerprint
+func (x *CertificateAuthority) GetUserPublicKeyFingerprint() string {
+	if x != nil && x.UserPublicKeyFingerprint != nil {
+		return *x.UserPublicKeyFingerprint
 	}
 	return ""
 }
@@ -520,11 +520,10 @@ var File_nokku_v1_certificates_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"\n" +
-	"\x1bnokku/v1/certificates.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xf0\x03\n" +
+	"\x1bnokku/v1/certificates.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x82\x04\n" +
 	"\x14CertificateAuthority\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
-	"\n" +
-	"public_key\x18\x02 \x01(\tR\tpublicKey\x12&\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12&\n" +
+	"\x0fuser_public_key\x18\x02 \x01(\tR\ruserPublicKey\x12&\n" +
 	"\x0fhost_public_key\x18\x03 \x01(\tR\rhostPublicKey\x129\n" +
 	"\n" +
 	"rotated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\trotatedAt\x124\n" +
@@ -534,8 +533,8 @@ const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12%\n" +
 	"\x0esource_address\x18\n" +
-	" \x01(\tR\rsourceAddress\x124\n" +
-	"\x16public_key_fingerprint\x18\v \x01(\tR\x14publicKeyFingerprint\x12=\n" +
+	" \x01(\tR\rsourceAddress\x12=\n" +
+	"\x1buser_public_key_fingerprint\x18\v \x01(\tR\x18userPublicKeyFingerprint\x12=\n" +
 	"\x1bhost_public_key_fingerprint\x18\f \x01(\tR\x18hostPublicKeyFingerprint\" \n" +
 	"\x1eGetCertificateAuthorityRequest\"v\n" +
 	"\x1fGetCertificateAuthorityResponse\x12S\n" +

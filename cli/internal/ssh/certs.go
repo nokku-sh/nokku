@@ -51,7 +51,7 @@ func CheckCert(data []byte, caKey string, margin time.Duration) error {
 // CertValid wants a certificate the target takes, valid for at least margin.
 func CertValid(target state.Target, ca state.CA, margin time.Duration) bool {
 	cert, err := readCert(target.ID)
-	return err == nil && (target.Behind(ca) || signedBy(cert, ca.PublicKey)) && within(cert, margin)
+	return err == nil && (target.Behind(ca) || signedBy(cert, ca.UserPublicKey)) && within(cert, margin)
 }
 
 // CertFresh ends at half life, so a core outage leaves a user half a lifetime.
@@ -65,7 +65,7 @@ func CertFresh(target state.Target, ca state.CA) bool {
 		return within(cert, 0)
 	}
 	after, before := CertWindow(cert)
-	return covers(cert, target.Usernames) && signedBy(cert, ca.PublicKey) && within(cert, before.Sub(after)/2)
+	return covers(cert, target.Usernames) && signedBy(cert, ca.UserPublicKey) && within(cert, before.Sub(after)/2)
 }
 
 // CertCovers is false for a certificate older than a grant.

@@ -35,8 +35,8 @@ type Config struct {
 type Access struct {
 	Principals   map[string][]string   `json:"principals,omitempty"`
 	DaemonConfig *nokkuv1.DaemonConfig `json:"daemon_config,omitempty"`
-	CA           string                `json:"ca,omitempty"`
-	// HostCA signs the host cert. Logins only ever check CA.
+	UserCA       string                `json:"user_ca,omitempty"`
+	// HostCA signs the host cert. Logins only ever check UserCA.
 	HostCA string `json:"host_ca,omitempty"`
 	// StateHash is the core's hash of the sync this came from. The daemon only hands it back.
 	StateHash []byte `json:"state_hash,omitempty"`
@@ -87,7 +87,7 @@ func AccessFrom(res *nokkuv1.SyncDaemonResponse, targetID string) *Access {
 	return &Access{
 		Principals:   validAccounts(principals),
 		DaemonConfig: res.GetConfig(),
-		CA:           res.GetCaPublicKey(),
+		UserCA:       res.GetUserCaPublicKey(),
 		HostCA:       res.GetHostCaPublicKey(),
 		StateHash:    res.GetStateHash(),
 		SyncedAt:     time.Now(),

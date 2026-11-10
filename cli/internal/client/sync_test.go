@@ -129,7 +129,7 @@ func accessResponse(caPubKey string) *nokkuv1.GetSubjectAccessResponse {
 			Name:      new("prod"),
 			Usernames: []string{"alice"},
 		}},
-		CertificateAuthority: &nokkuv1.CertificateAuthority{PublicKey: new(caPubKey)},
+		CertificateAuthority: &nokkuv1.CertificateAuthority{UserPublicKey: new(caPubKey)},
 	}
 }
 
@@ -147,7 +147,7 @@ func TestSyncCommitsAccessSnapshot(t *testing.T) {
 	require.Len(t, c.State.Targets, 1)
 	assert.Equal(t, "prod", c.State.Targets[0].Name)
 	require.NotNil(t, c.State.CA)
-	assert.Equal(t, ca.pubKey, c.State.CA.PublicKey)
+	assert.Equal(t, ca.pubKey, c.State.CA.UserPublicKey)
 
 	// The snapshot is committed to disk for offline use.
 	assert.NotNil(t, state.Load().User)
@@ -258,7 +258,7 @@ func TestEnsureCertFreshIsNoOp(t *testing.T) {
 
 	c := &Client{State: &state.State{APIURL: "http://127.0.0.1:1", SessionToken: "sess-token"}}
 	err = c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{
-		PublicKey: ca.pubKey,
+		UserPublicKey: ca.pubKey,
 	})
 	require.NoError(t, err, "a fresh certificate must not trigger a re-sign")
 }
@@ -282,7 +282,7 @@ func TestEnsureCertSignsAndWritesCert(t *testing.T) {
 	}
 	c := newSyncTestClient(t, core)
 
-	err = c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{PublicKey: ca.pubKey})
+	err = c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{UserPublicKey: ca.pubKey})
 	require.NoError(t, err)
 
 	certPath := paths.SSHCertificate(targetID)
@@ -307,7 +307,7 @@ func TestEnsureCertRenewsPastHalfLife(t *testing.T) {
 	certPath := paths.SSHCertificate(targetID)
 	require.NoError(t, os.WriteFile(certPath, []byte(aging), 0o600))
 	target := state.Target{ID: targetID}
-	authority := state.CA{PublicKey: ca.pubKey}
+	authority := state.CA{UserPublicKey: ca.pubKey}
 	require.True(t, ssh.CertValid(target, authority, 0))
 
 	core := &fakeCore{}

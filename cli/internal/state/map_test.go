@@ -17,7 +17,7 @@ func TestFromAccess(t *testing.T) {
 		Subject: &nokkuv1.GetSubjectAccessResponse_User{
 			User: &nokkuv1.User{Id: new("u"), Name: new("alice")},
 		},
-		CertificateAuthority: &nokkuv1.CertificateAuthority{PublicKey: new("ssh-ed25519 AAAA")},
+		CertificateAuthority: &nokkuv1.CertificateAuthority{UserPublicKey: new("ssh-ed25519 AAAA")},
 		Targets: []*nokkuv1.Target{
 			{Id: new(targetID), Name: new("web")},
 			{Id: new("../../etc"), Name: new("evil")},
@@ -29,7 +29,7 @@ func TestFromAccess(t *testing.T) {
 	require.NotNil(t, c.User)
 	assert.Equal(t, "alice", c.User.Name)
 	require.NotNil(t, c.CA)
-	assert.Equal(t, "ssh-ed25519 AAAA", c.CA.PublicKey)
+	assert.Equal(t, "ssh-ed25519 AAAA", c.CA.UserPublicKey)
 	require.Len(t, c.Targets, 1, "non-canonical ids are dropped")
 	assert.Equal(t, "web", c.Targets[0].Name)
 }

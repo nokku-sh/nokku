@@ -84,13 +84,13 @@ func TestSyncTargetUsers(t *testing.T) {
 	authority, err := nokkuv1connect.NewCertificateServiceClient(clientOn(srv, editorAuth)).
 		GetCertificateAuthority(t.Context(), &nokkuv1.GetCertificateAuthorityRequest{})
 	require.NoError(t, err)
-	caKey := authority.GetCertificateAuthority().GetPublicKey()
+	caKey := authority.GetCertificateAuthority().GetUserPublicKey()
 
 	// A host written with a key a rollover replaced is not in sync.
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-		TargetId:    &targetID,
-		Usernames:   []string{"root"},
-		CaPublicKey: &hostKey,
+		TargetId:        &targetID,
+		Usernames:       []string{"root"},
+		UserCaPublicKey: &hostKey,
 	})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "a stale CA key was reported, got %v", err)
 	stale, err := editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &targetID})
@@ -98,11 +98,11 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.Nil(t, stale.GetTarget().GetLastSyncAt(), "a refused report stamped the sync")
 
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-		TargetId:      &targetID,
-		HostPublicKey: &hostKey,
-		Usernames:     []string{"root", "deploy"},
-		Endpoints:     []string{"10.0.0.2:22"},
-		CaPublicKey:   &caKey,
+		TargetId:        &targetID,
+		HostPublicKey:   &hostKey,
+		Usernames:       []string{"root", "deploy"},
+		Endpoints:       []string{"10.0.0.2:22"},
+		UserCaPublicKey: &caKey,
 	})
 	require.NoError(t, err)
 
@@ -128,9 +128,9 @@ func TestSyncTargetUsers(t *testing.T) {
 
 	// A report without endpoints or key adds users and keeps the rest.
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-		TargetId:    &targetID,
-		Usernames:   []string{"ops"},
-		CaPublicKey: &caKey,
+		TargetId:        &targetID,
+		Usernames:       []string{"ops"},
+		UserCaPublicKey: &caKey,
 	})
 	require.NoError(t, err)
 	got, err = editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &targetID})
@@ -141,9 +141,9 @@ func TestSyncTargetUsers(t *testing.T) {
 
 	// A host can name a login twice, and one odd name must not cost the others.
 	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-		TargetId:    &targetID,
-		Usernames:   []string{"backup", "ops", "backup", "not a login"},
-		CaPublicKey: &caKey,
+		TargetId:        &targetID,
+		Usernames:       []string{"backup", "ops", "backup", "not a login"},
+		UserCaPublicKey: &caKey,
 	})
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"root", "deploy", "ops", "backup"}, usernames())
@@ -158,9 +158,9 @@ func TestSyncTargetUsers(t *testing.T) {
 		),
 	)
 	_, err = viewer.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-		TargetId:    &targetID,
-		Usernames:   []string{"intruder"},
-		CaPublicKey: &caKey,
+		TargetId:        &targetID,
+		Usernames:       []string{"intruder"},
+		UserCaPublicKey: &caKey,
 	})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "viewer may not sync, got %v", err)
 }
@@ -764,7 +764,7 @@ func TestAMachineManagesOnlyTheServersItAdded(t *testing.T) {
 	authority, err := nokkuv1connect.NewCertificateServiceClient(admin).
 		GetCertificateAuthority(t.Context(), &nokkuv1.GetCertificateAuthorityRequest{})
 	require.NoError(t, err)
-	caKey := authority.GetCertificateAuthority().GetPublicKey()
+	caKey := authority.GetCertificateAuthority().GetUserPublicKey()
 	hostKey := func() string {
 		pub, _, err := ed25519.GenerateKey(rand.Reader)
 		require.NoError(t, err)
@@ -785,7 +785,7 @@ func TestAMachineManagesOnlyTheServersItAdded(t *testing.T) {
 	repoint := func(as nokkuv1connect.TargetServiceClient, id string) error {
 		_, err := as.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 			TargetId: &id, Usernames: []string{"root"}, Endpoints: []string{"203.0.113.66:22"},
-			HostPublicKey: &attacker, CaPublicKey: &caKey,
+			HostPublicKey: &attacker, UserCaPublicKey: &caKey,
 		})
 		return err
 	}

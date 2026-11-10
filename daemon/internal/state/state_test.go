@@ -36,7 +36,7 @@ func TestAccessFromDropsInvalidAccounts(t *testing.T) {
 			{Username: new("0start"), CertPrincipals: []string{alice1}},
 			{Username: new(""), CertPrincipals: []string{alice1}},
 		},
-		CaPublicKey:     new("ssh-ed25519 BBBB"),
+		UserCaPublicKey: new("ssh-ed25519 BBBB"),
 		HostCaPublicKey: new("ssh-ed25519 HHHH"),
 		Config:          &nokkuv1.DaemonConfig{RecordSessions: new(true)},
 		StateHash:       []byte("7"),
@@ -44,7 +44,7 @@ func TestAccessFromDropsInvalidAccounts(t *testing.T) {
 
 	is.Equal([]string{alice1, alice2}, a.Principals["alice"])
 	is.Len(a.Principals, 1, "only alice is a valid account")
-	is.Equal("ssh-ed25519 BBBB", a.CA)
+	is.Equal("ssh-ed25519 BBBB", a.UserCA)
 	is.Equal("ssh-ed25519 HHHH", a.HostCA, "the host CA is kept apart from the login CA")
 	is.True(a.DaemonConfig.GetRecordSessions())
 	is.Equal("7", string(a.StateHash))
@@ -80,7 +80,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	s.SetAccess(&Access{
 		Principals:   map[string][]string{"alice": {"uuid-1", "uuid-2"}, "bob": {"uuid-3"}},
 		DaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(true)},
-		CA:           "ssh-ed25519 BBBB",
+		UserCA:       "ssh-ed25519 BBBB",
 		HostCA:       "ssh-ed25519 HHHH",
 		StateHash:    []byte("7"),
 	})
@@ -92,7 +92,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	a := loaded.Access()
 	is.Equal(map[string][]string{"alice": {"uuid-1", "uuid-2"}, "bob": {"uuid-3"}}, a.Principals)
 	is.True(a.DaemonConfig.GetRecordSessions())
-	is.Equal("ssh-ed25519 BBBB", a.CA)
+	is.Equal("ssh-ed25519 BBBB", a.UserCA)
 	is.Equal("ssh-ed25519 HHHH", a.HostCA)
 	is.Equal("7", string(a.StateHash))
 	is.Equal("7", string(loaded.Saved().StateHash), "the state on disk is the one to report")

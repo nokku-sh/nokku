@@ -70,7 +70,7 @@ func TestRunServesFromCacheWhenCoreIsDown(t *testing.T) {
 		"session_token": "session",
 		"access": {
 			"principals": {%q: ["subject-1"]},
-			"ca": %q,
+			"user_ca": %q,
 			"state_hash": "aGVsZA==",
 			"synced_at": %q
 		}

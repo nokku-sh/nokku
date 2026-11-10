@@ -105,7 +105,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("reading the certificate authority: %w", err)
 	}
-	if ca == nil || strings.TrimSpace(ca.PublicKey) == "" {
+	if ca == nil || strings.TrimSpace(ca.UserPublicKey) == "" {
 		return errors.New("the core sent no certificate authority key, nothing was written")
 	}
 	var seeds []client.Grant
@@ -140,7 +140,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 		fmt.Fprintf(progress, "Added target %s\n", ui.Bold(target.Name))
 		printGrants(progress, seeds)
 	}
-	plan, err := manual.NewPlan(ca.PublicKey, target.ID)
+	plan, err := manual.NewPlan(ca.UserPublicKey, target.ID)
 	if err != nil {
 		return err
 	}
@@ -282,7 +282,7 @@ func applyPlan(
 		}
 		return fmt.Errorf("writing to %s failed, the new target %s was removed again: %w", dest.host, target.Name, err)
 	}
-	err = c.ReportTarget(ctx, target, h.Accounts, h.HostKey, ca.PublicKey)
+	err = c.ReportTarget(ctx, target, h.Accounts, h.HostKey, ca.UserPublicKey)
 	if connectrpc.CodeOf(err) == connectrpc.CodeFailedPrecondition {
 		return errors.New("the keys of the certificate authority changed during this sync, run nk sync again")
 	}

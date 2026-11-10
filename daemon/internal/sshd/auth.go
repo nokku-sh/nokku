@@ -53,8 +53,8 @@ func (s *Server) SetAccess(sa *state.Access) {
 		policy:     policyFrom(sa.DaemonConfig),
 		syncedAt:   sa.SyncedAt,
 	}
-	if sa.CA != "" {
-		if pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sa.CA)); err != nil {
+	if sa.UserCA != "" {
+		if pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sa.UserCA)); err != nil {
 			slog.Warn("unreadable CA public key, trusting no CA", "error", err)
 		} else {
 			a.ca = string(pub.Marshal())

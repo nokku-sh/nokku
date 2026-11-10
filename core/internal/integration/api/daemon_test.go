@@ -784,7 +784,7 @@ func TestSyncDaemonReport(t *testing.T) {
 			PrivateIps: []string{"10.0.0.5:4022", "example.com:22", "nonsense"},
 		})
 	require.NoError(t, err)
-	assert.Equal(t, ca.GetPublicKey(), synced.GetCaPublicKey(), "the daemon trusts the CA of its target")
+	assert.Equal(t, ca.GetUserPublicKey(), synced.GetUserCaPublicKey(), "the daemon trusts the CA of its target")
 	assert.Equal(
 		t,
 		ca.GetHostPublicKey(),

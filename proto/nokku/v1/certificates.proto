@@ -40,7 +40,7 @@ service CertificateService {
 
 message CertificateAuthority {
   string id = 1;
-  string public_key = 2;
+  string user_public_key = 2;
   string host_public_key = 3;
   // Unset until the first rollover.
   google.protobuf.Timestamp rotated_at = 4;
@@ -51,7 +51,7 @@ message CertificateAuthority {
   // source_address lists where people log in from. A service account has a list of its own.
   string source_address = 10;
   // What ssh-keygen -lf prints for each key.
-  string public_key_fingerprint = 11;
+  string user_public_key_fingerprint = 11;
   string host_public_key_fingerprint = 12;
 }
 

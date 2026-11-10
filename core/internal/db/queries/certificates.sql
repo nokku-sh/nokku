@@ -2,13 +2,13 @@
 -- Every setting comes from the caller, ssh.NewCA fills in what a new CA starts with. ssh.CreateCA adds the keys.
 INSERT INTO
   ssh_cas (
-    public_key,
+    user_public_key,
     host_public_key,
     user_ttl
   )
 VALUES
   (
-    @public_key,
+    @user_public_key,
     @host_public_key,
     @user_ttl
   )
@@ -34,7 +34,7 @@ SELECT
   (
     CASE
       WHEN k.kind = 'host' THEN c.host_public_key
-      ELSE c.public_key
+      ELSE c.user_public_key
     END
   )::TEXT AS public_key
 FROM
@@ -87,7 +87,7 @@ RETURNING
 -- Nothing keeps the old keys. clock_timestamp is after any sync report that held the row.
 UPDATE ssh_cas
 SET
-  public_key = @public_key,
+  user_public_key = @user_public_key,
   host_public_key = @host_public_key,
   rotated_at = clock_timestamp(),
   updated_at = NOW()

@@ -139,7 +139,7 @@ func answer(
 		if idle := settings.GetSessionIdleTimeout(); idle.AsDuration() > 0 {
 			res.Config.IdleTimeout = idle
 		}
-		res.CaPublicKey = &ca.PublicKey
+		res.UserCaPublicKey = &ca.UserPublicKey
 		res.HostCaPublicKey = &ca.HostPublicKey
 		res.Principals = principals
 	}

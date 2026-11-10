@@ -65,7 +65,7 @@ func TestRolloverReachesTheNextSync(t *testing.T) {
 	for _, id := range daemons {
 		res, err := daemon.Sync(f.ctx, f.conn, daemon.SyncInput{DaemonID: id})
 		require.NoError(t, err)
-		assert.Equal(t, next.PublicKey, res.GetCaPublicKey())
+		assert.Equal(t, next.UserPublicKey, res.GetUserCaPublicKey())
 		assert.Equal(t, next.HostPublicKey, res.GetHostCaPublicKey())
 		assert.NotEqual(t, before.GetStateHash(), res.GetStateHash(), "new keys must change the hash")
 	}
@@ -162,7 +162,7 @@ func TestSyncAnswer(t *testing.T) {
 	res, err := daemon.Sync(f.ctx, f.conn, daemon.SyncInput{DaemonID: web.DaemonID})
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, res.GetStatus())
-	assert.Equal(t, "pub", res.GetCaPublicKey())
+	assert.Equal(t, "pub", res.GetUserCaPublicKey())
 	assert.Equal(t, "host-pub", res.GetHostCaPublicKey())
 	assert.Equal(t, 10*time.Minute, res.GetConfig().GetIdleTimeout().AsDuration(), "the workspace's idle timeout")
 	got := map[string][]string{}
@@ -209,7 +209,7 @@ func TestSyncAnswer(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, res.GetStatus())
 	assert.Empty(t, res.GetPrincipals(), "a pending daemon lets nobody in")
-	assert.Empty(t, res.GetCaPublicKey(), "a pending daemon trusts no CA")
+	assert.Empty(t, res.GetUserCaPublicKey(), "a pending daemon trusts no CA")
 
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
 		_, err := q.DeleteDaemon(f.ctx, db1.DaemonID)

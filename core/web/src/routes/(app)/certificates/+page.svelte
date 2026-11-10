@@ -124,7 +124,7 @@
 	const keys = $derived(
 		entity
 			? [
-					{ name: 'User key', key: entity.publicKey, print: entity.publicKeyFingerprint },
+					{ name: 'User key', key: entity.userPublicKey, print: entity.userPublicKeyFingerprint },
 					{ name: 'Host key', key: entity.hostPublicKey, print: entity.hostPublicKeyFingerprint }
 				]
 			: []

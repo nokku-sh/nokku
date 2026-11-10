@@ -29,10 +29,10 @@ func TestSetAccessTrust(t *testing.T) {
 	require.NoError(t, err, "new server without a CA")
 	is.False(trustsCA(srv, first), "a server that never synced trusts no CA")
 
-	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(first.pub))})
+	srv.SetAccess(&state.Access{UserCA: string(ssh.MarshalAuthorizedKey(first.pub))})
 	is.True(trustsCA(srv, first), "the synced CA is not trusted")
 
-	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(second.pub))})
+	srv.SetAccess(&state.Access{UserCA: string(ssh.MarshalAuthorizedKey(second.pub))})
 	is.True(trustsCA(srv, second), "the new CA is not trusted")
 	is.False(trustsCA(srv, first), "the replaced CA is still trusted")
 
@@ -48,8 +48,8 @@ func TestUnreadableCATrustsNone(t *testing.T) {
 	srv, err := New(nil, nil)
 	require.NoError(t, err)
 
-	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(ca.pub))})
-	srv.SetAccess(&state.Access{CA: "garbage"})
+	srv.SetAccess(&state.Access{UserCA: string(ssh.MarshalAuthorizedKey(ca.pub))})
+	srv.SetAccess(&state.Access{UserCA: "garbage"})
 	is.False(trustsCA(srv, ca), "an unreadable CA kept the previous trust")
 }
 

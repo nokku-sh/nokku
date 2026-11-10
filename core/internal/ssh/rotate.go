@@ -15,7 +15,7 @@ func Rollover(ctx context.Context, q *db.Queries, keys *kms.Keyset, ca *db.SSHCA
 	}
 	next, err := q.ReplaceCA(ctx, &db.ReplaceCAParams{
 		CaID:          ca.ID,
-		PublicKey:     user.public,
+		UserPublicKey: user.public,
 		HostPublicKey: host.public,
 	})
 	if err != nil {

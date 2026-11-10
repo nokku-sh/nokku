@@ -80,7 +80,7 @@ func (b *fakeCore) SyncDaemon(
 func (b *fakeCore) accepted() *nokkuv1.SyncDaemonResponse {
 	return &nokkuv1.SyncDaemonResponse{
 		Status:          nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
-		CaPublicKey:     &b.ca,
+		UserCaPublicKey: &b.ca,
 		HostCaPublicKey: &b.hostCA,
 		StateHash:       []byte("7"),
 		Principals: []*nokkuv1.AccountPrincipals{
@@ -177,7 +177,7 @@ func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 
 	must.NoError(c.syncDaemon(t.Context()), "a sync must not fail on the host certificate")
 	is.Equal([]string{principal("deploy")}, c.state.Access().Principals["deploy"], "the grant did not land")
-	is.Equal(core.ca, c.state.Access().CA, "the CA did not land")
+	is.Equal(core.ca, c.state.Access().UserCA, "the CA did not land")
 	is.Equal("7", string(c.state.Saved().StateHash))
 	is.Zero(core.signs.Load(), "the sync signed a host certificate itself")
 
@@ -200,7 +200,7 @@ func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 
 	loaded, err := state.Load()
 	must.NoError(err)
-	is.Equal(core.ca, loaded.Access().CA)
+	is.Equal(core.ca, loaded.Access().UserCA)
 	is.Equal([]string{principal("deploy")}, loaded.Access().Principals["deploy"])
 }
 
@@ -214,7 +214,7 @@ func TestSyncPendingDropsTrust(t *testing.T) {
 	core.answer.Store(&nokkuv1.SyncDaemonResponse{Status: nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING.Enum()})
 	require.NoError(t, c.syncDaemon(t.Context()))
 	assert.Empty(t, c.state.Access().Principals["deploy"], "a pending daemon still honors its old grants")
-	assert.Empty(t, c.state.Access().CA, "a pending daemon still trusts its old CA")
+	assert.Empty(t, c.state.Access().UserCA, "a pending daemon still trusts its old CA")
 
 	loaded, err := state.Load()
 	require.NoError(t, err)
@@ -251,7 +251,7 @@ func TestEnrollRestartReEnroll(t *testing.T) {
 	is.Equal("daemon-1", restarted.DaemonID)
 	is.Equal(testTarget, restarted.TargetID)
 	is.Equal("session", restarted.SessionToken)
-	is.Equal(core.ca, restarted.Access().CA)
+	is.Equal(core.ca, restarted.Access().UserCA)
 	is.Equal([]string{principal("deploy")}, restarted.Access().Principals["deploy"])
 	is.Equal("7", string(restarted.Saved().StateHash))
 
@@ -260,7 +260,7 @@ func TestEnrollRestartReEnroll(t *testing.T) {
 	must.NoError(err)
 	for _, s := range []*state.State{c.state, reenrolled} {
 		is.Equal("daemon-1", s.DaemonID)
-		is.Empty(s.Access().CA, "a new enrollment still trusts the old CA")
+		is.Empty(s.Access().UserCA, "a new enrollment still trusts the old CA")
 		is.Empty(s.Access().Principals, "a new enrollment still has the old grants")
 		is.True(s.Access().DaemonConfig.GetEphemeral(), "the new enroll config was lost")
 	}
@@ -282,7 +282,7 @@ func TestRejectionDropsEnrollmentAndAccess(t *testing.T) {
 	loaded, err := state.Load()
 	must.NoError(err)
 	is.Equal(state.Config{APIURL: "https://nokku.example", APICA: "private CA"}, loaded.Config)
-	is.Empty(loaded.Access().CA)
+	is.Empty(loaded.Access().UserCA)
 	is.Empty(loaded.Access().Principals)
 }
 
@@ -371,7 +371,7 @@ func TestSyncWithUnreadableCAClosesTheOldCA(t *testing.T) {
 	c := newSyncClient(t, core)
 	grant := func(caKey string) *nokkuv1.SyncDaemonResponse {
 		res := core.accepted()
-		res.CaPublicKey = &caKey
+		res.UserCaPublicKey = &caKey
 		res.Principals = []*nokkuv1.AccountPrincipals{
 			{Username: &cur.Username, CertPrincipals: []string{principal(cur.Username)}},
 		}

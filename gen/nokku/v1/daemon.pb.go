@@ -1033,7 +1033,7 @@ type SyncDaemonResponse struct {
 	Config     *DaemonConfig          `protobuf:"bytes,2,opt,name=config" json:"config,omitempty"`
 	Principals []*AccountPrincipals   `protobuf:"bytes,3,rep,name=principals" json:"principals,omitempty"`
 	// The user CA key logins are checked against.
-	CaPublicKey *string `protobuf:"bytes,5,opt,name=ca_public_key,json=caPublicKey" json:"ca_public_key,omitempty"`
+	UserCaPublicKey *string `protobuf:"bytes,5,opt,name=user_ca_public_key,json=userCaPublicKey" json:"user_ca_public_key,omitempty"`
 	// The host CA key the daemon's host certificate has to come from.
 	HostCaPublicKey *string `protobuf:"bytes,6,opt,name=host_ca_public_key,json=hostCaPublicKey" json:"host_ca_public_key,omitempty"`
 	// A hash of this answer, the daemon sends it back with every heartbeat. A daemon never works it out itself.
@@ -1093,9 +1093,9 @@ func (x *SyncDaemonResponse) GetPrincipals() []*AccountPrincipals {
 	return nil
 }
 
-func (x *SyncDaemonResponse) GetCaPublicKey() string {
-	if x != nil && x.CaPublicKey != nil {
-		return *x.CaPublicKey
+func (x *SyncDaemonResponse) GetUserCaPublicKey() string {
+	if x != nil && x.UserCaPublicKey != nil {
+		return *x.UserCaPublicKey
 	}
 	return ""
 }
@@ -2503,14 +2503,14 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\bmetadata\x18\x03 \x03(\v2).nokku.v1.SyncDaemonRequest.MetadataEntryB\x15\xbaH\x12\x9a\x01\x0f\x10\x10\"\x04r\x02\x18@*\x05r\x03\x18\x80\x02R\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa1\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xaa\x02\n" +
 	"\x12SyncDaemonResponse\x12.\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x16.nokku.v1.DaemonStatusR\x06status\x12.\n" +
 	"\x06config\x18\x02 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x12;\n" +
 	"\n" +
 	"principals\x18\x03 \x03(\v2\x1b.nokku.v1.AccountPrincipalsR\n" +
-	"principals\x12\"\n" +
-	"\rca_public_key\x18\x05 \x01(\tR\vcaPublicKey\x12+\n" +
+	"principals\x12+\n" +
+	"\x12user_ca_public_key\x18\x05 \x01(\tR\x0fuserCaPublicKey\x12+\n" +
 	"\x12host_ca_public_key\x18\x06 \x01(\tR\x0fhostCaPublicKey\x12\x1d\n" +
 	"\n" +
 	"state_hash\x18\a \x01(\fR\tstateHash\"G\n" +

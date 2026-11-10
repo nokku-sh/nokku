@@ -319,6 +319,6 @@ func TestEnsureCertNamesAnEndedCISession(t *testing.T) {
 	ca := newFakeCA(t)
 	setupKey(t)
 
-	err := c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{PublicKey: ca.pubKey})
+	err := c.EnsureCert(t.Context(), state.Target{ID: targetID}, state.CA{UserPublicKey: ca.pubKey})
 	require.ErrorIs(t, err, ErrCISessionEnded)
 }

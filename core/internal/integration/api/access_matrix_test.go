@@ -113,7 +113,7 @@ func seedMatrix(t *testing.T) *matrixFixture {
 
 	ca := workspaceCA(t, cfg)
 	f.labels[ca.GetId()] = "ca-active"
-	f.labels[strings.TrimSpace(ca.GetPublicKey())] = "ca-active.user-key"
+	f.labels[strings.TrimSpace(ca.GetUserPublicKey())] = "ca-active.user-key"
 	f.labels[strings.TrimSpace(ca.GetHostPublicKey())] = "ca-active.host-key"
 	f.seedDaemonTarget(t, "accepted", nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED)
 	f.seedDaemonTarget(t, "pending", nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING)
@@ -376,7 +376,7 @@ func (f *matrixFixture) syncLines(t *testing.T) []string {
 		}
 		lines = append(lines,
 			prefix+": status "+strings.ToLower(strings.TrimPrefix(res.GetStatus().String(), "DAEMON_STATUS_")),
-			prefix+": ca key "+f.key(res.GetCaPublicKey())+", host ca key "+f.key(res.GetHostCaPublicKey()),
+			prefix+": ca key "+f.key(res.GetUserCaPublicKey())+", host ca key "+f.key(res.GetHostCaPublicKey()),
 		)
 		lines = append(lines, f.principalLines(prefix, res.GetPrincipals())...)
 	}

@@ -41,7 +41,7 @@ var fixedColumns = map[string]string{
 
 // syncColumns are read by a sync outside the access view.
 var syncColumns = []string{
-	"ssh_cas.public_key", "ssh_cas.host_public_key", "workspaces.settings", "daemons.status", "daemons.config",
+	"ssh_cas.user_public_key", "ssh_cas.host_public_key", "workspaces.settings", "daemons.status", "daemons.config",
 }
 
 // quietRows are tables of the view whose new or deleted rows need no trigger.

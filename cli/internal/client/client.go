@@ -204,7 +204,7 @@ func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.C
 	}
 
 	signed := []byte(res.GetSignedCertificate())
-	if err = ssh.CheckCert(signed, ca.PublicKey, 0); err != nil {
+	if err = ssh.CheckCert(signed, ca.UserPublicKey, 0); err != nil {
 		return fmt.Errorf("core returned an unusable certificate: %w", err)
 	}
 	return fsutil.WriteFile(paths.SSHCertificate(target.ID), signed, 0o600)
@@ -213,11 +213,11 @@ func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.C
 // ReportTarget also stamps the target's last sync.
 func (c *Client) ReportTarget(ctx context.Context, t *state.Target, accounts []string, hostKey, caKey string) error {
 	_, err := c.targets.SyncTargetUsers(ctx, &nokkuv1.SyncTargetUsersRequest{
-		TargetId:      new(t.ID),
-		Usernames:     accounts,
-		HostPublicKey: new(hostKey),
-		Endpoints:     t.Endpoints,
-		CaPublicKey:   new(caKey),
+		TargetId:        new(t.ID),
+		Usernames:       accounts,
+		HostPublicKey:   new(hostKey),
+		Endpoints:       t.Endpoints,
+		UserCaPublicKey: new(caKey),
 	})
 	return err
 }

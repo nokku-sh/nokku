@@ -99,13 +99,13 @@ func TestRolloverReplacesBothKeys(t *testing.T) {
 		next, err = ssh.Rollover(t.Context(), q, keys, current)
 		return err
 	}))
-	assert.NotEqual(t, ca.PublicKey, next.PublicKey)
+	assert.NotEqual(t, ca.UserPublicKey, next.UserPublicKey)
 	assert.NotEqual(t, ca.HostPublicKey, next.HostPublicKey, "a rollover replaces both keys")
 	require.NotNil(t, next.RotatedAt, "a rollover sets the rotation time")
 	assert.WithinDuration(t, time.Now(), *next.RotatedAt, time.Minute)
 
 	// The key rows follow, the CA signs with the new keys only.
-	for certType, want := range map[uint32]string{gossh.UserCert: next.PublicKey, gossh.HostCert: next.HostPublicKey} {
+	for certType, want := range map[uint32]string{gossh.UserCert: next.UserPublicKey, gossh.HostCert: next.HostPublicKey} {
 		s, err := signer(t, conn, keys, next, certType)
 		require.NoError(t, err, "the CA does not sign after the rollover")
 		assert.Equal(t, want, ssh.MarshalKey(s.PublicKey()), "the rollover did not replace the key row")
@@ -123,8 +123,8 @@ func TestCASignerSignsWithTheKeyOfItsKind(t *testing.T) {
 		authority, other   string
 		principal, keygenL string
 	}{
-		{gossh.UserCert, ca.PublicKey, ca.HostPublicKey, "deploy", "user certificate"},
-		{gossh.HostCert, ca.HostPublicKey, ca.PublicKey, "web-1.example.com", "host certificate"},
+		{gossh.UserCert, ca.UserPublicKey, ca.HostPublicKey, "deploy", "user certificate"},
+		{gossh.HostCert, ca.HostPublicKey, ca.UserPublicKey, "web-1.example.com", "host certificate"},
 	} {
 		s, err := signer(t, conn, keys, ca, c.certType)
 		require.NoError(t, err)

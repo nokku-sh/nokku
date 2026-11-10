@@ -60,7 +60,7 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		VALUES ($2, $1, $2 || '@test', 5), ($3, $1, $3 || '@test', 2);
 		INSERT INTO teams (id, workspace_id, name) VALUES ($4, $1, 'team');
 		INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $3, $4);
-		INSERT INTO ssh_cas (id, workspace_id, public_key, host_public_key, user_ttl)
+		INSERT INTO ssh_cas (id, workspace_id, user_public_key, host_public_key, user_ttl)
 		VALUES ($8, $1, 'pub', 'host-pub', '1 hour');
 		INSERT INTO daemons (id, workspace_id, status) VALUES ($5, $1, 2);
 		INSERT INTO targets (id, workspace_id, daemon_id, name) VALUES ($6, $1, $5, 't');

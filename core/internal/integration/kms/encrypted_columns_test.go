@@ -307,7 +307,7 @@ func seedSSHCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) m
 	return map[string]sealedValue{
 		"ssh_ca_keys.private_key of the user key": {
 			table: "ssh_ca_keys", column: "private_key", where: "kind = 'user'",
-			read: sign(gossh.UserCert, "deploy", ca.PublicKey),
+			read: sign(gossh.UserCert, "deploy", ca.UserPublicKey),
 		},
 		"ssh_ca_keys.private_key of the host key": {
 			table: "ssh_ca_keys", column: "private_key", where: "kind = 'host'",
