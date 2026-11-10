@@ -52,7 +52,7 @@ func TestSpoolDropsWhenFull(t *testing.T) {
 		s.Add(event("x"))
 	}
 	events, dropped := s.Next()
-	assert.Len(t, events, Batch, "one report carries one batch")
+	assert.Len(t, events, batch, "one report carries one batch")
 	assert.EqualValues(t, 3, dropped)
 
 	s.Done(len(events), dropped)

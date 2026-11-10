@@ -19,8 +19,8 @@ import (
 // maxPrincipals is how many principals OpenSSH reads from one certificate.
 const maxPrincipals = 256
 
-// HostTTL is what a host certificate lasts. A daemon renews its own at half of it.
-const HostTTL = 90 * 24 * time.Hour
+// hostTTL is what a host certificate lasts. A daemon renews its own at half of it.
+const hostTTL = 90 * 24 * time.Hour
 
 // What a session may really do is the host's call: the daemon config where
 // nokkud runs, sshd_config where it does not.
@@ -81,7 +81,7 @@ func SignCertificate(
 
 	if certType == ssh.HostCert {
 		cert.CertType = ssh.HostCert
-		ttl = HostTTL
+		ttl = hostTTL
 	} else {
 		cert.CertType = ssh.UserCert
 		// A caller only shortens the workspace's lifetime.

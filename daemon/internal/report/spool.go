@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// Batch is how many events one report carries, the core takes no more.
-	Batch = 100
+	// batch is how many events one report carries, the core takes no more.
+	batch = 100
 	// maxEvents is what the spool holds while the core is away, a few megabytes. Past it new events are dropped
 	// and counted, the server's own log still has them.
 	maxEvents = 10_000
@@ -87,7 +87,7 @@ func (s *Spool) Ready() <-chan struct{} { return s.ready }
 func (s *Spool) Next() ([]Event, uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return slices.Clone(s.events[:min(len(s.events), Batch)]), s.dropped
+	return slices.Clone(s.events[:min(len(s.events), batch)]), s.dropped
 }
 
 // Done forgets the n oldest events and that many drops, once the core has them.
