@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nokku-sh/nokku/daemon/internal/safe"
+
 	"connectrpc.com/connect/v2"
 	"github.com/cenkalti/backoff/v7"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -73,7 +75,9 @@ func NewUploads(ctx context.Context, client nokkuv1connect.DaemonControlServiceC
 	}
 	for _, e := range entries {
 		if !e.IsDir() && isRecording(e.Name()) {
-			u.wg.Go(func() { u.run(&upload{path: filepath.Join(paths.RecordsDir(), e.Name())}) })
+			u.wg.Go(safe.Func("recording upload", func() {
+				u.run(&upload{path: filepath.Join(paths.RecordsDir(), e.Name())})
+			}))
 		}
 	}
 	return u
@@ -82,10 +86,10 @@ func NewUploads(ctx context.Context, client nokkuv1connect.DaemonControlServiceC
 // Wait waits up to grace. What is left stays on disk for the next start.
 func (u *Uploads) Wait(grace time.Duration) bool {
 	done := make(chan struct{})
-	go func() {
+	go safe.Func("wait for uploads", func() {
 		u.wg.Wait()
 		close(done)
-	}()
+	})()
 	select {
 	case <-done:
 		return true
@@ -101,10 +105,10 @@ func (u *Uploads) follow(rec *Recorder) {
 		return
 	}
 	up := &upload{path: rec.path, rec: rec, f: f, meta: rec.header.meta()}
-	u.wg.Go(func() {
+	u.wg.Go(safe.Func("recording upload", func() {
 		defer f.Close()
 		u.run(up)
-	})
+	}))
 }
 
 func (u *Uploads) run(up *upload) {

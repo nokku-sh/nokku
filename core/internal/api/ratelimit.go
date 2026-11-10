@@ -66,19 +66,21 @@ func clientIP(r *http.Request) (string, error) {
 	return realip.Bucket(r.Header, r.RemoteAddr), nil
 }
 
-// Enrolling a daemon takes only a token, so it is guessed at like a sign-in.
+// Enrolling a daemon is not one. Its token is random and too long to guess, and a rollout of a thousand servers
+// behind one address has to fit.
 func isAuthRoute(path string) bool {
-	return path == nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure ||
-		strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
+	return strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
 		strings.HasPrefix(path, "/nokku.v1.InvitationService/") ||
 		strings.HasPrefix(path, "/auth/") ||
 		strings.HasPrefix(path, "/oidc/") ||
 		strings.HasPrefix(path, "/passkey/")
 }
 
-// A limit would block daemon reconnect storms. Hashed assets are left out too.
+// A limit would block daemon reconnect storms, when a whole site behind one address connects and syncs at once.
+// Hashed assets are left out too.
 func rateLimited(path string) bool {
 	return path != nokkuv1connect.DaemonControlServiceConnectProcedure &&
+		path != nokkuv1connect.DaemonControlServiceSyncDaemonProcedure &&
 		path != nokkuv1connect.DaemonControlServiceDaemonRelayProcedure &&
 		!strings.HasPrefix(path, "/_app/")
 }

@@ -87,7 +87,7 @@ func TestHostKeyReadableByOthersIsRefused(t *testing.T) {
 	require.NoError(t, CreateHostKey())
 	require.NoError(t, os.Chmod(paths.HostKey(), 0o644))
 
-	_, err := New(nil)
+	_, err := New(nil, nil)
 	assert.ErrorContains(t, err, "readable by others")
 }
 

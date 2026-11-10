@@ -11,13 +11,26 @@
 		/** The highest role on offer. Ownership moves through a transfer, never through a role change. */
 		max?: WorkspaceRole;
 		disabled?: boolean;
+		/** For a service account. Its editor adds servers, access is for people to change. */
+		machine?: boolean;
 	}
 
-	let { value, onChange, max = WorkspaceRole.ADMIN, disabled = false }: Props = $props();
+	let {
+		value,
+		onChange,
+		max = WorkspaceRole.ADMIN,
+		disabled = false,
+		machine = false
+	}: Props = $props();
 
 	const roles = rolesApi.list();
 	const options = $derived((roles.data ?? []).filter((r) => r.role <= max));
 	const selected = $derived(options.find((r) => r.role === value));
+	const description = $derived(
+		machine && value === WorkspaceRole.EDITOR
+			? 'Also add and remove servers with nk sync. Only people change who has access'
+			: selected?.description
+	);
 
 	// The toggle group speaks strings.
 	function pick(slug: string) {
@@ -52,6 +65,6 @@
 				</ToggleGroup.Item>
 			{/each}
 		</ToggleGroup.Root>
-		<p class="min-h-4 text-xs text-muted-foreground">{selected?.description}</p>
+		<p class="min-h-4 text-xs text-muted-foreground">{description}</p>
 	</div>
 {/if}

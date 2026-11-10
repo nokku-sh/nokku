@@ -9,6 +9,7 @@ Found a vulnerability? Don't open a public issue. See [SECURITY.md](../SECURITY.
 - **Keep `/var/lib/nokkud` to root.** It holds the server's identity in Nokku and its SSH host key.
 - **Logins need a certificate.** No passwords, no plain keys, no PAM.
 - **A revoke closes open connections** as soon as the daemon syncs. Processes a user detached, like `nohup` or a tmux server, keep running.
+- **A daemon cut off from the core for seven days takes no new logins** until it syncs again.
 - **Your own `sshd` on port 22 is never touched.** It is your way back in, and outside Nokku's checks. [Keep its keys out of home directories](#your-own-sshd), or a revoked user can come back through it.
 - **Recordings are not redacted.** Treat them like the server they come from.
 
@@ -21,6 +22,7 @@ In scope:
   - `daemon.json`, the enrollment and the synced access. The trusted CA keys are part of it
   - `state.json`, the daemon's signing identity toward the core, with a `.lock` file next to it
   - `ssh_host_ecdsa_key`, the SSH host key, with its public key and host certificate
+  - `connections.jsonl`, the logins the core has not been told of yet
   - `recordings/`
 
 Out of scope:
@@ -103,10 +105,11 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 ### Revokes and outages
 
 - **A daemon that syncs applies a revoke at once** and closes the connections that were open on it. Processes the user detached from the session keep running, like `nohup`, `setsid` or a tmux server, as with sshd.
-- **When the core is unreachable**, logins still work against the cached CA key and access list. An open session runs on until a sync that revokes it, or until it ends.
+- **When the core is unreachable**, logins still work against the cached CA key and access list, for seven days. An open session runs on until a sync that revokes it, or until it ends.
+- **After seven days with no word from the core, new logins stop.** Seven days is the longest a certificate lasts, so what the daemon saved is then older than anything it could vouch for, and it may still trust a CA you rolled over since. The daemon syncs every few hours and at every start, so this only meets a server that is cut off. A client reads why, sessions that are open go on, and the first sync brings logins back with nobody touching the server. Until then port 22 is the way in.
 - **A revoke that never reaches the daemon** still stops new logins once the user's last certificate expires, since the core signs no new one without the grant. A relayed connection ends after 8 hours at most.
 - **An approval can be taken back.** A daemon set back to pending drops its access list and its CA at the next sync. The core signs nothing for its server until it is approved again.
-- **A rollover ends the old CA at the next sync.** From then on the daemon trusts only the new key, and closes the connections still open on a certificate of the old one.
+- **A rollover ends the old CA at the next sync.** From then on the daemon trusts only the new key, and closes the connections still open on a certificate of the old one. A daemon that never syncs again stops trusting the old one after seven days, see above.
 - **A sync never waits for the host certificate.** The access list and CA keys apply as soon as they arrive. The host certificate is renewed apart from them, at half of its lifetime or when the CA's host key changes, so a signing failure can't hold back a revoke.
 
 ### What a session may do
@@ -122,6 +125,9 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 - **A forced command**, which only a service account's certificate can carry, refuses all client-supplied environment. The command the client asked for is passed along as `SSH_ORIGINAL_COMMAND`, like sshd does, so wrappers such as `git-shell` work.
 - **Forwards are opened as the session user.** A helper that runs as the user dials direct forwards and binds remote ones, then hands the socket to the daemon. Firewall rules that match on the user, like nftables `meta skuid` or the iptables `owner` match, see the session's user. Connections that arrive on a remote forward are accepted by the daemon, so those still count as root's.
 - **Signals from the client are sent as the session user.** A process that became privileged, like a `sudo` the user started, can't be signaled this way. A forced command and SFTP take no signals from the client, like in sshd.
+- **Connections are capped at 100, and only logins count.** A peer that has not logged in holds none of them. One person or service account holds 25 at most, over all its accounts on the server and the browser terminals too, so nobody fills the server alone. A CI job that opens more than 25 connections to one server at once has to queue them. A login past either cap is refused with a line that says so.
+- **Unauthenticated connections are dropped early, at random.** One address gets three at a time, an IPv6 /64 counts as one. From ten on, a new one is refused more often the more there are, and always at sixty, like sshd's `MaxStartups 10:30:60`. A few addresses that hold the first slots lower your odds of getting in, they can't end them. Enough addresses still can, so keep the port off the open internet where you can.
+- **A panic ends one goroutine.** Every goroutine that serves a connection, a session or a recording recovers its own panic, and a test fails on one that would not.
 - **Channels are capped per connection.** Sessions, port forwards, agent forwards and remote forward listeners all count against one fixed cap, so one connection can't exhaust the daemon's file descriptors.
 - **Relayed connections carry the user's address.** A connection through the relay is served in process, not over loopback. Audit events, `SSH_CLIENT` and a certificate's `source-address` see the address the core reported for the user.
 - **The daemon is not sandboxed.** Sessions are its children and would inherit any systemd, AppArmor or SELinux confinement, which would stop a root session from doing normal admin work. Like in OpenSSH, the user boundary isolates sessions.
@@ -131,6 +137,9 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 ### Audit and recording
 
 - **Audit events go to the daemon's log** as `audit` lines with a `type`: logins, sessions, commands, subsystems, forwards and idle timeouts. Under systemd that is journald, under OpenRC `/var/log/nokkud.log`.
+- **Every connection is reported to the core's audit log**, once when it opens and once when it is gone: who, as which account, from where, with which certificate. Commands, forwards and refused logins stay in the daemon's log only.
+- **The report is the daemon's word.** Root on a server can make its daemon report anything, or nothing. So the core's audit log names the daemon as the one who said it and the person as who it is about, and keeps its own time next to the daemon's. A certificate the core signed is in the log either way, as something the core saw itself.
+- **Reports wait for the core.** While the core is away the daemon keeps up to 10,000 events in `connections.jsonl` and sends them when it is back. Past that it drops new ones and tells the core how many, which the audit log shows. A machine that loses power can lose the last few events, the file is not synced on every login.
 - **Sessions with a terminal are recorded**, when recording is on for the daemon. Input is recorded only while the terminal echoes, so password prompts are left out.
 - **Sessions without a terminal**, like `ssh host command`, are logged as `command` events, and their output is recorded.
 - **SFTP**, and so modern `scp`, is logged as a `subsystem` event. File contents are not recorded.

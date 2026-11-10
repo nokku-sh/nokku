@@ -196,7 +196,7 @@ func (h scimUserHandler) apply(
 		// First, a reactivation locks the workspace row, and every path takes
 		// that before a user row.
 		if active != nil {
-			if _, err := h.svc.SetUserActive(ctx, q, id, *active); err != nil {
+			if _, err := h.svc.scimSetActive(ctx, q, id, *active); err != nil {
 				return err
 			}
 		}

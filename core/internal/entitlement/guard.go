@@ -63,6 +63,10 @@ func RequestedFeatures(msg any) []string {
 		if req.GetExpiresAt() != nil {
 			features = append(features, FeatureExpiringAccess)
 		}
+	case *nokkuv1.GrantRequest:
+		if req.GetGrant().GetExpiresAt() != nil {
+			features = append(features, FeatureExpiringAccess)
+		}
 	}
 	return features
 }

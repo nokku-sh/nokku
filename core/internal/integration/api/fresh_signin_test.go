@@ -96,6 +96,12 @@ func TestFreshSignInMatrix(t *testing.T) {
 				url.Values{"user_code": {grant.UserCode}}, withCookie(s.token))
 			return r.String(), r.status == http.StatusUnauthorized
 		}},
+		// No daemon has this id, a call past the fresh check answers not_found.
+		{"DaemonService.CreateSession", member, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewDaemonServiceClient(rpc(s)).CreateSession(t.Context(),
+				&nokkuv1.CreateSessionRequest{DaemonId: new(uuid.NewV7().String()), Username: new("root")})
+			return refusedRPC(err)
+		}},
 		{"AccountService.RequestEmailChange", member, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewAccountServiceClient(rpc(s)).RequestEmailChange(t.Context(),
 				&nokkuv1.RequestEmailChangeRequest{NewEmail: new(newMailAddress())})
@@ -175,6 +181,14 @@ func TestFreshSignInMatrix(t *testing.T) {
 		{"SCIMService.CreateSCIMToken", owner, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewSCIMServiceClient(rpc(s)).CreateSCIMToken(t.Context(),
 				&nokkuv1.CreateSCIMTokenRequest{Label: new("idp")})
+			return refusedRPC(err)
+		}},
+		// No server has this id, a call past the fresh check answers not_found.
+		{"TargetService.UpdateTarget address", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).UpdateTarget(t.Context(),
+				masked(
+					&nokkuv1.UpdateTargetRequest{Id: new(uuid.NewV7().String()), Endpoints: []string{"10.0.0.9:22"}},
+				))
 			return refusedRPC(err)
 		}},
 		{"SSOService.PutSSOProvider", owner, func(s login) (string, bool) {

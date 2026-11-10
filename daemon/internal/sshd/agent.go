@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/nokku-sh/nokku/daemon/internal/safe"
+
 	"golang.org/x/crypto/ssh"
 )
 
@@ -81,7 +83,7 @@ func newAgentSock(sysUser *account) (ln net.Listener, sock string, err error) {
 
 func (sess *session) serveAgent() {
 	defer os.RemoveAll(filepath.Dir(sess.agentSock))
-	stop := context.AfterFunc(sess.ctx, func() { _ = sess.agentLn.Close() })
+	stop := context.AfterFunc(sess.ctx, safe.Func("close agent socket", func() { _ = sess.agentLn.Close() }))
 	defer stop()
 	for {
 		c, err := sess.agentLn.Accept()
@@ -92,10 +94,10 @@ func (sess *session) serveAgent() {
 			_ = c.Close()
 			continue
 		}
-		go func() {
+		go safe.Func("agent connection", func() {
 			defer sess.st.releaseChannel()
 			sess.relayAgentConn(c)
-		}()
+		})()
 	}
 }
 
@@ -106,18 +108,18 @@ func (sess *session) relayAgentConn(c net.Conn) {
 		return
 	}
 	defer ch.Close()
-	go ssh.DiscardRequests(reqs)
+	go safe.Func("agent requests", func() { ssh.DiscardRequests(reqs) })()
 
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	wg.Go(safe.Func("agent to socket", func() {
 		_, _ = io.Copy(c, ch)
 		if u, ok := c.(*net.UnixConn); ok {
 			_ = u.CloseWrite()
 		}
-	})
-	wg.Go(func() {
+	}))
+	wg.Go(safe.Func("socket to agent", func() {
 		_, _ = io.Copy(ch, c)
 		_ = ch.CloseWrite()
-	})
+	}))
 	wg.Wait()
 }

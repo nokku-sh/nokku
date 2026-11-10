@@ -190,6 +190,7 @@ nk sync 10.0.0.5 --grant root=me --grant deploy=team:ops,alice@example.com --tag
 - The account has to be a login account on the server, root or a regular user with a shell. If it is not, the sync stops and writes nothing.
 - You get `root` on a new server, unless a `--grant` already names you. You have root there already, this only lets you in through Nokku too. A service account gets only the grants it asks for.
 - Grants and tags are set once, with the new target. On a server Nokku already knows they are ignored with a warning, so the web app stays the place to change access.
+- A service account syncs and removes only the servers it added itself. A person does both with any server.
 
 <details>
 <summary><b>Host keys, scripts and <code>nk rm</code></b></summary>
@@ -224,12 +225,11 @@ Every binary download is checked against the release checksums, and against the 
 | `--api`         | `NK_API_URL`     | Address of the core                                                                                       |
 |                 | `NK_TOKEN`       | Service account key (`nk_sa_...`) for scripts. Environment only, never a flag                             |
 |                 | `NK_ID_TOKEN`    | The job's signed token for `nk login --ci`, anywhere but GitHub Actions                                   |
-| `--ttl`         | `NK_TTL`         | Requested SSH certificate lifetime, kept for later connections. `0` goes back to the CA default           |
 | `--require-tpm` | `NK_REQUIRE_TPM` | Refuse software keys. The SSH key may be in a TPM 2.0 or on a security key, the sign-in key needs the TPM |
 | `--ca-file`     | `NK_CA_FILE`     | PEM file with the core's private CA, kept for later runs                                                  |
 | `--debug`       | `NK_DEBUG`       | Debug logging                                                                                             |
 
-`--api`, `--ttl` and `--ca-file` are remembered after the first use. Switching to another core drops the old session and its CA. `--require-tpm` is remembered until `nk logout`, also when you switch cores. `--debug` applies to one run only.
+`--api` and `--ca-file` are remembered after the first use. Switching to another core drops the old session and its CA. `--require-tpm` is remembered until `nk logout`, also when you switch cores. `--debug` applies to one run only.
 
 Local state lives under `~/.config/nk/` on every OS. On Windows the agent listens on a named pipe instead of a socket in that folder.
 

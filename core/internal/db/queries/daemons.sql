@@ -44,6 +44,15 @@ FROM
 WHERE
   d.id = @daemon_id;
 
+-- name: ListDaemonsForSync :many
+-- Every daemon of the workspace with its server, for the pass that works out what each one is told.
+SELECT
+  sqlc.embed(d),
+  t.id AS target_id
+FROM
+  daemons d
+  JOIN targets t ON t.daemon_id = d.id;
+
 -- name: GetTargetByDaemon :one
 SELECT
   *

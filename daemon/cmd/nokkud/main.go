@@ -173,7 +173,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	stopped := make(chan time.Time, 1)
 	context.AfterFunc(ctx, func() { stopped <- time.Now() })
 	uploads := cl.StartUploads(ctx)
-	srv, err := sshd.New(uploads)
+	srv, err := sshd.New(uploads, cl.Reports())
 	if err != nil {
 		return err
 	}

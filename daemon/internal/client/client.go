@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"net/netip"
 	"sync"
 	"time"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 	"github.com/nokku-sh/nokku/daemon/internal/recording"
+	"github.com/nokku-sh/nokku/daemon/internal/report"
 	"github.com/nokku-sh/nokku/daemon/internal/sshd"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 	"github.com/nokku-sh/nokku/daemon/internal/sysutil"
@@ -32,6 +34,9 @@ const (
 	dialTimeout   = 30 * time.Second
 	enrollTimeout = 30 * time.Second
 	syncTimeout   = 15 * time.Second
+	// A full sync with nothing to trigger it. It is how the core hears of new accounts on the host, and how a
+	// daemon knows that what it saved is still what the core says.
+	resyncEvery = 4 * time.Hour
 )
 
 var errDaemonRejected = errors.New("daemon rejected by core")
@@ -48,6 +53,10 @@ type Client struct {
 
 	// renew wakes the certificate watcher when the trusted CA changed.
 	renew chan struct{}
+	// reports are the connections the core has yet to hear of.
+	reports *report.Spool
+	// One sync at a time, so an older answer never lands after a newer one.
+	syncing sync.Mutex
 }
 
 func New(ctx context.Context, st *state.State, requireTPM bool, enrollToken string) (*Client, error) {
@@ -69,7 +78,7 @@ func New(ctx context.Context, st *state.State, requireTPM bool, enrollToken stri
 		return nil, err
 	}
 
-	c := &Client{state: st, renew: make(chan struct{}, 1)}
+	c := &Client{state: st, renew: make(chan struct{}, 1), reports: report.Open(paths.ReportsFile())}
 	apiURL := st.APIURL
 	c.dpop = dpopclient.New(proofer, httpc, func() string { return st.SessionToken }, dpopclient.Options{
 		BaseURL:           apiURL,
@@ -107,9 +116,12 @@ func (c *Client) enroll(ctx context.Context, token string) error {
 	c.state.DaemonID = res.GetId()
 	c.state.SessionToken = res.GetAccessToken()
 	// Re-enrolling may change Nokku, so nothing the old one trusted survives.
-	c.state.SetAccess(&state.Access{DaemonConfig: res.GetConfig()})
+	c.state.SetAccess(&state.Access{DaemonConfig: res.GetConfig(), SyncedAt: time.Now()})
 	return c.state.Save()
 }
+
+// Reports is where the SSH server puts its connections, the control stream sends them on.
+func (c *Client) Reports() *report.Spool { return c.reports }
 
 func (c *Client) StartUploads(ctx context.Context) *recording.Uploads {
 	return recording.NewUploads(ctx, c.ctl)
@@ -131,6 +143,7 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 		slog.Warn("initial sync failed, serving from cache", "error", err)
 	}
 	go c.watchCertificates(ctx)
+	go c.resync(ctx, resyncEvery)
 
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = time.Second
@@ -162,9 +175,29 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 			return nil
 		case <-time.After(next):
 		}
-		// Deleted while offline means no poke, only a sync tells it to stop.
+		// A core that takes the stream says when to sync. One that refuses it has deleted this daemon or not
+		// accepted it yet, and only a sync tells which.
+		if code := connect.CodeOf(err); code != connect.CodeNotFound && code != connect.CodePermissionDenied {
+			continue
+		}
 		if errors.Is(c.syncDaemon(ctx), errDaemonRejected) {
 			return errDaemonRejected
+		}
+	}
+}
+
+// resync waits between half and one and a half of every, so a fleet that started together does not sync together.
+func (c *Client) resync(ctx context.Context, every time.Duration) {
+	for {
+		wait := every/2 + rand.N(every) //nolint:gosec // spreads load, guards no secret
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		// A rejection drops the access here. The control stream ends the daemon on its next sync.
+		if err := c.syncDaemon(ctx); err != nil && ctx.Err() == nil {
+			slog.Warn("periodic sync failed", "error", err)
 		}
 	}
 }

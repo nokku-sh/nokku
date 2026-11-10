@@ -29,8 +29,11 @@ func TestInvalidRowsAreRefused(t *testing.T) {
 		args []any
 	}{
 		"a trial with no end": {`INSERT INTO workspace_licenses (workspace_id) VALUES ($1)`, []any{f.ws}},
-		"a certificate lifetime of nothing": {
-			`UPDATE ssh_cas SET user_default_ttl = '0' WHERE id = $1`, []any{f.ca},
+		"a certificate that lasts minutes": {
+			`UPDATE ssh_cas SET user_ttl = '14 minutes' WHERE id = $1`, []any{f.ca},
+		},
+		"a certificate that lasts over a week": {
+			`UPDATE ssh_cas SET user_ttl = '8 days' WHERE id = $1`, []any{f.ca},
 		},
 		"an owner switched off": {`UPDATE users SET active = FALSE WHERE id = $1`, []any{f.owner}},
 		"an identity with no subject": {

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
@@ -17,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/nokku-sh/nokku/daemon/internal/report"
 )
 
 type lockedWriter struct {
@@ -152,4 +155,35 @@ func TestServerAuditFileTransferAndRemoteForward(t *testing.T) {
 	_ = client.Close()
 	assert.Contains(t, events(), eventSubsystem)
 	assert.Contains(t, events(), eventRemoteForward)
+}
+
+// Every connection is put down for the core twice, when it opens and when it is gone.
+func TestConnectionIsReported(t *testing.T) {
+	ca := newTestCA(t)
+	spool := report.Open(filepath.Join(t.TempDir(), "connections.jsonl"))
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.reports = spool })
+	defer closeFn()
+
+	_, err := dial(t, addr, currentUser(t), userCert(t, ca, "some-other-principal"))
+	require.Error(t, err)
+	events, _ := spool.Next()
+	require.Empty(t, events, "a refused login is no connection")
+
+	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { events, _ = spool.Next(); return len(events) == 1 },
+		5*time.Second, 10*time.Millisecond, "the login was not put down")
+	opened := events[0]
+	assert.False(t, opened.Closed)
+	assert.Equal(t, testPrincipal, opened.Principal)
+	assert.Equal(t, "test-user", opened.KeyID, "the key id the CA signed")
+	assert.Equal(t, client.LocalAddr().String(), opened.Remote)
+	assert.NotEmpty(t, opened.Client)
+	assert.WithinDuration(t, time.Now(), opened.Time, time.Minute)
+
+	require.NoError(t, client.Close())
+	require.Eventually(t, func() bool { events, _ = spool.Next(); return len(events) == 2 },
+		5*time.Second, 10*time.Millisecond, "the end of the connection was not put down")
+	assert.True(t, events[1].Closed)
+	assert.Equal(t, opened.ConnectionID, events[1].ConnectionID, "both ends go by one id")
 }

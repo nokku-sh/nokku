@@ -21,6 +21,12 @@ func TestGenerate(t *testing.T) {
 	require.GreaterOrEqual(t, len(seen), 100, "too few distinct names in 1000 draws")
 }
 
+func TestNumbered(t *testing.T) {
+	for range 100 {
+		require.Regexp(t, `^[a-z]+-[a-z]+-[1-9]\d{3}$`, Numbered())
+	}
+}
+
 func TestNoDuplicateWords(t *testing.T) {
 	check := func(name string, list []string) {
 		t.Helper()

@@ -44,9 +44,8 @@ message CertificateAuthority {
   string host_public_key = 3;
   // Unset until the first rollover.
   google.protobuf.Timestamp rotated_at = 4;
-  google.protobuf.Duration user_default_ttl = 5;
-  google.protobuf.Duration user_max_ttl = 6;
-  google.protobuf.Duration host_ttl = 7;
+  // What a person's certificate lasts. A machine and a server set up with nk sync get an hour at most.
+  google.protobuf.Duration user_ttl = 5;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
   // source_address lists where people log in from. A service account has a list of its own.
@@ -62,26 +61,17 @@ message GetCertificateAuthorityResponse {
 }
 
 message UpdateCertificateAuthorityRequest {
-  google.protobuf.Duration user_default_ttl = 1 [(buf.validate.field).duration = {
-    gte: {seconds: 60} /* Min 1 minute */
-    lte: {seconds: 31536000} /* Max 1 year */
-  }];
-  google.protobuf.Duration user_max_ttl = 2 [(buf.validate.field).duration = {
-    gte: {seconds: 60}
-    lte: {seconds: 31536000}
-  }];
-  google.protobuf.Duration host_ttl = 3 [(buf.validate.field).duration = {
-    gte: {seconds: 60}
-    lte: {seconds: 31536000}
+  // 15 minutes to 7 days. The ceiling is login.MaxCertTTL, a test holds the two together.
+  google.protobuf.Duration user_ttl = 1 [(buf.validate.field).duration = {
+    gte: {seconds: 900}
+    lte: {seconds: 604800}
   }];
   string source_address = 4 [(buf.validate.field).string.max_len = 1024];
   google.protobuf.FieldMask update_mask = 5 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
-        "user_default_ttl",
-        "user_max_ttl",
-        "host_ttl",
+        "user_ttl",
         "source_address"
       ]
     }
@@ -99,14 +89,11 @@ message RolloverCertificateAuthorityResponse {
 
 // Certificate messages -------------------------------------------------------
 
+// The core picks the lifetime, a caller never asks for one.
 message SignSSHCertificateRequest {
   string public_key = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 10000
-  }];
-  google.protobuf.Duration ttl = 2 [(buf.validate.field).duration = {
-    gte: {seconds: 60}
-    lte: {seconds: 31536000}
   }];
   string target_id = 3 [
     (buf.validate.field).string.uuid = true,

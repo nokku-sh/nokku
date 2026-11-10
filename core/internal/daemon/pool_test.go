@@ -2,16 +2,12 @@ package daemon
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,41 +18,11 @@ import (
 
 type stubConn struct{}
 
-// versionConn answers the state version query with what the test stored.
-type versionConn struct {
-	stubConn
-
-	version atomic.Int64
-}
-
-type versionRow int64
-
 func (stubConn) SysTx(context.Context, func(*db.Queries) error) error {
 	return nil
 }
 
 func (stubConn) TenantTx(context.Context, func(*db.Queries) error) error {
-	return nil
-}
-
-func (c *versionConn) TenantTx(_ context.Context, fn func(*db.Queries) error) error {
-	return fn(db.New(c))
-}
-
-func (c *versionConn) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, errors.New("not in this test")
-}
-
-func (c *versionConn) Query(context.Context, string, ...any) (pgx.Rows, error) {
-	return nil, errors.New("not in this test")
-}
-
-func (c *versionConn) QueryRow(context.Context, string, ...any) pgx.Row {
-	return versionRow(c.version.Load())
-}
-
-func (r versionRow) Scan(dest ...any) error {
-	*dest[0].(*int64) = int64(r)
 	return nil
 }
 
@@ -119,6 +85,7 @@ func TestPool_ConnectedIn(t *testing.T) {
 	assert.ElementsMatch(t, []string{"d1", "d2", "d3"}, p.Connected())
 }
 
+// Marks, pokes and disconnects from every side at once must not race.
 func TestPool_PokeStorm(t *testing.T) {
 	p := newTestPool(t)
 
@@ -131,21 +98,22 @@ func TestPool_PokeStorm(t *testing.T) {
 	for i := range daemons {
 		id := fmt.Sprintf("d%02d", i)
 		wg.Go(func() {
-			for range 200 {
-				p.poke("w1")
-			}
 			p.mu.RLock()
 			c := p.byID[id]
 			p.mu.RUnlock()
-			if c != nil {
-				p.unregisterDaemon(id, c)
+			for n := range 200 {
+				p.mark("w1")
+				c.want([]byte{byte(n)})
+				c.heartbeat([]byte{byte(n + 1)})
 			}
+			p.unregisterDaemon(id, c)
 		})
 	}
 	wg.Wait()
 }
 
-// A burst of pokes is one queued StateUpdate, only in the poked workspace.
+// A daemon is woken when what it holds is not what it should, and a burst of changes is one queued update that
+// carries the latest.
 func TestPool_PokeCoalesces(t *testing.T) {
 	p := newTestPool(t)
 	c := p.registerDaemon(t.Context(), "d1", "w1")
@@ -153,13 +121,21 @@ func TestPool_PokeCoalesces(t *testing.T) {
 	other := p.registerDaemon(t.Context(), "d2", "w2")
 	defer p.unregisterDaemon("d2", other)
 
-	for range 100 {
-		p.poke("w1")
-	}
+	c.want([]byte("a"))
+	require.Empty(t, c.state, "woken before a heartbeat said what it holds")
+	c.heartbeat([]byte("a"))
+	require.Empty(t, c.state, "woken although it holds what it should")
 
+	for n := range 100 {
+		c.want([]byte{byte(n)})
+	}
 	require.Len(t, c.state, 1, "queued state updates")
-	require.NotNil(t, (<-c.state).GetStateUpdate(), "queued message is not a StateUpdate")
-	require.Empty(t, other.state, "the other workspace got state updates")
+	<-c.state
+	require.Equal(t, []byte{99}, c.update().GetStateUpdate().GetStateHash(), "the update carries an old hash")
+	require.Empty(t, other.state, "the other daemon got state updates")
+
+	c.want([]byte("a"))
+	require.Empty(t, c.state, "woken for the hash it already holds")
 }
 
 // Coalescing state updates never drops a queued control message.
@@ -175,8 +151,9 @@ func TestPool_PokeKeepsControlMessages(t *testing.T) {
 		},
 	}
 	require.NoError(t, p.sendToDaemonWait(t.Context(), "d1", relayOpen, time.Second), "queue relay open")
-	for range 10 {
-		p.poke("w1")
+	c.heartbeat(nil)
+	for n := range 10 {
+		c.want([]byte{byte(n)})
 	}
 	select {
 	case msg := <-c.send:
@@ -208,7 +185,7 @@ func TestPool_SendFollowsAReconnect(t *testing.T) {
 		p := newTestPool(t)
 		old := p.registerDaemon(t.Context(), "d1", "w1")
 		for range sendBufferSize {
-			old.send <- stateUpdate
+			old.send <- &nokkuv1.ConnectResponse{}
 		}
 		rid := "r1"
 		relayOpen := &nokkuv1.ConnectResponse{
@@ -451,38 +428,28 @@ func TestPool_RelayOutlivesTheControlStream(t *testing.T) {
 	<-relay.done()
 }
 
-// A notification can get lost, so the heartbeat reads the version on its own.
-func TestPool_StateVersionNeedsNoListener(t *testing.T) {
-	conn := &versionConn{}
-	conn.version.Store(1)
-	p := New(conn, nil)
-
-	v, err := p.stateVersion(t.Context(), "w1")
-	require.NoError(t, err)
-	assert.Equal(t, int64(1), v)
-
-	conn.version.Store(2)
-	v, err = p.stateVersion(t.Context(), "w1")
-	require.NoError(t, err)
-	assert.Equal(t, int64(2), v, "the change never reached the heartbeat check")
-}
-
-// A daemon is behind only on a version it had a whole heartbeat to reach.
+// A daemon is behind only on what it had a whole heartbeat to reach.
 func TestHeartbeatFindsADaemonThatFellBehind(t *testing.T) {
-	c := &daemonConn{}
-	assert.False(t, c.heartbeat(0, 5), "the first heartbeat has nothing to compare with")
-	assert.False(t, c.heartbeat(5, 7), "a daemon that reached the version of the last heartbeat")
+	c := &daemonConn{state: make(chan struct{}, 1)}
+	v5, v6, v7, v9 := []byte("5"), []byte("6"), []byte("7"), []byte("9")
+	assert.False(t, c.heartbeat(nil), "nothing is wanted yet")
+	c.want(v5)
+	assert.False(t, c.heartbeat(nil), "the first heartbeat has nothing to compare with")
+	c.want(v7)
+	assert.False(t, c.heartbeat(v5), "a daemon that reached what the last heartbeat wanted")
 	assert.Nil(t, c.behindSince.Load())
 
-	assert.True(t, c.heartbeat(6, 7), "a daemon still short of the version of the last heartbeat")
+	assert.True(t, c.heartbeat(v6), "a daemon still short of what the last heartbeat wanted")
 	since := c.behindSince.Load()
 	require.NotNil(t, since)
-	assert.False(t, c.heartbeat(6, 7), "falling behind is reported once")
+	assert.False(t, c.heartbeat(v6), "falling behind is reported once")
 	assert.Equal(t, since, c.behindSince.Load(), "the first moment stays")
 
-	assert.False(t, c.heartbeat(7, 9), "a daemon that caught up")
+	c.want(v9)
+	assert.False(t, c.heartbeat(v7), "a daemon that caught up")
 	assert.Nil(t, c.behindSince.Load())
 
-	assert.False(t, c.heartbeat(8, 9), "flapping back behind right away is not reported again")
+	c.want([]byte("11"))
+	assert.False(t, c.heartbeat(v6), "flapping back behind right away is not reported again")
 	require.NotNil(t, c.behindSince.Load(), "the console still sees it as behind")
 }

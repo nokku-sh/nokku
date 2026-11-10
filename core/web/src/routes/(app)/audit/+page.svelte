@@ -29,6 +29,7 @@
 		areas,
 		csv,
 		eventLabel,
+		eventSource,
 		outcomes,
 		quickViews,
 		setParams
@@ -106,7 +107,7 @@
 		columnHelper.accessor('ip', {
 			header: 'Source',
 			meta: { hideBelow: 'md' },
-			cell: ({ row }) => renderComponent(MachineCell, { value: row.original.ip })
+			cell: ({ row }) => renderComponent(MachineCell, { value: eventSource(row.original) })
 		})
 	]);
 </script>

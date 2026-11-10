@@ -50,6 +50,15 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil
 	}
+	if actor.WorkspaceIDFromContext(ctx) == "" && event.WorkspaceID != "" {
+		ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: event.WorkspaceID})
+	}
+	return Insert(ctx, s.conn.Tenant(), event)
+}
+
+// Insert is the one way into the audit log. A caller with a transaction of its own passes its queries. An event
+// that brings an id is stored once, however often it comes.
+func Insert(ctx context.Context, q *db.Queries, event *Event) error {
 	if event.WorkspaceID == "" {
 		return errors.New("audit event without a workspace")
 	}
@@ -61,10 +70,12 @@ func (s *Service) Append(ctx context.Context, event *Event) error {
 	if string(details) == "null" {
 		details = []byte("{}")
 	}
-	if actor.WorkspaceIDFromContext(ctx) == "" {
-		ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: event.WorkspaceID})
+	var id *string
+	if event.ID != "" {
+		id = &event.ID
 	}
-	return s.conn.Tenant().InsertAuditLog(ctx, &db.InsertAuditLogParams{
+	return q.InsertAuditLog(ctx, &db.InsertAuditLogParams{
+		ID:          id,
 		WorkspaceID: event.WorkspaceID,
 		ActorID:     event.ActorID,
 		ActorKind:   event.ActorKind,

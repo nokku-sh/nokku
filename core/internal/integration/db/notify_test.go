@@ -58,7 +58,7 @@ type querier interface {
 }
 
 // A change to who may log in where reaches daemons only through a
-// bump_state_version trigger. Every table the answer is made of needs one.
+// notify_state_change trigger. Every table the answer is made of needs one.
 func TestEveryAccessTableNotifies(t *testing.T) {
 	ctx := t.Context()
 	owner := ownerConn(t)
@@ -79,7 +79,7 @@ func TestEveryAccessTableNotifies(t *testing.T) {
 	tx, err := owner.Begin(ctx)
 	require.NoError(t, err)
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	_, err = tx.Exec(ctx, "DROP TRIGGER bump_state_version ON users")
+	_, err = tx.Exec(ctx, "DROP TRIGGER notify_state_change ON users")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"users"}, silent(t, tx, tables))
 }
@@ -105,12 +105,12 @@ func viewTables(t *testing.T, q querier, view string) []string {
 	return tables
 }
 
-// silent lists the tables of names with no bump_state_version trigger.
+// silent lists the tables of names with no notify_state_change trigger.
 func silent(t *testing.T, q querier, names []string) []string {
 	t.Helper()
 	var out []string
 	for _, name := range names {
-		if bumpEvents(t, q, name) == 0 && !slices.Contains(out, name) {
+		if notifyEvents(t, q, name) == 0 && !slices.Contains(out, name) {
 			out = append(out, name)
 		}
 	}
@@ -130,16 +130,16 @@ func TestEveryAccessColumnNotifies(t *testing.T) {
 	}
 	assert.Empty(
 		t,
-		unbumped(t, owner, append(columns, syncColumns...)),
-		"these columns change access without telling a daemon, add them to a bump_state_version trigger",
+		unnotified(t, owner, append(columns, syncColumns...)),
+		"these columns change access without telling a daemon, add them to a notify_state_change trigger",
 	)
 
 	tx, err := owner.Begin(ctx)
 	require.NoError(t, err)
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	_, err = tx.Exec(ctx, "DROP TRIGGER bump_state_version ON users")
+	_, err = tx.Exec(ctx, "DROP TRIGGER notify_state_change ON users")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"users.active"}, unbumped(t, tx, columns))
+	assert.Equal(t, []string{"users.active"}, unnotified(t, tx, columns))
 }
 
 func TestEveryAccessTableNotifiesOnInsertAndDelete(t *testing.T) {
@@ -153,9 +153,14 @@ func TestEveryAccessTableNotifiesOnInsertAndDelete(t *testing.T) {
 		if _, ok := quietRows[table]; ok {
 			continue
 		}
-		events := bumpEvents(t, owner, table)
-		assert.NotZero(t, events&triggerInsert, "%s: a new row can grant access, add a bump trigger on insert", table)
-		assert.NotZero(t, events&triggerDelete, "%s: a deleted row can end access, add a bump trigger on delete", table)
+		events := notifyEvents(t, owner, table)
+		assert.NotZero(t, events&triggerInsert, "%s: a new row can grant access, add a notify trigger on insert", table)
+		assert.NotZero(
+			t,
+			events&triggerDelete,
+			"%s: a deleted row can end access, add a notify trigger on delete",
+			table,
+		)
 	}
 }
 
@@ -187,9 +192,9 @@ func viewColumns(t *testing.T, q querier, view string) []string {
 	return columns
 }
 
-// unbumped lists the columns that no bump_state_version trigger fires on
+// unnotified lists the columns that no notify_state_change trigger fires on
 // when they are updated, leaving out keys and fixedColumns.
-func unbumped(t *testing.T, q querier, columns []string) []string {
+func unnotified(t *testing.T, q querier, columns []string) []string {
 	t.Helper()
 	var out []string
 	for _, column := range columns {
@@ -197,31 +202,31 @@ func unbumped(t *testing.T, q querier, columns []string) []string {
 		if _, ok := fixedColumns[column]; ok || name == "id" || name == "workspace_id" {
 			continue
 		}
-		var bumps bool
+		var notifies bool
 		require.NoError(t, q.QueryRow(t.Context(), `
 			SELECT EXISTS (
 				SELECT 1 FROM pg_trigger t
-				WHERE t.tgrelid = $1::regclass AND t.tgname LIKE 'bump_state_version%'
+				WHERE t.tgrelid = $1::regclass AND t.tgname LIKE 'notify_state_change%'
 					AND t.tgtype & $3 <> 0 AND t.tgenabled <> 'D'
 					AND (
 						-- A WHEN may filter on another column, only a listed one counts then.
 						(cardinality(t.tgattr::INT2[]) = 0 AND t.tgqual IS NULL)
 						OR (SELECT attnum FROM pg_attribute WHERE attrelid = t.tgrelid AND attname = $2) = ANY (t.tgattr::INT2[])
 					)
-			)`, table, name, triggerUpdate).Scan(&bumps))
-		if !bumps {
+			)`, table, name, triggerUpdate).Scan(&notifies))
+		if !notifies {
 			out = append(out, column)
 		}
 	}
 	return out
 }
 
-// bumpEvents ORs the event bits of a table's bump_state_version triggers.
-func bumpEvents(t *testing.T, q querier, table string) int16 {
+// notifyEvents ORs the event bits of a table's notify_state_change triggers.
+func notifyEvents(t *testing.T, q querier, table string) int16 {
 	t.Helper()
 	var events int16
 	require.NoError(t, q.QueryRow(t.Context(), `
 		SELECT COALESCE(bit_or(tgtype), 0)::INT2 FROM pg_trigger
-		WHERE tgrelid = $1::regclass AND tgname LIKE 'bump_state_version%' AND tgenabled <> 'D'`, table).Scan(&events))
+		WHERE tgrelid = $1::regclass AND tgname LIKE 'notify_state_change%' AND tgenabled <> 'D'`, table).Scan(&events))
 	return events
 }

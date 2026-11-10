@@ -153,8 +153,13 @@ func requestedFresh(msg any) bool {
 			slices.Contains(req.GetUpdateMask().GetPaths(), "role")
 	case *nokkuv1.SetUserActiveRequest:
 		return req.GetActive()
+	case *nokkuv1.UpdateTeamRequest:
+		return req.GetScimOpen()
 	case *nokkuv1.UpdateDaemonRequest:
 		return slices.Contains(req.GetUpdateMask().GetPaths(), "config.record_sessions")
+	case *nokkuv1.UpdateTargetRequest:
+		// Where logins go.
+		return slices.Contains(req.GetUpdateMask().GetPaths(), "endpoints")
 	}
 	return false
 }

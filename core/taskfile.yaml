@@ -53,6 +53,13 @@ tasks:
     cmds:
       - go test -tags integration -race -count=1 -timeout 15m ./internal/integration/api/...
 
+  load:
+    desc: Measure what one access change costs with fake daemons connected, the count goes after --, needs Docker
+    env:
+      NOKKU_LOAD_DAEMONS: '{{.CLI_ARGS | default "1000"}}'
+    cmds:
+      - go test -tags integration -count=1 -v -timeout 30m -run TestLoadFanOut ./internal/integration/api/
+
   lint:
     desc: Run go vet & lint
     ignore_error: true

@@ -94,13 +94,23 @@ WHERE
   AND role <> 5; -- owner
 
 -- name: SetUserActive :exec
+-- An admin's call, so it also takes the account out of SCIM's hands. MarkUserSCIMDeactivated puts it back.
 UPDATE users
 SET
   active = @active,
+  scim_deactivated = FALSE,
   updated_at = NOW()
 WHERE
   id = @id
   AND role <> 5; -- owner
+
+-- name: MarkUserSCIMDeactivated :exec
+UPDATE users
+SET
+  scim_deactivated = TRUE
+WHERE
+  id = @id
+  AND NOT active;
 
 -- name: DemoteOwner :execrows
 -- Runs before PromoteOwner. The partial unique index on the owner is checked row by row, so one statement

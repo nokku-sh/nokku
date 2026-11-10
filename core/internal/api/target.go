@@ -141,6 +141,10 @@ func (s *targetService) insertTarget(
 	name string,
 ) (*nokkuv1.CreateTargetResponse, error) {
 	var result *db.Target
+	var createdBy *string
+	if caller, ok := actor.PrincipalFromContext(ctx); ok && caller.ID != "" {
+		createdBy = &caller.ID
+	}
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
 			Name:          name,
@@ -148,6 +152,7 @@ func (s *targetService) insertTarget(
 			Endpoints:     req.GetEndpoints(),
 			Tags:          req.GetTags(),
 			HostPublicKey: trimmed(req.HostPublicKey),
+			CreatedBy:     createdBy,
 		})
 		if err != nil {
 			return err
@@ -205,6 +210,23 @@ func seedTargetGrants(ctx context.Context, q *db.Queries, targetID string, grant
 	return nil
 }
 
+// ownTarget keeps a service account to the servers it added. Its key is a string in a secret store, so a leaked
+// one must not delete the fleet or point someone else's server at another host and host key. People are not held
+// to it, they can do both in the web app anyway.
+func ownTarget(ctx context.Context, target *db.Target) error {
+	caller, _ := actor.PrincipalFromContext(ctx)
+	if caller.Kind != actor.KindServiceAccount {
+		return nil
+	}
+	if target.CreatedBy != nil && *target.CreatedBy == caller.ID {
+		return nil
+	}
+	return connect.NewError(
+		connect.CodePermissionDenied,
+		"a service account can only sync or remove the servers it added itself",
+	)
+}
+
 func (s *targetService) UpdateTarget(
 	ctx context.Context,
 	req *nokkuv1.UpdateTargetRequest,
@@ -213,16 +235,12 @@ func (s *targetService) UpdateTarget(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
-		return nil, err
-	}
 	params := &db.UpdateTargetParams{
-		TargetID:      req.GetId(),
-		Name:          req.Name,
-		Description:   req.Description,
-		HostPublicKey: trimmed(req.HostPublicKey),
-		Endpoints:     maskedList(named("endpoints"), req.GetEndpoints()),
-		Tags:          maskedList(named("tags"), req.GetTags()),
+		TargetID:    req.GetId(),
+		Name:        req.Name,
+		Description: req.Description,
+		Endpoints:   maskedList(named("endpoints"), req.GetEndpoints()),
+		Tags:        maskedList(named("tags"), req.GetTags()),
 	}
 	result, err := s.cfg.Conn.Tenant().UpdateTarget(ctx, params)
 	if err != nil {
@@ -246,6 +264,9 @@ func (s *targetService) DeleteTarget(
 			return err
 		}
 		audit.Set(ctx, "name", target.Name)
+		if err := ownTarget(ctx, target); err != nil {
+			return err
+		}
 		if target.DaemonID != nil {
 			_, err = q.DeleteDaemon(ctx, *target.DaemonID)
 			return err
@@ -322,6 +343,13 @@ func (s *targetService) SyncTargetUsers(
 	}
 
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		target, err := q.GetTarget(ctx, req.GetTargetId())
+		if err != nil {
+			return err
+		}
+		if err := ownTarget(ctx, target); err != nil {
+			return err
+		}
 		// The stamp says the host has the current key, so check it under the lock.
 		ca, err := q.GetWorkspaceCAForShare(ctx)
 		if err != nil {

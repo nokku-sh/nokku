@@ -6,15 +6,25 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
 const accountKey = "nokku-account"
 
-var errNoCertificates = errors.New("sshd: only certificate authentication is supported")
+// What a client of a stale daemon reads. Anyone who connects sees it, so it names no date and no person.
+const staleNotice = "This server lost touch with Nokku and takes no new logins through it until it syncs again. " +
+	"Its own sshd on port 22 is the way in.\r\n"
+
+var (
+	errNoCertificates = errors.New("sshd: only certificate authentication is supported")
+	errStale          = errors.New("sshd: the access list is too old to trust")
+)
 
 // access is one sync. It is swapped whole, so a login never sees half of one.
 type access struct {
@@ -22,6 +32,14 @@ type access struct {
 	policy     policy
 	// The CA key in wire form. Empty trusts none.
 	ca string
+	// When the core last confirmed all of this.
+	syncedAt time.Time
+}
+
+// stale is true once the core has not confirmed the access for longer than any certificate lives. A CA that was
+// rolled over since would still be trusted here, so new logins stop. Open sessions go on.
+func (a *access) stale() bool {
+	return time.Since(a.syncedAt) > login.MaxCertTTL
 }
 
 func (a *access) trusts(wire string) bool {
@@ -33,6 +51,7 @@ func (s *Server) SetAccess(sa *state.Access) {
 	a := &access{
 		principals: sa.Principals,
 		policy:     policyFrom(sa.DaemonConfig),
+		syncedAt:   sa.SyncedAt,
 	}
 	if sa.CA != "" {
 		if pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sa.CA)); err != nil {
@@ -62,6 +81,9 @@ func (s *Server) publicKeyCallback(
 
 	// One sync answers every question of this login.
 	a := s.access.Load()
+	if a.stale() {
+		return nil, s.deny(conn, errStale)
+	}
 	trusted := func(key ssh.PublicKey) bool { return a.trusts(string(key.Marshal())) }
 	if !trusted(cert.SignatureKey) {
 		return nil, s.deny(conn, errors.New("sshd: certificate signed by unrecognized authority"))
@@ -115,16 +137,15 @@ func (s *Server) publicKeyCallback(
 	return perms, nil
 }
 
-// Runs after key proof. Checks the account here so nologin stops forwards too.
-func (s *Server) verifiedPublicKey(
-	conn ssh.ConnMetadata,
-	_ ssh.PublicKey,
-	perms *ssh.Permissions,
-	_ string,
-) (*ssh.Permissions, error) {
+// login runs after key proof. It checks the account here so nologin stops forwards too, then takes a connection
+// slot, which leave gives back.
+func (s *Server) login(conn ssh.ConnMetadata, perms *ssh.Permissions) (leave func(), err error) {
 	sysUser, err := s.lookupAccount(conn.User())
 	if err == nil {
 		err = loginAllowed(sysUser, s.nologinFile)
+	}
+	if err == nil {
+		leave, err = s.admit(perms.Extensions["nokku-principal"])
 	}
 	if err != nil {
 		return nil, s.deny(conn, err)
@@ -134,7 +155,7 @@ func (s *Server) verifiedPublicKey(
 	ev := connEvent(conn, eventAuthSuccess)
 	ev.Principal = perms.Extensions["nokku-principal"]
 	s.emit(ev)
-	return perms, nil
+	return leave, nil
 }
 
 // Absent means deny.

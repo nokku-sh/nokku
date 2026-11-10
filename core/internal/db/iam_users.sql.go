@@ -35,7 +35,7 @@ INSERT INTO
 VALUES
   ($1, $2, $3, $4)
 RETURNING
-  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, scim_deactivated, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -63,6 +63,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 		&i.Active,
 		&i.ScimExternalID,
 		&i.ScimManaged,
+		&i.ScimDeactivated,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -75,7 +76,7 @@ INSERT INTO
 VALUES
   ($1, $2, $3, $4, $5)
 RETURNING
-  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, scim_deactivated, created_at, updated_at
 `
 
 type CreateUserWithIDParams struct {
@@ -105,6 +106,7 @@ func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDPar
 		&i.Active,
 		&i.ScimExternalID,
 		&i.ScimManaged,
+		&i.ScimDeactivated,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -124,7 +126,6 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) error {
 }
 
 const demoteOwner = `-- name: DemoteOwner :execrows
-
 UPDATE users
 SET
   role = 4, -- admin
@@ -133,7 +134,6 @@ WHERE
   role = 5
 `
 
-// owner
 // Runs before PromoteOwner. The partial unique index on the owner is checked row by row, so one statement
 // that swaps both can see two owners. See Queries.TransferOwnership.
 func (q *Queries) DemoteOwner(ctx context.Context) (int64, error) {
@@ -146,7 +146,7 @@ func (q *Queries) DemoteOwner(ctx context.Context) (int64, error) {
 
 const getOwner = `-- name: GetOwner :one
 SELECT
-  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, scim_deactivated, created_at, updated_at
 FROM
   users
 WHERE
@@ -166,6 +166,7 @@ func (q *Queries) GetOwner(ctx context.Context) (*User, error) {
 		&i.Active,
 		&i.ScimExternalID,
 		&i.ScimManaged,
+		&i.ScimDeactivated,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -174,7 +175,7 @@ func (q *Queries) GetOwner(ctx context.Context) (*User, error) {
 
 const getUser = `-- name: GetUser :one
 SELECT
-  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, scim_deactivated, created_at, updated_at
 FROM
   users
 WHERE
@@ -194,6 +195,7 @@ func (q *Queries) GetUser(ctx context.Context, id string) (*User, error) {
 		&i.Active,
 		&i.ScimExternalID,
 		&i.ScimManaged,
+		&i.ScimDeactivated,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -202,7 +204,7 @@ func (q *Queries) GetUser(ctx context.Context, id string) (*User, error) {
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT
-  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, scim_deactivated, created_at, updated_at
 FROM
   users
 WHERE
@@ -222,6 +224,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 		&i.Active,
 		&i.ScimExternalID,
 		&i.ScimManaged,
+		&i.ScimDeactivated,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -231,7 +234,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 const listUsers = `-- name: ListUsers :many
 
 SELECT
-  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.scim_external_id, u.scim_managed, u.created_at, u.updated_at,
+  u.id, u.workspace_id, u.email, u.name, u.picture, u.role, u.active, u.scim_external_id, u.scim_managed, u.scim_deactivated, u.created_at, u.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   users u
@@ -291,6 +294,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*ListU
 			&i.User.Active,
 			&i.User.ScimExternalID,
 			&i.User.ScimManaged,
+			&i.User.ScimDeactivated,
 			&i.User.CreatedAt,
 			&i.User.UpdatedAt,
 			&i.TotalCount,
@@ -303,6 +307,22 @@ func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*ListU
 		return nil, err
 	}
 	return items, nil
+}
+
+const markUserSCIMDeactivated = `-- name: MarkUserSCIMDeactivated :exec
+
+UPDATE users
+SET
+  scim_deactivated = TRUE
+WHERE
+  id = $1
+  AND NOT active
+`
+
+// owner
+func (q *Queries) MarkUserSCIMDeactivated(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, markUserSCIMDeactivated, id)
+	return err
 }
 
 const promoteOwner = `-- name: PromoteOwner :execrows
@@ -330,6 +350,7 @@ const setUserActive = `-- name: SetUserActive :exec
 UPDATE users
 SET
   active = $1,
+  scim_deactivated = FALSE,
   updated_at = NOW()
 WHERE
   id = $2
@@ -342,6 +363,7 @@ type SetUserActiveParams struct {
 }
 
 // owner
+// An admin's call, so it also takes the account out of SCIM's hands. MarkUserSCIMDeactivated puts it back.
 func (q *Queries) SetUserActive(ctx context.Context, arg *SetUserActiveParams) error {
 	_, err := q.db.Exec(ctx, setUserActive, arg.Active, arg.ID)
 	return err
@@ -355,7 +377,7 @@ SET
 WHERE
   id = $2
 RETURNING
-  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, scim_deactivated, created_at, updated_at
 `
 
 type SetUserEmailParams struct {
@@ -376,6 +398,7 @@ func (q *Queries) SetUserEmail(ctx context.Context, arg *SetUserEmailParams) (*U
 		&i.Active,
 		&i.ScimExternalID,
 		&i.ScimManaged,
+		&i.ScimDeactivated,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -391,7 +414,7 @@ SET
 WHERE
   id = $3
 RETURNING
-  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, created_at, updated_at
+  id, workspace_id, email, name, picture, role, active, scim_external_id, scim_managed, scim_deactivated, created_at, updated_at
 `
 
 type UpdateUserParams struct {
@@ -413,6 +436,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User,
 		&i.Active,
 		&i.ScimExternalID,
 		&i.ScimManaged,
+		&i.ScimDeactivated,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

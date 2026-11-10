@@ -7,7 +7,6 @@
 	import { util, workspace } from '#lib/api/workspaces.svelte.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
-	import DurationInput from '#lib/components/blocks/DurationInput.svelte';
 	import LoadError from '#lib/components/blocks/LoadError.svelte';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
 	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
@@ -19,6 +18,7 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { CertificateAuthoritySchema } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { TargetStatus } from '#lib/gen/nokku/v1/target_pb.js';
@@ -26,8 +26,8 @@
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
 	import { UseClipboard } from '#lib/hooks/use-clipboard.svelte.js';
 	import type { Tone } from '#lib/tone.js';
-	import { cn, formatTs, listNames, toDate } from '#lib/utils.js';
-	import { timestampFromMs, type Duration } from '@bufbuild/protobuf/wkt';
+	import { cn, formatHours, formatTs, listNames, toDate } from '#lib/utils.js';
+	import { durationFromMs, durationMs, timestampFromMs } from '@bufbuild/protobuf/wkt';
 	import { Check, Copy, Plus, ShieldAlert, TriangleAlert } from '@lucide/svelte';
 
 	// Ansible fills in the braces, so they stay out of the markup.
@@ -52,27 +52,17 @@
 	// A change here takes a recent sign-in, so that comes before anything is typed.
 	const askFresh = () => void whenFresh(() => {});
 
-	const lifetimes: {
-		key: 'userDefaultTtl' | 'userMaxTtl' | 'hostTtl';
-		label: string;
-		hint: string;
-	}[] = [
-		{
-			key: 'userDefaultTtl',
-			label: 'Login certificates',
-			hint: 'What a login gets unless nk asks for less or more.'
-		},
-		{ key: 'userMaxTtl', label: 'Longest login', hint: 'The most nk --ttl can ask for.' },
-		{
-			key: 'hostTtl',
-			label: 'Host certificates',
-			hint: 'A daemon renews its own before this runs out.'
-		}
-	];
+	// The core takes 15 minutes to 7 days. These cover what people pick.
+	const LIFETIME_HOURS = [1, 4, 8, 16, 24, 72, 168];
+	const lifetimeHours = $derived(model?.userTtl ? durationMs(model.userTtl) / 3_600_000 : 0);
+	// One set over the API stays on offer.
+	const lifetimes = $derived(
+		[...new Set([...LIFETIME_HOURS, lifetimeHours])].filter(Boolean).toSorted((a, b) => a - b)
+	);
 
-	function setLifetime(key: (typeof lifetimes)[number]['key'], value: Duration) {
+	function setLifetime(hours: string) {
 		if (!model) return;
-		model[key] = value;
+		model.userTtl = durationFromMs(Number(hours) * 3_600_000);
 		save();
 	}
 
@@ -414,28 +404,33 @@
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-3" onfocusin={askFresh}>
-				<Item.Group class="gap-3">
-					{#each lifetimes as l (l.key)}
-						<Item.Root variant="outline">
-							<Item.Content>
-								<Item.Title><label for="ca-{l.key}">{l.label}</label></Item.Title>
-								<Item.Description>{l.hint}</Item.Description>
-							</Item.Content>
-							<Item.Actions class="w-full sm:w-auto">
-								<DurationInput
-									id="ca-{l.key}"
-									class="w-full sm:w-44"
-									value={model[l.key]}
-									disabled={!can.admin}
-									onchange={(v) => setLifetime(l.key, v)}
-								/>
-							</Item.Actions>
-						</Item.Root>
-					{/each}
-				</Item.Group>
+				<Item.Root variant="outline">
+					<Item.Content>
+						<Item.Title><label for="ca-user-ttl">Login certificates</label></Item.Title>
+						<Item.Description>What a person's login gets, a week at most.</Item.Description>
+					</Item.Content>
+					<Item.Actions class="w-full sm:w-auto">
+						<Select.Root
+							type="single"
+							value={String(lifetimeHours)}
+							disabled={!can.admin}
+							onValueChange={setLifetime}
+						>
+							<Select.Trigger id="ca-user-ttl" class="w-full sm:w-44">
+								{formatHours(lifetimeHours)}
+							</Select.Trigger>
+							<Select.Content>
+								{#each lifetimes as h (h)}
+									<Select.Item value={String(h)}>{formatHours(h)}</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</Item.Actions>
+				</Item.Root>
 				<p class="text-xs text-muted-foreground">
 					A server without the daemon only drops access when a certificate runs out. There, and for
-					service accounts, a certificate lasts an hour at most whatever is set here.
+					service accounts, a certificate lasts an hour at most whatever is set here. A daemon's
+					host certificate lasts 90 days and renews by itself.
 				</p>
 			</Card.Content>
 		</Card.Root>

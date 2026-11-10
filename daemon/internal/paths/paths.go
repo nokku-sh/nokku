@@ -12,11 +12,15 @@ const (
 	signerStateFilename = "state.json"
 	recordsDir          = "recordings"
 	hostKeyName         = "ssh_host_ecdsa_key"
+	reportsFilename     = "connections.jsonl"
 )
 
 func RecordsDir() string { return filepath.Join(dataDir(), recordsDir) }
 
 func StateFile() string { return filepath.Join(dataDir(), stateFilename) }
+
+// ReportsFile holds the connection events the core does not have yet.
+func ReportsFile() string { return filepath.Join(dataDir(), reportsFilename) }
 
 func SignerStateFile() string { return filepath.Join(dataDir(), signerStateFilename) }
 

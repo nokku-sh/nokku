@@ -16,19 +16,26 @@ service DaemonService {
   }
   // Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
   rpc UpdateDaemon(UpdateDaemonRequest) returns (UpdateDaemonResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
   }
   rpc DeleteDaemon(DeleteDaemonRequest) returns (DeleteDaemonResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
   }
   rpc ListDaemons(ListDaemonsRequest) returns (ListDaemonsResponse) {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  // A browser shell is a way onto a server, so a cookie alone does not open one.
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      people_only: true
+      fresh: true
       signs: true
     };
   }
@@ -228,11 +235,12 @@ message SyncDaemonResponse {
   DaemonStatus status = 1;
   DaemonConfig config = 2;
   repeated AccountPrincipals principals = 3;
-  int64 state_version = 4;
   // The user CA key logins are checked against.
   string ca_public_key = 5;
   // The host CA key the daemon's host certificate has to come from.
   string host_ca_public_key = 6;
+  // A hash of this answer, the daemon sends it back with every heartbeat. A daemon never works it out itself.
+  bytes state_hash = 7;
 }
 
 message SignHostCertificateRequest {
@@ -253,6 +261,7 @@ message UnenrollDaemonResponse {}
 message ConnectRequest {
   oneof msg {
     Heartbeat heartbeat = 1;
+    ConnectionReport connection_report = 2;
   }
 }
 
@@ -260,14 +269,52 @@ message ConnectResponse {
   oneof msg {
     StateUpdate state_update = 1;
     RelayOpen relay_open = 2;
+    ConnectionReportAck connection_report_ack = 3;
   }
 }
 
-message Heartbeat {
-  int64 state_version = 1;
+// ConnectionReport tells the core who logged in on the daemon's server and when they left. The daemon sends one
+// report at a time and keeps its events until the ack. A report may so come twice, the core stores each event once.
+message ConnectionReport {
+  repeated ConnectionEvent events = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 100
+  }];
+  // Events the daemon threw away since its last report, because it could keep no more.
+  uint32 dropped = 2;
 }
 
-message StateUpdate {}
+// The core cuts a field that is too long, it does not refuse the event. A refused report would come again forever.
+message ConnectionEvent {
+  // The same for the open and the close of one connection.
+  string connection_id = 1 [(buf.validate.field).string.uuid = true];
+  // False when the connection opened, true when it closed.
+  bool closed = 2;
+  // By the daemon's clock.
+  google.protobuf.Timestamp time = 3;
+  // The certificate principal the login matched. It names the subject and the account.
+  string principal = 4;
+  // The key id the CA signed into the certificate.
+  string key_id = 5;
+  // Where the client came from, as the daemon saw it.
+  string remote_addr = 6;
+  string client_version = 7;
+  // It came through the core's relay, like a browser shell.
+  bool relayed = 8;
+}
+
+// The core stored the report it got last.
+message ConnectionReportAck {}
+
+message Heartbeat {
+  // The state_hash of the last sync the daemon saved, empty before the first.
+  bytes state_hash = 2 [(buf.validate.field).bytes.max_len = 64];
+}
+
+// StateUpdate tells a daemon what it should hold. It syncs when its own hash differs, or when this one is empty.
+message StateUpdate {
+  bytes state_hash = 1;
+}
 
 message DaemonSession {
   string session_id = 1;

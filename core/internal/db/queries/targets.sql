@@ -6,7 +6,8 @@ INSERT INTO
     endpoints,
     tags,
     metadata,
-    host_public_key
+    host_public_key,
+    created_by
   )
 VALUES
   (
@@ -15,7 +16,8 @@ VALUES
     @endpoints,
     COALESCE(sqlc.narg('tags')::TEXT[], '{}'),
     COALESCE(sqlc.narg('metadata')::JSONB, '{}'),
-    sqlc.narg('host_public_key')
+    sqlc.narg('host_public_key'),
+    sqlc.narg('created_by')
   )
 RETURNING
   *;
@@ -102,7 +104,6 @@ SET
   endpoints = COALESCE(sqlc.narg('endpoints'), endpoints),
   tags = COALESCE(sqlc.narg('tags'), tags),
   metadata = COALESCE(sqlc.narg('metadata'), metadata),
-  host_public_key = COALESCE(sqlc.narg('host_public_key'), host_public_key),
   updated_at = NOW()
 WHERE
   targets.id = @target_id

@@ -194,13 +194,11 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 	require.NoError(t, err)
 	sshPub, err := gossh.NewPublicKey(pub)
 	require.NoError(t, err)
-	// It asks for two days, which the CA would give a person.
 	validUntil := func(token string) time.Time {
 		res, err := nokkuv1connect.NewCertificateServiceClient(clientOn(srv, header("Authorization", "Bearer "+token))).
 			SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
 				TargetId:  &targetID,
 				PublicKey: new(string(gossh.MarshalAuthorizedKey(sshPub))),
-				Ttl:       durationpb.New(48 * time.Hour),
 			})
 		require.NoError(t, err)
 		return res.GetExpiresAt().AsTime()
@@ -225,9 +223,8 @@ func setCA(
 	t.Cleanup(func() {
 		_, err := certs.UpdateCertificateAuthority(context.WithoutCancel(t.Context()),
 			masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-				UserDefaultTtl: ca.GetUserDefaultTtl(),
-				UserMaxTtl:     ca.GetUserMaxTtl(),
-				SourceAddress:  new(ca.GetSourceAddress()),
+				UserTtl:       ca.GetUserTtl(),
+				SourceAddress: new(ca.GetSourceAddress()),
 			}))
 		require.NoError(t, err)
 	})
@@ -239,10 +236,7 @@ func setCA(
 // gets its own limits and nothing from the CA, an office list must not block a
 // hosted runner.
 func TestCertificateLimitsPerSubjectKind(t *testing.T) {
-	const (
-		day        = 24 * time.Hour
-		officeList = "10.0.0.0/8,192.0.2.7"
-	)
+	const officeList = "10.0.0.0/8,192.0.2.7"
 	n := newNKSync(t)
 	workspaceID := testWorkspace.ID
 	adminAuth := header("Authorization",
@@ -251,8 +245,7 @@ func TestCertificateLimitsPerSubjectKind(t *testing.T) {
 
 	setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new(officeList)})
 	ca := workspaceCA(t, n.cfg)
-	require.Equal(t, 16*time.Hour, ca.GetUserDefaultTtl().AsDuration(), "the rows below assume the built-in default")
-	require.Equal(t, 7*day, ca.GetUserMaxTtl().AsDuration(), "the rows below assume the built-in max")
+	require.Equal(t, 16*time.Hour, ca.GetUserTtl().AsDuration(), "the rows below assume the built-in lifetime")
 
 	personID, personToken := n.person(t)
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(admin)
@@ -312,13 +305,12 @@ func TestCertificateLimitsPerSubjectKind(t *testing.T) {
 		name       string
 		caller     caller
 		target     string
-		asked      time.Duration
 		want       time.Duration
 		principals []string
 	}
 	check := func(t *testing.T, tt row) {
 		t.Helper()
-		cert, err := n.sign(t, tt.caller.token, tt.target, tt.asked)
+		cert, err := n.sign(t, tt.caller.token, tt.target)
 		require.NoError(t, err)
 		assert.InDelta(t, tt.want, lifetime(cert), float64(2*time.Second), "wrong lifetime")
 		assert.Equal(t, tt.principals, cert.ValidPrincipals, "wrong principals")
@@ -326,51 +318,27 @@ func TestCertificateLimitsPerSubjectKind(t *testing.T) {
 	}
 
 	for _, tt := range []row{
-		{"person with a daemon, nothing asked", person, daemonTarget, 0, 16 * time.Hour, onDaemon(person)},
-		{"person with a daemon, under the max", person, daemonTarget, 2 * day, 2 * day, onDaemon(person)},
-		{"person with a daemon, at the max", person, daemonTarget, 7 * day, 7 * day, onDaemon(person)},
-		{
-			"person with a daemon, over the max gets the default",
-			person,
-			daemonTarget,
-			8 * day,
-			16 * time.Hour,
-			onDaemon(person),
-		},
-		{"person without a daemon, nothing asked", person, syncTarget, 0, time.Hour, onSync(person)},
-		{"person without a daemon, under the hour", person, syncTarget, 10 * time.Minute, 10 * time.Minute, onSync(person)},
-		{"person without a daemon, over the hour", person, syncTarget, 2 * day, time.Hour, onSync(person)},
-		{"person without a daemon, over the max", person, syncTarget, 8 * day, time.Hour, onSync(person)},
-		{"service account with a daemon, nothing asked", service, daemonTarget, 0, time.Hour, onDaemon(service)},
-		{
-			"service account with a daemon, under the hour",
-			service,
-			daemonTarget,
-			10 * time.Minute,
-			10 * time.Minute,
-			onDaemon(service),
-		},
-		{"service account with a daemon, over the hour", service, daemonTarget, 2 * day, time.Hour, onDaemon(service)},
-		{"service account without a daemon, over the hour", service, syncTarget, 2 * day, time.Hour, onSync(service)},
+		{"person with a daemon", person, daemonTarget, 16 * time.Hour, onDaemon(person)},
+		{"person without a daemon", person, syncTarget, time.Hour, onSync(person)},
+		{"service account with a daemon", service, daemonTarget, time.Hour, onDaemon(service)},
+		{"service account without a daemon", service, syncTarget, time.Hour, onSync(service)},
 	} {
 		t.Run(tt.name, func(t *testing.T) { check(t, tt) })
 	}
 
 	t.Run("a service account with no limits gets none", func(t *testing.T) {
-		cert, err := n.sign(t, plainToken, daemonTarget, 0)
+		cert, err := n.sign(t, plainToken, daemonTarget)
 		require.NoError(t, err)
 		assert.Empty(t, cert.CriticalOptions, "the CA's settings reached a service account")
 	})
 
 	t.Run("a CA under the hour", func(t *testing.T) {
 		setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{
-			UserDefaultTtl: durationpb.New(20 * time.Minute),
-			UserMaxTtl:     durationpb.New(30 * time.Minute),
+			UserTtl: durationpb.New(20 * time.Minute),
 		})
 		for _, tt := range []row{
-			{"person without a daemon", person, syncTarget, 0, 20 * time.Minute, onSync(person)},
-			{"service account", service, syncTarget, 0, 20 * time.Minute, onSync(service)},
-			{"service account, over the max", service, syncTarget, 2 * day, 20 * time.Minute, onSync(service)},
+			{"person without a daemon", person, syncTarget, 20 * time.Minute, onSync(person)},
+			{"service account", service, syncTarget, 20 * time.Minute, onSync(service)},
 		} {
 			t.Run(tt.name, func(t *testing.T) { check(t, tt) })
 		}
@@ -378,10 +346,35 @@ func TestCertificateLimitsPerSubjectKind(t *testing.T) {
 
 	t.Run("a CA with no source list", func(t *testing.T) {
 		setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("")})
-		cert, err := n.sign(t, personToken, daemonTarget, 0)
+		cert, err := n.sign(t, personToken, daemonTarget)
 		require.NoError(t, err)
 		assert.Empty(t, cert.CriticalOptions, "an empty list must add nothing")
 	})
+}
+
+// A workspace picks its lifetime between 15 minutes and login.MaxCertTTL, the week a cut-off daemon keeps serving.
+func TestCALifetimeBounds(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	admin := nokkuv1connect.NewCertificateServiceClient(
+		clientOn(srv, header(
+			"Authorization",
+			"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
+		)),
+	)
+	set := func(ttl time.Duration) error {
+		_, err := admin.UpdateCertificateAuthority(t.Context(),
+			masked(&nokkuv1.UpdateCertificateAuthorityRequest{UserTtl: durationpb.New(ttl)}))
+		return err
+	}
+
+	setCA(t, cfg, admin, &nokkuv1.UpdateCertificateAuthorityRequest{UserTtl: durationpb.New(nklogin.MaxCertTTL)})
+	require.NoError(t, set(15*time.Minute))
+	for name, ttl := range map[string]time.Duration{
+		"over the ceiling": nklogin.MaxCertTTL + time.Second,
+		"under 15 minutes": 15*time.Minute - time.Second,
+	} {
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(set(ttl)), "a lifetime %s was taken", name)
+	}
 }
 
 // The list is stored the way a server reads it, an unreadable one is refused.
@@ -404,7 +397,7 @@ func TestCASourceList(t *testing.T) {
 
 	// An update that doesn't name it keeps it, an empty one takes it away.
 	res, err := admin.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-		HostTtl: durationpb.New(90 * 24 * time.Hour),
+		UserTtl: durationpb.New(16 * time.Hour),
 	}))
 	require.NoError(t, err)
 	assert.Equal(t, "10.0.0.0/8,192.0.2.7", res.GetCertificateAuthority().GetSourceAddress())

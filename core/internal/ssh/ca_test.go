@@ -34,11 +34,9 @@ func newTestCA(t *testing.T) testCA {
 	}
 	return testCA{
 		row: &db.SSHCA{
-			PublicKey:      user.public,
-			HostPublicKey:  host.public,
-			UserDefaultTtl: 24 * time.Hour,
-			UserMaxTtl:     168 * time.Hour,
-			HostTtl:        2160 * time.Hour,
+			PublicKey:     user.public,
+			HostPublicKey: host.public,
+			UserTtl:       24 * time.Hour,
 		},
 		user: signer(user),
 		host: signer(host),
@@ -93,8 +91,7 @@ func TestNewCA(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, user.public, host.public, "the user and the host key must differ")
 	info := NewCA()
-	assert.Equal(t, 16*time.Hour, info.UserDefaultTtl)
-	assert.Equal(t, 7*24*time.Hour, info.UserMaxTtl)
+	assert.Equal(t, 16*time.Hour, info.UserTtl)
 	for name, key := range map[string]caKey{"user": user, "host": host} {
 		assert.Equal(t, ssh.KeyAlgoED25519, parseKey(t, key.public).Type(), "%s key", name)
 		_, err := x509.ParsePKCS8PrivateKey(key.private)

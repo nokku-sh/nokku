@@ -17,39 +17,27 @@ INSERT INTO
   ssh_cas (
     public_key,
     host_public_key,
-    user_default_ttl,
-    user_max_ttl,
-    host_ttl
+    user_ttl
   )
 VALUES
   (
     $1,
     $2,
-    $3,
-    $4,
-    $5
+    $3
   )
 RETURNING
-  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 `
 
 type CreateCAParams struct {
-	PublicKey      string        `json:"publicKey"`
-	HostPublicKey  string        `json:"hostPublicKey"`
-	UserDefaultTtl time.Duration `json:"userDefaultTtl"`
-	UserMaxTtl     time.Duration `json:"userMaxTtl"`
-	HostTtl        time.Duration `json:"hostTtl"`
+	PublicKey     string        `json:"publicKey"`
+	HostPublicKey string        `json:"hostPublicKey"`
+	UserTtl       time.Duration `json:"userTtl"`
 }
 
 // Every setting comes from the caller, ssh.NewCA fills in what a new CA starts with. ssh.CreateCA adds the keys.
 func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, error) {
-	row := q.db.QueryRow(ctx, createCA,
-		arg.PublicKey,
-		arg.HostPublicKey,
-		arg.UserDefaultTtl,
-		arg.UserMaxTtl,
-		arg.HostTtl,
-	)
+	row := q.db.QueryRow(ctx, createCA, arg.PublicKey, arg.HostPublicKey, arg.UserTtl)
 	var i SSHCA
 	err := row.Scan(
 		&i.ID,
@@ -57,9 +45,7 @@ func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, er
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
+		&i.UserTtl,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -113,7 +99,7 @@ func (q *Queries) GetCASigningKey(ctx context.Context, arg *GetCASigningKeyParam
 
 const getWorkspaceCA = `-- name: GetWorkspaceCA :one
 SELECT
-  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -130,9 +116,7 @@ func (q *Queries) GetWorkspaceCA(ctx context.Context) (*SSHCA, error) {
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
+		&i.UserTtl,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -142,7 +126,7 @@ func (q *Queries) GetWorkspaceCA(ctx context.Context) (*SSHCA, error) {
 
 const getWorkspaceCAForShare = `-- name: GetWorkspaceCAForShare :one
 SELECT
-  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -160,9 +144,7 @@ func (q *Queries) GetWorkspaceCAForShare(ctx context.Context) (*SSHCA, error) {
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
+		&i.UserTtl,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -172,7 +154,7 @@ func (q *Queries) GetWorkspaceCAForShare(ctx context.Context) (*SSHCA, error) {
 
 const getWorkspaceCAForUpdate = `-- name: GetWorkspaceCAForUpdate :one
 SELECT
-  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -189,9 +171,7 @@ func (q *Queries) GetWorkspaceCAForUpdate(ctx context.Context) (*SSHCA, error) {
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
+		&i.UserTtl,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -231,7 +211,7 @@ SET
 WHERE
   id = $3
 RETURNING
-  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 `
 
 type ReplaceCAParams struct {
@@ -250,9 +230,7 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, 
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
+		&i.UserTtl,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -263,31 +241,22 @@ func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, 
 const updateCA = `-- name: UpdateCA :one
 UPDATE ssh_cas
 SET
-  user_default_ttl = COALESCE($1, user_default_ttl),
-  user_max_ttl = COALESCE($2, user_max_ttl),
-  source_address = COALESCE($3, source_address),
-  host_ttl = COALESCE($4, host_ttl),
+  user_ttl = COALESCE($1, user_ttl),
+  source_address = COALESCE($2, source_address),
   updated_at = NOW()
 WHERE
   workspace_id = current_workspace_id ()
 RETURNING
-  id, workspace_id, public_key, host_public_key, rotated_at, user_default_ttl, user_max_ttl, host_ttl, source_address, created_at, updated_at
+  id, workspace_id, public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 `
 
 type UpdateCAParams struct {
-	UserDefaultTtl *time.Duration `json:"userDefaultTtl"`
-	UserMaxTtl     *time.Duration `json:"userMaxTtl"`
-	SourceAddress  *string        `json:"sourceAddress"`
-	HostTtl        *time.Duration `json:"hostTtl"`
+	UserTtl       *time.Duration `json:"userTtl"`
+	SourceAddress *string        `json:"sourceAddress"`
 }
 
 func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, error) {
-	row := q.db.QueryRow(ctx, updateCA,
-		arg.UserDefaultTtl,
-		arg.UserMaxTtl,
-		arg.SourceAddress,
-		arg.HostTtl,
-	)
+	row := q.db.QueryRow(ctx, updateCA, arg.UserTtl, arg.SourceAddress)
 	var i SSHCA
 	err := row.Scan(
 		&i.ID,
@@ -295,9 +264,7 @@ func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, er
 		&i.PublicKey,
 		&i.HostPublicKey,
 		&i.RotatedAt,
-		&i.UserDefaultTtl,
-		&i.UserMaxTtl,
-		&i.HostTtl,
+		&i.UserTtl,
 		&i.SourceAddress,
 		&i.CreatedAt,
 		&i.UpdatedAt,

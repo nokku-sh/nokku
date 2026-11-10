@@ -47,7 +47,7 @@ Use the hosted service, or run the core yourself for free. The guides are at [no
 - **Revokes that land.** At once on daemon servers, open sessions included. Within the hour on `nk sync` servers.
 - **Access that runs out.** Grant a server for a while, or let people ask and an admin approve.
 - **Keys that stay in hardware.** In a TPM or on a FIDO2 security key where there is one.
-- **No bastion in the path.** Every server serves its own SSH. When the core is down, a certificate you hold still logs in.
+- **No bastion in the path.** Every server serves its own SSH. When the core is down, a certificate you hold still logs in, on a daemon server for up to a week.
 - **No open ports needed.** Servers behind NAT are reached through an end-to-end encrypted relay.
 - **Recorded sessions and an audit log.** Recordings are encrypted, the log streams to your SIEM.
 - **A terminal in the browser**, for the day you only have a tablet.

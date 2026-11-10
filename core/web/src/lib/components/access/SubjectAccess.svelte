@@ -12,7 +12,16 @@
 	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { AccessBlock, type Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Clock, Plus, Search, Server, ShieldOff, SquareTerminal, Users } from '@lucide/svelte';
+	import {
+		Clock,
+		FileClock,
+		Plus,
+		Search,
+		Server,
+		ShieldOff,
+		SquareTerminal,
+		Users
+	} from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { openGrant } from './grant.svelte';
 	import { kindLabels, subjectIds, type Subject } from './subjects.svelte';
@@ -93,7 +102,7 @@
 </script>
 
 <div class="flex flex-col gap-3">
-	<div class="flex items-start justify-between gap-3">
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 		<p class="text-sm text-muted-foreground">
 			{#if usable.length}
 				{name} can log in to <span class="font-medium text-foreground">{usable.length}</span>
@@ -114,12 +123,21 @@
 				Every member gets this access.
 			{/if}
 		</p>
-		{#if can.edit}
-			<Button size="sm" onclick={() => openGrant({ subjects: [self] })}>
-				<Plus data-icon="inline-start" />
-				Grant access
-			</Button>
-		{/if}
+		<div class="flex shrink-0 gap-2">
+			<!-- A team never logs in itself, its members do. -->
+			{#if kind !== SubjectKind.TEAM}
+				<Button size="sm" variant="outline" href={`/audit?area=sessions&target=${subjectId}`}>
+					<FileClock data-icon="inline-start" />
+					Logins
+				</Button>
+			{/if}
+			{#if can.edit}
+				<Button size="sm" onclick={() => openGrant({ subjects: [self] })}>
+					<Plus data-icon="inline-start" />
+					Grant access
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	{#if targets.length > 6}

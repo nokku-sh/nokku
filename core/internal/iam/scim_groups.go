@@ -9,6 +9,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"strconv"
 	"uuid"
 
 	scim "github.com/elimity-com/scim"
@@ -48,7 +49,7 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 	var res scim.Resource
 	var events []*audit.Event
 	err := h.tx(ctx, "", func(q *db.Queries) error {
-		// A hand-made team is taken over, keeping its id and grants. Its
+		// A hand-made team an admin opened is taken over, keeping its id and grants. Its
 		// members are the group's from now on.
 		team, err := q.GetTeamByName(ctx, name)
 		switch {
@@ -62,6 +63,14 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 		case team.ScimManaged:
 			// Another group holds it, the two would overwrite each other.
 			return scimerrors.ScimErrorUniqueness
+		case !team.ScimOpen:
+			// The group would get the team's access by using its name. An admin has to say so first.
+			return scimerrors.ScimError{
+				ScimType: scimerrors.ScimTypeUniqueness,
+				Status:   http.StatusConflict,
+				Detail: "a team named " + strconv.Quote(name) + " exists in Nokku and is not open for the identity " +
+					"provider. Open it in the team's settings, then push the group again.",
+			}
 		default:
 			events = append(events, groupEvent(actionUpdateTeam, team.ID, map[string]any{"name": team.Name}))
 		}

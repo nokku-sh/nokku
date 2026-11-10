@@ -316,7 +316,7 @@ func (q *Queries) GetOfflineDaemonByTokenAndName(ctx context.Context, arg *GetOf
 
 const getTargetByDaemon = `-- name: GetTargetByDaemon :one
 SELECT
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
 FROM
   targets
 WHERE
@@ -337,6 +337,7 @@ func (q *Queries) GetTargetByDaemon(ctx context.Context, daemonID *string) (*Tar
 		&i.Tags,
 		&i.Metadata,
 		&i.LastSyncAt,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -417,6 +418,54 @@ func (q *Queries) ListDaemons(ctx context.Context, arg *ListDaemonsParams) ([]*L
 			&i.Daemon.UpdatedAt,
 			&i.Name,
 			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDaemonsForSync = `-- name: ListDaemonsForSync :many
+SELECT
+  d.id, d.workspace_id, d.join_token_id, d.key_thumbprint, d.version, d.status, d.config, d.retire_after, d.last_seen_at, d.created_at, d.updated_at,
+  t.id AS target_id
+FROM
+  daemons d
+  JOIN targets t ON t.daemon_id = d.id
+`
+
+type ListDaemonsForSyncRow struct {
+	Daemon   Daemon `json:"daemon"`
+	TargetID string `json:"targetId"`
+}
+
+// Every daemon of the workspace with its server, for the pass that works out what each one is told.
+func (q *Queries) ListDaemonsForSync(ctx context.Context) ([]*ListDaemonsForSyncRow, error) {
+	rows, err := q.db.Query(ctx, listDaemonsForSync)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListDaemonsForSyncRow
+	for rows.Next() {
+		var i ListDaemonsForSyncRow
+		if err := rows.Scan(
+			&i.Daemon.ID,
+			&i.Daemon.WorkspaceID,
+			&i.Daemon.JoinTokenID,
+			&i.Daemon.KeyThumbprint,
+			&i.Daemon.Version,
+			&i.Daemon.Status,
+			&i.Daemon.Config,
+			&i.Daemon.RetireAfter,
+			&i.Daemon.LastSeenAt,
+			&i.Daemon.CreatedAt,
+			&i.Daemon.UpdatedAt,
+			&i.TargetID,
 		); err != nil {
 			return nil, err
 		}

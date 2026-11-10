@@ -12,19 +12,66 @@ service TargetAccountService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc AddTargetAccount(AddTargetAccountRequest) returns (AddTargetAccountResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
   }
   rpc RemoveTargetAccount(RemoveTargetAccountRequest) returns (RemoveTargetAccountResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
   }
   rpc AddSubjects(AddSubjectsRequest) returns (AddSubjectsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
   }
   rpc RemoveSubjects(RemoveSubjectsRequest) returns (RemoveSubjectsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
   }
   rpc RevokeAllAccess(RevokeAllAccessRequest) returns (RevokeAllAccessResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
+  }
+  // PlanGrant says what Grant would do with the same request, and changes nothing.
+  rpc PlanGrant(PlanGrantRequest) returns (PlanGrantResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
+  // access change, however many servers.
+  rpc Grant(GrantRequest) returns (GrantResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
+  }
+  // PlanRevoke says what Revoke would do with the same request, and changes nothing.
+  rpc PlanRevoke(PlanRevokeRequest) returns (PlanRevokeResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Revoke takes one subject's own grants off many servers, the servers by id or by tag. Like Grant it is one
+  // transaction and one access change.
+  rpc Revoke(RevokeRequest) returns (RevokeResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
   }
 }
 
@@ -96,6 +143,141 @@ message RemoveSubjectsRequest {
   }];
 }
 message RemoveSubjectsResponse {}
+
+message GrantSubject {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  SubjectKind kind = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+// Who gets which account where. A server counts when its id is named or it has one of the tags.
+message GrantSpec {
+  repeated GrantSubject subjects = 1 [(buf.validate.field).repeated.max_items = 50];
+  repeated string target_ids = 2 [(buf.validate.field).repeated = {
+    max_items: 500
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  repeated string tags = 3 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {
+        min_len: 1
+        max_len: 64
+      }
+    }
+  }];
+  // Empty asks only which servers these are and what accounts they have.
+  string username = 4 [(buf.validate.field).string.max_len = 32];
+  // Unset is for good.
+  google.protobuf.Timestamp expires_at = 5;
+  // A grant that stands with another end keeps it, unless this is set.
+  bool change_ends = 6;
+}
+
+message GrantAccount {
+  string username = 1;
+  int32 servers = 2;
+}
+
+message GrantOutcome {
+  string subject_id = 1;
+  // New grants.
+  int32 added = 2;
+  // Grants that stand already with the same end.
+  int32 same = 3;
+  // Grants that stand with another end.
+  int32 other_end = 4;
+}
+
+message GrantPlan {
+  // Servers the ids and tags name.
+  int32 servers = 1;
+  // Some of their names, to show which they are.
+  repeated string server_names = 2;
+  // The accounts those servers have, the most common first.
+  repeated GrantAccount accounts = 3;
+  // Servers that have the account asked for.
+  int32 with_account = 4;
+  // Some of the servers that lack it. Nothing happens there.
+  repeated string skipped = 5;
+  repeated GrantOutcome outcomes = 6;
+}
+
+message PlanGrantRequest {
+  GrantSpec grant = 1 [(buf.validate.field).required = true];
+}
+message PlanGrantResponse {
+  GrantPlan plan = 1;
+}
+
+message GrantRequest {
+  GrantSpec grant = 1 [(buf.validate.field).required = true];
+}
+message GrantResponse {
+  // What it did.
+  GrantPlan plan = 1;
+}
+
+// Whose grants go where. A server counts when its id is named or it has one of the tags. Only the subject's own
+// grants go, what a team gives its members stays.
+message RevokeSpec {
+  GrantSubject subject = 1 [(buf.validate.field).required = true];
+  repeated string target_ids = 2 [(buf.validate.field).repeated = {
+    max_items: 500
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  repeated string tags = 3 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {
+        min_len: 1
+        max_len: 64
+      }
+    }
+  }];
+}
+
+message RevokeAccount {
+  string username = 1;
+  // Servers the grant on this account goes from.
+  int32 servers = 2;
+  // Some of their names.
+  repeated string server_names = 3;
+}
+
+message RevokePlan {
+  // Grants that go, one per account and server.
+  int32 grants = 1;
+  // Servers they are on.
+  int32 servers = 2;
+  // The accounts, the one on the most servers first.
+  repeated RevokeAccount accounts = 3;
+  // Servers among them with more than one tag. The access goes for those tags too.
+  int32 other_tags = 4;
+  // Some of their names.
+  repeated string other_tag_names = 5;
+}
+
+message PlanRevokeRequest {
+  RevokeSpec revoke = 1 [(buf.validate.field).required = true];
+}
+message PlanRevokeResponse {
+  RevokePlan plan = 1;
+}
+
+message RevokeRequest {
+  RevokeSpec revoke = 1 [(buf.validate.field).required = true];
+}
+message RevokeResponse {
+  // What it did.
+  RevokePlan plan = 1;
+}
 
 message RevokeAllAccessRequest {
   string subject_id = 1 [(buf.validate.field).string.uuid = true];

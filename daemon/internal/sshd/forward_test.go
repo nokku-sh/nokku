@@ -422,7 +422,7 @@ func TestServerForwardingLargeTransfer(t *testing.T) {
 // A forward request racing connection teardown must not leak a listener.
 func TestTCPIPForwardAfterClose(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	require.NoError(t, err)
 	withPolicy(policy{AllowForwarding: true})(srv)
 

@@ -19,6 +19,9 @@ import (
 // maxPrincipals is how many principals OpenSSH reads from one certificate.
 const maxPrincipals = 256
 
+// HostTTL is what a host certificate lasts. A daemon renews its own at half of it.
+const HostTTL = 90 * 24 * time.Hour
+
 // What a session may really do is the host's call: the daemon config where
 // nokkud runs, sshd_config where it does not.
 var userExtensions = map[string]string{
@@ -78,10 +81,11 @@ func SignCertificate(
 
 	if certType == ssh.HostCert {
 		cert.CertType = ssh.HostCert
-		ttl = ca.HostTtl
+		ttl = HostTTL
 	} else {
 		cert.CertType = ssh.UserCert
-		ttl = UserTTL(ca, ttl)
+		// A caller only shortens the workspace's lifetime.
+		ttl = min(ttl, ca.UserTtl)
 		cert.Permissions = userPermissions(limits)
 	}
 	cert.ValidBefore = UnixUint64(time.Now().Add(ttl).Unix())
@@ -90,18 +94,6 @@ func SignCertificate(
 		return nil, fmt.Errorf("failed to sign certificate: %w", err)
 	}
 	return cert, nil
-}
-
-// UserTTL falls back to the CA's default, also when asked for over the max.
-func UserTTL(ca *db.SSHCA, ttl time.Duration) time.Duration {
-	return boundTTL(ttl, ca.UserDefaultTtl, ca.UserMaxTtl)
-}
-
-func boundTTL(ttl, defaultTTL, maxTTL time.Duration) time.Duration {
-	if ttl <= 0 || ttl > maxTTL {
-		return defaultTTL
-	}
-	return ttl
 }
 
 func userPermissions(limits Limits) ssh.Permissions {

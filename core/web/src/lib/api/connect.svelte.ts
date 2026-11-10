@@ -4,6 +4,7 @@ import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 import { recentTargets } from '#lib/store.svelte.js';
 import { nkLoginCommand } from '#lib/utils.js';
 import { toast } from 'svelte-sonner';
+import { whenFresh } from './auth.svelte';
 import { daemon } from './daemons.svelte';
 import { target } from './targets.svelte';
 import { user } from './user.svelte';
@@ -21,16 +22,22 @@ export function useConnect() {
 		get pending() {
 			return createSession.isPending;
 		},
-		async shell(t: Pick<Target, 'id' | 'daemonId'>, username: string) {
-			remember(t.id);
-			try {
-				await createSession.mutateAsync({ daemonId: t.daemonId, username });
-			} catch {
-				// The global mutation handler already toasted it.
-				return;
-			}
-			if (page.url.pathname !== '/shell') await goto('/shell');
-		},
+		// A shell takes a recent sign-in, so that is settled before the core is asked. It is one click, with no form
+		// to leave time for.
+		shell: (t: Pick<Target, 'id' | 'daemonId'>, username: string) =>
+			whenFresh(
+				async () => {
+					remember(t.id);
+					try {
+						await createSession.mutateAsync({ daemonId: t.daemonId, username });
+					} catch {
+						// The global mutation handler already toasted it.
+						return;
+					}
+					if (page.url.pathname !== '/shell') await goto('/shell');
+				},
+				{ room: 0 }
+			),
 		async copy(t: Pick<Target, 'id' | 'name'>, username: string) {
 			remember(t.id);
 			await navigator.clipboard.writeText(`ssh ${username}@${t.name}`);

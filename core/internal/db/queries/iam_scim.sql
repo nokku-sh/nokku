@@ -46,7 +46,7 @@ RETURNING
   *;
 
 -- name: GetTeamByName :one
--- A SCIM create takes over a team of that name that no group is linked to yet.
+-- A SCIM create takes over a team of that name that an admin opened for it.
 SELECT
   *
 FROM
@@ -58,6 +58,7 @@ WHERE
 UPDATE teams
 SET
   scim_managed = TRUE,
+  scim_open = FALSE,
   updated_at = NOW()
 WHERE
   id = @id

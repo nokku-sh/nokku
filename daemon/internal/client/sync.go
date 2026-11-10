@@ -15,6 +15,8 @@ import (
 
 // A failed sync keeps the old access, a failed save keeps the new in memory.
 func (c *Client) syncDaemon(ctx context.Context) error {
+	c.syncing.Lock()
+	defer c.syncing.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, syncTimeout)
 	defer cancel()
 	res, err := c.ctl.SyncDaemon(ctx, &nokkuv1.SyncDaemonRequest{

@@ -204,22 +204,6 @@ func (q *Queries) GetWorkspaceForUpdate(ctx context.Context) (*Workspace, error)
 	return &i, err
 }
 
-const getWorkspaceStateVersion = `-- name: GetWorkspaceStateVersion :one
-SELECT
-  version
-FROM
-  workspace_state
-WHERE
-  workspace_id = $1
-`
-
-func (q *Queries) GetWorkspaceStateVersion(ctx context.Context, workspaceID string) (int64, error) {
-	row := q.db.QueryRow(ctx, getWorkspaceStateVersion, workspaceID)
-	var version int64
-	err := row.Scan(&version)
-	return version, err
-}
-
 const listUnclaimedWorkspaces = `-- name: ListUnclaimedWorkspaces :many
 SELECT
   id, slug, name, description, settings, requestable_tags, claimed_at, created_at, updated_at

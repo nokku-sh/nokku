@@ -43,6 +43,7 @@ SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
   tags = COALESCE(sqlc.narg('tags'), tags),
+  scim_open = COALESCE(sqlc.narg('scim_open'), scim_open),
   updated_at = NOW()
 WHERE
   id = @team_id

@@ -122,11 +122,9 @@ func NewCA(t testing.TB) (*db.SSHCA, ssh.Signer) {
 
 func caRow(user, host ssh.Signer) *db.SSHCA {
 	return &db.SSHCA{
-		PublicKey:      nokkussh.MarshalKey(user.PublicKey()),
-		HostPublicKey:  nokkussh.MarshalKey(host.PublicKey()),
-		UserDefaultTtl: time.Hour,
-		UserMaxTtl:     24 * time.Hour,
-		HostTtl:        time.Hour,
+		PublicKey:     nokkussh.MarshalKey(user.PublicKey()),
+		HostPublicKey: nokkussh.MarshalKey(host.PublicKey()),
+		UserTtl:       time.Hour,
 	}
 }
 

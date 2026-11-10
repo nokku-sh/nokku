@@ -57,11 +57,6 @@ func Root() *cli.Command {
 				Value:   "https://app.nokku.sh",
 				Sources: cli.EnvVars("NK_API_URL"),
 			},
-			&cli.DurationFlag{
-				Name:    "ttl",
-				Usage:   "Certificate TTL, kept for later ssh connections. 0 goes back to the default",
-				Sources: cli.EnvVars("NK_TTL"),
-			},
 			&cli.BoolFlag{
 				Name:    "require-tpm",
 				Usage:   "Refuse software keys. Keys live in a TPM 2.0, the ssh key may be on a security key instead",
@@ -122,10 +117,6 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 		// Another server never gets this session or shows its targets. The key belongs to the machine.
 		s.Config = state.Config{APIURL: api, SecurityKey: s.SecurityKey, RequireTPM: s.RequireTPM}
 		s.Cache = state.Cache{}
-	}
-	if cmd.IsSet("ttl") {
-		// Saved with the next sync.
-		s.TTL = cmd.Duration("ttl")
 	}
 	if plainHTTP(s.APIURL) {
 		return nil, fmt.Errorf("%s is not encrypted, Nokku is only reached over https", s.APIURL)

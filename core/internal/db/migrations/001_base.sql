@@ -18,12 +18,6 @@ CREATE TABLE workspaces (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- The version daemons sync against. No RLS, only the sync triggers write it.
-CREATE TABLE workspace_state (
-  workspace_id UUID PRIMARY KEY REFERENCES workspaces (id) ON DELETE CASCADE,
-  version BIGINT NOT NULL DEFAULT 0
-);
-
 -- The license key of a workspace. Hosted signup starts a trial row without a key, self-hosted has none until a key.
 CREATE TABLE workspace_licenses (
   workspace_id UUID PRIMARY KEY DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -55,6 +49,8 @@ CREATE TABLE users (
   ), -- the owner can't be switched off
   scim_external_id TEXT,
   scim_managed BOOLEAN NOT NULL DEFAULT FALSE, -- SCIM created it, so the identity provider owns the address
+  -- SCIM switched it off, so SCIM may switch it on again. What an admin switched off stays off until an admin says so.
+  scim_deactivated BOOLEAN NOT NULL DEFAULT FALSE CHECK (NOT (scim_deactivated AND active)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, email),
@@ -75,6 +71,8 @@ CREATE TABLE teams (
   scim_external_id TEXT,
   -- SCIM only sees teams it made or took over. An IdP that syncs deletes every group it does not know.
   scim_managed BOOLEAN NOT NULL DEFAULT FALSE,
+  -- An admin lets a SCIM group of the same name take this team over, with its grants. Used up by the takeover.
+  scim_open BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, id),
@@ -316,20 +314,13 @@ CREATE TABLE ssh_cas (
   public_key TEXT NOT NULL,
   host_public_key TEXT NOT NULL,
   rotated_at TIMESTAMPTZ, -- NULL until the first rollover
-  -- No defaults here, ssh.NewCA holds the settings a new CA starts with.
-  user_default_ttl INTERVAL NOT NULL,
-  user_max_ttl INTERVAL NOT NULL,
-  host_ttl INTERVAL NOT NULL, -- a daemon never asks for a lifetime, so a host certificate always gets this
+  -- What a person's certificate lasts, ssh.NewCA holds what a new CA starts with. The ceiling is login.MaxCertTTL.
+  user_ttl INTERVAL NOT NULL CHECK (user_ttl BETWEEN INTERVAL '15 minutes' AND INTERVAL '7 days'),
   source_address TEXT NOT NULL DEFAULT '', -- where people log in from, addresses and CIDRs, comma separated
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id),
-  UNIQUE (workspace_id, id),
-  CHECK (user_default_ttl <= user_max_ttl),
-  CHECK (
-    user_default_ttl > INTERVAL '0'
-    AND host_ttl > INTERVAL '0'
-  )
+  UNIQUE (workspace_id, id)
 );
 
 -- Apart so reading a CA never touches a private key. Only GetCASigningKey reads one.
@@ -391,6 +382,9 @@ CREATE TABLE targets (
   tags TEXT[] NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
   last_sync_at TIMESTAMPTZ, -- the last nk sync of a host without a daemon
+  -- The person or service account that added the server, NULL after a daemon's enrollment. A service account
+  -- may only sync or delete what it added. No foreign key, it is one of two tables and may outlive its row.
+  created_by UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, name),
@@ -678,20 +672,6 @@ CREATE TABLE keysets (
 );
 
 -- Triggers -------------------------------------------------------------------
-CREATE FUNCTION create_workspace_state () RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO workspace_state (workspace_id) VALUES (NEW.id);
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET
-  search_path = public,
-  pg_temp;
-
-CREATE TRIGGER create_workspace_state
-AFTER INSERT ON workspaces FOR EACH ROW
-EXECUTE FUNCTION create_workspace_state ();
-
 -- So a list of accounts needs no join, and the time outlives a deleted token.
 CREATE FUNCTION note_service_account_used () RETURNS TRIGGER AS $$
 BEGIN
@@ -754,9 +734,9 @@ SET
   pg_temp;
 
 -- Daemon sync ----------------------------------------------------------------
--- Any change to what a daemon enforces bumps the workspace version and notifies on commit. Every new input needs a
--- trigger here, or daemons keep enforcing the old state.
-CREATE FUNCTION bump_state_version () RETURNS TRIGGER AS $$
+-- Any change to what a daemon enforces notifies on commit. The core then works out which daemons it touches, see
+-- daemon.Pool.Reconcile. Every new input needs a trigger here, or daemons enforce the old state until the next sweep.
+CREATE FUNCTION notify_state_change () RETURNS TRIGGER AS $$
 DECLARE
   ws UUID;
 BEGIN
@@ -767,16 +747,13 @@ BEGIN
   ELSE
     ws := NEW.workspace_id;
   END IF;
-  -- Once per transaction. A team with thousands of grants would otherwise rewrite the row for each of them.
-  IF current_setting('nokku.bumped', TRUE) = ws::TEXT THEN
+  -- Once per transaction. A team with thousands of grants would otherwise queue a notification for each of them.
+  -- A server coming or going changes nothing for the others, and its own daemon is looked at when it connects.
+  IF current_setting('nokku.notified', TRUE) = ws::TEXT OR current_setting('nokku.quiet', TRUE) = 'on' THEN
     RETURN NULL;
   END IF;
-  UPDATE workspace_state SET version = version + 1 WHERE workspace_id = ws;
-  -- A server coming or going changes nothing for the others. The version still moves, so they catch up at a heartbeat.
-  IF current_setting('nokku.quiet', TRUE) IS DISTINCT FROM 'on' THEN
-    PERFORM pg_notify('nokku_state', ws::TEXT);
-  END IF;
-  PERFORM set_config('nokku.bumped', ws::TEXT, TRUE);
+  PERFORM pg_notify('nokku_state', ws::TEXT);
+  PERFORM set_config('nokku.notified', ws::TEXT, TRUE);
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
@@ -785,61 +762,61 @@ SET
   pg_temp;
 
 -- Daemons take the idle timeout from the workspace settings, nothing else in them.
-CREATE TRIGGER bump_state_version
+CREATE TRIGGER notify_state_change
 AFTER
 UPDATE OF settings ON workspaces FOR EACH ROW WHEN (
   OLD.settings -> 'session_idle_timeout' IS DISTINCT FROM NEW.settings -> 'session_idle_timeout'
 )
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
 -- A deactivated account must leave every daemon's map at once.
-CREATE TRIGGER bump_state_version
+CREATE TRIGGER notify_state_change
 AFTER
 UPDATE OF active ON users FOR EACH ROW WHEN (OLD.active IS DISTINCT FROM NEW.active)
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
-CREATE TRIGGER bump_state_version
+CREATE TRIGGER notify_state_change
 AFTER INSERT
 OR DELETE ON team_members FOR EACH ROW
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
-CREATE TRIGGER bump_state_version_update
+CREATE TRIGGER notify_state_change_update
 AFTER
 UPDATE OF public_key,
 host_public_key ON ssh_cas FOR EACH ROW WHEN (
   OLD.public_key IS DISTINCT FROM NEW.public_key
   OR OLD.host_public_key IS DISTINCT FROM NEW.host_public_key
 )
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
-CREATE TRIGGER bump_state_version
+CREATE TRIGGER notify_state_change
 AFTER
 UPDATE OF status,
 config ON daemons FOR EACH ROW WHEN (
   OLD.status IS DISTINCT FROM NEW.status
   OR OLD.config IS DISTINCT FROM NEW.config
 )
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
-CREATE TRIGGER bump_state_version_delete
+CREATE TRIGGER notify_state_change_delete
 AFTER DELETE ON daemons FOR EACH ROW
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
 -- A new account carries no grants, so only deletes matter.
-CREATE TRIGGER bump_state_version
+CREATE TRIGGER notify_state_change
 AFTER DELETE ON target_accounts FOR EACH ROW
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
-CREATE TRIGGER bump_state_version
+CREATE TRIGGER notify_state_change
 AFTER INSERT
 OR DELETE ON grants FOR EACH ROW
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
 -- An expiry moved earlier must reach the hosts before the old one would have.
-CREATE TRIGGER bump_state_version_update
+CREATE TRIGGER notify_state_change_update
 AFTER
 UPDATE OF expires_at ON grants FOR EACH ROW WHEN (OLD.expires_at IS DISTINCT FROM NEW.expires_at)
-EXECUTE FUNCTION bump_state_version ();
+EXECUTE FUNCTION notify_state_change ();
 
 -- Roles ----------------------------------------------------------------------
 -- nokku_app serves requests under RLS, nokku_system bypasses it. Neither is a member of the other.
@@ -882,13 +859,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT USAGE,
 SELECT
   ON SEQUENCES TO nokku_app,
-  nokku_system;
-
-REVOKE INSERT,
-UPDATE,
-DELETE ON workspace_state
-FROM
-  nokku_app,
   nokku_system;
 
 -- Only those functions queue, the sweeper as nokku_system works the queue off.
@@ -961,7 +931,8 @@ CREATE SCHEMA audit;
 -- No foreign key on workspace_id, the log outlives a deleted workspace.
 CREATE TABLE audit.audit_logs (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- The clock and not NOW(), so the rows of one transaction keep the order they were written in.
+  timestamp TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
   workspace_id UUID NOT NULL,
   actor_id TEXT NOT NULL DEFAULT '',
   actor_kind TEXT NOT NULL DEFAULT '',
@@ -977,6 +948,9 @@ CREATE TABLE audit.audit_logs (
 CREATE INDEX idx_audit_logs_workspace_time ON audit.audit_logs (workspace_id, timestamp DESC);
 
 CREATE INDEX idx_audit_logs_actor ON audit.audit_logs (workspace_id, actor_id, timestamp DESC);
+
+-- What an event is about. A login is about the person, and its actor is the daemon that reported it.
+CREATE INDEX idx_audit_logs_target ON audit.audit_logs (workspace_id, target, timestamp DESC);
 
 -- For the retention delete. Rows arrive in time order, so a block range index stays tiny.
 CREATE INDEX idx_audit_logs_time ON audit.audit_logs USING brin (timestamp);

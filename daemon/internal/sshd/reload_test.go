@@ -25,7 +25,7 @@ func TestSetAccessTrust(t *testing.T) {
 	first, second := newTestCA(t), newTestCA(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	require.NoError(t, err, "new server without a CA")
 	is.False(trustsCA(srv, first), "a server that never synced trusts no CA")
 
@@ -45,7 +45,7 @@ func TestUnreadableCATrustsNone(t *testing.T) {
 	is := assert.New(t)
 	ca := newTestCA(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	require.NoError(t, err)
 
 	srv.SetAccess(&state.Access{CA: string(ssh.MarshalAuthorizedKey(ca.pub))})
@@ -60,7 +60,7 @@ func TestServerReloadRefreshesHostCerts(t *testing.T) {
 	configDir := t.TempDir()
 	t.Setenv("NOKKUD_DATA_DIR", configDir)
 
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	must.NoError(err, "new server")
 	srv.SetAccess(testAccess(t, ca))
 

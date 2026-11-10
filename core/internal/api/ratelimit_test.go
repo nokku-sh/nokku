@@ -32,9 +32,9 @@ func TestRateLimited(t *testing.T) {
 		// A limit here would block legitimate reconnect storms.
 		{"/nokku.v1.DaemonControlService/Connect", false},
 		{"/nokku.v1.DaemonControlService/DaemonRelay", false},
+		{"/nokku.v1.DaemonControlService/SyncDaemon", false},
 		// Enrollment is public and takes a token, so it stays limited.
 		{"/nokku.v1.DaemonControlService/EnrollDaemon", true},
-		{"/nokku.v1.DaemonControlService/SyncDaemon", true},
 
 		// One page load pulls many hashed assets.
 		{"/_app/immutable/chunks/app.js", false},
@@ -80,6 +80,18 @@ func TestWithRateLimit(t *testing.T) {
 	)
 	assert.Equal(t, http.StatusNoContent, call("/nokku.v1.DaemonControlService/Connect", office),
 		"daemon streams are never limited")
+
+	// A rollout behind one address enrolls more servers in a minute than people sign in.
+	const site = "203.0.113.9:4000"
+	for i := range 4 * authPerMinute {
+		require.Equal(
+			t,
+			http.StatusNoContent,
+			call("/nokku.v1.DaemonControlService/EnrollDaemon", site),
+			"enroll %d",
+			i+1,
+		)
+	}
 }
 
 // Anyone can start a device login, and every start parks a grant.
@@ -145,7 +157,8 @@ func TestIsAuthRoute(t *testing.T) {
 		{"/nokku.v1.AuthService/ExchangeWorkloadToken", true},
 		{"/nokku.v1.InvitationService/AcceptInvitation", true},
 
-		// Other RPCs stay on the general limit.
+		// Other RPCs stay on the general limit, enrolling a daemon with them.
+		{"/nokku.v1.DaemonControlService/EnrollDaemon", false},
 		{"/nokku.v1.AccountService/GetAccount", false},
 		{"/nokku.v1.WorkspaceService/GetWorkspace", false},
 

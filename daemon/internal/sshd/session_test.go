@@ -23,13 +23,6 @@ import (
 
 const webSessionID = "0197a3f2-7c1b-7de1-9a2b-3f4c5d6e7f80"
 
-func TestRecoverPanic(t *testing.T) {
-	assert.NotPanics(t, func() {
-		defer recoverPanic("test")
-		panic("handler panic must be contained")
-	})
-}
-
 func TestServerDisconnectReapsCommand(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
@@ -229,7 +222,7 @@ func TestPlainSessionRecorded(t *testing.T) {
 
 	cur := currentUser(t)
 	ca := newTestCA(t)
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	must.NoError(err, "new server")
 	srv.SetAccess(testAccess(t, ca))
 	withPolicy(policy{Record: true})(srv)
@@ -321,7 +314,7 @@ func recordingIDFor(t *testing.T, keyID string) string {
 
 	cur := currentUser(t)
 	ca := newTestCA(t)
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	must.NoError(err, "new server")
 	srv.SetAccess(testAccess(t, ca))
 	withPolicy(policy{Record: true})(srv)

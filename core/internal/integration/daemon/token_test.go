@@ -173,9 +173,9 @@ func TestEnrollEphemeralWaitsForReconnects(t *testing.T) {
 	}), "a daemon that may still reconnect was deleted")
 }
 
-// A container coming or going wakes nobody, or a busy fleet would sync without
-// end. The version still moves, so every daemon catches up at its next
-// heartbeat, and a real change wakes them all at once.
+// A container coming or going costs the core no pass over the workspace, or a
+// busy fleet would keep it busy. Its own daemon is looked at when it connects,
+// and a real change is told at once.
 func TestContainerChurnWakesNobody(t *testing.T) {
 	f, token := ephemeralToken(t, 10*time.Minute)
 	teamID := seedTeamGrant(t, f, "deploy")
@@ -199,23 +199,14 @@ func TestContainerChurnWakesNobody(t *testing.T) {
 			}
 		}
 	}
-	version := func() int64 {
-		v, err := f.conn.Sys().GetWorkspaceStateVersion(t.Context(), workspaceID)
-		require.NoError(t, err)
-		return v
-	}
 
-	before := version()
 	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice")})
 	require.NoError(t, err)
 	assert.False(t, woken(), "a new container woke the fleet")
-	assert.Greater(t, version(), before, "the version must move, the heartbeat is the backstop")
 
-	before = version()
 	_, err = enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("alice"), Settled: true})
 	require.NoError(t, err)
 	assert.False(t, woken(), "a container replacing its offline self woke the fleet")
-	assert.Greater(t, version(), before)
 
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
 		return q.RevokeSubjectAccessInWorkspace(f.ctx, &db.RevokeSubjectAccessInWorkspaceParams{

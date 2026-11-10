@@ -236,10 +236,8 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 	t.Cleanup(func() {
 		_, err := certs.UpdateCertificateAuthority(context.WithoutCancel(t.Context()),
 			masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-				UserDefaultTtl: before.GetUserDefaultTtl(),
-				UserMaxTtl:     before.GetUserMaxTtl(),
-				HostTtl:        before.GetHostTtl(),
-				SourceAddress:  new(before.GetSourceAddress()),
+				UserTtl:       before.GetUserTtl(),
+				SourceAddress: new(before.GetSourceAddress()),
 			}))
 		require.NoError(t, err)
 	})
@@ -253,25 +251,15 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 		rpc: "CertificateService.UpdateCertificateAuthority",
 		create: func() string {
 			res, err := certs.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
-				UserDefaultTtl: durationpb.New(time.Hour),
-				UserMaxTtl:     durationpb.New(12 * time.Hour),
-				HostTtl:        durationpb.New(24 * time.Hour),
-				SourceAddress:  new("10.0.0.0/8"),
+				UserTtl:       durationpb.New(time.Hour),
+				SourceAddress: new("10.0.0.0/8"),
 			}))
 			require.NoError(t, err)
 			return res.GetCertificateAuthority().GetId()
 		},
 		read: func(string) []partialField { return partialFields(read(), "id") },
 		cases: []partialCase{
-			{"user_default_ttl", update(&nokkuv1.UpdateCertificateAuthorityRequest{
-				UserDefaultTtl: durationpb.New(2 * time.Hour),
-			})},
-			{"user_max_ttl", update(&nokkuv1.UpdateCertificateAuthorityRequest{
-				UserMaxTtl: durationpb.New(10 * time.Hour),
-			})},
-			{"host_ttl", update(&nokkuv1.UpdateCertificateAuthorityRequest{
-				HostTtl: durationpb.New(48 * time.Hour),
-			})},
+			{"user_ttl", update(&nokkuv1.UpdateCertificateAuthorityRequest{UserTtl: durationpb.New(2 * time.Hour)})},
 			{"source_address", update(&nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("192.0.2.0/24")})},
 			{"nothing", update(&nokkuv1.UpdateCertificateAuthorityRequest{})},
 		},
@@ -479,6 +467,7 @@ func partialTeam(t *testing.T, cfg *config.Config, admin *connect.Client) partia
 				"tags to none",
 				update(&nokkuv1.UpdateTeamRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}}}),
 			},
+			{"scim_open", update(&nokkuv1.UpdateTeamRequest{ScimOpen: new(true)})},
 			{"nothing", update(&nokkuv1.UpdateTeamRequest{})},
 		},
 	}
@@ -515,7 +504,6 @@ func partialTarget(t *testing.T, admin *connect.Client) partialResource {
 		cases: []partialCase{
 			{"name", update(&nokkuv1.UpdateTargetRequest{Name: new(uniq("renamed"))})},
 			{"description", update(&nokkuv1.UpdateTargetRequest{Description: new("changed")})},
-			{"host_public_key", update(&nokkuv1.UpdateTargetRequest{HostPublicKey: new(partialHostKey(t))})},
 			{"endpoints", update(&nokkuv1.UpdateTargetRequest{Endpoints: []string{"10.0.0.3:22"}})},
 			{"tags", update(&nokkuv1.UpdateTargetRequest{Tags: []string{"staging"}})},
 			{

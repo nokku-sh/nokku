@@ -116,6 +116,7 @@ type DaemonServiceClient interface {
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
+	// A browser shell is a way onto a server, so a cookie alone does not open one.
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	Relay(context.Context) (DaemonServiceRelayClientStream, error)
 }
@@ -169,6 +170,7 @@ type DaemonServiceHandler interface {
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
+	// A browser shell is a way onto a server, so a cookie alone does not open one.
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	Relay(context.Context, DaemonServiceRelayServerStream) error
 }

@@ -48,6 +48,13 @@ func dpopProofWithNonce(
 	procedure, token, nonce string,
 ) string {
 	t.Helper()
+	proof, err := signDPoP(key, procedure, token, nonce)
+	require.NoError(t, err)
+	return proof
+}
+
+// signDPoP fails no test by itself, the load test signs from many goroutines.
+func signDPoP(key *ecdsa.PrivateKey, procedure, token, nonce string) (string, error) {
 	claims := map[string]any{
 		"htm":   http.MethodPost,
 		"htu":   testWorkspace.BaseURL + procedure,
@@ -59,15 +66,19 @@ func dpopProofWithNonce(
 		claims["ath"] = dpop.ATH(token)
 	}
 	payload, err := json.Marshal(claims)
-	require.NoError(t, err)
+	if err != nil {
+		return "", err
+	}
 	opts := (&jose.SignerOptions{EmbedJWK: true}).WithType("dpop+jwt")
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: cryptosigner.Opaque(key)}, opts)
-	require.NoError(t, err)
+	if err != nil {
+		return "", err
+	}
 	jws, err := signer.Sign(payload)
-	require.NoError(t, err)
-	proof, err := jws.CompactSerialize()
-	require.NoError(t, err)
-	return proof
+	if err != nil {
+		return "", err
+	}
+	return jws.CompactSerialize()
 }
 
 func TestEnrollDaemon(t *testing.T) {
@@ -525,15 +536,6 @@ func TestDaemonThatFallsBehindShows(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
-	// A fresh hosted workspace is still at version 0, where nothing is behind.
-	member := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
-	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
-		team, err := q.CreateTeam(t.Context(), &db.CreateTeamParams{Name: uniq("behind")})
-		if err != nil {
-			return err
-		}
-		return q.AddTeamMember(t.Context(), &db.AddTeamMemberParams{TeamID: team.ID, UserID: member.ID})
-	})
 	token := enrolled.GetAccessToken()
 	ctx, call := connect.NewClientContext(t.Context())
 	call.RequestHeader().Set("Authorization", "DPoP "+token)
@@ -542,33 +544,38 @@ func TestDaemonThatFallsBehindShows(t *testing.T) {
 		clientOn(srv),
 	).Connect(ctx)
 	require.NoError(t, err)
+	updates := make(chan struct{}, 1)
 	go func() {
 		for {
-			if _, err := stream.Receive(); err != nil {
+			msg, err := stream.Receive()
+			if err != nil {
 				return
+			}
+			if msg.GetStateUpdate() != nil {
+				select {
+				case updates <- struct{}{}:
+				default:
+				}
 			}
 		}
 	}()
-	heartbeat := func(applied int64) {
+	heartbeat := func(holds []byte) {
 		t.Helper()
 		require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
-			Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{StateVersion: &applied}},
+			Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{StateHash: holds}},
 		}))
 	}
 	behind := func() bool {
 		return !cfg.Pool.BehindSince(enrolled.GetId()).IsZero()
 	}
 
-	// The first one sets what the daemon must reach by the next.
-	heartbeat(0)
-	require.Eventually(
-		t,
-		func() bool { return cfg.Pool.IsConnected(enrolled.GetId()) },
-		time.Second,
-		5*time.Millisecond,
-	)
-	heartbeat(0)
-	require.Eventually(t, behind, 2*time.Second, 5*time.Millisecond, "a daemon stuck on an old version did not show")
+	// A daemon that holds nothing is told to sync once the core worked out what it should hold.
+	heartbeat(nil)
+	require.True(t, woken(t, updates), "the core never said what the daemon should hold")
+	// The next heartbeat sets what it must reach by the one after.
+	heartbeat(nil)
+	heartbeat(nil)
+	require.Eventually(t, behind, 2*time.Second, 5*time.Millisecond, "a daemon stuck on an old state did not show")
 
 	daemons := nokkuv1connect.NewDaemonServiceClient(clientOn(
 		srv,
@@ -587,12 +594,10 @@ func TestDaemonThatFallsBehindShows(t *testing.T) {
 	})
 	assert.Len(t, events, 1, "falling behind is audited once")
 
-	var current int64
-	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
-		current, err = q.GetWorkspaceStateVersion(t.Context(), workspaceID)
-		return err
-	})
-	heartbeat(current)
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(clientOn(srv, daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))).
+		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
+	require.NoError(t, err)
+	heartbeat(synced.GetStateHash())
 	require.Eventually(
 		t,
 		func() bool { return !behind() },
@@ -602,7 +607,8 @@ func TestDaemonThatFallsBehindShows(t *testing.T) {
 	)
 }
 
-// holdControlStream is a daemon's stream. An unread update covers the next.
+// holdControlStream is the stream of a daemon that is up to date: it synced, and its heartbeat says so. An unread
+// update covers the next.
 func holdControlStream(
 	t *testing.T,
 	cfg *config.Config,
@@ -611,6 +617,11 @@ func holdControlStream(
 	token string,
 ) <-chan struct{} {
 	t.Helper()
+	synced, err := nokkuv1connect.NewDaemonControlServiceClient(
+		clientOn(srv, daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure)),
+	).SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
+	require.NoError(t, err)
+
 	ctx, call := connect.NewClientContext(t.Context())
 	call.RequestHeader().Set("Authorization", "DPoP "+token)
 	call.RequestHeader().Set("DPoP",
@@ -634,12 +645,56 @@ func holdControlStream(
 			}
 		}
 	}()
-	// A heartbeat with no version earns an update, so the core has the stream.
 	require.NoError(t, stream.Send(&nokkuv1.ConnectRequest{
-		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{}},
+		Msg: &nokkuv1.ConnectRequest_Heartbeat{Heartbeat: &nokkuv1.Heartbeat{StateHash: synced.GetStateHash()}},
 	}))
-	require.True(t, woken(t, updates), "the core never answered the first heartbeat")
+	// The core works out what the daemon should hold a moment after it connects. It holds just that.
+	require.False(t, wokenWithin(updates, 600*time.Millisecond), "a daemon that is up to date was told to sync")
 	return updates
+}
+
+func wokenWithin(updates <-chan struct{}, wait time.Duration) bool {
+	select {
+	case <-updates:
+		return true
+	case <-time.After(wait):
+		return false
+	}
+}
+
+// A change wakes the daemons it touches and no other, or one grant would sync a whole fleet.
+func TestAChangeWakesOnlyItsServer(t *testing.T) {
+	n := newNKSync(t)
+	cfg, srv := n.cfg, n.srv
+	person := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+
+	type server struct {
+		account string
+		updates <-chan struct{}
+	}
+	servers := make([]server, 2)
+	for i := range servers {
+		key, enrolled := enrollTestDaemon(t, cfg, srv, testWorkspace.ID, true)
+		account, err := n.accounts.AddTargetAccount(t.Context(), &nokkuv1.AddTargetAccountRequest{
+			TargetId: new(enrolled.GetTargetId()),
+			Username: new("root"),
+		})
+		require.NoError(t, err)
+		servers[i] = server{
+			account: account.GetAccount().GetId(),
+			updates: holdControlStream(t, cfg, srv, key, enrolled.GetAccessToken()),
+		}
+	}
+
+	n.grant(t, servers[0].account, person.ID)
+	assert.True(t, woken(t, servers[0].updates), "the server of the grant was not told")
+	assert.False(t, wokenWithin(servers[1].updates, time.Second), "a grant on one server woke another")
+
+	// Switching a person off changes what a server lets in only where the person was let in.
+	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
+		return q.SetUserActive(t.Context(), &db.SetUserActiveParams{ID: person.ID, Active: false})
+	})
+	assert.False(t, wokenWithin(servers[1].updates, time.Second), "switching off a person woke a server without them")
 }
 
 func woken(t *testing.T, updates <-chan struct{}) bool {
@@ -654,7 +709,7 @@ func woken(t *testing.T, updates <-chan struct{}) bool {
 	}, 5*time.Second, 10*time.Millisecond, "no StateUpdate reached the daemon")
 }
 
-// One transaction revokes on every server and bumps the version once. That one
+// One transaction revokes on every server and notifies once. That one
 // notification must reach every daemon, not only the owner of the first deleted
 // grant.
 func TestRevokeAllAccessReachesEveryServer(t *testing.T) {
@@ -690,18 +745,10 @@ func TestRevokeAllAccessReachesEveryServer(t *testing.T) {
 	principal := func(s *server, u *db.User) string {
 		return nklogin.Principal(u.ID, s.enrolled.GetTargetId(), "root")
 	}
-	version := func() int64 {
-		v, err := cfg.Conn.Sys().GetWorkspaceStateVersion(t.Context(), workspaceID)
-		require.NoError(t, err)
-		return v
-	}
-
-	// Expire now, or a grant another test left bumps the version later.
+	// Expire now, or a grant another test left wakes these daemons later.
 	require.NoError(t, access.Expire(t.Context(), cfg.Conn, cfg.Audit.Append))
-	before := version()
 	for _, s := range servers {
 		synced := sync(s)
-		require.Equal(t, before, synced.GetStateVersion(), "the daemon must start out up to date")
 		require.Len(t, synced.GetPrincipals(), 1)
 		require.ElementsMatch(t, []string{principal(s, revoked), principal(s, kept)},
 			synced.GetPrincipals()[0].GetCertPrincipals(), "both people must be on the server before the revoke")
@@ -713,13 +760,10 @@ func TestRevokeAllAccessReachesEveryServer(t *testing.T) {
 		Kind:      nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
 	})
 	require.NoError(t, err)
-	after := version()
-	assert.Equal(t, before+1, after, "one transaction bumps once, however many servers its grants were on")
 
 	for i, s := range servers {
 		assert.True(t, woken(t, s.updates), "daemon %d was not told about the revoke", i)
 		synced := sync(s)
-		assert.Equal(t, after, synced.GetStateVersion(), "daemon %d must see the one bump", i)
 		require.Len(t, synced.GetPrincipals(), 1, "daemon %d lost the account of the person who stays", i)
 		assert.Equal(t, []string{principal(s, kept)}, synced.GetPrincipals()[0].GetCertPrincipals(),
 			"daemon %d must drop the revoked person and keep the other one", i)

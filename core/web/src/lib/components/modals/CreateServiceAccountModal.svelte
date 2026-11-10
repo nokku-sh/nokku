@@ -54,6 +54,7 @@
 		<RolePicker
 			value={model.role}
 			max={SERVICE_ACCOUNT_MAX_ROLE}
+			machine
 			onChange={(role) => (model.role = role)}
 		/>
 	</Field.Set>

@@ -209,6 +209,7 @@ func TestRelayServesSSH(t *testing.T) {
 	c.srv.SetAccess(&state.Access{
 		Principals: map[string][]string{cur.Username: {"subject-1"}},
 		CA:         string(ssh.MarshalAuthorizedKey(caKey)),
+		SyncedAt:   time.Now(),
 	})
 
 	_, userPriv, err := ed25519.GenerateKey(rand.Reader)

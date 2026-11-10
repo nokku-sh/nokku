@@ -117,7 +117,7 @@ func (f *SCIMFlow) serverFor(ws actor.Workspace) (scim.Server, error) {
 	return s, nil
 }
 
-// scimProvisionUser sets active on existing accounts too, the IdP owns it.
+// scimProvisionUser sets active on existing accounts too, within what scimSetActive allows.
 func (s *Service) scimProvisionUser(
 	ctx context.Context,
 	email, name string,
@@ -139,7 +139,7 @@ func (s *Service) scimProvisionUser(
 			}
 			created = true
 			if !active {
-				if u, err = s.SetUserActive(ctx, q, u.ID, false); err != nil {
+				if u, err = s.scimSetActive(ctx, q, u.ID, false); err != nil {
 					return err
 				}
 			}
@@ -151,7 +151,7 @@ func (s *Service) scimProvisionUser(
 					return err
 				}
 			}
-			if u, err = s.SetUserActive(ctx, q, u.ID, active); err != nil {
+			if u, err = s.scimSetActive(ctx, q, u.ID, active); err != nil {
 				return err
 			}
 			flipped = true
@@ -242,6 +242,29 @@ func keepOwner(ctx context.Context, q *db.Queries, userID string) error {
 	return nil
 }
 
+// scimSetActive is SetUserActive for the identity provider. It switches anyone but the owner off, which is how
+// people leave. It switches on only what it switched off, so it never undoes an admin's emergency brake.
+func (s *Service) scimSetActive(ctx context.Context, q *db.Queries, userID string, active bool) (*db.User, error) {
+	u, err := q.GetUser(ctx, userID)
+	if err != nil || u.Active == active {
+		return u, err
+	}
+	if active && !u.ScimDeactivated {
+		return nil, scimerrors.ScimError{
+			Status: http.StatusConflict,
+			Detail: "this account was switched off in Nokku, an admin has to switch it on there",
+		}
+	}
+	if u, err = s.SetUserActive(ctx, q, userID, active); err != nil || active {
+		return u, err
+	}
+	if err = q.MarkUserSCIMDeactivated(ctx, userID); err != nil {
+		return nil, err
+	}
+	u.ScimDeactivated = true
+	return u, nil
+}
+
 // scimDeprovisionUser keeps the data for a re-assignment.
 func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
 	var after *db.User
@@ -249,7 +272,7 @@ func (s *Service) scimDeprovisionUser(ctx context.Context, u *db.User) error {
 		if err := keepOwner(ctx, q, u.ID); err != nil {
 			return err
 		}
-		if after, err = s.SetUserActive(ctx, q, u.ID, false); err != nil {
+		if after, err = s.scimSetActive(ctx, q, u.ID, false); err != nil {
 			return err
 		}
 		if err := q.SetUserSCIMExternalID(ctx, &db.SetUserSCIMExternalIDParams{ID: u.ID}); err != nil {

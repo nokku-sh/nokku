@@ -99,6 +99,7 @@ Everything `nokkud` owns lives under `/var/lib/nokkud/`:
 - `daemon.json` holds the enrollment and the synced access. A host that still has the older `config.json` and `cache.json` is not enrolled anymore, so enroll it again.
 - `state.json` is the daemon's identity toward the core. With a TPM, its key never leaves the chip.
 - `ssh_host_ecdsa_key` is the SSH host key, a normal OpenSSH key file readable by root only. Every enrollment makes a new one, and the core signs a host certificate for it.
+- `connections.jsonl` holds the logins the core's audit log does not have yet. It is empty while the core is reachable.
 - `recordings/` holds recordings that are not uploaded yet.
 
 ### Operations

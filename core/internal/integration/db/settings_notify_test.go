@@ -16,11 +16,10 @@ import (
 
 // Daemons read the idle timeout from the settings, a change reaches them at
 // once.
-func TestStateVersionBumpsOnSettings(t *testing.T) {
+func TestTheIdleTimeoutNotifies(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	conn := listen(t, c)
-	before := stateVersion(t, c, f.ws)
+	w := watch(t, c, f.ws)
 
 	asOwner(t, c, f, func(q *db.Queries) error {
 		_, err := q.UpdateWorkspace(t.Context(), &db.UpdateWorkspaceParams{
@@ -29,9 +28,7 @@ func TestStateVersionBumpsOnSettings(t *testing.T) {
 		return err
 	})
 
-	waitNotify(t, conn, f.ws)
-	after := stateVersion(t, c, f.ws)
-	require.Greater(t, after, before, "an idle timeout change must bump the version")
+	require.Equal(t, 1, w.seen(t), "an idle timeout change")
 
 	// Daemons read nothing else there, so nothing else makes them sync.
 	asOwner(t, c, f, func(q *db.Queries) error {
@@ -43,5 +40,5 @@ func TestStateVersionBumpsOnSettings(t *testing.T) {
 		})
 		return err
 	})
-	require.Equal(t, after, stateVersion(t, c, f.ws), "another settings change moved the version")
+	require.Zero(t, w.seen(t), "another settings change looked like an access change")
 }

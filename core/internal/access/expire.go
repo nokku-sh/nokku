@@ -40,7 +40,7 @@ func Expire(ctx context.Context, conn *db.Connection, write func(context.Context
 		return err
 	}
 	for _, workspaceID := range workspaces {
-		// One tx per workspace, the version bumps once per tx and workspace.
+		// One tx per workspace, the trigger notifies once per tx and workspace.
 		var gone []*db.DeleteExpiredGrantsRow
 		if err := conn.SysTx(ctx, func(q *db.Queries) error {
 			gone, err = q.DeleteExpiredGrants(ctx, workspaceID)

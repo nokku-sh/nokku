@@ -3,6 +3,7 @@
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
 	import {
+		eventHappened,
 		eventLabel,
 		eventWhat,
 		outcomeLabel,
@@ -10,6 +11,7 @@
 		setParams
 	} from '#lib/components/audit/audit.js';
 	import EventIcon from '#lib/components/audit/EventIcon.svelte';
+	import { formatTs } from '#lib/utils.js';
 
 	let { log }: { log: EventLog } = $props();
 
@@ -17,6 +19,7 @@
 	const code = $derived(log.details?.['code'] as string | undefined);
 	// Older events stored only the id, they show it as before.
 	const what = $derived(eventWhat(log));
+	const happened = $derived(eventHappened(log));
 </script>
 
 <div class="flex min-w-0 items-center gap-2.5">
@@ -49,6 +52,13 @@
 			>
 				{what ?? log.target}
 			</button>
+		{:else if what}
+			<span class="max-w-80 truncate text-xs text-muted-foreground">{what}</span>
+		{/if}
+		{#if happened}
+			<span class="text-xs text-muted-foreground">
+				Happened {formatTs(happened, 'withTime')}, reported later
+			</span>
 		{/if}
 	</div>
 </div>

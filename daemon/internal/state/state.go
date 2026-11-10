@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/mizuchilabs/kata/fsutil"
 
@@ -36,8 +37,11 @@ type Access struct {
 	DaemonConfig *nokkuv1.DaemonConfig `json:"daemon_config,omitempty"`
 	CA           string                `json:"ca,omitempty"`
 	// HostCA signs the host cert. Logins only ever check CA.
-	HostCA       string `json:"host_ca,omitempty"`
-	StateVersion int64  `json:"state_version,omitzero"`
+	HostCA string `json:"host_ca,omitempty"`
+	// StateHash is the core's hash of the sync this came from. The daemon only hands it back.
+	StateHash []byte `json:"state_hash,omitempty"`
+	// SyncedAt is when the core last said so, by this host's clock. The sshd counts from it.
+	SyncedAt time.Time `json:"synced_at,omitzero"`
 }
 
 // State has a Config set before the client starts and only read after.
@@ -45,8 +49,8 @@ type State struct {
 	Config
 
 	access atomic.Pointer[Access]
-	// saved is the state version on disk, the one the heartbeat reports.
-	saved atomic.Int64
+	// saved is the access on disk, the one the heartbeat reports.
+	saved atomic.Pointer[Access]
 
 	mu sync.Mutex
 	// The daemon the file named at load, a save never overwrites another.
@@ -85,7 +89,8 @@ func AccessFrom(res *nokkuv1.SyncDaemonResponse, targetID string) *Access {
 		DaemonConfig: res.GetConfig(),
 		CA:           res.GetCaPublicKey(),
 		HostCA:       res.GetHostCaPublicKey(),
-		StateVersion: res.GetStateVersion(),
+		StateHash:    res.GetStateHash(),
+		SyncedAt:     time.Now(),
 	}
 }
 
@@ -104,6 +109,7 @@ func validAccounts(principals map[string][]string) map[string][]string {
 func New(cfg Config) *State {
 	s := &State{Config: cfg}
 	s.access.Store(&Access{})
+	s.saved.Store(&Access{})
 	return s
 }
 
@@ -119,7 +125,7 @@ func Load() (*State, error) {
 	if f.Access != nil {
 		f.Access.Principals = validAccounts(f.Access.Principals)
 		s.access.Store(f.Access)
-		s.saved.Store(f.Access.StateVersion)
+		s.saved.Store(f.Access)
 	}
 	return s, nil
 }
@@ -149,7 +155,7 @@ func (s *State) Save() error {
 		return err
 	}
 	s.owner = s.DaemonID
-	s.saved.Store(a.StateVersion)
+	s.saved.Store(a)
 	return nil
 }
 
@@ -162,6 +168,7 @@ func (s *State) Dropped() *State {
 	return d
 }
 
-func (s *State) SavedVersion() int64 {
+// Saved is the access that reached the disk, which may be one sync behind Access.
+func (s *State) Saved() *Access {
 	return s.saved.Load()
 }

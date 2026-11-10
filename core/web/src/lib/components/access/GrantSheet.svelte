@@ -8,7 +8,6 @@
 	import PlanBadge from '#lib/components/blocks/PlanBadge.svelte';
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
-	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import * as Command from '#lib/components/ui/command/index.js';
@@ -20,16 +19,10 @@
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, IsMobile } from '#lib/hooks/index.js';
 	import { formatHours, formatTs, listNames } from '#lib/utils.js';
-	import { Check, Plus, Server, Tag, TriangleAlert } from '@lucide/svelte';
+	import { Check, Plus, Server, Tag } from '@lucide/svelte';
 	import { Debounced } from 'runed';
-	import {
-		accountsOf,
-		grantSheet,
-		MAX_SERVERS,
-		planGrant,
-		subjectLabel,
-		useGrantWhere
-	} from './grant.svelte';
+	import { toast } from 'svelte-sonner';
+	import { grantSheet, subjectLabel } from './grant.svelte';
 	import SubjectAvatar from './SubjectAvatar.svelte';
 	import SubjectPicker from './SubjectPicker.svelte';
 	import { grantEnd, type Subject } from './subjects.svelte';
@@ -42,16 +35,17 @@
 	// Past this many servers, or on root, the grant asks once more before it runs.
 	const CAREFUL = 10;
 
-	const where = useGrantWhere(
-		() => ({ ids: grantSheet.servers.map((s) => s.id), tags: grantSheet.tags }),
-		() => grantSheet.open
-	);
 	const picked = $derived(grantSheet.servers.length + grantSheet.tags.length > 0);
-	const servers = $derived(picked ? (where.data?.servers ?? []) : []);
-	const tooMany = $derived(picked && !!where.data?.tooMany);
+	const whereSpec = () => ({
+		targetIds: grantSheet.servers.map((s) => s.id),
+		tags: grantSheet.tags
+	});
+	// The core says which servers these are and what the grant does there. The sheet only shows it.
+	const where = targetAccount.planGrant(whereSpec, () => grantSheet.open && can.edit && picked);
+	const servers = $derived(picked ? (where.data?.plan?.servers ?? 0) : 0);
 	const finding = $derived(picked && where.isFetching);
 
-	const accounts = $derived(accountsOf(servers));
+	const accounts = $derived(picked ? (where.data?.plan?.accounts ?? []) : []);
 	// The only account there is picks itself.
 	const account = $derived(
 		grantSheet.account || (accounts.length === 1 ? accounts[0].username : '')
@@ -63,20 +57,35 @@
 	);
 
 	const end = $derived(grantEnd(grantSheet.hours));
-	const plan = $derived(
-		account && servers.length
-			? planGrant(grantSheet.subjects, servers, account, end, grantSheet.changeEnds)
-			: undefined
+	const spec = $derived({
+		...whereSpec(),
+		subjects: grantSheet.subjects.map(({ id, kind }) => ({ id, kind })),
+		username: account,
+		expiresAt: end,
+		changeEnds: grantSheet.changeEnds
+	});
+	const planned = targetAccount.planGrant(
+		() => spec,
+		() => grantSheet.open && can.edit && !!account && servers > 0
 	);
-	const added = $derived(plan?.rows.reduce((n, r) => n + r.added, 0) ?? 0);
-	const otherEnd = $derived(plan?.rows.reduce((n, r) => n + r.otherEnd, 0) ?? 0);
+	const plan = $derived(account && servers ? planned.data?.plan : undefined);
+	const rows = $derived(
+		grantSheet.subjects.flatMap((subject) => {
+			const outcome = plan?.outcomes.find((o) => o.subjectId === subject.id);
+			return outcome ? [{ subject, ...outcome }] : [];
+		})
+	);
+	const added = $derived(rows.reduce((n, r) => n + r.added, 0));
+	const otherEnd = $derived(rows.reduce((n, r) => n + r.otherEnd, 0));
+	const changes = $derived(added + (grantSheet.changeEnds ? otherEnd : 0));
+	const skipped = $derived(plan ? plan.servers - plan.withAccount : 0);
 	const ready = $derived(
 		can.edit &&
 			grantSheet.subjects.length > 0 &&
 			!!plan &&
-			plan.calls.length > 0 &&
-			!tooMany &&
-			!finding
+			changes > 0 &&
+			!finding &&
+			!planned.isFetching
 	);
 
 	const endText = $derived(
@@ -86,47 +95,34 @@
 	);
 	const whereText = $derived.by(() => {
 		if (!picked) return 'Pick servers by name, or a tag for all its servers.';
-		if (tooMany || (finding && !servers.length)) return '';
-		if (!servers.length) return 'No server has these tags yet.';
-		return `${plural(servers.length, 'server')}: ${listNames(servers.map((s) => s.name))}`;
+		if (finding && !servers) return '';
+		if (!servers) return 'No server has these tags yet.';
+		return `${plural(servers, 'server')}: ${listNames(where.data?.plan?.serverNames ?? [], 3, servers)}`;
 	});
 	const previewTitle = $derived.by(() => {
 		if (!plan) return '';
-		if (!plan.servers) return `No server here has a ${account} account.`;
-		if (!plan.calls.length) return 'Nothing to change, they have it already.';
-		const changed = grantSheet.changeEnds ? otherEnd : 0;
-		return [added && `${plural(added, 'new grant')}`, changed && `${plural(changed, 'new end')}`]
+		if (!plan.withAccount) return `No server here has a ${account} account.`;
+		if (!changes) return 'Nothing to change, they have it already.';
+		const moved = grantSheet.changeEnds ? otherEnd : 0;
+		return [added && `${plural(added, 'new grant')}`, moved && `${plural(moved, 'new end')}`]
 			.filter(Boolean)
 			.join(' and ')
-			.concat(` on ${plural(plan.servers, 'server')}`);
+			.concat(` on ${plural(plan.withAccount, 'server')}`);
 	});
 
-	let done = '';
-	let calls = 0;
-	const grant = targetAccount.grant((ok) =>
-		ok === calls ? done : 'Part of the grant went through, what is left stays in the sheet'
-	);
+	const grant = targetAccount.grant();
 
 	async function submit() {
-		if (!ready) return;
-		const fresh = planGrant(
-			grantSheet.subjects,
-			servers,
-			account,
-			grantEnd(grantSheet.hours),
-			grantSheet.changeEnds
-		);
-		const on = plural(fresh.servers, 'server');
-		done = fresh.rows.some((r) => r.added)
-			? `Granted ${account} on ${on}`
-			: `New end for ${account} on ${on}`;
-		calls = fresh.calls.length;
-		// On a partial failure the sheet stays, the refetch leaves only what is still missing.
+		if (!ready || !plan) return;
+		const on = plural(plan.withAccount, 'server');
+		const done = added ? `Granted ${account} on ${on}` : `New end for ${account} on ${on}`;
+		// One call and one transaction, so it lands whole or not at all. The end counts from now.
 		const run = async () => {
-			const { failures } = await grant.mutateAsync(fresh.calls);
-			if (!failures.length) grantSheet.open = false;
+			await grant.mutateAsync({ grant: { ...spec, expiresAt: grantEnd(grantSheet.hours) } });
+			toast.success(done);
+			grantSheet.open = false;
 		};
-		if (account === 'root' || fresh.servers > CAREFUL) {
+		if (account === 'root' || plan.withAccount > CAREFUL) {
 			const who = listNames(grantSheet.subjects.map(subjectLabel));
 			await confirm({
 				title: `Grant ${account} on ${on}?`,
@@ -275,16 +271,7 @@
 							{/if}
 						</SearchPopover>
 					</div>
-					{#if tooMany}
-						<Alert.Root variant="warning">
-							<TriangleAlert />
-							<Alert.Title>More than {MAX_SERVERS} servers</Alert.Title>
-							<Alert.Description>
-								The sheet grants on up to {MAX_SERVERS} at a time for now. Pick a narrower tag or fewer
-								servers.
-							</Alert.Description>
-						</Alert.Root>
-					{:else if finding && !servers.length}
+					{#if finding && !servers}
 						<Skeleton class="h-4 w-48" />
 					{:else}
 						<Field.Description>{whereText}</Field.Description>
@@ -308,7 +295,7 @@
 								<ToggleGroup.Item value={a.username} class="gap-2">
 									<span class="font-mono">{a.username}</span>
 									<span class="text-xs text-muted-foreground tabular-nums">
-										{a.servers}/{servers.length}
+										{a.servers}/{servers}
 									</span>
 								</ToggleGroup.Item>
 							{/each}
@@ -370,7 +357,7 @@
 					>
 						<h3 id="grant-preview" class="text-sm font-medium">{previewTitle}</h3>
 						<ul class="flex flex-col gap-2">
-							{#each plan.rows as row (row.subject.id)}
+							{#each rows as row (row.subject.id)}
 								<li class="flex flex-wrap items-center gap-2 text-sm">
 									<SubjectAvatar subject={row.subject} class="size-6" />
 									<span class="min-w-0 flex-1 truncate">{subjectLabel(row.subject)}</span>
@@ -385,11 +372,11 @@
 								</li>
 							{/each}
 						</ul>
-						{#if plan.skipped.length}
+						{#if skipped}
 							<p class="text-xs text-muted-foreground">
-								{listNames(plan.skipped.map((s) => s.name))}
-								{plan.skipped.length === 1 ? 'has' : 'have'} no {account} account, so
-								{plan.skipped.length === 1 ? 'it is' : 'they are'} skipped.
+								{listNames(plan.skipped, 3, skipped)}
+								{skipped === 1 ? 'has' : 'have'} no {account} account, so
+								{skipped === 1 ? 'it is' : 'they are'} skipped.
 							</p>
 						{/if}
 					</section>

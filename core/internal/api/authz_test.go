@@ -250,6 +250,28 @@ func TestAuthorizePeopleOnly(t *testing.T) {
 	}
 }
 
+// A machine key adds and removes servers through nk sync. Who has access is for people to change, so a new editor
+// call is refused for machines until it is listed here.
+func TestMachinesOnlyReachTheNkSyncCalls(t *testing.T) {
+	a := &authorizationInterceptor{}
+	editor := nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR
+	machine := actor.ContextWithPrincipal(
+		t.Context(),
+		actor.Principal{ID: "sa1", Kind: actor.KindServiceAccount, Role: editor},
+	)
+	var reached []string
+	for _, procedure := range allProcedures(t) {
+		if procedureAccess[procedure].GetRole() == editor && a.authorize(machine, procedure, nil) == nil {
+			reached = append(reached, procedure)
+		}
+	}
+	assert.ElementsMatch(t, []string{
+		nokkuv1connect.TargetServiceCreateTargetProcedure,
+		nokkuv1connect.TargetServiceDeleteTargetProcedure,
+		nokkuv1connect.TargetServiceSyncTargetUsersProcedure,
+	}, reached)
+}
+
 func TestAuthorizeUnknownProcedure(t *testing.T) {
 	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(

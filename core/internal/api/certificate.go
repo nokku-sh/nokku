@@ -56,11 +56,7 @@ func (s *certificateService) UpdateCertificateAuthority(
 	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
 		return nil, err
 	}
-	params := &db.UpdateCAParams{
-		UserDefaultTtl: optDuration(req.GetUserDefaultTtl()),
-		UserMaxTtl:     optDuration(req.GetUserMaxTtl()),
-		HostTtl:        optDuration(req.GetHostTtl()),
-	}
+	params := &db.UpdateCAParams{UserTtl: optDuration(req.GetUserTtl())}
 	// Unset keeps what the CA has, empty takes the list away.
 	if req.SourceAddress != nil {
 		list, err := ssh.SourceAddresses(req.GetSourceAddress())
@@ -187,25 +183,26 @@ func (s *certificateService) SignSSHCertificate(
 	}); err != nil {
 		return nil, err
 	}
-	ttl := req.GetTtl().AsDuration()
+	// The workspace's lifetime, and everything below only shortens it.
+	ttl := ca.UserTtl
 	if caller.Kind == actor.KindServiceAccount {
 		// The cap follows the token the account called with, not the account.
 		tok, _ := iam.CurrentToken(ctx)
-		ttl = serviceAccountTTL(ca, ttl, tok.ExpiresAt)
-		// Nothing left would sign for the CA default.
+		ttl = serviceAccountTTL(ttl, tok.ExpiresAt)
 		if ttl <= 0 {
 			return nil, connect.NewError(connect.CodeUnauthenticated, "the token has expired")
 		}
 	}
 	if until != nil {
-		ttl = grantTTL(ca, ttl, *until)
+		// The certificate never outlives its first grant to end.
+		ttl = min(ttl, time.Until(*until))
 		if ttl <= 0 {
 			return nil, connect.NewError(connect.CodePermissionDenied, "you have no access to this server")
 		}
 	}
 	if daemonless {
 		// No revoke reaches such a server, only expiry ends the access.
-		ttl = min(ssh.UserTTL(ca, ttl), daemonlessCertTTL)
+		ttl = min(ttl, daemonlessCertTTL)
 	}
 
 	cert, err := ssh.SignCertificate(
@@ -238,14 +235,9 @@ func (s *certificateService) SignSSHCertificate(
 	}, nil
 }
 
-// grantTTL keeps the certificate from outliving its first grant to end.
-func grantTTL(ca *db.SSHCA, ttl time.Duration, until time.Time) time.Duration {
-	return min(ssh.UserTTL(ca, ttl), time.Until(until))
-}
-
 // serviceAccountTTL keeps the certificate from outliving the token.
-func serviceAccountTTL(ca *db.SSHCA, ttl time.Duration, tokenExpiresAt *time.Time) time.Duration {
-	ttl = min(ssh.UserTTL(ca, ttl), serviceAccountCertTTL)
+func serviceAccountTTL(ttl time.Duration, tokenExpiresAt *time.Time) time.Duration {
+	ttl = min(ttl, serviceAccountCertTTL)
 	if tokenExpiresAt != nil {
 		ttl = min(ttl, time.Until(*tokenExpiresAt))
 	}

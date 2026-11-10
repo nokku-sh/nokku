@@ -26,7 +26,6 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		APIURL: "https://a.example", SessionToken: "sess", SessionExpiresAt: expires,
 		Targets: []Target{{ID: "t", Name: "web"}}, User: &User{ID: "u"},
 		Token: "nk_sa_secret",
-		TTL:   time.Hour,
 	}
 	require.NoError(t, s.Save())
 
@@ -35,7 +34,6 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	assert.Equal(t, "sess", loaded.SessionToken)
 	assert.True(t, loaded.SessionExpiresAt.Equal(expires))
 	assert.Equal(t, s.Cache, loaded.Cache)
-	assert.Equal(t, time.Hour, loaded.TTL, "--ttl is kept for the nk that ssh runs")
 	assert.Empty(t, loaded.Token, "a token is never persisted")
 
 	raw, err := os.ReadFile(paths.ConfigFile())
@@ -44,6 +42,17 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	fi, err := os.Stat(paths.ConfigFile())
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+}
+
+// nk once kept a --ttl here. A file from then still loads.
+func TestLoadTakesAConfigWithAFieldThatIsGone(t *testing.T) {
+	setHome(t)
+	old := `{"api_url":"https://a.example","session_token":"sess","ttl":3600000000000}`
+	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte(old), 0o600))
+
+	loaded := Load()
+	assert.Equal(t, "https://a.example", loaded.APIURL)
+	assert.Equal(t, "sess", loaded.SessionToken)
 }
 
 func TestSessionValid(t *testing.T) {

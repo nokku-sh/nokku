@@ -1,6 +1,8 @@
 -- name: InsertAuditLog :exec
+-- An event with an id of its own is stored once, however often it comes.
 INSERT INTO
   audit.audit_logs (
+    id,
     workspace_id,
     actor_id,
     actor_kind,
@@ -14,6 +16,7 @@ INSERT INTO
   )
 VALUES
   (
+    COALESCE(sqlc.narg('id')::UUID, uuidv7()),
     @workspace_id,
     @actor_id,
     @actor_kind,
@@ -24,7 +27,8 @@ VALUES
     @ip,
     @user_agent,
     @details::jsonb
-  );
+  )
+ON CONFLICT (id) DO NOTHING;
 
 -- name: ListAuditLogs :many
 -- The total is counted on its own. A window count reads every matching row in full to return one page.

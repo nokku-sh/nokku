@@ -148,6 +148,16 @@ func TestRequestedFresh(t *testing.T) {
 	}
 	assert.True(t, requestedFresh(daemon("config.record_sessions")), "turning recording off")
 	assert.False(t, requestedFresh(daemon("status", "config.allow_forwarding")), "other daemon settings stay free")
+
+	server := func(paths ...string) *nokkuv1.UpdateTargetRequest {
+		return &nokkuv1.UpdateTargetRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}}
+	}
+	assert.True(t, requestedFresh(server("name", "endpoints")), "a server's address")
+	assert.False(t, requestedFresh(server("name", "description", "tags")), "the rest of a server stays free")
+
+	assert.True(t, requestedFresh(&nokkuv1.UpdateTeamRequest{ScimOpen: new(true)}), "opening a team for SCIM")
+	assert.False(t, requestedFresh(&nokkuv1.UpdateTeamRequest{ScimOpen: new(false)}), "closing it again stays quick")
+	assert.False(t, requestedFresh(&nokkuv1.UpdateTeamRequest{Name: new("renamed")}), "a team's name stays free")
 }
 
 // An uncapped create is unbounded when hosted, so each is capped or named here.

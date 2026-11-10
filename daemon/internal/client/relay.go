@@ -44,11 +44,6 @@ type relayConn struct {
 
 // The sshd enforces its connection cap, so relays need none.
 func (c *Client) runRelay(ctx context.Context, req *nokkuv1.RelayOpen) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("relay panicked", "relay", req.GetRelayId(), "panic", r)
-		}
-	}()
 	ctx, cancel := context.WithTimeout(ctx, sessionTTL)
 	defer cancel()
 	stream, err := c.ctl.DaemonRelay(ctx)

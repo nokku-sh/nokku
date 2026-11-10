@@ -25,14 +25,19 @@ const (
 )
 
 type Team struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
-	MemberCount   *int32                 `protobuf:"varint,5,opt,name=member_count,json=memberCount" json:"member_count,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	Tags        []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	MemberCount *int32                 `protobuf:"varint,5,opt,name=member_count,json=memberCount" json:"member_count,omitempty"`
+	CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	// The identity provider sets the members over SCIM.
+	ScimManaged *bool `protobuf:"varint,8,opt,name=scim_managed,json=scimManaged" json:"scim_managed,omitempty"`
+	// An admin lets a SCIM group of the same name take this team over, with the access it has. Until then such a group
+	// is refused. The takeover uses it up.
+	ScimOpen      *bool `protobuf:"varint,9,opt,name=scim_open,json=scimOpen" json:"scim_open,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -114,6 +119,20 @@ func (x *Team) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *Team) GetScimManaged() bool {
+	if x != nil && x.ScimManaged != nil {
+		return *x.ScimManaged
+	}
+	return false
+}
+
+func (x *Team) GetScimOpen() bool {
+	if x != nil && x.ScimOpen != nil {
+		return *x.ScimOpen
+	}
+	return false
 }
 
 type GetTeamRequest struct {
@@ -309,11 +328,13 @@ func (x *CreateTeamResponse) GetTeam() *Team {
 }
 
 type UpdateTeamRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Tags          []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	Tags        []string               `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty"`
+	// Opening a team for SCIM takes a fresh sign-in, it hands its access to whoever runs the identity provider.
+	ScimOpen      *bool                  `protobuf:"varint,6,opt,name=scim_open,json=scimOpen" json:"scim_open,omitempty"`
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,5,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -375,6 +396,13 @@ func (x *UpdateTeamRequest) GetTags() []string {
 		return x.Tags
 	}
 	return nil
+}
+
+func (x *UpdateTeamRequest) GetScimOpen() bool {
+	if x != nil && x.ScimOpen != nil {
+		return *x.ScimOpen
+	}
+	return false
 }
 
 func (x *UpdateTeamRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
@@ -984,7 +1012,7 @@ var File_nokku_v1_team_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_team_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/team.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"\xf9\x01\n" +
+	"\x13nokku/v1/team.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"\xb9\x02\n" +
 	"\x04Team\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -994,7 +1022,9 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"*\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12!\n" +
+	"\fscim_managed\x18\b \x01(\bR\vscimManaged\x12\x1b\n" +
+	"\tscim_open\x18\t \x01(\bR\bscimOpen\"*\n" +
 	"\x0eGetTeamRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"5\n" +
 	"\x0fGetTeamResponse\x12\"\n" +
@@ -1005,14 +1035,15 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x03 \x03(\tR\x04tags\"8\n" +
 	"\x12CreateTeamResponse\x12\"\n" +
-	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\xee\x01\n" +
+	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\x96\x02\n" +
 	"\x11UpdateTeamRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04name\x12*\n" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\x12_\n" +
-	"\vupdate_mask\x18\x05 \x01(\v2\x1a.google.protobuf.FieldMaskB\"\xbaH\x1f\xc8\x01\x01\xe2\x01\x19\x12\x04name\x12\vdescription\x12\x04tagsR\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\x12\x1b\n" +
+	"\tscim_open\x18\x06 \x01(\bR\bscimOpen\x12j\n" +
+	"\vupdate_mask\x18\x05 \x01(\v2\x1a.google.protobuf.FieldMaskB-\xbaH*\xc8\x01\x01\xe2\x01$\x12\x04name\x12\vdescription\x12\x04tags\x12\tscim_openR\n" +
 	"updateMask\"8\n" +
 	"\x12UpdateTeamResponse\x12\"\n" +
 	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"-\n" +
@@ -1042,18 +1073,19 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\x17ListTeamsForUserRequest\x12!\n" +
 	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"@\n" +
 	"\x18ListTeamsForUserResponse\x12$\n" +
-	"\x05teams\x18\x01 \x03(\v2\x0e.nokku.v1.TeamR\x05teams2\xa6\x06\n" +
+	"\x05teams\x18\x01 \x03(\v2\x0e.nokku.v1.TeamR\x05teams2\xb0\x06\n" +
 	"\vTeamService\x12I\n" +
 	"\aGetTeam\x12\x18.nokku.v1.GetTeamRequest\x1a\x19.nokku.v1.GetTeamResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12Q\n" +
-	"\tListTeams\x12\x1a.nokku.v1.ListTeamsRequest\x1a\x1b.nokku.v1.ListTeamsResponse\"\v\xc2\xf3\x18\x04\x18\x02X\x01\x90\x02\x01\x12Q\n" +
+	"\tListTeams\x12\x1a.nokku.v1.ListTeamsRequest\x1a\x1b.nokku.v1.ListTeamsResponse\"\v\xc2\xf3\x18\x04\x18\x02X\x01\x90\x02\x01\x12S\n" +
 	"\n" +
-	"CreateTeam\x12\x1b.nokku.v1.CreateTeamRequest\x1a\x1c.nokku.v1.CreateTeamResponse\"\b\xc2\xf3\x18\x04\x18\x03@\x01\x12O\n" +
+	"CreateTeam\x12\x1b.nokku.v1.CreateTeamRequest\x1a\x1c.nokku.v1.CreateTeamResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x03(\x01@\x01\x12Q\n" +
 	"\n" +
-	"UpdateTeam\x12\x1b.nokku.v1.UpdateTeamRequest\x1a\x1c.nokku.v1.UpdateTeamResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12O\n" +
+	"UpdateTeam\x12\x1b.nokku.v1.UpdateTeamRequest\x1a\x1c.nokku.v1.UpdateTeamResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12Q\n" +
 	"\n" +
-	"DeleteTeam\x12\x1b.nokku.v1.DeleteTeamRequest\x1a\x1c.nokku.v1.DeleteTeamResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12X\n" +
-	"\rAddTeamMember\x12\x1e.nokku.v1.AddTeamMemberRequest\x1a\x1f.nokku.v1.AddTeamMemberResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12a\n" +
-	"\x10RemoveTeamMember\x12!.nokku.v1.RemoveTeamMemberRequest\x1a\".nokku.v1.RemoveTeamMemberResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12a\n" +
+	"DeleteTeam\x12\x1b.nokku.v1.DeleteTeamRequest\x1a\x1c.nokku.v1.DeleteTeamResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12Z\n" +
+	"\rAddTeamMember\x12\x1e.nokku.v1.AddTeamMemberRequest\x1a\x1f.nokku.v1.AddTeamMemberResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12c\n" +
+	"\x10RemoveTeamMember\x12!.nokku.v1.RemoveTeamMemberRequest\x1a\".nokku.v1.RemoveTeamMemberResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12a\n" +
 	"\x0fListTeamMembers\x12 .nokku.v1.ListTeamMembersRequest\x1a!.nokku.v1.ListTeamMembersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12d\n" +
 	"\x10ListTeamsForUser\x12!.nokku.v1.ListTeamsForUserRequest\x1a\".nokku.v1.ListTeamsForUserResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01B\x8a\x01\n" +
 	"\fcom.nokku.v1B\tTeamProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"

@@ -55,25 +55,6 @@ func TestSignCertificate_Errors(t *testing.T) {
 	}
 }
 
-func TestBoundTTL(t *testing.T) {
-	tests := []struct {
-		name string
-		ttl  time.Duration
-		want time.Duration
-	}{
-		{"zero", 0, time.Hour},
-		{"negative", -time.Minute, time.Hour},
-		{"over max", 48 * time.Hour, time.Hour},
-		{"in range", 30 * time.Minute, 30 * time.Minute},
-		{"exactly max", 24 * time.Hour, 24 * time.Hour},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, boundTTL(tt.ttl, time.Hour, 24*time.Hour))
-		})
-	}
-}
-
 func TestAcceptedKey(t *testing.T) {
 	_, ed, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
@@ -185,7 +166,7 @@ func TestSignUserCertificate(t *testing.T) {
 		newTestKey(t),
 		[]string{"user-123"},
 		"nokku:login:user:alice:user-123",
-		0,
+		ca.row.UserTtl,
 		ssh.UserCert,
 		Limits{},
 	)
@@ -195,7 +176,7 @@ func TestSignUserCertificate(t *testing.T) {
 	assert.Equal(t, []string{"user-123"}, cert.ValidPrincipals)
 	// The same set for every CA, a host decides what a session may do.
 	assert.Equal(t, userExtensions, cert.Permissions.Extensions)
-	// Default user TTL is 24h (plus 1m clock-skew allowance on ValidAfter)
+	// The workspace lifetime is 24h here, plus the minute ValidAfter is backdated.
 	assert.GreaterOrEqual(t, validity(cert), 24*time.Hour)
 	assert.LessOrEqual(t, validity(cert), 24*time.Hour+2*time.Minute)
 	require.NoError(t, checkCert(t, ca.row, cert, "user-123"), "certificate failed verification")
@@ -224,21 +205,18 @@ func TestSignHostCertificate(t *testing.T) {
 	require.NoError(t, checkCert(t, ca.row, cert, "target-123"), "certificate failed verification")
 }
 
-func TestSignCertificateTTLBounds(t *testing.T) {
+// A caller only shortens the workspace's lifetime.
+func TestSignCertificateLifetime(t *testing.T) {
 	ca := newTestCA(t)
 
-	cert, err := SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", -time.Hour, 0, Limits{})
+	cert, err := SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 1000*time.Hour, 0, Limits{})
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, validity(cert), 24*time.Hour, "negative TTL should fall back to default")
-
-	cert, err = SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 1000*time.Hour, 0, Limits{})
-	require.NoError(t, err)
-	assert.LessOrEqual(t, validity(cert), 25*time.Hour, "over-max TTL should fall back to default")
+	assert.InDelta(t, ca.row.UserTtl+time.Minute, validity(cert), float64(2*time.Second),
+		"more than the workspace gives")
 
 	cert, err = SignCertificate(ca.row, ca.user, newTestKey(t), []string{"u"}, "k", 2*time.Hour, 0, Limits{})
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, validity(cert), 2*time.Hour)
-	assert.LessOrEqual(t, validity(cert), 2*time.Hour+2*time.Minute)
+	assert.InDelta(t, 2*time.Hour+time.Minute, validity(cert), float64(2*time.Second), "less is kept")
 }
 
 // No principals is valid for every account, and OpenSSH reads at most 256.

@@ -53,8 +53,6 @@ type Config struct {
 	SessionExpiresAt time.Time `json:"session_expires_at,omitzero"`
 	// SessionKey is the nokku.pub a sign-in sent, the only key its session gets certificates for.
 	SessionKey string `json:"session_key,omitempty"`
-	// TTL is kept from --ttl, ssh runs nk proxy and nk prepare without flags.
-	TTL time.Duration `json:"ttl,omitzero"`
 	// SecurityKey is kept from nk login --security-key, for the same reason.
 	SecurityKey bool `json:"security_key,omitzero"`
 	// RequireTPM is kept from --require-tpm or NK_REQUIRE_TPM until nk logout.

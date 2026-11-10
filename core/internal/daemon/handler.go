@@ -3,12 +3,10 @@ package daemon
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/time/rate"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -18,12 +16,7 @@ import (
 )
 
 // heartbeatDeadline allows three missed 30s heartbeats.
-const (
-	heartbeatDeadline = 2 * time.Minute
-	// nokkud beats every 30s. A burst passes, a flood would cost a transaction per message.
-	heartbeatEvery = 10 * time.Second
-	heartbeatBurst = 5
-)
+const heartbeatDeadline = 2 * time.Minute
 
 func (p *Pool) Connect(
 	ctx context.Context,
@@ -53,6 +46,8 @@ func (p *Pool) Connect(
 	}
 
 	conn := p.registerDaemon(ctx, daemonID, daemon.Daemon.WorkspaceID)
+	// The next pass works out what this daemon should hold. Its first heartbeat says what it has.
+	p.mark(daemon.Daemon.WorkspaceID)
 	p.markSeen(ctx, daemonID)
 	defer p.markSeen(context.WithoutCancel(ctx), daemonID)
 	defer p.unregisterDaemon(daemonID, conn)
@@ -74,23 +69,19 @@ func (p *Pool) Connect(
 				if err := stream.Send(msg); err != nil {
 					return
 				}
-			case msg, ok := <-conn.state:
-				if !ok {
-					return
-				}
-				if err := stream.Send(msg); err != nil {
+			case <-conn.state:
+				if err := stream.Send(conn.update()); err != nil {
 					return
 				}
 			}
 		}
 	}()
 
-	// Silence drops half-open connections, a stale heartbeat gets an update.
+	// Silence drops half-open connections, a heartbeat with a stale hash gets an update.
 	silence := time.AfterFunc(heartbeatDeadline, conn.cancel)
 	defer silence.Stop()
 	recvErr := make(chan error, 1)
 	go func() {
-		beats := rate.NewLimiter(rate.Every(heartbeatEvery), heartbeatBurst)
 		for {
 			req, err := stream.Receive()
 			if err != nil {
@@ -98,20 +89,24 @@ func (p *Pool) Connect(
 				return
 			}
 			silence.Reset(heartbeatDeadline)
-			hb := req.GetHeartbeat()
-			if hb == nil || !beats.Allow() {
-				continue
-			}
-			version, err := p.stateVersion(conn.ctx, daemon.Daemon.WorkspaceID)
-			if err != nil {
-				slog.Warn("read workspace state version", "daemon_id", daemonID, "error", err)
-				continue
-			}
-			if conn.heartbeat(hb.GetStateVersion(), version) {
-				p.reportBehind(conn, daemon.Name, hb.GetStateVersion(), version)
-			}
-			if version != hb.GetStateVersion() {
-				conn.poke()
+			switch m := req.GetMsg().(type) {
+			case *nokkuv1.ConnectRequest_Heartbeat:
+				if conn.heartbeat(m.Heartbeat.GetStateHash()) {
+					p.reportBehind(conn, daemon.Name)
+				}
+			case *nokkuv1.ConnectRequest_ConnectionReport:
+				// No ack without the rows. The daemon keeps its events and sends them again on its next stream.
+				if err := p.storeReport(conn.ctx, daemon, m.ConnectionReport); err != nil {
+					recvErr <- err
+					return
+				}
+				select {
+				case conn.send <- &nokkuv1.ConnectResponse{Msg: &nokkuv1.ConnectResponse_ConnectionReportAck{
+					ConnectionReportAck: &nokkuv1.ConnectionReportAck{},
+				}}:
+				case <-conn.ctx.Done():
+					return
+				}
 			}
 		}
 	}()

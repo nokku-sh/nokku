@@ -81,12 +81,11 @@ func TestGrantEndIsTheLatestThatApplies(t *testing.T) {
 	require.Nil(t, rows[0].Until(), "a grant for good through the team")
 }
 
-func TestExpireDeletesBumpsAndAudits(t *testing.T) {
+func TestExpireDeletesNotifiesAndAudits(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 	soleGrant(t, c, f, new(time.Now().Add(-time.Second)))
-	conn := listen(t, c)
-	before := stateVersion(t, c, f.ws)
+	w := watch(t, c, f.ws)
 
 	// The database is shared, other tests leave their ended grants in it.
 	var events []*audit.Event
@@ -98,8 +97,7 @@ func TestExpireDeletesBumpsAndAudits(t *testing.T) {
 	}
 	require.NoError(t, access.Expire(t.Context(), c.Connection, write), "expire")
 
-	waitNotify(t, conn, f.ws)
-	require.Greater(t, stateVersion(t, c, f.ws), before, "no version bump, hosts keep the grant")
+	require.Equal(t, 1, w.seen(t), "nobody was told, hosts keep the grant")
 	_, ok := grantEnd(t, c, f)
 	require.False(t, ok, "the ended grant is still there")
 	require.Len(t, events, 1, "want one GrantExpired event")

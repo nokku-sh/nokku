@@ -42,6 +42,17 @@ const (
 	// TargetAccountServiceRevokeAllAccessProcedure is the procedure name of the TargetAccountService's
 	// RevokeAllAccess RPC.
 	TargetAccountServiceRevokeAllAccessProcedure = "/nokku.v1.TargetAccountService/RevokeAllAccess"
+	// TargetAccountServicePlanGrantProcedure is the procedure name of the TargetAccountService's
+	// PlanGrant RPC.
+	TargetAccountServicePlanGrantProcedure = "/nokku.v1.TargetAccountService/PlanGrant"
+	// TargetAccountServiceGrantProcedure is the procedure name of the TargetAccountService's Grant RPC.
+	TargetAccountServiceGrantProcedure = "/nokku.v1.TargetAccountService/Grant"
+	// TargetAccountServicePlanRevokeProcedure is the procedure name of the TargetAccountService's
+	// PlanRevoke RPC.
+	TargetAccountServicePlanRevokeProcedure = "/nokku.v1.TargetAccountService/PlanRevoke"
+	// TargetAccountServiceRevokeProcedure is the procedure name of the TargetAccountService's Revoke
+	// RPC.
+	TargetAccountServiceRevokeProcedure = "/nokku.v1.TargetAccountService/Revoke"
 )
 
 var (
@@ -88,6 +99,36 @@ var (
 			Procedure:  TargetAccountServiceRevokeAllAccessProcedure,
 		}
 	})
+	targetAccountServicePlanGrantSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("PlanGrant"),
+			Procedure:        TargetAccountServicePlanGrantProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetAccountServiceGrantSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("Grant"),
+			Procedure:  TargetAccountServiceGrantProcedure,
+		}
+	})
+	targetAccountServicePlanRevokeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("PlanRevoke"),
+			Procedure:        TargetAccountServicePlanRevokeProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
+	targetAccountServiceRevokeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("Revoke"),
+			Procedure:  TargetAccountServiceRevokeProcedure,
+		}
+	})
 )
 
 // TargetAccountServiceClient is a client for the nokku.v1.TargetAccountService service.
@@ -98,6 +139,16 @@ type TargetAccountServiceClient interface {
 	AddSubjects(context.Context, *v1.AddSubjectsRequest) (*v1.AddSubjectsResponse, error)
 	RemoveSubjects(context.Context, *v1.RemoveSubjectsRequest) (*v1.RemoveSubjectsResponse, error)
 	RevokeAllAccess(context.Context, *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error)
+	// PlanGrant says what Grant would do with the same request, and changes nothing.
+	PlanGrant(context.Context, *v1.PlanGrantRequest) (*v1.PlanGrantResponse, error)
+	// Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
+	// access change, however many servers.
+	Grant(context.Context, *v1.GrantRequest) (*v1.GrantResponse, error)
+	// PlanRevoke says what Revoke would do with the same request, and changes nothing.
+	PlanRevoke(context.Context, *v1.PlanRevokeRequest) (*v1.PlanRevokeResponse, error)
+	// Revoke takes one subject's own grants off many servers, the servers by id or by tag. Like Grant it is one
+	// transaction and one access change.
+	Revoke(context.Context, *v1.RevokeRequest) (*v1.RevokeResponse, error)
 }
 
 // NewTargetAccountServiceClient constructs a client for the nokku.v1.TargetAccountService service.
@@ -114,6 +165,16 @@ type TargetAccountServiceHandler interface {
 	AddSubjects(context.Context, *v1.AddSubjectsRequest) (*v1.AddSubjectsResponse, error)
 	RemoveSubjects(context.Context, *v1.RemoveSubjectsRequest) (*v1.RemoveSubjectsResponse, error)
 	RevokeAllAccess(context.Context, *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error)
+	// PlanGrant says what Grant would do with the same request, and changes nothing.
+	PlanGrant(context.Context, *v1.PlanGrantRequest) (*v1.PlanGrantResponse, error)
+	// Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
+	// access change, however many servers.
+	Grant(context.Context, *v1.GrantRequest) (*v1.GrantResponse, error)
+	// PlanRevoke says what Revoke would do with the same request, and changes nothing.
+	PlanRevoke(context.Context, *v1.PlanRevokeRequest) (*v1.PlanRevokeResponse, error)
+	// Revoke takes one subject's own grants off many servers, the servers by id or by tag. Like Grant it is one
+	// transaction and one access change.
+	Revoke(context.Context, *v1.RevokeRequest) (*v1.RevokeResponse, error)
 }
 
 // RegisterTargetAccountServiceHandler registers svc as the nokku.v1.TargetAccountService
@@ -127,6 +188,10 @@ func RegisterTargetAccountServiceHandler(server *connect.Server, svc TargetAccou
 		connect.Method{Spec: targetAccountServiceAddSubjectsSpec(), Handler: adapter.addSubjects},
 		connect.Method{Spec: targetAccountServiceRemoveSubjectsSpec(), Handler: adapter.removeSubjects},
 		connect.Method{Spec: targetAccountServiceRevokeAllAccessSpec(), Handler: adapter.revokeAllAccess},
+		connect.Method{Spec: targetAccountServicePlanGrantSpec(), Handler: adapter.planGrant},
+		connect.Method{Spec: targetAccountServiceGrantSpec(), Handler: adapter.grant},
+		connect.Method{Spec: targetAccountServicePlanRevokeSpec(), Handler: adapter.planRevoke},
+		connect.Method{Spec: targetAccountServiceRevokeSpec(), Handler: adapter.revoke},
 	)
 }
 
@@ -155,6 +220,22 @@ func (UnimplementedTargetAccountServiceHandler) RemoveSubjects(context.Context, 
 
 func (UnimplementedTargetAccountServiceHandler) RevokeAllAccess(context.Context, *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.RevokeAllAccess is not implemented")
+}
+
+func (UnimplementedTargetAccountServiceHandler) PlanGrant(context.Context, *v1.PlanGrantRequest) (*v1.PlanGrantResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.PlanGrant is not implemented")
+}
+
+func (UnimplementedTargetAccountServiceHandler) Grant(context.Context, *v1.GrantRequest) (*v1.GrantResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.Grant is not implemented")
+}
+
+func (UnimplementedTargetAccountServiceHandler) PlanRevoke(context.Context, *v1.PlanRevokeRequest) (*v1.PlanRevokeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.PlanRevoke is not implemented")
+}
+
+func (UnimplementedTargetAccountServiceHandler) Revoke(context.Context, *v1.RevokeRequest) (*v1.RevokeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.Revoke is not implemented")
 }
 
 type targetAccountServiceClient struct {
@@ -204,6 +285,38 @@ func (c *targetAccountServiceClient) RemoveSubjects(ctx context.Context, req *v1
 func (c *targetAccountServiceClient) RevokeAllAccess(ctx context.Context, req *v1.RevokeAllAccessRequest) (*v1.RevokeAllAccessResponse, error) {
 	var res v1.RevokeAllAccessResponse
 	if err := c.client.CallUnary(ctx, targetAccountServiceRevokeAllAccessSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) PlanGrant(ctx context.Context, req *v1.PlanGrantRequest) (*v1.PlanGrantResponse, error) {
+	var res v1.PlanGrantResponse
+	if err := c.client.CallUnary(ctx, targetAccountServicePlanGrantSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) Grant(ctx context.Context, req *v1.GrantRequest) (*v1.GrantResponse, error) {
+	var res v1.GrantResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceGrantSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) PlanRevoke(ctx context.Context, req *v1.PlanRevokeRequest) (*v1.PlanRevokeResponse, error) {
+	var res v1.PlanRevokeResponse
+	if err := c.client.CallUnary(ctx, targetAccountServicePlanRevokeSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) Revoke(ctx context.Context, req *v1.RevokeRequest) (*v1.RevokeResponse, error) {
+	var res v1.RevokeResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceRevokeSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -277,6 +390,54 @@ func (h targetAccountServiceHandler) revokeAllAccess(ctx context.Context, _ conn
 		return err
 	}
 	res, err := h.svc.RevokeAllAccess(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) planGrant(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PlanGrantRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PlanGrant(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) grant(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GrantRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Grant(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) planRevoke(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PlanRevokeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PlanRevoke(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) revoke(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RevokeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.Revoke(ctx, &req)
 	if err != nil {
 		return err
 	}

@@ -33,7 +33,10 @@ service TargetService {
     };
   }
   rpc UpdateTarget(UpdateTargetRequest) returns (UpdateTargetResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      people_only: true
+    };
   }
   rpc DeleteTarget(DeleteTargetRequest) returns (DeleteTargetResponse) {
     option (access) = {
@@ -158,17 +161,16 @@ message UpdateTargetRequest {
     pattern: "^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
   }];
   string description = 3 [(buf.validate.field).string.max_len = 1000];
-  string host_public_key = 4;
-  repeated string endpoints = 5;
-  repeated string tags = 6;
+  repeated string endpoints = 4;
+  repeated string tags = 5;
   // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-  google.protobuf.FieldMask update_mask = 7 [
+  // The pinned host key is not among them, only nk sync on the server sets it.
+  google.protobuf.FieldMask update_mask = 6 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
         "name",
         "description",
-        "host_public_key",
         "endpoints",
         "tags"
       ]

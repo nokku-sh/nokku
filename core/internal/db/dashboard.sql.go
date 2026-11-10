@@ -206,7 +206,7 @@ func (q *Queries) ListEndingGrants(ctx context.Context) ([]*ListEndingGrantsRow,
 
 const listOfflineTargets = `-- name: ListOfflineTargets :many
 SELECT
-  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_at, t.updated_at
+  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_by, t.created_at, t.updated_at
 FROM
   daemons d
   JOIN targets t ON t.daemon_id = d.id
@@ -243,6 +243,7 @@ func (q *Queries) ListOfflineTargets(ctx context.Context, connected []string) ([
 			&i.Target.Tags,
 			&i.Target.Metadata,
 			&i.Target.LastSyncAt,
+			&i.Target.CreatedBy,
 			&i.Target.CreatedAt,
 			&i.Target.UpdatedAt,
 		); err != nil {

@@ -91,6 +91,8 @@ func (t *Team) ToProto() *nokkuv1.Team {
 		Tags:        t.Tags,
 		CreatedAt:   SafeTimestamp(&t.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&t.UpdatedAt),
+		ScimManaged: &t.ScimManaged,
+		ScimOpen:    &t.ScimOpen,
 	}
 }
 
@@ -316,10 +318,8 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 		RotatedAt:                SafeTimestamp(r.RotatedAt),
 		CreatedAt:                SafeTimestamp(&r.CreatedAt),
 		UpdatedAt:                SafeTimestamp(&r.UpdatedAt),
-		UserDefaultTtl:           durationpb.New(r.UserDefaultTtl),
-		UserMaxTtl:               durationpb.New(r.UserMaxTtl),
+		UserTtl:                  durationpb.New(r.UserTtl),
 		SourceAddress:            &r.SourceAddress,
-		HostTtl:                  durationpb.New(r.HostTtl),
 	}
 }
 

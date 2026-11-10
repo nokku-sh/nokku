@@ -27,7 +27,7 @@ const tenantPolicy = "(workspace_id = current_workspace_id())"
 
 // unscoped has a workspace_id but no policy, on purpose. Only definer triggers
 // write these, the app role cannot.
-var unscoped = []string{"workspace_state", "recording_deletes"}
+var unscoped = []string{"recording_deletes"}
 
 // pinnedConn runs statements the way a request does: nokku_app, pinned to ws.
 func pinnedConn(t *testing.T, c *conn, ws string) *pgx.Conn {

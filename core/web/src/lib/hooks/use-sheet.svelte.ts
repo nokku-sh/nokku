@@ -79,7 +79,7 @@ export function useCreate({ fresh = false, form = '1' } = {}) {
 			if (value === open) return;
 			const url = urlWith({ new: value ? form : undefined });
 			const go = () => void goto(url, { replace: true, reset: false });
-			if (value && fresh) void whenFresh(go, url.pathname + url.search);
+			if (value && fresh) void whenFresh(go, { back: url.pathname + url.search });
 			else go();
 		}
 	};

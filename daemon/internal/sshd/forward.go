@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/nokku-sh/nokku/daemon/internal/safe"
+
 	"golang.org/x/crypto/ssh"
 )
 
@@ -96,7 +98,7 @@ func (s *Server) serveDirectTCPIP(ctx context.Context, st *connState, newCh ssh.
 		_ = dconn.Close()
 		return
 	}
-	go ssh.DiscardRequests(reqs)
+	go safe.Func("forward requests", func() { ssh.DiscardRequests(reqs) })()
 	proxy(ch, dconn)
 }
 
@@ -107,7 +109,6 @@ func (s *Server) forwardingAllowed(conn *ssh.ServerConn) bool {
 func (s *Server) handleGlobalRequests(ctx context.Context, st *connState, reqs <-chan *ssh.Request) {
 	// After a panic nothing reads the requests, which would stall the connection.
 	defer st.conn.Close()
-	defer recoverPanic("global request")
 	for req := range reqs {
 		switch req.Type {
 		case "tcpip-forward":
@@ -148,7 +149,7 @@ func (s *Server) tcpipForward(ctx context.Context, st *connState, payload []byte
 	ev := connEvent(st.conn, eventRemoteForward)
 	ev.Target = ln.Addr().String()
 	s.emit(ev)
-	go s.acceptForwarded(st, ln, f.BindAddr)
+	go safe.Func("remote forward", func() { s.acceptForwarded(st, ln, f.BindAddr) })()
 	return true, ssh.Marshal(struct{ Port uint32 }{f.BindPort})
 }
 
@@ -189,7 +190,6 @@ func (s *Server) acceptForwarded(st *connState, ln net.Listener, bindAddr string
 	defer st.releaseChannel()
 	// A listener nobody accepts on would hold the port until the connection ends.
 	defer ln.Close()
-	defer recoverPanic("remote forward")
 	for {
 		c, err := ln.Accept()
 		if err != nil {
@@ -199,7 +199,7 @@ func (s *Server) acceptForwarded(st *connState, ln net.Listener, bindAddr string
 			_ = c.Close()
 			continue
 		}
-		go func() {
+		go safe.Func("forwarded connection", func() {
 			defer st.releaseChannel()
 			origin := addrPort(c.RemoteAddr())
 			ch, reqs, openErr := st.conn.OpenChannel("forwarded-tcpip", ssh.Marshal(tcpipChannelData{
@@ -213,9 +213,9 @@ func (s *Server) acceptForwarded(st *connState, ln net.Listener, bindAddr string
 				_ = c.Close()
 				return
 			}
-			go ssh.DiscardRequests(reqs)
+			go safe.Func("forward requests", func() { ssh.DiscardRequests(reqs) })()
 			proxy(ch, c)
-		}()
+		})()
 	}
 }
 
@@ -225,14 +225,14 @@ func proxy(ch ssh.Channel, c net.Conn) {
 		_ = c.Close()
 	})
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	wg.Go(safe.Func("forward in", func() {
 		_, _ = io.Copy(ch, c)
 		closeBoth()
-	})
-	wg.Go(func() {
+	}))
+	wg.Go(safe.Func("forward out", func() {
 		_, _ = io.Copy(c, ch)
 		closeBoth()
-	})
+	}))
 	wg.Wait()
 }
 

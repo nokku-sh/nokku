@@ -32,9 +32,7 @@ type caKey struct {
 func NewCA() *db.CreateCAParams {
 	return &db.CreateCAParams{
 		// A work day, and how long people keep working while the core is down.
-		UserDefaultTtl: 16 * time.Hour,
-		UserMaxTtl:     7 * 24 * time.Hour,
-		HostTtl:        90 * 24 * time.Hour,
+		UserTtl: 16 * time.Hour,
 	}
 }
 

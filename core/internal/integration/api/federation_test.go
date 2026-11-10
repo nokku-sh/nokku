@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
-	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -244,7 +243,6 @@ func TestExchangeSignsAJobIn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, f.account.GetId(), got)
 
-	// It asks for two days, a person could get that.
 	sshKey, err := gossh.NewPublicKey(f.key.Public())
 	require.NoError(t, err)
 	signed, err := nokkuv1connect.NewCertificateServiceClient(
@@ -252,7 +250,6 @@ func TestExchangeSignsAJobIn(t *testing.T) {
 	).SignSSHCertificate(t.Context(), &nokkuv1.SignSSHCertificateRequest{
 		TargetId:  &targetID,
 		PublicKey: new(string(gossh.MarshalAuthorizedKey(sshKey))),
-		Ttl:       durationpb.New(48 * time.Hour),
 	})
 	require.NoError(t, err)
 	assert.False(t, signed.GetExpiresAt().AsTime().After(res.GetExpiresAt().AsTime()),

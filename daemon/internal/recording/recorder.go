@@ -18,6 +18,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/nokku-sh/nokku/daemon/internal/safe"
+
 	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
@@ -177,7 +179,7 @@ func New(opts Options) (*Recorder, error) {
 	if opts.Uploads != nil {
 		opts.Uploads.follow(rec)
 	}
-	go rec.flushLoop()
+	go safe.Func("recording flush", rec.flushLoop)()
 	return rec, nil
 }
 

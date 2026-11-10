@@ -632,15 +632,15 @@ func (x *CreateTargetResponse) GetTarget() *Target {
 }
 
 type UpdateTargetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	HostPublicKey *string                `protobuf:"bytes,4,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
-	Endpoints     []string               `protobuf:"bytes,5,rep,name=endpoints" json:"endpoints,omitempty"`
-	Tags          []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	Endpoints   []string               `protobuf:"bytes,4,rep,name=endpoints" json:"endpoints,omitempty"`
+	Tags        []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
 	// update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,7,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
+	// The pinned host key is not among them, only nk sync on the server sets it.
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,6,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -692,13 +692,6 @@ func (x *UpdateTargetRequest) GetName() string {
 func (x *UpdateTargetRequest) GetDescription() string {
 	if x != nil && x.Description != nil {
 		return *x.Description
-	}
-	return ""
-}
-
-func (x *UpdateTargetRequest) GetHostPublicKey() string {
-	if x != nil && x.HostPublicKey != nil {
-		return *x.HostPublicKey
 	}
 	return ""
 }
@@ -2308,15 +2301,14 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\x12:\n" +
 	"\x06grants\x18\x06 \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grants\"@\n" +
 	"\x14CreateTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xef\x02\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xb6\x02\n" +
 	"\x13UpdateTargetRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12;\n" +
 	"\x04name\x18\x02 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
-	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12&\n" +
-	"\x0fhost_public_key\x18\x04 \x01(\tR\rhostPublicKey\x12\x1c\n" +
-	"\tendpoints\x18\x05 \x03(\tR\tendpoints\x12\x12\n" +
-	"\x04tags\x18\x06 \x03(\tR\x04tags\x12{\n" +
-	"\vupdate_mask\x18\a \x01(\v2\x1a.google.protobuf.FieldMaskB>\xbaH;\xc8\x01\x01\xe2\x015\x12\x04name\x12\vdescription\x12\x0fhost_public_key\x12\tendpoints\x12\x04tagsR\n" +
+	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x1c\n" +
+	"\tendpoints\x18\x04 \x03(\tR\tendpoints\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x12j\n" +
+	"\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskB-\xbaH*\xc8\x01\x01\xe2\x01$\x12\x04name\x12\vdescription\x12\tendpoints\x12\x04tagsR\n" +
 	"updateMask\"@\n" +
 	"\x14UpdateTargetResponse\x12(\n" +
 	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"/\n" +
@@ -2436,13 +2428,13 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x15TARGET_STATUS_PENDING\x10\x01\x12\x18\n" +
 	"\x14TARGET_STATUS_ONLINE\x10\x02\x12\x19\n" +
 	"\x15TARGET_STATUS_OFFLINE\x10\x03\x12\x18\n" +
-	"\x14TARGET_STATUS_MANUAL\x10\x042\xaf\b\n" +
+	"\x14TARGET_STATUS_MANUAL\x10\x042\xb1\b\n" +
 	"\rTargetService\x12O\n" +
 	"\tGetTarget\x12\x1a.nokku.v1.GetTargetRequest\x1a\x1b.nokku.v1.GetTargetResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12W\n" +
 	"\vListTargets\x12\x1c.nokku.v1.ListTargetsRequest\x1a\x1d.nokku.v1.ListTargetsResponse\"\v\xc2\xf3\x18\x04\x18\x02X\x01\x90\x02\x01\x12Y\n" +
 	"\fCreateTarget\x12\x1d.nokku.v1.CreateTargetRequest\x1a\x1e.nokku.v1.CreateTargetResponse\"\n" +
-	"\xc2\xf3\x18\x06\x18\x03@\x01X\x01\x12U\n" +
-	"\fUpdateTarget\x12\x1d.nokku.v1.UpdateTargetRequest\x1a\x1e.nokku.v1.UpdateTargetResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12W\n" +
+	"\xc2\xf3\x18\x06\x18\x03@\x01X\x01\x12W\n" +
+	"\fUpdateTarget\x12\x1d.nokku.v1.UpdateTargetRequest\x1a\x1e.nokku.v1.UpdateTargetResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12W\n" +
 	"\fDeleteTarget\x12\x1d.nokku.v1.DeleteTargetRequest\x1a\x1e.nokku.v1.DeleteTargetResponse\"\b\xc2\xf3\x18\x04\x18\x03X\x01\x12f\n" +
 	"\x10GetSubjectAccess\x12!.nokku.v1.GetSubjectAccessRequest\x1a\".nokku.v1.GetSubjectAccessResponse\"\v\xc2\xf3\x18\x04\x10\x01X\x01\x90\x02\x01\x12d\n" +
 	"\x10GetTargetFilters\x12!.nokku.v1.GetTargetFiltersRequest\x1a\".nokku.v1.GetTargetFiltersResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12`\n" +

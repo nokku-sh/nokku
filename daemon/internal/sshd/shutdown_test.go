@@ -95,7 +95,7 @@ func TestShutdownWithALiveSessionUploadsTheRecording(t *testing.T) {
 
 	ctx, stop := context.WithCancel(t.Context())
 	uploads := recording.NewUploads(ctx, core.client)
-	srv, err := New(uploads)
+	srv, err := New(uploads, nil)
 	must.NoError(err)
 	srv.SetAccess(testAccess(t, ca))
 	withPolicy(policy{Record: true})(srv)

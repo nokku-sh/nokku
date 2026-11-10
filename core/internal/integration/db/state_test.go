@@ -35,6 +35,12 @@ type conn struct {
 	sysPool *pgxpool.Pool
 }
 
+// watcher counts the notifications that tell the core a workspace's access changed.
+type watcher struct {
+	conn *pgx.Conn
+	ws   string
+}
+
 func newStateFixture(t *testing.T, c *conn) stateFixture {
 	t.Helper()
 	f := stateFixture{
@@ -54,9 +60,8 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		VALUES ($2, $1, $2 || '@test', 5), ($3, $1, $3 || '@test', 2);
 		INSERT INTO teams (id, workspace_id, name) VALUES ($4, $1, 'team');
 		INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $3, $4);
-		INSERT INTO ssh_cas (id, workspace_id, public_key, host_public_key,
-			user_default_ttl, user_max_ttl, host_ttl)
-		VALUES ($8, $1, 'pub', 'host-pub', '1 hour', '1 hour', '1 hour');
+		INSERT INTO ssh_cas (id, workspace_id, public_key, host_public_key, user_ttl)
+		VALUES ($8, $1, 'pub', 'host-pub', '1 hour');
 		INSERT INTO daemons (id, workspace_id, status) VALUES ($5, $1, 2);
 		INSERT INTO targets (id, workspace_id, daemon_id, name) VALUES ($6, $1, $5, 't');
 		INSERT INTO target_accounts (id, workspace_id, target_id, username) VALUES ($7, $1, $6, 'deploy');
@@ -84,11 +89,28 @@ func testConnection(t testing.TB) *conn {
 	return &conn{Connection: c, sysPool: sysPool}
 }
 
-func stateVersion(t *testing.T, c *conn, ws string) int64 {
+// watch has to start before the change it counts.
+func watch(t *testing.T, c *conn, ws string) *watcher {
 	t.Helper()
-	v, err := c.Sys().GetWorkspaceStateVersion(t.Context(), ws)
-	require.NoError(t, err, "read state version")
-	return v
+	return &watcher{conn: listen(t, c), ws: ws}
+}
+
+// seen is how many came since the last call. One on its way gets a moment to arrive.
+func (w *watcher) seen(t *testing.T) int {
+	t.Helper()
+	n := 0
+	for {
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		note, err := w.conn.WaitForNotification(ctx)
+		cancel()
+		if err != nil {
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			return n
+		}
+		if note.Payload == w.ws {
+			n++
+		}
+	}
 }
 
 func grantedIDs(t *testing.T, c *conn, target string) []string {
@@ -122,39 +144,22 @@ func listen(t *testing.T, c *conn) *pgx.Conn {
 	return conn
 }
 
-func waitNotify(t *testing.T, conn *pgx.Conn, ws string) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
-	defer cancel()
-	for {
-		n, err := conn.WaitForNotification(ctx)
-		require.NoError(t, err, "no state notification for %s", ws)
-		if n.Payload == ws {
-			return
-		}
-	}
-}
-
-func TestStateVersionBumpsOnAccessChanges(t *testing.T) {
+func TestAccessChangesNotify(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	conn := listen(t, c)
+	w := watch(t, c, f.ws)
 
 	require.Equal(t, []string{f.u}, grantedIDs(t, c, f.target))
 
-	before := stateVersion(t, c, f.ws)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.RemoveTeamMember(t.Context(), &db.RemoveTeamMemberParams{TeamID: f.team, UserID: f.u})
 	})
-	waitNotify(t, conn, f.ws)
-	require.Greater(t, stateVersion(t, c, f.ws), before, "team member removal, want a bump")
+	require.Equal(t, 1, w.seen(t), "a team member removal")
 
-	before = stateVersion(t, c, f.ws)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.DeleteUser(t.Context(), f.u)
 	})
-	waitNotify(t, conn, f.ws)
-	require.Greater(t, stateVersion(t, c, f.ws), before, "user removal, want a bump")
+	require.Equal(t, 1, w.seen(t), "a user removal")
 	require.Empty(t, grantedIDs(t, c, f.target), "removed user still granted")
 }
 
@@ -162,21 +167,21 @@ func TestStateVersionBumpsOnAccessChanges(t *testing.T) {
 func TestDeletingATargetNotifies(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	before := stateVersion(t, c, f.ws)
+	w := watch(t, c, f.ws)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		_, err := q.DeleteTarget(t.Context(), f.target)
 		return err
 	})
-	require.Greater(t, stateVersion(t, c, f.ws), before, "target removal, want a bump")
+	require.Equal(t, 1, w.seen(t), "a target removal")
 }
 
-// One transaction bumps once, however many rows it touches. A team with
+// One transaction notifies once, however many rows it touches. A team with
 // thousands of grants is one statement.
-func TestStateVersionBumpsOncePerTransaction(t *testing.T) {
+func TestAccessChangesNotifyOncePerTransaction(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
+	w := watch(t, c, f.ws)
 
-	before := stateVersion(t, c, f.ws)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		if err := q.RemoveTeamMember(t.Context(), &db.RemoveTeamMemberParams{TeamID: f.team, UserID: f.u}); err != nil {
 			return err
@@ -184,12 +189,12 @@ func TestStateVersionBumpsOncePerTransaction(t *testing.T) {
 		// Both grants of the fixture go with it.
 		return q.DeleteTargetAccount(t.Context(), f.account)
 	})
-	require.Equal(t, before+1, stateVersion(t, c, f.ws), "three removals in one transaction, want one bump")
+	require.Equal(t, 1, w.seen(t), "three removals in one transaction")
 
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.SetUserActive(t.Context(), &db.SetUserActiveParams{ID: f.u, Active: false})
 	})
-	require.Equal(t, before+2, stateVersion(t, c, f.ws), "the next transaction")
+	require.Equal(t, 1, w.seen(t), "the next transaction")
 }
 
 // A deactivated account leaves every daemon's map at once, or a cert it holds
@@ -197,29 +202,28 @@ func TestStateVersionBumpsOncePerTransaction(t *testing.T) {
 func TestDeactivatedUserLosesAccess(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	conn := listen(t, c)
+	w := watch(t, c, f.ws)
 
 	setActive := func(active bool) {
 		require.NoError(t, c.Sys().SetUserActive(t.Context(), &db.SetUserActiveParams{ID: f.u, Active: active}),
 			"set active=%v", active)
 	}
 
-	before := stateVersion(t, c, f.ws)
 	setActive(false)
-	waitNotify(t, conn, f.ws)
-	require.Greater(t, stateVersion(t, c, f.ws), before, "deactivation, want a bump")
+	require.Equal(t, 1, w.seen(t), "a deactivation")
 	require.Empty(t, grantedIDs(t, c, f.target), "deactivated user still granted")
 
 	setActive(true)
-	waitNotify(t, conn, f.ws)
+	require.Equal(t, 1, w.seen(t), "a reactivation")
 	require.Equal(t, []string{f.u}, grantedIDs(t, c, f.target), "reactivated user")
 }
 
-func TestStateVersionIgnoresHeartbeatWrites(t *testing.T) {
+// What a daemon reports about its host changes nobody's access.
+func TestAServersReportNotifiesNobody(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
+	w := watch(t, c, f.ws)
 
-	before := stateVersion(t, c, f.ws)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		if err := q.UpdateDaemonVersion(t.Context(), &db.UpdateDaemonVersionParams{
 			DaemonID: f.daemon,
@@ -239,7 +243,7 @@ func TestStateVersionIgnoresHeartbeatWrites(t *testing.T) {
 			Usernames: []string{"deploy", "backup"},
 		})
 	})
-	require.Equal(t, before, stateVersion(t, c, f.ws), "heartbeat writes moved the version")
+	require.Zero(t, w.seen(t), "a server's report looked like an access change")
 }
 
 func TestGrantRejectsForeignTeam(t *testing.T) {

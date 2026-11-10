@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/proto"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/login"
@@ -24,19 +26,9 @@ type SyncInput struct {
 	PrivateIPs  []string
 }
 
-type Synced struct {
-	Version     int64
-	Status      *nokkuv1.DaemonStatus
-	Config      *nokkuv1.DaemonConfig
-	Principals  []*nokkuv1.AccountPrincipals
-	CAPublicKey string
-	// HostCAPublicKey is what the daemon's host certificate must come from.
-	HostCAPublicKey string
-}
-
 // Sync saves the report on its own, a failure never costs the principal list.
-func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
-	res := &Synced{}
+func Sync(ctx context.Context, conn connection, in SyncInput) (*nokkuv1.SyncDaemonResponse, error) {
+	var res *nokkuv1.SyncDaemonResponse
 	var targetID string
 	err := conn.TenantTx(ctx, func(q *db.Queries) error {
 		row, err := q.GetDaemon(ctx, in.DaemonID)
@@ -44,66 +36,42 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		// the host drop them. Its token stays until it expires, so a lost
 		// answer comes again, and nothing else takes it.
 		if errors.Is(err, pgx.ErrNoRows) {
-			res.Status = new(nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)
-			return nil
+			res, err = answer(nil, nil, nil, nil)
+			return err
 		}
 		if err != nil {
 			return err
 		}
 		daemon := &row.Daemon
-		res.Status = &daemon.Status
-		res.Config = daemon.EffectiveConfig()
-
 		// Pending daemons keep retrying, rejected ones are told to stop.
 		if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-			return nil
+			res, err = answer(daemon, nil, nil, nil)
+			return err
 		}
 
 		workspace, err := q.GetWorkspace(ctx)
 		if err != nil {
 			return err
 		}
-		// Zero is off, which is what an unset field says too.
-		if idle := workspace.Settings.GetSessionIdleTimeout(); idle.AsDuration() > 0 {
-			res.Config.IdleTimeout = idle
-		}
-
-		// Read the version first, a race then costs a sync, not a stale daemon.
-		res.Version, err = q.GetWorkspaceStateVersion(ctx, daemon.WorkspaceID)
-		if err != nil {
-			return err
-		}
-
 		target, err := q.GetTargetByDaemon(ctx, &daemon.ID)
 		if err != nil {
 			return err
 		}
 		targetID = target.ID
-
 		ca, err := q.GetWorkspaceCA(ctx)
 		if err != nil {
 			return err
 		}
-		res.CAPublicKey = ca.PublicKey
-		res.HostCAPublicKey = ca.HostPublicKey
-
-		result, err := q.ListAccountSubjectsForTarget(ctx, target.ID)
+		accounts, err := q.ListAccountSubjectsForTarget(ctx, target.ID)
 		if err != nil {
 			return err
 		}
-		// The host compares these as they are, see login.Principal.
-		for _, p := range result {
-			principals := make([]string, 0, len(p.Ids))
-			for _, id := range p.Ids {
-				principals = append(principals, login.Principal(id, target.ID, p.Username))
-			}
-			res.Principals = append(res.Principals, &nokkuv1.AccountPrincipals{
-				Username:       &p.Username,
-				CertPrincipals: principals,
-			})
+		principals := make([]*nokkuv1.AccountPrincipals, 0, len(accounts))
+		for _, a := range accounts {
+			principals = append(principals, accountPrincipals(target.ID, a.Username, a.Ids))
 		}
-
-		return nil
+		res, err = answer(daemon, workspace.Settings, ca, principals)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -114,6 +82,84 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*Synced, error) {
 		}
 	}
 	return res, nil
+}
+
+// Hashes is the pass over a workspace: the hash of what each of its daemons would be told right now, by id. One
+// transaction, and every answer built the way Sync builds it.
+func Hashes(ctx context.Context, conn connection) (map[string][]byte, error) {
+	hashes := map[string][]byte{}
+	err := conn.TenantTx(ctx, func(q *db.Queries) error {
+		workspace, err := q.GetWorkspace(ctx)
+		if err != nil {
+			return err
+		}
+		ca, err := q.GetWorkspaceCA(ctx)
+		if err != nil {
+			return err
+		}
+		daemons, err := q.ListDaemonsForSync(ctx)
+		if err != nil {
+			return err
+		}
+		accounts, err := q.ListAccountSubjects(ctx)
+		if err != nil {
+			return err
+		}
+		principals := map[string][]*nokkuv1.AccountPrincipals{}
+		for _, a := range accounts {
+			principals[a.TargetID] = append(principals[a.TargetID], accountPrincipals(a.TargetID, a.Username, a.Ids))
+		}
+		for _, d := range daemons {
+			res, err := answer(&d.Daemon, workspace.Settings, ca, principals[d.TargetID])
+			if err != nil {
+				return err
+			}
+			hashes[d.Daemon.ID] = res.GetStateHash()
+		}
+		return nil
+	})
+	return hashes, err
+}
+
+// answer is what one daemon is told to enforce, with its hash. A daemon that is gone is nil, and one that is not
+// accepted gets no CA and nobody to let in.
+func answer(
+	daemon *db.Daemon,
+	settings *nokkuv1.WorkspaceSettings,
+	ca *db.SSHCA,
+	principals []*nokkuv1.AccountPrincipals,
+) (*nokkuv1.SyncDaemonResponse, error) {
+	res := &nokkuv1.SyncDaemonResponse{Status: new(nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)}
+	if daemon != nil {
+		res.Status = &daemon.Status
+		res.Config = daemon.EffectiveConfig()
+	}
+	if daemon != nil && daemon.Status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+		// Zero is off, which is what an unset field says too.
+		if idle := settings.GetSessionIdleTimeout(); idle.AsDuration() > 0 {
+			res.Config.IdleTimeout = idle
+		}
+		res.CaPublicKey = &ca.PublicKey
+		res.HostCaPublicKey = &ca.HostPublicKey
+		res.Principals = principals
+	}
+	// Deterministic for one build of the core. A new build may hash the same answer anew, which costs one sync.
+	wire, err := proto.MarshalOptions{Deterministic: true}.Marshal(res)
+	if err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256(wire)
+	res.StateHash = sum[:]
+	return res, nil
+}
+
+// The host compares these as they are, see login.Principal.
+func accountPrincipals(targetID, username string, subjects []string) *nokkuv1.AccountPrincipals {
+	principals := make([]string, 0, len(subjects))
+	for _, id := range subjects {
+		principals = append(principals, login.Principal(id, targetID, username))
+	}
+	return &nokkuv1.AccountPrincipals{Username: &username, CertPrincipals: principals}
 }
 
 // An account saved here has no grants yet, so the list read before misses none.

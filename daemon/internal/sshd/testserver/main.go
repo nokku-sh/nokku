@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"os/user"
 	"syscall"
+	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -57,6 +58,8 @@ func main() {
 	}
 	access := *st.Access()
 	access.DaemonConfig = &nokkuv1.DaemonConfig{RecordSessions: new(false)}
+	// The state file is a fixture nobody synced.
+	access.SyncedAt = time.Now()
 	if *allowNonRoot {
 		// Nothing drops privileges here, so only this account may log in.
 		self, userErr := user.Current()
@@ -66,7 +69,7 @@ func main() {
 		access.Principals = map[string][]string{self.Username: access.Principals[self.Username]}
 	}
 
-	srv, err := sshd.New(nil)
+	srv, err := sshd.New(nil, nil)
 	if err != nil {
 		fail(err.Error())
 	}

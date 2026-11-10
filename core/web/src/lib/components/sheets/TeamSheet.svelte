@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -8,6 +9,8 @@
 	import * as Command from '#lib/components/ui/command/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -18,7 +21,16 @@
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { TeamSchema } from '#lib/gen/nokku/v1/team_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
-	import { Check, FileText, Info, Settings2, ShieldCheck, UserPlus, Users } from '@lucide/svelte';
+	import {
+		Check,
+		FileText,
+		Info,
+		RefreshCw,
+		Settings2,
+		ShieldCheck,
+		UserPlus,
+		Users
+	} from '@lucide/svelte';
 	import { Debounced } from 'runed';
 	import DangerZone from './DangerZone.svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -56,6 +68,17 @@
 		draft.save((changes) => update.mutateAsync({ ...changes, id: model?.id }))
 	);
 	const save = () => autoSave.save();
+
+	// Opening hands the team's access to whoever runs the identity provider, so that takes a recent sign-in.
+	function setScimOpen(open: boolean) {
+		const apply = () => {
+			if (!model) return;
+			model.scimOpen = open;
+			save();
+		};
+		if (open) void whenFresh(apply);
+		else apply();
+	}
 
 	function toggleMember(userId: string) {
 		const vars = { teamId: sheet.id, userId };
@@ -228,6 +251,35 @@
 						/>
 					</Field.Field>
 				</Field.Group>
+			</Section>
+
+			<Section title="Identity provider" icon={RefreshCw}>
+				{#if entity.scimManaged}
+					<p class="text-sm text-muted-foreground">
+						The members come from your identity provider over SCIM. A change made here lasts until
+						its next sync.
+					</p>
+				{:else}
+					<Item.Root size="sm" variant="outline">
+						<Item.Content>
+							<Item.Title>
+								<label for="team-scim-open">Let a SCIM group take this team over</label>
+							</Item.Title>
+							<Item.Description>
+								A group of the same name then gets this team, its members and the access it has.
+								Until you turn this on, such a group is refused.
+							</Item.Description>
+						</Item.Content>
+						<Item.Actions>
+							<Switch
+								id="team-scim-open"
+								checked={model.scimOpen}
+								onCheckedChange={setScimOpen}
+								disabled={!can.edit}
+							/>
+						</Item.Actions>
+					</Item.Root>
+				{/if}
 			</Section>
 
 			<DangerZone

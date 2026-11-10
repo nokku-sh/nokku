@@ -268,17 +268,15 @@ type RecordingDelete struct {
 }
 
 type SSHCA struct {
-	ID             string        `json:"id"`
-	WorkspaceID    string        `json:"workspaceId"`
-	PublicKey      string        `json:"publicKey"`
-	HostPublicKey  string        `json:"hostPublicKey"`
-	RotatedAt      *time.Time    `json:"rotatedAt"`
-	UserDefaultTtl time.Duration `json:"userDefaultTtl"`
-	UserMaxTtl     time.Duration `json:"userMaxTtl"`
-	HostTtl        time.Duration `json:"hostTtl"`
-	SourceAddress  string        `json:"sourceAddress"`
-	CreatedAt      time.Time     `json:"createdAt"`
-	UpdatedAt      time.Time     `json:"updatedAt"`
+	ID            string        `json:"id"`
+	WorkspaceID   string        `json:"workspaceId"`
+	PublicKey     string        `json:"publicKey"`
+	HostPublicKey string        `json:"hostPublicKey"`
+	RotatedAt     *time.Time    `json:"rotatedAt"`
+	UserTtl       time.Duration `json:"userTtl"`
+	SourceAddress string        `json:"sourceAddress"`
+	CreatedAt     time.Time     `json:"createdAt"`
+	UpdatedAt     time.Time     `json:"updatedAt"`
 }
 
 type SSHCAKey struct {
@@ -332,6 +330,7 @@ type Target struct {
 	Tags          []string   `json:"tags"`
 	Metadata      []byte     `json:"metadata"`
 	LastSyncAt    *time.Time `json:"lastSyncAt"`
+	CreatedBy     *string    `json:"createdBy"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
 }
@@ -353,6 +352,7 @@ type Team struct {
 	Tags           []string  `json:"tags"`
 	ScimExternalID *string   `json:"scimExternalId"`
 	ScimManaged    bool      `json:"scimManaged"`
+	ScimOpen       bool      `json:"scimOpen"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
@@ -365,17 +365,18 @@ type TeamMember struct {
 }
 
 type User struct {
-	ID             string              `json:"id"`
-	WorkspaceID    string              `json:"workspaceId"`
-	Email          string              `json:"email"`
-	Name           string              `json:"name"`
-	Picture        *string             `json:"picture"`
-	Role           nokku.WorkspaceRole `json:"role"`
-	Active         bool                `json:"active"`
-	ScimExternalID *string             `json:"scimExternalId"`
-	ScimManaged    bool                `json:"scimManaged"`
-	CreatedAt      time.Time           `json:"createdAt"`
-	UpdatedAt      time.Time           `json:"updatedAt"`
+	ID              string              `json:"id"`
+	WorkspaceID     string              `json:"workspaceId"`
+	Email           string              `json:"email"`
+	Name            string              `json:"name"`
+	Picture         *string             `json:"picture"`
+	Role            nokku.WorkspaceRole `json:"role"`
+	Active          bool                `json:"active"`
+	ScimExternalID  *string             `json:"scimExternalId"`
+	ScimManaged     bool                `json:"scimManaged"`
+	ScimDeactivated bool                `json:"scimDeactivated"`
+	CreatedAt       time.Time           `json:"createdAt"`
+	UpdatedAt       time.Time           `json:"updatedAt"`
 }
 
 type Workspace struct {
@@ -399,9 +400,4 @@ type WorkspaceLicense struct {
 	DeletionWarning  int32      `json:"deletionWarning"`
 	DeletionWarnedAt *time.Time `json:"deletionWarnedAt"`
 	UpdatedAt        time.Time  `json:"updatedAt"`
-}
-
-type WorkspaceState struct {
-	WorkspaceID string `json:"workspaceId"`
-	Version     int64  `json:"version"`
 }

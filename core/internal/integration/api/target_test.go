@@ -247,6 +247,12 @@ func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, updated.GetTarget().GetTags(), "naming a list with nothing in it clears it")
 	assert.Equal(t, []string{"10.0.0.9:22"}, updated.GetTarget().GetEndpoints())
+
+	_, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
+		Id:         &targetID,
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"host_public_key"}},
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "only nk sync on the server pins a host key")
 }
 
 func (s graphSeed) member(name string) string {
@@ -729,4 +735,81 @@ func TestGetAccessMatrix(t *testing.T) {
 	})
 	assert.Empty(t, matrix(&nokkuv1.GetAccessMatrixRequest{Query: new("bob")}).GetRows(),
 		"someone deactivated logs in nowhere")
+}
+
+// A service account key sits in a secret store. One that leaks must not delete the fleet, or point someone else's
+// server at another host and host key. So a machine syncs and removes only the servers it added itself.
+func TestAMachineManagesOnlyTheServersItAdded(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ws := testWorkspace.ID
+	admin := clientOn(srv, header("Authorization",
+		"Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)))
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(admin)
+	machine := func() nokkuv1connect.TargetServiceClient {
+		created, err := accounts.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{
+			Name: new(uniq("ci")),
+		})
+		require.NoError(t, err)
+		id := created.GetServiceAccount().GetId()
+		_, err = accounts.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+			Id: &id, Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
+		}))
+		require.NoError(t, err)
+		key := serviceAccountToken(t, accounts, id, nil)
+		return nokkuv1connect.NewTargetServiceClient(clientOn(srv, header("Authorization", "Bearer "+key)))
+	}
+	terraform, leaked := machine(), machine()
+	person := nokkuv1connect.NewTargetServiceClient(clientOn(srv, header("Authorization",
+		"Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR))))
+	authority, err := nokkuv1connect.NewCertificateServiceClient(admin).
+		GetCertificateAuthority(t.Context(), &nokkuv1.GetCertificateAuthorityRequest{})
+	require.NoError(t, err)
+	caKey := authority.GetCertificateAuthority().GetPublicKey()
+	hostKey := func() string {
+		pub, _, err := ed25519.GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		sshPub, err := ssh.NewPublicKey(pub)
+		require.NoError(t, err)
+		return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPub)))
+	}
+	pinned, attacker := hostKey(), hostKey()
+
+	added, err := terraform.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
+		Name: new(uniq("web")), Endpoints: []string{"10.0.0.2:22"}, HostPublicKey: &pinned,
+	})
+	require.NoError(t, err)
+	own := added.GetTarget().GetId()
+	// A server a person or a daemon brought is no machine's.
+	byHand := seedTarget(t, cfg, ws)
+
+	repoint := func(as nokkuv1connect.TargetServiceClient, id string) error {
+		_, err := as.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
+			TargetId: &id, Usernames: []string{"root"}, Endpoints: []string{"203.0.113.66:22"},
+			HostPublicKey: &attacker, CaPublicKey: &caKey,
+		})
+		return err
+	}
+	remove := func(as nokkuv1connect.TargetServiceClient, id string) error {
+		_, err := as.DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &id})
+		return err
+	}
+	denied := func(err error, what string) {
+		t.Helper()
+		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "%s, got %v", what, err)
+	}
+
+	denied(repoint(leaked, own), "a machine repointed a server another machine added")
+	denied(remove(leaked, own), "a machine removed a server another machine added")
+	denied(repoint(terraform, byHand), "a machine repointed a server it did not add")
+	denied(remove(terraform, byHand), "a machine removed a server it did not add")
+	got, err := person.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &own})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"10.0.0.2:22"}, got.GetTarget().GetEndpoints(), "a refused sync moved the server")
+	assert.Equal(t, pinned, got.GetTarget().GetHostPublicKey(), "a refused sync changed the pinned host key")
+
+	// Its own servers it syncs and removes. A person does both with any, as in the web app.
+	require.NoError(t, repoint(terraform, own))
+	require.NoError(t, repoint(person, byHand))
+	require.NoError(t, remove(person, byHand))
+	require.NoError(t, remove(terraform, own))
 }

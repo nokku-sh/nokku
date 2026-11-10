@@ -16,6 +16,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/nokku-sh/nokku/daemon/internal/safe"
+
 	"golang.org/x/crypto/ssh"
 
 	"github.com/nokku-sh/nokku/internal/login"
@@ -120,11 +122,10 @@ func (sess *session) handleRequests() {
 	var handlerDone chan struct{}
 	startHandler := func(fn func()) {
 		handlerDone = make(chan struct{})
-		go func() {
+		go safe.Func("session handler", func() {
 			defer close(handlerDone)
-			defer recoverPanic("session handler")
 			fn()
-		}()
+		})()
 	}
 
 	for req := range sess.reqs {
@@ -143,7 +144,7 @@ func (sess *session) handleRequests() {
 			sess.ptyReq(req)
 		case agentRequestType:
 			if sess.agentRequest(req) {
-				go sess.serveAgent()
+				go safe.Func("agent forward", sess.serveAgent)()
 			}
 		case "window-change":
 			sess.windowChange(req)
@@ -387,19 +388,19 @@ func (sess *session) runPTY() {
 	// Drop our slave end, so the master reports EOF once the child exits.
 	_ = sess.tty.Close()
 	// A background process can hold the slave. Closing the master hangs it up.
-	stop := context.AfterFunc(sess.ctx, func() { _ = sess.ptmx.Close() })
+	stop := context.AfterFunc(sess.ctx, safe.Func("close pty", func() { _ = sess.ptmx.Close() }))
 	defer stop()
 
 	// Read once, a running session keeps its rule. Only keystrokes count.
 	touch := func() {}
 	if idle := sess.server.access.Load().policy.IdleTimeout; idle > 0 {
-		timer := time.AfterFunc(idle, sess.idleOut)
+		timer := time.AfterFunc(idle, safe.Func("idle timeout", sess.idleOut))
 		defer timer.Stop()
 		touch = func() { timer.Reset(idle) }
 	}
 
 	var input sync.WaitGroup
-	input.Go(func() {
+	input.Go(safe.Func("pty input", func() {
 		buf := make([]byte, 32*1024)
 		for {
 			n, readErr := sess.Read(buf)
@@ -417,7 +418,7 @@ func (sess *session) runPTY() {
 				return
 			}
 		}
-	})
+	}))
 
 	out := recOut{w: sess, rec: sess.rec}
 	// nk's ssh config, ssh -q and most IDEs hide the login banner, this line shows.
@@ -646,7 +647,7 @@ func startPiped(cmd *exec.Cmd) (stdin io.WriteCloser, stdout io.ReadCloser, err 
 
 func (sess *session) relay(cmd *exec.Cmd, stdin io.WriteCloser, stdout io.ReadCloser) {
 	sess.setProc(cmd.Process)
-	stop := context.AfterFunc(sess.ctx, func() { _ = stdout.Close() })
+	stop := context.AfterFunc(sess.ctx, safe.Func("close stdout", func() { _ = stdout.Close() }))
 	defer stop()
 
 	var relay sync.WaitGroup
@@ -654,16 +655,16 @@ func (sess *session) relay(cmd *exec.Cmd, stdin io.WriteCloser, stdout io.ReadCl
 	// Only output is recorded, without a pty no echo tells typed secrets apart.
 	outW := recOut{w: sess, rec: sess.rec}
 
-	relay.Go(func() {
+	relay.Go(safe.Func("stdin", func() {
 		defer stdin.Close()
 		_, _ = io.Copy(stdin, sess)
-	})
+	}))
 
 	stdoutDone := make(chan struct{})
-	relay.Go(func() {
+	relay.Go(safe.Func("stdout", func() {
 		defer close(stdoutDone)
 		_, _ = io.Copy(outW, stdout)
-	})
+	}))
 
 	// Drain stdout first, cmd.Wait closes the pipe and would truncate the rest.
 	<-stdoutDone

@@ -4,17 +4,13 @@ INSERT INTO
   ssh_cas (
     public_key,
     host_public_key,
-    user_default_ttl,
-    user_max_ttl,
-    host_ttl
+    user_ttl
   )
 VALUES
   (
     @public_key,
     @host_public_key,
-    @user_default_ttl,
-    @user_max_ttl,
-    @host_ttl
+    @user_ttl
   )
 RETURNING
   *;
@@ -79,10 +75,8 @@ FOR SHARE;
 -- name: UpdateCA :one
 UPDATE ssh_cas
 SET
-  user_default_ttl = COALESCE(sqlc.narg('user_default_ttl'), user_default_ttl),
-  user_max_ttl = COALESCE(sqlc.narg('user_max_ttl'), user_max_ttl),
+  user_ttl = COALESCE(sqlc.narg('user_ttl'), user_ttl),
   source_address = COALESCE(sqlc.narg('source_address'), source_address),
-  host_ttl = COALESCE(sqlc.narg('host_ttl'), host_ttl),
   updated_at = NOW()
 WHERE
   workspace_id = current_workspace_id ()

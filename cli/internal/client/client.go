@@ -12,7 +12,6 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/fsutil"
-	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 	"github.com/nokku-sh/nokku/cli/internal/ssh"
@@ -195,9 +194,6 @@ func (c *Client) EnsureCert(ctx context.Context, target state.Target, ca state.C
 	req := &nokkuv1.SignSSHCertificateRequest{
 		TargetId:  new(target.ID),
 		PublicKey: new(pubKey),
-	}
-	if c.State.TTL > 0 {
-		req.Ttl = durationpb.New(c.State.TTL)
 	}
 	res, err := c.certs.SignSSHCertificate(ctx, req)
 	if c.State.CIJob() && connect.CodeOf(err) == connect.CodeUnauthenticated {

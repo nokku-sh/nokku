@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/daemon/internal/report"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
@@ -74,7 +76,8 @@ func silentClient(t *testing.T) (*Client, *silentCore) {
 		srv.Close()
 	})
 	return &Client{
-		state: state.New(state.Config{}),
+		state:   state.New(state.Config{}),
+		reports: report.Open(filepath.Join(t.TempDir(), "connections.jsonl")),
 		ctl: nokkuv1connect.NewDaemonControlServiceClient(
 			connect.NewClient(connecthttp.NewTransport(srv.Client(), srv.URL)),
 		),

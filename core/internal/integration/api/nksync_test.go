@@ -111,14 +111,11 @@ func (n *nkSync) publicKey(t *testing.T) string {
 	return line
 }
 
-func (n *nkSync) sign(t *testing.T, token, targetID string, ttl time.Duration) (*gossh.Certificate, error) {
+func (n *nkSync) sign(t *testing.T, token, targetID string) (*gossh.Certificate, error) {
 	t.Helper()
 	req := &nokkuv1.SignSSHCertificateRequest{
 		TargetId:  &targetID,
 		PublicKey: new(n.publicKey(t)),
-	}
-	if ttl > 0 {
-		req.Ttl = durationpb.New(ttl)
 	}
 	res, err := nokkuv1connect.NewCertificateServiceClient(clientOn(
 		n.srv, header("Authorization", "Bearer "+token),
@@ -192,24 +189,26 @@ func TestNKSyncCertificateLifetime(t *testing.T) {
 	require.NoError(t, err)
 	n.grant(t, daemonAccount.GetAccount().GetId(), personID)
 
-	cert, err := n.sign(t, token, targetID, 48*time.Hour)
+	setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{
+		UserTtl: durationpb.New(48 * time.Hour),
+	})
+	cert, err := n.sign(t, token, targetID)
 	require.NoError(t, err)
-	assert.InDelta(t, time.Hour, lifetime(cert), float64(2*time.Second), "two days asked for")
+	assert.InDelta(t, time.Hour, lifetime(cert), float64(2*time.Second), "the workspace gives two days")
 	assert.Equal(t, []string{
 		nklogin.Principal(personID, targetID, "root"),
 		nklogin.ServerPrincipal(targetID, "root"),
 	}, cert.ValidPrincipals)
 
-	cert, err = n.sign(t, token, enrolled.GetTargetId(), 48*time.Hour)
+	cert, err = n.sign(t, token, enrolled.GetTargetId())
 	require.NoError(t, err)
 	assert.InDelta(t, 48*time.Hour, lifetime(cert), float64(2*time.Second), "a server with a daemon got the cap")
 	assert.Equal(t, []string{nklogin.Principal(personID, enrolled.GetTargetId(), "root")}, cert.ValidPrincipals)
 
 	setCA(t, n.cfg, n.certs, &nokkuv1.UpdateCertificateAuthorityRequest{
-		UserDefaultTtl: durationpb.New(20 * time.Minute),
-		UserMaxTtl:     durationpb.New(30 * time.Minute),
+		UserTtl: durationpb.New(20 * time.Minute),
 	})
-	cert, err = n.sign(t, token, targetID, 0)
+	cert, err = n.sign(t, token, targetID)
 	require.NoError(t, err)
 	assert.InDelta(t, 20*time.Minute, lifetime(cert), float64(2*time.Second), "the cap made a short CA longer")
 }
@@ -271,23 +270,23 @@ func TestNKSyncServerWithOpenSSH(t *testing.T) {
 		return nil
 	}
 
-	cert, err := n.sign(t, aliceToken, targetID, 0)
+	cert, err := n.sign(t, aliceToken, targetID)
 	require.NoError(t, err)
 	require.NoError(t, sshIn(cert), "the certificate for this server and account")
 
-	_, err = n.sign(t, bobToken, targetID, 0)
+	_, err = n.sign(t, bobToken, targetID)
 	require.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "bob has no grant yet, %v", err)
 	n.grant(t, accountID, bob)
-	cert, err = n.sign(t, bobToken, targetID, 0)
+	cert, err = n.sign(t, bobToken, targetID)
 	require.NoError(t, err)
 	require.NoError(t, sshIn(cert), "a new grant needs no change on the server")
 
-	cert, err = n.sign(t, aliceToken, otherID, 0)
+	cert, err = n.sign(t, aliceToken, otherID)
 	require.NoError(t, err)
 	require.Error(t, sshIn(cert), "a certificate for another server on the same CA got in")
 
 	n.revoke(t, accountID, alice)
-	_, err = n.sign(t, aliceToken, targetID, 0)
+	_, err = n.sign(t, aliceToken, targetID)
 	assert.Equal(
 		t,
 		connect.CodePermissionDenied,

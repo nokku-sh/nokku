@@ -136,24 +136,13 @@ func (s *daemonControlService) SyncDaemon(
 		return nil, errInternal
 	}
 
-	res, err := nokkudaemon.Sync(ctx, s.cfg.Conn, nokkudaemon.SyncInput{
+	return nokkudaemon.Sync(ctx, s.cfg.Conn, nokkudaemon.SyncInput{
 		DaemonID:    actor.DaemonIDFromContext(ctx),
 		Version:     daemonVersion(ci.RequestHeader().Get("User-Agent")),
 		ReqMetadata: req.GetMetadata(),
 		Users:       req.GetUsers(),
 		PrivateIPs:  req.GetPrivateIps(),
 	})
-	if err != nil {
-		return nil, err
-	}
-	return &nokkuv1.SyncDaemonResponse{
-		Status:          res.Status,
-		Config:          res.Config,
-		Principals:      res.Principals,
-		CaPublicKey:     &res.CAPublicKey,
-		HostCaPublicKey: &res.HostCAPublicKey,
-		StateVersion:    &res.Version,
-	}, nil
 }
 
 // SignHostCertificate signs the daemon's host key for its own target.

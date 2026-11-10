@@ -182,6 +182,78 @@ ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
   expires_at = EXCLUDED.expires_at;
 
+-- name: GrantWhere :many
+-- The servers a batch grant names, by id or by tag, each with the account asked for if it has one.
+SELECT
+  t.id,
+  t.name,
+  a.id AS account_id
+FROM
+  targets t
+  LEFT JOIN target_accounts a ON a.target_id = t.id
+  AND a.username = @username
+WHERE
+  t.id = ANY (@target_ids::UUID[])
+  OR t.tags && @tags::TEXT[]
+ORDER BY
+  t.name;
+
+-- name: GrantWhereAccounts :many
+-- The accounts those servers have, the most common first.
+SELECT
+  a.username,
+  COUNT(*)::INT AS servers
+FROM
+  targets t
+  JOIN target_accounts a ON a.target_id = t.id
+WHERE
+  t.id = ANY (@target_ids::UUID[])
+  OR t.tags && @tags::TEXT[]
+GROUP BY
+  a.username
+ORDER BY
+  servers DESC,
+  a.username;
+
+-- name: ListGrantEnds :many
+-- What one subject holds on these accounts already. A grant that ran out counts as none.
+SELECT
+  account_id,
+  expires_at
+FROM
+  live_grants
+WHERE
+  account_id = ANY (@account_ids::UUID[])
+  AND subject_id = @subject_id;
+
+-- name: PutGrants :exec
+-- PutGrant for many accounts in one statement.
+INSERT INTO
+  grants (
+    account_id,
+    user_id,
+    team_id,
+    service_account_id,
+    expires_at
+  )
+SELECT
+  account_id,
+  CASE
+    WHEN @subject_kind::TEXT = 'user' THEN @subject_id::UUID
+  END,
+  CASE
+    WHEN @subject_kind::TEXT = 'team' THEN @subject_id::UUID
+  END,
+  CASE
+    WHEN @subject_kind::TEXT = 'service_account' THEN @subject_id::UUID
+  END,
+  sqlc.narg('expires_at')::TIMESTAMPTZ
+FROM
+  unnest(@account_ids::UUID[]) AS account_id
+ON CONFLICT (account_id, subject_id) DO UPDATE
+SET
+  expires_at = EXCLUDED.expires_at;
+
 -- name: ExtendGrant :exec
 -- An approved request never shortens access the user already has. A grant for good stays one.
 INSERT INTO
@@ -204,7 +276,7 @@ WHERE
   expires_at <= NOW();
 
 -- name: DeleteExpiredGrants :many
--- One workspace at a time, the state version is bumped once per transaction and workspace.
+-- One workspace at a time, the trigger notifies once per transaction and workspace.
 WITH
   gone AS (
     DELETE FROM grants g
@@ -237,6 +309,37 @@ FROM
 DELETE FROM grants
 WHERE
   account_id = @account_id
+  AND subject_kind = @subject_kind::TEXT
+  AND subject_id = @subject_id::UUID;
+
+-- name: RevokeWhere :many
+-- One subject's own grants on the servers a batch revoke names, by id or by tag.
+SELECT
+  g.account_id,
+  a.username,
+  t.id AS target_id,
+  t.name,
+  (cardinality(t.tags) > 1)::BOOLEAN AS other_tags
+FROM
+  grants g
+  JOIN target_accounts a ON a.id = g.account_id
+  JOIN targets t ON t.id = a.target_id
+WHERE
+  g.subject_kind = @subject_kind::TEXT
+  AND g.subject_id = @subject_id::UUID
+  AND (
+    t.id = ANY (@target_ids::UUID[])
+    OR t.tags && @tags::TEXT[]
+  )
+ORDER BY
+  t.name,
+  a.username;
+
+-- name: RemoveGrants :exec
+-- RemoveGrant for many accounts in one statement.
+DELETE FROM grants
+WHERE
+  account_id = ANY (@account_ids::UUID[])
   AND subject_kind = @subject_kind::TEXT
   AND subject_id = @subject_id::UUID;
 
@@ -329,7 +432,12 @@ ORDER BY
 -- Who a server lets in as which account, as the subjects its certificates name.
 SELECT
   e.username,
-  array_agg(DISTINCT e.subject_id)::TEXT[] AS ids
+  -- Sorted, the answer to a daemon is hashed.
+  array_agg(
+    DISTINCT e.subject_id
+    ORDER BY
+      e.subject_id
+  )::TEXT[] AS ids
 FROM
   effective_access e
 WHERE
@@ -339,6 +447,28 @@ WHERE
 GROUP BY
   e.username
 ORDER BY
+  e.username;
+
+-- name: ListAccountSubjects :many
+-- ListAccountSubjectsForTarget for every server of the workspace at once, in the same order.
+SELECT
+  e.target_id,
+  e.username,
+  array_agg(
+    DISTINCT e.subject_id
+    ORDER BY
+      e.subject_id
+  )::TEXT[] AS ids
+FROM
+  effective_access e
+WHERE
+  e.user_ok
+  AND e.daemon_ok
+GROUP BY
+  e.target_id,
+  e.username
+ORDER BY
+  e.target_id,
   e.username;
 
 -- name: DeleteTargetAccount :exec

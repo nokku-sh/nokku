@@ -6,11 +6,16 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"uuid"
 )
 
 // WebSessionKeyIDPrefix plus the session id is a web terminal cert's key id.
 const WebSessionKeyIDPrefix = "nokku:web:session:"
+
+// MaxCertTTL is the longest a person's certificate lasts. The core takes no setting above it, and a daemon that has
+// not synced for this long takes no new logins: what it saved is older than any certificate it could vouch for.
+const MaxCertTTL = 7 * 24 * time.Hour
 
 // maxAccounts keeps a huge passwd file from flooding the core.
 const maxAccounts = 200

@@ -82,7 +82,7 @@ type DeleteExpiredGrantsRow struct {
 	SubjectName string    `json:"subjectName"`
 }
 
-// One workspace at a time, the state version is bumped once per transaction and workspace.
+// One workspace at a time, the trigger notifies once per transaction and workspace.
 func (q *Queries) DeleteExpiredGrants(ctx context.Context, workspaceID string) ([]*DeleteExpiredGrantsRow, error) {
 	rows, err := q.db.Query(ctx, deleteExpiredGrants, workspaceID)
 	if err != nil {
@@ -246,6 +246,103 @@ func (q *Queries) GetTargetAccountsByTargetIDs(ctx context.Context, targetIds []
 	return items, nil
 }
 
+const grantWhere = `-- name: GrantWhere :many
+SELECT
+  t.id,
+  t.name,
+  a.id AS account_id
+FROM
+  targets t
+  LEFT JOIN target_accounts a ON a.target_id = t.id
+  AND a.username = $1
+WHERE
+  t.id = ANY ($2::UUID[])
+  OR t.tags && $3::TEXT[]
+ORDER BY
+  t.name
+`
+
+type GrantWhereParams struct {
+	Username  string   `json:"username"`
+	TargetIds []string `json:"targetIds"`
+	Tags      []string `json:"tags"`
+}
+
+type GrantWhereRow struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	AccountID *string `json:"accountId"`
+}
+
+// The servers a batch grant names, by id or by tag, each with the account asked for if it has one.
+func (q *Queries) GrantWhere(ctx context.Context, arg *GrantWhereParams) ([]*GrantWhereRow, error) {
+	rows, err := q.db.Query(ctx, grantWhere, arg.Username, arg.TargetIds, arg.Tags)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GrantWhereRow
+	for rows.Next() {
+		var i GrantWhereRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.AccountID); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const grantWhereAccounts = `-- name: GrantWhereAccounts :many
+SELECT
+  a.username,
+  COUNT(*)::INT AS servers
+FROM
+  targets t
+  JOIN target_accounts a ON a.target_id = t.id
+WHERE
+  t.id = ANY ($1::UUID[])
+  OR t.tags && $2::TEXT[]
+GROUP BY
+  a.username
+ORDER BY
+  servers DESC,
+  a.username
+`
+
+type GrantWhereAccountsParams struct {
+	TargetIds []string `json:"targetIds"`
+	Tags      []string `json:"tags"`
+}
+
+type GrantWhereAccountsRow struct {
+	Username string `json:"username"`
+	Servers  int32  `json:"servers"`
+}
+
+// The accounts those servers have, the most common first.
+func (q *Queries) GrantWhereAccounts(ctx context.Context, arg *GrantWhereAccountsParams) ([]*GrantWhereAccountsRow, error) {
+	rows, err := q.db.Query(ctx, grantWhereAccounts, arg.TargetIds, arg.Tags)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GrantWhereAccountsRow
+	for rows.Next() {
+		var i GrantWhereAccountsRow
+		if err := rows.Scan(&i.Username, &i.Servers); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertTargetAccounts = `-- name: InsertTargetAccounts :exec
 INSERT INTO
   target_accounts (workspace_id, target_id, username, seen_at)
@@ -293,10 +390,64 @@ func (q *Queries) InsertTargetAccounts(ctx context.Context, arg *InsertTargetAcc
 	return err
 }
 
+const listAccountSubjects = `-- name: ListAccountSubjects :many
+SELECT
+  e.target_id,
+  e.username,
+  array_agg(
+    DISTINCT e.subject_id
+    ORDER BY
+      e.subject_id
+  )::TEXT[] AS ids
+FROM
+  effective_access e
+WHERE
+  e.user_ok
+  AND e.daemon_ok
+GROUP BY
+  e.target_id,
+  e.username
+ORDER BY
+  e.target_id,
+  e.username
+`
+
+type ListAccountSubjectsRow struct {
+	TargetID string   `json:"targetId"`
+	Username string   `json:"username"`
+	Ids      []string `json:"ids"`
+}
+
+// ListAccountSubjectsForTarget for every server of the workspace at once, in the same order.
+func (q *Queries) ListAccountSubjects(ctx context.Context) ([]*ListAccountSubjectsRow, error) {
+	rows, err := q.db.Query(ctx, listAccountSubjects)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListAccountSubjectsRow
+	for rows.Next() {
+		var i ListAccountSubjectsRow
+		if err := rows.Scan(&i.TargetID, &i.Username, &i.Ids); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAccountSubjectsForTarget = `-- name: ListAccountSubjectsForTarget :many
 SELECT
   e.username,
-  array_agg(DISTINCT e.subject_id)::TEXT[] AS ids
+  -- Sorted, the answer to a daemon is hashed.
+  array_agg(
+    DISTINCT e.subject_id
+    ORDER BY
+      e.subject_id
+  )::TEXT[] AS ids
 FROM
   effective_access e
 WHERE
@@ -325,6 +476,48 @@ func (q *Queries) ListAccountSubjectsForTarget(ctx context.Context, targetID str
 	for rows.Next() {
 		var i ListAccountSubjectsForTargetRow
 		if err := rows.Scan(&i.Username, &i.Ids); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGrantEnds = `-- name: ListGrantEnds :many
+SELECT
+  account_id,
+  expires_at
+FROM
+  live_grants
+WHERE
+  account_id = ANY ($1::UUID[])
+  AND subject_id = $2
+`
+
+type ListGrantEndsParams struct {
+	AccountIds []string `json:"accountIds"`
+	SubjectID  string   `json:"subjectId"`
+}
+
+type ListGrantEndsRow struct {
+	AccountID string     `json:"accountId"`
+	ExpiresAt *time.Time `json:"expiresAt"`
+}
+
+// What one subject holds on these accounts already. A grant that ran out counts as none.
+func (q *Queries) ListGrantEnds(ctx context.Context, arg *ListGrantEndsParams) ([]*ListGrantEndsRow, error) {
+	rows, err := q.db.Query(ctx, listGrantEnds, arg.AccountIds, arg.SubjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListGrantEndsRow
+	for rows.Next() {
+		var i ListGrantEndsRow
+		if err := rows.Scan(&i.AccountID, &i.ExpiresAt); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)
@@ -617,6 +810,52 @@ func (q *Queries) PutGrant(ctx context.Context, arg *PutGrantParams) error {
 	return err
 }
 
+const putGrants = `-- name: PutGrants :exec
+INSERT INTO
+  grants (
+    account_id,
+    user_id,
+    team_id,
+    service_account_id,
+    expires_at
+  )
+SELECT
+  account_id,
+  CASE
+    WHEN $1::TEXT = 'user' THEN $2::UUID
+  END,
+  CASE
+    WHEN $1::TEXT = 'team' THEN $2::UUID
+  END,
+  CASE
+    WHEN $1::TEXT = 'service_account' THEN $2::UUID
+  END,
+  $3::TIMESTAMPTZ
+FROM
+  unnest($4::UUID[]) AS account_id
+ON CONFLICT (account_id, subject_id) DO UPDATE
+SET
+  expires_at = EXCLUDED.expires_at
+`
+
+type PutGrantsParams struct {
+	SubjectKind string     `json:"subjectKind"`
+	SubjectID   string     `json:"subjectId"`
+	ExpiresAt   *time.Time `json:"expiresAt"`
+	AccountIds  []string   `json:"accountIds"`
+}
+
+// PutGrant for many accounts in one statement.
+func (q *Queries) PutGrants(ctx context.Context, arg *PutGrantsParams) error {
+	_, err := q.db.Exec(ctx, putGrants,
+		arg.SubjectKind,
+		arg.SubjectID,
+		arg.ExpiresAt,
+		arg.AccountIds,
+	)
+	return err
+}
+
 const removeGrant = `-- name: RemoveGrant :exec
 DELETE FROM grants
 WHERE
@@ -636,6 +875,26 @@ func (q *Queries) RemoveGrant(ctx context.Context, arg *RemoveGrantParams) error
 	return err
 }
 
+const removeGrants = `-- name: RemoveGrants :exec
+DELETE FROM grants
+WHERE
+  account_id = ANY ($1::UUID[])
+  AND subject_kind = $2::TEXT
+  AND subject_id = $3::UUID
+`
+
+type RemoveGrantsParams struct {
+	AccountIds  []string `json:"accountIds"`
+	SubjectKind string   `json:"subjectKind"`
+	SubjectID   string   `json:"subjectId"`
+}
+
+// RemoveGrant for many accounts in one statement.
+func (q *Queries) RemoveGrants(ctx context.Context, arg *RemoveGrantsParams) error {
+	_, err := q.db.Exec(ctx, removeGrants, arg.AccountIds, arg.SubjectKind, arg.SubjectID)
+	return err
+}
+
 const revokeSubjectAccessInWorkspace = `-- name: RevokeSubjectAccessInWorkspace :exec
 DELETE FROM grants
 WHERE
@@ -651,6 +910,76 @@ type RevokeSubjectAccessInWorkspaceParams struct {
 func (q *Queries) RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error {
 	_, err := q.db.Exec(ctx, revokeSubjectAccessInWorkspace, arg.SubjectKind, arg.SubjectID)
 	return err
+}
+
+const revokeWhere = `-- name: RevokeWhere :many
+SELECT
+  g.account_id,
+  a.username,
+  t.id AS target_id,
+  t.name,
+  (cardinality(t.tags) > 1)::BOOLEAN AS other_tags
+FROM
+  grants g
+  JOIN target_accounts a ON a.id = g.account_id
+  JOIN targets t ON t.id = a.target_id
+WHERE
+  g.subject_kind = $1::TEXT
+  AND g.subject_id = $2::UUID
+  AND (
+    t.id = ANY ($3::UUID[])
+    OR t.tags && $4::TEXT[]
+  )
+ORDER BY
+  t.name,
+  a.username
+`
+
+type RevokeWhereParams struct {
+	SubjectKind string   `json:"subjectKind"`
+	SubjectID   string   `json:"subjectId"`
+	TargetIds   []string `json:"targetIds"`
+	Tags        []string `json:"tags"`
+}
+
+type RevokeWhereRow struct {
+	AccountID string `json:"accountId"`
+	Username  string `json:"username"`
+	TargetID  string `json:"targetId"`
+	Name      string `json:"name"`
+	OtherTags bool   `json:"otherTags"`
+}
+
+// One subject's own grants on the servers a batch revoke names, by id or by tag.
+func (q *Queries) RevokeWhere(ctx context.Context, arg *RevokeWhereParams) ([]*RevokeWhereRow, error) {
+	rows, err := q.db.Query(ctx, revokeWhere,
+		arg.SubjectKind,
+		arg.SubjectID,
+		arg.TargetIds,
+		arg.Tags,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*RevokeWhereRow
+	for rows.Next() {
+		var i RevokeWhereRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.Username,
+			&i.TargetID,
+			&i.Name,
+			&i.OtherTags,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const seedTargetAccountsFromToken = `-- name: SeedTargetAccountsFromToken :exec

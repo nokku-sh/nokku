@@ -134,6 +134,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Keyset, store, cfg.Entitlements, cfg.Audit)
 	cfg.Pool = daemon.New(cfg.Conn, cfg.Audit.Record)
 	go cfg.Pool.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
+	go cfg.Pool.Reconcile(ctx)
 	go daemon.RetireLoop(ctx, cfg.Conn, cfg.Pool.Connected, cfg.Audit.Record)
 	go access.ExpireLoop(ctx, cfg.Conn, cfg.Audit.Append)
 	go cfg.Keyset.VaultTokenLoop(ctx)

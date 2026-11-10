@@ -24,6 +24,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
+	"github.com/nokku-sh/nokku/daemon/internal/report"
 	"github.com/nokku-sh/nokku/daemon/internal/sshd"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
@@ -70,13 +71,16 @@ func TestRunServesFromCacheWhenCoreIsDown(t *testing.T) {
 		"access": {
 			"principals": {%q: ["subject-1"]},
 			"ca": %q,
-			"state_version": 7
+			"state_hash": "aGVsZA==",
+			"synced_at": %q
 		}
-	}`, cur.Username, ssh.MarshalAuthorizedKey(caSigner.PublicKey())), 0o600))
+	}`, cur.Username, ssh.MarshalAuthorizedKey(caSigner.PublicKey()),
+		// Within the week a saved state is good for, see TestStaleAccessTakesNoNewLogins for past it.
+		time.Now().Add(-time.Hour).Format(time.RFC3339)), 0o600))
 
 	st, err := state.Load()
 	must.NoError(err)
-	srv, err := sshd.New(nil)
+	srv, err := sshd.New(nil, nil)
 	must.NoError(err)
 	// As run does in cmd/nokkud, which needs root and has no test itself.
 	srv.SetAccess(st.Access())
@@ -89,7 +93,8 @@ func TestRunServesFromCacheWhenCoreIsDown(t *testing.T) {
 		ctl: nokkuv1connect.NewDaemonControlServiceClient(
 			connect.NewClient(connecthttp.NewTransport(&http.Client{Transport: core}, deadPort)),
 		),
-		renew: make(chan struct{}, 1),
+		renew:   make(chan struct{}, 1),
+		reports: report.Open(paths.ReportsFile()),
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	var wg sync.WaitGroup

@@ -16,7 +16,7 @@ const colors: Partial<Record<WorkspaceRole, string>> = {
 	[WorkspaceRole.MEMBER]: 'text-muted-foreground'
 };
 
-/** A service account never manages people, the API takes nothing above the editor. */
+/** A service account never manages people or access, the API takes nothing above the editor. */
 export const SERVICE_ACCOUNT_MAX_ROLE = WorkspaceRole.EDITOR;
 
 /** The role as a word, like "admin". URLs and string-valued inputs carry it. Empty for no role. */

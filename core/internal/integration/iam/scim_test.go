@@ -612,9 +612,31 @@ func TestSCIMGroupAdoptsAnUnlinkedTeam(t *testing.T) {
 		return err
 	}), "SCIM deleted a team made by hand")
 
+	// The team has grants. A group that only shares its name gets none of them until an admin opens the team.
+	assert.Equal(t, http.StatusConflict, c.do(http.MethodPost, "/Groups", group("pid-1"), nil),
+		"a team nobody opened was taken over by its name")
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		members, err := q.ListTeamMembers(t.Context(), team.ID)
+		if err != nil {
+			return err
+		}
+		require.Len(t, members, 1, "the refused group changed the members")
+		_, err = q.UpdateTeam(t.Context(), &db.UpdateTeamParams{TeamID: team.ID, ScimOpen: new(true)})
+		return err
+	}))
+
 	var got scimResource
 	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Groups", group("pid-1"), &got))
 	assert.Equal(t, team.ID, got.ID, "a new team was made instead")
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		taken, err := q.GetTeam(t.Context(), team.ID)
+		if err != nil {
+			return err
+		}
+		assert.True(t, taken.ScimManaged)
+		assert.False(t, taken.ScimOpen, "the takeover did not use the opening up")
+		return nil
+	}))
 	assert.Equal(t, "pid-1", got.ExternalID)
 	require.Len(t, got.Members, 1, "the members are the group's")
 	assert.Equal(t, bob.ID, got.Members[0].Value)
@@ -666,6 +688,13 @@ func TestSCIMGroupChangesAreAudited(t *testing.T) {
 	var platform *db.Team
 	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
 		if platform, err = q.CreateTeam(t.Context(), &db.CreateTeamParams{Name: "platform"}); err != nil {
+			return err
+		}
+		// Open for the takeover below.
+		if _, err = q.UpdateTeam(
+			t.Context(),
+			&db.UpdateTeamParams{TeamID: platform.ID, ScimOpen: new(true)},
+		); err != nil {
 			return err
 		}
 		return q.AddTeamMember(t.Context(), &db.AddTeamMemberParams{TeamID: platform.ID, UserID: alice.ID})
@@ -743,6 +772,54 @@ func TestSCIMReactivationNeedsASeat(t *testing.T) {
 	second := e.userByEmail(t, o.ws, two)
 	require.NotNil(t, second)
 	assert.Equal(t, http.StatusOK, c.do(http.MethodPatch, "/Users/"+second.ID, on, nil))
+}
+
+// SCIM switches an account off whoever made it, that is how people leave. It switches on only what it switched off
+// itself, so an account an admin stopped stays stopped whatever the identity provider sends.
+func TestSCIMSwitchesOnOnlyWhatItSwitchedOff(t *testing.T) {
+	e := newTestEnv(t)
+	o := e.org(t)
+	c := e.scim(t, o)
+	off, on := patchOp("replace", "active", false), patchOp("replace", "active", true)
+	set := func(id string, active bool) {
+		t.Helper()
+		require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+			_, err := c.svc.SetUserActive(t.Context(), q, id, active)
+			return err
+		}))
+	}
+
+	// An account made by hand, then found by the identity provider.
+	byHand := "hand@" + testDomain()
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		_, err := q.CreateUser(t.Context(), &db.CreateUserParams{
+			Email: byHand, Name: "Hand", Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
+		})
+		return err
+	}))
+	hand := e.userByEmail(t, o.ws, byHand)
+	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, "/Users/"+hand.ID, off, nil), "offboarding must reach it")
+	assert.False(t, e.userByEmail(t, o.ws, byHand).Active)
+	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, "/Users/"+hand.ID, on, nil), "what SCIM switched off")
+	assert.True(t, e.userByEmail(t, o.ws, byHand).Active)
+
+	set(hand.ID, false)
+	assert.Equal(t, http.StatusConflict, c.do(http.MethodPatch, "/Users/"+hand.ID, on, nil), "patch")
+	assert.Equal(t, http.StatusConflict, c.do(http.MethodPost, "/Users", scimUser(byHand, ""), nil), "post")
+	assert.False(t, e.userByEmail(t, o.ws, byHand).Active, "SCIM undid an admin's switch")
+
+	// The same for an account SCIM made, the admin's switch is the emergency brake.
+	var made scimResource
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Users", scimUser("made@"+testDomain(), ""), &made))
+	set(made.ID, false)
+	assert.Equal(t, http.StatusConflict, c.do(http.MethodPatch, "/Users/"+made.ID, on, nil))
+
+	// An admin who switches it on and off again takes it out of SCIM's hands too.
+	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, "/Users/"+hand.ID, off, nil))
+	set(hand.ID, true)
+	set(hand.ID, false)
+	assert.Equal(t, http.StatusConflict, c.do(http.MethodPatch, "/Users/"+hand.ID, on, nil),
+		"an old SCIM switch outlived the admin's")
 }
 
 func TestSCIMAdvertisesWhatItSupports(t *testing.T) {

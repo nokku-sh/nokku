@@ -1,6 +1,9 @@
 import { page } from '$app/state';
+import { plural } from '#lib/api/bulk.js';
 import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
 import { setFilters } from '#lib/hooks/index.js';
+import { listNames } from '#lib/utils.js';
+import { timestampDate, timestampFromDate, type Timestamp } from '@bufbuild/protobuf/wkt';
 import {
 	Bot,
 	CircleCheck,
@@ -36,6 +39,8 @@ export const areas: Area[] = [
 		actions: [
 			'AddSubjects',
 			'RemoveSubjects',
+			'Grant',
+			'Revoke',
 			'RevokeAllAccess',
 			'AddTargetAccount',
 			'RemoveTargetAccount',
@@ -108,7 +113,15 @@ export const areas: Area[] = [
 		value: 'sessions',
 		label: 'Sessions',
 		icon: SquareTerminal,
-		actions: ['CreateSession', 'RelayOpen', 'RelayClose', 'GetRecording']
+		actions: [
+			'ConnectionOpen',
+			'ConnectionClose',
+			'ConnectionReportsDropped',
+			'CreateSession',
+			'RelayOpen',
+			'RelayClose',
+			'GetRecording'
+		]
 	},
 	{
 		value: 'signins',
@@ -168,6 +181,7 @@ const filterParams = ['q', 'area', 'outcome', 'kind', 'actor', 'target'];
 export const quickViews: { label: string; params: Record<string, string> }[] = [
 	{ label: 'Everything', params: {} },
 	{ label: 'Access changes', params: { area: 'access' } },
+	{ label: 'Server logins', params: { area: 'sessions' } },
 	{ label: 'Failed & denied', params: { outcome: 'failed' } },
 	{ label: 'People & roles', params: { area: 'people' } },
 	{ label: 'Certificates', params: { area: 'certificates' } },
@@ -188,9 +202,15 @@ const labels: Record<string, string> = {
 	UserDeactivated: 'Account deactivated',
 	RelayOpen: 'Relay opened',
 	RelayClose: 'Relay closed',
+	// What a daemon reported from its server.
+	ConnectionOpen: 'Logged in to a server',
+	ConnectionClose: 'Left a server',
+	ConnectionReportsDropped: 'Login reports lost',
 	GetRecording: 'Played a recording',
 	AddSubjects: 'Granted access',
 	RemoveSubjects: 'Revoked access',
+	Grant: 'Granted access',
+	Revoke: 'Revoked access',
 	RevokeAllAccess: 'Revoked all access',
 	AddTargetAccount: 'Added login account',
 	RemoveTargetAccount: 'Removed login account',
@@ -226,6 +246,11 @@ const detail = (log: EventLog, key: string) => {
 	return typeof v === 'string' && v ? v : undefined;
 };
 
+const strings = (log: EventLog, key: string) => {
+	const v = log.details?.[key];
+	return (Array.isArray(v) ? v : []).filter((s): s is string => typeof s === 'string' && s !== '');
+};
+
 const subjectPrefix: Record<string, string> = { team: 'team:', service_account: 'sa:' };
 
 // How a grant event joins the account and the subjects, like "deploy on web-1 to Mia".
@@ -241,15 +266,32 @@ export function eventWhat(log: EventLog): string | undefined {
 	const server = detail(log, 'target');
 	const account = detail(log, 'username');
 	const prefix = subjectPrefix[detail(log, 'subject_kind') ?? ''] ?? '';
-	const listed = log.details?.['subjects'];
-	const who = (Array.isArray(listed) ? listed : [])
-		.filter((s): s is string => typeof s === 'string' && s !== '')
+	const who = strings(log, 'subjects')
 		.map((s) => prefix + s)
 		.join(', ');
 	const on = account && server ? `${account} on ${server}` : undefined;
 
 	if (grantWords[log.action]) return on && (who ? `${on} ${grantWords[log.action]} ${who}` : on);
 	switch (log.action) {
+		case 'ConnectionOpen':
+		case 'ConnectionClose': {
+			const person = detail(log, 'subject');
+			return person && on ? `${person} as ${on}` : (on ?? server);
+		}
+		case 'ConnectionReportsDropped': {
+			const count = log.details?.['count'];
+			return typeof count === 'number' && name ? `${plural(count, 'event')} on ${name}` : name;
+		}
+		case 'Grant':
+		case 'Revoke': {
+			// One event for many servers. It names the tags and the servers picked by name, and counts the rest.
+			const count = log.details?.['servers'];
+			if (typeof count !== 'number') return undefined;
+			const accounts = account ?? strings(log, 'usernames').join(', ');
+			const where = [...strings(log, 'tags'), ...strings(log, 'targets')];
+			const servers = `${plural(count, 'server')}${where.length ? ` (${listNames(where)})` : ''}`;
+			return `${accounts} on ${servers} ${log.action === 'Grant' ? 'to' : 'from'} ${who}`;
+		}
 		case 'RevokeAllAccess':
 			return name && prefix + name;
 		case 'AddTeamMember':
@@ -264,6 +306,22 @@ export function eventWhat(log: EventLog): string | undefined {
 		}
 	}
 	return name ?? on;
+}
+
+/** Where an event came from. For a login that is the client the daemon saw, not the daemon that reported it. */
+export function eventSource(log: EventLog): string {
+	const remote = detail(log, 'remote');
+	if (!remote || !log.action.startsWith('Connection')) return log.ip;
+	// Without the port, "[::1]:22" and "10.0.0.1:22" alike.
+	return remote.replace(/:\d+$/, '').replace(/^\[(.*)\]$/, '$1');
+}
+
+/** When a reported login happened by the daemon's clock, if the core only heard of it over a minute later. */
+export function eventHappened(log: EventLog): Timestamp | undefined {
+	const at = Date.parse(detail(log, 'at') ?? '');
+	if (!log.timestamp || Number.isNaN(at)) return undefined;
+	const late = timestampDate(log.timestamp).getTime() - at > 60_000;
+	return late ? timestampFromDate(new Date(at)) : undefined;
 }
 
 /** "DeleteTarget" reads as "Delete target". */

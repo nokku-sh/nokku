@@ -17,7 +17,8 @@ INSERT INTO
     endpoints,
     tags,
     metadata,
-    host_public_key
+    host_public_key,
+    created_by
   )
 VALUES
   (
@@ -26,10 +27,11 @@ VALUES
     $3,
     COALESCE($4::TEXT[], '{}'),
     COALESCE($5::JSONB, '{}'),
-    $6
+    $6,
+    $7
   )
 RETURNING
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
 `
 
 type CreateTargetParams struct {
@@ -39,6 +41,7 @@ type CreateTargetParams struct {
 	Tags          []string `json:"tags"`
 	Metadata      []byte   `json:"metadata"`
 	HostPublicKey *string  `json:"hostPublicKey"`
+	CreatedBy     *string  `json:"createdBy"`
 }
 
 func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*Target, error) {
@@ -49,6 +52,7 @@ func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*T
 		arg.Tags,
 		arg.Metadata,
 		arg.HostPublicKey,
+		arg.CreatedBy,
 	)
 	var i Target
 	err := row.Scan(
@@ -62,6 +66,7 @@ func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*T
 		&i.Tags,
 		&i.Metadata,
 		&i.LastSyncAt,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -73,7 +78,7 @@ DELETE FROM targets
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
 `
 
 func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, error) {
@@ -90,6 +95,7 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 		&i.Tags,
 		&i.Metadata,
 		&i.LastSyncAt,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -98,7 +104,7 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 
 const getTarget = `-- name: GetTarget :one
 SELECT
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
 FROM
   targets
 WHERE
@@ -119,6 +125,7 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 		&i.Tags,
 		&i.Metadata,
 		&i.LastSyncAt,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -127,7 +134,7 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 
 const getTargetsBySubject = `-- name: GetTargetsBySubject :many
 SELECT
-  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_at, t.updated_at
+  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_by, t.created_at, t.updated_at
 FROM
   targets t
 WHERE
@@ -172,6 +179,7 @@ func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]
 			&i.Tags,
 			&i.Metadata,
 			&i.LastSyncAt,
+			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -245,7 +253,7 @@ func (q *Queries) GetWorkspaceTags(ctx context.Context) ([]string, error) {
 
 const listTargets = `-- name: ListTargets :many
 SELECT
-  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_at, t.updated_at,
+  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_by, t.created_at, t.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
@@ -357,6 +365,7 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 			&i.Target.Tags,
 			&i.Target.Metadata,
 			&i.Target.LastSyncAt,
+			&i.Target.CreatedBy,
 			&i.Target.CreatedAt,
 			&i.Target.UpdatedAt,
 			&i.TotalCount,
@@ -419,22 +428,20 @@ SET
   endpoints = COALESCE($3, endpoints),
   tags = COALESCE($4, tags),
   metadata = COALESCE($5, metadata),
-  host_public_key = COALESCE($6, host_public_key),
   updated_at = NOW()
 WHERE
-  targets.id = $7
+  targets.id = $6
 RETURNING
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_at, updated_at
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
 `
 
 type UpdateTargetParams struct {
-	Name          *string  `json:"name"`
-	Description   *string  `json:"description"`
-	Endpoints     []string `json:"endpoints"`
-	Tags          []string `json:"tags"`
-	Metadata      []byte   `json:"metadata"`
-	HostPublicKey *string  `json:"hostPublicKey"`
-	TargetID      string   `json:"targetId"`
+	Name        *string  `json:"name"`
+	Description *string  `json:"description"`
+	Endpoints   []string `json:"endpoints"`
+	Tags        []string `json:"tags"`
+	Metadata    []byte   `json:"metadata"`
+	TargetID    string   `json:"targetId"`
 }
 
 func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*Target, error) {
@@ -444,7 +451,6 @@ func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*T
 		arg.Endpoints,
 		arg.Tags,
 		arg.Metadata,
-		arg.HostPublicKey,
 		arg.TargetID,
 	)
 	var i Target
@@ -459,6 +465,7 @@ func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*T
 		&i.Tags,
 		&i.Metadata,
 		&i.LastSyncAt,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

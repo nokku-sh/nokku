@@ -503,11 +503,14 @@ func (s *smoke) revokeGrant(t *testing.T) {
 		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
 	})
 	require.NoError(t, err)
+	// A revoke is a matter of seconds. A sync change that makes it slower has to show up here.
+	revoked := time.Now()
 	select {
 	case err = <-ended:
 		require.Error(t, err, "ssh ended cleanly, the daemon should have cut it: %s", &out)
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "the session outlived the revoke by 10 s")
+		t.Logf("the revoke ended the session after %s", time.Since(revoked).Round(time.Millisecond))
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "the session outlived the revoke by 5 s")
 	}
 
 	again, err := s.home.ssh(t, login, "echo smoke-after-revoke").CombinedOutput()
@@ -517,8 +520,12 @@ func (s *smoke) revokeGrant(t *testing.T) {
 }
 
 func (s *smoke) checkAuditLog(t *testing.T) {
+	// nokkud reports its connections by itself, a moment after they happen.
+	waitFor(t, 30*time.Second, func() bool { return len(s.auditLogs(t, "ConnectionClose")) > 0 },
+		"the daemon reported no connection to the audit log")
 	seen := map[string]bool{}
-	for _, l := range s.auditLogs(t, "Login", "SignSSHCertificate", "CreateSession", "RelayOpen", "RelayClose") {
+	for _, l := range s.auditLogs(t, "Login", "SignSSHCertificate", "CreateSession", "RelayOpen", "RelayClose",
+		"ConnectionOpen", "ConnectionClose") {
 		if l.GetOk() {
 			seen[l.GetAction()+" by "+l.GetActorKind()] = true
 		}
@@ -530,6 +537,8 @@ func (s *smoke) checkAuditLog(t *testing.T) {
 		"CreateSession by user", // the web terminal
 		"RelayOpen by cli",
 		"RelayClose by cli",
+		"ConnectionOpen by daemon", // each SSH login, as nokkud saw it
+		"ConnectionClose by daemon",
 	} {
 		assert.True(t, seen[want], "no %q in the audit log, it holds %v", want, slices.Sorted(maps.Keys(seen)))
 	}

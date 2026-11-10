@@ -237,11 +237,12 @@
 			<Section
 				title="Workspace role"
 				icon={UserCog}
-				description="What it may change through the API."
+				description="What it may read and do through the API."
 			>
 				<RolePicker
 					value={model.role}
 					max={SERVICE_ACCOUNT_MAX_ROLE}
+					machine
 					disabled={!can.edit}
 					onChange={(role) =>
 						whenFresh(() => {

@@ -20,6 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/namegen"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
@@ -123,6 +124,32 @@ func TestEnrollSameNameConcurrently(t *testing.T) {
 	assert.Contains(t, names, "web-1")
 	slices.Sort(names)
 	assert.Len(t, slices.Compact(names), n, "two daemons got one name")
+}
+
+// A fleet of cloud hosts with default names outgrows the word pairs. The names then carry a number.
+func TestEnrollPastTheWordPairs(t *testing.T) {
+	f, token := enrollToken(t, nil)
+
+	// 300,000 draws leave no pair out, there are under 12,000.
+	pairs := make(map[string]bool)
+	for range 300_000 {
+		pairs[namegen.Generate()] = true
+	}
+	err := f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
+		for name := range pairs {
+			if _, err := q.CreateTarget(f.ctx, &db.CreateTargetParams{Name: name}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err, "take every word pair")
+
+	for i := range 20 {
+		out, err := enroll(t, f, daemon.EnrollInput{Token: token, ReqMetadata: hostname("ip-10-0-12-34")})
+		require.NoError(t, err, "enroll %d", i)
+		assert.False(t, pairs[out.Name], "enroll %d took the name %q twice", i, out.Name)
+	}
 }
 
 // A known machine re-enrolls without consulting the quota, a new one does.

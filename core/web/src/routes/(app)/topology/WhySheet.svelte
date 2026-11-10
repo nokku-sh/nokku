@@ -3,15 +3,9 @@
 	import { targetAccount } from '#lib/api/target-accounts.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import {
-		MAX_SERVERS,
-		openGrant,
-		planRevoke,
-		subjectLabel,
-		useGrantWhere
-	} from '#lib/components/access/grant.svelte.js';
+	import { openGrant, subjectLabel } from '#lib/components/access/grant.svelte.js';
 	import SubjectAvatar from '#lib/components/access/SubjectAvatar.svelte';
-	import { kindLabels, subjectHref, type Subject } from '#lib/components/access/subjects.svelte.js';
+	import { subjectHref, type Subject } from '#lib/components/access/subjects.svelte.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -23,6 +17,7 @@
 	import { IsMobile } from '#lib/hooks/index.js';
 	import { cn, formatTs, listNames } from '#lib/utils.js';
 	import { Clock, Server, UserMinus, UserPlus } from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
 	import { tagLabel } from './graph.js';
 
 	interface Props {
@@ -66,47 +61,42 @@
 	}
 
 	let revoking = $state(false);
-	const where = useGrantWhere(
-		() => (cell.tag ? { ids: [], tags: [cell.tag] } : { ids: reached.map((t) => t.id), tags: [] }),
+	const revokeSpec = $derived({
+		subject: { id: subject.id, kind: subject.kind },
+		// The untagged servers have no tag to revoke on, they go by id.
+		...(cell.tag ? { tags: [cell.tag] } : { targetIds: reached.map((t) => t.id) })
+	});
+	// The core says which grants go. The sheet only shows it.
+	const planned = targetAccount.planRevoke(
+		() => revokeSpec,
 		() => revoking
 	);
-	const tooMany = $derived(!!where.data?.tooMany);
-	const plan = $derived(
-		where.data && !tooMany ? planRevoke(subject, where.data.servers) : undefined
-	);
-	const notes = $derived.by(() => {
-		const otherTags = plan?.servers.filter((t) => t.tags.length > 1) ?? [];
-		return [
+	const plan = $derived(planned.data?.plan);
+	const notes = $derived(
+		[
 			team &&
 				'Every member loses it too, unless a grant of their own or another team gives it to them.',
 			person && 'What their teams give them stays.',
-			otherTags.length > 0 &&
-				`${listNames(
-					otherTags.map((t) => t.name),
-					MISSING
-				)} ${otherTags.length === 1 ? 'has' : 'have'} other tags too, so the access goes there as well.`
-		].filter((n) => typeof n === 'string');
-	});
+			!!plan?.otherTags &&
+				`${listNames(plan.otherTagNames, MISSING, plan.otherTags)} ${plan.otherTags === 1 ? 'has' : 'have'} other tags too, so the access goes there as well.`
+		].filter((n) => typeof n === 'string')
+	);
 	const revokeTitle = $derived.by(() => {
-		if (tooMany) return `More than ${MAX_SERVERS} servers`;
 		if (!plan) return 'Finding the grants...';
-		if (!plan.calls.length) return 'Nothing left to revoke here.';
-		return `Removes ${plural(plan.calls.length, 'grant')} on ${plural(plan.servers.length, 'server')}`;
+		if (!plan.grants) return 'Nothing left to revoke here.';
+		return `Removes ${plural(plan.grants, 'grant')} on ${plural(plan.servers, 'server')}`;
 	});
 
-	let done = '';
-	let calls = 0;
-	const revoke = targetAccount.revoke((ok) =>
-		ok === calls ? done : 'Part of the revoke went through, what is left stays in the sheet'
-	);
+	const revoke = targetAccount.revoke();
 
 	async function submit() {
-		if (!plan?.calls.length) return;
-		done = `Revoked ${subjectLabel(subject)} on ${plural(plan.servers.length, 'server')}`;
-		calls = plan.calls.length;
+		if (!plan?.grants) return;
+		const done = `Revoked ${subjectLabel(subject)} on ${plural(plan.servers, 'server')}`;
 		try {
-			const { failures } = await revoke.mutateAsync(plan.calls);
-			if (!failures.length) onClose();
+			// One call and one transaction, so it lands whole or not at all.
+			await revoke.mutateAsync({ revoke: revokeSpec });
+			toast.success(done);
+			onClose();
 		} catch {
 			// The mutation already toasted it.
 		}
@@ -192,24 +182,15 @@
 					>
 						{revokeTitle}
 					</h3>
-					{#if tooMany}
-						<p class="text-xs text-muted-foreground">
-							The sheet revokes on up to {MAX_SERVERS} servers at a time for now. Open the {kindLabels[
-								row.kind
-							].one} and remove it per server.
-						</p>
-					{:else if !plan}
+					{#if !plan}
 						<Skeleton class="h-12 w-full" />
-					{:else if plan.calls.length}
+					{:else if plan.grants}
 						<ul class="flex flex-col gap-1.5 text-sm">
 							{#each plan.accounts as a (a.username)}
 								<li>
 									<span class="font-mono">{a.username}</span>
 									<span class="text-muted-foreground">
-										on {listNames(
-											a.servers.map((t) => t.name),
-											MISSING
-										)}
+										on {listNames(a.serverNames, MISSING, a.servers)}
 									</span>
 								</li>
 							{/each}
@@ -273,7 +254,7 @@
 					<Button
 						variant="destructive"
 						onclick={submit}
-						disabled={!plan?.calls.length || where.isFetching || revoke.isPending}
+						disabled={!plan?.grants || planned.isFetching || revoke.isPending}
 					>
 						{#if revoke.isPending}<Spinner data-icon="inline-start" />{/if}
 						Revoke

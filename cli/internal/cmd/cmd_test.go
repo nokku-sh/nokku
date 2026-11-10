@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +29,7 @@ func setHome(t *testing.T) {
 func runFlags(t *testing.T, args ...string) (*state.State, error) {
 	t.Helper()
 	// The flags read these, and a developer's shell must not leak in.
-	for _, env := range []string{"NK_API_URL", "NK_TTL", "NK_REQUIRE_TPM", "NK_CA_FILE", "NK_DEBUG"} {
+	for _, env := range []string{"NK_API_URL", "NK_REQUIRE_TPM", "NK_CA_FILE", "NK_DEBUG"} {
 		t.Setenv(env, "")
 		require.NoError(t, os.Unsetenv(env))
 	}
@@ -159,23 +158,6 @@ func TestLoadStateRejectsNonServiceToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, s.IsServiceAccount())
 	assert.True(t, s.SessionValid())
-}
-
-func TestLoadStateKeepsTTL(t *testing.T) {
-	setHome(t)
-	require.NoError(t, (&state.State{APIURL: "https://app.nokku.sh", TTL: time.Hour}).Save())
-
-	s, err := runFlags(t)
-	require.NoError(t, err)
-	assert.Equal(t, time.Hour, s.TTL, "without --ttl the stored one stays")
-
-	s, err = runFlags(t, "--ttl", "0")
-	require.NoError(t, err)
-	assert.Zero(t, s.TTL, "0 goes back to the CA default")
-
-	s, err = runFlags(t, "--ttl", "2h", "ls")
-	require.NoError(t, err)
-	assert.Equal(t, 2*time.Hour, s.TTL, "a root flag before a subcommand counts")
 }
 
 func TestDropSecurityKey(t *testing.T) {

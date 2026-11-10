@@ -106,6 +106,7 @@ func (q *Queries) GetNames(ctx context.Context, ids []string) ([]string, error) 
 const insertAuditLog = `-- name: InsertAuditLog :exec
 INSERT INTO
   audit.audit_logs (
+    id,
     workspace_id,
     actor_id,
     actor_kind,
@@ -119,7 +120,7 @@ INSERT INTO
   )
 VALUES
   (
-    $1,
+    COALESCE($1::UUID, uuidv7()),
     $2,
     $3,
     $4,
@@ -128,25 +129,30 @@ VALUES
     $7,
     $8,
     $9,
-    $10::jsonb
+    $10,
+    $11::jsonb
   )
+ON CONFLICT (id) DO NOTHING
 `
 
 type InsertAuditLogParams struct {
-	WorkspaceID string `json:"workspaceId"`
-	ActorID     string `json:"actorId"`
-	ActorKind   string `json:"actorKind"`
-	ActorName   string `json:"actorName"`
-	Action      string `json:"action"`
-	Target      string `json:"target"`
-	Ok          bool   `json:"ok"`
-	Ip          string `json:"ip"`
-	UserAgent   string `json:"userAgent"`
-	Details     []byte `json:"details"`
+	ID          *string `json:"id"`
+	WorkspaceID string  `json:"workspaceId"`
+	ActorID     string  `json:"actorId"`
+	ActorKind   string  `json:"actorKind"`
+	ActorName   string  `json:"actorName"`
+	Action      string  `json:"action"`
+	Target      string  `json:"target"`
+	Ok          bool    `json:"ok"`
+	Ip          string  `json:"ip"`
+	UserAgent   string  `json:"userAgent"`
+	Details     []byte  `json:"details"`
 }
 
+// An event with an id of its own is stored once, however often it comes.
 func (q *Queries) InsertAuditLog(ctx context.Context, arg *InsertAuditLogParams) error {
 	_, err := q.db.Exec(ctx, insertAuditLog,
+		arg.ID,
 		arg.WorkspaceID,
 		arg.ActorID,
 		arg.ActorKind,

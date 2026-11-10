@@ -34,6 +34,7 @@
 		Clock,
 		Copy,
 		Cpu,
+		FileClock,
 		FileText,
 		Globe,
 		Info,
@@ -93,18 +94,24 @@
 
 	let newEndpoint = $state('');
 
+	// Where logins go takes a recent sign-in.
 	function addEndpoint() {
 		const value = newEndpoint.trim();
 		if (!model || !value || model.endpoints.includes(value)) return;
-		model.endpoints = [...model.endpoints, value];
-		newEndpoint = '';
-		save();
+		void whenFresh(() => {
+			if (!model) return;
+			model.endpoints = [...model.endpoints, value];
+			newEndpoint = '';
+			save();
+		});
 	}
 
 	function removeEndpoint(endpoint: string) {
-		if (!model) return;
-		model.endpoints = model.endpoints.filter((e) => e !== endpoint);
-		save();
+		void whenFresh(() => {
+			if (!model) return;
+			model.endpoints = model.endpoints.filter((e) => e !== endpoint);
+			save();
+		});
 	}
 
 	const updateDaemon = daemonApi.update();
@@ -322,6 +329,16 @@
 
 			{#if linkedDaemon}
 				<Section title="Daemon" icon={Bot}>
+					{#snippet action()}
+						<Button
+							size="sm"
+							variant="outline"
+							href={`/audit?area=sessions&actor=${linkedDaemon.id}`}
+						>
+							<FileClock data-icon="inline-start" />
+							Logins
+						</Button>
+					{/snippet}
 					<DetailList
 						items={[
 							{ label: 'Version', value: linkedDaemon.version || 'unknown', mono: true },

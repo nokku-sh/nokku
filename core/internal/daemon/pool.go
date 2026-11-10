@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/time/rate"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -25,24 +27,32 @@ const (
 	behindReportGap = 10 * time.Minute
 	// reconnectWindow outlasts nokkud's longest reconnect backoff, a minute plus jitter.
 	reconnectWindow = 2 * time.Minute
+	// Access changes come in bursts, like a grant on many servers. The first is acted on at once, then the passes
+	// over the workspace come this far apart.
+	mergeWindow = 200 * time.Millisecond
+	// The net under a lost notification, and what ends a grant that ran out on time.
+	sweepEvery = time.Minute
 )
-
-var stateUpdate = &nokkuv1.ConnectResponse{
-	Msg: &nokkuv1.ConnectResponse_StateUpdate{StateUpdate: &nokkuv1.StateUpdate{}},
-}
 
 type daemonConn struct {
 	daemonID    string
 	workspaceID string
 	// state coalesces to one StateUpdate, apart so send never loses a message.
 	send   chan *nokkuv1.ConnectResponse
-	state  chan *nokkuv1.ConnectResponse
+	state  chan struct{}
 	ctx    context.Context
 	cancel context.CancelFunc
-	// wanted is the core's version at the last heartbeat.
-	wanted      int64
-	behindSince atomic.Pointer[time.Time]
-	reportedAt  time.Time
+
+	mu sync.Mutex
+	// wanted is the hash of what the daemon should hold, nil until the first pass over its workspace.
+	wanted []byte
+	// applied is what its last heartbeat said it holds.
+	applied []byte
+	heard   bool
+	// wantedAtBeat is wanted as of the heartbeat before.
+	wantedAtBeat []byte
+	reportedAt   time.Time
+	behindSince  atomic.Pointer[time.Time]
 }
 
 // connection lets tests stub db.Connection without Postgres.
@@ -62,13 +72,42 @@ type Pool struct {
 	// record is told when a daemon falls behind.
 	record  func(context.Context, *audit.Event)
 	started time.Time
+
+	// dirty are the workspaces Reconcile has to look at, wake tells it there are some.
+	dirtyMu sync.Mutex
+	dirty   map[string]struct{}
+	wake    chan struct{}
+
+	// reportLimits paces each daemon's connection reports.
+	reportMu     sync.Mutex
+	reportLimits map[string]*rate.Limiter
 }
 
-// heartbeat checks against the core's version one heartbeat ago, so a daemon
-// busy with the latest change never counts.
-func (c *daemonConn) heartbeat(applied, current int64) (fell bool) {
-	behind := applied < c.wanted
-	c.wanted = current
+// want sets what the daemon should hold and wakes it when its last heartbeat said something else.
+func (c *daemonConn) want(hash []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.wanted = hash
+	if c.heard && !bytes.Equal(c.applied, hash) {
+		c.poke()
+	}
+}
+
+// heartbeat takes what the daemon holds and wakes it when that is not what it should. It fell behind when it
+// still misses what was wanted one heartbeat ago, so a daemon busy with the latest change never counts.
+func (c *daemonConn) heartbeat(applied []byte) (fell bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.applied, c.heard = applied, true
+	if c.wanted == nil {
+		return false
+	}
+	current := bytes.Equal(applied, c.wanted)
+	if !current {
+		c.poke()
+	}
+	behind := !current && c.wantedAtBeat != nil && !bytes.Equal(applied, c.wantedAtBeat)
+	c.wantedAtBeat = c.wanted
 	if !behind {
 		c.behindSince.Store(nil)
 		return false
@@ -80,6 +119,15 @@ func (c *daemonConn) heartbeat(applied, current int64) (fell bool) {
 	return true
 }
 
+// update is the message a poke sends, with what the daemon should hold by now.
+func (c *daemonConn) update() *nokkuv1.ConnectResponse {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return &nokkuv1.ConnectResponse{
+		Msg: &nokkuv1.ConnectResponse_StateUpdate{StateUpdate: &nokkuv1.StateUpdate{StateHash: c.wanted}},
+	}
+}
+
 func New(conn connection, record func(context.Context, *audit.Event)) *Pool {
 	return &Pool{
 		byID:          make(map[string]*daemonConn),
@@ -89,6 +137,9 @@ func New(conn connection, record func(context.Context, *audit.Event)) *Pool {
 		conn:          conn,
 		record:        record,
 		started:       time.Now(),
+		dirty:         make(map[string]struct{}),
+		wake:          make(chan struct{}, 1),
+		reportLimits:  make(map[string]*rate.Limiter),
 	}
 }
 
@@ -142,8 +193,8 @@ func (p *Pool) BehindIn(workspaceID string) int32 {
 	return n
 }
 
-func (p *Pool) reportBehind(c *daemonConn, name string, applied, current int64) {
-	slog.Warn("daemon is behind", "daemon_id", c.daemonID, "applied", applied, "current", current)
+func (p *Pool) reportBehind(c *daemonConn, name string) {
+	slog.Warn("daemon is behind", "daemon_id", c.daemonID)
 	if p.record == nil {
 		return
 	}
@@ -151,7 +202,7 @@ func (p *Pool) reportBehind(c *daemonConn, name string, applied, current int64) 
 		Action:  "DaemonBehind",
 		Target:  c.daemonID,
 		OK:      true,
-		Details: map[string]any{"name": name, "applied": applied, "current": current},
+		Details: map[string]any{"name": name},
 	})
 }
 
@@ -169,7 +220,7 @@ func (p *Pool) registerDaemon(ctx context.Context, daemonID, workspaceID string)
 		daemonID:    daemonID,
 		workspaceID: workspaceID,
 		send:        make(chan *nokkuv1.ConnectResponse, sendBufferSize),
-		state:       make(chan *nokkuv1.ConnectResponse, 1),
+		state:       make(chan struct{}, 1),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -217,8 +268,15 @@ func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 	}
 	p.mu.Unlock()
 	c.cancel()
+	// A daemon that was not held back has nothing to be remembered for.
+	p.reportMu.Lock()
+	if l := p.reportLimits[daemonID]; l != nil && l.Tokens() >= reportBurst {
+		delete(p.reportLimits, daemonID)
+	}
+	p.reportMu.Unlock()
 }
 
+// Listen marks a workspace for Reconcile whenever its access changed.
 func (p *Pool) Listen(ctx context.Context, cfg *pgx.ConnConfig) {
 	for ctx.Err() == nil {
 		if err := p.listen(ctx, cfg); err != nil && ctx.Err() == nil {
@@ -241,17 +299,71 @@ func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 		return err
 	}
 	// Anything that changed while we were not listening went unnoticed.
-	p.pokeAll()
+	p.markAll()
 	for {
 		n, err := conn.WaitForNotification(ctx)
 		if err != nil {
 			return err
 		}
-		p.poke(n.Payload)
+		p.mark(n.Payload)
 	}
 }
 
-func (p *Pool) poke(workspaceID string) {
+// mark has Reconcile look at a workspace. A workspace waits once, however often it is marked.
+func (p *Pool) mark(workspaceID string) {
+	p.dirtyMu.Lock()
+	p.dirty[workspaceID] = struct{}{}
+	p.dirtyMu.Unlock()
+	select {
+	case p.wake <- struct{}{}:
+	default:
+	}
+}
+
+// markAll marks every workspace with a daemon connected. No other has anyone to wake.
+func (p *Pool) markAll() {
+	p.mu.RLock()
+	workspaces := slices.Collect(maps.Keys(p.byWksp))
+	p.mu.RUnlock()
+	for _, id := range workspaces {
+		p.mark(id)
+	}
+}
+
+// Reconcile runs until ctx ends. For each marked workspace it works out what every daemon should hold and wakes
+// the ones that hold something else, so a change costs one pass and a sync per daemon it touches.
+func (p *Pool) Reconcile(ctx context.Context) {
+	sweep := time.NewTicker(sweepEvery)
+	defer sweep.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-sweep.C:
+			p.markAll()
+			continue
+		case <-p.wake:
+		}
+		p.dirtyMu.Lock()
+		marked := p.dirty
+		p.dirty = make(map[string]struct{})
+		p.dirtyMu.Unlock()
+		for workspaceID := range marked {
+			if err := p.reconcile(ctx, workspaceID); err != nil && ctx.Err() == nil {
+				// The sweep comes back to it.
+				slog.Warn("working out what the daemons should hold", "workspace_id", workspaceID, "error", err)
+			}
+		}
+		// A lone change, like a revoke, was acted on at once. What follows it within the window shares one pass.
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(mergeWindow):
+		}
+	}
+}
+
+func (p *Pool) reconcile(ctx context.Context, workspaceID string) error {
 	p.mu.RLock()
 	daemons := make([]*daemonConn, 0, len(p.byWksp[workspaceID]))
 	for daemonID := range p.byWksp[workspaceID] {
@@ -260,36 +372,32 @@ func (p *Pool) poke(workspaceID string) {
 		}
 	}
 	p.mu.RUnlock()
-	for _, c := range daemons {
-		c.poke()
+	if len(daemons) == 0 {
+		return nil
 	}
-}
-
-// Read every time, so a lost notification only waits for the next heartbeat.
-func (p *Pool) stateVersion(ctx context.Context, workspaceID string) (int64, error) {
-	var v int64
-	if err := p.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		v, err = q.GetWorkspaceStateVersion(ctx, workspaceID)
+	hashes, err := Hashes(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), p.conn)
+	if err != nil {
 		return err
-	}); err != nil {
-		return 0, err
 	}
-	return v, nil
-}
-
-func (p *Pool) pokeAll() {
-	p.mu.RLock()
-	daemons := slices.Collect(maps.Values(p.byID))
-	p.mu.RUnlock()
+	// A daemon that is connected and gone from the database is told to stop by its next sync.
+	gone, err := answer(nil, nil, nil, nil)
+	if err != nil {
+		return err
+	}
 	for _, c := range daemons {
-		c.poke()
+		hash, ok := hashes[c.daemonID]
+		if !ok {
+			hash = gone.GetStateHash()
+		}
+		c.want(hash)
 	}
+	return nil
 }
 
 // poke never blocks, a pending update already covers this one.
 func (c *daemonConn) poke() {
 	select {
-	case c.state <- stateUpdate:
+	case c.state <- struct{}{}:
 	default:
 	}
 }

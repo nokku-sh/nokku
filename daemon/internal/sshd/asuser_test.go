@@ -173,7 +173,7 @@ func dialAsUser(t *testing.T) *ssh.Client {
 	t.Helper()
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 	ca := newTestCA(t)
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	require.NoError(t, err)
 	a := testAccess(t, ca)
 	a.Principals = map[string][]string{asUser: {testPrincipal}}

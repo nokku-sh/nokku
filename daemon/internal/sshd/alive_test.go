@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/nokku-sh/nokku/internal/login"
 )
 
 func TestServerMaxConnections(t *testing.T) {
@@ -39,6 +41,123 @@ func TestServerMaxConnections(t *testing.T) {
 		}
 		return false
 	}, 5*time.Second, 20*time.Millisecond, "connection cap never released")
+}
+
+// Peers that never log in hold no connection slot, and a login past the cap hears why it is refused.
+func TestConnectionSlotsAreForLogins(t *testing.T) {
+	must := require.New(t)
+	ca := newTestCA(t)
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { s.conns = make(chan struct{}, 1) })
+	defer closeFn()
+	auth := userCert(t, ca, testPrincipal)
+
+	for range 3 {
+		idle, err := net.Dial("tcp", addr)
+		must.NoError(err)
+		defer idle.Close()
+	}
+	first, err := dial(t, addr, currentUser(t), auth)
+	must.NoError(err, "three peers that never logged in kept a login out")
+	defer first.Close()
+
+	var banner string
+	_, err = ssh.Dial("tcp", addr, &ssh.ClientConfig{
+		User:            currentUser(t),
+		Auth:            []ssh.AuthMethod{auth},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
+		BannerCallback:  func(message string) error { banner += message; return nil },
+		Timeout:         10 * time.Second,
+	})
+	must.Error(err, "a login past the cap got in")
+	assert.Contains(t, banner, "no free connection")
+}
+
+// One person takes a share of the slots, over all accounts, and the next person still gets in.
+func TestConnectionSharePerSubject(t *testing.T) {
+	must := require.New(t)
+	ca := newTestCA(t)
+	target := "5d0c8a1e-3b2f-4c6d-8e9f-0a1b2c3d4e5f"
+	alice := login.Principal("9a3c2a0f-5f1e-4a7b-9c4d-2e6b8f0a1c3d", target, currentUser(t))
+	bob := login.Principal("1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c5d", target, currentUser(t))
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) {
+		a := testAccess(t, ca)
+		a.Principals[currentUser(t)] = []string{alice, bob}
+		s.SetAccess(a)
+		s.maxSubject = 1
+	})
+	defer closeFn()
+
+	first, err := dial(t, addr, currentUser(t), userCert(t, ca, alice))
+	must.NoError(err)
+	defer first.Close()
+
+	var banner string
+	_, err = ssh.Dial("tcp", addr, &ssh.ClientConfig{
+		User:            currentUser(t),
+		Auth:            []ssh.AuthMethod{userCert(t, ca, alice)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
+		BannerCallback:  func(message string) error { banner += message; return nil },
+		Timeout:         10 * time.Second,
+	})
+	must.Error(err, "one subject got past its share")
+	assert.Contains(t, banner, "You have 1 connections open")
+
+	other, err := dial(t, addr, currentUser(t), userCert(t, ca, bob))
+	must.NoError(err, "one subject at its share kept another out")
+	_ = other.Close()
+
+	_ = first.Close()
+	assert.Eventually(t, func() bool {
+		again, dialErr := dial(t, addr, currentUser(t), userCert(t, ca, alice))
+		if dialErr != nil {
+			return false
+		}
+		_ = again.Close()
+		return true
+	}, 5*time.Second, 20*time.Millisecond, "a closed connection kept its share")
+}
+
+// A daemon that has not heard from the core for longer than a certificate lives takes no new logins and says why.
+// What it saved may trust a CA that was rolled over since. Sessions that are open go on.
+func TestStaleAccessTakesNoNewLogins(t *testing.T) {
+	must := require.New(t)
+	ca := newTestCA(t)
+	var srv *Server
+	addr, closeFn := startTestServerOpts(t, ca, func(s *Server) { srv = s })
+	defer closeFn()
+	auth := userCert(t, ca, testPrincipal)
+	dialWithBanner := func() (client *ssh.Client, banner string, err error) {
+		client, err = ssh.Dial("tcp", addr, &ssh.ClientConfig{
+			User:            currentUser(t),
+			Auth:            []ssh.AuthMethod{auth},
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
+			BannerCallback:  func(message string) error { banner += message; return nil },
+			Timeout:         10 * time.Second,
+		})
+		return client, banner, err
+	}
+
+	open, banner, err := dialWithBanner()
+	must.NoError(err, "a login on fresh access")
+	defer open.Close()
+	must.NotContains(banner, "lost touch")
+
+	old := testAccess(t, ca)
+	old.SyncedAt = time.Now().Add(-login.MaxCertTTL - time.Hour)
+	srv.SetAccess(old)
+	srv.DropRevoked()
+
+	_, banner, err = dialWithBanner()
+	must.Error(err, "a login on access the core last confirmed over a week ago")
+	assert.Contains(t, banner, "lost touch with Nokku")
+	_, _, err = open.SendRequest("keepalive@openssh.com", true, nil)
+	must.NoError(err, "the session that was open ended with the access going stale")
+
+	fresh := testAccess(t, ca)
+	srv.SetAccess(fresh)
+	again, _, err := dialWithBanner()
+	must.NoError(err, "a sync did not bring logins back")
+	_ = again.Close()
 }
 
 func TestServerMaxStartups(t *testing.T) {
@@ -92,6 +211,48 @@ func TestServerMaxStartupsReleasedAfterHandshake(t *testing.T) {
 	second, err := dial(t, addr, user, auth)
 	must.NoError(err, "second connection while the first was authenticated and idle")
 	_ = second.Close()
+}
+
+// A few addresses that hold the first slots must not keep everyone else out for certain.
+func TestStartupsDropEarlyAtRandom(t *testing.T) {
+	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
+	s, err := New(nil, nil)
+	require.NoError(t, err)
+	s.startupsStart, s.startupsFull = 2, 4
+
+	next := 0
+	try := func() (func(), bool) {
+		next++
+		return s.acquireStartup(net.TCPAddrFromAddrPort(
+			netip.AddrPortFrom(netip.AddrFrom4([4]byte{192, 0, 2, byte(next%250 + 1)}), 1000),
+		))
+	}
+	for range 2 {
+		_, ok := try()
+		require.True(t, ok, "refused below the start")
+	}
+
+	// Two are held. A third gets in sometimes, and sometimes not.
+	in, out := 0, 0
+	for range 200 {
+		release, ok := try()
+		if !ok {
+			out++
+			continue
+		}
+		in++
+		release()
+	}
+	assert.Positive(t, in, "nobody got in past the start, the slots were held for certain")
+	assert.Positive(t, out, "nobody was refused past the start")
+
+	for s.startups < 4 {
+		try()
+	}
+	for range 50 {
+		_, ok := try()
+		require.False(t, ok, "accepted when full")
+	}
 }
 
 func TestServerMaxChannels(t *testing.T) {
@@ -260,8 +421,10 @@ func TestStartupSlotsPerSource(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	s, err := New(nil)
+	s, err := New(nil, nil)
 	must.NoError(err)
+	// A hard cap, so nothing here is up to chance.
+	s.startupsStart, s.startupsFull = 10, 10
 
 	addr := func(ip string) net.Addr { return net.TCPAddrFromAddrPort(netip.MustParseAddrPort(ip)) }
 

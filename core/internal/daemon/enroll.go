@@ -14,7 +14,11 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/namegen"
 )
 
-const maxNameAttempts = 5
+// The hostname or a word pair first. A full workspace has few pairs left, so the later tries add a number.
+const (
+	maxNameAttempts   = 5
+	plainNameAttempts = 2
+)
 
 // ErrEnrollToken never says which way the token was invalid.
 var ErrEnrollToken = errors.New("invalid or expired enrollment token")
@@ -114,6 +118,9 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 			}
 			// A taken name returns no row, then the generator takes over.
 			name := namegen.Generate()
+			if attempt >= plainNameAttempts {
+				name = namegen.Numbered()
+			}
 			if attempt == 0 && named {
 				name = wanted
 				// Here and not before, so an enrollment that fails keeps the old self.

@@ -39,7 +39,7 @@ func TestAccessFromDropsInvalidAccounts(t *testing.T) {
 		CaPublicKey:     new("ssh-ed25519 BBBB"),
 		HostCaPublicKey: new("ssh-ed25519 HHHH"),
 		Config:          &nokkuv1.DaemonConfig{RecordSessions: new(true)},
-		StateVersion:    new(int64(7)),
+		StateHash:       []byte("7"),
 	}, ownTarget)
 
 	is.Equal([]string{alice1, alice2}, a.Principals["alice"])
@@ -47,7 +47,7 @@ func TestAccessFromDropsInvalidAccounts(t *testing.T) {
 	is.Equal("ssh-ed25519 BBBB", a.CA)
 	is.Equal("ssh-ed25519 HHHH", a.HostCA, "the host CA is kept apart from the login CA")
 	is.True(a.DaemonConfig.GetRecordSessions())
-	is.EqualValues(7, a.StateVersion)
+	is.Equal("7", string(a.StateHash))
 }
 
 // Even if the core sent a wrong list, a principal opens only this server and
@@ -82,7 +82,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		DaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(true)},
 		CA:           "ssh-ed25519 BBBB",
 		HostCA:       "ssh-ed25519 HHHH",
-		StateVersion: 7,
+		StateHash:    []byte("7"),
 	})
 	must.NoError(s.Save())
 
@@ -94,8 +94,8 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	is.True(a.DaemonConfig.GetRecordSessions())
 	is.Equal("ssh-ed25519 BBBB", a.CA)
 	is.Equal("ssh-ed25519 HHHH", a.HostCA)
-	is.EqualValues(7, a.StateVersion)
-	is.EqualValues(7, loaded.SavedVersion(), "the version on disk is the one to report")
+	is.Equal("7", string(a.StateHash))
+	is.Equal("7", string(loaded.Saved().StateHash), "the state on disk is the one to report")
 }
 
 func TestLoadMissingFileStartsEmpty(t *testing.T) {
@@ -107,7 +107,7 @@ func TestLoadMissingFileStartsEmpty(t *testing.T) {
 	is.Empty(s.DaemonID)
 	is.NotNil(s.Access())
 	is.Empty(s.Access().Principals)
-	is.Zero(s.SavedVersion())
+	is.Empty(s.Saved().StateHash)
 }
 
 // A hand-edited file cannot sneak in an unsafe account name.
@@ -193,7 +193,7 @@ func TestStateConcurrentAccess(t *testing.T) {
 	var saveErr error
 	wg.Go(func() {
 		for i := range 50 {
-			s.SetAccess(&Access{Principals: map[string][]string{"alice": {"uuid-1"}}, StateVersion: int64(i)})
+			s.SetAccess(&Access{Principals: map[string][]string{"alice": {"uuid-1"}}, StateHash: []byte{byte(i)}})
 			if saveErr = s.Save(); saveErr != nil {
 				return
 			}
@@ -203,13 +203,13 @@ func TestStateConcurrentAccess(t *testing.T) {
 		wg.Go(func() {
 			for range 50 {
 				_ = s.Access().Principals["alice"]
-				_ = s.SavedVersion()
+				_ = s.Saved().StateHash
 			}
 		})
 	}
 	wg.Wait()
 	require.NoError(t, saveErr)
-	assert.EqualValues(t, 49, s.SavedVersion())
+	assert.Equal(t, []byte{49}, s.Saved().StateHash)
 }
 
 // An enroll during a run writes a new enrollment, the service must not undo it.

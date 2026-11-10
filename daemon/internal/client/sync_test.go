@@ -25,6 +25,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
+	"github.com/nokku-sh/nokku/daemon/internal/report"
 	"github.com/nokku-sh/nokku/daemon/internal/sshd"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
@@ -44,8 +45,11 @@ type fakeCore struct {
 	// answer replaces the accepted sync answer when set.
 	answer   atomic.Pointer[nokkuv1.SyncDaemonResponse]
 	enrolled atomic.Pointer[nokkuv1.EnrollDaemonRequest]
-	// heartbeats gets the state version of each stream's first heartbeat.
-	heartbeats chan int64
+	// heartbeats gets the state hash of each stream's first heartbeat.
+	heartbeats chan string
+	syncs      atomic.Int32
+	// updates are the hashes Connect sends as state updates before it hangs up.
+	updates atomic.Pointer[[][]byte]
 }
 
 func (b *fakeCore) EnrollDaemon(
@@ -66,6 +70,7 @@ func (b *fakeCore) SyncDaemon(
 	context.Context,
 	*nokkuv1.SyncDaemonRequest,
 ) (*nokkuv1.SyncDaemonResponse, error) {
+	b.syncs.Add(1)
 	if res := b.answer.Load(); res != nil {
 		return res, nil
 	}
@@ -77,7 +82,7 @@ func (b *fakeCore) accepted() *nokkuv1.SyncDaemonResponse {
 		Status:          nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
 		CaPublicKey:     &b.ca,
 		HostCaPublicKey: &b.hostCA,
-		StateVersion:    new(int64(7)),
+		StateHash:       []byte("7"),
 		Principals: []*nokkuv1.AccountPrincipals{
 			{Username: new("deploy"), CertPrincipals: []string{principal("deploy")}},
 		},
@@ -98,7 +103,16 @@ func (b *fakeCore) Connect(_ context.Context, stream nokkuv1connect.DaemonContro
 	if err != nil {
 		return err
 	}
-	b.heartbeats <- req.GetHeartbeat().GetStateVersion()
+	b.heartbeats <- string(req.GetHeartbeat().GetStateHash())
+	if updates := b.updates.Load(); updates != nil {
+		for _, hash := range *updates {
+			if err = stream.Send(&nokkuv1.ConnectResponse{
+				Msg: &nokkuv1.ConnectResponse_StateUpdate{StateUpdate: &nokkuv1.StateUpdate{StateHash: hash}},
+			}); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -126,7 +140,7 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 	api.StartTLS()
 	t.Cleanup(api.Close)
 
-	srv, err := sshd.New(nil)
+	srv, err := sshd.New(nil, nil)
 	require.NoError(t, err)
 	// Serve owns the host key, so it has to run for the key to be released.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -150,6 +164,7 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 		srv:     srv,
 		sshAddr: netip.MustParseAddrPort(l.Addr().String()),
 		renew:   make(chan struct{}, 1),
+		reports: report.Open(paths.ReportsFile()),
 	}
 }
 
@@ -163,7 +178,7 @@ func TestSyncAppliesStateWithoutHostCert(t *testing.T) {
 	must.NoError(c.syncDaemon(t.Context()), "a sync must not fail on the host certificate")
 	is.Equal([]string{principal("deploy")}, c.state.Access().Principals["deploy"], "the grant did not land")
 	is.Equal(core.ca, c.state.Access().CA, "the CA did not land")
-	is.EqualValues(7, c.state.SavedVersion())
+	is.Equal("7", string(c.state.Saved().StateHash))
 	is.Zero(core.signs.Load(), "the sync signed a host certificate itself")
 
 	select {
@@ -238,7 +253,7 @@ func TestEnrollRestartReEnroll(t *testing.T) {
 	is.Equal("session", restarted.SessionToken)
 	is.Equal(core.ca, restarted.Access().CA)
 	is.Equal([]string{principal("deploy")}, restarted.Access().Principals["deploy"])
-	is.EqualValues(7, restarted.SavedVersion())
+	is.Equal("7", string(restarted.Saved().StateHash))
 
 	must.NoError(c.enroll(t.Context(), "token"))
 	reenrolled, err := state.Load()
@@ -272,32 +287,74 @@ func TestRejectionDropsEnrollmentAndAccess(t *testing.T) {
 }
 
 // The heartbeat reports what is on disk, so a failed save gets synced again.
-func TestHeartbeatReportsTheSavedVersion(t *testing.T) {
+func TestHeartbeatReportsTheSavedState(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
-	core := &fakeCore{ca: newTestCAKey(t), heartbeats: make(chan int64, 1)}
+	core := &fakeCore{ca: newTestCAKey(t), heartbeats: make(chan string, 1)}
 	c := newSyncClient(t, core)
-	reported := func() int64 {
+	reported := func() string {
 		_ = c.runControlStream(t.Context())
 		return <-core.heartbeats
 	}
 
 	must.NoError(c.syncDaemon(t.Context()))
-	is.EqualValues(7, reported())
+	is.Equal("7", reported())
 
 	// A directory in its place fails every save, root or not.
 	must.NoError(os.Remove(paths.StateFile()))
 	must.NoError(os.Mkdir(paths.StateFile(), 0o700))
 	next := core.accepted()
-	next.StateVersion = new(int64(8))
+	next.StateHash = []byte("8")
 	core.answer.Store(next)
 	must.Error(c.syncDaemon(t.Context()), "the failed save went unnoticed")
-	is.EqualValues(8, c.state.Access().StateVersion, "the sync did not apply because its save failed")
-	is.EqualValues(7, reported(), "a version that never reached the disk was reported")
+	is.Equal("8", string(c.state.Access().StateHash), "the sync did not apply because its save failed")
+	is.Equal("7", reported(), "a state that never reached the disk was reported")
 
 	must.NoError(os.Remove(paths.StateFile()))
 	must.NoError(c.syncDaemon(t.Context()))
-	is.EqualValues(8, reported())
+	is.Equal("8", reported())
+}
+
+// The core says what the daemon should hold. With that on disk there is nothing to fetch.
+func TestStateUpdateFetchesOnlyWhatIsNew(t *testing.T) {
+	core := &fakeCore{ca: newTestCAKey(t), heartbeats: make(chan string, 1)}
+	c := newSyncClient(t, core)
+	held := core.accepted()
+	held.StateHash = []byte("held")
+	core.answer.Store(held)
+	require.NoError(t, c.syncDaemon(t.Context()))
+
+	for _, tt := range []struct {
+		name    string
+		update  []byte
+		fetches int32
+	}{
+		{"what it holds", []byte("held"), 0},
+		{"something else", []byte("new"), 1},
+		{"no hash at all", nil, 1},
+	} {
+		before := core.syncs.Load()
+		core.updates.Store(&[][]byte{tt.update})
+		_ = c.runControlStream(t.Context())
+		<-core.heartbeats
+		assert.Equal(t, tt.fetches, core.syncs.Load()-before, "an update with %s", tt.name)
+	}
+}
+
+// With nothing to trigger it, a daemon still syncs now and then.
+func TestResyncKeepsSyncing(t *testing.T) {
+	core := &fakeCore{ca: newTestCAKey(t)}
+	c := newSyncClient(t, core)
+	ctx, stop := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.resync(ctx, 10*time.Millisecond)
+	}()
+	assert.Eventually(t, func() bool { return core.syncs.Load() >= 3 }, 5*time.Second, 5*time.Millisecond,
+		"the daemon stopped syncing on its own")
+	stop()
+	<-done
 }
 
 // A sync with an unparsable CA key closes the old CA, just as a restart would.

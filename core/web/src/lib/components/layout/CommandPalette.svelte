@@ -302,7 +302,7 @@
 						value={`action:${action.title}`}
 						onSelect={() => {
 							const url = action.url;
-							if (url) return 'fresh' in action ? whenFresh(() => go(url), url) : go(url);
+							if (url) return 'fresh' in action ? whenFresh(() => go(url), { back: url }) : go(url);
 							open = false;
 							action.run?.();
 						}}

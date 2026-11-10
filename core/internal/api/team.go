@@ -53,6 +53,7 @@ func (s *teamService) UpdateTeam(
 		Name:        req.Name,
 		Description: req.Description,
 		Tags:        maskedList(named("tags"), req.GetTags()),
+		ScimOpen:    req.ScimOpen,
 	})
 	if err != nil {
 		return nil, err

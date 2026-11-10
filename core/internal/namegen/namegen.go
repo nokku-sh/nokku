@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"math/big"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -62,6 +63,15 @@ var (
 
 func Generate() string {
 	return word(adjectives) + "-" + word(nouns)
+}
+
+// Numbered is for a workspace that used up most of the word pairs, like "sunny-otter-4821".
+func Numbered() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(9000))
+	if err != nil {
+		return Generate() + "-1000"
+	}
+	return Generate() + "-" + strconv.FormatInt(1000+n.Int64(), 10)
 }
 
 func word(list []string) string {

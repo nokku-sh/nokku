@@ -110,7 +110,7 @@ func startTestServer(t *testing.T, ca testCA) (addr string, closeFn func()) {
 func startTestServerOpts(t *testing.T, ca testCA, tweaks ...func(*Server)) (addr string, closeFn func()) {
 	t.Helper()
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	require.NoError(t, err, "new server")
 	srv.SetAccess(testAccess(t, ca))
 	for _, tweak := range tweaks {
@@ -130,6 +130,7 @@ func testAccess(t *testing.T, ca testCA) *state.Access {
 		Principals:   map[string][]string{currentUser(t): {testPrincipal}},
 		CA:           string(ssh.MarshalAuthorizedKey(ca.pub)),
 		DaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: off, AllowForwarding: off, AllowAgentForwarding: off},
+		SyncedAt:     time.Now(),
 	}
 }
 
@@ -365,7 +366,7 @@ func TestNewWithoutTrustedCA(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	must.NoError(err, "expected server to start without a trusted CA")
 	is.Empty(srv.access.Load().ca)
 }
@@ -375,10 +376,10 @@ func TestServerLivePrincipals(t *testing.T) {
 	ca := newTestCA(t)
 
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	must.NoError(err, "new server")
 	granted := testAccess(t, ca)
-	srv.SetAccess(&state.Access{CA: granted.CA, DaemonConfig: granted.DaemonConfig})
+	srv.SetAccess(&state.Access{CA: granted.CA, DaemonConfig: granted.DaemonConfig, SyncedAt: granted.SyncedAt})
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	must.NoError(err, "listen")
 	go srv.Serve(t.Context(), l)
@@ -422,7 +423,7 @@ func TestServeConnReportsRelayedClient(t *testing.T) {
 	_, closeFn := startTestServerOpts(t, ca, func(s *Server) {
 		srv = s
 		// No pre-auth slot at all: only a relayed connection gets through.
-		s.startups = make(chan struct{})
+		s.startupsFull = 0
 		s.localStartups = make(chan struct{})
 	})
 	defer closeFn()
@@ -470,7 +471,7 @@ func TestServeConnReportsRelayedClient(t *testing.T) {
 // Relayed connections hold at most half the slots, so direct logins stay open.
 func TestRelayCapLeavesRoomForDirectLogins(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil)
+	srv, err := New(nil, nil)
 	require.NoError(t, err)
 	assert.Less(t, cap(srv.relayed), cap(srv.conns), "relayed connections could take every slot")
 

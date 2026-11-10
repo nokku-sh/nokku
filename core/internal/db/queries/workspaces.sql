@@ -86,11 +86,3 @@ RETURNING
 DELETE FROM workspaces
 WHERE
   id = @workspace_id;
-
--- name: GetWorkspaceStateVersion :one
-SELECT
-  version
-FROM
-  workspace_state
-WHERE
-  workspace_id = @workspace_id;
