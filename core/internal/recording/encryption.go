@@ -28,8 +28,9 @@ var ErrNotStored = errors.New("nothing of this recording is stored yet")
 
 // Writer commits on Close, so a dead daemon leaves a partial recording.
 type Writer struct {
-	enc io.WriteCloser
-	obj io.WriteCloser
+	enc  io.WriteCloser
+	obj  io.WriteCloser
+	drop context.CancelFunc
 }
 
 type Reader struct {
@@ -56,16 +57,19 @@ func (s *Service) NewWriter(ctx context.Context, rec *db.Recording, objectID str
 	if err != nil {
 		return nil, err
 	}
+	ctx, drop := context.WithCancel(ctx)
 	obj, err := s.store.CreateWriter(ctx, storage.RecordingPath(rec.WorkspaceID, objectID))
 	if err != nil {
+		drop()
 		return nil, fmt.Errorf("open recording object: %w", err)
 	}
 	// On an error the caller cancels ctx, which drops the object.
 	enc, err := aead.NewEncryptingWriter(obj, objectAAD(rec.ID, objectID))
 	if err != nil {
+		drop()
 		return nil, fmt.Errorf("encrypt recording: %w", err)
 	}
-	return &Writer{enc: enc, obj: obj}, nil
+	return &Writer{enc: enc, obj: obj, drop: drop}, nil
 }
 
 func (s *Service) streamingAEAD(rec *db.Recording) (*subtle.AESGCMHKDF, error) {
@@ -93,7 +97,13 @@ func (w *Writer) WriteChunk(plaintext []byte) error {
 
 // Close seals the last segment, then commits. Tink leaves the object to us.
 func (w *Writer) Close() error {
-	return errors.Join(w.enc.Close(), w.obj.Close())
+	defer w.drop()
+	sealErr := w.enc.Close()
+	if sealErr != nil {
+		// A file bucket commits what it has, only a canceled ctx drops it.
+		w.drop()
+	}
+	return errors.Join(sealErr, w.obj.Close())
 }
 
 func (s *Service) OpenReader(ctx context.Context, rec *db.Recording) (*Reader, error) {

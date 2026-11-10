@@ -5,15 +5,31 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gocloud.dev/gcerrors"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/storage"
 )
+
+// fullDisk takes writes until it is full, like the volume under a file bucket.
+type fullDisk struct {
+	io.Writer
+
+	full bool
+}
+
+func (d *fullDisk) Write(p []byte) (int, error) {
+	if d.full {
+		return 0, syscall.ENOSPC
+	}
+	return d.Writer.Write(p)
+}
 
 func newTestService(t *testing.T) *Service {
 	t.Helper()
@@ -144,4 +160,24 @@ func TestRecordingWithoutAnObjectIsNotStored(t *testing.T) {
 	rec.ObjectID = nil
 	_, err := s.OpenReader(t.Context(), rec)
 	require.ErrorIs(t, err, ErrNotStored)
+}
+
+// A file bucket commits whatever was written, so a failed seal must drop it.
+func TestAFailedSealLeavesNoObject(t *testing.T) {
+	s := newTestService(t)
+	rec := newRecording(t, s, "rec1", NewKey())
+	w, err := s.NewWriter(t.Context(), rec, *rec.ObjectID)
+	require.NoError(t, err)
+	aead, err := s.streamingAEAD(rec)
+	require.NoError(t, err)
+	disk := &fullDisk{Writer: w.obj}
+	w.enc, err = aead.NewEncryptingWriter(disk, objectAAD(rec.ID, *rec.ObjectID))
+	require.NoError(t, err)
+	require.NoError(t, w.WriteChunk([]byte(strings.Repeat("x", 3*segmentSize+100))))
+
+	disk.full = true
+	require.ErrorIs(t, w.Close(), syscall.ENOSPC)
+
+	_, err = s.store.Reader(t.Context(), storage.RecordingPath(rec.WorkspaceID, *rec.ObjectID))
+	assert.Equal(t, gcerrors.NotFound, gcerrors.Code(err), "a truncated object was committed")
 }
