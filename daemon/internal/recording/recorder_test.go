@@ -8,8 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -282,4 +285,28 @@ func TestRecorderRefusesAnIDInUse(t *testing.T) {
 	text, err := unzipCast(data)
 	require.NoError(t, err)
 	assert.Contains(t, text, "first session")
+}
+
+// Retention tries the lock of every recording. A try by another session must not cost a new recorder its file.
+func TestRecorderStartsWhileRetentionLooks(t *testing.T) {
+	dir := newRecordsDir(t)
+	for range 400 {
+		id := uuid.New().String()
+		path := filepath.Join(dir, id+partSuffix)
+		var started atomic.Bool
+		var probes sync.WaitGroup
+		for range 4 {
+			probes.Go(func() {
+				for !started.Load() {
+					beingWritten(path)
+				}
+			})
+		}
+		rec, err := New(Options{Width: 80, Height: 24, SessionID: id})
+		started.Store(true)
+		probes.Wait()
+		require.NoError(t, err, "a retention check held the new file's lock")
+		rec.Close()
+		require.NoError(t, os.Remove(rec.path))
+	}
 }

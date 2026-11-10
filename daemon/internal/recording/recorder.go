@@ -134,8 +134,11 @@ func New(opts Options) (*Recorder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create recording file: %w", err)
 	}
-	// The lock tells retention a session writes this. A crash releases it too.
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	// Tells retention a session writes this, a crash releases it too. Waits out another session's retention check.
+	for err = syscall.EINTR; errors.Is(err, syscall.EINTR); {
+		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
+	}
+	if err != nil {
 		_ = f.Close()
 		_ = os.Remove(path)
 		return nil, fmt.Errorf("lock recording file: %w", err)
