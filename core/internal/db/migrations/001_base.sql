@@ -725,9 +725,11 @@ AFTER
 UPDATE OF object_id ON recordings FOR EACH ROW WHEN (OLD.object_id IS DISTINCT FROM NEW.object_id)
 EXECUTE FUNCTION queue_recording_delete ();
 
--- An upload that lost to a larger copy never reached a row, so no trigger sees its object.
+-- An upload that lost to a larger copy never reached a row, so no trigger sees its object. An upload may queue its
+-- object twice, when the answer to its first COMMIT got lost.
 CREATE FUNCTION queue_lost_recording_object (lost UUID) RETURNS VOID AS $$
-  INSERT INTO recording_deletes (workspace_id, object_id) VALUES (current_workspace_id (), lost);
+  INSERT INTO recording_deletes (workspace_id, object_id) VALUES (current_workspace_id (), lost)
+  ON CONFLICT (object_id) DO NOTHING;
 $$ LANGUAGE sql SECURITY DEFINER
 SET
   search_path = public,

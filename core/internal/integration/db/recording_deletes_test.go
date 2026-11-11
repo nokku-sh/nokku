@@ -71,6 +71,8 @@ func TestDeletedRecordingsAreQueued(t *testing.T) {
 	lost := &db.Recording{ObjectID: new(uuid.NewV7().String())}
 	asOwner(t, c, f, func(q *db.Queries) error { return q.QueueLostRecordingObject(t.Context(), *lost.ObjectID) })
 	assert.True(t, queued(lost), "an object that lost to a larger copy was not queued")
+	// An upload whose COMMIT answer got lost queues its object again.
+	asOwner(t, c, f, func(q *db.Queries) error { return q.QueueLostRecordingObject(t.Context(), *lost.ObjectID) })
 
 	empty := uuid.NewV7().String()
 	asOwner(t, c, f, func(q *db.Queries) error {
