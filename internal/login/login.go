@@ -17,6 +17,9 @@ const WebSessionKeyIDPrefix = "nokku:web:session:"
 // not synced for this long takes no new logins: what it saved is older than any certificate it could vouch for.
 const MaxCertTTL = 7 * 24 * time.Hour
 
+// MaxRelayTime ends a relayed connection on both sides, so a revoke the daemon never heard of holds no longer.
+const MaxRelayTime = 8 * time.Hour
+
 // maxAccounts keeps a huge passwd file from flooding the core.
 const maxAccounts = 200
 

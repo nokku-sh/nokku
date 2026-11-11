@@ -21,7 +21,6 @@ import (
 )
 
 const (
-	sessionTTL      = 8 * time.Hour
 	sessionDialTime = 30 * time.Second
 	sessionCertTTL  = time.Hour
 )
@@ -94,7 +93,7 @@ func (p *Pool) StartSession(ctx context.Context, cfg SessionConfig) (*Session, e
 		return nil, fmt.Errorf("ssh session: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, sessionTTL)
+	ctx, cancel := context.WithTimeout(ctx, login.MaxRelayTime)
 	s := &Session{
 		sessionID: cfg.SessionID,
 		username:  cfg.Username,

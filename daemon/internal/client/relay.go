@@ -10,9 +10,8 @@ import (
 	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/login"
 )
-
-const sessionTTL = 8 * time.Hour
 
 var relayClosed = &nokkuv1.DaemonRelayRequest{
 	Msg: &nokkuv1.DaemonRelayRequest_Closed{Closed: &nokkuv1.DaemonRelayClosed{}},
@@ -44,7 +43,7 @@ type relayConn struct {
 
 // The sshd enforces its connection cap, so relays need none.
 func (c *Client) runRelay(ctx context.Context, req *nokkuv1.RelayOpen) {
-	ctx, cancel := context.WithTimeout(ctx, sessionTTL)
+	ctx, cancel := context.WithTimeout(ctx, login.MaxRelayTime)
 	defer cancel()
 	stream, err := c.ctl.DaemonRelay(ctx)
 	if err == nil {
