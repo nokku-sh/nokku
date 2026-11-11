@@ -161,6 +161,9 @@ func (s *smoke) ciJob(t *testing.T) {
 	out, err = job.nk(t, "ls").CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(out), "run nk login --ci")
-	out, err = job.ssh(t, login, "echo smoke-ci").CombinedOutput()
-	assert.Error(t, err, "the deleted account still reached the server: %s", out)
+	// The delete can share a sync pass with the grant just before it, so it lands a moment later.
+	waitFor(t, 5*time.Second, func() bool {
+		out, err = job.ssh(t, login, "echo smoke-ci").CombinedOutput()
+		return err != nil
+	}, "the deleted account still reached the server: %s", &out)
 }
