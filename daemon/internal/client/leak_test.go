@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nokku-sh/nokku/daemon/internal/leaktest"
+	"github.com/nokku-sh/nokku/internal/leaktest"
 )
 
 func TestMain(m *testing.M) {

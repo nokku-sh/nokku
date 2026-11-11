@@ -13,6 +13,7 @@ agree on, so there is exactly one implementation of each.
 | `trust`      | Trust in a core whose certificate comes from a private CA | `nk` and `nokkud` |
 | `id`         | A stable, hashed machine fingerprint                      | `nk` and `nokkud` |
 | `tpm`        | Machine-bound signing keys, in the TPM or wrapped         | `nk` and `nokkud` |
+| `leaktest`   | Test only. Fails a test suite that leaks goroutines       | tests             |
 
 ## Packages in depth
 
@@ -52,6 +53,10 @@ agree on, so there is exactly one implementation of each.
   it, and every `SignerOptions.StatePath` is an identity of its own.
   A `.lock` file beside the state file keeps two processes from creating
   different keys at once.
+- **leaktest** - test only, never in a binary. `Exit` wraps `m.Run` in a
+  `TestMain` and fails the suite when the runtime's `goroutineleak` profile
+  shows a stuck goroutine. It does nothing on a toolchain without that
+  profile.
 
 ## Machine identity trust model
 

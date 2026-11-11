@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nokku-sh/nokku/daemon/internal/leaktest"
+	"github.com/nokku-sh/nokku/internal/leaktest"
 )
 
 func TestMain(m *testing.M) {
