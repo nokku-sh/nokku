@@ -47,7 +47,7 @@
 		"bits-ui": "^2.20.2",
 		"cn": "^0.5.1",
 		"mode-watcher": "^1.1.0",
-		"oxfmt": "^0.75.0",
+		"oxfmt": "^0.76.0",
 		"oxlint": "^1.90.0",
 		"oxlint-tsgolint": "^7.0.2005",
 		"runed": "^0.38.0",
