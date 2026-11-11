@@ -100,6 +100,11 @@ type core struct {
 	url    string
 	// admin-link runs with the server's environment.
 	env []string
+	dir string
+	// The whole test, a server started in a phase must outlive it.
+	t *testing.T
+	// stop shuts the running server down and waits for it.
+	stop func()
 }
 
 // nkHome is where nk and ssh run. Its own HOME keeps the real ~/.ssh,
@@ -139,6 +144,7 @@ func TestSmoke(t *testing.T) {
 		{"ssh connects through the relay", s.sshRelay},
 		{"web terminal runs a shell", s.webTerminal},
 		{"sessions are recorded", s.checkRecordings},
+		{"ssh connects while the core is down", s.sshWithoutCore},
 		{"an upgrade waits for the open session", s.upgradeWaitsForSessions},
 		{"revoking the grant ends the session", s.revokeGrant},
 		{"audit log holds the flows", s.checkAuditLog},
@@ -325,8 +331,13 @@ func (s *smoke) loginNK(t *testing.T) {
 	_ = res.Body.Close()
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, res.StatusCode, "the approval was refused")
-	require.True(t, strings.HasPrefix(approved.Redirect, "http://127.0.0.1:"), "no way back to nk: %q", approved.Redirect)
-	back, err := http.Get(approved.Redirect) //nolint:noctx // nk answers at once
+	require.True(
+		t,
+		strings.HasPrefix(approved.Redirect, "http://127.0.0.1:"),
+		"no way back to nk: %q",
+		approved.Redirect,
+	)
+	back, err := http.Get(approved.Redirect)
 	require.NoError(t, err)
 	_ = back.Body.Close()
 	require.Equal(t, http.StatusOK, back.StatusCode, "nk did not take the browser's answer")
@@ -429,6 +440,32 @@ func (s *smoke) checkRecordings(t *testing.T) {
 	all := strings.Join(slices.Collect(maps.Values(casts)), "\n")
 	assert.Contains(t, all, "smoke-direct")
 	assert.Contains(t, all, "smoke-relay")
+}
+
+// A certificate nk holds logs in on a server it reaches directly, with no core
+// to ask. The daemon enforces the access it last synced.
+func (s *smoke) sshWithoutCore(t *testing.T) {
+	res, err := s.targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: new(s.target.GetId())})
+	require.NoError(t, err)
+	if len(res.GetTarget().GetEndpoints()) == 0 {
+		t.Skip("the daemon advertised no address of this machine, and the relay needs the core")
+	}
+
+	s.core.stop()
+	require.False(t, healthy(s.core.url), "the core still answers")
+	out, sshErr := s.home.ssh(t, login, "echo smoke-offline").CombinedOutput()
+	// Back up before the verdict, the later phases need it either way.
+	s.core.start()
+	require.NoError(t, sshErr, "ssh without the core: %s", out)
+	assert.Contains(t, string(out), "smoke-offline")
+
+	waitFor(t, 2*time.Minute, func() bool {
+		res, err := s.daemons.ListDaemons(t.Context(), &nokkuv1.ListDaemonsRequest{Online: new(true)})
+		require.NoError(t, err)
+		return slices.ContainsFunc(res.GetDaemons(), func(d *nokkuv1.Daemon) bool {
+			return d.GetId() == s.daemon.GetId()
+		})
+	}, "the daemon never came back to the restarted core")
 }
 
 // An upgrade renames a new binary over the running one, and postinstall.sh then
@@ -601,23 +638,36 @@ func startCore(t *testing.T, bin, smtpHost, smtpPort, platformCert string) core 
 			"NOKKU_ALLOW_PRIVATE_NETWORKS=true",
 			"SSL_CERT_FILE=" + platformCert,
 		},
+		dir: t.TempDir(),
+		t:   t,
 	}
 	// testenv.Postgres pointed these at its container.
 	for _, key := range []string{"PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE", "PGSSLMODE"} {
 		c.env = append(c.env, key+"="+os.Getenv(key))
 	}
 
-	server := c.command(t.Context())
-	server.Dir = t.TempDir()
+	c.start()
+	return c
+}
+
+// start runs the server until the test ends or stop is called.
+func (c *core) start() {
+	t := c.t
+	ctx, cancel := context.WithCancel(t.Context())
+	server := c.command(ctx)
+	server.Dir = c.dir
 	exited := startLogged(t, server)
+	c.stop = func() {
+		cancel()
+		<-exited
+	}
 	waitFor(t, time.Minute, func() bool {
 		require.False(t, closed(exited), "the core exited at start")
 		return healthy(c.url)
 	}, "the core never answered /healthz")
-	return c
 }
 
-func (c core) command(ctx context.Context, args ...string) *exec.Cmd {
+func (c *core) command(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, c.binary, args...)
 	cmd.Env = c.env
 	return cmd
