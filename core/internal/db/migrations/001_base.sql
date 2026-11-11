@@ -223,7 +223,8 @@ CREATE TABLE device_grants (
   user_code TEXT NOT NULL, -- a handle, no secret, approving takes a session
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied')),
   user_id UUID, -- who decided
-  approved_method TEXT, -- how the approving session signed in, the CLI session inherits it
+  -- How the approving session signed in, the CLI session inherits it.
+  approved_method TEXT CHECK (approved_method IN ('passkey', 'magic_link', 'oidc', 'device', 'token', 'federation', 'scim')),
   ip TEXT NOT NULL DEFAULT '',
   user_agent TEXT NOT NULL DEFAULT '',
   polled_at TIMESTAMPTZ,
@@ -260,7 +261,7 @@ CREATE TABLE access_tokens (
   service_account_id UUID,
   daemon_id UUID,
   subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, service_account_id, daemon_id)) STORED,
-  method TEXT NOT NULL, -- passkey, magic_link, oidc, device, token, federation, scim
+  method TEXT NOT NULL CHECK (method IN ('passkey', 'magic_link', 'oidc', 'device', 'token', 'federation', 'scim')),
   binding TEXT NOT NULL DEFAULT '', -- DPoP JWK thumbprint, empty for cookie sessions and keys
   -- The SSH key nk signed in with, the only key the session gets certificates for. Empty for every other kind.
   ssh_key TEXT NOT NULL DEFAULT '',
@@ -484,10 +485,7 @@ CREATE TABLE access_requests (
   decided_by UUID,
   decided_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (
-    status NOT IN ('approved', 'denied')
-    OR decided_at IS NOT NULL
-  ),
+  CHECK ((status IN ('approved', 'denied')) = (decided_at IS NOT NULL)),
   FOREIGN KEY (workspace_id, requester_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, account_id) REFERENCES target_accounts (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, decided_by) REFERENCES users (workspace_id, id) ON DELETE SET NULL (decided_by)

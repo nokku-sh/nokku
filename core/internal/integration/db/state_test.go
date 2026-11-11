@@ -331,7 +331,7 @@ func TestAccessTokenTakesTheSubjectOfItsKind(t *testing.T) {
 			INSERT INTO access_tokens (
 				token_hash, workspace_id, kind, method, user_id, service_account_id, daemon_id, expires_at, ssh_key
 			)
-			VALUES (uuidv7()::TEXT, $1, $2, 'test', $3, $4, $5, NOW() + INTERVAL '1 hour',
+			VALUES (uuidv7()::TEXT, $1, $2, 'token', $3, $4, $5, NOW() + INTERVAL '1 hour',
 				CASE WHEN $2 = 'cli' THEN 'ssh-ed25519 AAAA' ELSE '' END)`,
 			f.ws, kind, user, serviceAccount, daemon)
 		return err
@@ -372,7 +372,7 @@ func TestOnlyAnNKSessionCarriesAnSSHKey(t *testing.T) {
 	insert := func(kind, sshKey string) error {
 		_, err := c.sysPool.Exec(t.Context(), `
 			INSERT INTO access_tokens (token_hash, workspace_id, kind, method, user_id, ssh_key)
-			VALUES (uuidv7()::TEXT, $1, $2, 'test', $3, $4)`,
+			VALUES (uuidv7()::TEXT, $1, $2, 'token', $3, $4)`,
 			f.ws, kind, f.u, sshKey)
 		return err
 	}
@@ -399,7 +399,7 @@ func TestServiceAccountTokenHasAnEndDate(t *testing.T) {
 			INSERT INTO access_tokens (
 				token_hash, workspace_id, kind, method, service_account_id, expires_at, binding, workload_jti
 			)
-			VALUES (uuidv7()::TEXT, $1, 'service_account', 'test', $2, $3, $4, $5)`,
+			VALUES (uuidv7()::TEXT, $1, 'service_account', 'token', $2, $3, $4, $5)`,
 			f.ws, sa, expiresAt, binding, jti)
 		return err
 	}

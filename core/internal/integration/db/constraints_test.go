@@ -49,6 +49,23 @@ func TestInvalidRowsAreRefused(t *testing.T) {
 		"a token that retires early": {joinToken, []any{f.ws, id(), nil, 0, "-1 minute"}},
 		"a request for no time":      {request, []any{f.ws, f.u, f.account, "0", "pending"}},
 		"a decision with no time":    {request, []any{f.ws, f.u, f.account, "1 hour", "approved"}},
+		"a time with no decision": {
+			`INSERT INTO access_requests (workspace_id, requester_id, account_id, duration, reason, decided_at)
+				VALUES ($1, $2, $3, '1 hour', 'because', NOW())`,
+			[]any{f.ws, f.u, f.account},
+		},
+		"a session that signed in no known way": {
+			`INSERT INTO access_tokens (token_hash, workspace_id, kind, method, user_id)
+				VALUES ($1, $2, 'user', 'pigeon', $3)`,
+			[]any{id(), f.ws, f.u},
+		},
+		"an nk login approved no known way": {
+			`INSERT INTO device_grants (
+					device_code_hash, workspace_id, user_code, status, user_id, approved_method, expires_at
+				)
+				VALUES ($1, $2, 'CODE', 'approved', $3, 'pigeon', NOW())`,
+			[]any{id(), f.ws, f.u},
+		},
 		"a whole recording with no object": {
 			recording, []any{f.ws, true, 0, "-1 hour"},
 		},

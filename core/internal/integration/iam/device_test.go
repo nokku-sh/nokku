@@ -51,7 +51,7 @@ func devicePost(
 	r.RemoteAddr = remote
 	ctx := anon(r.Context(), ws)
 	if u != nil {
-		ctx = as(ctx, ws, u)
+		ctx = iam.ContextWithToken(as(ctx, ws, u), db.AccessToken{Method: string(iam.MethodPasskey)})
 	}
 	w := httptest.NewRecorder()
 	handler(w, r.WithContext(ctx))
