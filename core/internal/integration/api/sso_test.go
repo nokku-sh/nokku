@@ -357,7 +357,10 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	for token, stays := range sessions {
 		_, tok, err := cfg.IAM.AuthenticateToken(wsCtx(t), token, accessTokens...)
 		if stays {
-			assert.NoError(t, err, "a %s session of kind %s was ended", tok.Method, tok.Kind)
+			require.NoError(t, err, "a %s session of kind %s was ended", tok.Method, tok.Kind)
+			require.NotNil(t, tok.ExpiresAt, "a %s session of kind %s kept no end", tok.Method, tok.Kind)
+			assert.WithinDuration(t, time.Now().Add(iam.SSOSessionTTL), *tok.ExpiresAt, time.Minute,
+				"a session from before the rule outlives a new one")
 		} else {
 			assert.Error(t, err, "a session outlived the rule")
 		}

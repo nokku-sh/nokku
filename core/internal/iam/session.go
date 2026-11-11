@@ -30,6 +30,11 @@ const (
 // recentSignIn is the max age of a session for a call marked fresh.
 const recentSignIn = 10 * time.Minute
 
+// SSOSessionTTL is how long a person stays signed in where single sign-on is
+// required. Nothing asks the provider again in between, so this is how long
+// someone removed there keeps a session.
+const SSOSessionTTL = 24 * time.Hour
+
 var tokenKinds = map[actor.Kind]crypto.TokenKind{
 	actor.KindUser:           crypto.TokenSession,
 	actor.KindCLI:            crypto.TokenCLI,
@@ -86,17 +91,20 @@ func (s *Service) issueSignIn(
 	if !u.Active {
 		return deny(ErrInactive, "inactive")
 	}
-	if p.Method != MethodOIDC {
-		w, err := q.GetWorkspace(ctx)
-		if err != nil {
-			return nil, "", err
-		}
-		enforced := w.Settings.GetEnforceSso()
+	w, err := q.GetWorkspace(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	if w.Settings.GetEnforceSso() {
 		// The owner keeps passkey and link, to fix a broken provider.
 		breakGlass := u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER &&
 			(p.Method == MethodPasskey || p.Method == MethodMagicLink)
-		if enforced && !breakGlass {
+		if p.Method != MethodOIDC && !breakGlass {
 			return deny(ErrSSORequired, "sso enforced")
+		}
+		// Zero would never expire.
+		if p.TTL == 0 || p.TTL > SSOSessionTTL {
+			p.TTL = SSOSessionTTL
 		}
 	}
 	// An unclaimed workspace is purged, so failing to claim fails the sign-in.

@@ -146,6 +146,18 @@ WHERE
   id = @id
   AND kind = 'scim';
 
+-- name: CapSessions :execrows
+-- Requiring single sign-on shortens the sessions it leaves, a provider's and the owner's, to what a new one gets.
+UPDATE access_tokens
+SET
+  expires_at = @not_after::TIMESTAMPTZ
+WHERE
+  kind IN ('user', 'cli')
+  AND (
+    expires_at IS NULL
+    OR expires_at > @not_after::TIMESTAMPTZ
+  );
+
 -- name: DeleteNonSSOSessions :execrows
 -- Requiring single sign-on ends the sessions a passkey or a mailed link started, in the browser and in nk. The owner
 -- keeps theirs, the way in when a provider breaks.

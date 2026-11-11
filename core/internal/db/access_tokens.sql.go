@@ -12,6 +12,27 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 )
 
+const capSessions = `-- name: CapSessions :execrows
+UPDATE access_tokens
+SET
+  expires_at = $1::TIMESTAMPTZ
+WHERE
+  kind IN ('user', 'cli')
+  AND (
+    expires_at IS NULL
+    OR expires_at > $1::TIMESTAMPTZ
+  )
+`
+
+// Requiring single sign-on shortens the sessions it leaves, a provider's and the owner's, to what a new one gets.
+func (q *Queries) CapSessions(ctx context.Context, notAfter time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, capSessions, notAfter)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createAccessToken = `-- name: CreateAccessToken :one
 INSERT INTO
   access_tokens (

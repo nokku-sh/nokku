@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect/v2"
 
@@ -91,7 +92,12 @@ func (s *workspaceService) UpdateWorkspace(
 		}
 		// A passkey session would outlive the rule by up to 30 days otherwise.
 		ended, err := q.DeleteNonSSOSessions(ctx)
+		if err != nil {
+			return err
+		}
 		audit.Set(ctx, "sessions_ended", ended)
+		// The ones that stay get what a new session gets from now on.
+		_, err = q.CapSessions(ctx, time.Now().Add(iam.SSOSessionTTL))
 		return err
 	}); err != nil {
 		return nil, err
