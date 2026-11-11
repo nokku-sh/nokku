@@ -66,7 +66,7 @@ The table holds until your next `nk login`. Malware that runs as you can replace
 
 ### Sessions and service account keys
 
-- **A session from `nk login`** is bound to a machine key with DPoP, so a copied session token is useless elsewhere. A person's session gets certificates only for the SSH key it signed in with.
+- **A session from `nk login`** is bound to a machine key with DPoP, so a copied session token is useless elsewhere. A person's session gets certificates only for the SSH key it signed in with. It lasts 30 days, or one day where the workspace requires single sign-on, and no certificate outlives it.
 - **It makes only the calls `nk` needs**: certificates, the list of what you reach, the relay, access requests and `nk sync`. Roles, grants, recordings and tokens are changed in the web app only, also by an owner.
 - **A session from `nk login --ci`** is bound to the runner's key too, but like any service account it may get certificates for any key it sends.
 - **A service account key** is not bound, it is a plain bearer token. Treat it like a password. Pass it as `NK_TOKEN`, it is never accepted as a flag. Keep it out of source control.

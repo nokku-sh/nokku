@@ -31,7 +31,7 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 
 ## What it does
 
-- Signs you in through your browser, the way you sign in to the web app. On a machine without one, `nk login --headless` gives you a code to type on another device.
+- Signs you in through your browser, the way you sign in to the web app. On a machine without one, `nk login --headless` gives you a code to type on another device. A sign-in lasts 30 days, or one day where your workspace requires single sign-on. After that `ssh` tells you to run `nk login` again.
 - Gets a short-lived certificate per server right before `ssh` needs it, and renews it on its own.
 - Writes an SSH config for your servers and adds one `Include` line to your `~/.ssh/config`. Your own settings stay untouched.
 - Connects directly when it can, and through the Nokku relay when it can't.

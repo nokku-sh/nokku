@@ -19,7 +19,7 @@
 Nokku gives people short-lived SSH certificates instead of long-lived keys. You decide who may log in to which server as which account. Nokku signs a certificate for exactly that, and it expires by itself.
 
 ```bash
-nk login           # opens your browser, once
+nk login           # opens your browser, good for 30 days
 ssh deploy@web-1   # the ssh you already know
 ```
 
