@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -136,4 +137,12 @@ func TestConnectionReportsWaitForTheAck(t *testing.T) {
 	live := next()
 	require.Len(t, live.GetEvents(), 1)
 	assert.Equal(t, "c2", live.GetEvents()[0].GetConnectionId())
+}
+
+// One event with a byte the wire refuses must not hold back every report after it.
+func TestAReportWithABadByteStillGoesOut(t *testing.T) {
+	msg := connectionReport([]report.Event{{ConnectionID: "c1", Client: "SSH-2.0-\xffbad", Remote: "r\xfe"}}, 0)
+	_, err := proto.Marshal(msg)
+	require.NoError(t, err)
+	assert.Equal(t, "SSH-2.0-bad", msg.GetConnectionReport().GetEvents()[0].GetClientVersion())
 }

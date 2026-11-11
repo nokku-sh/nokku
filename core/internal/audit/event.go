@@ -66,6 +66,7 @@ func Insert(ctx context.Context, q *db.Queries, event *Event) error {
 	if err != nil {
 		return err
 	}
+	details = dropNUL(details)
 	// marshal(nil) yields "null", the column wants an object.
 	if string(details) == "null" {
 		details = []byte("{}")
@@ -79,12 +80,12 @@ func Insert(ctx context.Context, q *db.Queries, event *Event) error {
 		WorkspaceID: event.WorkspaceID,
 		ActorID:     event.ActorID,
 		ActorKind:   event.ActorKind,
-		ActorName:   event.ActorName,
+		ActorName:   text(event.ActorName),
 		Action:      event.Action,
-		Target:      event.Target,
+		Target:      text(event.Target),
 		Ok:          event.OK,
-		Ip:          event.IP,
-		UserAgent:   event.UserAgent,
+		Ip:          text(event.IP),
+		UserAgent:   text(event.UserAgent),
 		Details:     details,
 	})
 }
@@ -205,4 +206,32 @@ func SpreadsheetSafe(s string) string {
 		return "'" + s
 	}
 	return s
+}
+
+// text is what a Postgres text column takes. Much of a row is the caller's to pick, and a row the database
+// refuses is a row the log lacks.
+func text(s string) string {
+	return strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", ""), "")
+}
+
+// dropNUL takes the NUL characters out of marshaled JSON, jsonb holds none. A backslash only starts an escape
+// there, so the pair after an escaped backslash is skipped whole.
+func dropNUL(doc []byte) []byte {
+	const nul = `\u0000`
+	if !bytes.Contains(doc, []byte(nul)) {
+		return doc
+	}
+	out := make([]byte, 0, len(doc))
+	for i := 0; i < len(doc); i++ {
+		switch {
+		case bytes.HasPrefix(doc[i:], []byte(nul)):
+			i += len(nul) - 1
+		case doc[i] == '\\' && i+1 < len(doc):
+			out = append(out, doc[i], doc[i+1])
+			i++
+		default:
+			out = append(out, doc[i])
+		}
+	}
+	return out
 }

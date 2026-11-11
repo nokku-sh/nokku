@@ -33,6 +33,12 @@ type wrongKeySigner struct {
 	other ssh.Signer
 }
 
+type versionLine struct {
+	ssh.ConnMetadata
+
+	line string
+}
+
 func TestServerAuditEvents(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
@@ -186,4 +192,19 @@ func TestConnectionIsReported(t *testing.T) {
 		5*time.Second, 10*time.Millisecond, "the end of the connection was not put down")
 	assert.True(t, events[1].Closed)
 	assert.Equal(t, opened.ConnectionID, events[1].ConnectionID, "both ends go by one id")
+}
+
+func (v versionLine) ClientVersion() []byte { return []byte(v.line) }
+
+// The client picks its version line, and it goes into the log and the login report.
+func TestClientVersionKeepsOnlyWhatPrints(t *testing.T) {
+	for in, want := range map[string]string{
+		"SSH-2.0-OpenSSH_10.0":        "SSH-2.0-OpenSSH_10.0",
+		"SSH-2.0-nul\x00here":         "SSH-2.0-nulhere",
+		"SSH-2.0-bad\xffbyte":         "SSH-2.0-badbyte",
+		"SSH-2.0-line\nfake=1\x1b[0m": "SSH-2.0-linefake=1[0m",
+		"SSH-2.0-Größe":               "SSH-2.0-Größe",
+	} {
+		assert.Equal(t, want, clientVersion(versionLine{line: in}), "%q", in)
+	}
 }

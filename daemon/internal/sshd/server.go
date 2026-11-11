@@ -262,7 +262,7 @@ func (s *Server) handleConn(ctx context.Context, nc net.Conn, relayed bool) {
 		s.liveMu.Unlock()
 	}()
 	slog.Info("connection established",
-		"user", conn.User(), "remote", conn.RemoteAddr(), "client", string(conn.ClientVersion()))
+		"user", conn.User(), "remote", conn.RemoteAddr(), "client", clientVersion(conn))
 	// Deferred first, so the close is reported once every session of the connection ended.
 	id := uuid.NewV7().String()
 	s.report(conn, id, relayed, false)
@@ -314,7 +314,7 @@ func (s *Server) report(conn *ssh.ServerConn, id string, relayed, closed bool) {
 		Principal:    conn.Permissions.Extensions["nokku-principal"],
 		KeyID:        conn.Permissions.Extensions["nokku-cert-key-id"],
 		Remote:       conn.RemoteAddr().String(),
-		Client:       string(conn.ClientVersion()),
+		Client:       clientVersion(conn),
 		Relayed:      relayed,
 	})
 }

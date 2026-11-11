@@ -119,6 +119,24 @@ func TestConnectionReport(t *testing.T) {
 	require.True(t, acked(5*time.Second))
 	assert.Len(t, about(person.ID), 2)
 
+	// A client picks its own version line. One the log cannot hold must not stay first in the daemon's spool.
+	crafted := event(uuid.NewV7().String(), false)
+	crafted.ClientVersion = new("SSH-2.0-nul\x00here")
+	crafted.KeyId = new("\\u0000 as text")
+	send(crafted)
+	require.True(t, acked(5*time.Second), "a NUL in a report ended the stream with no ack")
+	send(event(uuid.NewV7().String(), false))
+	require.True(t, acked(5*time.Second), "no report got through after the crafted one")
+	rows = about(person.ID)
+	require.Len(t, rows, 4)
+	var kept struct {
+		Client string `json:"client"`
+		KeyID  string `json:"key_id"`
+	}
+	require.NoError(t, json.Unmarshal(rows[1].Details, &kept))
+	assert.Equal(t, "SSH-2.0-nulhere", kept.Client)
+	assert.Equal(t, `\u0000 as text`, kept.KeyID, "text that only reads like a NUL is kept")
+
 	// The burst is 200 events. What comes after waits for its ack, at 20 events a second.
 	flood := func() []*nokkuv1.ConnectionEvent {
 		events := make([]*nokkuv1.ConnectionEvent, 100)
@@ -133,5 +151,5 @@ func TestConnectionReport(t *testing.T) {
 	send(flood()...)
 	acked(5 * time.Second)
 	assert.False(t, acked(time.Second), "a flood from one daemon went straight into the audit log")
-	assert.Less(t, len(about(person.ID)), 2+300)
+	assert.Less(t, len(about(person.ID)), 4+300)
 }

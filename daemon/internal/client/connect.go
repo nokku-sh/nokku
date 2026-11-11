@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -114,15 +115,17 @@ func (c *Client) send(
 
 func connectionReport(events []report.Event, dropped uint32) *nokkuv1.ConnectRequest {
 	r := &nokkuv1.ConnectionReport{Dropped: &dropped}
+	// A string the wire cannot carry fails the send, and its event would come first in every report after.
+	wire := func(s string) *string { return new(strings.ToValidUTF8(s, "")) }
 	for _, e := range events {
 		r.Events = append(r.Events, &nokkuv1.ConnectionEvent{
 			ConnectionId:  &e.ConnectionID,
 			Closed:        &e.Closed,
 			Time:          timestamppb.New(e.Time),
-			Principal:     &e.Principal,
-			KeyId:         &e.KeyID,
-			RemoteAddr:    &e.Remote,
-			ClientVersion: &e.Client,
+			Principal:     wire(e.Principal),
+			KeyId:         wire(e.KeyID),
+			RemoteAddr:    wire(e.Remote),
+			ClientVersion: wire(e.Client),
 			Relayed:       &e.Relayed,
 		})
 	}

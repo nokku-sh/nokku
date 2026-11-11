@@ -1,6 +1,12 @@
 package sshd
 
-import "golang.org/x/crypto/ssh"
+import (
+	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	"golang.org/x/crypto/ssh"
+)
 
 const (
 	eventAuthSuccess       eventType = "auth_success"
@@ -33,12 +39,23 @@ type auditEvent struct {
 	ExitCode        int
 }
 
+// clientVersion is the client's version line without what a log or a report cannot carry. The client picks
+// every byte of it.
+func clientVersion(conn ssh.ConnMetadata) string {
+	return strings.Map(func(r rune) rune {
+		if r == utf8.RuneError || !unicode.IsPrint(r) {
+			return -1
+		}
+		return r
+	}, string(conn.ClientVersion()))
+}
+
 func connEvent(conn ssh.ConnMetadata, typ eventType) auditEvent {
 	return auditEvent{
 		Type:   typ,
 		User:   conn.User(),
 		Remote: conn.RemoteAddr().String(),
-		Client: string(conn.ClientVersion()),
+		Client: clientVersion(conn),
 	}
 }
 
