@@ -28,8 +28,10 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 	nklogin "github.com/nokku-sh/nokku/internal/login"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 )
 
@@ -211,6 +213,35 @@ func TestNKSyncCertificateLifetime(t *testing.T) {
 	cert, err = n.sign(t, token, targetID)
 	require.NoError(t, err)
 	assert.InDelta(t, 20*time.Minute, lifetime(cert), float64(2*time.Second), "the cap made a short CA longer")
+}
+
+// Ending a session ends what it can sign. A certificate that ran on would
+// keep someone in after their session was cut short.
+func TestNKCertificateEndsWithItsSession(t *testing.T) {
+	n := newNKSync(t)
+	u := seedUser(t, n.cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	key, err := ssh.NormalizeKey(n.publicKey(t))
+	require.NoError(t, err)
+	sess, token, err := n.cfg.IAM.IssueSignIn(wsCtx(t), u, iam.TokenParams{
+		Kind: actor.KindCLI, Method: iam.MethodPasskey, SSHKey: key, TTL: 10 * time.Minute,
+	})
+	require.NoError(t, err)
+	targetID, accountID := n.target(t, "root")
+	n.grant(t, accountID, u.ID)
+
+	cert, err := n.sign(t, token, targetID)
+	require.NoError(t, err)
+	assert.False(t, time.Unix(int64(cert.ValidBefore), 0).After(*sess.ExpiresAt),
+		"the certificate outlives its session")
+
+	// A session about to end still signs, for what is left of it.
+	_, token, err = n.cfg.IAM.IssueSignIn(wsCtx(t), u, iam.TokenParams{
+		Kind: actor.KindCLI, Method: iam.MethodPasskey, SSHKey: key, TTL: 30 * time.Second,
+	})
+	require.NoError(t, err)
+	cert, err = n.sign(t, token, targetID)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, lifetime(cert), 30*time.Second)
 }
 
 // The core signs, real OpenSSH checks with the rule nk sync writes. Access

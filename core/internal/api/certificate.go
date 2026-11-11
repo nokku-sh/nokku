@@ -185,13 +185,14 @@ func (s *certificateService) SignSSHCertificate(
 	}
 	// The workspace's lifetime, and everything below only shortens it.
 	ttl := ca.UserTtl
+	// No certificate outlives the key or the nk session it was asked with.
+	tok, _ := iam.CurrentToken(ctx)
 	if caller.Kind == actor.KindServiceAccount {
 		// The cap follows the token the account called with, not the account.
-		tok, _ := iam.CurrentToken(ctx)
-		ttl = serviceAccountTTL(ttl, tok.ExpiresAt)
-		if ttl <= 0 {
-			return nil, connect.NewError(connect.CodeUnauthenticated, "the token has expired")
-		}
+		ttl = min(ttl, serviceAccountCertTTL)
+	}
+	if ttl = untilTokenEnds(ttl, tok.ExpiresAt); ttl <= 0 {
+		return nil, connect.NewError(connect.CodeUnauthenticated, "the token has expired")
 	}
 	if until != nil {
 		// The certificate never outlives its first grant to end.
@@ -235,9 +236,8 @@ func (s *certificateService) SignSSHCertificate(
 	}, nil
 }
 
-// serviceAccountTTL keeps the certificate from outliving the token.
-func serviceAccountTTL(ttl time.Duration, tokenExpiresAt *time.Time) time.Duration {
-	ttl = min(ttl, serviceAccountCertTTL)
+// untilTokenEnds keeps the certificate from outliving the token.
+func untilTokenEnds(ttl time.Duration, tokenExpiresAt *time.Time) time.Duration {
 	if tokenExpiresAt != nil {
 		ttl = min(ttl, time.Until(*tokenExpiresAt))
 	}
