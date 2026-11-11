@@ -88,3 +88,26 @@ func TestProviderSessionLifetimes(t *testing.T) {
 	assert.WithinDuration(t, time.Now().Add(deviceSessionTTL), e.sessionEnds(t, h.org.ws, u.ID, actor.KindCLI),
 		time.Minute)
 }
+
+// Where single sign-on is required, nothing but a new sign-in asks the provider
+// whether someone is still there. So every session ends after a day.
+func TestRequiredSSOEndsSessionsAfterADay(t *testing.T) {
+	h := newOIDCIdP(t)
+	e, svc := h.setup(t, true)
+	e.setEnforceSSO(t, h.org.ws, true)
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	u := e.userByEmail(t, h.org.ws, h.email)
+	require.NotNil(t, u)
+	day := time.Now().Add(iam.SSOSessionTTL)
+
+	assert.WithinDuration(t, day, e.sessionEnds(t, h.org.ws, u.ID, actor.KindUser), time.Minute, "in the browser")
+	approveNK(t, e, h.org.ws, u, iam.MethodOIDC)
+	assert.WithinDuration(t, day, e.sessionEnds(t, h.org.ws, u.ID, actor.KindCLI), time.Minute, "in nk")
+
+	// The owner's way in when the provider breaks is no way around the rule.
+	_, _, err := e.svc.IssueSignIn(anon(t.Context(), h.org.ws), h.org.owner,
+		iam.TokenParams{Kind: actor.KindUser, Method: iam.MethodPasskey, TTL: webSessionTTL})
+	require.NoError(t, err)
+	assert.WithinDuration(t, day, e.sessionEnds(t, h.org.ws, h.org.owner.ID, actor.KindUser), time.Minute,
+		"the owner's passkey")
+}
