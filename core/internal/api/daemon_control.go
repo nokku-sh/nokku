@@ -53,9 +53,6 @@ const (
 	storeTimeout = 30 * time.Second
 )
 
-// errRecordingFinalized tells the daemon it can delete its copy.
-var errRecordingFinalized = connect.NewError(connect.CodeAlreadyExists, "recording is already finalized")
-
 // Connect and DaemonRelay come from the embedded pool.
 type daemonControlService struct {
 	*nokkudaemon.Pool
@@ -227,6 +224,10 @@ func (s *daemonControlService) UploadRecording(
 		return nil, err
 	}
 	audit.SetTarget(ctx, rec.ID)
+	if rec.Complete {
+		// An earlier try got through and its answer was lost.
+		return uploadAnswer(rec), nil
+	}
 	// What arrived before a daemon died is evidence, the writer outlives ctx.
 	wctx, abort := context.WithCancel(context.WithoutCancel(ctx))
 	defer abort()
@@ -293,31 +294,40 @@ receive:
 		audit.Set(ctx, "missing_bytes", final.GetSizeBytes()-size)
 	}
 
-	// Only the last message ends the session. Any other stream end is one try.
-	var endedAt *time.Time
-	if final != nil {
-		endedAt = new(time.Now())
-		if t := final.GetEndedAt(); t.IsValid() {
-			endedAt = new(t.AsTime())
-		}
-	}
 	if rec, err = s.storeUpload(ctx, rec, w, abort, &db.FinishRecordingUploadParams{
 		ID:        rec.ID,
 		ObjectID:  &objectID,
 		SizeBytes: size,
 		Complete:  complete,
-		EndedAt:   endedAt,
+		EndedAt:   sessionEnd(final),
 	}); err != nil {
 		return nil, err
 	}
-	if ended != nil {
+	if ended != nil && !rec.Complete {
 		// What was stored is kept as a cut recording.
 		return nil, ended
 	}
+	return uploadAnswer(rec), nil
+}
+
+// Only the last message ends the session. Any other stream end is one try.
+func sessionEnd(final *nokkuv1.RecordingFinal) *time.Time {
+	if final == nil {
+		return nil
+	}
+	if t := final.GetEndedAt(); t.IsValid() {
+		return new(t.AsTime())
+	}
+	return new(time.Now())
+}
+
+// A daemon deletes its file on this answer alone, never on an error.
+func uploadAnswer(rec *db.Recording) *nokkuv1.UploadRecordingResponse {
 	return &nokkuv1.UploadRecordingResponse{
 		RecordingId: &rec.ID,
 		SizeBytes:   &rec.SizeBytes,
-	}, nil
+		Complete:    &rec.Complete,
+	}
 }
 
 func (s *daemonControlService) takeUploadSlot(daemonID string) (release func(), ok bool) {
@@ -424,7 +434,8 @@ func (s *daemonControlService) storeUpload(
 			// Remade, or a rotation resealed it. The daemon resends the file.
 			answer = pgx.ErrNoRows
 		case row.Complete:
-			rec, answer = row, errRecordingFinalized
+			// Another try finished it, the answer says so.
+			rec = row
 		default:
 			kept = stored && upload.SizeBytes >= row.SizeBytes
 			// The larger copy wins, even over a shorter one marked complete.
@@ -478,11 +489,7 @@ func (s *daemonControlService) resolveUpload(
 		existing, err := q.GetRecording(ctx, rm.GetRecordingId())
 		if err == nil {
 			if existing.DaemonID == nil || *existing.DaemonID != daemonID {
-				// AlreadyExists would get another server's file deleted.
 				return connect.NewError(connect.CodeInvalidArgument, "recording belongs to another daemon")
-			}
-			if existing.Complete {
-				return errRecordingFinalized
 			}
 			rec = existing
 			return nil
@@ -522,7 +529,7 @@ func (s *daemonControlService) resolveUpload(
 			StartedAt: startedAt,
 		})
 		if db.IsUniqueViolation(err) {
-			// A race with another upload. AlreadyExists would delete the file.
+			// A race with another upload, the generic answer would not say to retry.
 			return connect.NewError(connect.CodeAborted, "another upload of this recording just started, try again")
 		}
 		return err

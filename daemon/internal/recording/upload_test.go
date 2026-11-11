@@ -330,7 +330,16 @@ func TestCoreAnswerDecidesWhatHappensToTheFile(t *testing.T) {
 		})
 	}
 
-	whole := connect.NewError(connect.CodeAlreadyExists, "recording is already finalized")
+	// No error code deletes the only copy, whatever layer of the core sent it.
+	exists := connect.NewError(connect.CodeAlreadyExists, "a record with this value already exists")
+	t.Run("an error that reads like success", func(t *testing.T) {
+		newRecordsDir(t)
+		rec, _ := uploadAnswered(t, nil, []error{exists, exists, exists})
+		assert.FileExists(t, rec.path, "an error deleted the file")
+	})
+
+	// Big: the answer comes while the daemon still sends.
+	whole := errWhole
 	trouble := connect.NewError(connect.CodeInternal, "internal error")
 	full := connect.NewError(connect.CodeResourceExhausted, "the workspace is full")
 	nonce := connect.NewError(connect.CodeUnauthenticated, "dpop: nonce required")
@@ -353,6 +362,33 @@ func TestCoreAnswerDecidesWhatHappensToTheFile(t *testing.T) {
 			}, 5*time.Second, 10*time.Millisecond, "the file stayed, the core holds it")
 		})
 	}
+}
+
+// "Whole already" about a session that still writes can't be true. The file
+// stays and the upload stops, the next start sends it.
+func TestWholeAlreadyKeepsAFileStillWritten(t *testing.T) {
+	dir := newRecordsDir(t)
+	fastRetries(t)
+	calls := new(atomic.Int32)
+	core := newFakeCore(t, func(context.Context, *nokkuv1.RecordingMeta) error {
+		calls.Add(1)
+		return errWhole
+	})
+
+	rec := newRecorder(t, Options{Uploads: startUploads(t, core)})
+	require.Eventually(t, func() bool { return calls.Load() == 1 }, 5*time.Second, 10*time.Millisecond)
+	// The answer shows on the next send, which a flush sets off.
+	rec.RecordOutput([]byte("typed after the answer"))
+	waitOnDisk(t, rec.path, "typed after the answer")
+	time.Sleep(200 * time.Millisecond)
+	rec.RecordExit(0)
+	rec.Close()
+
+	time.Sleep(200 * time.Millisecond)
+	left, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Len(t, left, 1, "the file of a session that still wrote was deleted")
+	assert.EqualValues(t, 1, calls.Load(), "the upload went on after the core's answer")
 }
 
 // uploadAnswered sends a closed recording to a core that answers each try from

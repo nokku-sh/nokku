@@ -65,7 +65,11 @@ message RecordingFinal {
 
 message UploadRecordingResponse {
   string recording_id = 1;
+  // size_bytes is what the core holds of the recording.
   int64 size_bytes = 2;
+  // complete says the core takes no more of this recording. Only this answer
+  // lets a daemon delete its file, an error never does.
+  bool complete = 3;
 }
 
 message ListRecordingsRequest {

@@ -384,9 +384,13 @@ func (x *RecordingFinal) GetEndedAt() *timestamppb.Timestamp {
 }
 
 type UploadRecordingResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RecordingId   *string                `protobuf:"bytes,1,opt,name=recording_id,json=recordingId" json:"recording_id,omitempty"`
-	SizeBytes     *int64                 `protobuf:"varint,2,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	RecordingId *string                `protobuf:"bytes,1,opt,name=recording_id,json=recordingId" json:"recording_id,omitempty"`
+	// size_bytes is what the core holds of the recording.
+	SizeBytes *int64 `protobuf:"varint,2,opt,name=size_bytes,json=sizeBytes" json:"size_bytes,omitempty"`
+	// complete says the core takes no more of this recording. Only this answer
+	// lets a daemon delete its file, an error never does.
+	Complete      *bool `protobuf:"varint,3,opt,name=complete" json:"complete,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -433,6 +437,13 @@ func (x *UploadRecordingResponse) GetSizeBytes() int64 {
 		return *x.SizeBytes
 	}
 	return 0
+}
+
+func (x *UploadRecordingResponse) GetComplete() bool {
+	if x != nil && x.Complete != nil {
+		return *x.Complete
+	}
+	return false
 }
 
 type ListRecordingsRequest struct {
@@ -816,11 +827,12 @@ const file_nokku_v1_recordings_proto_rawDesc = "" +
 	"size_bytes\x18\x01 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\tsizeBytes\x12'\n" +
 	"\n" +
 	"cut_reason\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\tcutReason\x125\n" +
-	"\bended_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\"[\n" +
+	"\bended_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\"w\n" +
 	"\x17UploadRecordingResponse\x12!\n" +
 	"\frecording_id\x18\x01 \x01(\tR\vrecordingId\x12\x1d\n" +
 	"\n" +
-	"size_bytes\x18\x02 \x01(\x03R\tsizeBytes\"\xc5\x01\n" +
+	"size_bytes\x18\x02 \x01(\x03R\tsizeBytes\x12\x1a\n" +
+	"\bcomplete\x18\x03 \x01(\bR\bcomplete\"\xc5\x01\n" +
 	"\x15ListRecordingsRequest\x12%\n" +
 	"\tdaemon_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdaemonId\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +

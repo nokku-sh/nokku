@@ -27,6 +27,10 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
+// errWhole from answer makes the fake core say it holds the whole recording,
+// in its normal answer and before the file is sent.
+var errWhole = errors.New("the core holds the whole recording")
+
 // coreUpload is one upload stream the way the core saw it.
 type coreUpload struct {
 	meta  *nokkuv1.RecordingMeta
@@ -116,7 +120,11 @@ func (h uploadHandler) UploadRecording(
 	c.uploads = append(c.uploads, up)
 	c.mu.Unlock()
 	if c.answer != nil {
-		if err = c.answer(ctx, up.meta); err != nil {
+		err = c.answer(ctx, up.meta)
+		if errors.Is(err, errWhole) {
+			return &nokkuv1.UploadRecordingResponse{Complete: new(true)}, nil
+		}
+		if err != nil {
 			c.end(up, err)
 			return nil, err
 		}

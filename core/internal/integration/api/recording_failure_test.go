@@ -214,8 +214,8 @@ func TestCoreRestartMidUploadEndsWithTheWholeRecordingOnce(t *testing.T) {
 	assert.True(t, objectExists(workspaceID, objectOf(t, cfg, id)), "the delete queue took the whole file")
 
 	// The answer got lost on the way, so the daemon sends the file again.
-	err = uploadFile(t, cfg, srv, key, token, id, whole, "")
-	assert.Equal(t, connect.CodeAlreadyExists, connect.CodeOf(err), "got %v", err)
+	require.NoError(t, uploadFile(t, cfg, srv, key, token, id, whole, ""),
+		"a finished recording is no error, an error never lets the daemon delete its file")
 	again, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
 	assert.Equal(t, rec.EndedAt, again.EndedAt, "the refused repeat touched the row")
@@ -316,8 +316,10 @@ func TestStaleLiveStreamCannotReplaceTheFinishedRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, rec.Complete)
 
-	_, err = live.CloseAndReceive()
-	assert.Equal(t, connect.CodeAlreadyExists, connect.CodeOf(err), "got %v", err)
+	res, err := live.CloseAndReceive()
+	require.NoError(t, err)
+	assert.True(t, res.GetComplete(), "the answer must say the core is done with the recording")
+	assert.EqualValues(t, len(whole), res.GetSizeBytes())
 	after, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
 	assert.True(t, after.Complete, "the stale stream turned a finished recording incomplete")
@@ -329,7 +331,7 @@ func TestStaleLiveStreamCannotReplaceTheFinishedRetry(t *testing.T) {
 		"the stale stream left an object nothing tracks")
 }
 
-// AlreadyExists would make nokkud delete its copy, the core has no whole file.
+// The core has no whole file yet, so the loser hears to try again.
 func TestRacingFirstUploadIsToldToRetry(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := testWorkspace.ID

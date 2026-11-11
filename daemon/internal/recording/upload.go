@@ -119,8 +119,8 @@ func (u *Uploads) run(up *upload) {
 		err := u.send(up)
 		code := connect.CodeOf(err)
 		switch {
-		// AlreadyExists: an earlier try got through and its answer was lost.
-		case err == nil, code == connect.CodeAlreadyExists && up.written():
+		// Only the core's own answer deletes the file, no error code does.
+		case err == nil && up.written():
 			if up.rec != nil {
 				up.path = up.rec.path
 			}
@@ -128,10 +128,14 @@ func (u *Uploads) run(up *upload) {
 				slog.Warn("remove uploaded recording", "path", up.path, "error", err)
 			}
 			return
+		case err == nil:
+			// Complete, says the core, about a session that still writes.
+			slog.Warn("recording not taken, it stays on disk", "path", up.path)
+			return
 		case errors.Is(err, fs.ErrNotExist):
 			// Retention dropped it.
 			return
-		case errors.Is(err, errUnreadable), code == connect.CodeInvalidArgument, code == connect.CodeAlreadyExists:
+		case errors.Is(err, errUnreadable), code == connect.CodeInvalidArgument:
 			slog.Warn("recording not taken, it stays on disk", "path", up.path, "error", err)
 			return
 		}
@@ -164,7 +168,8 @@ func (up *upload) written() bool {
 	}
 }
 
-// Every try starts at byte 0, the core keeps the larger copy.
+// Every try starts at byte 0, the core keeps the larger copy. No error means
+// the core is done with the recording: it holds every byte, or calls it complete.
 func (u *Uploads) send(up *upload) error {
 	f := up.f
 	if f == nil {
@@ -244,7 +249,7 @@ func (u *Uploads) send(up *upload) error {
 	if err != nil {
 		return err
 	}
-	if res.GetSizeBytes() < sent {
+	if !res.GetComplete() && res.GetSizeBytes() < sent {
 		return fmt.Errorf("the core holds %d of %d bytes", res.GetSizeBytes(), sent)
 	}
 	return nil
@@ -275,9 +280,14 @@ func (up *upload) final(f *os.File) *nokkuv1.RecordingFinal {
 }
 
 // answer gets why the core ended the stream, a failed Send only says it did.
+// A core that holds the whole recording answers before the file is sent.
 func answer(stream nokkuv1connect.DaemonControlServiceUploadRecordingClientStream, sendErr error) error {
-	if _, err := stream.CloseAndReceive(); err != nil {
+	res, err := stream.CloseAndReceive()
+	if err != nil {
 		return err
+	}
+	if res.GetComplete() {
+		return nil
 	}
 	return sendErr
 }
