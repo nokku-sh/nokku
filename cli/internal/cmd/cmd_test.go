@@ -181,3 +181,24 @@ func TestDropSecurityKey(t *testing.T) {
 	assert.NotContains(t, string(config), "security-key")
 	assert.NotContains(t, string(config), "IdentityAgent none", "ssh signs through the nk agent again")
 }
+
+// Any local user can read a command line, so a secret comes from the environment or a prompt.
+func TestNoFlagTakesASecret(t *testing.T) {
+	var walk func(c *cli.Command)
+	walk = func(c *cli.Command) {
+		for _, f := range c.Flags {
+			for _, name := range f.Names() {
+				for _, word := range []string{"token", "secret", "password"} {
+					assert.NotContains(t, name, word, "%s --%s", c.Name, name)
+				}
+				assert.NotEqual(t, "key", name, "%s --%s", c.Name, name)
+			}
+		}
+		for _, sub := range c.Commands {
+			walk(sub)
+		}
+	}
+	root := Root()
+	require.NotEmpty(t, root.Commands)
+	walk(root)
+}
