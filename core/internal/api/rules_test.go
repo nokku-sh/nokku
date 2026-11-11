@@ -175,3 +175,26 @@ func TestEveryCreateIsCapped(t *testing.T) {
 		assert.NotNil(t, procedureAccess[procedure], "uncappedCreates names %s, which does not exist", procedure)
 	}
 }
+
+// A stream is authorized before its first message, so it skips the plan gates.
+func TestNoStreamCarriesAPlanGate(t *testing.T) {
+	streams := 0
+	protoregistry.GlobalFiles.RangeFilesByPackage("nokku.v1", func(fd protoreflect.FileDescriptor) bool {
+		for i := range fd.Services().Len() {
+			svc := fd.Services().Get(i)
+			for j := range svc.Methods().Len() {
+				m := svc.Methods().Get(j)
+				if !m.IsStreamingClient() && !m.IsStreamingServer() {
+					continue
+				}
+				streams++
+				a := procedureAccess["/"+string(svc.FullName())+"/"+string(m.Name())]
+				assert.Empty(t, a.GetFeature(), "%s: a stream's feature is never checked", m.FullName())
+				assert.False(t, a.GetSigns(), "%s: a stream's signs is never checked", m.FullName())
+				assert.False(t, a.GetCapped(), "%s: a stream's capped is never checked", m.FullName())
+			}
+		}
+		return true
+	})
+	assert.Positive(t, streams, "found no stream to check")
+}
