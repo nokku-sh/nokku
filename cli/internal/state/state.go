@@ -10,6 +10,9 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/paths"
 )
 
+// ConfigVersion goes up when an older nk would misread config.json. A file without one is version 1.
+const ConfigVersion = 1
+
 type User struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
@@ -46,7 +49,8 @@ type Target struct {
 
 // Config keeps a session with the API that issued it.
 type Config struct {
-	APIURL string `json:"api_url,omitempty"`
+	Version int    `json:"version,omitempty"`
+	APIURL  string `json:"api_url,omitempty"`
 	// PEM of the API's private CA, empty when the system roots know it.
 	APICA            string    `json:"api_ca,omitempty"`
 	SessionToken     string    `json:"session_token,omitempty"`
@@ -113,6 +117,7 @@ func (s *State) LoadCache() error {
 }
 
 func (s *State) Save() error {
+	s.Version = ConfigVersion
 	if err := fsutil.SaveJSON(paths.ConfigFile(), s.Config, 0o600); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}

@@ -202,3 +202,17 @@ func TestNoFlagTakesASecret(t *testing.T) {
 	require.NotEmpty(t, root.Commands)
 	walk(root)
 }
+
+// An older nk would misread a newer config and then save over it.
+func TestLoadStateRefusesANewerConfig(t *testing.T) {
+	setHome(t)
+	require.NoError(t, (&state.State{APIURL: "https://a.example"}).Save())
+	raw, err := os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"version": 1`)
+
+	newer := strings.Replace(string(raw), `"version": 1`, `"version": 2`, 1)
+	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte(newer), 0o600))
+	_, err = runFlags(t)
+	require.ErrorContains(t, err, "newer nk")
+}

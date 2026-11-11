@@ -104,6 +104,14 @@ func connect(ctx context.Context, cmd *cli.Command) (*client.Client, error) {
 
 func loadState(cmd *cli.Command) (*state.State, error) {
 	s := state.Load()
+	// A save would write the newer file back as this version.
+	if s.Version > state.ConfigVersion {
+		return nil, fmt.Errorf(
+			"%s is version %d, written by a newer nk, upgrade this one",
+			paths.ConfigFile(),
+			s.Version,
+		)
+	}
 	s.Token = os.Getenv("NK_TOKEN")
 	// Sticks, or the nk proxy ssh starts without flags would take a software key.
 	s.RequireTPM = s.RequireTPM || cmd.Bool("require-tpm")

@@ -232,3 +232,21 @@ func TestSaveKeepsANewerEnrollment(t *testing.T) {
 	assert.Equal(t, "daemon-b", onDisk.DaemonID)
 	assert.Equal(t, "token-b", onDisk.SessionToken)
 }
+
+// An older nokkud would misread a newer file and then save over it.
+func TestLoadRefusesANewerFile(t *testing.T) {
+	newTestDataDir(t)
+
+	require.NoError(t, os.WriteFile(paths.StateFile(), []byte(`{"daemon_id":"d1"}`), 0o600))
+	s, err := Load()
+	require.NoError(t, err, "a file from before the version field")
+	assert.Equal(t, "d1", s.DaemonID)
+	require.NoError(t, s.Save())
+	raw, err := os.ReadFile(paths.StateFile())
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"version": 1`)
+
+	require.NoError(t, os.WriteFile(paths.StateFile(), []byte(`{"version":2,"daemon_id":"d1"}`), 0o600))
+	_, err = Load()
+	require.ErrorContains(t, err, "newer nokkud")
+}

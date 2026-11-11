@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"maps"
 	"slices"
@@ -17,7 +18,11 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
-const DefaultAPIURL = "https://app.nokku.sh"
+const (
+	DefaultAPIURL = "https://app.nokku.sh"
+	// fileVersion goes up when an older nokkud would misread the file. A file without one is version 1.
+	fileVersion = 1
+)
 
 var errReplaced = errors.New("another enrollment replaced this one on disk, restart nokkud to use it")
 
@@ -59,6 +64,8 @@ type State struct {
 
 type file struct {
 	Config
+
+	Version int `json:"version"`
 
 	Access *Access `json:"access,omitempty"`
 }
@@ -120,6 +127,13 @@ func Load() (*State, error) {
 	if err := fsutil.LoadJSON(paths.StateFile(), &f); err != nil {
 		return nil, err
 	}
+	if f.Version > fileVersion {
+		return nil, fmt.Errorf(
+			"%s is version %d, written by a newer nokkud, upgrade this one",
+			paths.StateFile(),
+			f.Version,
+		)
+	}
 	s := New(f.Config)
 	s.owner = f.DaemonID
 	if f.Access != nil {
@@ -151,7 +165,11 @@ func (s *State) Save() error {
 		}
 	}
 	a := s.Access()
-	if err := fsutil.SaveJSON(paths.StateFile(), file{Config: s.Config, Access: a}, 0o600); err != nil {
+	if err := fsutil.SaveJSON(
+		paths.StateFile(),
+		file{Version: fileVersion, Config: s.Config, Access: a},
+		0o600,
+	); err != nil {
 		return err
 	}
 	s.owner = s.DaemonID
