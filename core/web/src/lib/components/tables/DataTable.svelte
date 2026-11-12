@@ -18,7 +18,7 @@
 		ChevronsRight,
 		ChevronsUpDown,
 		CircleAlert,
-		FilterX,
+		FunnelX,
 		RotateCw,
 		SearchXIcon,
 		type LucideIcon
@@ -138,7 +138,7 @@
 			? { icon: CircleAlert, title: "Couldn't load this list", description: error.message }
 			: isFiltered
 				? {
-						icon: FilterX,
+						icon: FunnelX,
 						title: 'No matches',
 						description: 'Nothing matches the current search and filters.'
 					}

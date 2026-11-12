@@ -23,7 +23,7 @@
 		Plus,
 		Send,
 		ShieldCheck,
-		Trash2,
+		Trash,
 		UserPlus
 	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
@@ -218,7 +218,7 @@
 						aria-label={`Revoke the invite for ${i.email}`}
 						onclick={() => askRevoke(i)}
 					>
-						<Trash2 />
+						<Trash />
 					</Button>
 				</div>
 			{/each}

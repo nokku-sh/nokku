@@ -32,7 +32,7 @@
 		Plus,
 		Settings2,
 		ShieldCheck,
-		Trash2,
+		Trash,
 		UserCog,
 		Workflow
 	} from '@lucide/svelte';
@@ -221,7 +221,7 @@
 									aria-label={`Revoke ${t.label || 'token'}`}
 									onclick={() => askRevoke(t)}
 								>
-									<Trash2 />
+									<Trash />
 								</Button>
 							{/if}
 						</div>

@@ -15,7 +15,7 @@
 <script lang="ts">
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { Ellipsis, Hash, Link, Trash2, type LucideIcon } from '@lucide/svelte';
+	import { Ellipsis, Hash, Link, Trash, type LucideIcon } from '@lucide/svelte';
 	import * as ButtonGroup from '#lib/components/ui/button-group/index.js';
 	import { confirm, sheetLink } from '#lib/hooks/index.js';
 	import { toast } from 'svelte-sonner';
@@ -147,7 +147,7 @@
 					{/if}
 					<DropdownMenu.Group>
 						<DropdownMenu.Item onclick={askDelete} variant="destructive">
-							<Trash2 />
+							<Trash />
 							{deleteConfig.confirmText ?? 'Delete'}
 						</DropdownMenu.Item>
 					</DropdownMenu.Group>

@@ -23,7 +23,7 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
-	import { Plus, Trash2, Workflow } from '@lucide/svelte';
+	import { Plus, Trash, Workflow } from '@lucide/svelte';
 
 	let {
 		open = $bindable(false),
@@ -180,7 +180,7 @@
 							disabled={rows.length === 1}
 							onclick={() => (rows = rows.filter((other) => other.id !== r.id))}
 						>
-							<Trash2 />
+							<Trash />
 						</Button>
 					</div>
 				{/each}

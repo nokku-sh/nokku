@@ -35,7 +35,7 @@
 		Rocket,
 		Server,
 		SlidersHorizontal,
-		Trash2,
+		Trash,
 		X
 	} from '@lucide/svelte';
 	import EntitySheet from './EntitySheet.svelte';
@@ -579,7 +579,7 @@
 							aria-label={`Revoke ${t.label || 'token'}`}
 							onclick={() => askRevoke(t)}
 						>
-							<Trash2 />
+							<Trash />
 						</Button>
 					</div>
 					<div class="flex items-center gap-3 text-xs">

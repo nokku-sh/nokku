@@ -18,7 +18,7 @@
 		Plus,
 		Search,
 		SquareTerminal,
-		Trash2,
+		Trash,
 		UserPlus
 	} from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -189,7 +189,7 @@
 										variant="destructive"
 										onclick={() => askRemoveAccount(account)}
 									>
-										<Trash2 />
+										<Trash />
 										Remove login account
 									</DropdownMenu.Item>
 								</DropdownMenu.Group>

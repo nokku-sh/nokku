@@ -26,7 +26,7 @@
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
 	import { formatTs } from '#lib/utils.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
-	import { Check, FileQuestion, Info, Link, Pencil } from '@lucide/svelte';
+	import { Check, FileQuestionMark, Info, Link, Pencil } from '@lucide/svelte';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
 
 	interface Props {
@@ -235,7 +235,7 @@
 		{#if missing}
 			<Empty.Root class="flex-1">
 				<Empty.Header>
-					<Empty.Media variant="icon"><FileQuestion /></Empty.Media>
+					<Empty.Media variant="icon"><FileQuestionMark /></Empty.Media>
 					<Empty.Title>Not found</Empty.Title>
 					<Empty.Description
 						>It may have been deleted, or the link is out of date.</Empty.Description
@@ -252,12 +252,12 @@
 			<Tabs.Root value={activeTab} onValueChange={onTabChange} class="min-h-0 flex-1 gap-0">
 				<Tabs.List
 					variant="line"
-					class="no-scrollbar w-full max-w-full justify-start gap-5 overflow-x-auto border-b px-5 py-0 group-data-horizontal/tabs:h-[45px]"
+					class="no-scrollbar w-full max-w-full justify-start gap-5 overflow-x-auto border-b px-5 py-0 group-data-horizontal/tabs:h-11.25"
 				>
 					{#each tabs as t (t.value)}
 						<Tabs.Trigger
 							value={t.value}
-							class="-mx-1.5 h-8 flex-none border-0 px-1.5 after:bg-primary group-data-horizontal/tabs:after:inset-x-1.5 group-data-horizontal/tabs:after:bottom-[-6px]"
+							class="-mx-1.5 h-8 flex-none border-0 px-1.5 after:bg-primary group-data-horizontal/tabs:after:inset-x-1.5 group-data-horizontal/tabs:after:-bottom-1.5"
 						>
 							{#if t.icon}
 								<t.icon />

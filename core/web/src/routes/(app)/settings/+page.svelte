@@ -125,8 +125,8 @@
 				</Field.Group>
 			{:else}
 				<div class="flex min-w-0 flex-col gap-1 self-center">
-					<h2 class="text-xl font-semibold break-words">{model.name}</h2>
-					<p class="text-sm break-words text-muted-foreground">
+					<h2 class="text-xl font-semibold wrap-break-word">{model.name}</h2>
+					<p class="text-sm wrap-break-word text-muted-foreground">
 						{model.description || 'No description'}
 					</p>
 				</div>

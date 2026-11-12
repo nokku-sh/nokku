@@ -16,7 +16,7 @@
 	import { confirm } from '#lib/hooks/index.js';
 	import { usePlans } from '#lib/plans.js';
 	import { formatTs } from '#lib/utils.js';
-	import { ArrowRight, KeyRound, Plus, ShieldAlert, Trash2, UsersRound } from '@lucide/svelte';
+	import { ArrowRight, KeyRound, Plus, ShieldAlert, Trash, UsersRound } from '@lucide/svelte';
 
 	interface Props {
 		readonly?: boolean;
@@ -228,7 +228,7 @@
 											aria-label={`Revoke ${t.label}`}
 											onclick={() => revoke(t.id ?? '', t.label)}
 										>
-											<Trash2 />
+											<Trash />
 										</Button>
 									</Item.Actions>
 								{/if}

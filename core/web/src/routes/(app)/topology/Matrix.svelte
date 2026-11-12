@@ -227,7 +227,7 @@
 		<!-- One scroll box for both axes, so the header and the first column stay put. The table's own wrapper would
 		     scroll sideways on its own and take the sticky header with it. -->
 		<div
-			class="max-h-[70vh] overflow-auto rounded-xl border bg-card [&_[data-slot=table-container]]:overflow-visible"
+			class="max-h-[70vh] overflow-auto rounded-xl border bg-card **:data-[slot=table-container]:overflow-visible"
 		>
 			<Table.Root class="border-separate border-spacing-0">
 				<Table.Header>

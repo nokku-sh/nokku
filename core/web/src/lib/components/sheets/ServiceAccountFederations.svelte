@@ -14,7 +14,7 @@
 	import type { ServiceAccountFederation } from '#lib/gen/nokku/v1/service_account_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
-	import { Plus, Trash2, Workflow } from '@lucide/svelte';
+	import { Plus, Trash, Workflow } from '@lucide/svelte';
 
 	let { serviceAccountId, name }: { serviceAccountId: string; name: string } = $props();
 
@@ -95,7 +95,7 @@
 					aria-label={`Remove the ${platform(rule.issuer)} rule`}
 					onclick={() => askRemove(rule)}
 				>
-					<Trash2 />
+					<Trash />
 				</Button>
 			{/if}
 		</div>

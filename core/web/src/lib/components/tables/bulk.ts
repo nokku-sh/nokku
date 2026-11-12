@@ -1,4 +1,4 @@
-import { Trash2 } from '@lucide/svelte';
+import { Trash } from '@lucide/svelte';
 import { plural } from '#lib/api/bulk.js';
 import type { BulkAction } from './types';
 
@@ -12,7 +12,7 @@ export function bulkDelete<T>(opts: {
 }): BulkAction<T> {
 	return {
 		label: 'Delete',
-		icon: Trash2,
+		icon: Trash,
 		variant: 'destructive',
 		confirm: (selected) => ({
 			title: `Delete ${plural(selected.length, opts.noun, opts.nouns)}?`,

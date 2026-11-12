@@ -16,7 +16,7 @@
 	import type { AccountCredential } from '#lib/gen/nokku/v1/account_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import type { Timestamp } from '@bufbuild/protobuf/wkt';
-	import { KeyRound, Link, Mail, Plus, Trash2, Unlink } from '@lucide/svelte';
+	import { KeyRound, Link, Mail, Plus, Trash, Unlink } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import { confirm } from '#lib/hooks/index.js';
 
@@ -135,7 +135,7 @@
 															onConfirm: () => remove.mutateAsync({ id: pk.id })
 														})}
 												>
-													<Trash2 />
+													<Trash />
 												</Button>
 											</span>
 										{/snippet}

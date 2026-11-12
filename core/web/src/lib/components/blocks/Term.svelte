@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import * as HoverCard from '#lib/components/ui/hover-card/index.js';
 	import { glossary, type TermName } from '#lib/glossary.js';
-	import { CircleHelp } from '@lucide/svelte';
+	import { CircleQuestionMark } from '@lucide/svelte';
 	import CopyCommand from './CopyCommand.svelte';
 
 	interface Props {
@@ -26,7 +26,7 @@
 				class="inline-flex cursor-help items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			>
 				{#if children}{@render children()}{:else}{name}{/if}
-				<CircleHelp class="size-3 text-muted-foreground" aria-hidden="true" />
+				<CircleQuestionMark class="size-3 text-muted-foreground" aria-hidden="true" />
 			</button>
 		{/snippet}
 	</HoverCard.Trigger>

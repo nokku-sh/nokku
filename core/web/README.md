@@ -10,7 +10,7 @@ pnpm dev            # dev server
 pnpm build          # production build
 pnpm check          # type checking
 pnpm fmt            # format with oxfmt
-pnpm lint           # oxlint
+pnpm lint           # oxlint, eslint for deprecated names, tailwint for class names
 ```
 
 The dev server needs a backend. Run `task core:dev` from the repo root, it starts both and the app is on the backend's port.

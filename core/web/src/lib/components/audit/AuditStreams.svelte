@@ -17,7 +17,7 @@
 	import { confirm } from '#lib/hooks/index.js';
 	import PlanBadge from '#lib/components/blocks/PlanBadge.svelte';
 	import { formatTs } from '#lib/utils.js';
-	import { Radio, Send, Trash2 } from '@lucide/svelte';
+	import { Radio, Send, Trash } from '@lucide/svelte';
 
 	// maxAuditStreams in core.
 	const maxStreams = 3;
@@ -187,7 +187,7 @@
 										aria-label="Remove stream"
 										onclick={() => askRemove(s)}
 									>
-										<Trash2 />
+										<Trash />
 									</Button>
 								</Item.Actions>
 							{/if}
