@@ -195,7 +195,7 @@ Other OIDC providers are added in the web app.
 | `NOKKU_SMTP_PORT`     | `587`   | 465 is implicit TLS, 587 is STARTTLS                |
 | `NOKKU_SMTP_USERNAME` |         | Username                                            |
 | `NOKKU_SMTP_PASSWORD` |         | Password. A login the relay rejects fails the start |
-| `NOKKU_EMAIL_SENDER`  |         | From address, required with SMTP                    |
+| `NOKKU_SMTP_FROM`     |         | From address, required with SMTP                    |
 
 Any SMTP relay works. Without email, people sign in with passkeys or an identity provider. Invites still work: an admin gets the invite link to hand over, and vouches for whoever opens it.
 
