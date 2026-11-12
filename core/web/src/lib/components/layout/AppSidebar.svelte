@@ -19,7 +19,7 @@
 	import { plural } from '#lib/api/bulk.js';
 	import { useWaitingRequests } from '#lib/components/access/requests.svelte.js';
 	import { headline, isFresh, issuesOf } from '#lib/components/dashboard/issues.js';
-	import { toneText } from '#lib/tone.js';
+	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { displayName } from '#lib/utils.js';
 
 	let { ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
@@ -38,6 +38,12 @@
 	const issues = $derived(overview.data && issuesOf(overview.data));
 	const requests = useWaitingRequests();
 	const status = $derived(headline(issues, isFresh(overview.data), requests.count));
+	const waiting = $derived((issues?.length ?? 0) + requests.count);
+
+	// Under the name: what the owner wrote about the workspace, or its address when they wrote nothing. The address
+	// is always there and tells two workspaces of one name apart.
+	const baseUrl = workspace.baseUrl();
+	const host = $derived(baseUrl.data?.replace(/^https?:\/\//, ''));
 	const statusTitle = $derived(
 		[
 			requests.count &&
@@ -95,17 +101,25 @@
 							</div>
 							<div class="grid flex-1 text-left text-sm leading-tight">
 								<span class="truncate font-medium">{ws.data?.name ?? 'Nokku'}</span>
-								{#if can.view}
-									<span class={['truncate font-mono text-xs', toneText[status.tone]]}>
-										<span aria-hidden="true">{status.mark}</span>
-										{status.text}
-									</span>
-								{:else}
-									<span class="truncate text-xs text-muted-foreground">
-										{ws.data?.description || 'Workspace'}
-									</span>
-								{/if}
+								<span
+									class={[
+										'truncate text-xs text-muted-foreground',
+										!ws.data?.description && 'font-mono'
+									]}
+								>
+									{ws.data?.description || host}
+								</span>
 							</div>
+							<!-- Quiet while all is well. A number only when something waits, the list is on Home. -->
+							{#if can.view && waiting > 0}
+								<Badge
+									variant={status.tone === 'destructive' ? 'destructive' : 'warning'}
+									class="font-mono tabular-nums"
+								>
+									<span aria-hidden="true">{waiting}</span>
+									<span class="sr-only">{status.text}</span>
+								</Badge>
+							{/if}
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>

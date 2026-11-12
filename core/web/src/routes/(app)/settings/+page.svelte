@@ -136,7 +136,7 @@
 			<Card.Footer class="border-t">
 				<SaveStatus
 					state={autoSave.saveState}
-					idleText="Shows in the sidebar for everyone. Changes save automatically"
+					idleText="Both show in the sidebar for everyone, the description cut to one line. Changes save automatically"
 					onRetry={autoSave.retry}
 				/>
 			</Card.Footer>
