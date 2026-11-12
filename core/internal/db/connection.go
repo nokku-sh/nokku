@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -55,10 +56,33 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
+	warnDefaults(config.ConnConfig.Host)
 	if err := c.createPools(ctx, config); err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// Only NewConnection calls it, a start reads the settings three times.
+func warnDefaults(host string) {
+	if os.Getenv("PGPASSWORD") == "" {
+		slog.Warn("PGPASSWORD is not set, the default is only fit for a local try")
+	}
+	if os.Getenv("PGSSLMODE") == "" && !sameMachine(host) {
+		slog.Warn(
+			"PGSSLMODE is not set and PostgreSQL is on another host, set verify-full so the core checks who answers",
+			"host",
+			host,
+		)
+	}
+}
+
+func sameMachine(host string) bool {
+	if host == "localhost" || strings.HasPrefix(host, "/") {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.IsLoopback()
 }
 
 func settings() (*Connection, *pgxpool.Config, error) {
@@ -73,18 +97,14 @@ func settings() (*Connection, *pgxpool.Config, error) {
 		{"PGDATABASE", "dbname", "nokku"},
 		{"PGUSER", "user", "postgres"},
 		{"PGPASSWORD", "password", "postgres"},
-		{"PGSSLMODE", "sslmode", "disable"},
 	}
 
 	// pgx reads the environment first, so only the unset keys go in.
+	// No sslmode here, pgx then uses prefer and takes TLS when the server offers it.
 	var fallbacks []string
 	for _, d := range defaults {
-		if os.Getenv(d.env) != "" {
-			continue
-		}
-		fallbacks = append(fallbacks, d.key+"="+d.value)
-		if d.env == "PGPASSWORD" || d.env == "PGSSLMODE" {
-			slog.Warn(d.env + " is not set, the default is only fit for a local try")
+		if os.Getenv(d.env) == "" {
+			fallbacks = append(fallbacks, d.key+"="+d.value)
 		}
 	}
 

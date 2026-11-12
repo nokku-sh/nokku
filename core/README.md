@@ -176,7 +176,7 @@ The rest, grouped by topic. Key management and rotating the secret are in [SECUR
 | `PGDATABASE`         | `nokku`     | Database name                                    |
 | `PGUSER`             | `postgres`  | User. It owns the schema and runs the migrations |
 | `PGPASSWORD`         | `postgres`  | Password                                         |
-| `PGSSLMODE`          | `disable`   | libpq SSL mode                                   |
+| `PGSSLMODE`          | `prefer`    | libpq SSL mode, see below                        |
 | `NOKKU_DB_MAX_CONNS` | `20`        | Largest pool size                                |
 
 `PGUSER` is the only user you create. On start the core makes two more roles for itself, `nokku_app` and `nokku_system`, and gives them the same password. The user of the official PostgreSQL image is a superuser and just works. A user you create yourself needs to own the database and have `CREATEROLE` and `BYPASSRLS`:
@@ -185,6 +185,8 @@ The rest, grouped by topic. Key management and rotating the secret are in [SECUR
 CREATE ROLE nokku LOGIN PASSWORD '...' CREATEROLE BYPASSRLS;
 CREATE DATABASE nokku OWNER nokku;
 ```
+
+Without `PGSSLMODE` the core uses TLS when PostgreSQL offers it and checks no certificate. That is fine on the same machine. For a database on another host set `verify-full`, the core warns at start until you pick a mode.
 
 Connect directly, or through a pooler in session mode. A pooler in transaction mode, like PgBouncer with `pool_mode = transaction`, does not work. Nokku keeps state on the connection.
 
