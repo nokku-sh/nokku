@@ -22,7 +22,7 @@ func TestTimeoutCapsAClientDeadline(t *testing.T) {
 		left = time.Until(deadline)
 		return nil
 	}
-	err := newTimeoutInterceptor()(next)(ctx, connect.Spec{StreamType: connect.StreamTypeUnary}, nil)
+	err := unaryTimeout(next)(ctx, connect.Spec{StreamType: connect.StreamTypeUnary}, nil)
 	require.NoError(t, err)
 	assert.LessOrEqual(t, left, 10*time.Second, "a client deadline lifted the cap")
 }

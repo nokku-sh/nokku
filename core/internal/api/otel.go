@@ -26,25 +26,25 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 )
 
-// newTelemetry is off without an OTLP endpoint. The rest follows OTEL_*.
-func newTelemetry(ctx context.Context) connect.ServerInterceptor {
+// telemetry is off without an OTLP endpoint. The rest follows OTEL_*.
+func telemetry(ctx context.Context) connect.ServerInterceptor {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
-		return nil
+		return noTelemetry
 	}
 	traceExporter, err := otlptracehttp.New(ctx)
 	if err != nil {
 		slog.Error("failed to init otel exporter", "exporter", "trace", "error", err)
-		return nil
+		return noTelemetry
 	}
 	metricExporter, err := otlpmetrichttp.New(ctx)
 	if err != nil {
 		slog.Error("failed to init otel exporter", "exporter", "metric", "error", err)
-		return nil
+		return noTelemetry
 	}
 	logExporter, err := otlploghttp.New(ctx)
 	if err != nil {
 		slog.Error("failed to init otel exporter", "exporter", "log", "error", err)
-		return nil
+		return noTelemetry
 	}
 
 	res, err := resource.New(
@@ -60,7 +60,7 @@ func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 	)
 	if err != nil {
 		slog.Warn("failed to create otel resource", "error", err)
-		return nil
+		return noTelemetry
 	}
 	tp := trace.NewTracerProvider(
 		trace.WithBatcher(traceExporter),
@@ -105,13 +105,15 @@ func newTelemetry(ctx context.Context) connect.ServerInterceptor {
 	interceptor, err := otelconnect.NewServerInterceptor()
 	if err != nil {
 		slog.Warn("failed to create otel interceptor", "error", err)
-		return nil
+		return noTelemetry
 	}
 	return interceptor
 }
 
+func noTelemetry(next connect.ServerFunc) connect.ServerFunc { return next }
+
 // withTrace covers plain HTTP routes, the otelconnect interceptor the RPCs.
-// It is a no-op until newTelemetry sets the global providers.
+// It is a no-op until telemetry sets the global providers.
 func (s *Server) withTrace(next http.Handler) http.Handler {
 	traced := otelhttp.NewHandler(next, "http",
 		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return r.Pattern }),

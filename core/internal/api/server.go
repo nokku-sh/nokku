@@ -109,37 +109,35 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 }
 
-func (s *Server) recoverRPC(next connect.ServerFunc) connect.ServerFunc {
-	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
-		defer func() {
-			p := recover()
-			if p == nil {
-				return
-			}
-			if perr, ok := p.(error); ok && errors.Is(perr, http.ErrAbortHandler) {
-				panic(p)
-			}
-			attrs := []slog.Attr{
-				slog.String("procedure", spec.Procedure),
-				slog.String("panic_type", fmt.Sprintf("%T", p)),
-			}
-			if s.cfg.Debug {
-				attrs = append(attrs, slog.String("stack", string(debug.Stack())))
-			}
-			slog.LogAttrs(ctx, slog.LevelError, "rpc panic recovered", attrs...)
-			err = errInternal
-		}()
-		return next(ctx, spec, stream)
+func recoverPanics(withStack bool) connect.ServerInterceptor {
+	return func(next connect.ServerFunc) connect.ServerFunc {
+		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
+			defer func() {
+				p := recover()
+				if p == nil {
+					return
+				}
+				if perr, ok := p.(error); ok && errors.Is(perr, http.ErrAbortHandler) {
+					panic(p)
+				}
+				attrs := []slog.Attr{
+					slog.String("procedure", spec.Procedure),
+					slog.String("panic_type", fmt.Sprintf("%T", p)),
+				}
+				if withStack {
+					attrs = append(attrs, slog.String("stack", string(debug.Stack())))
+				}
+				slog.LogAttrs(ctx, slog.LevelError, "rpc panic recovered", attrs...)
+				err = errInternal
+			}()
+			return next(ctx, spec, stream)
+		}
 	}
 }
 
 // Handler registers every route, so call it once per Server.
 func (s *Server) Handler(ctx context.Context) http.Handler {
 	s.registerServices(ctx)
-	return s.handler()
-}
-
-func (s *Server) handler() http.Handler {
 	return chain(
 		s.withTrace,
 		s.withHTTPS,
@@ -229,7 +227,7 @@ func (s *Server) registerServices(ctx context.Context) {
 		static.ServeHTTP(w, r)
 	})
 
-	registerAuthRoutes(s.mux, s.cfg)
+	registerAuthRoutes(s.mux, s.cfg.IAM)
 
 	protec := chain(s.cfg.IAM.Middleware, s.cfg.IAM.RequireLogin)
 
@@ -248,21 +246,18 @@ func (s *Server) registerServices(ctx context.Context) {
 }
 
 func (s *Server) serverInterceptors(ctx context.Context) []connect.ServerInterceptor {
-	interceptors := []connect.ServerInterceptor{
-		newTimeoutInterceptor(),
-		newStreamEndInterceptor(ctx),
-		(&authNInterceptor{cfg: s.cfg}).intercept,
+	return []connect.ServerInterceptor{
+		// Outermost, so it sees the mapped code and the calls turned down early.
+		telemetry(ctx),
+		unaryTimeout,
+		streamsEndWith(ctx),
+		authenticate(s.cfg.IAM),
 		// Audit wraps authorization, so denied calls are recorded too.
 		s.cfg.Audit.Intercept,
 		// Inside audit, so a panicked call is recorded with its code.
-		s.recoverRPC,
-		errorInterceptor,
-		(&authorizationInterceptor{cfg: s.cfg}).intercept,
+		recoverPanics(s.cfg.Debug),
+		mapErrors,
+		authorize(s.cfg),
 		validate.NewServerInterceptor(),
 	}
-	// Outermost, so it sees the mapped code and the calls turned down early.
-	if telemetry := newTelemetry(ctx); telemetry != nil {
-		interceptors = append([]connect.ServerInterceptor{telemetry}, interceptors...)
-	}
-	return interceptors
 }

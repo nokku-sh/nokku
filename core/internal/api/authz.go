@@ -54,6 +54,10 @@ func loadProcedureAccess() map[string]*nokkuv1.Access {
 	return out
 }
 
+func authorize(cfg *config.Config) connect.ServerInterceptor {
+	return (&authorizationInterceptor{cfg: cfg}).intercept
+}
+
 // A unary call is checked once decoded, so plan gates can read it and a denied
 // call's audit row names the target. Generated handlers receive before they
 // run. A stream is checked up front.

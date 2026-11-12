@@ -123,8 +123,8 @@ var (
 	)
 )
 
-// errorInterceptor sits inside audit, so audit sees the final code.
-func errorInterceptor(next connect.ServerFunc) connect.ServerFunc {
+// mapErrors sits inside audit, so audit sees the final code.
+func mapErrors(next connect.ServerFunc) connect.ServerFunc {
 	return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
 		return toConnectError(ctx, next(ctx, spec, stream))
 	}

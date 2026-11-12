@@ -2,16 +2,19 @@ package api
 
 import (
 	"net/http"
+	"time"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
 // maxAuthBody fits any WebAuthn answer or form these public routes take.
 const maxAuthBody = 64 << 10
 
-func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
-	svc := cfg.IAM
-	limit := func(h http.Handler) http.Handler { return http.MaxBytesHandler(h, maxAuthBody) }
+// A slow body would hold the connection open, the server has no read timeout.
+const authBodyTimeout = 10 * time.Second
+
+func registerAuthRoutes(mux *http.ServeMux, svc *iam.Service) {
+	limit := limitBody(maxAuthBody, authBodyTimeout)
 	public := chain(limit)
 	session := chain(limit, svc.Middleware)
 	signedIn := chain(limit, svc.Middleware, svc.RequireLogin)
@@ -40,6 +43,21 @@ func registerAuthRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.HandleFunc("GET /oidc/callback", svc.OIDC.Callback)
 
 	// SCIM has no session, the workspace-scoped token is the only gate.
-	mux.Handle("/scim/v2", cfg.IAM.SCIMHandler())
-	mux.Handle("/scim/v2/", cfg.IAM.SCIMHandler())
+	mux.Handle("/scim/v2", svc.SCIMHandler())
+	mux.Handle("/scim/v2/", svc.SCIMHandler())
+}
+
+// limitBody caps the size of a request body and the time a client has to send it.
+// The deadline ends with the body, a slow handler is not cut.
+func limitBody(maxBytes int64, timeout time.Duration) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		limited := http.MaxBytesHandler(h, maxBytes)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Without a body the server already watches the connection, a deadline would cancel the request.
+			if r.Body != http.NoBody {
+				_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(timeout))
+			}
+			limited.ServeHTTP(w, r)
+		})
+	}
 }

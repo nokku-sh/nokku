@@ -38,12 +38,12 @@ func TestTelemetryExportsOverHTTP(t *testing.T) {
 		otel.SetMeterProvider(meter)
 	})
 
-	// newTelemetry wraps the default handler, and Go's own loops through log.
+	// telemetry wraps the default handler, and Go's own loops through log.
 	slog.SetDefault(slog.New(slog.DiscardHandler))
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	require.NotNil(t, newTelemetry(ctx), "telemetry stayed off with an endpoint set")
+	telemetry(ctx)
 
 	_, span := otel.Tracer("test").Start(ctx, "request")
 	span.End()

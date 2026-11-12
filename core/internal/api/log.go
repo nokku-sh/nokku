@@ -50,7 +50,7 @@ func (s *Server) withLogger(next http.Handler) http.Handler {
 	})
 }
 
-// withRecover covers plain HTTP routes, recoverRPC the connect handlers.
+// withRecover covers plain HTTP routes, recoverPanics the connect handlers.
 func (s *Server) withRecover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
