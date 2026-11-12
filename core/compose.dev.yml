@@ -23,19 +23,18 @@ services:
 
   # OIDC and SCIM for nokku. task seed:idp fills it, see cmd/seed/idp.go.
   pocket-id:
-    image: ghcr.io/pocket-id/pocket-id:v2.18.0
+    image: ghcr.io/pocket-id/pocket-id:v2.19
     container_name: pocket-id
     environment:
       APP_URL: http://localhost:1411
       ENCRYPTION_KEY: dev-only-not-secret-at-all-0123456789
       STATIC_API_KEY: dev-static-api-key
       ANALYTICS_DISABLED: "true"
-      # Settings come from here, not from the admin UI.
       UI_CONFIG_DISABLED: "true"
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_FROM: pocket-id@nokku.test
-      # There are no passwords. Ask for a code on the login page, it lands in Mailpit.
+      # Ask for a code on the login page, it lands in Mailpit.
       EMAIL_ONE_TIME_ACCESS_AS_UNAUTHENTICATED_ENABLED: "true"
     volumes:
       - type: tmpfs
