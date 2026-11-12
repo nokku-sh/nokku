@@ -32,6 +32,8 @@ import (
 
 const (
 	hostedBase = "nokku.test"
+	// Where people sign up and find their workspace.
+	hostedRoot = "signup." + hostedBase
 	hostedSlug = "acme"
 )
 
@@ -192,14 +194,15 @@ func TestHostedUnknownHostsAreLimited(t *testing.T) {
 	_, err := cfg.Tenant.FromHost(t.Context(), hostedSlug+"."+hostedBase)
 	require.NoError(t, err)
 	assert.NotEqual(t, http.StatusTooManyRequests, get(hostedSlug+"."+hostedBase), "a cached host was counted")
-	assert.NotEqual(t, http.StatusTooManyRequests, get(hostedBase), "the root host was counted")
+	assert.NotEqual(t, http.StatusTooManyRequests, get(hostedRoot), "the root host was counted")
 }
 
 // Only the root host and real workspaces answer, a health check needs none.
 func TestHostedHostPicksTheWorkspace(t *testing.T) {
 	hostedOnly(t)
 	for host, want := range map[string]int{
-		hostedBase:                            http.StatusOK,
+		hostedRoot:                            http.StatusOK,
+		hostedBase:                            http.StatusNotFound,
 		hostedSlug + "." + hostedBase:         http.StatusOK,
 		"ACME." + strings.ToUpper(hostedBase): http.StatusOK,
 		"nobody." + hostedBase:                http.StatusNotFound,
@@ -224,7 +227,8 @@ func TestHostedHostPicksTheWorkspace(t *testing.T) {
 		require.NoError(t, err)
 		return res
 	}
-	assert.True(t, info(hostedBase).GetSignup(), "the root host is where people sign up")
+	assert.True(t, info(hostedRoot).GetSignup(), "the root host is where people sign up")
+	assert.Equal(t, hostedBase, info(hostedRoot).GetWorkspaceDomain(), "the signup form shows it after the slug")
 	assert.False(t, info(hostedSlug+"."+hostedBase).GetSignup(), "a workspace host signs nobody up")
 }
 
@@ -246,11 +250,29 @@ func TestHostedSessionWorksOnItsOwnHostOnly(t *testing.T) {
 	}
 }
 
+// The answer never says whether an address has an account, the mail does.
+func TestHostedFindWorkspaces(t *testing.T) {
+	hostedOnly(t)
+	_, shared := newTestAPI(t)
+	root := workspacesOn(onHost(t, hostedRoot))
+
+	for _, addr := range []string{newMailAddress(), "nobody-" + newMailAddress()} {
+		_, err := root.FindWorkspaces(t.Context(), &nokkuv1.FindWorkspacesRequest{Email: &addr})
+		require.NoError(t, err, addr)
+	}
+	_, err := root.FindWorkspaces(t.Context(), &nokkuv1.FindWorkspacesRequest{Email: new("not an address")})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
+	_, err = workspacesOn(
+		shared,
+	).FindWorkspaces(t.Context(), &nokkuv1.FindWorkspacesRequest{Email: new(newMailAddress())})
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "on a workspace host: %v", err)
+}
+
 // A signup gets its own host, the first sign-in keeps it from the purge.
 func TestHostedSignup(t *testing.T) {
 	hostedOnly(t)
 	cfg, shared := newTestAPI(t)
-	root := workspacesOn(onHost(t, hostedBase))
+	root := workspacesOn(onHost(t, hostedRoot))
 	slug, addr := "s"+strings.ReplaceAll(uuid.New().String(), "-", "")[:12], newMailAddress()
 	signup := func(c nokkuv1connect.WorkspaceServiceClient, slug, addr string) (*nokkuv1.CreateWorkspaceResponse, error) {
 		return c.CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{
@@ -274,6 +296,10 @@ func TestHostedSignup(t *testing.T) {
 	host := slug + "." + hostedBase
 	ws, err := cfg.Tenant.FromHost(t.Context(), host)
 	require.NoError(t, err)
+	found, err := cfg.Conn.Sys().ListWorkspacesByEmail(t.Context(), addr)
+	require.NoError(t, err)
+	require.Len(t, found, 1, "the owner's address finds the workspace")
+	assert.Equal(t, slug, found[0].Slug)
 	row, err := cfg.Conn.Sys().GetWorkspaceBySlug(t.Context(), slug)
 	require.NoError(t, err)
 	assert.Nil(t, row.ClaimedAt, "nobody signed in yet")
@@ -307,7 +333,7 @@ func TestHostedSignupTakesAFreedSlug(t *testing.T) {
 	_, err := cfg.Conn.Sys().DeleteUnclaimedWorkspace(t.Context(), squat.ID)
 	require.NoError(t, err)
 
-	_, err = workspacesOn(onHost(t, hostedBase)).CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{
+	_, err = workspacesOn(onHost(t, hostedRoot)).CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{
 		Slug: &squat.Slug, Name: new("Signup"), OwnerEmail: new(newMailAddress()),
 	})
 	require.NoError(t, err)

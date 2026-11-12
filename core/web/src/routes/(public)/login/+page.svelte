@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { auth } from '#lib/api/auth.svelte.js';
+	import { util } from '#lib/api/workspaces.svelte.js';
 	import { loginWithPasskey } from '#lib/api/passkey.js';
 	import { OIDCIcon } from '#lib/assets/index.js';
 	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
@@ -14,8 +15,11 @@
 	import { returnTo } from '#lib/store.svelte.js';
 	import { KeyRound, Mail, MailCheck } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
+	import FindWorkspace from './FindWorkspace.svelte';
 
 	const options = auth.options();
+	// The root host of a hosted Nokku has no workspace to sign in to.
+	const info = util.instanceInfo();
 	const request = auth.requestMagicLink();
 
 	let email = $state('');
@@ -59,11 +63,13 @@
 	}
 </script>
 
-{#if options.isLoading}
+{#if options.isLoading || info.isLoading}
 	<AuthCard title="Sign in" description="One moment">
 		<Skeleton class="h-10 w-full" />
 		<Skeleton class="h-10 w-full" />
 	</AuthCard>
+{:else if info.data?.signup}
+	<FindWorkspace />
 {:else if options.isError}
 	<AuthCard
 		title="No workspace here"

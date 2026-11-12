@@ -33,10 +33,15 @@ const (
 	purgeEvery     = time.Hour
 )
 
+// rootLabel names the hosted root host, where people sign up and find their
+// workspace. The bare domain is left to the public site.
+const rootLabel = "signup"
+
 var ErrUnknownWorkspace = errors.New("no such workspace")
 
 // reserved slugs never resolve, so nobody can sign up as app.nokku.sh.
 var reserved = map[string]bool{
+	rootLabel: true,
 	"www":     true,
 	"app":     true,
 	"api":     true,
@@ -110,14 +115,18 @@ func New(ctx context.Context, conn *db.Connection, keys *kms.Keyset, baseURL str
 func (r *Resolver) Single() actor.Workspace { return r.single }
 
 func (r *Resolver) BaseURL(slug string) string {
-	host := r.host
 	if r.saas {
-		host = slug + "." + r.host
+		return r.scheme + "://" + slug + "." + r.Domain()
 	}
+	return r.scheme + "://" + r.Domain()
+}
+
+// Domain is what follows a hosted workspace's slug, with the port if any.
+func (r *Resolver) Domain() string {
 	if r.port != "" {
-		host += ":" + r.port
+		return r.host + ":" + r.port
 	}
-	return r.scheme + "://" + host
+	return r.host
 }
 
 // FromHost returns an empty workspace for the hosted root host, and only it.
@@ -126,7 +135,7 @@ func (r *Resolver) FromHost(ctx context.Context, host string) (actor.Workspace, 
 		return r.single, nil
 	}
 	host = hostname(host)
-	if host == r.host {
+	if host == rootLabel+"."+r.host {
 		return actor.Workspace{}, nil
 	}
 	slug, ok := r.slug(host)

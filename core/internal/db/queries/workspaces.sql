@@ -44,6 +44,21 @@ ORDER BY
 LIMIT
   1;
 
+-- name: ListWorkspacesByEmail :many
+-- Every workspace an address can sign in to. Runs as nokku_system.
+SELECT
+  w.slug,
+  w.name
+FROM
+  workspaces w
+  JOIN users u ON u.workspace_id = w.id
+WHERE
+  u.email = @email
+  AND u.active
+ORDER BY
+  w.name,
+  w.slug;
+
 -- name: ListUnclaimedWorkspaces :many
 -- Signups nobody ever signed in to. Runs as nokku_system.
 SELECT

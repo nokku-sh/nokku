@@ -69,6 +69,10 @@ service WorkspaceService {
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {
     option (access) = {public: true};
   }
+  // Mails an address the workspaces it can sign in to. Always answers OK.
+  rpc FindWorkspaces(FindWorkspacesRequest) returns (FindWorkspacesResponse) {
+    option (access) = {public: true};
+  }
 }
 
 message Workspace {
@@ -161,6 +165,11 @@ message UpdateDaemonDefaultsResponse {
 
 message DeleteWorkspaceRequest {}
 message DeleteWorkspaceResponse {}
+
+message FindWorkspacesRequest {
+  string email = 1 [(buf.validate.field).string.email = true];
+}
+message FindWorkspacesResponse {}
 
 message CreateWorkspaceRequest {
   string slug = 1 [(buf.validate.field).string = {

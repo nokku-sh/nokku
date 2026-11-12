@@ -245,6 +245,47 @@ func (q *Queries) ListUnclaimedWorkspaces(ctx context.Context, cutoff time.Time)
 	return items, nil
 }
 
+const listWorkspacesByEmail = `-- name: ListWorkspacesByEmail :many
+SELECT
+  w.slug,
+  w.name
+FROM
+  workspaces w
+  JOIN users u ON u.workspace_id = w.id
+WHERE
+  u.email = $1
+  AND u.active
+ORDER BY
+  w.name,
+  w.slug
+`
+
+type ListWorkspacesByEmailRow struct {
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
+// Every workspace an address can sign in to. Runs as nokku_system.
+func (q *Queries) ListWorkspacesByEmail(ctx context.Context, email string) ([]*ListWorkspacesByEmailRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspacesByEmail, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListWorkspacesByEmailRow
+	for rows.Next() {
+		var i ListWorkspacesByEmailRow
+		if err := rows.Scan(&i.Slug, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateWorkspace = `-- name: UpdateWorkspace :one
 UPDATE workspaces
 SET

@@ -242,17 +242,19 @@ func (*GetInstanceInfoRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetInstanceInfoResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OperatorName  *string                `protobuf:"bytes,1,opt,name=operator_name,json=operatorName" json:"operator_name,omitempty"`
-	SupportEmail  *string                `protobuf:"bytes,2,opt,name=support_email,json=supportEmail" json:"support_email,omitempty"`
-	WebsiteUrl    *string                `protobuf:"bytes,3,opt,name=website_url,json=websiteUrl" json:"website_url,omitempty"`
-	TermsUrl      *string                `protobuf:"bytes,4,opt,name=terms_url,json=termsUrl" json:"terms_url,omitempty"`
-	PrivacyUrl    *string                `protobuf:"bytes,5,opt,name=privacy_url,json=privacyUrl" json:"privacy_url,omitempty"`
-	ImprintUrl    *string                `protobuf:"bytes,6,opt,name=imprint_url,json=imprintUrl" json:"imprint_url,omitempty"`
-	Hosted        *bool                  `protobuf:"varint,7,opt,name=hosted" json:"hosted,omitempty"`
-	Signup        *bool                  `protobuf:"varint,8,opt,name=signup" json:"signup,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	OperatorName *string                `protobuf:"bytes,1,opt,name=operator_name,json=operatorName" json:"operator_name,omitempty"`
+	SupportEmail *string                `protobuf:"bytes,2,opt,name=support_email,json=supportEmail" json:"support_email,omitempty"`
+	WebsiteUrl   *string                `protobuf:"bytes,3,opt,name=website_url,json=websiteUrl" json:"website_url,omitempty"`
+	TermsUrl     *string                `protobuf:"bytes,4,opt,name=terms_url,json=termsUrl" json:"terms_url,omitempty"`
+	PrivacyUrl   *string                `protobuf:"bytes,5,opt,name=privacy_url,json=privacyUrl" json:"privacy_url,omitempty"`
+	ImprintUrl   *string                `protobuf:"bytes,6,opt,name=imprint_url,json=imprintUrl" json:"imprint_url,omitempty"`
+	Hosted       *bool                  `protobuf:"varint,7,opt,name=hosted" json:"hosted,omitempty"`
+	Signup       *bool                  `protobuf:"varint,8,opt,name=signup" json:"signup,omitempty"`
+	// Set where signup is: a workspace lives at <slug>.<workspace_domain>.
+	WorkspaceDomain *string `protobuf:"bytes,9,opt,name=workspace_domain,json=workspaceDomain" json:"workspace_domain,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetInstanceInfoResponse) Reset() {
@@ -339,6 +341,13 @@ func (x *GetInstanceInfoResponse) GetSignup() bool {
 		return *x.Signup
 	}
 	return false
+}
+
+func (x *GetInstanceInfoResponse) GetWorkspaceDomain() string {
+	if x != nil && x.WorkspaceDomain != nil {
+		return *x.WorkspaceDomain
+	}
+	return ""
 }
 
 type Role struct {
@@ -1163,7 +1172,7 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x11GetVersionRequest\".\n" +
 	"\x12GetVersionResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\"\x18\n" +
-	"\x16GetInstanceInfoRequest\"\x93\x02\n" +
+	"\x16GetInstanceInfoRequest\"\xbe\x02\n" +
 	"\x17GetInstanceInfoResponse\x12#\n" +
 	"\roperator_name\x18\x01 \x01(\tR\foperatorName\x12#\n" +
 	"\rsupport_email\x18\x02 \x01(\tR\fsupportEmail\x12\x1f\n" +
@@ -1175,7 +1184,8 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\vimprint_url\x18\x06 \x01(\tR\n" +
 	"imprintUrl\x12\x16\n" +
 	"\x06hosted\x18\a \x01(\bR\x06hosted\x12\x16\n" +
-	"\x06signup\x18\b \x01(\bR\x06signup\"U\n" +
+	"\x06signup\x18\b \x01(\bR\x06signup\x12)\n" +
+	"\x10workspace_domain\x18\t \x01(\tR\x0fworkspaceDomain\"U\n" +
 	"\x04Role\x12+\n" +
 	"\x04role\x18\x01 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\"\x12\n" +

@@ -58,6 +58,8 @@ message GetInstanceInfoResponse {
   string imprint_url = 6;
   bool hosted = 7;
   bool signup = 8;
+  // Set where signup is: a workspace lives at <slug>.<workspace_domain>.
+  string workspace_domain = 9;
 }
 
 message Role {

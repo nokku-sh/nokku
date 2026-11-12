@@ -58,6 +58,9 @@ const (
 	// WorkspaceServiceCreateWorkspaceProcedure is the procedure name of the WorkspaceService's
 	// CreateWorkspace RPC.
 	WorkspaceServiceCreateWorkspaceProcedure = "/nokku.v1.WorkspaceService/CreateWorkspace"
+	// WorkspaceServiceFindWorkspacesProcedure is the procedure name of the WorkspaceService's
+	// FindWorkspaces RPC.
+	WorkspaceServiceFindWorkspacesProcedure = "/nokku.v1.WorkspaceService/FindWorkspaces"
 )
 
 var (
@@ -148,6 +151,13 @@ var (
 			Procedure:  WorkspaceServiceCreateWorkspaceProcedure,
 		}
 	})
+	workspaceServiceFindWorkspacesSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("FindWorkspaces"),
+			Procedure:  WorkspaceServiceFindWorkspacesProcedure,
+		}
+	})
 )
 
 // WorkspaceServiceClient is a client for the nokku.v1.WorkspaceService service.
@@ -168,6 +178,8 @@ type WorkspaceServiceClient interface {
 	ClearUserIdentities(context.Context, *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error)
 	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
+	// Mails an address the workspaces it can sign in to. Always answers OK.
+	FindWorkspaces(context.Context, *v1.FindWorkspacesRequest) (*v1.FindWorkspacesResponse, error)
 }
 
 // NewWorkspaceServiceClient constructs a client for the nokku.v1.WorkspaceService service. Multiple
@@ -194,6 +206,8 @@ type WorkspaceServiceHandler interface {
 	ClearUserIdentities(context.Context, *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error)
 	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
+	// Mails an address the workspaces it can sign in to. Always answers OK.
+	FindWorkspaces(context.Context, *v1.FindWorkspacesRequest) (*v1.FindWorkspacesResponse, error)
 }
 
 // RegisterWorkspaceServiceHandler registers svc as the nokku.v1.WorkspaceService implementation on
@@ -213,6 +227,7 @@ func RegisterWorkspaceServiceHandler(server *connect.Server, svc WorkspaceServic
 		connect.Method{Spec: workspaceServiceClearUserIdentitiesSpec(), Handler: adapter.clearUserIdentities},
 		connect.Method{Spec: workspaceServiceTransferOwnershipSpec(), Handler: adapter.transferOwnership},
 		connect.Method{Spec: workspaceServiceCreateWorkspaceSpec(), Handler: adapter.createWorkspace},
+		connect.Method{Spec: workspaceServiceFindWorkspacesSpec(), Handler: adapter.findWorkspaces},
 	)
 }
 
@@ -265,6 +280,10 @@ func (UnimplementedWorkspaceServiceHandler) TransferOwnership(context.Context, *
 
 func (UnimplementedWorkspaceServiceHandler) CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.CreateWorkspace is not implemented")
+}
+
+func (UnimplementedWorkspaceServiceHandler) FindWorkspaces(context.Context, *v1.FindWorkspacesRequest) (*v1.FindWorkspacesResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.FindWorkspaces is not implemented")
 }
 
 type workspaceServiceClient struct {
@@ -362,6 +381,14 @@ func (c *workspaceServiceClient) TransferOwnership(ctx context.Context, req *v1.
 func (c *workspaceServiceClient) CreateWorkspace(ctx context.Context, req *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error) {
 	var res v1.CreateWorkspaceResponse
 	if err := c.client.CallUnary(ctx, workspaceServiceCreateWorkspaceSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *workspaceServiceClient) FindWorkspaces(ctx context.Context, req *v1.FindWorkspacesRequest) (*v1.FindWorkspacesResponse, error) {
+	var res v1.FindWorkspacesResponse
+	if err := c.client.CallUnary(ctx, workspaceServiceFindWorkspacesSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -507,6 +534,18 @@ func (h workspaceServiceHandler) createWorkspace(ctx context.Context, _ connect.
 		return err
 	}
 	res, err := h.svc.CreateWorkspace(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h workspaceServiceHandler) findWorkspaces(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.FindWorkspacesRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.FindWorkspaces(ctx, &req)
 	if err != nil {
 		return err
 	}

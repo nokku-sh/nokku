@@ -25,6 +25,7 @@ const (
 	cooldown        = 15 * time.Minute
 	cooldownEntries = 10_000
 	emailConfirm    = "email-confirm"
+	findWorkspaces  = "find-workspaces"
 	mailDate        = "2 Jan 2006"
 	mailTime        = "2 Jan 2006, 15:04 UTC"
 	magicLink       = "magic-link"
@@ -85,6 +86,11 @@ type sendRequest struct {
 	subject  string
 	template string
 	data     any
+}
+
+// WorkspaceLink is one workspace an address can sign in to.
+type WorkspaceLink struct {
+	Name, URL string
 }
 
 type TrialEnding struct {
@@ -192,6 +198,17 @@ func (s *Service) SendOwnerLinkEmail(ctx context.Context, email, link string, ex
 func (s *Service) OwnerLinkOnCooldown(email string) bool {
 	_, on := s.cache.Get(cooldownKey(email, magicLink))
 	return on
+}
+
+// SendWorkspacesEmail keys the cooldown by address, it has accounts in many workspaces.
+func (s *Service) SendWorkspacesEmail(ctx context.Context, email string, list []WorkspaceLink) error {
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   email,
+		to:       email,
+		subject:  "Your Nokku workspaces",
+		template: findWorkspaces,
+		data:     workspacesTemplateData{Operator: s.Operator, Workspaces: list},
+	})
 }
 
 // SendEmailChangeConfirm goes to the new address, the link makes the switch.

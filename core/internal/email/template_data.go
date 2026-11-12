@@ -7,6 +7,12 @@ type linkTemplateData struct {
 	Expiration string
 }
 
+type workspacesTemplateData struct {
+	Operator Operator
+
+	Workspaces []WorkspaceLink
+}
+
 type inviteTemplateData struct {
 	Operator Operator
 

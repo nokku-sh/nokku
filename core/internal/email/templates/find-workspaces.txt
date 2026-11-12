@@ -1,0 +1,28 @@
+nokku.
+
+Your workspaces
+
+
+Here is where you sign in.
+
+Your address has an account in {{ if eq (len .Workspaces) 1 }}this workspace{{ else }}these workspaces{{ end }}. Open one and bookmark it.
+
+{{ range .Workspaces }}
+{{ .Name }} {{ .URL }}
+{{ end }}
+This mail signs nobody in
+
+It only lists addresses. If you did not ask for it, ignore this email.
+
+This is a security email about your account on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}this Nokku server{{ end }}. If you did not do this, {{ if .Operator.SupportEmail }}contact {{ .Operator.SupportEmail }}{{ else }}tell your administrator{{ end }}.
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

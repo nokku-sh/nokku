@@ -3,6 +3,7 @@ package api
 import (
 	"cmp"
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -21,7 +22,9 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
-// Only CreateWorkspace runs outside the workspace of the request's host.
+const findMailTimeout = 30 * time.Second
+
+// Only CreateWorkspace and FindWorkspaces run outside the workspace of the request's host.
 type workspaceService struct {
 	cfg *config.Config
 }
@@ -145,6 +148,39 @@ func (s *workspaceService) DeleteWorkspace(
 		return nil, err
 	}
 	return &nokkuv1.DeleteWorkspaceResponse{}, nil
+}
+
+// FindWorkspaces mails an address the workspaces it can sign in to. It answers
+// the same whether there are any, so it names no account and no customer.
+func (s *workspaceService) FindWorkspaces(
+	ctx context.Context,
+	req *nokkuv1.FindWorkspacesRequest,
+) (*nokkuv1.FindWorkspacesResponse, error) {
+	if !s.cfg.SaaS || actor.WorkspaceIDFromContext(ctx) != "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, "workspaces are only found on the root host")
+	}
+	addr := iam.NormalizeEmail(req.GetEmail())
+	// Detached, so timing never shows if the address has an account.
+	mailCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), findMailTimeout)
+	go func() {
+		defer cancel()
+		if err := s.mailWorkspaces(mailCtx, addr); err != nil && !errors.Is(err, email.ErrCooldown) {
+			slog.Warn("workspaces mail not sent", "error", err)
+		}
+	}()
+	return &nokkuv1.FindWorkspacesResponse{}, nil
+}
+
+func (s *workspaceService) mailWorkspaces(ctx context.Context, addr string) error {
+	rows, err := s.cfg.Conn.Sys().ListWorkspacesByEmail(ctx, addr)
+	if err != nil || len(rows) == 0 {
+		return err
+	}
+	list := make([]email.WorkspaceLink, len(rows))
+	for i, row := range rows {
+		list[i] = email.WorkspaceLink{Name: row.Name, URL: s.cfg.Tenant.BaseURL(row.Slug)}
+	}
+	return s.cfg.Email.SendWorkspacesEmail(ctx, addr, list)
 }
 
 // A deleted workspace's recording objects go through the delete queue.

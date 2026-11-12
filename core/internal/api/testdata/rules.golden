@@ -117,6 +117,7 @@
 /nokku.v1.WorkspaceService/CreateWorkspace public=true self=false role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.WorkspaceService/DeleteUser public=false self=false role=ADMIN daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.WorkspaceService/DeleteWorkspace public=false self=false role=OWNER daemon=false cli=false people_only=false fresh=true feature= capped=false signs=false audited=true
+/nokku.v1.WorkspaceService/FindWorkspaces public=true self=false role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=true
 /nokku.v1.WorkspaceService/GetUser public=false self=false role=VIEWER daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.WorkspaceService/GetWorkspace public=false self=true role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false feature= capped=false signs=false audited=false
 /nokku.v1.WorkspaceService/ListUsers public=false self=false role=VIEWER daemon=false cli=true people_only=false fresh=false feature= capped=false signs=false audited=false

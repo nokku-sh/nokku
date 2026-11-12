@@ -21,7 +21,7 @@ func TestFromHostParsesWithoutTheDatabase(t *testing.T) {
 	cached := actor.Workspace{ID: "1", Slug: "acme", BaseURL: "https://acme.nokku.sh"}
 	r.slugs.Set("acme", cached)
 
-	root, err := r.FromHost(t.Context(), "nokku.sh")
+	root, err := r.FromHost(t.Context(), "signup.nokku.sh")
 	require.NoError(t, err)
 	assert.Empty(t, root.ID, "the root host has no workspace")
 
@@ -29,7 +29,7 @@ func TestFromHostParsesWithoutTheDatabase(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, cached, ws)
 
-	for _, host := range []string{"app.nokku.sh", "a.b.nokku.sh", "evil.com", ".nokku.sh", "nokku.sh.evil.com"} {
+	for _, host := range []string{"nokku.sh", "app.nokku.sh", "a.b.nokku.sh", "evil.com", ".nokku.sh", "nokku.sh.evil.com"} {
 		_, err := r.FromHost(t.Context(), host)
 		assert.ErrorIs(t, err, ErrUnknownWorkspace, host)
 	}
@@ -43,7 +43,7 @@ func TestBaseURL(t *testing.T) {
 }
 
 func TestForbiddenSlugs(t *testing.T) {
-	for _, slug := range []string{"www", "api", "cdn", "google", "my-google-sso", "acme-login", "paypal-verify", "okta"} {
+	for _, slug := range []string{"www", "api", "cdn", "signup", "google", "my-google-sso", "acme-login", "paypal-verify", "okta"} {
 		assert.True(t, Forbidden(slug), slug)
 	}
 	for _, slug := range []string{"acme", "blue-sky", "w0rkshop", "default", "rapid", "ecstatic"} {

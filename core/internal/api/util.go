@@ -45,7 +45,8 @@ func (s *utilService) GetInstanceInfo(
 	_ *nokkuv1.GetInstanceInfoRequest,
 ) (*nokkuv1.GetInstanceInfoResponse, error) {
 	op := s.cfg.Email.Operator
-	return &nokkuv1.GetInstanceInfoResponse{
+	signup := s.cfg.SaaS && actor.WorkspaceIDFromContext(ctx) == ""
+	info := &nokkuv1.GetInstanceInfoResponse{
 		OperatorName: &op.Name,
 		SupportEmail: &op.SupportEmail,
 		WebsiteUrl:   &op.WebsiteURL,
@@ -53,8 +54,12 @@ func (s *utilService) GetInstanceInfo(
 		PrivacyUrl:   &op.PrivacyURL,
 		ImprintUrl:   &op.ImprintURL,
 		Hosted:       new(s.cfg.SaaS),
-		Signup:       new(s.cfg.SaaS && actor.WorkspaceIDFromContext(ctx) == ""),
-	}, nil
+		Signup:       &signup,
+	}
+	if signup {
+		info.WorkspaceDomain = new(s.cfg.Tenant.Domain())
+	}
+	return info, nil
 }
 
 func (s *utilService) ListRoles(

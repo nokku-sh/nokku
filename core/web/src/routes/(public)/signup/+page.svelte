@@ -20,7 +20,6 @@
 	let ownerEmail = $state('');
 
 	const slugPattern = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
-	const host = $derived(location.host);
 
 	function slugOf(s: string) {
 		return s
@@ -97,7 +96,7 @@
 							class="font-mono"
 							required
 						/>
-						<InputGroup.Addon align="inline-end">.{host}</InputGroup.Addon>
+						<InputGroup.Addon align="inline-end">.{info.data.workspaceDomain}</InputGroup.Addon>
 					</InputGroup.Root>
 					<Field.Description
 						>Lowercase letters, digits and dashes. Fixed once created.</Field.Description
@@ -138,7 +137,7 @@
 		<LegalConsent lead="By creating a workspace," />
 
 		{#snippet footer()}
-			Have a workspace? Open its address to sign in.
+			Have a workspace? <a href="/login" class="text-primary hover:underline">Find its address</a>
 		{/snippet}
 	</AuthCard>
 {/if}

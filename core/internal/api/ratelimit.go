@@ -69,7 +69,8 @@ func clientIP(r *http.Request) (string, error) {
 // Enrolling a daemon is not one. Its token is random and too long to guess, and a rollout of a thousand servers
 // behind one address has to fit.
 func isAuthRoute(path string) bool {
-	return strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
+	return path == nokkuv1connect.WorkspaceServiceFindWorkspacesProcedure ||
+		strings.HasPrefix(path, "/nokku.v1.AuthService/") ||
 		strings.HasPrefix(path, "/nokku.v1.InvitationService/") ||
 		strings.HasPrefix(path, "/auth/") ||
 		strings.HasPrefix(path, "/oidc/") ||

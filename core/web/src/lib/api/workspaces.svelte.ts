@@ -44,7 +44,8 @@ export const workspace = {
 			}
 		}),
 	// Public, only on the root host of a hosted Nokku.
-	create: () => useMutation(WorkspaceService.method.createWorkspace)
+	create: () => useMutation(WorkspaceService.method.createWorkspace),
+	find: () => useMutation(WorkspaceService.method.findWorkspaces)
 };
 
 export const users = {

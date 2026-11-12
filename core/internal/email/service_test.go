@@ -28,6 +28,18 @@ func TestRenderTemplates(t *testing.T) {
 			},
 		},
 		{
+			name: "find-workspaces",
+			data: workspacesTemplateData{Workspaces: []WorkspaceLink{
+				{Name: "Acme", URL: "https://acme.nokku.sh"},
+				{Name: "Blue & Sky", URL: "https://blue-sky.nokku.sh"},
+			}},
+			contains: []string{
+				"these workspaces",
+				"https://acme.nokku.sh",
+				"https://blue-sky.nokku.sh",
+			},
+		},
+		{
 			name: "invite",
 			data: inviteTemplateData{
 				Workspace:  "Acme",

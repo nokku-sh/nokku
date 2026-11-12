@@ -62,6 +62,9 @@ CREATE UNIQUE INDEX idx_users_owner ON users (workspace_id)
 WHERE
   role = 5;
 
+-- The hosted root host looks an address up across workspaces.
+CREATE INDEX idx_users_email ON users (email);
+
 CREATE TABLE teams (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
