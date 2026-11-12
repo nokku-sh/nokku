@@ -32,11 +32,9 @@ func New(
 	conn *db.Connection,
 	keys *kms.Keyset,
 	entitlements *entitlement.Service,
+	hosted bool,
 ) (*Service, error) {
-	client, err := egress.NewClient(streamTimeout)
-	if err != nil {
-		return nil, err
-	}
+	client := egress.NewClient(streamTimeout, hosted)
 	client.CheckRedirect = refuseRedirect
 	s := &Service{conn: conn, keys: keys, entitlements: entitlements, egress: client}
 	go s.runBackgroundJobs(ctx)

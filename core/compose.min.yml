@@ -12,9 +12,6 @@ name: nokku
 
 networks:
   nokku:
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
 
 volumes:
   pgdata:
@@ -55,14 +52,12 @@ services:
       PGUSER: ${POSTGRES_USER:-nokku}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
       PGSSLMODE: disable
-      # Only Caddy may name the client. The port below reaches the core through
-      # the network gateway, a private address that would be trusted otherwise.
-      NOKKU_TRUSTED_PROXIES: 172.28.0.10
       NOKKU_STORAGE_URL: file:///home/nonroot/recordings
     volumes:
       # The image runs as nonroot. A volume on its home takes that owner, one on /data would stay root's.
       - nokku-data:/home/nonroot
-    # For NOKKU_BASE_URL=localhost:3000, a browser on this machine only.
+    # For NOKKU_BASE_URL=localhost:3000, a browser on this machine only. A
+    # program on this machine can name any client address through it.
     ports:
       - "127.0.0.1:3000:3000"
     restart: unless-stopped
@@ -85,5 +80,4 @@ services:
       - caddy-config:/config
     restart: unless-stopped
     networks:
-      nokku:
-        ipv4_address: 172.28.0.10
+      - nokku

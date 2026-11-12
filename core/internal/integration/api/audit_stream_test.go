@@ -134,7 +134,7 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	`, pgx.QueryExecModeSimpleProtocol, ids, ws)
 	require.NoError(t, err)
 
-	_, err = audit.New(t.Context(), cfg.Conn, cfg.Keyset, cfg.Entitlements)
+	_, err = audit.New(t.Context(), cfg.Conn, cfg.Keyset, cfg.Entitlements, cfg.SaaS)
 	require.NoError(t, err)
 
 	select {
@@ -192,7 +192,7 @@ func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
 	`, pgx.QueryExecModeSimpleProtocol, ids, broken, good)
 	require.NoError(t, err)
 
-	_, err = audit.New(t.Context(), cfg.Conn, cfg.Keyset, cfg.Entitlements)
+	_, err = audit.New(t.Context(), cfg.Conn, cfg.Keyset, cfg.Entitlements, cfg.SaaS)
 	require.NoError(t, err)
 
 	select {

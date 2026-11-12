@@ -657,7 +657,7 @@ func TestSCIMGroupChangesAreAudited(t *testing.T) {
 	e := newTestEnv(t)
 	plans, err := entitlement.New(t.Context(), e.conn, "", true)
 	require.NoError(t, err)
-	trail, err := audit.New(t.Context(), e.conn, e.keys, plans)
+	trail, err := audit.New(t.Context(), e.conn, e.keys, plans, false)
 	require.NoError(t, err)
 	e.svc, err = iam.New(t.Context(), iam.Deps{Conn: e.conn, Keyset: e.keys, Audit: trail})
 	require.NoError(t, err)

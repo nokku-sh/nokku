@@ -11,6 +11,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect/v2"
@@ -23,12 +24,20 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/config"
-	"github.com/nokku-sh/nokku/core/internal/egress"
 	"github.com/nokku-sh/nokku/core/web"
 )
 
 // The largest real messages are 32 KiB recording chunks and relay frames.
 const maxMessageBytes = 4 << 20
+
+// duplexProcedures stream both ways at once, which HTTP/1.1 cannot carry.
+var duplexProcedures = map[string]bool{
+	nokkuv1connect.DaemonServiceRelayProcedure:              true,
+	nokkuv1connect.DaemonControlServiceConnectProcedure:     true,
+	nokkuv1connect.DaemonControlServiceDaemonRelayProcedure: true,
+}
+
+var warnHTTP1 sync.Once
 
 type Server struct {
 	mux *http.ServeMux
@@ -44,10 +53,6 @@ func New(cfg *config.Config) *Server {
 
 func (s *Server) Start(ctx context.Context) error {
 	if s.cfg.SaaS {
-		// Not in config.New, the hosted tests boot through it on loopback.
-		if err := egress.CheckHosted(); err != nil {
-			return err
-		}
 		// Unset, any private peer could set the address source limits check.
 		if !slices.ContainsFunc(s.cfg.TrustedProxies, func(p string) bool { return strings.TrimSpace(p) != "" }) {
 			return errors.New(
@@ -67,7 +72,7 @@ func (s *Server) Start(ctx context.Context) error {
 	defer stop()
 	server := &http.Server{
 		BaseContext:       func(net.Listener) context.Context { return base },
-		Addr:              "0.0.0.0:" + s.cfg.Port,
+		Addr:              ":" + s.cfg.Port,
 		Handler:           s.Handler(ctx),
 		Protocols:         proto,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -140,7 +145,7 @@ func (s *Server) Handler(ctx context.Context) http.Handler {
 	s.registerServices(ctx)
 	return chain(
 		s.withTrace,
-		s.withHTTPS,
+		s.withDuplex,
 		s.withRateLimit,
 		s.withHeaders,
 		s.withCSRF,
@@ -162,6 +167,24 @@ func (s *Server) printOwnerLink(ctx context.Context) {
 		return
 	}
 	_, _ = fmt.Fprintf(os.Stderr, "\nSign in as %s within 24 hours:\n\n  %s\n\n", owner.Email, link)
+}
+
+// withDuplex names the fix when a proxy forwards a two-way stream over
+// HTTP/1.1. Connect would answer a bare 505, which tells the client nothing.
+func (s *Server) withDuplex(h http.Handler) http.Handler {
+	const fix = "the reverse proxy in front of the core forwards over HTTP/1.1, relays and daemons need HTTP/2. " +
+		"Make it forward with HTTP/2 without TLS (h2c), see the core's README"
+	rpcErrors := connecthttp.NewErrorWriter()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor >= 2 || !duplexProcedures[r.URL.Path] {
+			h.ServeHTTP(w, r)
+			return
+		}
+		warnHTTP1.Do(func() { slog.Warn(fix, "peer", r.RemoteAddr) })
+		// A client that waits on both directions would hang on a kept connection.
+		w.Header().Set("Connection", "close")
+		_ = rpcErrors.Write(w, r, connect.NewError(connect.CodeUnavailable, fix))
+	})
 }
 
 // withRequestMeta sets the address and headers that sessions and audit read.

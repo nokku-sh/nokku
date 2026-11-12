@@ -72,6 +72,8 @@ type Deps struct {
 	Secure bool
 	// StrictEmail needs DNS, so it is for SaaS, not air-gapped installs.
 	StrictEmail bool
+	// Hosted keeps provider fetches to public addresses, see egress.NewClient.
+	Hosted bool
 	// CanJoin gates new users on the seat cap. used is read in the creating tx.
 	CanJoin func(ctx context.Context, workspaceID string, used int64) error
 	// HasSCIM gates SCIM writes that let someone in. Unset, every plan has it.
@@ -128,6 +130,7 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		canJoin:        d.CanJoin,
 		hasSCIM:        d.HasSCIM,
 		strict:         d.StrictEmail,
+		idp:            egress.NewClient(providerHTTPTimeout, d.Hosted),
 		sendMagicLink:  d.SendMagicLink,
 		sendInvite:     d.SendInvite,
 		sendNewLogin:   d.SendNewLogin,
@@ -135,9 +138,6 @@ func New(ctx context.Context, d Deps) (*Service, error) {
 		sendEmailMoved: d.SendEmailMoved,
 	}
 	var err error
-	if s.idp, err = egress.NewClient(providerHTTPTimeout); err != nil {
-		return nil, err
-	}
 	// Random per boot, so a restart means a new nonce and a new sign-in flow.
 	nonceKey, flowKey := make([]byte, 32), make([]byte, chacha20poly1305.KeySize)
 	_, _ = rand.Read(nonceKey)

@@ -127,7 +127,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Keyset, cfg.Entitlements)
+	cfg.Audit, err = audit.New(ctx, cfg.Conn, cfg.Keyset, cfg.Entitlements, cfg.SaaS)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +150,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 			return st.Plan.Has(entitlement.FeatureSCIM), err
 		},
 		StrictEmail:    cfg.SaaS,
+		Hosted:         cfg.SaaS,
 		SendNewLogin:   cfg.Email.SendNewLoginEmail,
 		SendNewWayIn:   cfg.Email.SendNewWayInEmail,
 		SendEmailMoved: cfg.Email.SendEmailMovedNotice,

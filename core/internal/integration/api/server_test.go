@@ -169,7 +169,7 @@ func TestShutdownLetsARequestFinish(t *testing.T) {
 	assert.NoError(t, <-stopped)
 }
 
-// The core speaks plain HTTP. Its proxy uses h2c, a lone client goes to https.
+// The core speaks plain HTTP, and its proxy has to reach it with h2c.
 func TestPlainHTTPIsForTheProxy(t *testing.T) {
 	selfHostedOnly(t, "it sets a base URL of its own")
 	cfg, _ := newTestAPI(t)
@@ -184,21 +184,12 @@ func TestPlainHTTPIsForTheProxy(t *testing.T) {
 	)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Forwarded-Proto", "https")
 	resp, err := (&http.Client{Transport: &http.Transport{Protocols: &h2c}}).Do(req)
 	require.NoError(t, err)
 	_ = resp.Body.Close()
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "the proxy for a client on https is served")
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, 2, resp.ProtoMajor, "nk and nokkud speak gRPC through the proxy, that needs h2c")
-
-	noFollow := &http.Client{
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
-	resp, err = noFollow.Get(base + "/login?next=%2F")
-	require.NoError(t, err)
-	_ = resp.Body.Close()
-	assert.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode, "a client that connects by itself is sent to https")
-	assert.Equal(t, "https://nokku.example.com/login?next=%2F", resp.Header.Get("Location"))
+	assert.NotEmpty(t, resp.Header.Get("Strict-Transport-Security"), "a browser on https must stay there")
 }
 
 // startCore runs cfg's real server on a free port and returns its address.

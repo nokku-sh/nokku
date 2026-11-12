@@ -396,11 +396,9 @@ func splunk(t *testing.T, got chan<- string) *httptest.Server {
 
 func auditService(t *testing.T, conn *db.Connection, keys *kms.Keyset) *audit.Service {
 	t.Helper()
-	// The destination listens on loopback.
-	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
 	plans, err := entitlement.New(t.Context(), conn, "", false)
 	require.NoError(t, err)
-	svc, err := audit.New(t.Context(), conn, keys, plans)
+	svc, err := audit.New(t.Context(), conn, keys, plans, false)
 	require.NoError(t, err)
 	return svc
 }

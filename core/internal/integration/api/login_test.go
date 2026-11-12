@@ -110,6 +110,7 @@ func iamServer(t *testing.T, base *config.Config, mail iam.Deps) (*config.Config
 	mail.Secure = strings.HasPrefix(base.FullURL(), "https://")
 	mail.CanJoin = base.Entitlements.CanInvite
 	mail.StrictEmail = base.SaaS
+	mail.Hosted = base.SaaS
 	local := *base
 	var err error
 	local.IAM, err = iam.New(t.Context(), mail)

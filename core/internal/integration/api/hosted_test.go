@@ -117,7 +117,6 @@ func serving(next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Host = hostedSlug + "." + hostedBase
-		r.Header.Set("X-Forwarded-Proto", "https")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -134,7 +133,6 @@ func onHost(t *testing.T, host string) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Host = host
-		r.Header.Set("X-Forwarded-Proto", "https")
 		testHandler.ServeHTTP(w, r)
 	}))
 	t.Cleanup(srv.Close)
@@ -178,7 +176,6 @@ func TestHostedUnknownHostsAreLimited(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/_app/version.json", nil)
 		req.Host = host
 		req.RemoteAddr = "127.0.0.1:40000"
-		req.Header.Set("X-Forwarded-Proto", "https")
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		return rec.Code

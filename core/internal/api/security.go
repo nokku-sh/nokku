@@ -2,7 +2,6 @@ package api
 
 import (
 	"log/slog"
-	"net"
 	"net/http"
 	"strings"
 
@@ -30,45 +29,6 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 		}
 
 		protected.ServeHTTP(w, r)
-	})
-}
-
-// X-Forwarded-Proto is taken from anyone. A browser never sends it, so faking
-// it only fools the core about the faker's own connection.
-func (s *Server) withHTTPS(h http.Handler) http.Handler {
-	// A browser takes http://localhost as secure, so no certificate is needed.
-	if s.cfg.Hostname() == "localhost" {
-		return h
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" {
-			h.ServeHTTP(w, r)
-			return
-		}
-		proto := r.Header.Get("X-Forwarded-Proto")
-		if proto == "" && r.Header.Get("X-Forwarded-For") == "" {
-			// A client that connects by itself.
-			proto = "http"
-		}
-		// Traefik names a WebSocket upgrade ws or wss.
-		switch proto {
-		case "https", "wss":
-			h.ServeHTTP(w, r)
-		case "http", "ws":
-			target := s.cfg.FullURL()
-			if s.cfg.SaaS {
-				// Every workspace of the hosted service has a host of its own.
-				target = "https://" + r.Host
-			}
-			// #nosec G710 -- same host on https, only the path is the client's
-			http.Redirect(w, r, target+r.URL.RequestURI(), http.StatusTemporaryRedirect)
-		default:
-			// A redirect would come back through the same proxy.
-			peer, _, _ := net.SplitHostPort(r.RemoteAddr)
-			http.Error(w, "Nokku is served over https. This request came through a proxy at "+peer+
-				" that does not say which scheme the client used. It has to send X-Forwarded-Proto.",
-				http.StatusBadRequest)
-		}
 	})
 }
 
@@ -103,8 +63,8 @@ func (s *Server) withHeaders(h http.Handler) http.Handler {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 
-		// Harmless if faked, a browser takes HSTS only over https.
-		if hsts && r.Header.Get("X-Forwarded-Proto") == "https" {
+		// Sent whatever the scheme, a browser takes HSTS only over https.
+		if hsts {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 		h.ServeHTTP(w, r)

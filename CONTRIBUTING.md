@@ -86,8 +86,7 @@ the UI that was built into the binary.
 is up, adds Pocket ID as a provider, fills Pocket ID with the users below and
 has it send them over SCIM.
 
-The server needs `NOKKU_ALLOW_PRIVATE_NETWORKS=true`, Pocket ID is on
-localhost. Set `NOKKU_ADMIN_EMAIL=admin@nokku.test`, the owner is linked to
+Set `NOKKU_ADMIN_EMAIL=admin@nokku.test`, the owner is linked to
 the first Pocket ID user. Point mail at Mailpit: `NOKKU_SMTP_HOST=localhost`,
 `NOKKU_SMTP_PORT=1025` and no username or password. Mailpit keeps every mail,
 whoever it is for, at http://localhost:8025.

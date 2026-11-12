@@ -28,6 +28,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
+	"github.com/nokku-sh/nokku/core/internal/egress"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
@@ -80,7 +81,7 @@ func TestMain(m *testing.M) {
 	// A test with a license key must not ask the real worker for a new one.
 	os.Setenv("NOKKU_LICENSE_OFFLINE", "true")
 	// Saving a provider fetches discovery from an issuer on loopback.
-	os.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
+	egress.AllowPrivateWhenHosted()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var err error

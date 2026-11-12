@@ -78,16 +78,41 @@ docker compose -f compose.prod.yml up -d
 ```bash
 export NOKKU_BASE_URL=nokku.example.com NOKKU_SECRET=...
 export PGHOST=db.internal PGUSER=nokku PGPASSWORD=...
+export NOKKU_TRUSTED_PROXIES=127.0.0.1   # the proxy on this machine
 ./nokku
 ```
 
+The last line is for a proxy on the same machine. Without it every machine on the network may name the client, see [Client addresses](#client-addresses).
+
+### The reverse proxy
+
 The core listens on port 3000 and speaks plain HTTP. Put a reverse proxy in front that:
 
-- holds the TLS certificate and sends `X-Forwarded-Proto`
+- holds the TLS certificate and redirects http to https
 - forwards with HTTP/2 without TLS (h2c), because `nk` and `nokkud` speak gRPC
 - allows WebSockets, for the terminal in the browser
 
-The [Caddyfile](./Caddyfile) is a working example. No domain? See [Without a domain](#without-a-domain).
+Nothing works over plain http. The web app says so instead of showing the sign-in. A proxy without h2c is named in the core's log, and in what `nk` and `nokkud` print.
+
+**Caddy.** The [Caddyfile](./Caddyfile) is a working example.
+
+**Traefik.** One label sets h2c, the rest is what any service gets:
+
+```yaml
+services:
+  nokku:
+    networks: [proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.nokku.rule: Host(`nokku.example.com`)
+      traefik.http.routers.nokku.tls.certresolver: letsencrypt
+      traefik.http.services.nokku.loadbalancer.server.port: "3000"
+      traefik.http.services.nokku.loadbalancer.server.scheme: h2c
+```
+
+In Kubernetes, annotate the Service with `traefik.ingress.kubernetes.io/service.serversscheme: h2c`.
+
+No domain? See [Without a domain](#without-a-domain).
 
 ## Connect a server and your terminal
 
@@ -124,7 +149,7 @@ Everything is set with environment variables. Most installs only touch these:
 | `NOKKU_TRUSTED_PROXIES`                        | Your reverse proxies as IPs or CIDRs, to tighten the default |
 | `NOKKU_SMTP_HOST`, `NOKKU_SMTP_FROM`           | Turns on email sign-in links and mailed invitations          |
 
-The rest, grouped by topic. Key management, rotating the secret and `NOKKU_ALLOW_PRIVATE_NETWORKS` are in [SECURITY.md](./SECURITY.md#running-nokku-securely).
+The rest, grouped by topic. Key management and rotating the secret are in [SECURITY.md](./SECURITY.md#running-nokku-securely).
 
 <details>
 <summary><b>Core</b></summary>
@@ -256,14 +281,20 @@ The other standard `OTEL_*` variables work too. To trace one request in ten, set
 
 Nokku takes the client's address from `X-Forwarded-For`. By default it trusts a proxy on the same machine or on a private network, like a Docker network or a cluster's pod network. Docker and Kubernetes need nothing set.
 
-That address goes into the audit log, rate limits and sign-in mails, and a certificate's `source-address` is checked against it. So **let only the proxy reach port 3000**: keep the port on the proxy's Docker network, as `compose.prod.yml` does, or use a NetworkPolicy in a cluster.
+Whoever reaches port 3000 from such an address can fake their client address. That address goes into the audit log, rate limits and sign-in mails, and a certificate's `source-address` is checked against it for browser and relayed sessions. It never signs anyone in.
+
+So **let only the proxy reach port 3000**. Any one of these does it:
+
+- keep the port on a Docker network that only the proxy shares, as `compose.prod.yml` does
+- admit only the ingress with a NetworkPolicy in a cluster
+- name the proxy in `NOKKU_TRUSTED_PROXIES`
 
 <details>
 <summary><b>When to set <code>NOKKU_TRUSTED_PROXIES</code></b></summary>
 
 Set it to your proxies, as IPs or CIDRs. It replaces the default, and only those may name the client. Set it when:
 
-- you want only your proxy trusted, not every private address
+- you want only your proxy trusted, not every private address, like `127.0.0.1` for a proxy next to the binary
 - your proxy reaches Nokku from a public address, like a Docker network or cluster on public IPv6, or from `100.64.0.0/10` like over Tailscale
 - more than one proxy sits in front, like a CDN or a cloud load balancer before your ingress
 
@@ -280,35 +311,11 @@ A wrong setting does not stop Nokku from working. It gets addresses wrong:
 </details>
 
 <details>
-<summary><b>Traefik, in Docker and Kubernetes</b></summary>
+<summary><b>Traefik</b></summary>
 
-Traefik sends `X-Forwarded-Proto` and `X-Forwarded-For` by itself, and drops those headers when a client sends them, as long as `forwardedHeaders.insecure` stays off on the entrypoint. Leave it off, unless another proxy you control sits in front.
+Traefik sends `X-Forwarded-For` by itself, and drops the header when a client sends it, as long as `forwardedHeaders.insecure` stays off on the entrypoint. Leave it off, unless another proxy you control sits in front.
 
-**Docker.** Put Traefik and Nokku on one network and keep anything else off it:
-
-```yaml
-networks:
-  proxy:
-
-services:
-  nokku:
-    networks: [proxy]
-    labels:
-      traefik.enable: "true"
-      traefik.http.routers.nokku.rule: Host(`nokku.example.com`)
-      traefik.http.routers.nokku.tls.certresolver: letsencrypt
-      traefik.http.services.nokku.loadbalancer.server.port: "3000"
-      traefik.http.services.nokku.loadbalancer.server.scheme: h2c
-```
-
-**Kubernetes.** Nokku sees the Traefik pod's address, which is trusted as it is. Every other pod is on that network too, so let only Traefik reach Nokku with a NetworkPolicy. It needs a network plugin that enforces policies.
-
-- Name the namespace Traefik runs in, or the one a gateway's proxy pods run in. A wrong one cuts Nokku off, and Traefik answers 502 or 504.
-- Anything else that calls Nokku directly, like a scraper, needs a rule of its own. Health probes come from the node, most plugins let them through.
-- A controller on the host network, common for ingress-nginx on bare metal, comes from the node's address. Add the nodes as an `ipBlock`, if your plugin matches node addresses that way.
-- Cilium's own ingress and gateway reach pods as Cilium's `ingress` identity, which a NetworkPolicy cannot name. Use a CiliumNetworkPolicy there.
-- Annotate the Service with `traefik.ingress.kubernetes.io/service.serversscheme: h2c`.
-- Traefik only sees real client addresses when its own Service keeps them, with `externalTrafficPolicy: Local` on a LoadBalancer or NodePort.
+In Kubernetes, Traefik only sees real client addresses when its own Service keeps them, with `externalTrafficPolicy: Local` on a LoadBalancer or NodePort.
 
 </details>
 

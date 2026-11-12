@@ -58,8 +58,6 @@ func newTestEnv(t *testing.T) *testEnv {
 // newTestEnvWith takes the mail and seat functions, fills in Conn and Keyset.
 func newTestEnvWith(t *testing.T, deps iam.Deps) *testEnv {
 	t.Helper()
-	// The mock IdPs listen on loopback.
-	t.Setenv("NOKKU_ALLOW_PRIVATE_NETWORKS", "true")
 	conn, err := db.NewConnection(t.Context())
 	require.NoError(t, err, "connect")
 	t.Setenv("NOKKU_SECRET", "test-secret-0123456789-0123456789")
