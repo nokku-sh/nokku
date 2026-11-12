@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"text/template"
 	"time"
 	"unicode"
 
@@ -32,8 +34,11 @@ const (
 	callbackTimeout = 5 * time.Second
 )
 
-const callbackPage = `<!doctype html><meta charset="utf-8"><title>nk</title>` +
-	`<p style="font:16px system-ui;margin:3em auto;max-width:30em">%s You can close this tab.</p>`
+//go:embed callback.html
+var callbackHTML string
+
+// Rendered with true when the browser brought a code.
+var callbackPage = template.Must(template.New("callback").Parse(callbackHTML))
 
 // deviceTransport signs each request with a proof for its URL. A stale nonce is
 // retried at once, the rejection came with a fresh one (RFC 9449 section 8).
@@ -165,13 +170,10 @@ func awaitBrowser(ctx context.Context, l net.Listener, expiry time.Time) (string
 				return
 			}
 			code := r.URL.Query().Get("code")
-			msg := "Nokku signed nk in."
-			if code == "" {
-				msg = "The sign-in was denied."
-			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Header().Set("Cache-Control", "no-store")
-			_, _ = fmt.Fprintf(w, callbackPage, msg)
+			//nolint:gosec // only a bool reaches the template
+			_ = callbackPage.Execute(w, code != "")
 			select {
 			case answers <- code:
 			default:

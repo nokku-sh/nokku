@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{if .}}Signed in{{else}}Sign-in denied{{end}} · Nokku</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-13 -34.4 137.4 137.4'%3E%3Cstyle%3Eellipse%7Bfill:%232b2f36%7D@media(prefers-color-scheme:dark)%7Bellipse%7Bfill:%23d6dbe4%7D%7D%3C/style%3E%3Cellipse cx='12.146' cy='34.275' rx='12.145' ry='12.248'/%3E%3Cellipse cx='46.485' cy='34.275' rx='12.145' ry='12.248'/%3E%3Cpath fill='none' stroke='%2315d1aa' stroke-width='16.933' stroke-linecap='round' stroke-linejoin='round' d='M77.145 8.467 102.953 34.275 77.145 60.083'/%3E%3C/svg%3E">
+<style>
+	/* The web app's theme, copied. nk serves this page alone, so nothing can be linked. */
+	:root {
+		color-scheme: light dark;
+		--background: oklch(0.972 0.005 255);
+		--foreground: oklch(0.21 0.016 260);
+		--card: oklch(0.995 0.002 255);
+		--muted: oklch(0.945 0.006 260);
+		--muted-foreground: oklch(0.5 0.012 260);
+		--border: oklch(0.88 0.01 260);
+		--brand-dot: #2b2f36;
+		--brand-caret: #15d1aa;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root {
+			--background: oklch(0.145 0.014 262);
+			--foreground: oklch(0.94 0.006 260);
+			--card: oklch(0.175 0.015 262);
+			--muted: oklch(0.21 0.016 262);
+			--muted-foreground: oklch(0.66 0.012 260);
+			--border: oklch(0.255 0.02 262);
+			--brand-dot: #d6dbe4;
+		}
+	}
+
+	* {
+		box-sizing: border-box;
+		margin: 0;
+	}
+	body {
+		min-height: 100dvh;
+		display: grid;
+		place-items: center;
+		padding: 1rem;
+		background: var(--background);
+		color: var(--foreground);
+		font: 1rem/1.5 'Manrope Variable', Manrope, system-ui, sans-serif;
+		-webkit-font-smoothing: antialiased;
+	}
+	main {
+		width: 100%;
+		max-width: 24rem;
+		overflow: hidden;
+		border: 1px solid var(--border);
+		border-radius: 0.875rem;
+		background: var(--muted);
+		text-align: center;
+	}
+	.card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		margin: -1px;
+		padding: 2.5rem 1.5rem 2rem;
+		border: 1px solid var(--border);
+		border-radius: 0.875rem;
+		background: var(--card);
+	}
+	.mark {
+		width: 6rem;
+		margin-bottom: 1.75rem;
+		overflow: visible;
+	}
+	.eye {
+		fill: var(--brand-dot);
+		transform-box: fill-box;
+		transform-origin: center;
+	}
+	.caret,
+	.shut {
+		fill: none;
+		stroke: var(--brand-caret);
+		stroke-width: 16.933;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.shut {
+		stroke: var(--brand-dot);
+		stroke-width: 6.5;
+	}
+	h1 {
+		font-size: 1.25rem;
+		font-weight: 600;
+		letter-spacing: -0.025em;
+	}
+	p {
+		font-size: 0.875rem;
+		color: var(--muted-foreground);
+		text-wrap: balance;
+	}
+	h1 + p {
+		margin-top: 0.25rem;
+	}
+	main > p {
+		padding: 0.75rem;
+	}
+
+	/* Denied: eyes shut, the prompt goes dark. */
+	.denied .caret {
+		stroke: var(--border);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		main {
+			animation: rise 0.4s ease-out both;
+		}
+		.mark {
+			animation: pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
+		}
+		/* Signed in: the eyes blink, lean over to the prompt, and it nudges back. */
+		.ok .eyes {
+			animation: glance 6s ease-in-out 1s infinite;
+		}
+		.ok .eye {
+			animation: blink 6s 1s infinite;
+		}
+		.ok .caret {
+			animation: nudge 6s ease-in-out 1s infinite;
+		}
+		.denied .mark {
+			animation: shake 0.5s ease-in-out 0.3s both;
+		}
+	}
+	@keyframes rise {
+		from {
+			opacity: 0;
+			translate: 0 0.5rem;
+		}
+	}
+	@keyframes pop {
+		from {
+			opacity: 0;
+			scale: 0.6;
+		}
+	}
+	@keyframes blink {
+		0%, 6%, 12%, 62%, 68%, 100% {
+			scale: 1;
+		}
+		9%, 65% {
+			scale: 1 0.1;
+		}
+	}
+	@keyframes glance {
+		0%, 22%, 54%, 100% {
+			translate: 0;
+		}
+		28%, 48% {
+			translate: 5px;
+		}
+	}
+	@keyframes nudge {
+		0%, 31%, 47%, 100% {
+			translate: 0;
+		}
+		35%, 43% {
+			translate: 5px;
+		}
+		39% {
+			translate: 1px;
+		}
+	}
+	@keyframes shake {
+		20%, 60% {
+			translate: -0.3rem;
+		}
+		40%, 80% {
+			translate: 0.3rem;
+		}
+	}
+</style>
+</head>
+<body class="{{if .}}ok{{else}}denied{{end}}">
+<main>
+	<div class="card">
+		<svg class="mark" viewBox="0 0 111.42 68.55" role="img" aria-label="Nokku">
+			<g class="eyes">
+{{- if .}}
+				<ellipse class="eye" cx="12.146" cy="34.275" rx="12.145" ry="12.248" />
+				<ellipse class="eye" cx="46.485" cy="34.275" rx="12.145" ry="12.248" />
+{{- else}}
+				<path class="shut" d="M3.25 34.275h17.8m16.54 0h17.8" />
+{{- end}}
+			</g>
+			<path class="caret" d="M77.145 8.467 102.953 34.275 77.145 60.083" />
+		</svg>
+{{- if .}}
+		<h1>You're in.</h1>
+		<p>nk is signed in. Close this tab and head back to your terminal.</p>
+{{- else}}
+		<h1>Not this time.</h1>
+		<p>The sign-in was denied, so nk stays signed out. You can close this tab.</p>
+{{- end}}
+	</div>
+	<p>This page comes from nk on your machine.</p>
+</main>
+</body>
+</html>

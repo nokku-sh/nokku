@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -604,4 +605,30 @@ func TestAwaitBrowserIgnoresOtherRequests(t *testing.T) {
 	code, err := awaitBrowser(t.Context(), l, time.Now().Add(time.Minute))
 	require.NoError(t, err)
 	assert.Equal(t, "nk_loopback_x", code)
+}
+
+// A denial must never read as a sign-in.
+func TestCallbackPageTellsDeniedFromSignedIn(t *testing.T) {
+	for query, want := range map[string]string{
+		"code=nk_loopback_x":  "nk is signed in",
+		"error=access_denied": "was denied",
+	} {
+		var lc net.ListenConfig
+		l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		pages := make(chan string, 1)
+		go func() {
+			resp, getErr := http.Get("http://" + l.Addr().String() + "/callback?" + query)
+			if getErr != nil {
+				pages <- getErr.Error()
+				return
+			}
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			pages <- string(body)
+		}()
+		_, err = awaitBrowser(t.Context(), l, time.Now().Add(time.Minute))
+		require.NoError(t, err)
+		assert.Contains(t, <-pages, want, query)
+	}
 }
