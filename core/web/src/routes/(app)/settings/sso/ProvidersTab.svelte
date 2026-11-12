@@ -21,12 +21,12 @@
 
 	interface Props {
 		readonly?: boolean;
-		mode?: string;
+		hosted?: boolean;
 		/** Undefined while the plan loads. */
 		enforceAvailable?: boolean;
 	}
 
-	let { readonly = false, mode, enforceAvailable }: Props = $props();
+	let { readonly = false, hosted, enforceAvailable }: Props = $props();
 
 	const providers = sso.list();
 	const ws = workspace.get();
@@ -38,7 +38,7 @@
 	const anyEnabled = $derived((providers.data ?? []).some((p) => p.enabled));
 	const locked = $derived(enforceAvailable === false && !enforced);
 	const plans = usePlans();
-	const upgrade = $derived(plans.upgradeLink('enforce_sso', mode));
+	const upgrade = $derived(plans.upgradeLink('enforce_sso', hosted));
 
 	// Only the switch is sent. A downgraded workspace may turn it off, and nothing else rides along to be refused.
 	function setEnforced(on: boolean) {
@@ -51,7 +51,7 @@
 {#if !readonly}
 	<AddProviderModal bind:open={create.open} />
 {/if}
-<ProviderSheet {mode} />
+<ProviderSheet {hosted} />
 
 <div class="flex flex-col gap-4">
 	<Card.Root>

@@ -116,7 +116,7 @@ No domain? See [Without a domain](#without-a-domain).
 
 ## Connect a server and your terminal
 
-`nk` and `nokkud` talk to the hosted service unless told otherwise. Point them at your core once:
+`nk` and `nokkud` know no address by themselves. Point them at your core once:
 
 ```bash
 nk --api https://nokku.example.com login

@@ -125,11 +125,9 @@ export function formatHours(hours: number): string {
 	return hours >= 24 && hours % 24 === 0 ? plural(hours / 24, 'day') : plural(hours, 'hour');
 }
 
-/** nk goes to app.nokku.sh unless told otherwise. */
+/** nk knows no address by itself, every workspace has its own. */
 export function nkLoginCommand(): string {
-	return location.origin === 'https://app.nokku.sh'
-		? 'nk login'
-		: `nk login --api ${location.origin}`;
+	return `nk --api ${location.origin} login`;
 }
 
 /** "a, b and c", or "a, b, c and 4 more" past max. A total above the list counts names it left out. */

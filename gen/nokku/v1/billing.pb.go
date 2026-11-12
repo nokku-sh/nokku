@@ -62,7 +62,7 @@ func (*GetBillingRequest) Descriptor() ([]byte, []int) {
 type GetBillingResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Plan          *string                `protobuf:"bytes,1,opt,name=plan" json:"plan,omitempty"`
-	Mode          *string                `protobuf:"bytes,2,opt,name=mode" json:"mode,omitempty"`
+	Hosted        *bool                  `protobuf:"varint,2,opt,name=hosted" json:"hosted,omitempty"`
 	Features      map[string]bool        `protobuf:"bytes,3,rep,name=features" json:"features,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
 	Quotas        *Quotas                `protobuf:"bytes,4,opt,name=quotas" json:"quotas,omitempty"`
 	UserCount     *int64                 `protobuf:"varint,5,opt,name=user_count,json=userCount" json:"user_count,omitempty"`
@@ -116,11 +116,11 @@ func (x *GetBillingResponse) GetPlan() string {
 	return ""
 }
 
-func (x *GetBillingResponse) GetMode() string {
-	if x != nil && x.Mode != nil {
-		return *x.Mode
+func (x *GetBillingResponse) GetHosted() bool {
+	if x != nil && x.Hosted != nil {
+		return *x.Hosted
 	}
-	return ""
+	return false
 }
 
 func (x *GetBillingResponse) GetFeatures() map[string]bool {
@@ -443,10 +443,10 @@ var File_nokku_v1_billing_proto protoreflect.FileDescriptor
 const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
 	"\x16nokku/v1/billing.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x13\n" +
-	"\x11GetBillingRequest\"\xd6\x04\n" +
+	"\x11GetBillingRequest\"\xda\x04\n" +
 	"\x12GetBillingResponse\x12\x12\n" +
-	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x12\n" +
-	"\x04mode\x18\x02 \x01(\tR\x04mode\x12F\n" +
+	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x16\n" +
+	"\x06hosted\x18\x02 \x01(\bR\x06hosted\x12F\n" +
 	"\bfeatures\x18\x03 \x03(\v2*.nokku.v1.GetBillingResponse.FeaturesEntryR\bfeatures\x12(\n" +
 	"\x06quotas\x18\x04 \x01(\v2\x10.nokku.v1.QuotasR\x06quotas\x12\x1d\n" +
 	"\n" +

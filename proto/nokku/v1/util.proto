@@ -56,7 +56,7 @@ message GetInstanceInfoResponse {
   string terms_url = 4;
   string privacy_url = 5;
   string imprint_url = 6;
-  string mode = 7;
+  bool hosted = 7;
   bool signup = 8;
 }
 

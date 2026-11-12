@@ -23,7 +23,7 @@ func TestOpenBrowserPassesTheLinkAsOneArgument(t *testing.T) {
 	t.Setenv("PATH", dir)
 	t.Setenv("NK_TEST_OUT", out)
 
-	link := `https://app.nokku.sh/device?user_code=AB-CD&next=$(id);'"`
+	link := `https://acme.nokku.sh/device?user_code=AB-CD&next=$(id);'"`
 	require.NoError(t, openBrowser(link))
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {

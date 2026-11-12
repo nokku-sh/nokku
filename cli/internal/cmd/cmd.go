@@ -53,8 +53,7 @@ func Root() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "api",
-				Usage:   "Nokku API URL",
-				Value:   "https://app.nokku.sh",
+				Usage:   "Address of your Nokku, remembered after the first use",
 				Sources: cli.EnvVars("NK_API_URL"),
 			},
 			&cli.BoolFlag{
@@ -144,6 +143,11 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 
 // nk logout uses client.New, it has no use for an ssh identity.
 func newClient(s *state.State) (*client.Client, error) {
+	// Every workspace has an address of its own, so there is none to fall back to.
+	if s.APIURL == "" {
+		return nil, errors.New("nk does not know your Nokku yet. Pass its address once, " +
+			"like nk --api https://nokku.example.com login. The web app shows the full command")
+	}
 	if err := ssh.SetupKey(s); err != nil {
 		return nil, err
 	}

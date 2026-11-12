@@ -20,12 +20,12 @@
 curl -fsSL https://get.nokku.sh/nk | sh      # Linux and macOS
 irm https://get.nokku.sh/nk.ps1 | iex        # Windows, in PowerShell
 
-nk login          # opens your browser, then sets up your SSH config
-nk ls             # lists the servers you can reach
-ssh user@target   # plain OpenSSH
+nk --api https://nokku.example.com login   # opens your browser, then sets up your SSH config
+nk ls                                      # lists the servers you can reach
+ssh user@target                            # plain OpenSSH
 ```
 
-On a self-hosted core, point `nk` at it once with `nk --api https://nokku.example.com login`. It remembers the address.
+`--api` is the address you open Nokku at, self-hosted or hosted. `nk` remembers it, so later it is just `nk login`. The web app shows the command with your address filled in.
 
 Something not working? Run `nk doctor`. It checks the core, your key and your SSH setup, and `nk doctor --fix` repairs what it can.
 
@@ -155,6 +155,7 @@ Any other platform with signed tokens works the same way: put the job's token in
 For Ansible and scripts that run somewhere without a signed token, use a service account key. CI should not hold one.
 
 ```bash
+export NK_API_URL=https://nokku.example.com
 export NK_TOKEN=nk_sa_<SECRET>
 nk login
 ssh user@target

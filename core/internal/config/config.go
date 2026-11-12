@@ -174,14 +174,6 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	return &cfg, nil
 }
 
-// Mode is what the API reports, the UI switches on it.
-func (c *EnvConfig) Mode() string {
-	if c.SaaS {
-		return "saas"
-	}
-	return "self_hosted"
-}
-
 // FullURL is the public address, plain http only on localhost.
 func (c *EnvConfig) FullURL() string {
 	if c.Hostname() == "localhost" {

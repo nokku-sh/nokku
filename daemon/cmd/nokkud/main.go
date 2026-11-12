@@ -121,7 +121,7 @@ enrolled yet, which is how a container joins. Once enrolled, the variable is ign
 			},
 			&cli.StringFlag{
 				Name:    "api",
-				Usage:   "Nokku API URL, https only",
+				Usage:   "Address of your Nokku, https only, kept with the enrollment",
 				Sources: cli.EnvVars("NOKKUD_API_URL"),
 			},
 			&cli.StringFlag{
@@ -341,8 +341,10 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 		// The CA of one Nokku is never trusted for another.
 		st.APIURL, st.APICA = api, ""
 	}
+	// Every workspace has an address of its own, so there is none to fall back to.
 	if st.APIURL == "" {
-		st.APIURL = state.DefaultAPIURL
+		return nil, errors.New("nokkud does not know its Nokku yet. Pass the address with --api or " +
+			"NOKKUD_API_URL, the web app shows the full command")
 	}
 	if err = checkAPIURL(st.APIURL); err != nil {
 		return nil, err

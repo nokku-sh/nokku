@@ -22,7 +22,7 @@
 	import { Globe, Info, KeyRound, LogIn, Plug, Settings2 } from '@lucide/svelte';
 	import RedirectURI from './RedirectURI.svelte';
 
-	let { mode }: { mode?: string } = $props();
+	let { hosted }: { hosted?: boolean } = $props();
 
 	const sheet = useSheet();
 	const can = user.can();
@@ -76,7 +76,7 @@
 		}
 		void confirm({
 			title: `Create accounts through ${model.name}?`,
-			description: `Anyone who can sign in to ${model.name} gets a member account here${mode === 'saas' ? ', and each one takes a seat' : ''}. Leave it off to invite people first.`,
+			description: `Anyone who can sign in to ${model.name} gets a member account here${hosted ? ', and each one takes a seat' : ''}. Leave it off to invite people first.`,
 			confirmText: 'Create accounts',
 			onConfirm: () => {
 				if (!model) return;
@@ -241,7 +241,7 @@
 			<Section
 				title="At the provider"
 				icon={Globe}
-				description={mode === 'saas'
+				description={hosted
 					? 'Each workspace needs its own app at the provider.'
 					: 'It follows NOKKU_BASE_URL. Update the provider when the address changes.'}
 			>

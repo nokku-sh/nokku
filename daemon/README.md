@@ -24,11 +24,11 @@ Create an enrollment token in the Nokku web app, on the **Servers** page. Then o
 
 ```bash
 curl -fsSL https://get.nokku.sh/nokkud | sudo sh    # installs the package and the service
-sudo nokkud enroll                                  # paste the token, it is not shown
+sudo nokkud --api https://nokku.example.com enroll  # paste the token, it is not shown
 sudo systemctl restart nokkud
 ```
 
-On a self-hosted core, enroll with `sudo nokkud --api https://nokku.example.com enroll`. The web app shows these commands with your address filled in.
+`--api` is the address you open Nokku at, self-hosted or hosted. `nokkud` keeps it with the enrollment. The web app shows these commands with your address filled in.
 
 The server shows up in the web app. Unless the token approves it automatically, someone approves it there before it serves logins.
 

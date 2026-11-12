@@ -30,13 +30,13 @@ export function usePlans() {
 		/** The plan to buy for a feature, the same hosted and self-hosted. */
 		requiredPlan: (feature: string) => planName(planFor(feature)),
 		/** Where to get a feature. Self-hosted activates a key in billing, hosted Pro is bought in billing, hosted Enterprise is sold outside. */
-		upgradeLink: (feature: string, mode: string | undefined) => {
-			if (mode === 'saas' && planFor(feature) === 'enterprise') {
+		upgradeLink: (feature: string, hosted: boolean | undefined) => {
+			if (hosted && planFor(feature) === 'enterprise') {
 				return { href: UpgradeURL, label: 'See plans', external: true };
 			}
 			return {
 				href: '/settings/billing',
-				label: mode === 'saas' ? 'Upgrade' : 'Activate a license',
+				label: hosted ? 'Upgrade' : 'Activate a license',
 				external: false
 			};
 		}

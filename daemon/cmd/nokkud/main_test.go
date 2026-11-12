@@ -22,7 +22,7 @@ func TestCheckAPIURL(t *testing.T) {
 		url string
 		ok  bool
 	}{
-		{"https://app.nokku.sh", true},
+		{"https://acme.nokku.sh", true},
 		{"https://10.0.0.5:8443", true},
 		{"http://localhost:3000", true},
 		{"http://127.0.0.1:3000", true},

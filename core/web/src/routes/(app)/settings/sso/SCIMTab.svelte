@@ -20,12 +20,12 @@
 
 	interface Props {
 		readonly?: boolean;
-		mode?: string;
+		hosted?: boolean;
 		/** Whether the plan has SCIM, undefined while it loads. */
 		available?: boolean;
 	}
 
-	let { readonly = false, mode, available }: Props = $props();
+	let { readonly = false, hosted, available }: Props = $props();
 
 	const tokens = scim.listTokens();
 	const createToken = scim.createToken();
@@ -38,7 +38,7 @@
 
 	const plans = usePlans();
 	const plan = $derived(plans.requiredPlan('scim'));
-	const upgrade = $derived(plans.upgradeLink('scim', mode));
+	const upgrade = $derived(plans.upgradeLink('scim', hosted));
 	// Tokens keep provisioning after a downgrade, so they stay listed and revocable.
 	const lapsed = $derived(available === false && !!tokens.data?.length);
 

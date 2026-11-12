@@ -13,7 +13,7 @@
 
 	const status = $derived(licenseStatus(data.data));
 	// A hosted workspace with an expired key has no plan, the plan banner says so.
-	const expired = $derived(status.state === 'expired' && info.data?.mode !== 'saas');
+	const expired = $derived(status.state === 'expired' && !info.data?.hosted);
 	// Only the people who can act on it.
 	const show = $derived(
 		(expired || status.state === 'expiring') && atLeast(me.data?.role, WorkspaceRole.ADMIN)

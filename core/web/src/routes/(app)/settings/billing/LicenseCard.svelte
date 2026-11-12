@@ -23,7 +23,7 @@
 	const plans = usePlans();
 	const activate = license.activate();
 
-	const hosted = $derived(billing.mode === 'saas');
+	const hosted = $derived(billing.hosted);
 	const place = $derived(hosted ? 'workspace' : 'server');
 	const status = $derived(licenseStatus(billing.license));
 	const phase = $derived(status.state);

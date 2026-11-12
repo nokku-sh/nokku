@@ -80,7 +80,7 @@ func TestRenderTemplates(t *testing.T) {
 		{
 			name: "new-login",
 			data: newLoginTemplateData{
-				ProfileURL: "https://app.nokku.sh/profile/security",
+				ProfileURL: "https://acme.nokku.sh/profile/security",
 				DeviceID:   "device-id",
 				DeviceName: "Web browser",
 				EventTime:  "just now",
@@ -88,7 +88,7 @@ func TestRenderTemplates(t *testing.T) {
 			},
 			contains: []string{
 				"New sign-in from",
-				"https://app.nokku.sh/profile/security",
+				"https://acme.nokku.sh/profile/security",
 				"Web browser",
 				"203.0.113.7",
 			},
@@ -96,7 +96,7 @@ func TestRenderTemplates(t *testing.T) {
 		{
 			name: "new-way-in",
 			data: newWayInTemplateData{
-				ProfileURL: "https://app.nokku.sh/profile/security",
+				ProfileURL: "https://acme.nokku.sh/profile/security",
 				What:       `The passkey "MacBook"`,
 				EventTime:  "just now",
 				IPAddress:  "203.0.113.7",
@@ -104,7 +104,7 @@ func TestRenderTemplates(t *testing.T) {
 			contains: []string{
 				"A new way into your account.",
 				"can now sign in to your account",
-				"https://app.nokku.sh/profile/security",
+				"https://acme.nokku.sh/profile/security",
 				"MacBook",
 				"203.0.113.7",
 			},
@@ -134,13 +134,13 @@ func TestRenderTemplates(t *testing.T) {
 			name: "email-change",
 			data: changeNoticeTemplateData{
 				NewEmail:   "j***@example.com",
-				CancelURL:  "https://app.nokku.sh/email-change?cancel=1&token=t",
+				CancelURL:  "https://acme.nokku.sh/email-change?cancel=1&token=t",
 				Expiration: "7 days",
 			},
 			contains: []string{
 				"Your email address is being changed.",
 				"j***@example.com",
-				"https://app.nokku.sh/email-change?cancel=1&amp;token=t",
+				"https://acme.nokku.sh/email-change?cancel=1&amp;token=t",
 				"7 days",
 			},
 		},

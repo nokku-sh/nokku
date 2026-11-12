@@ -164,7 +164,7 @@ func TestSendTemplate_FullCooldownStoreSendsAnyway(t *testing.T) {
 	svc.cache.Set("taken", struct{}{})
 
 	err := svc.SendMagicLinkEmail(
-		t.Context(), "user-1", "ada@example.com", "https://app.nokku.sh/reset/token", 15*time.Minute,
+		t.Context(), "user-1", "ada@example.com", "https://acme.nokku.sh/reset/token", 15*time.Minute,
 	)
 	require.NoError(t, err)
 	require.Len(t, sender.sent, 1)
@@ -192,7 +192,7 @@ func TestSendTemplate_UnknownTemplate(t *testing.T) {
 func TestSendTemplate_MessageAndData(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	svc.appURL = "https://app.nokku.sh"
+	svc.appURL = "https://acme.nokku.sh"
 
 	err := svc.SendNewLoginEmail(
 		t.Context(),
@@ -206,17 +206,17 @@ func TestSendTemplate_MessageAndData(t *testing.T) {
 	msg := sender.sent[0]
 	assert.Contains(t, msg.HTML, "203.0.113.7", "body missing IP address")
 	assert.Contains(t, msg.HTML, "device-42", "body missing device id")
-	assert.Contains(t, msg.HTML, "https://app.nokku.sh/profile/security", "body missing profile URL")
+	assert.Contains(t, msg.HTML, "https://acme.nokku.sh/profile/security", "body missing profile URL")
 	assert.Equal(t, "New sign-in from Web browser", msg.Subject)
 	assert.Contains(t, msg.Text, "203.0.113.7", "text part missing the IP address")
-	assert.Contains(t, msg.Text, "https://app.nokku.sh/profile/security", "text part missing the profile URL")
+	assert.Contains(t, msg.Text, "https://acme.nokku.sh/profile/security", "text part missing the profile URL")
 }
 
 // The text part is not html escaped, so a long query stays clickable.
 func TestSendTemplate_TextPartKeepsURLs(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	link := "https://app.nokku.sh/email-change?cancel=1&token=t"
+	link := "https://acme.nokku.sh/email-change?cancel=1&token=t"
 	require.NoError(t, svc.SendEmailChangeNotice(t.Context(), "user-1", "a@b.io", "new@b.io", link, 7*24*time.Hour))
 	msg := sender.sent[0]
 	assert.Contains(t, msg.Text, link)

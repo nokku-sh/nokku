@@ -106,6 +106,10 @@ func checkAccount(ctx context.Context, r *Report, s *state.State) {
 	}
 	r.add(sec, "servers", statusInfo, strconv.Itoa(len(s.Targets)))
 
+	if s.APIURL == "" {
+		r.add(sec, "Nokku", statusWarn, "no address yet, run nk --api https://<your Nokku> login")
+		return
+	}
 	switch err := probe(ctx, s); {
 	case err == nil:
 		r.add(sec, "Nokku", statusOK, s.APIURL)

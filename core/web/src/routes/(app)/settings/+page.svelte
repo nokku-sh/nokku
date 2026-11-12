@@ -34,7 +34,7 @@
 	const can = user.can();
 	const draft = useDraft(WorkspaceSchema, () => ws.data);
 	const model = $derived(draft.current);
-	const hosted = $derived(info.data?.mode === 'saas');
+	const hosted = $derived(info.data?.hosted);
 
 	// Waits for the role, so nobody fires a query their role would refuse.
 	const ownerQuery = users.list(
@@ -221,7 +221,7 @@
 						{ label: 'Workspace ID', value: ws.data.id, mono: true, copy: true, wide: true },
 						{
 							label: 'Mode',
-							value: info.data?.mode && (hosted ? 'Hosted' : 'Self-hosted')
+							value: info.data && (hosted ? 'Hosted' : 'Self-hosted')
 						},
 						{ label: 'Created', value: formatTs(ws.data.createdAt) }
 					]}
@@ -256,7 +256,7 @@
 				}
 			]}
 		/>
-	{:else if can.own && info.data?.mode}
+	{:else if can.own && info.data}
 		<p class="text-xs text-muted-foreground">
 			On a self-hosted core the workspace is the whole server, so it can't be deleted from here.
 		</p>

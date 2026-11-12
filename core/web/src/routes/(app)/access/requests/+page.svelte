@@ -81,7 +81,7 @@
 			</Card.Description>
 		</Card.Header>
 		{#if can.admin}
-			{@const upgrade = plans.upgradeLink('access_requests', info.data?.mode)}
+			{@const upgrade = plans.upgradeLink('access_requests', info.data?.hosted)}
 			<Card.Footer>
 				<Button
 					variant="outline"

@@ -18,11 +18,8 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 )
 
-const (
-	DefaultAPIURL = "https://app.nokku.sh"
-	// fileVersion goes up when an older nokkud would misread the file. A file without one is version 1.
-	fileVersion = 1
-)
+// fileVersion goes up when an older nokkud would misread the file. A file without one is version 1.
+const fileVersion = 1
 
 var errReplaced = errors.New("another enrollment replaced this one on disk, restart nokkud to use it")
 

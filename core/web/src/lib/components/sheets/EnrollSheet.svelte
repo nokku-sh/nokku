@@ -5,7 +5,6 @@
 	import SubjectChip from '#lib/components/access/SubjectChip.svelte';
 	import SubjectPicker from '#lib/components/access/SubjectPicker.svelte';
 	import type { Subject } from '#lib/components/access/subjects.svelte.js';
-	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
@@ -27,7 +26,6 @@
 	import { formatTs, toDate } from '#lib/utils.js';
 	import {
 		CircleCheck,
-		Info,
 		KeyRound,
 		List,
 		Plus,
@@ -162,15 +160,11 @@
 
 	// The installer needs root. Ansible and cloud-init already run as root.
 	const installer = 'curl -fsSL https://get.nokku.sh/nokkud';
-	// nokkud talks to app.nokku.sh unless told otherwise, self-hosted needs the URL.
-	const selfHosted = location.origin !== 'https://app.nokku.sh';
-	const apiEnv = selfHosted ? `NOKKUD_API_URL=${location.origin} ` : '';
+	// nokkud knows no address by itself, every workspace has its own.
+	const apiEnv = `NOKKUD_API_URL=${location.origin} `;
 
 	function envFlags(token: string) {
-		return [
-			`NOKKUD_ENROLL_TOKEN='${token}'`,
-			...(selfHosted ? [`NOKKUD_API_URL=${location.origin}`] : [])
-		];
+		return [`NOKKUD_ENROLL_TOKEN='${token}'`, `NOKKUD_API_URL=${location.origin}`];
 	}
 
 	function snippets(token: string) {
@@ -218,7 +212,8 @@
       args:
         creates: /var/lib/nokkud/ssh_host_ecdsa_key
       environment:
-        NOKKUD_ENROLL_TOKEN: "{{ nokkud_enroll_token }}"${selfHosted ? `\n        NOKKUD_API_URL: "${location.origin}"` : ''}
+        NOKKUD_ENROLL_TOKEN: "{{ nokkud_enroll_token }}"
+        NOKKUD_API_URL: "${location.origin}"
       no_log: true
       notify: Restart nokkud
 
@@ -309,15 +304,6 @@ runcmd:
 							</Tabs.Content>
 						{/each}
 					</Tabs.Root>
-
-					{#if selfHosted}
-						<Alert.Root variant="info">
-							<Info />
-							<Alert.Description>
-								Self-hosted: the commands point nokkud at {location.origin} through NOKKUD_API_URL.
-							</Alert.Description>
-						</Alert.Root>
-					{/if}
 				</SecretReveal>
 				<Button variant="outline" size="sm" class="self-start" onclick={another}>
 					<Plus data-icon="inline-start" />

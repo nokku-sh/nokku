@@ -50,7 +50,7 @@ func (s *billingService) GetBilling(
 	plan := st.Plan
 	resp := &nokkuv1.GetBillingResponse{
 		Plan:          new(plan.Name),
-		Mode:          new(s.cfg.Mode()),
+		Hosted:        new(s.cfg.SaaS),
 		Features:      featuresProto(plan),
 		Quotas:        quotasProto(plan),
 		UserCount:     new(userCount),

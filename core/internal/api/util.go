@@ -45,7 +45,6 @@ func (s *utilService) GetInstanceInfo(
 	_ *nokkuv1.GetInstanceInfoRequest,
 ) (*nokkuv1.GetInstanceInfoResponse, error) {
 	op := s.cfg.Email.Operator
-	saas := s.cfg.SaaS
 	return &nokkuv1.GetInstanceInfoResponse{
 		OperatorName: &op.Name,
 		SupportEmail: &op.SupportEmail,
@@ -53,8 +52,8 @@ func (s *utilService) GetInstanceInfo(
 		TermsUrl:     &op.TermsURL,
 		PrivacyUrl:   &op.PrivacyURL,
 		ImprintUrl:   &op.ImprintURL,
-		Mode:         new(s.cfg.Mode()),
-		Signup:       new(saas && actor.WorkspaceIDFromContext(ctx) == ""),
+		Hosted:       new(s.cfg.SaaS),
+		Signup:       new(s.cfg.SaaS && actor.WorkspaceIDFromContext(ctx) == ""),
 	}, nil
 }
 

@@ -249,7 +249,7 @@ type GetInstanceInfoResponse struct {
 	TermsUrl      *string                `protobuf:"bytes,4,opt,name=terms_url,json=termsUrl" json:"terms_url,omitempty"`
 	PrivacyUrl    *string                `protobuf:"bytes,5,opt,name=privacy_url,json=privacyUrl" json:"privacy_url,omitempty"`
 	ImprintUrl    *string                `protobuf:"bytes,6,opt,name=imprint_url,json=imprintUrl" json:"imprint_url,omitempty"`
-	Mode          *string                `protobuf:"bytes,7,opt,name=mode" json:"mode,omitempty"`
+	Hosted        *bool                  `protobuf:"varint,7,opt,name=hosted" json:"hosted,omitempty"`
 	Signup        *bool                  `protobuf:"varint,8,opt,name=signup" json:"signup,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -327,11 +327,11 @@ func (x *GetInstanceInfoResponse) GetImprintUrl() string {
 	return ""
 }
 
-func (x *GetInstanceInfoResponse) GetMode() string {
-	if x != nil && x.Mode != nil {
-		return *x.Mode
+func (x *GetInstanceInfoResponse) GetHosted() bool {
+	if x != nil && x.Hosted != nil {
+		return *x.Hosted
 	}
-	return ""
+	return false
 }
 
 func (x *GetInstanceInfoResponse) GetSignup() bool {
@@ -1163,7 +1163,7 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x11GetVersionRequest\".\n" +
 	"\x12GetVersionResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\"\x18\n" +
-	"\x16GetInstanceInfoRequest\"\x8f\x02\n" +
+	"\x16GetInstanceInfoRequest\"\x93\x02\n" +
 	"\x17GetInstanceInfoResponse\x12#\n" +
 	"\roperator_name\x18\x01 \x01(\tR\foperatorName\x12#\n" +
 	"\rsupport_email\x18\x02 \x01(\tR\fsupportEmail\x12\x1f\n" +
@@ -1173,8 +1173,8 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\vprivacy_url\x18\x05 \x01(\tR\n" +
 	"privacyUrl\x12\x1f\n" +
 	"\vimprint_url\x18\x06 \x01(\tR\n" +
-	"imprintUrl\x12\x12\n" +
-	"\x04mode\x18\a \x01(\tR\x04mode\x12\x16\n" +
+	"imprintUrl\x12\x16\n" +
+	"\x06hosted\x18\a \x01(\bR\x06hosted\x12\x16\n" +
 	"\x06signup\x18\b \x01(\bR\x06signup\"U\n" +
 	"\x04Role\x12+\n" +
 	"\x04role\x18\x01 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x12 \n" +

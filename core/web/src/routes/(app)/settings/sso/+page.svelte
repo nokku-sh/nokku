@@ -14,7 +14,7 @@
 	const me = user.self();
 	const can = user.can();
 	const info = util.instanceInfo();
-	const mode = $derived(info.data?.mode);
+	const hosted = $derived(info.data?.hosted);
 
 	const has = useFeatures();
 
@@ -57,9 +57,9 @@
 	</Tabs.List>
 
 	<Tabs.Content value="providers">
-		<ProvidersTab readonly={!can.own} {mode} enforceAvailable={has('enforce_sso')} />
+		<ProvidersTab readonly={!can.own} {hosted} enforceAvailable={has('enforce_sso')} />
 	</Tabs.Content>
 	<Tabs.Content value="scim">
-		<SCIMTab readonly={!can.own} {mode} available={has('scim')} />
+		<SCIMTab readonly={!can.own} {hosted} available={has('scim')} />
 	</Tabs.Content>
 </Tabs.Root>

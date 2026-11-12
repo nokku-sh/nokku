@@ -24,7 +24,7 @@ service BillingService {
 message GetBillingRequest {}
 message GetBillingResponse {
   string plan = 1;
-  string mode = 2;
+  bool hosted = 2;
   map<string, bool> features = 3;
   Quotas quotas = 4;
   int64 user_count = 5;

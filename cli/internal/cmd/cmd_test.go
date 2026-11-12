@@ -59,8 +59,18 @@ func TestLoadStateKeepsStoredAPI(t *testing.T) {
 
 	s, err := runFlags(t)
 	require.NoError(t, err)
-	assert.Equal(t, "https://self.example", s.APIURL, "the default must not override a stored server")
+	assert.Equal(t, "https://self.example", s.APIURL, "a run without the flag must keep the stored server")
 	assert.Equal(t, "sess", s.SessionToken)
+}
+
+// Every workspace has an address of its own, so a fresh nk has none to fall back to.
+func TestNoAddressUntilOneIsGiven(t *testing.T) {
+	setHome(t)
+	s, err := runFlags(t)
+	require.NoError(t, err)
+	require.Empty(t, s.APIURL)
+	_, err = newClient(s)
+	assert.ErrorContains(t, err, "--api")
 }
 
 func TestLoadStateNewAPIDropsSession(t *testing.T) {
