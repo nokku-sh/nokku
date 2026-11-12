@@ -57,8 +57,7 @@ type Service struct {
 	cache  *cache.TTL[string, struct{}]
 	appURL string
 
-	From string `env:"NOKKU_EMAIL_SENDER"`
-
+	SMTPFrom     string `env:"NOKKU_SMTP_FROM"`
 	SMTPHost     string `env:"NOKKU_SMTP_HOST"`
 	SMTPPort     int    `env:"NOKKU_SMTP_PORT"     envDefault:"587"`
 	SMTPUsername string `env:"NOKKU_SMTP_USERNAME"`
@@ -137,8 +136,8 @@ func New(ctx context.Context, appURL string) (*Service, error) {
 		return &svc, nil
 	}
 	// A default sender would be somebody else's domain, and relays reject that.
-	if svc.From == "" {
-		return nil, errors.New("NOKKU_EMAIL_SENDER is required when NOKKU_SMTP_HOST is set")
+	if svc.SMTPFrom == "" {
+		return nil, errors.New("NOKKU_SMTP_FROM is required when NOKKU_SMTP_HOST is set")
 	}
 	relay, err := newSMTPSender(svc.SMTPHost, svc.SMTPPort, svc.SMTPUsername, svc.SMTPPassword, sendTimeout)
 	if err != nil {
@@ -422,7 +421,7 @@ func (s *Service) sendTemplate(ctx context.Context, req sendRequest) error {
 	}
 
 	err = s.sender.Send(ctx, message{
-		From:    "Nokku <" + s.From + ">",
+		From:    "Nokku <" + s.SMTPFrom + ">",
 		To:      req.to,
 		Subject: req.subject,
 		Text:    body.text,

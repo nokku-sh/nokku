@@ -66,7 +66,7 @@ func setRelayEnv(t *testing.T, port int) {
 	t.Setenv("NOKKU_SMTP_PORT", strconv.Itoa(port))
 	t.Setenv("NOKKU_SMTP_USERNAME", "mailer")
 	t.Setenv("NOKKU_SMTP_PASSWORD", "wrong-or-right")
-	t.Setenv("NOKKU_EMAIL_SENDER", "noreply@nokku.test")
+	t.Setenv("NOKKU_SMTP_FROM", "noreply@nokku.test")
 }
 
 func TestNew_RejectedLoginFailsTheStart(t *testing.T) {

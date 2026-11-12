@@ -34,9 +34,9 @@ func (m *mockSender) Send(_ context.Context, msg message) error {
 
 func newTestService(sender sender) *Service {
 	return &Service{
-		sender: sender,
-		cache:  cache.New[string, struct{}](cooldownEntries, cooldown),
-		From:   "noreply@system.nokku.sh",
+		sender:   sender,
+		cache:    cache.New[string, struct{}](cooldownEntries, cooldown),
+		SMTPFrom: "noreply@system.nokku.sh",
 	}
 }
 

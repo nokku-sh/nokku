@@ -631,7 +631,7 @@ func startCore(t *testing.T, bin, smtpHost, smtpPort, platformCert string) core 
 			"NOKKU_ADMIN_EMAIL=" + ownerEmail,
 			"NOKKU_SMTP_HOST=" + smtpHost,
 			"NOKKU_SMTP_PORT=" + smtpPort,
-			"NOKKU_EMAIL_SENDER=nokku@smoke.test",
+			"NOKKU_SMTP_FROM=nokku@smoke.test",
 			"NOKKU_STORAGE_URL=file://" + t.TempDir(),
 			"NOKKU_LICENSE_OFFLINE=true",
 			// The job platform listens on loopback, behind its own certificate.

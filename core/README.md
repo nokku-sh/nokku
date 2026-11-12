@@ -122,7 +122,7 @@ Everything is set with environment variables. Most installs only touch these:
 | `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | Where PostgreSQL is                                          |
 | `NOKKU_ADMIN_EMAIL`                            | Creates the owner account                                    |
 | `NOKKU_TRUSTED_PROXIES`                        | Your reverse proxies as IPs or CIDRs, to tighten the default |
-| `NOKKU_SMTP_HOST`, `NOKKU_EMAIL_SENDER`        | Turns on email sign-in links and mailed invitations          |
+| `NOKKU_SMTP_HOST`, `NOKKU_SMTP_FROM`           | Turns on email sign-in links and mailed invitations          |
 
 The rest, grouped by topic. Key management, rotating the secret and `NOKKU_ALLOW_PRIVATE_NETWORKS` are in [SECURITY.md](./SECURITY.md#running-nokku-securely).
 
@@ -213,8 +213,8 @@ Session recordings go to a local folder by default. They are encrypted before th
 | `AWS_SECRET_ACCESS_KEY` |                 | S3 secret key                             |
 
 - **A folder** is `file:///var/lib/nokku/recordings`, created when it is missing. The image runs as user 65532, so that user must own it.
-- **A bucket** is `s3://nokku?region=auto&endpoint=https%3A%2F%2Fs3.example.com&use_path_style=true`. Leave out `endpoint` for AWS itself, `use_path_style` is for MinIO. The URL takes the parameters of [gocloud's S3 driver](https://gocloud.dev/howto/blob/#s3).
-- **Stores other than AWS** often want `request_checksum_calculation=when_required`. On Scaleway that is `s3://nokku?region=fr-par&endpoint=https%3A%2F%2Fs3.fr-par.scw.cloud&request_checksum_calculation=when_required`.
+- **A bucket** is `s3://nokku?region=auto&endpoint=https://s3.example.com&use_path_style=true`. Leave out `endpoint` for AWS itself, `use_path_style` is for MinIO. The URL takes the parameters of [gocloud's S3 driver](https://gocloud.dev/howto/blob/#s3).
+- **Stores other than AWS** often want `request_checksum_calculation=when_required`. On Scaleway that is `s3://nokku?region=fr-par&endpoint=https://s3.fr-par.scw.cloud&request_checksum_calculation=when_required`.
 - **Startup.** The core starts while a bucket can't be reached and logs a warning, daemons keep their recordings until it is back. A bucket that refuses the credentials stops the start.
 - **Lifecycle rules.** Add two on `videos/`: expire objects after 400 days, longer than any recording is kept, and abort incomplete multipart uploads after a few days. The core deletes recordings itself, these only catch what a crash leaves behind.
 
