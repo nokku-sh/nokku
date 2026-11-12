@@ -144,16 +144,22 @@ The rest, grouped by topic. Key management, rotating the secret and `NOKKU_ALLOW
 <details>
 <summary><b>Database</b></summary>
 
-| Variable                | Default      | Purpose                                          |
-| ----------------------- | ------------ | ------------------------------------------------ |
-| `PGHOST`                | `localhost`  | Host                                             |
-| `PGPORT`                | `5432`       | Port                                             |
-| `PGDATABASE`            | `nokku`      | Database name                                    |
-| `PGUSER`                | `postgres`   | User. It owns the schema and runs the migrations |
-| `PGPASSWORD`            | `postgres`   | Password                                         |
-| `PGSSLMODE`             | `disable`    | libpq SSL mode                                   |
-| `NOKKU_DB_APP_PASSWORD` | `PGPASSWORD` | Password of the two runtime roles, set at start  |
-| `NOKKU_DB_MAX_CONNS`    | `20`         | Largest pool size                                |
+| Variable             | Default     | Purpose                                          |
+| -------------------- | ----------- | ------------------------------------------------ |
+| `PGHOST`             | `localhost` | Host                                             |
+| `PGPORT`             | `5432`      | Port                                             |
+| `PGDATABASE`         | `nokku`     | Database name                                    |
+| `PGUSER`             | `postgres`  | User. It owns the schema and runs the migrations |
+| `PGPASSWORD`         | `postgres`  | Password                                         |
+| `PGSSLMODE`          | `disable`   | libpq SSL mode                                   |
+| `NOKKU_DB_MAX_CONNS` | `20`        | Largest pool size                                |
+
+`PGUSER` is the only user you create. On start the core makes two more roles for itself, `nokku_app` and `nokku_system`, and gives them the same password. The user of the official PostgreSQL image is a superuser and just works. A user you create yourself needs to own the database and have `CREATEROLE` and `BYPASSRLS`:
+
+```sql
+CREATE ROLE nokku LOGIN PASSWORD '...' CREATEROLE BYPASSRLS;
+CREATE DATABASE nokku OWNER nokku;
+```
 
 Connect directly, or through a pooler in session mode. A pooler in transaction mode, like PgBouncer with `pool_mode = transaction`, does not work. Nokku keeps state on the connection.
 

@@ -151,7 +151,7 @@ Requiring single sign-on closes passkeys and email links for everyone else, and 
 ### Database
 
 - **Three roles.** The owner (`PGUSER`) runs migrations at start. Requests run as `nokku_app`, under row-level security. Work that spans workspaces, like background jobs, runs as `nokku_system`, which bypasses it. `core/internal/db/testdata/bypass.golden` lists every such query, and a new one fails the tests until someone reviews it.
-- **Set `NOKKU_DB_APP_PASSWORD`** to give the two runtime roles their own password instead of sharing the owner's.
+- **One password.** The core sets the password of `nokku_app` and `nokku_system` to `PGPASSWORD` at every start. It holds the owner's login anyway, so a second password would protect nothing.
 - **Use `PGSSLMODE=verify-full`** when PostgreSQL is on another host.
 
 ### Tokens

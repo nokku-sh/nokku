@@ -21,6 +21,7 @@ func TestNewConnectionChangesNothing(t *testing.T) {
 	owner, err := pgx.Connect(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = owner.Close(context.WithoutCancel(ctx)) })
+	// The hash is salted, so setting the same password again still changes it.
 	password := func() string {
 		var p string
 		require.NoError(
@@ -37,7 +38,6 @@ func TestNewConnectionChangesNothing(t *testing.T) {
 		_, _ = owner.Exec(context.WithoutCancel(ctx), "DROP DATABASE nokku_open_only WITH (FORCE)")
 	})
 	t.Setenv("PGDATABASE", "nokku_open_only")
-	t.Setenv("NOKKU_DB_APP_PASSWORD", "not-the-one-the-server-set")
 
 	_, err = db.NewConnection(ctx)
 	require.NoError(t, err)

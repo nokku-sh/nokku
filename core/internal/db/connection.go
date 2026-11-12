@@ -31,8 +31,7 @@ var (
 )
 
 type Connection struct {
-	AppPassword string `env:"NOKKU_DB_APP_PASSWORD"`
-	MaxConns    int32  `env:"NOKKU_DB_MAX_CONNS"    envDefault:"20"`
+	MaxConns int32 `env:"NOKKU_DB_MAX_CONNS" envDefault:"20"`
 
 	// Pool serves request traffic as nokku_app, under RLS.
 	Pool    *pgxpool.Pool
@@ -93,10 +92,6 @@ func settings() (*Connection, *pgxpool.Config, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	// Falling back to PGPASSWORD keeps single-credential dev setups working.
-	if c.AppPassword == "" {
-		c.AppPassword = config.ConnConfig.Password
-	}
 	return &c, config, nil
 }
 
@@ -120,10 +115,9 @@ func (c *Connection) poolConfig(connString string) (*pgxpool.Config, error) {
 	return config, nil
 }
 
-// Two runtime roles, so no runtime path holds owner rights.
+// Two runtime roles, so no runtime path holds owner rights. They log in with the owner's password.
 func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config) error {
 	appConfig.ConnConfig.User = "nokku_app"
-	appConfig.ConnConfig.Password = c.AppPassword
 	appConfig.PrepareConn = pinWorkspace
 
 	var err error
@@ -166,18 +160,18 @@ func (c *Connection) setupSchema(ctx context.Context, owner *pgx.ConnConfig) err
 	if err := runMigrations(ctx, conn); err != nil {
 		return err
 	}
-	return c.setupRoles(ctx, conn)
+	return setupRoles(ctx, conn, owner.Password)
 }
 
 // The migration creates the runtime roles without a password.
-func (c *Connection) setupRoles(ctx context.Context, conn *pgx.Conn) error {
+func setupRoles(ctx context.Context, conn *pgx.Conn, password string) error {
 	for _, role := range []string{"nokku_app", "nokku_system"} {
 		// ALTER ROLE takes no bind parameters, format() quotes it server-side.
 		var stmt string
 		if err := conn.QueryRow(
 			ctx,
 			"SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', $1::text, $2::text)",
-			role, c.AppPassword,
+			role, password,
 		).Scan(&stmt); err != nil {
 			return fmt.Errorf("building role statement: %w", err)
 		}
