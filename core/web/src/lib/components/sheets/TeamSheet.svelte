@@ -9,7 +9,6 @@
 	import * as Command from '#lib/components/ui/command/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
-	import * as Item from '#lib/components/ui/item/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
@@ -17,6 +16,7 @@
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
+	import SettingRow from '#lib/components/blocks/SettingRow.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { TeamSchema } from '#lib/gen/nokku/v1/team_pb.js';
@@ -105,7 +105,7 @@
 		if (!entity) return;
 		void confirm({
 			title: `Revoke all access for ${entity.name}?`,
-			description: 'The team is removed from every login account on every target.',
+			description: 'The team is removed from every login account on every server.',
 			confirmText: 'Revoke all',
 			onConfirm: () => revokeAll.mutateAsync({ subjectId: entity.id, kind: SubjectKind.TEAM })
 		});
@@ -260,25 +260,19 @@
 						its next sync.
 					</p>
 				{:else}
-					<Item.Root size="sm" variant="outline">
-						<Item.Content>
-							<Item.Title>
-								<label for="team-scim-open">Let a SCIM group take this team over</label>
-							</Item.Title>
-							<Item.Description>
-								A group of the same name then gets this team, its members and the access it has.
-								Until you turn this on, such a group is refused.
-							</Item.Description>
-						</Item.Content>
-						<Item.Actions>
-							<Switch
-								id="team-scim-open"
-								checked={model.scimOpen}
-								onCheckedChange={setScimOpen}
-								disabled={!can.edit}
-							/>
-						</Item.Actions>
-					</Item.Root>
+					<SettingRow
+						outline
+						title="Let a SCIM group take this team over"
+						description="A group of the same name then gets this team, its members and the access it has. Until you turn this on, such a group is refused."
+						for="team-scim-open"
+					>
+						<Switch
+							id="team-scim-open"
+							checked={model.scimOpen}
+							onCheckedChange={setScimOpen}
+							disabled={!can.edit}
+						/>
+					</SettingRow>
 				{/if}
 			</Section>
 

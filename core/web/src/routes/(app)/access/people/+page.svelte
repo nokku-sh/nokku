@@ -5,7 +5,7 @@
 	import { users } from '#lib/api/workspaces.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { roles } from '#lib/api/roles.svelte.js';
-	import { atLeast, parseRole, roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
+	import { parseRole, roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
 	import AccessReportMenu from '#lib/components/access/AccessReportMenu.svelte';
 	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
 	import UserSheet from '#lib/components/sheets/UserSheet.svelte';
@@ -37,12 +37,11 @@
 	const debounced = new Debounced(() => page.url.searchParams.get('q') || undefined, 500);
 
 	const me = user.self();
-	const canManage = $derived(atLeast(me.data?.role, WorkspaceRole.ADMIN));
 	const can = user.can();
 	// An invited account signs in without a provider, so a workspace that requires SSO takes none.
 	// Passkeys are off exactly then.
 	const options = auth.options();
-	const canInvite = $derived(canManage && !!options.data?.passkey);
+	const canInvite = $derived(can.admin && !!options.data?.passkey);
 
 	const pager = usePagination();
 	const list = users.list(() => ({
@@ -108,7 +107,7 @@
 			id: 'actions',
 			cell: ({ row }) => {
 				const u = row.original;
-				const protectedRow = u.role === WorkspaceRole.OWNER || u.id === me.data?.id || !canManage;
+				const protectedRow = u.role === WorkspaceRole.OWNER || u.id === me.data?.id || !can.admin;
 				return renderComponent(ActionCell, {
 					label: u.name || u.email,
 					id: u.id,
@@ -171,7 +170,7 @@
 	error={list.error}
 	onRetry={list.refetch}
 	{columns}
-	bulkActions={canManage ? bulkActions : []}
+	bulkActions={can.admin ? bulkActions : []}
 	onRowClick={(u) => sheet.show(u.id)}
 	rowLabel={(u) => u.name || u.email}
 	emptyState={{

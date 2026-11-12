@@ -6,9 +6,7 @@
 	const login = nkLoginCommand();
 </script>
 
-<p class="text-sm text-muted-foreground">
-	Sign the CLI in once. After that plain <code class="font-mono">ssh</code> just works.
-</p>
+<p class="text-sm text-muted-foreground">Sign the CLI in once. After that plain ssh just works.</p>
 <CodeSnippet code={login} language="bash" />
 <a
 	href={DocsURL}

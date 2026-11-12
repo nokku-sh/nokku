@@ -17,7 +17,6 @@
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm, useAutoSave, useSheet } from '#lib/hooks/index.js';
-	import { atLeast } from '#lib/roles.js';
 	import {
 		Check,
 		Crown,
@@ -86,7 +85,7 @@
 	const isOwner = $derived(person?.role === WorkspaceRole.OWNER);
 	const isMe = $derived(me.data?.id === person?.id);
 	const iAmOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
-	const canManage = $derived(atLeast(me.data?.role, WorkspaceRole.ADMIN) && !isOwner && !isMe);
+	const canManage = $derived(can.admin && !isOwner && !isMe);
 
 	function toggleTeam(teamId: string) {
 		if (!person) return;

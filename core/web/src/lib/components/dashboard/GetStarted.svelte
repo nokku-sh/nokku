@@ -5,12 +5,15 @@
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
+	import CopyCommand from '#lib/components/blocks/CopyCommand.svelte';
+	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Item from '#lib/components/ui/item/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { setupDismissed } from '#lib/store.svelte.js';
+	import { nkLoginCommand } from '#lib/utils.js';
 	import { Check, Rocket, UserPlus } from '@lucide/svelte';
-	import type { Snippet } from 'svelte';
 	import NkLogin from './NkLogin.svelte';
 
 	interface Props {
@@ -27,39 +30,28 @@
 	// A CLI session is what nk login leaves behind.
 	const sessions = session.list();
 	const signedIn = $derived((sessions.data ?? []).some((s) => s.kind === 'cli'));
+	const canInvite = $derived(can.admin && !!options.data?.passkey);
 
-	const done = $derived([true, connected, signedIn, users > 1]);
-	const left = $derived(done.filter((d) => !d).length);
+	const steps = $derived([
+		{ id: 'workspace', title: 'Your workspace is ready', done: true, body: undefined },
+		{ id: 'server', title: 'Connect a server', done: connected, body: server },
+		{ id: 'terminal', title: 'Sign in from your terminal', done: signedIn, body: terminal },
+		{ id: 'team', title: 'Bring your team', done: users > 1, body: team }
+	]);
+	const left = $derived(steps.filter((s) => !s.done).length);
+	const next = $derived(steps.find((s) => !s.done));
 	const show = $derived(!connected || (left > 0 && !sessions.isLoading && !setupDismissed.current));
+
+	// With a server connected the dashboard has real things to show, so setup shrinks to its next step.
+	let expanded = $state(false);
 
 	let enrollOpen = $state(false);
 	let inviteOpen = $state(false);
+	const invite = () => whenFresh(() => (inviteOpen = true));
 </script>
 
 <EnrollSheet bind:open={enrollOpen} />
 <InviteSheet bind:open={inviteOpen} />
-
-<!-- Done steps fold to their title, so the card shrinks as the setup goes on. -->
-{#snippet step(n: number, title: string, body?: Snippet)}
-	{@const ok = done[n - 1]}
-	<li class="grid grid-cols-[2rem_1fr] gap-4">
-		<span
-			class={[
-				'flex size-8 items-center justify-center rounded-full border font-mono text-sm',
-				ok ? 'border-success bg-success text-success-foreground' : 'bg-background'
-			]}
-		>
-			{#if ok}<Check class="size-4" aria-hidden="true" />{:else}{n}{/if}
-		</span>
-		<div class="flex min-w-0 flex-col gap-3 pb-2">
-			<h3 class={['pt-1 font-medium', ok && 'text-muted-foreground line-through']}>
-				{#if ok}<span class="sr-only">Done:</span>{/if}
-				{title}
-			</h3>
-			{#if !ok}{@render body?.()}{/if}
-		</div>
-	</li>
-{/snippet}
 
 {#snippet server()}
 	<p class="text-sm text-muted-foreground">
@@ -88,7 +80,8 @@
 		</Tabs.Content>
 		<Tabs.Content value="sync" class="flex flex-col gap-3">
 			<p class="text-sm text-muted-foreground">
-				From your machine, with root SSH to the server. Run it again when access changes.
+				From your machine, with root SSH to the server. Once is enough, access changes need no new
+				sync.
 			</p>
 			<CodeSnippet code="nk sync root@your-server" language="bash" />
 		</Tabs.Content>
@@ -103,12 +96,8 @@
 	<p class="text-sm text-muted-foreground">
 		Grant access per server account, to people or whole teams.
 	</p>
-	{#if can.admin && options.data?.passkey}
-		<Button
-			variant="outline"
-			class="self-start"
-			onclick={() => whenFresh(() => (inviteOpen = true))}
-		>
+	{#if canInvite}
+		<Button variant="outline" class="self-start" onclick={invite}>
 			<UserPlus data-icon="inline-start" />
 			Invite people
 		</Button>
@@ -120,7 +109,30 @@
 	{/if}
 {/snippet}
 
-{#if show}
+{#if show && connected && !expanded && next}
+	<Item.Root variant="outline" class="bg-card">
+		<Item.Media>
+			<Badge variant="success" class="font-mono">{steps.length - left} of {steps.length}</Badge>
+		</Item.Media>
+		<Item.Content>
+			<Item.Title>Next setup step: {next.title.toLowerCase()}</Item.Title>
+		</Item.Content>
+		<Item.Actions class="flex-wrap">
+			{#if next.id === 'terminal'}
+				<CopyCommand command={nkLoginCommand()} />
+			{:else if next.id === 'team' && canInvite}
+				<Button variant="outline" size="sm" onclick={invite}>
+					<UserPlus data-icon="inline-start" />
+					Invite people
+				</Button>
+			{/if}
+			<Button variant="ghost" size="sm" onclick={() => (expanded = true)}>All steps</Button>
+			<Button variant="ghost" size="sm" onclick={() => (setupDismissed.current = true)}>
+				Dismiss
+			</Button>
+		</Item.Actions>
+	</Item.Root>
+{:else if show}
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>
@@ -130,7 +142,7 @@
 			</Card.Title>
 			<Card.Description>
 				{#if connected}
-					{left} of 4 steps left.
+					{left} of {steps.length} steps left.
 				{:else}
 					Four steps, most of them one command. {workspace} already has its CA, so every login is a short-lived
 					certificate from day one.
@@ -138,6 +150,7 @@
 			</Card.Description>
 			{#if connected}
 				<Card.Action>
+					<Button variant="ghost" size="sm" onclick={() => (expanded = false)}>Show less</Button>
 					<Button variant="ghost" size="sm" onclick={() => (setupDismissed.current = true)}>
 						Dismiss
 					</Button>
@@ -145,11 +158,27 @@
 			{/if}
 		</Card.Header>
 		<Card.Content>
+			<!-- Done steps fold to their title, so the card shrinks as the setup goes on. -->
 			<ol class="flex flex-col gap-6">
-				{@render step(1, 'Your workspace is ready')}
-				{@render step(2, 'Connect a server', server)}
-				{@render step(3, 'Sign in from your terminal', terminal)}
-				{@render step(4, 'Bring your team', team)}
+				{#each steps as step, i (step.id)}
+					<li class="grid grid-cols-[2rem_1fr] gap-4">
+						<span
+							class={[
+								'flex size-8 items-center justify-center rounded-full border font-mono text-sm',
+								step.done ? 'border-success bg-success text-success-foreground' : 'bg-background'
+							]}
+						>
+							{#if step.done}<Check class="size-4" aria-hidden="true" />{:else}{i + 1}{/if}
+						</span>
+						<div class="flex min-w-0 flex-col gap-3 pb-2">
+							<h3 class={['pt-1 font-medium', step.done && 'text-muted-foreground line-through']}>
+								{#if step.done}<span class="sr-only">Done:</span>{/if}
+								{step.title}
+							</h3>
+							{#if !step.done}{@render step.body?.()}{/if}
+						</div>
+					</li>
+				{/each}
 			</ol>
 		</Card.Content>
 	</Card.Root>

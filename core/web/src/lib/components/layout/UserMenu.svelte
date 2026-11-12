@@ -8,6 +8,7 @@
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { confirm } from '#lib/hooks/index.js';
+	import { displayName } from '#lib/utils.js';
 	import { LogOut } from '@lucide/svelte';
 	import { UserRoutes } from './routes';
 
@@ -50,7 +51,7 @@
 				<UserAvatar user={me.data} />
 				<div class="grid flex-1 text-sm leading-tight">
 					<span class="truncate font-semibold">
-						{me.data?.name || me.data?.email.split('@')[0]}
+						{displayName(me.data)}
 					</span>
 					<span class="truncate text-xs text-muted-foreground">{me.data?.email}</span>
 				</div>

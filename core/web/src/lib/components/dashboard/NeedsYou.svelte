@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { useDaemonReview } from '#lib/api/daemons.svelte.js';
+	import { plural } from '#lib/api/bulk.js';
+	import { daemon, useDaemonReview } from '#lib/api/daemons.svelte.js';
+	import CopyCommand from '#lib/components/blocks/CopyCommand.svelte';
 	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -10,9 +12,14 @@
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { lasting, requester, useRequestAnswers } from '#lib/components/access/requests.svelte.js';
 	import type { AccessRequest } from '#lib/gen/nokku/v1/access_request_pb.js';
+	import { DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
+	import { confirm } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
 	import { Check, ChevronRight, CircleCheck, Hand } from '@lucide/svelte';
 	import type { Issue } from './issues';
+
+	// A row names this many servers, the rest are behind its link.
+	const SERVERS_SHOWN = 8;
 
 	interface Props {
 		issues: Issue[];
@@ -27,6 +34,17 @@
 	const answer = useRequestAnswers();
 
 	const review = useDaemonReview();
+	const approveMany = daemon.approveMany();
+
+	const approveAll = (daemons: Daemon[]) =>
+		confirm({
+			title: `Approve ${plural(daemons.length, 'server')}?`,
+			description: 'Check that you expect each host. People can log in to them once approved.',
+			confirmText: 'Approve all',
+			destructive: false,
+			onConfirm: () =>
+				approveMany.mutateAsync(daemons.map((d) => ({ id: d.id, status: DaemonStatus.ACCEPTED })))
+		});
 </script>
 
 <Card.Root class="gap-3">
@@ -89,13 +107,31 @@
 						<Item.Content>
 							<Item.Title>{issue.title}</Item.Title>
 							<Item.Description>{issue.detail}</Item.Description>
-							{#if issue.approve && canEdit}
+							{#if issue.command}
+								<CopyCommand command={issue.command} class="mt-1 self-start" />
+							{/if}
+							{#if issue.servers}
 								<div class="mt-2 flex flex-wrap gap-1.5">
-									{#each issue.approve as d (d.id)}
+									{#each issue.servers.slice(0, SERVERS_SHOWN) as s (s.id)}
+										<Button size="xs" variant="outline" href={`/servers?id=${s.id}`}>
+											<span class="font-mono">{s.name}</span>
+										</Button>
+									{/each}
+									{#if issue.servers.length > SERVERS_SHOWN}
+										<Button size="xs" variant="ghost" href={issue.href}>
+											{issue.servers.length - SERVERS_SHOWN} more
+										</Button>
+									{/if}
+								</div>
+							{/if}
+							{#if issue.approve && canEdit}
+								{@const waiting = issue.approve}
+								<div class="mt-2 flex flex-wrap gap-1.5">
+									{#each waiting as d (d.id)}
 										<Button
 											size="xs"
 											variant="outline"
-											disabled={review.pending}
+											disabled={review.pending || approveMany.isPending}
 											onclick={() => review.approve(d)}
 										>
 											{#if review.approving(d.id)}
@@ -106,6 +142,15 @@
 											<span class="font-mono">{d.name}</span>
 										</Button>
 									{/each}
+									{#if waiting.length > 1}
+										<Button
+											size="xs"
+											disabled={review.pending || approveMany.isPending}
+											onclick={() => approveAll(waiting)}
+										>
+											Approve all {waiting.length}
+										</Button>
+									{/if}
 								</div>
 							{/if}
 						</Item.Content>

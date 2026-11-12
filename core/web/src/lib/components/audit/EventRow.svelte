@@ -6,6 +6,7 @@
 	import * as Item from '#lib/components/ui/item/index.js';
 	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
 	import { cn } from '#lib/utils.js';
+	import { ChevronDown } from '@lucide/svelte';
 	import EventIcon from './EventIcon.svelte';
 	import { eventLabel, outcomeLabel, outcomeOf } from './audit';
 
@@ -20,9 +21,11 @@
 		subtitle?: string;
 		/** Extra badges after the title. */
 		badges?: Snippet;
+		/** Set on a row that folds other rows, says whether they show. */
+		expanded?: boolean;
 	}
 
-	let { log, onclick, title, meta, subtitle, badges }: Props = $props();
+	let { log, onclick, title, meta, subtitle, badges, expanded }: Props = $props();
 
 	const outcome = $derived(outcomeOf(log));
 	const method = $derived.by(() => {
@@ -38,6 +41,7 @@
 				type="button"
 				{...props}
 				class={cn(props.class as string, 'text-left hover:bg-muted/40')}
+				aria-expanded={expanded}
 				{onclick}
 			>
 				{@render body()}
@@ -63,7 +67,15 @@
 			{subtitle ?? `${describeAgent(log.userAgent)}${log.ip ? ` · ${log.ip}` : ''}`}
 		</Item.Description>
 	</Item.Content>
-	{#if meta}
-		<Item.Actions class="font-mono text-xs text-muted-foreground tabular-nums">{meta}</Item.Actions>
+	{#if meta || expanded !== undefined}
+		<Item.Actions class="font-mono text-xs text-muted-foreground tabular-nums">
+			{meta}
+			{#if expanded !== undefined}
+				<ChevronDown
+					class={['size-4 transition-transform', expanded && 'rotate-180']}
+					aria-hidden="true"
+				/>
+			{/if}
+		</Item.Actions>
 	{/if}
 {/snippet}

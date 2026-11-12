@@ -3,8 +3,9 @@ import { useDebounce } from 'runed';
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 // useAutoSave is the one save signal of a sheet. Debounced field edits go through save(), one-off changes like a
-// role or a membership through track(). Errors still raise the global mutation toast with the reason.
-export function useAutoSave(save: () => Promise<unknown>, wait = 600) {
+// role or a membership through track(). Errors still raise the global mutation toast with the reason. A page with
+// only one-off changes passes no save.
+export function useAutoSave(save: () => Promise<unknown> = async () => {}, wait = 600) {
 	let queued = $state(false);
 	let inFlight = $state(0);
 	let failed = $state(false);

@@ -7,8 +7,10 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import type { GetDashboardResponse } from '#lib/gen/nokku/v1/dashboard_pb.js';
 	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
-	import { formatTs } from '#lib/utils.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { formatTs, listNames } from '#lib/utils.js';
 	import { ArrowRight } from '@lucide/svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	let { data }: { data?: GetDashboardResponse } = $props();
 
@@ -26,9 +28,33 @@
 	);
 
 	let selected = $state<EventLog>();
+
+	const by = (log: EventLog) => `by ${log.actorName || 'system'}`;
+	const what = (log: EventLog) => [eventWhat(log), by(log)].filter(Boolean).join(' · ');
+
+	// A sync that adds ten people is one thing that happened, not ten. Same event, same actor, one row.
+	const changes = $derived(
+		Object.entries(
+			Object.groupBy(
+				data?.recentChanges ?? [],
+				(log) => `${log.action}:${log.actorId}:${String(log.details?.['method'] ?? '')}`
+			)
+		).map(([key, logs = []]) => ({ key, logs, first: logs[0] }))
+	);
+	const unfolded = new SvelteSet<string>();
+	const toggle = (key: string) => (unfolded.has(key) ? unfolded.delete(key) : unfolded.add(key));
 </script>
 
 <ActivitySheet log={selected} onClose={() => (selected = undefined)} />
+
+{#snippet change(log: EventLog)}
+	<EventRow
+		{log}
+		onclick={() => (selected = log)}
+		subtitle={what(log)}
+		meta={formatTs(log.timestamp, 'relative-short')}
+	/>
+{/snippet}
 
 <Card.Root class="gap-4">
 	<Card.Header>
@@ -71,17 +97,40 @@
 				</div>
 			</div>
 
-			{#if data.recentChanges.length}
+			{#if changes.length}
 				<div class="divide-y overflow-hidden rounded-lg border">
-					{#each data.recentChanges as log (log.id)}
-						<EventRow
-							{log}
-							onclick={() => (selected = log)}
-							subtitle={[eventWhat(log), `by ${log.actorName || 'system'}`]
-								.filter(Boolean)
-								.join(' · ')}
-							meta={formatTs(log.timestamp, 'relative-short')}
-						/>
+					{#each changes as group (group.key)}
+						{#if group.logs.length === 1}
+							{@render change(group.first)}
+						{:else}
+							{@const open = unfolded.has(group.key)}
+							<EventRow
+								log={group.first}
+								onclick={() => toggle(group.key)}
+								expanded={open}
+								subtitle={[
+									listNames(
+										group.logs.flatMap((l) => eventWhat(l) ?? []),
+										2
+									),
+									by(group.first)
+								]
+									.filter(Boolean)
+									.join(' · ')}
+								meta={formatTs(group.first.timestamp, 'relative-short')}
+							>
+								{#snippet badges()}
+									<Badge variant="outline" class="font-mono">{group.logs.length}×</Badge>
+								{/snippet}
+							</EventRow>
+							{#if open}
+								<div class="divide-y bg-muted/30 pl-6">
+									{#each group.logs as log (log.id)}
+										{@render change(log)}
+									{/each}
+								</div>
+							{/if}
+						{/if}
 					{/each}
 				</div>
 			{:else}

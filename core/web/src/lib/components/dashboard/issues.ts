@@ -11,6 +11,10 @@ export type Issue = {
 	href: string;
 	/** Pending daemons, approved inline. */
 	approve?: Daemon[];
+	/** The servers one issue stands for, each a link to its sheet. */
+	servers?: { id: string; name: string }[];
+	/** What to run on the host to look into it. */
+	command?: string;
 };
 
 /** Sums up the issues and waiting requests. Undefined issues is still loading, fresh is nothing enrolled yet. */
@@ -60,16 +64,33 @@ export function issuesOf(d: GetDashboardResponse): Issue[] {
 		});
 	}
 
-	for (const server of d.offlineServers) {
-		const seen = server.daemon?.lastSeenAt;
+	// One row however many are down, so a rack that loses power is one thing to look at, not forty.
+	const offline = d.offlineServers;
+	const never = offline.filter((s) => !s.daemon?.lastSeenAt).length;
+	if (offline.length === 1) {
+		const seen = offline[0].daemon?.lastSeenAt;
 		issues.push({
-			id: `offline-${server.id}`,
+			id: 'offline',
 			tone: 'destructive',
-			title: `${server.name} is offline`,
+			title: `${offline[0].name} is offline`,
 			detail: seen
 				? `Last seen ${formatTs(seen, 'relative')}. Nobody can log in through its daemon.`
 				: 'It never connected. Check that nokkud runs on the host.',
-			href: `/servers?id=${server.id}`
+			href: `/servers?id=${offline[0].id}`,
+			command: seen ? undefined : 'systemctl status nokkud'
+		});
+	} else if (offline.length) {
+		issues.push({
+			id: 'offline',
+			tone: 'destructive',
+			title: `${offline.length} servers are offline`,
+			detail:
+				never === offline.length
+					? 'They never connected. Check that nokkud runs on each host.'
+					: `Nobody can log in through their daemons.${never ? ` ${never} never connected.` : ''}`,
+			href: '/servers?status=offline',
+			servers: offline,
+			command: never ? 'systemctl status nokkud' : undefined
 		});
 	}
 

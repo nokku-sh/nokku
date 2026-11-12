@@ -5,6 +5,7 @@
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
+	import { workspace } from '#lib/api/workspaces.svelte.js';
 	import { grantsOf } from '#lib/components/access/subjects.svelte.js';
 	import TargetAccess from '#lib/components/access/TargetAccess.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
@@ -14,15 +15,14 @@
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
-	import * as Item from '#lib/components/ui/item/index.js';
-	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
-	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import CopyCommand from '#lib/components/blocks/CopyCommand.svelte';
+	import DaemonRules from '#lib/components/blocks/DaemonRules.svelte';
 	import Monogram from '#lib/components/blocks/Monogram.svelte';
-	import { daemonRules, type DaemonRule } from '#lib/daemon-rules.js';
+	import { daemonRules, differing, ruleValue } from '#lib/daemon-rules.js';
 	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
@@ -116,21 +116,24 @@
 
 	const updateDaemon = daemonApi.update();
 	const review = useDaemonReview();
-	// A switch shows what was flipped until the server's copy catches up.
-	let flipped = $state<Partial<Record<DaemonRule, boolean>>>({});
-	const ruleOn = (key: DaemonRule) => flipped[key] ?? linkedDaemon?.config?.[key] ?? false;
+	const ws = workspace.get();
+	const defaults = $derived(ws.data?.settings?.defaultDaemonConfig ?? {});
+	const differ = $derived(differing(linkedDaemon?.config, defaults));
 
-	async function applyRule(key: DaemonRule, value: boolean) {
+	// Resolves after the refetch every change runs, so the switch never jumps back. A step-up that is turned down
+	// starts no save, and the switch goes back.
+	async function applyRule(rule: (typeof daemonRules)[number], value: boolean) {
 		const d = linkedDaemon;
 		if (!d) return;
-		flipped[key] = value;
-		try {
-			const config: Partial<Record<DaemonRule, boolean>> = { [key]: value };
-			// Resolves after the refetch every change runs, so the switch never jumps back.
-			await updateDaemon.mutateAsync({ id: d.id, config });
-		} finally {
-			delete flipped[key];
-		}
+		let saved: Promise<unknown> | undefined;
+		const run = () => {
+			saved = autoSave.track(() =>
+				updateDaemon.mutateAsync({ id: d.id, config: ruleValue(rule.key, value) })
+			);
+		};
+		if (rule.fresh) await whenFresh(run);
+		else run();
+		await saved;
 	}
 
 	function askDelete() {
@@ -316,10 +319,7 @@
 							server refuses new certificates.
 						</p>
 					{/if}
-					<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
-						<SquareTerminal class="size-4 shrink-0 text-muted-foreground" />
-						<CopyText value={syncCommand} mono class="text-sm" />
-					</div>
+					<CopyCommand command={syncCommand} class="py-2" />
 					<p class="text-xs text-muted-foreground">
 						Run it on your own machine. It connects to the host as root, installs the CA key and an
 						sshd rule for this server, checks sshd and reloads it. Access changes need no new sync.
@@ -389,31 +389,21 @@
 				<Section
 					title="Session rules"
 					icon={ShieldCheck}
-					description="Its daemon takes them at its next sync. Running sessions keep the rules they started with."
+					description={`For this server only. ${
+						differ
+							? `${differ} of ${daemonRules.length} ${differ === 1 ? 'differs' : 'differ'} from the workspace defaults.`
+							: 'They match the workspace defaults.'
+					} A change reaches the daemon at its next sync, open sessions keep the rules they started with.`}
 				>
-					<Item.Group class="divide-y rounded-lg border">
-						{#each daemonRules as rule (rule.key)}
-							<Item.Root size="sm" class="rounded-none">
-								<Item.Content>
-									<Item.Title>
-										<label for={`rule-${rule.key}`}>{rule.title}</label>
-									</Item.Title>
-									<Item.Description>{rule.description}</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<Switch
-										id={`rule-${rule.key}`}
-										checked={ruleOn(rule.key)}
-										onCheckedChange={(v) =>
-											rule.fresh
-												? whenFresh(() => void applyRule(rule.key, v))
-												: void applyRule(rule.key, v)}
-										disabled={!can.edit || rule.key in flipped}
-									/>
-								</Item.Actions>
-							</Item.Root>
-						{/each}
-					</Item.Group>
+					{#snippet action()}
+						<Button size="sm" variant="ghost" href="/settings/daemons">Defaults</Button>
+					{/snippet}
+					<DaemonRules
+						values={linkedDaemon.config ?? {}}
+						{defaults}
+						disabled={!can.edit}
+						onChange={applyRule}
+					/>
 				</Section>
 			{/if}
 

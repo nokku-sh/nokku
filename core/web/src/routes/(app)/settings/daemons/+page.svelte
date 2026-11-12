@@ -1,44 +1,38 @@
 <script lang="ts">
-	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
+	import { plural } from '#lib/api/bulk.js';
+	import { daemon } from '#lib/api/daemons.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { useFeatures, workspace } from '#lib/api/workspaces.svelte.js';
-	import * as Select from '#lib/components/ui/select/index.js';
+	import DaemonRules from '#lib/components/blocks/DaemonRules.svelte';
 	import PlanBadge from '#lib/components/blocks/PlanBadge.svelte';
-	import { durationFromMs, durationMs } from '@bufbuild/protobuf/wkt';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
+	import SettingRow from '#lib/components/blocks/SettingRow.svelte';
+	import { Badge } from '#lib/components/ext/badge/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
-	import * as Item from '#lib/components/ui/item/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import { Switch } from '#lib/components/ui/switch/index.js';
-	import { DaemonConfigSchema } from '#lib/gen/nokku/v1/daemon_pb.js';
-	import { WorkspaceSettingsSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
+	import { differing, ruleValue } from '#lib/daemon-rules.js';
 	import { useAutoSave } from '#lib/hooks/index.js';
-	import { daemonRules, type DaemonRule } from '#lib/daemon-rules.js';
-	import { atLeast } from '#lib/roles.js';
-	import { create } from '@bufbuild/protobuf';
+	import { durationFromMs, durationMs } from '@bufbuild/protobuf/wkt';
 
 	const ws = workspace.get();
-	const me = user.self();
+	const can = user.can();
 	const update = workspace.updateDaemonDefaults();
-	const canEdit = $derived(atLeast(me.data?.role, WorkspaceRole.ADMIN));
+	const saving = useAutoSave();
 
-	// A real protobuf message, not a plain object, so the transport accepts it.
-	const settings = $derived.by(() => {
-		const s = create(WorkspaceSettingsSchema, ws.data?.settings);
-		if (!s.defaultDaemonConfig) s.defaultDaemonConfig = create(DaemonConfigSchema);
-		return s;
-	});
-	const config = $derived(settings.defaultDaemonConfig!);
+	// Unset defaults read as all off, like the daemon reads them.
+	const defaults = $derived(ws.data && (ws.data.settings?.defaultDaemonConfig ?? {}));
 
-	// Only the switches flipped since the last save go out, so a setting the plan no longer allows never blocks it.
-	const flipped: Partial<Record<DaemonRule, boolean>> = {};
-	const autoSave = useAutoSave(async () => {
-		const changes = { ...flipped };
-		await update.mutateAsync({ defaultDaemonConfig: changes });
-		for (const [key, value] of Object.entries(changes) as [DaemonRule, boolean][]) {
-			if (flipped[key] === value) delete flipped[key];
-		}
+	// The list is one page. Past that the count would be a guess, so it is left out.
+	const daemons = daemon.list();
+	const enrolled = $derived.by(() => {
+		const list = daemons.data?.daemons ?? [];
+		if (!defaults || !list.length || list.length < (daemons.data?.total ?? 0)) return undefined;
+		const differ = list.filter((d) => differing(d.config, defaults) > 0).length;
+		return `${list.length === 1 ? 'Your enrolled daemon keeps its' : `Your ${list.length} enrolled daemons keep their`} own rules. ${
+			differ ? `${plural(differ, 'differs', 'differ')} from these.` : 'None differ from these.'
+		}`;
 	});
 
 	const has = useFeatures();
@@ -59,97 +53,89 @@
 		idleChoices.find((c) => c.minutes === idleMinutes)?.label ?? `After ${idleMinutes} minutes`
 	);
 
-	function setIdle(minutes: number) {
-		update.mutate({ sessionIdleTimeout: durationFromMs(minutes * 60_000) });
-	}
+	// The global mutation handler toasts a failure, the footer offers the retry.
+	const setIdle = (minutes: number) =>
+		saving
+			.track(() => update.mutateAsync({ sessionIdleTimeout: durationFromMs(minutes * 60_000) }))
+			.catch(() => {});
 </script>
 
 <PageHeader
 	title="Daemon defaults"
-	description="SSH server settings new daemons inherit when they enroll, existing daemons keep their own"
-/>
+	description="The SSH rules a server starts with, and the ones every server shares"
+>
+	<SaveStatus
+		state={saving.saveState}
+		idleText={can.admin ? 'Changes save automatically' : 'Only admins can change this'}
+		onRetry={saving.retry}
+	/>
+</PageHeader>
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>New daemons start with</Card.Title>
+		<Card.Title class="flex flex-wrap items-center gap-2">
+			<h2>New daemons start with</h2>
+			<Badge variant="info">Applies to new daemons only</Badge>
+		</Card.Title>
+		<Card.Description>
+			{enrolled ?? 'Daemons that already enrolled keep their own rules.'} Change one on its server, under
+			Settings.
+		</Card.Description>
+	</Card.Header>
+	<Card.Content class="flex flex-col gap-3">
+		<!-- Only the flipped rule goes out, so one the plan no longer allows never blocks the others. -->
+		<DaemonRules
+			values={defaults}
+			disabled={!can.admin}
+			onChange={(rule, value) =>
+				saving.track(() => update.mutateAsync({ defaultDaemonConfig: ruleValue(rule.key, value) }))}
+		/>
+		<p class="text-xs text-muted-foreground">
+			Auto-approval is not a default. It is set on each enrollment token.
+		</p>
+	</Card.Content>
+</Card.Root>
+
+<Card.Root>
+	<Card.Header>
+		<Card.Title class="flex flex-wrap items-center gap-2">
+			<h2>Every daemon</h2>
+			<Badge variant="warning">Applies to every daemon at once</Badge>
+		</Card.Title>
 		<Card.Description
-			>Auto-approval is not here, it is set on each enrollment token.</Card.Description
+			>One value for the whole workspace. A server cannot override it.</Card.Description
 		>
 	</Card.Header>
 	<Card.Content>
-		<Item.Group class="gap-3">
-			{#each daemonRules as t (t.key)}
-				<Item.Root variant="outline">
-					<Item.Content>
-						<Item.Title>{t.title}</Item.Title>
-						<Item.Description>{t.description}</Item.Description>
-					</Item.Content>
-					<Item.Actions>
-						{#if ws.isLoading}
-							<Skeleton class="h-5 w-9 rounded-full" />
-						{:else}
-							<Switch
-								aria-label={t.title}
-								checked={config[t.key]}
-								disabled={!canEdit}
-								onCheckedChange={(v) => {
-									config[t.key] = v;
-									flipped[t.key] = v;
-									autoSave.save();
-								}}
-							/>
-						{/if}
-					</Item.Actions>
-				</Item.Root>
-			{/each}
-		</Item.Group>
-	</Card.Content>
-	<Card.Footer>
-		<SaveStatus
-			state={autoSave.saveState}
-			idleText={canEdit ? 'Changes save automatically' : 'Only admins can change this'}
-		/>
-	</Card.Footer>
-</Card.Root>
-
-<Card.Root class="mt-4">
-	<Card.Header>
-		<Card.Title>Every daemon</Card.Title>
-		<Card.Description>Applies to all daemons at once, enrolled or not.</Card.Description>
-	</Card.Header>
-	<Card.Content>
-		<Item.Root variant="outline">
-			<Item.Content>
-				<Item.Title>
-					Close idle terminals
-					<PlanBadge feature="idle_timeout" />
-				</Item.Title>
-				<Item.Description>
-					Ends a terminal session after this long without a keystroke. Commands without a terminal,
-					file copies and port forwards keep running. Servers set up with nk sync are not covered.
-				</Item.Description>
-			</Item.Content>
-			<Item.Actions>
-				{#if ws.isLoading}
-					<Skeleton class="h-8 w-40" />
-				{:else}
-					<Select.Root
-						type="single"
-						value={String(idleMinutes)}
-						onValueChange={(v) => setIdle(Number(v))}
-						disabled={!canEdit || idleLocked || update.isPending}
-					>
-						<Select.Trigger class="w-44" aria-label="Close idle terminals">
-							{idleLabel}
-						</Select.Trigger>
-						<Select.Content>
+		<SettingRow
+			outline
+			wide
+			title="Close idle terminals"
+			description="Ends a terminal session after this long without a keystroke. Commands without a terminal, file copies and port forwards keep running. Servers set up with nk sync are not covered."
+			for="idle-timeout"
+		>
+			{#snippet badge()}<PlanBadge feature="idle_timeout" />{/snippet}
+			{#if ws.data}
+				<Select.Root
+					type="single"
+					value={String(idleMinutes)}
+					onValueChange={(v) => setIdle(Number(v))}
+					disabled={!can.admin || idleLocked || update.isPending}
+				>
+					<Select.Trigger id="idle-timeout" class="w-full sm:w-44">
+						{idleLabel}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Group>
 							{#each idleChoices as c (c.minutes)}
 								<Select.Item value={String(c.minutes)}>{c.label}</Select.Item>
 							{/each}
-						</Select.Content>
-					</Select.Root>
-				{/if}
-			</Item.Actions>
-		</Item.Root>
+						</Select.Group>
+					</Select.Content>
+				</Select.Root>
+			{:else}
+				<Skeleton class="h-8 w-44" />
+			{/if}
+		</SettingRow>
 	</Card.Content>
 </Card.Root>

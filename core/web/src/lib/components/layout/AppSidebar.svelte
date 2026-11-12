@@ -20,6 +20,7 @@
 	import { useWaitingRequests } from '#lib/components/access/requests.svelte.js';
 	import { headline, isFresh, issuesOf } from '#lib/components/dashboard/issues.js';
 	import { toneText } from '#lib/tone.js';
+	import { displayName } from '#lib/utils.js';
 
 	let { ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
@@ -140,7 +141,7 @@
 							<UserAvatar user={currentUser.data} />
 							<div class="flex min-w-0 flex-col text-sm leading-tight">
 								<span class="truncate font-medium">
-									{currentUser.data?.name || currentUser.data?.email.split('@')[0]}
+									{displayName(currentUser.data)}
 								</span>
 								<span class="truncate text-xs opacity-70">{currentUser.data?.email}</span>
 							</div>

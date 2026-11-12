@@ -178,6 +178,24 @@
 		</Popover.Root>
 	</div>
 
+	{#if rows.length}
+		<!-- How to read a cell, said once above the table. -->
+		<dl class="flex flex-wrap gap-x-5 gap-y-1 px-1 text-xs text-muted-foreground">
+			<div class="flex gap-1.5">
+				<dt class="font-mono text-foreground">deploy, ubuntu</dt>
+				<dd>the accounts they can log in as</dd>
+			</div>
+			<div class="flex gap-1.5">
+				<dt class="font-mono text-foreground">2/12</dt>
+				<dd>on 2 of the 12 servers with the tag</dd>
+			</div>
+			<div class="flex gap-1.5">
+				<dt class="text-foreground">unused</dt>
+				<dd>no login in 30 days, a candidate to revoke</dd>
+			</div>
+		</dl>
+	{/if}
+
 	{#if matrix.isLoading}
 		<Skeleton class="h-96 w-full rounded-xl" />
 	{:else if !rows.length && pager.pageIndex > 0}

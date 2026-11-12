@@ -103,7 +103,7 @@
 		if (!entity) return;
 		void confirm({
 			title: `Revoke all access for ${entity.name}?`,
-			description: 'It is removed from every login account on every target.',
+			description: 'It is removed from every login account on every server.',
 			confirmText: 'Revoke all',
 			onConfirm: () =>
 				revokeAll.mutateAsync({ subjectId: entity.id, kind: SubjectKind.SERVICE_ACCOUNT })

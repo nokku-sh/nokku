@@ -8,7 +8,7 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import { LicensePortalURL, LicensePurchaseURL, LicenseTrialURL } from '#lib/config.js';
+	import { LicensePortalURL, LicensePurchaseURL } from '#lib/config.js';
 	import type { GetBillingResponse } from '#lib/gen/nokku/v1/billing_pb.js';
 	import { usePlans } from '#lib/plans.js';
 	import type { Tone } from '#lib/tone.js';
@@ -113,8 +113,8 @@
 				The trial ended{billing.trialEndsAt ? ` on ${formatTs(billing.trialEndsAt)}` : ''}.
 			{:else if phase === 'none'}
 				Free on your own server for up to 5 members. Pro is billed per seat and adds enforced SSO,
-				audit log export and 90 days of history. A free trial key unlocks every feature for 30 days.
-				Keys activate offline, so air-gapped servers work.
+				audit log export and 90 days of history. Your first license starts with a free trial. Keys
+				activate offline, so air-gapped servers work.
 			{:else if phase === 'expired'}
 				The license expired, so this server runs on the Community limits.
 			{:else if billing.license?.plan === 'pro'}
@@ -138,8 +138,7 @@
 					<Alert.Title>Nokku signs no certificates for this workspace</Alert.Title>
 					<Alert.Description>
 						Servers keep their access rules, and certificates already signed work until they expire.
-						Nobody can sign in with <code class="font-mono">nk</code> or open a terminal, and
-						nothing new can be added.
+						Nobody can sign in with nk or open a terminal, and nothing new can be added.
 						{#if billing.heldUntil}
 							Recordings and older audit logs are kept until {formatTs(billing.heldUntil)}.
 						{/if}
@@ -213,13 +212,6 @@
 				{:else}
 					<Button variant="outline" href={LicensePurchaseURL} target="_blank" rel="noopener">
 						Buy a license
-						<ExternalLink data-icon="inline-end" />
-					</Button>
-				{/if}
-				<!-- One trial per server, a lapsed key is renewed by buying. Hosted signup starts its own. -->
-				{#if phase === 'none' && !hosted}
-					<Button variant="ghost" href={LicenseTrialURL} target="_blank" rel="noopener">
-						Start a free trial
 						<ExternalLink data-icon="inline-end" />
 					</Button>
 				{/if}

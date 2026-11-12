@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Term from '#lib/components/blocks/Term.svelte';
 	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { MAX_PAGE_SIZE } from '#lib/config.js';
@@ -102,7 +103,8 @@
 
 <div class="flex flex-col gap-3">
 	<p class="text-sm text-muted-foreground">
-		People log in as one of these accounts. Grant a team and every member gets it.
+		<Term name="login account">Login accounts</Term> are who people log in as. Grant a team and every
+		member gets it.
 	</p>
 
 	{#if list.length > 6}

@@ -2,10 +2,11 @@
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+	import { displayName } from '#lib/utils.js';
 
 	let { user }: { user: User } = $props();
 
-	const name = $derived(user.name || user.email.split('@')[0]);
+	const name = $derived(displayName(user));
 </script>
 
 <div class="flex min-w-0 items-center gap-3">

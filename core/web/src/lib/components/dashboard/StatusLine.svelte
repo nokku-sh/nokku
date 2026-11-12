@@ -36,10 +36,22 @@
 	const age = $derived(Math.max(0, Math.round((now - updatedAt) / 1000)));
 </script>
 
-{#snippet row(key: string, value: string, tone = '')}
+<!-- A number that is off is one click from the list behind it. -->
+{#snippet row(key: string, value: string, tone = '', href?: string)}
 	<div class="flex min-w-0 flex-col gap-0.5">
 		<dt class="text-xs text-terminal-dim">{key}</dt>
-		<dd class={['min-w-0 text-pretty', tone]}>{value}</dd>
+		<dd class={['min-w-0 text-pretty', tone]}>
+			{#if href}
+				<a
+					{href}
+					class="rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-terminal-accent"
+				>
+					{value}
+				</a>
+			{:else}
+				{value}
+			{/if}
+		</dd>
 	</div>
 {/snippet}
 
@@ -69,23 +81,31 @@
 				`${data.targets} total · ${data.targetsOnline} online${data.targetsManual ? ` · ${data.targetsManual} via nk sync` : ''}`,
 				data.targets && data.targetsOnline + data.targetsManual < data.targets
 					? 'text-terminal-warn'
-					: ''
+					: '',
+				'/servers'
 			)}
 			{@render row(
 				'daemons',
 				`${data.daemonsOnline}/${data.daemons - data.pendingDaemons.length} connected${data.pendingDaemons.length ? ` · ${data.pendingDaemons.length} pending` : ''}${data.daemonsBehind ? ` · ${data.daemonsBehind} behind` : ''}`,
-				data.offlineServers.length || data.daemonsBehind ? 'text-terminal-err' : ''
+				data.offlineServers.length || data.daemonsBehind ? 'text-terminal-err' : '',
+				data.pendingDaemons.length
+					? '/servers?status=pending'
+					: data.offlineServers.length
+						? '/servers?status=offline'
+						: '/servers?status=online'
 			)}
 			{@render row(
 				'sessions',
 				`${data.liveSessions.length} live${recording ? ` · ${recording} recording` : ''}`
 			)}
-			{@render row('people', String(data.users))}
+			{@render row('people', String(data.users), '', '/access/people')}
 			{@render row(
 				'storage',
 				quota < 0
 					? `${formatBytes(Number(data.recordingBytes))} of recordings`
-					: `${formatBytes(Number(data.recordingBytes))} of ${formatBytes(quota)}`
+					: `${formatBytes(Number(data.recordingBytes))} of ${formatBytes(quota)}`,
+				'',
+				'/recordings'
 			)}
 		</dl>
 	{:else}

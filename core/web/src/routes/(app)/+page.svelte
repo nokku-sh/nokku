@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { dashboard } from '#lib/api/dashboard.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { workspace } from '#lib/api/workspaces.svelte.js';
@@ -15,7 +14,6 @@
 	import { isFresh, issuesOf } from '#lib/components/dashboard/issues.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { atLeast } from '#lib/roles.js';
 	import { Plus, SquareTerminal } from '@lucide/svelte';
 
 	const me = user.self();
@@ -23,12 +21,10 @@
 	// Without a plan nothing signs, so the ways in stay hidden until the owner activates a license key.
 	const plan = workspace.plan();
 	const inactive = $derived(!!plan.data?.inactive);
-	const role = $derived(me.data?.role);
 	// Members only see their own servers, the overview needs viewer rights.
-	const canView = $derived(atLeast(role, WorkspaceRole.VIEWER));
-	const canEdit = $derived(atLeast(role, WorkspaceRole.EDITOR));
+	const can = user.can();
 
-	const data = dashboard.get(() => canView, true);
+	const data = dashboard.get(() => can.view, true);
 	const waiting = useWaitingRequests(true);
 	const issues = $derived(data.data ? issuesOf(data.data) : []);
 	// Until something is enrolled, setup is the whole dashboard.
@@ -44,17 +40,17 @@
 <PageHeader
 	title={`${greeting}${first ? `, ${first}` : ''}`}
 	description={ws.data
-		? canView
+		? can.view
 			? `Here is how ${ws.data.name} is doing`
 			: `Your servers in ${ws.data.name}, and the ways to reach them`
 		: undefined}
 >
-	{#if !fresh && !inactive && canView}
+	{#if !fresh && !inactive && can.view}
 		<Button variant="outline" href="/shell">
 			<SquareTerminal data-icon="inline-start" />
 			Open a shell
 		</Button>
-		{#if canEdit}
+		{#if can.edit}
 			<Button onclick={() => openGrant()}>
 				<Plus data-icon="inline-start" />
 				Grant access
@@ -65,7 +61,7 @@
 
 {#if fresh}
 	<GetStarted workspace={ws.data?.name ?? ''} connected={false} users={data.data?.users ?? 0} />
-{:else if canView}
+{:else if can.view}
 	<StatusLine
 		data={data.data}
 		{issues}
@@ -78,11 +74,15 @@
 	{/if}
 	<div class="grid gap-6 lg:grid-cols-3">
 		<div class="min-w-0 lg:col-span-2">
-			<NeedsYou {issues} requests={waiting.list} loading={data.isLoading} {canEdit} />
+			<NeedsYou {issues} requests={waiting.list} loading={data.isLoading} canEdit={can.edit} />
 		</div>
 		<div class="flex min-w-0 flex-col gap-6">
 			{#if data.data?.endingGrants.length}
-				<EndingSoon grants={data.data.endingGrants} total={data.data.endingGrantsTotal} {canEdit} />
+				<EndingSoon
+					grants={data.data.endingGrants}
+					total={data.data.endingGrantsTotal}
+					canEdit={can.edit}
+				/>
 			{/if}
 			<LiveNow sessions={data.data?.liveSessions ?? []} loading={data.isLoading} />
 		</div>

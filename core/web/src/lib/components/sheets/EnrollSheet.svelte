@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { plural } from '#lib/api/bulk.js';
 	import SecretReveal from '#lib/components/blocks/SecretReveal.svelte';
 	import { target as targetApi } from '#lib/api/targets.svelte.js';
 	import { token as tokenApi } from '#lib/api/tokens.svelte.js';
 	import SubjectChip from '#lib/components/access/SubjectChip.svelte';
 	import SubjectPicker from '#lib/components/access/SubjectPicker.svelte';
 	import type { Subject } from '#lib/components/access/subjects.svelte.js';
+	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
@@ -20,35 +22,73 @@
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
+	import Term from '#lib/components/blocks/Term.svelte';
 	import type { JoinToken } from '#lib/gen/nokku/v1/join_token_pb.js';
 	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
-	import { formatTs, toDate } from '#lib/utils.js';
+	import { formatTs, listNames, toDate } from '#lib/utils.js';
 	import {
 		CircleCheck,
 		KeyRound,
 		List,
 		Plus,
 		Rocket,
-		ShieldCheck,
-		Timer,
+		Server,
+		SlidersHorizontal,
 		Trash2,
 		X
 	} from '@lucide/svelte';
 	import EntitySheet from './EntitySheet.svelte';
+	import { enrollSnippets } from './enroll-snippets.js';
 	import Section from './Section.svelte';
 
-	let { open = $bindable(false) }: { open?: boolean } = $props();
+	interface Props {
+		open?: boolean;
+		/** 'new' for the form, 'active' for the tokens that still work. */
+		tab?: string;
+	}
 
+	let { open = $bindable(false), tab = $bindable('new') }: Props = $props();
+
+	// The usual cases, each a set of the values below. Most people pick one and never open the rest.
+	const presets = [
+		{
+			value: 'one',
+			title: 'One server',
+			hint: 'One use, one hour, you approve it',
+			expiry: '3600',
+			uses: '1',
+			autoApprove: false,
+			ephemeral: false
+		},
+		{
+			value: 'fleet',
+			title: 'A fleet',
+			hint: 'Ansible or cloud-init, joins by itself',
+			expiry: '86400',
+			uses: 'unlimited',
+			autoApprove: true,
+			ephemeral: false
+		},
+		{
+			value: 'ephemeral',
+			title: 'Short-lived',
+			hint: 'Containers and devboxes, cleaned up',
+			expiry: '2592000',
+			uses: 'unlimited',
+			autoApprove: true,
+			ephemeral: true
+		}
+	];
 	const expiries = [
-		{ value: '3600', label: '1 hour' },
-		{ value: '86400', label: '1 day' },
-		{ value: '604800', label: '7 days' },
-		{ value: '2592000', label: '30 days' },
-		{ value: 'never', label: 'Never' }
+		{ value: '3600', label: '1 hour', within: 'within the next hour' },
+		{ value: '86400', label: '1 day', within: 'within the next day' },
+		{ value: '604800', label: '7 days', within: 'within the next 7 days' },
+		{ value: '2592000', label: '30 days', within: 'within the next 30 days' },
+		{ value: 'never', label: 'Never', within: 'with no end date' }
 	];
 	const usePresets = [
-		{ value: '1', label: '1 host' },
+		{ value: '1', label: '1 server' },
 		{ value: '25', label: '25' },
 		{ value: 'unlimited', label: 'Unlimited' },
 		{ value: 'custom', label: 'Custom' }
@@ -68,9 +108,8 @@
 	const createToken = tokenApi.create();
 	const removeToken = tokenApi.remove();
 
-	let tab = $state('new');
 	let label = $state('');
-	// Hosts enroll within minutes.
+	// Servers enroll within minutes.
 	let expiry = $state('86400');
 	let uses = $state('unlimited');
 	let customUses = $state('');
@@ -115,13 +154,56 @@
 				? Number(customUses) || undefined
 				: Number(uses)
 	);
+	// An ephemeral server is always approved on enroll.
+	const approves = $derived(autoApprove || ephemeral);
+
+	// The preset the values add up to, none once they were fine-tuned.
+	const preset = $derived(
+		presets.find(
+			(p) =>
+				p.expiry === expiry &&
+				p.uses === uses &&
+				p.ephemeral === ephemeral &&
+				p.autoApprove === approves
+		)?.value ?? ''
+	);
+
+	function applyPreset(value: string) {
+		const p = presets.find((x) => x.value === value);
+		if (!p) return;
+		({ expiry, uses, autoApprove, ephemeral } = p);
+	}
+
+	// What the token will do, in a sentence, so nobody has to add the settings up.
+	const summary = $derived.by(() => {
+		const one = maxUses === 1;
+		const count = one
+			? 'one server'
+			: maxUses
+				? `up to ${maxUses} servers`
+				: 'any number of servers';
+		const within = expiries.find((e) => e.value === expiry)?.within;
+		const retire = retirePresets.find((r) => r.value === retireAfter)?.label;
+		return [
+			`Enrolls ${count} ${within}.`,
+			approves
+				? `${one ? 'It joins' : 'They join'} right away.`
+				: `${one ? 'It waits' : 'Each one waits'} for your approval.`,
+			ephemeral && `A server removes itself when it stops, or after ${retire} offline.`,
+			tags.length && `Tagged ${listNames(tags)}.`,
+			grants.length && `Starts with ${plural(grants.length, 'login account')}.`
+		]
+			.filter(Boolean)
+			.join(' ');
+	});
+	const endless = $derived(expiry === 'never' && maxUses === undefined);
 
 	async function submit() {
 		await createToken.mutateAsync({
 			label: label.trim(),
 			ttl: expiry === 'never' ? undefined : { seconds: BigInt(expiry) },
 			maxUses,
-			autoApprove: autoApprove || ephemeral,
+			autoApprove: approves,
 			tags,
 			grants: grants.map((g) => ({
 				username: g.username,
@@ -146,7 +228,7 @@
 		void confirm({
 			title: `Revoke ${t.label || 'this token'}?`,
 			description:
-				'New hosts can no longer enroll with it. Daemons that already joined keep working.',
+				'New servers can no longer enroll with it. The ones that already joined keep working.',
 			confirmText: 'Revoke',
 			onConfirm: () => removeToken.mutateAsync({ id: t.id })
 		});
@@ -157,103 +239,6 @@
 	}
 
 	const active = $derived(tokens.data?.tokens ?? []);
-
-	// The installer needs root. Ansible and cloud-init already run as root.
-	const installer = 'curl -fsSL https://get.nokku.sh/nokkud';
-	// nokkud knows no address by itself, every workspace has its own.
-	const apiEnv = `NOKKUD_API_URL=${location.origin} `;
-
-	function envFlags(token: string) {
-		return [`NOKKUD_ENROLL_TOKEN='${token}'`, `NOKKUD_API_URL=${location.origin}`];
-	}
-
-	function snippets(token: string) {
-		return [
-			{
-				value: 'host',
-				label: 'One host',
-				language: 'bash',
-				hint: 'Paste the token when nokkud asks for it. It never ends up in your shell history.',
-				code: [
-					`${installer} | sudo sh`,
-					`sudo ${apiEnv}nokkud enroll`,
-					'sudo systemctl restart nokkud'
-				].join('\n')
-			},
-			{
-				value: 'script',
-				label: 'Script',
-				language: 'bash',
-				hint: 'Unattended. The token goes in through the environment, never as an argument.',
-				code: [
-					`${installer} | sudo sh`,
-					`sudo NOKKUD_ENROLL_TOKEN='${token}' ${apiEnv}nokkud enroll`,
-					'sudo systemctl restart nokkud'
-				].join('\n')
-			},
-			{
-				value: 'ansible',
-				label: 'Ansible',
-				language: 'yaml',
-				hint: 'Idempotent, reruns skip enrolled hosts. Keep the token in ansible-vault for real playbooks.',
-				code: `- name: Enroll hosts with Nokku
-  hosts: all
-  become: true
-  vars:
-    nokkud_enroll_token: "${token}"
-  tasks:
-    - name: Install nokkud
-      ansible.builtin.shell: ${installer} | sh
-      args:
-        creates: /usr/bin/nokkud
-
-    - name: Enroll
-      ansible.builtin.command: nokkud enroll
-      args:
-        creates: /var/lib/nokkud/ssh_host_ecdsa_key
-      environment:
-        NOKKUD_ENROLL_TOKEN: "{{ nokkud_enroll_token }}"
-        NOKKUD_API_URL: "${location.origin}"
-      no_log: true
-      notify: Restart nokkud
-
-    - name: Keep nokkud running
-      ansible.builtin.systemd_service:
-        name: nokkud
-        state: started
-        enabled: true
-
-  handlers:
-    - name: Restart nokkud
-      ansible.builtin.systemd_service:
-        name: nokkud
-        state: restarted`
-			},
-			{
-				value: 'cloud-init',
-				label: 'cloud-init',
-				language: 'yaml',
-				hint: 'User data is readable from the instance metadata, so use a short expiry and a use limit.',
-				code: `#cloud-config
-runcmd:
-  - ${installer} | sh
-  - NOKKUD_ENROLL_TOKEN='${token}' ${apiEnv}nokkud enroll
-  - systemctl restart nokkud`
-			},
-			{
-				value: 'container',
-				label: 'Container',
-				language: 'bash',
-				hint: 'The container enrolls itself on start and is reached through the relay, no port to open. An ephemeral token removes it again when it stops.',
-				code: [
-					'docker run -d --hostname alice \\',
-					...envFlags(token).map((e) => `  -e ${e} \\`),
-					'  ghcr.io/nokku-sh/nokkud',
-					'ssh dev@alice'
-				].join('\n')
-			}
-		];
-	}
 </script>
 
 <EntitySheet
@@ -262,7 +247,7 @@ runcmd:
 		open = false;
 		another();
 	}}
-	title="Enroll daemons"
+	title="Enroll servers"
 	tabs={[
 		{ value: 'new', label: 'New token', icon: Plus },
 		{ value: 'active', label: 'Active', icon: List, count: active.length }
@@ -276,7 +261,7 @@ runcmd:
 		</div>
 	{/snippet}
 	{#snippet subtitle()}
-		Tokens let new nokkud installs join this workspace. One token can enroll a whole fleet.
+		A token lets nokkud on a new server join this workspace. One token can enroll a whole fleet.
 	{/snippet}
 
 	<Tabs.Content value="new" class="flex flex-col divide-y">
@@ -285,19 +270,19 @@ runcmd:
 				<SecretReveal
 					note="Copy it now, it is only shown once. Revoke it under Active if it leaks."
 				>
-					{@const secret = createToken.data.secret}
+					{@const snippets = enrollSnippets(createToken.data.secret)}
 					<div class="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
 						<span class="shrink-0 text-xs text-muted-foreground">Token</span>
-						<CopyText value={secret} mono class="text-sm" />
+						<CopyText value={createToken.data.secret} mono class="text-sm" />
 					</div>
 
 					<Tabs.Root value="host" class="gap-2">
 						<Tabs.List variant="line" class="w-full justify-start">
-							{#each snippets(secret) as s (s.value)}
+							{#each snippets as s (s.value)}
 								<Tabs.Trigger value={s.value} class="flex-none">{s.label}</Tabs.Trigger>
 							{/each}
 						</Tabs.List>
-						{#each snippets(secret) as s (s.value)}
+						{#each snippets as s (s.value)}
 							<Tabs.Content value={s.value} class="flex flex-col gap-2">
 								<CodeSnippet code={s.code} language={s.language} />
 								<p class="text-xs text-muted-foreground">{s.hint}</p>
@@ -318,7 +303,37 @@ runcmd:
 					void submit();
 				}}
 			>
-				<Section title="Settings" icon={KeyRound}>
+				<Section title="What are you enrolling?" icon={Server}>
+					<ToggleGroup.Root
+						type="single"
+						variant="outline"
+						value={preset}
+						onValueChange={applyPreset}
+						class="grid w-full grid-cols-3"
+					>
+						{#each presets as p (p.value)}
+							<ToggleGroup.Item
+								value={p.value}
+								class="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left whitespace-normal"
+							>
+								<span class="font-medium">{p.title}</span>
+								<span class="text-xs font-normal text-muted-foreground">{p.hint}</span>
+							</ToggleGroup.Item>
+						{/each}
+					</ToggleGroup.Root>
+					<Alert.Root variant={endless ? 'warning' : 'info'}>
+						<KeyRound />
+						<Alert.Title>This token</Alert.Title>
+						<Alert.Description>
+							{summary}
+							{#if endless}
+								It never stops working, so set an expiry or a limit, or revoke it when you are done.
+							{/if}
+						</Alert.Description>
+					</Alert.Root>
+				</Section>
+
+				<Section title="Details" icon={KeyRound}>
 					<Field.Group class="gap-4">
 						<Field.Field>
 							<Field.Label for="token-label">Name</Field.Label>
@@ -330,6 +345,86 @@ runcmd:
 							/>
 							<Field.Description>Helps you find it later in the Active list.</Field.Description>
 						</Field.Field>
+						<Field.Field>
+							<Field.Label for="token-tags">Tags</Field.Label>
+							<TagsInput
+								id="token-tags"
+								value={tags}
+								suggestions={tagFilters.data?.tags}
+								onValueChange={(v) => (tags = v)}
+							/>
+							<Field.Description>Every server the token adds gets these tags.</Field.Description>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="token-account">
+								<Term name="login account">Login accounts</Term>
+							</Field.Label>
+							{#each grants as g (g.username)}
+								<div class="flex flex-col gap-1.5 rounded-lg border bg-card p-2">
+									<div class="flex items-center gap-2">
+										<span class="min-w-0 flex-1 truncate font-mono text-sm">{g.username}</span>
+										<SubjectPicker
+											selected={g.subjects.map((s) => s.id)}
+											onToggle={(s, grant) => toggleGrant(g.username, s, grant)}
+											label="Grant"
+											variant="ghost"
+											size="xs"
+										/>
+										<Button
+											variant="ghost"
+											size="icon-xs"
+											aria-label={`Remove ${g.username}`}
+											onclick={() => (grants = grants.filter((x) => x.username !== g.username))}
+										>
+											<X />
+										</Button>
+									</div>
+									{#if g.subjects.length}
+										<div class="flex flex-wrap gap-1.5">
+											{#each g.subjects as s (s.id)}
+												<SubjectChip
+													grant={{ id: s.id, kind: s.kind, subject: s }}
+													onRemove={() => toggleGrant(g.username, s, false)}
+												/>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							{/each}
+							<InputGroup.Root>
+								<InputGroup.Addon><KeyRound /></InputGroup.Addon>
+								<InputGroup.Input
+									id="token-account"
+									bind:value={newAccount}
+									placeholder="Add a login account, e.g. dev"
+									onkeydown={(e) => {
+										if (e.key !== 'Enter') return;
+										e.preventDefault();
+										addAccount();
+									}}
+								/>
+								<InputGroup.Addon align="inline-end">
+									<InputGroup.Button
+										type="button"
+										variant="secondary"
+										size="xs"
+										onclick={addAccount}
+									>
+										<Plus data-icon="inline-start" />
+										Add
+									</InputGroup.Button>
+								</InputGroup.Addon>
+							</InputGroup.Root>
+							<Field.Description>
+								Every server enrolled with this token starts with these grants. The account has to
+								exist on the server. Change grants per server later, in its sheet.
+							</Field.Description>
+						</Field.Field>
+					</Field.Group>
+				</Section>
+
+				<Section title="Fine-tune" icon={SlidersHorizontal}>
+					<Field.Group class="gap-4">
 						<Field.Field>
 							<Field.Label>Expires after</Field.Label>
 							<ToggleGroup.Root
@@ -346,7 +441,7 @@ runcmd:
 							</ToggleGroup.Root>
 						</Field.Field>
 						<Field.Field>
-							<Field.Label>Hosts it can enroll</Field.Label>
+							<Field.Label>Servers it can enroll</Field.Label>
 							<ToggleGroup.Root
 								type="single"
 								variant="outline"
@@ -369,126 +464,59 @@ runcmd:
 								/>
 							{/if}
 						</Field.Field>
-					</Field.Group>
-				</Section>
-
-				<Section title="Enrolled hosts" icon={ShieldCheck}>
-					<Field.Field orientation="horizontal">
-						<Field.Content>
-							<Field.Label for="token-auto-approve">Approve automatically</Field.Label>
-							<Field.Description>
-								Daemons join right away instead of waiting for your approval in the servers list.
-								Handy for fleets, keep it off for one-off hosts.
-							</Field.Description>
-						</Field.Content>
-						<Switch
-							id="token-auto-approve"
-							checked={autoApprove || ephemeral}
-							onCheckedChange={(v) => (autoApprove = v)}
-							disabled={ephemeral}
-						/>
-					</Field.Field>
-					<Field.Field>
-						<Field.Label for="token-tags">Tags</Field.Label>
-						<TagsInput
-							id="token-tags"
-							value={tags}
-							suggestions={tagFilters.data?.tags}
-							onValueChange={(v) => (tags = v)}
-						/>
-						<Field.Description>Every server the token adds gets these tags.</Field.Description>
-					</Field.Field>
-					<Field.Field>
-						<Field.Label for="token-account">Login accounts</Field.Label>
-						{#each grants as g (g.username)}
-							<div class="flex flex-col gap-1.5 rounded-lg border bg-card p-2">
-								<div class="flex items-center gap-2">
-									<span class="min-w-0 flex-1 truncate font-mono text-sm">{g.username}</span>
-									<SubjectPicker
-										selected={g.subjects.map((s) => s.id)}
-										onToggle={(s, grant) => toggleGrant(g.username, s, grant)}
-										label="Grant"
-										variant="ghost"
-										size="xs"
-									/>
-									<Button
-										variant="ghost"
-										size="icon-xs"
-										aria-label={`Remove ${g.username}`}
-										onclick={() => (grants = grants.filter((x) => x.username !== g.username))}
-									>
-										<X />
-									</Button>
-								</div>
-								{#if g.subjects.length}
-									<div class="flex flex-wrap gap-1.5">
-										{#each g.subjects as s (s.id)}
-											<SubjectChip
-												grant={{ id: s.id, kind: s.kind, subject: s }}
-												onRemove={() => toggleGrant(g.username, s, false)}
-											/>
-										{/each}
-									</div>
-								{/if}
-							</div>
-						{/each}
-						<InputGroup.Root>
-							<InputGroup.Addon><KeyRound /></InputGroup.Addon>
-							<InputGroup.Input
-								id="token-account"
-								bind:value={newAccount}
-								placeholder="Add a login account, e.g. dev"
-								onkeydown={(e) => {
-									if (e.key !== 'Enter') return;
-									e.preventDefault();
-									addAccount();
-								}}
+						<Field.Field orientation="horizontal">
+							<Field.Content>
+								<Field.Label for="token-auto-approve">Approve automatically</Field.Label>
+								<Field.Description>
+									{#if ephemeral}
+										Always on for ephemeral servers.
+									{:else}
+										People can log in as soon as a server enrolls, instead of after your approval.
+										Handy for fleets, keep it off for a single server.
+									{/if}
+								</Field.Description>
+							</Field.Content>
+							<Switch
+								id="token-auto-approve"
+								checked={approves}
+								onCheckedChange={(v) => (autoApprove = v)}
+								disabled={ephemeral}
 							/>
-							<InputGroup.Addon align="inline-end">
-								<InputGroup.Button type="button" variant="secondary" size="xs" onclick={addAccount}>
-									<Plus data-icon="inline-start" />
-									Add
-								</InputGroup.Button>
-							</InputGroup.Addon>
-						</InputGroup.Root>
-						<Field.Description>
-							Every host enrolled with this token starts with these grants. The account has to exist
-							on the host. Change grants per host later, under its target.
-						</Field.Description>
-					</Field.Field>
-				</Section>
-
-				<Section title="Lifetime" icon={Timer}>
-					<Field.Field orientation="horizontal">
-						<Field.Content>
-							<Field.Label for="token-ephemeral">Ephemeral hosts</Field.Label>
-							<Field.Description>
-								For containers, devboxes and sandboxes. A host is approved on enroll, removes itself
-								when it stops, and is removed after it has been offline for a while.
-							</Field.Description>
-						</Field.Content>
-						<Switch id="token-ephemeral" bind:checked={ephemeral} />
-					</Field.Field>
-					{#if ephemeral}
-						<Field.Field>
-							<Field.Label>Remove after offline for</Field.Label>
-							<ToggleGroup.Root
-								type="single"
-								variant="outline"
-								size="sm"
-								value={retireAfter}
-								onValueChange={(v) => v && (retireAfter = v)}
-								class="w-full flex-wrap"
-							>
-								{#each retirePresets as r (r.value)}
-									<ToggleGroup.Item value={r.value} class="flex-1">{r.label}</ToggleGroup.Item>
-								{/each}
-							</ToggleGroup.Root>
-							<Field.Description>
-								A host that comes back under the same name takes over from the one that went away.
-							</Field.Description>
 						</Field.Field>
-					{/if}
+						<Field.Field orientation="horizontal">
+							<Field.Content>
+								<Field.Label for="token-ephemeral">
+									<Term name="ephemeral">Ephemeral servers</Term>
+								</Field.Label>
+								<Field.Description>
+									For containers, devboxes and sandboxes. A server removes itself when it stops, and
+									is removed after it has been offline for a while.
+								</Field.Description>
+							</Field.Content>
+							<Switch id="token-ephemeral" bind:checked={ephemeral} />
+						</Field.Field>
+						{#if ephemeral}
+							<Field.Field>
+								<Field.Label>Remove after offline for</Field.Label>
+								<ToggleGroup.Root
+									type="single"
+									variant="outline"
+									size="sm"
+									value={retireAfter}
+									onValueChange={(v) => v && (retireAfter = v)}
+									class="w-full flex-wrap"
+								>
+									{#each retirePresets as r (r.value)}
+										<ToggleGroup.Item value={r.value} class="flex-1">{r.label}</ToggleGroup.Item>
+									{/each}
+								</ToggleGroup.Root>
+								<Field.Description>
+									A server that comes back under the same name takes over from the one that went
+									away.
+								</Field.Description>
+							</Field.Field>
+						{/if}
+					</Field.Group>
 				</Section>
 
 				<div class="pt-5">

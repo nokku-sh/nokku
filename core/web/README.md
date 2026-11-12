@@ -50,6 +50,6 @@ The look is terminal-native: compliance paper in light mode, a console at night 
 
 ### Copy
 
-Sentence case everywhere. No trailing period on page descriptions. Use the domain verb when there is one (Invite, Enroll, Sign, Add target), otherwise Create. Machine values like IDs, hostnames, principals and fingerprints are set in mono.
+Sentence case everywhere. No trailing period on page descriptions. The docs are linked once, by their base address in the sidebar. No link goes to a page or an anchor inside them, those break when the docs move. Use the domain verb when there is one (Invite, Enroll, Sign, Add target), otherwise Create. Machine values like IDs, hostnames, principals and fingerprints are set in mono.
 
 [CONTRIBUTING.md](../../CONTRIBUTING.md) in the repo root has the setup and the project conventions.

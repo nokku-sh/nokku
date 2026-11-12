@@ -18,11 +18,10 @@
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import { DocsURL } from '#lib/config.js';
 	import { WorkspaceSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
 	import { roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
-	import { formatTs } from '#lib/utils.js';
+	import { displayName, formatTs } from '#lib/utils.js';
 	import { RotateCw } from '@lucide/svelte';
 
 	const ADMINS_SHOWN = 5;
@@ -51,11 +50,11 @@
 	const peopleLoading = $derived(!ownerQuery.data || !adminQuery.data);
 	const retryPeople = () => Promise.all([ownerQuery.refetch(), adminQuery.refetch()]);
 
+	// Whoever is in the list is marked there. Only someone outside it is told their role in words.
+	const listed = $derived(people.some((p) => p.id === me.data?.id));
 	const MyRoleIcon = $derived(roleIcon(me.data?.role));
 	const youAre = $derived.by(() => {
-		const role = me.data?.role;
-		if (role === WorkspaceRole.OWNER) return "You're the owner";
-		const slug = roleSlug(role);
+		const slug = roleSlug(me.data?.role);
 		return `You're ${/^[aeiou]/.test(slug) ? 'an' : 'a'} ${slug}`;
 	});
 
@@ -172,7 +171,8 @@
 										<Item.Media><UserAvatar user={person} class="size-8" /></Item.Media>
 										<Item.Content class="min-w-0">
 											<Item.Title class="max-w-full">
-												<span class="truncate">{person.name || person.email.split('@')[0]}</span>
+												<span class="truncate">{displayName(person)}</span>
+												{#if person.id === me.data?.id}<Badge variant="outline">You</Badge>{/if}
 											</Item.Title>
 											<Item.Description class="truncate">{person.email}</Item.Description>
 										</Item.Content>
@@ -193,26 +193,19 @@
 						</a>
 					{/if}
 				{/if}
-				<p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-					<MyRoleIcon class="size-4" />
-					<span>{youAre}.</span>
-					<a
-						href={`${DocsURL}/guides/access/#roles`}
-						target="_blank"
-						rel="noopener"
-						class="text-primary hover:underline">What each role can do</a
-					>
-				</p>
+				{#if !peopleLoading && !listed}
+					<p class="flex items-center gap-1.5 text-sm text-muted-foreground">
+						<MyRoleIcon class="size-4" />
+						{youAre}.
+					</p>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 
 		<Card.Root>
 			<Card.Header>
 				<Card.Title><h2>Connect</h2></Card.Title>
-				<Card.Description>
-					What <code class="font-mono">nk</code>, <code class="font-mono">nokkud</code> and support ask
-					for
-				</Card.Description>
+				<Card.Description>What nk, nokkud and support ask for</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-3">
 				<DetailList
@@ -227,7 +220,7 @@
 					]}
 				/>
 				<p class="text-sm text-muted-foreground">
-					The full <code class="font-mono">nk login</code> command is under
+					The full nk login command is under
 					<a href="/profile/security" class="text-primary hover:underline">Profile, Security</a>
 				</p>
 			</Card.Content>
@@ -256,9 +249,5 @@
 				}
 			]}
 		/>
-	{:else if can.own && info.data}
-		<p class="text-xs text-muted-foreground">
-			On a self-hosted core the workspace is the whole server, so it can't be deleted from here.
-		</p>
 	{/if}
 {/if}

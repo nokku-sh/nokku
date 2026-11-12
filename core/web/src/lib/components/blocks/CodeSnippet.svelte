@@ -12,12 +12,19 @@
 		wrap?: boolean;
 		/** File name. Adds a download button. */
 		download?: string;
+		/** Shows this many lines until someone asks for the rest. Copy and download always take all of it. */
+		preview?: number;
 		class?: string;
 	}
 
-	let { code, language, wrap = false, download, class: className }: Props = $props();
+	let { code, language, wrap = false, download, preview, class: className }: Props = $props();
 
 	const clipboard = new UseClipboard({ delay: 1500 });
+
+	const lines = $derived(code.split('\n'));
+	const folds = $derived(!!preview && lines.length > preview);
+	let unfolded = $state(false);
+	const shown = $derived(folds && !unfolded ? lines.slice(0, preview).join('\n') : code);
 
 	function save() {
 		const url = URL.createObjectURL(new Blob([code], { type: 'text/plain' }));
@@ -54,5 +61,16 @@
 		class={[
 			'p-3 font-mono text-xs leading-relaxed',
 			wrap ? 'break-all whitespace-pre-wrap' : 'overflow-x-auto'
-		]}><code>{code}</code></pre>
+		]}><code>{shown}</code></pre>
+	{#if folds}
+		<Button
+			variant="ghost"
+			size="xs"
+			class="w-full rounded-none border-t-border"
+			aria-expanded={unfolded}
+			onclick={() => (unfolded = !unfolded)}
+		>
+			{unfolded ? 'Show less' : `Show all ${lines.length} lines`}
+		</Button>
+	{/if}
 </div>

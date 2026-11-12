@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { plural } from '#lib/api/bulk.js';
+	import { ca } from '#lib/api/certificates.svelte.js';
 	import { daemon } from '#lib/api/daemons.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
+	import { token } from '#lib/api/tokens.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
+	import AddServerModal from '#lib/components/modals/AddServerModal.svelte';
 	import CreateTargetModal from '#lib/components/modals/CreateTargetModal.svelte';
 	import EnrollSheet from '#lib/components/sheets/EnrollSheet.svelte';
 	import TargetSheet from '#lib/components/sheets/TargetSheet.svelte';
@@ -18,10 +21,10 @@
 	import {
 		ActionCell,
 		IdentityCell,
-		MachineCell,
 		TagsCell,
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
@@ -30,9 +33,9 @@
 	import {
 		CircleCheckBig,
 		Clock,
+		KeyRound,
 		Plus,
 		RefreshCw,
-		Rocket,
 		Server,
 		ShieldCheck,
 		TagIcon,
@@ -47,9 +50,19 @@
 
 	const sheet = useSheet();
 	const can = user.can();
-	const create = useCreate();
+	// Add server asks which way first, then opens the form for it.
+	const add = useCreate();
+	const manual = useCreate({ form: 'manual' });
 	// An enroll token is a credential, so the form opens after a recent sign-in, like from the palette.
 	const enroll = useCreate({ fresh: true, form: 'enroll' });
+	let enrollTab = $state('new');
+	const openEnroll = (tab: string) => {
+		enrollTab = tab;
+		enroll.open = true;
+	};
+	const tokens = token.list();
+	// A server set up with nk sync that last synced before this refuses new certificates.
+	const authority = ca.get();
 
 	const statusOptions = [
 		{ label: 'Waiting for approval', value: 'pending', icon: Clock, status: TargetStatus.PENDING },
@@ -117,7 +130,11 @@
 		columnHelper.display({
 			id: 'status',
 			header: 'Status',
-			cell: ({ row }) => renderComponent(ServerStatusCell, { target: row.original })
+			cell: ({ row }) =>
+				renderComponent(ServerStatusCell, {
+					target: row.original,
+					caRotatedAt: authority.data?.rotatedAt
+				})
 		}),
 		columnHelper.display({
 			id: 'accounts',
@@ -128,13 +145,6 @@
 					mono: true,
 					noun: 'accounts'
 				})
-		}),
-		columnHelper.display({
-			id: 'version',
-			header: 'Daemon',
-			meta: { hideBelow: 'lg' },
-			cell: ({ row }) =>
-				renderComponent(MachineCell, { value: row.original.daemon?.version || '-' })
 		}),
 		columnHelper.accessor('tags', {
 			header: 'Tags',
@@ -217,8 +227,14 @@
 	];
 </script>
 
-<CreateTargetModal bind:open={create.open} />
-<EnrollSheet bind:open={enroll.open} />
+<AddServerModal
+	bind:open={add.open}
+	canEnroll={can.admin}
+	onDaemon={() => openEnroll('new')}
+	onManual={() => (manual.open = true)}
+/>
+<CreateTargetModal bind:open={manual.open} />
+<EnrollSheet bind:open={enroll.open} bind:tab={enrollTab} />
 <TargetSheet />
 
 <PageHeader
@@ -226,15 +242,18 @@
 	description="Every server people log in to, through its daemon or set up with nk sync"
 >
 	{#if can.admin}
-		<Button variant="outline" onclick={() => (enroll.open = true)}>
-			<Rocket data-icon="inline-start" />
-			Enroll servers
+		<Button variant="outline" onclick={() => openEnroll('active')}>
+			<KeyRound data-icon="inline-start" />
+			Enrollment tokens
+			{#if tokens.data?.tokens.length}
+				<Badge variant="secondary" class="font-mono">{tokens.data.tokens.length}</Badge>
+			{/if}
 		</Button>
 	{/if}
 	{#if can.edit}
-		<Button onclick={() => (create.open = true)}>
+		<Button onclick={() => (add.open = true)}>
 			<Plus data-icon="inline-start" />
-			Add a server
+			Add server
 		</Button>
 	{/if}
 </PageHeader>
@@ -252,7 +271,7 @@
 	emptyState={{
 		icon: Server,
 		title: 'No servers yet',
-		description: 'Enroll one with its daemon, or set it up from your terminal with nk sync.',
+		description: 'Add one with its daemon, or set it up from your terminal with nk sync.',
 		command: 'nk sync root@host'
 	}}
 >

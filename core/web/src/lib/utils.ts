@@ -125,6 +125,11 @@ export function formatHours(hours: number): string {
 	return hours >= 24 && hours % 24 === 0 ? plural(hours / 24, 'day') : plural(hours, 'hour');
 }
 
+/** What to call someone: their name, or the part of the address before the @. */
+export function displayName(user: { name: string; email: string } | undefined): string {
+	return user?.name || user?.email.split('@')[0] || '';
+}
+
 /** nk knows no address by itself, every workspace has its own. */
 export function nkLoginCommand(): string {
 	return `nk --api ${location.origin} login`;

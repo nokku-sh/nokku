@@ -1,23 +1,19 @@
 <script lang="ts">
-	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { license, licenseStatus } from '#lib/api/license.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { util } from '#lib/api/workspaces.svelte.js';
-	import { atLeast } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
 	import { TriangleAlert } from '@lucide/svelte';
 
 	const data = license.get();
-	const me = user.self();
+	const can = user.can();
 	const info = util.instanceInfo();
 
 	const status = $derived(licenseStatus(data.data));
 	// A hosted workspace with an expired key has no plan, the plan banner says so.
 	const expired = $derived(status.state === 'expired' && !info.data?.hosted);
 	// Only the people who can act on it.
-	const show = $derived(
-		(expired || status.state === 'expiring') && atLeast(me.data?.role, WorkspaceRole.ADMIN)
-	);
+	const show = $derived((expired || status.state === 'expiring') && can.admin);
 </script>
 
 {#if show}

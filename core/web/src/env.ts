@@ -5,6 +5,5 @@ export const variables = defineEnvVars({
 	PUBLIC_DOCS_URL: { public: true, schema: (input) => input ?? '' },
 	PUBLIC_UPGRADE_URL: { public: true, schema: (input) => input ?? '' },
 	PUBLIC_LICENSE_PURCHASE_URL: { public: true, schema: (input) => input ?? '' },
-	PUBLIC_LICENSE_TRIAL_URL: { public: true, schema: (input) => input ?? '' },
 	PUBLIC_LICENSE_PORTAL_URL: { public: true, schema: (input) => input ?? '' }
 });

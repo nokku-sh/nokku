@@ -9,6 +9,7 @@
 	import CodeSnippet from '#lib/components/blocks/CodeSnippet.svelte';
 	import LoadError from '#lib/components/blocks/LoadError.svelte';
 	import SaveStatus from '#lib/components/blocks/SaveStatus.svelte';
+	import SettingRow from '#lib/components/blocks/SettingRow.svelte';
 	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
 	import * as Alert from '#lib/components/ext/alert/index.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -17,7 +18,6 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
-	import * as Item from '#lib/components/ui/item/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { CertificateAuthoritySchema } from '#lib/gen/nokku/v1/certificates_pb.js';
@@ -78,6 +78,8 @@
 	);
 	const unchecked = $derived(manualCount - manual.length);
 	const syncCommands = (names: string[]) => names.map((name) => `nk sync ${name}`).join('\n');
+	// The warning is the count. The commands fold past this many, a fleet takes the file or the Ansible task.
+	const SYNC_PREVIEW = 5;
 
 	const midnight = timestampFromMs(new Date().setHours(0, 0, 0, 0));
 	const signedToday = util.getLogs(() => ({
@@ -371,7 +373,17 @@
 						<Alert.Title>{callout.title}</Alert.Title>
 						<Alert.Description class="flex flex-col gap-2">
 							<p>{callout.text}</p>
-							<CodeSnippet code={syncCommands(callout.names)} language="bash" wrap class="w-full" />
+							<CodeSnippet
+								code={syncCommands(callout.names)}
+								language="bash"
+								wrap
+								preview={SYNC_PREVIEW}
+								download={callout.names.length > SYNC_PREVIEW ? 'nk-sync.sh' : undefined}
+								class="w-full"
+							/>
+							{#if callout.names.length > SYNC_PREVIEW}
+								<p>For a whole inventory, the Ansible task below does the same.</p>
+							{/if}
 							{#if unchecked > 0}
 								<p>
 									{plural(unchecked, 'more server')}
@@ -404,29 +416,29 @@
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-3" onfocusin={askFresh}>
-				<Item.Root variant="outline">
-					<Item.Content>
-						<Item.Title><label for="ca-user-ttl">Login certificates</label></Item.Title>
-						<Item.Description>What a person's login gets, a week at most.</Item.Description>
-					</Item.Content>
-					<Item.Actions class="w-full sm:w-auto">
-						<Select.Root
-							type="single"
-							value={String(lifetimeHours)}
-							disabled={!can.admin}
-							onValueChange={setLifetime}
-						>
-							<Select.Trigger id="ca-user-ttl" class="w-full sm:w-44">
-								{formatHours(lifetimeHours)}
-							</Select.Trigger>
-							<Select.Content>
-								{#each lifetimes as h (h)}
-									<Select.Item value={String(h)}>{formatHours(h)}</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					</Item.Actions>
-				</Item.Root>
+				<SettingRow
+					outline
+					wide
+					title="Login certificates"
+					description="What a person's login gets, a week at most."
+					for="ca-user-ttl"
+				>
+					<Select.Root
+						type="single"
+						value={String(lifetimeHours)}
+						disabled={!can.admin}
+						onValueChange={setLifetime}
+					>
+						<Select.Trigger id="ca-user-ttl" class="w-full sm:w-44">
+							{formatHours(lifetimeHours)}
+						</Select.Trigger>
+						<Select.Content>
+							{#each lifetimes as h (h)}
+								<Select.Item value={String(h)}>{formatHours(h)}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</SettingRow>
 				<p class="text-xs text-muted-foreground">
 					A server without the daemon only drops access when a certificate runs out. There, and for
 					service accounts, a certificate lasts an hour at most whatever is set here. A daemon's
