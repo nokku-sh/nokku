@@ -17,7 +17,7 @@ require (
 	github.com/elimity-com/scim v0.0.0-20260728105928-2641426a1539
 	github.com/foxboron/go-tpm-keyfiles v0.0.0-20260902202739-8c9c2d1005f4
 	github.com/go-chi/httprate v0.16.1
-	github.com/go-jose/go-jose/v4 v4.1.8
+	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/go-webauthn/webauthn v0.18.2
 	github.com/google/go-tpm v0.9.9-0.20260124013517-8f8f42cba0de
 	github.com/hashicorp/vault/api v1.23.0
