@@ -50,7 +50,7 @@
 		"eslint": "^10.14.0",
 		"eslint-plugin-svelte": "^3.24.1",
 		"mode-watcher": "^1.1.0",
-		"oxfmt": "^0.76.0",
+		"oxfmt": "^0.77.0",
 		"oxlint": "^1.90.0",
 		"oxlint-tsgolint": "^7.0.2005",
 		"runed": "^0.38.0",
