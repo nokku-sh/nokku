@@ -214,6 +214,51 @@ func TestCheckHostKey(t *testing.T) {
 	assert.NoError(t, checkHostKey("ssh-ed25519 old", "ssh-ed25519 new", "web", true))
 }
 
+func TestCanRepin(t *testing.T) {
+	t.Parallel()
+	me := &state.State{User: &state.User{ID: "me-id"}}
+	pinned := func(by string) *state.Target {
+		return &state.Target{ID: "t1", Name: "web", HostPublicKey: "ssh-ed25519 old", CreatedBy: by}
+	}
+	require.NoError(t, canRepin(me, pinned("me-id")), "whoever added the server pins its new key")
+	require.NoError(t, canRepin(me, &state.Target{Name: "web"}), "a new server has no key to replace")
+	require.NoError(
+		t,
+		canRepin(me, &state.Target{ID: "t1", CreatedBy: "other-id"}),
+		"a forgotten key is pinned by anyone",
+	)
+
+	err := canRepin(me, pinned("other-id"))
+	require.Error(t, err, "someone else's server took a new host key")
+	assert.Contains(t, err.Error(), "web app")
+	require.Error(t, canRepin(me, pinned("")), "a server nobody is known to have added took a new host key")
+}
+
+func TestMachineOwns(t *testing.T) {
+	t.Parallel()
+	machine := &state.State{ServiceAccount: &state.ServiceAccount{ID: "sa-id"}}
+	require.NoError(t, machineOwns(machine, &state.Target{CreatedBy: "sa-id"}))
+	require.Error(t, machineOwns(machine, &state.Target{Name: "web", CreatedBy: "other-id"}))
+	require.Error(t, machineOwns(machine, &state.Target{Name: "web"}), "a server nobody is known to have added")
+
+	require.NoError(t, machineOwns(&state.State{User: &state.User{ID: "me-id"}}, &state.Target{CreatedBy: "other-id"}))
+	fresh := &state.State{ServiceAccount: &state.ServiceAccount{Name: "ci"}}
+	require.NoError(t, machineOwns(fresh, &state.Target{CreatedBy: "other-id"}), "the core decides for an unknown id")
+}
+
+func TestSomeoneElses(t *testing.T) {
+	t.Parallel()
+	me := &state.State{User: &state.User{ID: "me-id"}}
+	assert.False(t, someoneElses(me, &state.Target{CreatedBy: "me-id"}))
+	assert.True(t, someoneElses(me, &state.Target{CreatedBy: "other-id"}))
+	assert.True(t, someoneElses(me, &state.Target{}), "a server nobody is known to have added is not mine")
+
+	// The core holds these to their own servers and says why.
+	machine := &state.State{ServiceAccount: &state.ServiceAccount{ID: "sa-id"}}
+	assert.False(t, someoneElses(machine, &state.Target{CreatedBy: "other-id"}))
+	assert.False(t, someoneElses(&state.State{}, &state.Target{CreatedBy: "other-id"}))
+}
+
 func TestPlainWriterDropsEscapeSequences(t *testing.T) {
 	t.Parallel()
 	var out strings.Builder

@@ -3,17 +3,16 @@
 package api_test
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -60,24 +59,51 @@ func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
 	return targetID
 }
 
+// nkTargets is the target client of a new nk session of u.
+func nkTargets(
+	t *testing.T,
+	cfg *config.Config,
+	srv *httptest.Server,
+	u *db.User,
+) nokkuv1connect.TargetServiceClient {
+	t.Helper()
+	return nokkuv1connect.NewTargetServiceClient(partialConn(srv, cliSessionFor(t, cfg, u, partialHostKey(t))))
+}
+
+// webTargets is the target client of a new browser session of u, signed in age ago.
+func webTargets(
+	t *testing.T,
+	cfg *config.Config,
+	srv *httptest.Server,
+	u *db.User,
+	age time.Duration,
+) nokkuv1connect.TargetServiceClient {
+	t.Helper()
+	return nokkuv1connect.NewTargetServiceClient(clientOn(srv, signedIn(t, cfg, browserSession(t, cfg, u, age))))
+}
+
+func denied(t *testing.T, err error, what string) {
+	t.Helper()
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "%s, got %v", what, err)
+}
+
 func TestSyncTargetUsers(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := testWorkspace.ID
-	targetID := seedTarget(t, cfg, workspaceID)
+	hostKey := partialHostKey(t)
 
-	pub, _, err := ed25519.GenerateKey(rand.Reader)
-	require.NoError(t, err)
-	sshPub, err := ssh.NewPublicKey(pub)
-	require.NoError(t, err)
-	hostKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPub)))
-
-	editorAuth := header(
-		"Authorization",
-		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
-	)
+	// The web app reads, nk reports.
+	editorUser := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	editorAuth := header("Authorization", "Bearer "+sessionFor(t, cfg, editorUser))
 	editor := nokkuv1connect.NewTargetServiceClient(
 		clientOn(srv, editorAuth),
 	)
+	nk := nkTargets(t, cfg, srv, editorUser)
+	added, err := nk.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
+		Name: new(uniq("web")), Endpoints: []string{"10.0.0.1:22"},
+	})
+	require.NoError(t, err)
+	targetID := added.GetTarget().GetId()
 	accounts := nokkuv1connect.NewTargetAccountServiceClient(
 		clientOn(srv, editorAuth),
 	)
@@ -87,7 +113,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	caKey := authority.GetCertificateAuthority().GetUserPublicKey()
 
 	// A host written with a key a rollover replaced is not in sync.
-	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
+	_, err = nk.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:        &targetID,
 		Usernames:       []string{"root"},
 		UserCaPublicKey: &hostKey,
@@ -97,18 +123,17 @@ func TestSyncTargetUsers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, stale.GetTarget().GetLastSyncAt(), "a refused report stamped the sync")
 
-	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
+	_, err = nk.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:        &targetID,
 		HostPublicKey:   &hostKey,
 		Usernames:       []string{"root", "deploy"},
-		Endpoints:       []string{"10.0.0.2:22"},
 		UserCaPublicKey: &caKey,
 	})
 	require.NoError(t, err)
 
 	got, err := editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &targetID})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"10.0.0.2:22"}, got.GetTarget().GetEndpoints(), "endpoints replaced")
+	assert.Equal(t, []string{"10.0.0.1:22"}, got.GetTarget().GetEndpoints(), "a report moved the server")
 	assert.Equal(t, hostKey, got.GetTarget().GetHostPublicKey(), "host key pinned")
 	assert.NotNil(t, got.GetTarget().GetLastSyncAt(), "manual sync stamped")
 
@@ -127,7 +152,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.ElementsMatch(t, []string{"root", "deploy"}, usernames())
 
 	// A report without endpoints or key adds users and keeps the rest.
-	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
+	_, err = nk.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:        &targetID,
 		Usernames:       []string{"ops"},
 		UserCaPublicKey: &caKey,
@@ -135,12 +160,12 @@ func TestSyncTargetUsers(t *testing.T) {
 	require.NoError(t, err)
 	got, err = editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &targetID})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"10.0.0.2:22"}, got.GetTarget().GetEndpoints(), "endpoints kept")
+	assert.Equal(t, []string{"10.0.0.1:22"}, got.GetTarget().GetEndpoints(), "endpoints kept")
 	assert.Equal(t, hostKey, got.GetTarget().GetHostPublicKey(), "host key kept")
 	assert.ElementsMatch(t, []string{"root", "deploy", "ops"}, usernames(), "earlier users are never deleted")
 
 	// A host can name a login twice, and one odd name must not cost the others.
-	_, err = editor.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
+	_, err = nk.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:        &targetID,
 		Usernames:       []string{"backup", "ops", "backup", "not a login"},
 		UserCaPublicKey: &caKey,
@@ -148,21 +173,139 @@ func TestSyncTargetUsers(t *testing.T) {
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"root", "deploy", "ops", "backup"}, usernames())
 
-	viewer := nokkuv1connect.NewTargetServiceClient(
-		clientOn(
-			srv,
-			header(
-				"Authorization",
-				"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER),
-			),
-		),
-	)
+	viewerUser := seedUser(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	viewer := nkTargets(t, cfg, srv, viewerUser)
 	_, err = viewer.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:        &targetID,
 		Usernames:       []string{"intruder"},
 		UserCaPublicKey: &caKey,
 	})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "viewer may not sync, got %v", err)
+}
+
+// Everyone's ssh trusts the pinned host key, so a report replaces it only for whoever added the server.
+func TestOnlyWhoAddedAServerRepinsIt(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ws := testWorkspace.ID
+	alice := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	bob := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+	aliceNK, bobNK := nkTargets(t, cfg, srv, alice), nkTargets(t, cfg, srv, bob)
+	aliceWeb, bobWeb := webTargets(t, cfg, srv, alice, 0), webTargets(t, cfg, srv, bob, 0)
+	caKey := workspaceCA(t, cfg).GetUserPublicKey()
+
+	pinned, attacker := partialHostKey(t), partialHostKey(t)
+	address := []string{"10.0.0.2:22"}
+	added, err := aliceNK.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
+		Name: new(uniq("web")), Endpoints: address, HostPublicKey: &pinned,
+	})
+	require.NoError(t, err)
+	id := added.GetTarget().GetId()
+
+	report := func(as nokkuv1connect.TargetServiceClient, id, key string) error {
+		_, err := as.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
+			TargetId: &id, Usernames: []string{"root"}, HostPublicKey: &key, UserCaPublicKey: &caKey,
+		})
+		return err
+	}
+	stored := func(id string) *nokkuv1.Target {
+		t.Helper()
+		got, err := bobWeb.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &id})
+		require.NoError(t, err)
+		return got.GetTarget()
+	}
+
+	denied(t, report(webTargets(t, cfg, srv, alice, oldSignIn), id, attacker), "an old cookie pinned a host key")
+	denied(t, report(aliceWeb, id, attacker), "a cookie reported a host, only nk does")
+	denied(t, report(bobNK, id, attacker), "nk replaced the host key of a server someone else added")
+	got := stored(id)
+	assert.Equal(t, pinned, got.GetHostPublicKey(), "a refused report changed the pinned host key")
+	assert.Nil(t, got.GetLastSyncAt(), "a refused report stamped the sync")
+	assert.Equal(t, alice.ID, got.GetCreatedBy(), "nk can't tell who added the server")
+
+	// After a CA rollover anyone syncs every server again, with the key it has.
+	require.NoError(t, report(bobNK, id, pinned), "an unchanged report of someone else's server was refused")
+	assert.NotNil(t, stored(id).GetLastSyncAt(), "the sync was not stamped")
+
+	// A server added in the web app has no key yet, its first sync pins one.
+	blank, err := aliceWeb.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("web"))})
+	require.NoError(t, err)
+	blankID := blank.GetTarget().GetId()
+	require.NoError(t, report(bobNK, blankID, pinned), "the first sync of a server from the web app was refused")
+	assert.Equal(t, pinned, stored(blankID).GetHostPublicKey(), "the first sync pinned no host key")
+	denied(t, report(bobNK, blankID, attacker), "nk replaced a key it had just pinned on someone else's server")
+
+	// Reinstalled, and alice is away: a fresh sign-in forgets the pin and the next sync is a first one again.
+	_, err = bobWeb.ForgetHostKey(t.Context(), &nokkuv1.ForgetHostKeyRequest{Id: &id})
+	require.NoError(t, err)
+	assert.Empty(t, stored(id).GetHostPublicKey(), "the pin was not forgotten")
+	reinstalled := partialHostKey(t)
+	require.NoError(t, report(bobNK, id, reinstalled), "the sync after a forgotten key was refused")
+	assert.Equal(t, reinstalled, stored(id).GetHostPublicKey())
+
+	// A daemon reports for its own server, and the CA vouches for that host.
+	_, enrolled := enrollTestDaemon(t, cfg, srv, ws, true)
+	err = report(bobNK, enrolled.GetTargetId(), pinned)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "nk reported for a daemon's server, got %v", err)
+
+	require.NoError(t, report(aliceNK, id, attacker), "whoever added a server could not pin its new key")
+	got = stored(id)
+	assert.Equal(t, attacker, got.GetHostPublicKey())
+	assert.Equal(t, address, got.GetEndpoints(), "a report moved the server")
+}
+
+// People type a server's name, so an old cookie or a colleague's nk must not free it for another host.
+func TestAServerIsNotSwappedByDeletingIt(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ws := testWorkspace.ID
+	alice := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	bob := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	aliceNK, bobNK := nkTargets(t, cfg, srv, alice), nkTargets(t, cfg, srv, bob)
+	bobWeb := webTargets(t, cfg, srv, bob, 0)
+	add := func(as nokkuv1connect.TargetServiceClient, req *nokkuv1.CreateTargetRequest) (string, error) {
+		req.Name = new(uniq("web"))
+		res, err := as.CreateTarget(t.Context(), req)
+		return res.GetTarget().GetId(), err
+	}
+	remove := func(as nokkuv1connect.TargetServiceClient, id string) error {
+		_, err := as.DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &id})
+		return err
+	}
+	pinned := partialHostKey(t)
+	synced := func() string {
+		t.Helper()
+		id, err := add(
+			aliceNK,
+			&nokkuv1.CreateTargetRequest{Endpoints: []string{"10.0.0.2:22"}, HostPublicKey: &pinned},
+		)
+		require.NoError(t, err)
+		return id
+	}
+	first, second := synced(), synced()
+
+	denied(t, remove(bobNK, first), "nk deleted a server someone else added")
+	// A refused fresh check ends the old session, so each old cookie is its own.
+	err := remove(webTargets(t, cfg, srv, bob, oldSignIn), first)
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "an old cookie deleted a server, got %v", err)
+	_, err = bobWeb.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &first})
+	require.NoError(t, err, "a refused delete removed the server")
+
+	// A rename frees the name just like a delete.
+	_, err = webTargets(t, cfg, srv, bob, oldSignIn).UpdateTarget(t.Context(), masked(
+		&nokkuv1.UpdateTargetRequest{Id: &first, Name: new(uniq("moved"))},
+	))
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "an old cookie renamed a server, got %v", err)
+
+	_, err = add(bobWeb, &nokkuv1.CreateTargetRequest{Endpoints: []string{"203.0.113.66:22"}})
+	denied(t, err, "a cookie added a server with an address")
+	_, err = add(bobWeb, &nokkuv1.CreateTargetRequest{HostPublicKey: new(partialHostKey(t))})
+	denied(t, err, "a cookie added a server with a host key")
+	byName, err := add(webTargets(t, cfg, srv, bob, oldSignIn), &nokkuv1.CreateTargetRequest{})
+	require.NoError(t, err, "the web app could not add a server by name")
+
+	// A handoff needs nobody who added the server, only a fresh sign-in.
+	require.NoError(t, remove(bobWeb, first), "a fresh sign-in could not delete a colleague's server")
+	require.NoError(t, remove(aliceNK, second), "nk could not delete the server its person added")
+	require.NoError(t, remove(bobNK, byName), "nk could not delete a server its person added in the web app")
 }
 
 // Sessions and recordings show the daemon's name, so a rename has to reach it.
@@ -765,14 +908,7 @@ func TestAMachineManagesOnlyTheServersItAdded(t *testing.T) {
 		GetCertificateAuthority(t.Context(), &nokkuv1.GetCertificateAuthorityRequest{})
 	require.NoError(t, err)
 	caKey := authority.GetCertificateAuthority().GetUserPublicKey()
-	hostKey := func() string {
-		pub, _, err := ed25519.GenerateKey(rand.Reader)
-		require.NoError(t, err)
-		sshPub, err := ssh.NewPublicKey(pub)
-		require.NoError(t, err)
-		return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPub)))
-	}
-	pinned, attacker := hostKey(), hostKey()
+	pinned, attacker := partialHostKey(t), partialHostKey(t)
 
 	added, err := terraform.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
 		Name: new(uniq("web")), Endpoints: []string{"10.0.0.2:22"}, HostPublicKey: &pinned,
@@ -782,10 +918,9 @@ func TestAMachineManagesOnlyTheServersItAdded(t *testing.T) {
 	// A server a person or a daemon brought is no machine's.
 	byHand := seedTarget(t, cfg, ws)
 
-	repoint := func(as nokkuv1connect.TargetServiceClient, id string) error {
+	repin := func(as nokkuv1connect.TargetServiceClient, id string) error {
 		_, err := as.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
-			TargetId: &id, Usernames: []string{"root"}, Endpoints: []string{"203.0.113.66:22"},
-			HostPublicKey: &attacker, UserCaPublicKey: &caKey,
+			TargetId: &id, Usernames: []string{"root"}, HostPublicKey: &attacker, UserCaPublicKey: &caKey,
 		})
 		return err
 	}
@@ -793,23 +928,17 @@ func TestAMachineManagesOnlyTheServersItAdded(t *testing.T) {
 		_, err := as.DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: &id})
 		return err
 	}
-	denied := func(err error, what string) {
-		t.Helper()
-		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "%s, got %v", what, err)
-	}
 
-	denied(repoint(leaked, own), "a machine repointed a server another machine added")
-	denied(remove(leaked, own), "a machine removed a server another machine added")
-	denied(repoint(terraform, byHand), "a machine repointed a server it did not add")
-	denied(remove(terraform, byHand), "a machine removed a server it did not add")
+	denied(t, repin(leaked, own), "a machine pinned a host key on a server another machine added")
+	denied(t, remove(leaked, own), "a machine removed a server another machine added")
+	denied(t, repin(terraform, byHand), "a machine pinned a host key on a server it did not add")
+	denied(t, remove(terraform, byHand), "a machine removed a server it did not add")
 	got, err := person.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &own})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"10.0.0.2:22"}, got.GetTarget().GetEndpoints(), "a refused sync moved the server")
 	assert.Equal(t, pinned, got.GetTarget().GetHostPublicKey(), "a refused sync changed the pinned host key")
 
-	// Its own servers it syncs and removes. A person does both with any, as in the web app.
-	require.NoError(t, repoint(terraform, own))
-	require.NoError(t, repoint(person, byHand))
+	// Its own servers it syncs and removes. A person removes any, as in the web app.
+	require.NoError(t, repin(terraform, own))
 	require.NoError(t, remove(person, byHand))
 	require.NoError(t, remove(terraform, own))
 }

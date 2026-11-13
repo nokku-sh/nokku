@@ -13,6 +13,8 @@ export type BulkAction<T> = {
 	show?: (selectedItems: T[]) => boolean;
 	/** Asks first. The action runs inside the dialog, which shows its spinner. */
 	confirm?: (selectedItems: T[]) => ConfirmOptions;
+	/** The call takes a recent sign-in, so that is settled before anything opens. */
+	fresh?: boolean;
 	onClick?: (selectedItems: T[]) => unknown;
 };
 

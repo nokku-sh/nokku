@@ -55,6 +55,18 @@ SCIMService.CreateSCIMToken | cli | refused | permission_denied: do this in the 
 TargetService.UpdateTarget address | browser fresh | accepted | not_found: the requested resource was not found | session kept
 TargetService.UpdateTarget address | browser old | refused | unauthenticated: sign in again to continue | session ended
 TargetService.UpdateTarget address | cli | refused | permission_denied: do this in the web app | session kept
+TargetService.UpdateTarget name | browser fresh | accepted | not_found: the requested resource was not found | session kept
+TargetService.UpdateTarget name | browser old | refused | unauthenticated: sign in again to continue | session ended
+TargetService.UpdateTarget name | cli | refused | permission_denied: do this in the web app | session kept
+DaemonService.DeleteDaemon | browser fresh | accepted | not_found: the requested resource was not found | session kept
+DaemonService.DeleteDaemon | browser old | refused | unauthenticated: sign in again to continue | session ended
+DaemonService.DeleteDaemon | cli | refused | permission_denied: do this in the web app | session kept
+TargetService.DeleteTarget | browser fresh | accepted | not_found: the requested resource was not found | session kept
+TargetService.DeleteTarget | browser old | refused | unauthenticated: sign in again to continue | session ended
+TargetService.DeleteTarget | cli | accepted | not_found: the requested resource was not found | session kept
+TargetService.ForgetHostKey | browser fresh | accepted | not_found: the requested resource was not found | session kept
+TargetService.ForgetHostKey | browser old | refused | unauthenticated: sign in again to continue | session ended
+TargetService.ForgetHostKey | cli | refused | permission_denied: do this in the web app | session kept
 SSOService.PutSSOProvider | browser fresh | accepted | ok | session kept
 SSOService.PutSSOProvider | browser old | refused | unauthenticated: sign in again to continue | session ended
 SSOService.PutSSOProvider | cli | refused | permission_denied: do this in the web app | session kept

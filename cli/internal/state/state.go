@@ -45,6 +45,8 @@ type Target struct {
 	HostPublicKey string `json:"host_public_key,omitempty"`
 	// LastSyncAt is when nk sync last wrote the CA key to a manual target.
 	LastSyncAt time.Time `json:"last_sync_at,omitzero"`
+	// CreatedBy is who added the target, only they pin a new host key with nk sync.
+	CreatedBy string `json:"created_by,omitempty"`
 }
 
 // Config keeps a session with the API that issued it.

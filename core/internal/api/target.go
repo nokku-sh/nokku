@@ -109,6 +109,14 @@ func (s *targetService) CreateTarget(
 	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
 		return nil, err
 	}
+	// A cookie adds a server by name only, or an old one could put a deleted server's name on another host.
+	caller, _ := actor.PrincipalFromContext(ctx)
+	if caller.Kind == actor.KindUser && (len(req.GetEndpoints()) > 0 || req.GetHostPublicKey() != "") {
+		return nil, connect.NewError(
+			connect.CodePermissionDenied,
+			"add the server by name, then run nk sync on it or set its address in the settings",
+		)
+	}
 
 	name := strings.TrimSpace(req.GetName())
 	if name != "" {
@@ -210,20 +218,31 @@ func seedTargetGrants(ctx context.Context, q *db.Queries, targetID string, grant
 	return nil
 }
 
-// ownTarget keeps a service account to the servers it added. Its key is a string in a secret store, so a leaked
-// one must not delete the fleet or point someone else's server at another host and host key. People are not held
-// to it, they can do both in the web app anyway.
-func ownTarget(ctx context.Context, target *db.Target) error {
-	caller, _ := actor.PrincipalFromContext(ctx)
-	if caller.Kind != actor.KindServiceAccount {
-		return nil
-	}
-	if target.CreatedBy != nil && *target.CreatedBy == caller.ID {
+// ownTarget keeps a service account to the servers it added, a leaked key must not repoint someone else's.
+func ownTarget(caller actor.Principal, target *db.Target) error {
+	if caller.Kind != actor.KindServiceAccount || addedBy(target, caller) {
 		return nil
 	}
 	return connect.NewError(
 		connect.CodePermissionDenied,
-		"a service account can only sync or remove the servers it added itself",
+		"a service account can only sync the servers it added itself",
+	)
+}
+
+func addedBy(target *db.Target, caller actor.Principal) bool {
+	return target.CreatedBy != nil && *target.CreatedBy == caller.ID
+}
+
+// repinTarget lets only whoever added a server replace its pinned host key, the first pin stays open.
+func repinTarget(caller actor.Principal, target *db.Target, req *nokkuv1.SyncTargetUsersRequest) error {
+	key, pinned := strings.TrimSpace(req.GetHostPublicKey()), target.HostPublicKey
+	if key == "" || pinned == nil || key == *pinned || addedBy(target, caller) {
+		return nil
+	}
+	return connect.NewError(
+		connect.CodePermissionDenied,
+		"only whoever added this server can pin a new host key with nk sync. "+
+			"Anyone else forgets the host key in the web app, in the server's settings",
 	)
 }
 
@@ -264,8 +283,12 @@ func (s *targetService) DeleteTarget(
 			return err
 		}
 		audit.Set(ctx, "name", target.Name)
-		if err := ownTarget(ctx, target); err != nil {
-			return err
+		// A browser needed a fresh sign-in to get here. A stolen nk session or key must not delete the fleet.
+		if caller, _ := actor.PrincipalFromContext(ctx); caller.Kind != actor.KindUser && !addedBy(target, caller) {
+			return connect.NewError(
+				connect.CodePermissionDenied,
+				"only whoever added this server deletes it with nk rm. Anyone else deletes it in the web app",
+			)
 		}
 		if target.DaemonID != nil {
 			_, err = q.DeleteDaemon(ctx, *target.DaemonID)
@@ -341,13 +364,21 @@ func (s *targetService) SyncTargetUsers(
 	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
 		return nil, err
 	}
+	caller, _ := actor.PrincipalFromContext(ctx)
 
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		target, err := q.GetTarget(ctx, req.GetTargetId())
+		// Locked, or two reports that both saw no pin would both pin.
+		target, err := q.LockTarget(ctx, req.GetTargetId())
 		if err != nil {
 			return err
 		}
-		if err := ownTarget(ctx, target); err != nil {
+		if target.DaemonID != nil {
+			return connect.NewError(connect.CodeInvalidArgument, "this server runs the daemon, which reports for it")
+		}
+		if err := ownTarget(caller, target); err != nil {
+			return err
+		}
+		if err := repinTarget(caller, target, req); err != nil {
 			return err
 		}
 		// The stamp says the host has the current key, so check it under the lock.
@@ -371,7 +402,6 @@ func (s *targetService) SyncTargetUsers(
 
 		if err := q.ReportManualSync(ctx, &db.ReportManualSyncParams{
 			TargetID:      req.GetTargetId(),
-			Endpoints:     req.GetEndpoints(),
 			HostPublicKey: trimmed(req.HostPublicKey),
 		}); err != nil {
 			return err
@@ -382,6 +412,30 @@ func (s *targetService) SyncTargetUsers(
 	}
 
 	return &nokkuv1.SyncTargetUsersResponse{}, nil
+}
+
+// ForgetHostKey leaves the server without a pin, so the next nk sync is a first one and anyone's may pin again.
+func (s *targetService) ForgetHostKey(
+	ctx context.Context,
+	req *nokkuv1.ForgetHostKeyRequest,
+) (*nokkuv1.ForgetHostKeyResponse, error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		target, err := q.GetTarget(ctx, req.GetId())
+		if err != nil {
+			return err
+		}
+		audit.Set(ctx, "name", target.Name)
+		if target.DaemonID != nil {
+			return connect.NewError(
+				connect.CodeFailedPrecondition,
+				"a server with the daemon has no pinned host key, the certificate authority vouches for it",
+			)
+		}
+		return q.ForgetHostKey(ctx, target.ID)
+	}); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.ForgetHostKeyResponse{}, nil
 }
 
 func (s *targetService) GetSubjectAccess(

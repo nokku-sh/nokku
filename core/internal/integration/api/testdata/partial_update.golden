@@ -253,6 +253,7 @@ TargetService.UpdateTarget sets name: daemon.created_at kept
 TargetService.UpdateTarget sets name: daemon.last_seen_at kept
 TargetService.UpdateTarget sets name: daemon.version kept
 TargetService.UpdateTarget sets name: daemon.behind_since kept
+TargetService.UpdateTarget sets name: created_by kept
 TargetService.UpdateTarget sets description: daemon_id kept
 TargetService.UpdateTarget sets description: name kept
 TargetService.UpdateTarget sets description: description changed
@@ -282,6 +283,7 @@ TargetService.UpdateTarget sets description: daemon.created_at kept
 TargetService.UpdateTarget sets description: daemon.last_seen_at kept
 TargetService.UpdateTarget sets description: daemon.version kept
 TargetService.UpdateTarget sets description: daemon.behind_since kept
+TargetService.UpdateTarget sets description: created_by kept
 TargetService.UpdateTarget sets endpoints: daemon_id kept
 TargetService.UpdateTarget sets endpoints: name kept
 TargetService.UpdateTarget sets endpoints: description kept
@@ -311,6 +313,7 @@ TargetService.UpdateTarget sets endpoints: daemon.created_at kept
 TargetService.UpdateTarget sets endpoints: daemon.last_seen_at kept
 TargetService.UpdateTarget sets endpoints: daemon.version kept
 TargetService.UpdateTarget sets endpoints: daemon.behind_since kept
+TargetService.UpdateTarget sets endpoints: created_by kept
 TargetService.UpdateTarget sets tags: daemon_id kept
 TargetService.UpdateTarget sets tags: name kept
 TargetService.UpdateTarget sets tags: description kept
@@ -340,6 +343,7 @@ TargetService.UpdateTarget sets tags: daemon.created_at kept
 TargetService.UpdateTarget sets tags: daemon.last_seen_at kept
 TargetService.UpdateTarget sets tags: daemon.version kept
 TargetService.UpdateTarget sets tags: daemon.behind_since kept
+TargetService.UpdateTarget sets tags: created_by kept
 TargetService.UpdateTarget sets tags to none: daemon_id kept
 TargetService.UpdateTarget sets tags to none: name kept
 TargetService.UpdateTarget sets tags to none: description kept
@@ -369,6 +373,7 @@ TargetService.UpdateTarget sets tags to none: daemon.created_at kept
 TargetService.UpdateTarget sets tags to none: daemon.last_seen_at kept
 TargetService.UpdateTarget sets tags to none: daemon.version kept
 TargetService.UpdateTarget sets tags to none: daemon.behind_since kept
+TargetService.UpdateTarget sets tags to none: created_by kept
 TargetService.UpdateTarget sets endpoints to none: daemon_id kept
 TargetService.UpdateTarget sets endpoints to none: name kept
 TargetService.UpdateTarget sets endpoints to none: description kept
@@ -398,6 +403,7 @@ TargetService.UpdateTarget sets endpoints to none: daemon.created_at kept
 TargetService.UpdateTarget sets endpoints to none: daemon.last_seen_at kept
 TargetService.UpdateTarget sets endpoints to none: daemon.version kept
 TargetService.UpdateTarget sets endpoints to none: daemon.behind_since kept
+TargetService.UpdateTarget sets endpoints to none: created_by kept
 TargetService.UpdateTarget sets nothing: daemon_id kept
 TargetService.UpdateTarget sets nothing: name kept
 TargetService.UpdateTarget sets nothing: description kept
@@ -427,6 +433,7 @@ TargetService.UpdateTarget sets nothing: daemon.created_at kept
 TargetService.UpdateTarget sets nothing: daemon.last_seen_at kept
 TargetService.UpdateTarget sets nothing: daemon.version kept
 TargetService.UpdateTarget sets nothing: daemon.behind_since kept
+TargetService.UpdateTarget sets nothing: created_by kept
 AuditStreamService.UpdateAuditStream baseline: empty []
 AuditStreamService.UpdateAuditStream sets url: error invalid_argument "enter the secret again when the URL changes"
 AuditStreamService.UpdateAuditStream sets url: kind kept

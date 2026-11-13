@@ -42,6 +42,7 @@ service TargetService {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
       cli: true
+      browser: BROWSER_FRESH
     };
   }
   rpc GetSubjectAccess(GetSubjectAccessRequest) returns (GetSubjectAccessResponse) {
@@ -59,6 +60,15 @@ service TargetService {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
       cli: true
+      browser: BROWSER_REFUSED
+    };
+  }
+  // ForgetHostKey drops the pinned host key of a server without a daemon, for a server that was reinstalled and
+  // whoever added it is not around to pin the new key. Nobody logs in to it until the next nk sync pins one.
+  rpc ForgetHostKey(ForgetHostKeyRequest) returns (ForgetHostKeyResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      fresh: true
     };
   }
   rpc GetAccessGraph(GetAccessGraphRequest) returns (GetAccessGraphResponse) {
@@ -85,20 +95,19 @@ message SyncTargetUsersRequest {
       string: {max_len: 256}
     }
   }];
-  repeated string endpoints = 4 [(buf.validate.field).repeated = {
-    max_items: 16
-    items: {
-      string: {max_len: 255}
-    }
-  }];
   // The CA key nk sync wrote. A report for a key a rollover replaced fails.
-  string user_ca_public_key = 5 [(buf.validate.field).string = {
+  string user_ca_public_key = 4 [(buf.validate.field).string = {
     min_len: 1
     max_len: 1024
   }];
 }
 
 message SyncTargetUsersResponse {}
+
+message ForgetHostKeyRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ForgetHostKeyResponse {}
 
 message Target {
   string id = 1;
@@ -120,6 +129,9 @@ message Target {
   AccessBlock blocked = 15;
   // daemon is the server's daemon with its live state, from ListTargets and GetTarget. Unset for nk sync servers.
   Daemon daemon = 16;
+  // created_by is the person or service account that added the server, unset after a daemon's enrollment. Only they
+  // replace its pinned host key with nk sync.
+  string created_by = 17;
 }
 
 // AccessBlock is why grants that stand let nobody in today.

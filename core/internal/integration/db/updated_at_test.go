@@ -83,7 +83,7 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 			return err
 		}
 		if err := q.ReportManualSync(t.Context(), &db.ReportManualSyncParams{
-			TargetID: f.target, Endpoints: []string{"10.0.0.6:22"},
+			TargetID: f.target, HostPublicKey: new("ssh-ed25519 AAAA"),
 		}); err != nil {
 			return err
 		}

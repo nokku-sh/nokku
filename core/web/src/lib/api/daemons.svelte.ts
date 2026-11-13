@@ -2,6 +2,7 @@ import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { DaemonService, DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
 import { confirm } from '#lib/hooks/index.js';
 import { useMutation, useQuery } from '#lib/query/index.js';
+import { whenFresh } from './auth.svelte';
 import { plural, useBulkMutation } from './bulk';
 import { addSession, TerminalSession } from './terminal.svelte';
 import { usePatch, withMask } from './mask';
@@ -45,15 +46,17 @@ export function useDaemonReview() {
 		approve: (d: Pick<Daemon, 'id'>) =>
 			update.mutateAsync({ id: d.id, status: DaemonStatus.ACCEPTED }),
 		reject(d: Pick<Daemon, 'id' | 'name'>, done?: () => void) {
-			void confirm({
-				title: `Reject ${d.name}?`,
-				description: 'The server and its daemon are removed. The host has to enroll again.',
-				confirmText: 'Reject',
-				onConfirm: async () => {
-					await remove.mutateAsync({ id: d.id });
-					done?.();
-				}
-			});
+			void whenFresh(() =>
+				confirm({
+					title: `Reject ${d.name}?`,
+					description: 'The server and its daemon are removed. The host has to enroll again.',
+					confirmText: 'Reject',
+					onConfirm: async () => {
+						await remove.mutateAsync({ id: d.id });
+						done?.();
+					}
+				})
+			);
 		}
 	};
 }

@@ -30,6 +30,15 @@ FROM
 WHERE
   id = @target_id;
 
+-- name: LockTarget :one
+SELECT
+  *
+FROM
+  targets
+WHERE
+  id = @target_id
+FOR UPDATE;
+
 -- name: ListTargets :many
 SELECT
   sqlc.embed(t),
@@ -173,18 +182,22 @@ ORDER BY
   username ASC;
 
 -- name: ReportManualSync :exec
--- What nk sync reports about a host without a daemon. An empty value keeps what the target has, and an
--- unchanged report writes nothing. It is no edit, so updated_at stays.
+-- The host key nk sync saw on a host without a daemon. No key keeps the one the target has, and an unchanged
+-- report writes nothing. It is no edit, so updated_at stays.
 UPDATE targets
 SET
-  endpoints = COALESCE(NULLIF(sqlc.narg('endpoints')::TEXT[], '{}'), endpoints),
-  host_public_key = COALESCE(sqlc.narg('host_public_key'), host_public_key)
+  host_public_key = sqlc.narg('host_public_key')
 WHERE
   id = @target_id
-  AND (
-    COALESCE(NULLIF(sqlc.narg('endpoints')::TEXT[], '{}'), endpoints) IS DISTINCT FROM endpoints
-    OR COALESCE(sqlc.narg('host_public_key'), host_public_key) IS DISTINCT FROM host_public_key
-  );
+  AND sqlc.narg('host_public_key')::TEXT IS NOT NULL
+  AND host_public_key IS DISTINCT FROM sqlc.narg('host_public_key');
+
+-- name: ForgetHostKey :exec
+UPDATE targets
+SET
+  host_public_key = NULL
+WHERE
+  id = @target_id;
 
 -- name: TouchTargetSync :exec
 -- On its own, a statement that sets the stamp with another column would tell every console.

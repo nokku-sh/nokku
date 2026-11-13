@@ -26,7 +26,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/target.proto.
  */
 export const file_nokku_v1_target: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS90YXJnZXQucHJvdG8SCG5va2t1LnYxIr8BChZTeW5jVGFyZ2V0VXNlcnNSZXF1ZXN0EhsKCXRhcmdldF9pZBgBIAEoCUIIukgFcgOwAQESFwoPaG9zdF9wdWJsaWNfa2V5GAIgASgJEiMKCXVzZXJuYW1lcxgDIAMoCUIQukgNkgEKEMgBIgVyAxiAAhIiCgllbmRwb2ludHMYBCADKAlCD7pIDJIBCRAQIgVyAxj/ARImChJ1c2VyX2NhX3B1YmxpY19rZXkYBSABKAlCCrpIB3IFEAEYgAgiGQoXU3luY1RhcmdldFVzZXJzUmVzcG9uc2UinQUKBlRhcmdldBIKCgJpZBgBIAEoCRIRCglkYWVtb25faWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIXCg9ob3N0X3B1YmxpY19rZXkYBSABKAkSDAoEdGFncxgGIAMoCRIRCgllbmRwb2ludHMYByADKAkSEQoJdXNlcm5hbWVzGAggAygJEikKCGFjY291bnRzGAkgAygLMhcubm9ra3UudjEuVGFyZ2V0QWNjb3VudBIwCghtZXRhZGF0YRgKIAMoCzIeLm5va2t1LnYxLlRhcmdldC5NZXRhZGF0YUVudHJ5Ei4KCmNyZWF0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3Rfc3luY19hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASRAoTdXNlcm5hbWVfZXhwaXJlc19hdBgOIAMoCzInLm5va2t1LnYxLlRhcmdldC5Vc2VybmFtZUV4cGlyZXNBdEVudHJ5EiYKB2Jsb2NrZWQYDyABKA4yFS5ub2trdS52MS5BY2Nlc3NCbG9jaxIgCgZkYWVtb24YECABKAsyEC5ub2trdS52MS5EYWVtb24aLwoNTWV0YWRhdGFFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBGlQKFlVzZXJuYW1lRXhwaXJlc0F0RW50cnkSCwoDa2V5GAEgASgJEikKBXZhbHVlGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcDoCOAEiKAoQR2V0VGFyZ2V0UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiNQoRR2V0VGFyZ2V0UmVzcG9uc2USIAoGdGFyZ2V0GAEgASgLMhAubm9ra3UudjEuVGFyZ2V0ItoBChNDcmVhdGVUYXJnZXRSZXF1ZXN0EjYKBG5hbWUYASABKAlCKLpIJXIjGIACMh5eJHxeW2EtekEtWjAtOV1bYS16QS1aMC05LV9dKiQSHQoLZGVzY3JpcHRpb24YAiABKAlCCLpIBXIDGOgHEhcKD2hvc3RfcHVibGljX2tleRgDIAEoCRIRCgllbmRwb2ludHMYBCADKAkSDAoEdGFncxgFIAMoCRIyCgZncmFudHMYBiADKAsyGC5ub2trdS52MS5Kb2luVG9rZW5HcmFudEIIukgFkgECECAiOAoUQ3JlYXRlVGFyZ2V0UmVzcG9uc2USIAoGdGFyZ2V0GAEgASgLMhAubm9ra3UudjEuVGFyZ2V0IoICChNVcGRhdGVUYXJnZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARI1CgRuYW1lGAIgASgJQie6SCRyIhABGIACMhteW2EtekEtWjAtOV1bYS16QS1aMC05LV9dKiQSHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEhEKCWVuZHBvaW50cxgEIAMoCRIMCgR0YWdzGAUgAygJEl4KC3VwZGF0ZV9tYXNrGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0ItukgqyAEB4gEkEgRuYW1lEgtkZXNjcmlwdGlvbhIJZW5kcG9pbnRzEgR0YWdzIjgKFFVwZGF0ZVRhcmdldFJlc3BvbnNlEiAKBnRhcmdldBgBIAEoCzIQLm5va2t1LnYxLlRhcmdldCIrChNEZWxldGVUYXJnZXRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIWChREZWxldGVUYXJnZXRSZXNwb25zZSLZAQoSTGlzdFRhcmdldHNSZXF1ZXN0EhgKBWxpbWl0GAEgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAIgASgFQge6SAQaAigAEg0KBXF1ZXJ5GAMgASgJEhEKCWRhZW1vbl9pZBgEIAEoCRIQCghhY2NvdW50cxgFIAMoCRIMCgR0YWdzGAYgAygJEjAKBnN0YXR1cxgHIAEoDjIWLm5va2t1LnYxLlRhcmdldFN0YXR1c0IIukgFggECEAESHAoDaWRzGAggAygJQg+6SAySAQkQZCIFcgOwAQEiRwoTTGlzdFRhcmdldHNSZXNwb25zZRIhCgd0YXJnZXRzGAEgAygLMhAubm9ra3UudjEuVGFyZ2V0Eg0KBXRvdGFsGAIgASgFIjcKF0dldFN1YmplY3RBY2Nlc3NSZXF1ZXN0EhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBIv8BChhHZXRTdWJqZWN0QWNjZXNzUmVzcG9uc2USIQoHdGFyZ2V0cxgBIAMoCzIQLm5va2t1LnYxLlRhcmdldBIhCgdkYWVtb25zGAIgAygLMhAubm9ra3UudjEuRGFlbW9uEj0KFWNlcnRpZmljYXRlX2F1dGhvcml0eRgDIAEoCzIeLm5va2t1LnYxLkNlcnRpZmljYXRlQXV0aG9yaXR5Eh4KBHVzZXIYBCABKAsyDi5ub2trdS52MS5Vc2VySAASMwoPc2VydmljZV9hY2NvdW50GAUgASgLMhgubm9ra3UudjEuU2VydmljZUFjY291bnRIAEIJCgdzdWJqZWN0IhkKF0dldFRhcmdldEZpbHRlcnNSZXF1ZXN0IjoKGEdldFRhcmdldEZpbHRlcnNSZXNwb25zZRIMCgR0YWdzGAEgAygJEhAKCGFjY291bnRzGAIgAygJIoABChFBY2Nlc3NHcmFwaEZpbHRlchIcCgpzdWJqZWN0X2lkGAEgASgJQgi6SAVyA7ABARIbCgl0YXJnZXRfaWQYAiABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAMgASgJQge6SARyAhggEhUKA3RhZxgEIAEoCUIIukgFcgMYgAIiRAoVR2V0QWNjZXNzR3JhcGhSZXF1ZXN0EisKBmZpbHRlchgBIAEoCzIbLm5va2t1LnYxLkFjY2Vzc0dyYXBoRmlsdGVyIogCChZHZXRBY2Nlc3NHcmFwaFJlc3BvbnNlEi4KCHN1YmplY3RzGAEgAygLMhwubm9ra3UudjEuQWNjZXNzR3JhcGhTdWJqZWN0Ei4KCGFjY291bnRzGAIgAygLMhwubm9ra3UudjEuQWNjZXNzR3JhcGhBY2NvdW50EiYKBHRhZ3MYAyADKAsyGC5ub2trdS52MS5BY2Nlc3NHcmFwaFRhZxIqCgZncmFudHMYBCADKAsyGi5ub2trdS52MS5BY2Nlc3NHcmFwaEdyYW50EikKBXJlYWNoGAUgAygLMhoubm9ra3UudjEuQWNjZXNzR3JhcGhSZWFjaBIPCgd0YXJnZXRzGAYgASgFIokBChJBY2Nlc3NHcmFwaFN1YmplY3QSCgoCaWQYASABKAkSIwoEa2luZBgCIAEoDjIVLm5va2t1LnYxLlN1YmplY3RLaW5kEgwKBG5hbWUYAyABKAkSDQoFZW1haWwYBCABKAkSFAoMbWVtYmVyX2NvdW50GAUgASgFEg8KB3RhcmdldHMYBiABKAUiNwoSQWNjZXNzR3JhcGhBY2NvdW50EhAKCHVzZXJuYW1lGAEgASgJEg8KB3RhcmdldHMYAiABKAUiPQoOQWNjZXNzR3JhcGhUYWcSCwoDdGFnGAEgASgJEg8KB3RhcmdldHMYAiABKAUSDQoFdG90YWwYAyABKAUiSQoQQWNjZXNzR3JhcGhHcmFudBISCgpzdWJqZWN0X2lkGAEgASgJEhAKCHVzZXJuYW1lGAIgASgJEg8KB3RhcmdldHMYAyABKAUiQgoQQWNjZXNzR3JhcGhSZWFjaBIQCgh1c2VybmFtZRgBIAEoCRILCgN0YWcYAiABKAkSDwoHdGFyZ2V0cxgDIAEoBSKWAQodTGlzdEFjY2Vzc0dyYXBoVGFyZ2V0c1JlcXVlc3QSKwoGZmlsdGVyGAEgASgLMhsubm9ra3UudjEuQWNjZXNzR3JhcGhGaWx0ZXISFQoDdGFnGAIgASgJQgi6SAVyAxiAAhIYCgVsaW1pdBgDIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgEIAEoBUIHukgEGgIoACJdCh5MaXN0QWNjZXNzR3JhcGhUYXJnZXRzUmVzcG9uc2USLAoHdGFyZ2V0cxgBIAMoCzIbLm5va2t1LnYxLkFjY2Vzc0dyYXBoVGFyZ2V0Eg0KBXRvdGFsGAIgASgFIj4KEUFjY2Vzc0dyYXBoVGFyZ2V0EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDwoHbWF0Y2hlZBgDIAEoCCKyAQoWR2V0QWNjZXNzTWF0cml4UmVxdWVzdBIXCgVxdWVyeRgBIAEoCUIIukgFcgMYgAISLQoEa2luZBgCIAEoDjIVLm5va2t1LnYxLlN1YmplY3RLaW5kQgi6SAWCAQIQARIdCgR0YWdzGAMgAygJQg+6SAySAQkQFCIFcgMYgAISGAoFbGltaXQYBCABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYBSABKAVCB7pIBBoCKAAipAEKF0dldEFjY2Vzc01hdHJpeFJlc3BvbnNlEikKB2NvbHVtbnMYASADKAsyGC5ub2trdS52MS5BY2Nlc3NHcmFwaFRhZxInCgRyb3dzGAIgAygLMhkubm9ra3UudjEuQWNjZXNzTWF0cml4Um93Eg0KBXRvdGFsGAMgASgFEiYKBHRhZ3MYBCADKAsyGC5ub2trdS52MS5BY2Nlc3NHcmFwaFRhZyK5AQoPQWNjZXNzTWF0cml4Um93EhIKCnN1YmplY3RfaWQYASABKAkSIwoEa2luZBgCIAEoDjIVLm5va2t1LnYxLlN1YmplY3RLaW5kEgwKBG5hbWUYAyABKAkSDQoFZW1haWwYBCABKAkSFAoMbWVtYmVyX2NvdW50GAUgASgFEg8KB3RhcmdldHMYBiABKAUSKQoFY2VsbHMYByADKAsyGi5ub2trdS52MS5BY2Nlc3NNYXRyaXhDZWxsIqUBChBBY2Nlc3NNYXRyaXhDZWxsEgsKA3RhZxgBIAEoCRIPCgd0YXJnZXRzGAIgASgFEhEKCXVzZXJuYW1lcxgDIAMoCRIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxsYXN0X3VzZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wKnEKC0FjY2Vzc0Jsb2NrEhwKGEFDQ0VTU19CTE9DS19VTlNQRUNJRklFRBAAEh4KGkFDQ0VTU19CTE9DS19VU0VSX0lOQUNUSVZFEAESJAogQUNDRVNTX0JMT0NLX0RBRU1PTl9OT1RfQVBQUk9WRUQQAiqXAQoMVGFyZ2V0U3RhdHVzEh0KGVRBUkdFVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIZChVUQVJHRVRfU1RBVFVTX1BFTkRJTkcQARIYChRUQVJHRVRfU1RBVFVTX09OTElORRACEhkKFVRBUkdFVF9TVEFUVVNfT0ZGTElORRADEhgKFFRBUkdFVF9TVEFUVVNfTUFOVUFMEAQysQgKDVRhcmdldFNlcnZpY2USTwoJR2V0VGFyZ2V0Ehoubm9ra3UudjEuR2V0VGFyZ2V0UmVxdWVzdBobLm5va2t1LnYxLkdldFRhcmdldFJlc3BvbnNlIgmQAgHC8xgCGAISVwoLTGlzdFRhcmdldHMSHC5ub2trdS52MS5MaXN0VGFyZ2V0c1JlcXVlc3QaHS5ub2trdS52MS5MaXN0VGFyZ2V0c1Jlc3BvbnNlIguQAgHC8xgEGAJYARJZCgxDcmVhdGVUYXJnZXQSHS5ub2trdS52MS5DcmVhdGVUYXJnZXRSZXF1ZXN0Gh4ubm9ra3UudjEuQ3JlYXRlVGFyZ2V0UmVzcG9uc2UiCsLzGAYYA0ABWAESVwoMVXBkYXRlVGFyZ2V0Eh0ubm9ra3UudjEuVXBkYXRlVGFyZ2V0UmVxdWVzdBoeLm5va2t1LnYxLlVwZGF0ZVRhcmdldFJlc3BvbnNlIgjC8xgEGAMoARJXCgxEZWxldGVUYXJnZXQSHS5ub2trdS52MS5EZWxldGVUYXJnZXRSZXF1ZXN0Gh4ubm9ra3UudjEuRGVsZXRlVGFyZ2V0UmVzcG9uc2UiCMLzGAQYA1gBEmYKEEdldFN1YmplY3RBY2Nlc3MSIS5ub2trdS52MS5HZXRTdWJqZWN0QWNjZXNzUmVxdWVzdBoiLm5va2t1LnYxLkdldFN1YmplY3RBY2Nlc3NSZXNwb25zZSILkAIBwvMYBBABWAESZAoQR2V0VGFyZ2V0RmlsdGVycxIhLm5va2t1LnYxLkdldFRhcmdldEZpbHRlcnNSZXF1ZXN0GiIubm9ra3UudjEuR2V0VGFyZ2V0RmlsdGVyc1Jlc3BvbnNlIgmQAgHC8xgCGAISYAoPU3luY1RhcmdldFVzZXJzEiAubm9ra3UudjEuU3luY1RhcmdldFVzZXJzUmVxdWVzdBohLm5va2t1LnYxLlN5bmNUYXJnZXRVc2Vyc1Jlc3BvbnNlIgjC8xgEGANYARJeCg5HZXRBY2Nlc3NHcmFwaBIfLm5va2t1LnYxLkdldEFjY2Vzc0dyYXBoUmVxdWVzdBogLm5va2t1LnYxLkdldEFjY2Vzc0dyYXBoUmVzcG9uc2UiCZACAcLzGAIYAhJ2ChZMaXN0QWNjZXNzR3JhcGhUYXJnZXRzEicubm9ra3UudjEuTGlzdEFjY2Vzc0dyYXBoVGFyZ2V0c1JlcXVlc3QaKC5ub2trdS52MS5MaXN0QWNjZXNzR3JhcGhUYXJnZXRzUmVzcG9uc2UiCZACAcLzGAIYAhJhCg9HZXRBY2Nlc3NNYXRyaXgSIC5ub2trdS52MS5HZXRBY2Nlc3NNYXRyaXhSZXF1ZXN0GiEubm9ra3UudjEuR2V0QWNjZXNzTWF0cml4UmVzcG9uc2UiCZACAcLzGAIYAkKMAQoMY29tLm5va2t1LnYxQgtUYXJnZXRQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_certificates, file_nokku_v1_daemon, file_nokku_v1_join_token, file_nokku_v1_service_account, file_nokku_v1_target_account]);
+  fileDesc("ChVub2trdS92MS90YXJnZXQucHJvdG8SCG5va2t1LnYxIpsBChZTeW5jVGFyZ2V0VXNlcnNSZXF1ZXN0EhsKCXRhcmdldF9pZBgBIAEoCUIIukgFcgOwAQESFwoPaG9zdF9wdWJsaWNfa2V5GAIgASgJEiMKCXVzZXJuYW1lcxgDIAMoCUIQukgNkgEKEMgBIgVyAxiAAhImChJ1c2VyX2NhX3B1YmxpY19rZXkYBCABKAlCCrpIB3IFEAEYgAgiGQoXU3luY1RhcmdldFVzZXJzUmVzcG9uc2UiLAoURm9yZ2V0SG9zdEtleVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIhcKFUZvcmdldEhvc3RLZXlSZXNwb25zZSKxBQoGVGFyZ2V0EgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEhcKD2hvc3RfcHVibGljX2tleRgFIAEoCRIMCgR0YWdzGAYgAygJEhEKCWVuZHBvaW50cxgHIAMoCRIRCgl1c2VybmFtZXMYCCADKAkSKQoIYWNjb3VudHMYCSADKAsyFy5ub2trdS52MS5UYXJnZXRBY2NvdW50EjAKCG1ldGFkYXRhGAogAygLMh4ubm9ra3UudjEuVGFyZ2V0Lk1ldGFkYXRhRW50cnkSLgoKY3JlYXRlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zeW5jX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBJEChN1c2VybmFtZV9leHBpcmVzX2F0GA4gAygLMicubm9ra3UudjEuVGFyZ2V0LlVzZXJuYW1lRXhwaXJlc0F0RW50cnkSJgoHYmxvY2tlZBgPIAEoDjIVLm5va2t1LnYxLkFjY2Vzc0Jsb2NrEiAKBmRhZW1vbhgQIAEoCzIQLm5va2t1LnYxLkRhZW1vbhISCgpjcmVhdGVkX2J5GBEgASgJGi8KDU1ldGFkYXRhRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ARpUChZVc2VybmFtZUV4cGlyZXNBdEVudHJ5EgsKA2tleRgBIAEoCRIpCgV2YWx1ZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXA6AjgBIigKEEdldFRhcmdldFJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIjUKEUdldFRhcmdldFJlc3BvbnNlEiAKBnRhcmdldBgBIAEoCzIQLm5va2t1LnYxLlRhcmdldCLaAQoTQ3JlYXRlVGFyZ2V0UmVxdWVzdBI2CgRuYW1lGAEgASgJQii6SCVyIxiAAjIeXiR8XlthLXpBLVowLTldW2EtekEtWjAtOS1fXSokEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxIXCg9ob3N0X3B1YmxpY19rZXkYAyABKAkSEQoJZW5kcG9pbnRzGAQgAygJEgwKBHRhZ3MYBSADKAkSMgoGZ3JhbnRzGAYgAygLMhgubm9ra3UudjEuSm9pblRva2VuR3JhbnRCCLpIBZIBAhAgIjgKFENyZWF0ZVRhcmdldFJlc3BvbnNlEiAKBnRhcmdldBgBIAEoCzIQLm5va2t1LnYxLlRhcmdldCKCAgoTVXBkYXRlVGFyZ2V0UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQESNQoEbmFtZRgCIAEoCUInukgkciIQARiAAjIbXlthLXpBLVowLTldW2EtekEtWjAtOS1fXSokEh0KC2Rlc2NyaXB0aW9uGAMgASgJQgi6SAVyAxjoBxIRCgllbmRwb2ludHMYBCADKAkSDAoEdGFncxgFIAMoCRJeCgt1cGRhdGVfbWFzaxgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tCLbpIKsgBAeIBJBIEbmFtZRILZGVzY3JpcHRpb24SCWVuZHBvaW50cxIEdGFncyI4ChRVcGRhdGVUYXJnZXRSZXNwb25zZRIgCgZ0YXJnZXQYASABKAsyEC5ub2trdS52MS5UYXJnZXQiKwoTRGVsZXRlVGFyZ2V0UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiFgoURGVsZXRlVGFyZ2V0UmVzcG9uc2Ui2QEKEkxpc3RUYXJnZXRzUmVxdWVzdBIYCgVsaW1pdBgBIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgCIAEoBUIHukgEGgIoABINCgVxdWVyeRgDIAEoCRIRCglkYWVtb25faWQYBCABKAkSEAoIYWNjb3VudHMYBSADKAkSDAoEdGFncxgGIAMoCRIwCgZzdGF0dXMYByABKA4yFi5ub2trdS52MS5UYXJnZXRTdGF0dXNCCLpIBYIBAhABEhwKA2lkcxgIIAMoCUIPukgMkgEJEGQiBXIDsAEBIkcKE0xpc3RUYXJnZXRzUmVzcG9uc2USIQoHdGFyZ2V0cxgBIAMoCzIQLm5va2t1LnYxLlRhcmdldBINCgV0b3RhbBgCIAEoBSI3ChdHZXRTdWJqZWN0QWNjZXNzUmVxdWVzdBIcCgpzdWJqZWN0X2lkGAEgASgJQgi6SAVyA7ABASL/AQoYR2V0U3ViamVjdEFjY2Vzc1Jlc3BvbnNlEiEKB3RhcmdldHMYASADKAsyEC5ub2trdS52MS5UYXJnZXQSIQoHZGFlbW9ucxgCIAMoCzIQLm5va2t1LnYxLkRhZW1vbhI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYAyABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eRIeCgR1c2VyGAQgASgLMg4ubm9ra3UudjEuVXNlckgAEjMKD3NlcnZpY2VfYWNjb3VudBgFIAEoCzIYLm5va2t1LnYxLlNlcnZpY2VBY2NvdW50SABCCQoHc3ViamVjdCIZChdHZXRUYXJnZXRGaWx0ZXJzUmVxdWVzdCI6ChhHZXRUYXJnZXRGaWx0ZXJzUmVzcG9uc2USDAoEdGFncxgBIAMoCRIQCghhY2NvdW50cxgCIAMoCSKAAQoRQWNjZXNzR3JhcGhGaWx0ZXISHAoKc3ViamVjdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJdGFyZ2V0X2lkGAIgASgJQgi6SAVyA7ABARIZCgh1c2VybmFtZRgDIAEoCUIHukgEcgIYIBIVCgN0YWcYBCABKAlCCLpIBXIDGIACIkQKFUdldEFjY2Vzc0dyYXBoUmVxdWVzdBIrCgZmaWx0ZXIYASABKAsyGy5ub2trdS52MS5BY2Nlc3NHcmFwaEZpbHRlciKIAgoWR2V0QWNjZXNzR3JhcGhSZXNwb25zZRIuCghzdWJqZWN0cxgBIAMoCzIcLm5va2t1LnYxLkFjY2Vzc0dyYXBoU3ViamVjdBIuCghhY2NvdW50cxgCIAMoCzIcLm5va2t1LnYxLkFjY2Vzc0dyYXBoQWNjb3VudBImCgR0YWdzGAMgAygLMhgubm9ra3UudjEuQWNjZXNzR3JhcGhUYWcSKgoGZ3JhbnRzGAQgAygLMhoubm9ra3UudjEuQWNjZXNzR3JhcGhHcmFudBIpCgVyZWFjaBgFIAMoCzIaLm5va2t1LnYxLkFjY2Vzc0dyYXBoUmVhY2gSDwoHdGFyZ2V0cxgGIAEoBSKJAQoSQWNjZXNzR3JhcGhTdWJqZWN0EgoKAmlkGAEgASgJEiMKBGtpbmQYAiABKA4yFS5ub2trdS52MS5TdWJqZWN0S2luZBIMCgRuYW1lGAMgASgJEg0KBWVtYWlsGAQgASgJEhQKDG1lbWJlcl9jb3VudBgFIAEoBRIPCgd0YXJnZXRzGAYgASgFIjcKEkFjY2Vzc0dyYXBoQWNjb3VudBIQCgh1c2VybmFtZRgBIAEoCRIPCgd0YXJnZXRzGAIgASgFIj0KDkFjY2Vzc0dyYXBoVGFnEgsKA3RhZxgBIAEoCRIPCgd0YXJnZXRzGAIgASgFEg0KBXRvdGFsGAMgASgFIkkKEEFjY2Vzc0dyYXBoR3JhbnQSEgoKc3ViamVjdF9pZBgBIAEoCRIQCgh1c2VybmFtZRgCIAEoCRIPCgd0YXJnZXRzGAMgASgFIkIKEEFjY2Vzc0dyYXBoUmVhY2gSEAoIdXNlcm5hbWUYASABKAkSCwoDdGFnGAIgASgJEg8KB3RhcmdldHMYAyABKAUilgEKHUxpc3RBY2Nlc3NHcmFwaFRhcmdldHNSZXF1ZXN0EisKBmZpbHRlchgBIAEoCzIbLm5va2t1LnYxLkFjY2Vzc0dyYXBoRmlsdGVyEhUKA3RhZxgCIAEoCUIIukgFcgMYgAISGAoFbGltaXQYAyABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYBCABKAVCB7pIBBoCKAAiXQoeTGlzdEFjY2Vzc0dyYXBoVGFyZ2V0c1Jlc3BvbnNlEiwKB3RhcmdldHMYASADKAsyGy5ub2trdS52MS5BY2Nlc3NHcmFwaFRhcmdldBINCgV0b3RhbBgCIAEoBSI+ChFBY2Nlc3NHcmFwaFRhcmdldBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB21hdGNoZWQYAyABKAgisgEKFkdldEFjY2Vzc01hdHJpeFJlcXVlc3QSFwoFcXVlcnkYASABKAlCCLpIBXIDGIACEi0KBGtpbmQYAiABKA4yFS5ub2trdS52MS5TdWJqZWN0S2luZEIIukgFggECEAESHQoEdGFncxgDIAMoCUIPukgMkgEJEBQiBXIDGIACEhgKBWxpbWl0GAQgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAUgASgFQge6SAQaAigAIqQBChdHZXRBY2Nlc3NNYXRyaXhSZXNwb25zZRIpCgdjb2x1bW5zGAEgAygLMhgubm9ra3UudjEuQWNjZXNzR3JhcGhUYWcSJwoEcm93cxgCIAMoCzIZLm5va2t1LnYxLkFjY2Vzc01hdHJpeFJvdxINCgV0b3RhbBgDIAEoBRImCgR0YWdzGAQgAygLMhgubm9ra3UudjEuQWNjZXNzR3JhcGhUYWciuQEKD0FjY2Vzc01hdHJpeFJvdxISCgpzdWJqZWN0X2lkGAEgASgJEiMKBGtpbmQYAiABKA4yFS5ub2trdS52MS5TdWJqZWN0S2luZBIMCgRuYW1lGAMgASgJEg0KBWVtYWlsGAQgASgJEhQKDG1lbWJlcl9jb3VudBgFIAEoBRIPCgd0YXJnZXRzGAYgASgFEikKBWNlbGxzGAcgAygLMhoubm9ra3UudjEuQWNjZXNzTWF0cml4Q2VsbCKlAQoQQWNjZXNzTWF0cml4Q2VsbBILCgN0YWcYASABKAkSDwoHdGFyZ2V0cxgCIAEoBRIRCgl1c2VybmFtZXMYAyADKAkSLgoKZXhwaXJlc19hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF91c2VkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCpxCgtBY2Nlc3NCbG9jaxIcChhBQ0NFU1NfQkxPQ0tfVU5TUEVDSUZJRUQQABIeChpBQ0NFU1NfQkxPQ0tfVVNFUl9JTkFDVElWRRABEiQKIEFDQ0VTU19CTE9DS19EQUVNT05fTk9UX0FQUFJPVkVEEAIqlwEKDFRhcmdldFN0YXR1cxIdChlUQVJHRVRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASGQoVVEFSR0VUX1NUQVRVU19QRU5ESU5HEAESGAoUVEFSR0VUX1NUQVRVU19PTkxJTkUQAhIZChVUQVJHRVRfU1RBVFVTX09GRkxJTkUQAxIYChRUQVJHRVRfU1RBVFVTX01BTlVBTBAEMpEJCg1UYXJnZXRTZXJ2aWNlEk8KCUdldFRhcmdldBIaLm5va2t1LnYxLkdldFRhcmdldFJlcXVlc3QaGy5ub2trdS52MS5HZXRUYXJnZXRSZXNwb25zZSIJkAIBwvMYAhgCElcKC0xpc3RUYXJnZXRzEhwubm9ra3UudjEuTGlzdFRhcmdldHNSZXF1ZXN0Gh0ubm9ra3UudjEuTGlzdFRhcmdldHNSZXNwb25zZSILkAIBwvMYBBgCWAESWQoMQ3JlYXRlVGFyZ2V0Eh0ubm9ra3UudjEuQ3JlYXRlVGFyZ2V0UmVxdWVzdBoeLm5va2t1LnYxLkNyZWF0ZVRhcmdldFJlc3BvbnNlIgrC8xgGGANAAVgBElcKDFVwZGF0ZVRhcmdldBIdLm5va2t1LnYxLlVwZGF0ZVRhcmdldFJlcXVlc3QaHi5ub2trdS52MS5VcGRhdGVUYXJnZXRSZXNwb25zZSIIwvMYBBgDKAESWQoMRGVsZXRlVGFyZ2V0Eh0ubm9ra3UudjEuRGVsZXRlVGFyZ2V0UmVxdWVzdBoeLm5va2t1LnYxLkRlbGV0ZVRhcmdldFJlc3BvbnNlIgrC8xgGGANYAWABEmYKEEdldFN1YmplY3RBY2Nlc3MSIS5ub2trdS52MS5HZXRTdWJqZWN0QWNjZXNzUmVxdWVzdBoiLm5va2t1LnYxLkdldFN1YmplY3RBY2Nlc3NSZXNwb25zZSILkAIBwvMYBBABWAESZAoQR2V0VGFyZ2V0RmlsdGVycxIhLm5va2t1LnYxLkdldFRhcmdldEZpbHRlcnNSZXF1ZXN0GiIubm9ra3UudjEuR2V0VGFyZ2V0RmlsdGVyc1Jlc3BvbnNlIgmQAgHC8xgCGAISYgoPU3luY1RhcmdldFVzZXJzEiAubm9ra3UudjEuU3luY1RhcmdldFVzZXJzUmVxdWVzdBohLm5va2t1LnYxLlN5bmNUYXJnZXRVc2Vyc1Jlc3BvbnNlIgrC8xgGGANYAWACEloKDUZvcmdldEhvc3RLZXkSHi5ub2trdS52MS5Gb3JnZXRIb3N0S2V5UmVxdWVzdBofLm5va2t1LnYxLkZvcmdldEhvc3RLZXlSZXNwb25zZSIIwvMYBBgDMAESXgoOR2V0QWNjZXNzR3JhcGgSHy5ub2trdS52MS5HZXRBY2Nlc3NHcmFwaFJlcXVlc3QaIC5ub2trdS52MS5HZXRBY2Nlc3NHcmFwaFJlc3BvbnNlIgmQAgHC8xgCGAISdgoWTGlzdEFjY2Vzc0dyYXBoVGFyZ2V0cxInLm5va2t1LnYxLkxpc3RBY2Nlc3NHcmFwaFRhcmdldHNSZXF1ZXN0Gigubm9ra3UudjEuTGlzdEFjY2Vzc0dyYXBoVGFyZ2V0c1Jlc3BvbnNlIgmQAgHC8xgCGAISYQoPR2V0QWNjZXNzTWF0cml4EiAubm9ra3UudjEuR2V0QWNjZXNzTWF0cml4UmVxdWVzdBohLm5va2t1LnYxLkdldEFjY2Vzc01hdHJpeFJlc3BvbnNlIgmQAgHC8xgCGAJCjAEKDGNvbS5ub2trdS52MUILVGFyZ2V0UHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account, file_nokku_v1_certificates, file_nokku_v1_daemon, file_nokku_v1_join_token, file_nokku_v1_service_account, file_nokku_v1_target_account]);
 
 /**
  * @generated from message nokku.v1.SyncTargetUsersRequest
@@ -48,14 +48,9 @@ export type SyncTargetUsersRequest = Message<"nokku.v1.SyncTargetUsersRequest"> 
   usernames: string[];
 
   /**
-   * @generated from field: repeated string endpoints = 4;
-   */
-  endpoints: string[];
-
-  /**
    * The CA key nk sync wrote. A report for a key a rollover replaced fails.
    *
-   * @generated from field: string user_ca_public_key = 5;
+   * @generated from field: string user_ca_public_key = 4;
    */
   userCaPublicKey: string;
 };
@@ -79,6 +74,36 @@ export type SyncTargetUsersResponse = Message<"nokku.v1.SyncTargetUsersResponse"
  */
 export const SyncTargetUsersResponseSchema: GenMessage<SyncTargetUsersResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_target, 1);
+
+/**
+ * @generated from message nokku.v1.ForgetHostKeyRequest
+ */
+export type ForgetHostKeyRequest = Message<"nokku.v1.ForgetHostKeyRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message nokku.v1.ForgetHostKeyRequest.
+ * Use `create(ForgetHostKeyRequestSchema)` to create a new message.
+ */
+export const ForgetHostKeyRequestSchema: GenMessage<ForgetHostKeyRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_target, 2);
+
+/**
+ * @generated from message nokku.v1.ForgetHostKeyResponse
+ */
+export type ForgetHostKeyResponse = Message<"nokku.v1.ForgetHostKeyResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.ForgetHostKeyResponse.
+ * Use `create(ForgetHostKeyResponseSchema)` to create a new message.
+ */
+export const ForgetHostKeyResponseSchema: GenMessage<ForgetHostKeyResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_target, 3);
 
 /**
  * @generated from message nokku.v1.Target
@@ -171,6 +196,14 @@ export type Target = Message<"nokku.v1.Target"> & {
    * @generated from field: nokku.v1.Daemon daemon = 16;
    */
   daemon?: Daemon | undefined;
+
+  /**
+   * created_by is the person or service account that added the server, unset after a daemon's enrollment. Only they
+   * replace its pinned host key with nk sync.
+   *
+   * @generated from field: string created_by = 17;
+   */
+  createdBy: string;
 };
 
 /**
@@ -178,7 +211,7 @@ export type Target = Message<"nokku.v1.Target"> & {
  * Use `create(TargetSchema)` to create a new message.
  */
 export const TargetSchema: GenMessage<Target> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 2);
+  messageDesc(file_nokku_v1_target, 4);
 
 /**
  * @generated from message nokku.v1.GetTargetRequest
@@ -195,7 +228,7 @@ export type GetTargetRequest = Message<"nokku.v1.GetTargetRequest"> & {
  * Use `create(GetTargetRequestSchema)` to create a new message.
  */
 export const GetTargetRequestSchema: GenMessage<GetTargetRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 3);
+  messageDesc(file_nokku_v1_target, 5);
 
 /**
  * @generated from message nokku.v1.GetTargetResponse
@@ -212,7 +245,7 @@ export type GetTargetResponse = Message<"nokku.v1.GetTargetResponse"> & {
  * Use `create(GetTargetResponseSchema)` to create a new message.
  */
 export const GetTargetResponseSchema: GenMessage<GetTargetResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 4);
+  messageDesc(file_nokku_v1_target, 6);
 
 /**
  * @generated from message nokku.v1.CreateTargetRequest
@@ -256,7 +289,7 @@ export type CreateTargetRequest = Message<"nokku.v1.CreateTargetRequest"> & {
  * Use `create(CreateTargetRequestSchema)` to create a new message.
  */
 export const CreateTargetRequestSchema: GenMessage<CreateTargetRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 5);
+  messageDesc(file_nokku_v1_target, 7);
 
 /**
  * @generated from message nokku.v1.CreateTargetResponse
@@ -273,7 +306,7 @@ export type CreateTargetResponse = Message<"nokku.v1.CreateTargetResponse"> & {
  * Use `create(CreateTargetResponseSchema)` to create a new message.
  */
 export const CreateTargetResponseSchema: GenMessage<CreateTargetResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 6);
+  messageDesc(file_nokku_v1_target, 8);
 
 /**
  * @generated from message nokku.v1.UpdateTargetRequest
@@ -318,7 +351,7 @@ export type UpdateTargetRequest = Message<"nokku.v1.UpdateTargetRequest"> & {
  * Use `create(UpdateTargetRequestSchema)` to create a new message.
  */
 export const UpdateTargetRequestSchema: GenMessage<UpdateTargetRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 7);
+  messageDesc(file_nokku_v1_target, 9);
 
 /**
  * @generated from message nokku.v1.UpdateTargetResponse
@@ -335,7 +368,7 @@ export type UpdateTargetResponse = Message<"nokku.v1.UpdateTargetResponse"> & {
  * Use `create(UpdateTargetResponseSchema)` to create a new message.
  */
 export const UpdateTargetResponseSchema: GenMessage<UpdateTargetResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 8);
+  messageDesc(file_nokku_v1_target, 10);
 
 /**
  * @generated from message nokku.v1.DeleteTargetRequest
@@ -352,7 +385,7 @@ export type DeleteTargetRequest = Message<"nokku.v1.DeleteTargetRequest"> & {
  * Use `create(DeleteTargetRequestSchema)` to create a new message.
  */
 export const DeleteTargetRequestSchema: GenMessage<DeleteTargetRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 9);
+  messageDesc(file_nokku_v1_target, 11);
 
 /**
  * @generated from message nokku.v1.DeleteTargetResponse
@@ -365,7 +398,7 @@ export type DeleteTargetResponse = Message<"nokku.v1.DeleteTargetResponse"> & {
  * Use `create(DeleteTargetResponseSchema)` to create a new message.
  */
 export const DeleteTargetResponseSchema: GenMessage<DeleteTargetResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 10);
+  messageDesc(file_nokku_v1_target, 12);
 
 /**
  * @generated from message nokku.v1.ListTargetsRequest
@@ -419,7 +452,7 @@ export type ListTargetsRequest = Message<"nokku.v1.ListTargetsRequest"> & {
  * Use `create(ListTargetsRequestSchema)` to create a new message.
  */
 export const ListTargetsRequestSchema: GenMessage<ListTargetsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 11);
+  messageDesc(file_nokku_v1_target, 13);
 
 /**
  * @generated from message nokku.v1.ListTargetsResponse
@@ -441,7 +474,7 @@ export type ListTargetsResponse = Message<"nokku.v1.ListTargetsResponse"> & {
  * Use `create(ListTargetsResponseSchema)` to create a new message.
  */
 export const ListTargetsResponseSchema: GenMessage<ListTargetsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 12);
+  messageDesc(file_nokku_v1_target, 14);
 
 /**
  * @generated from message nokku.v1.GetSubjectAccessRequest
@@ -458,7 +491,7 @@ export type GetSubjectAccessRequest = Message<"nokku.v1.GetSubjectAccessRequest"
  * Use `create(GetSubjectAccessRequestSchema)` to create a new message.
  */
 export const GetSubjectAccessRequestSchema: GenMessage<GetSubjectAccessRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 13);
+  messageDesc(file_nokku_v1_target, 15);
 
 /**
  * @generated from message nokku.v1.GetSubjectAccessResponse
@@ -504,7 +537,7 @@ export type GetSubjectAccessResponse = Message<"nokku.v1.GetSubjectAccessRespons
  * Use `create(GetSubjectAccessResponseSchema)` to create a new message.
  */
 export const GetSubjectAccessResponseSchema: GenMessage<GetSubjectAccessResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 14);
+  messageDesc(file_nokku_v1_target, 16);
 
 /**
  * @generated from message nokku.v1.GetTargetFiltersRequest
@@ -517,7 +550,7 @@ export type GetTargetFiltersRequest = Message<"nokku.v1.GetTargetFiltersRequest"
  * Use `create(GetTargetFiltersRequestSchema)` to create a new message.
  */
 export const GetTargetFiltersRequestSchema: GenMessage<GetTargetFiltersRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 15);
+  messageDesc(file_nokku_v1_target, 17);
 
 /**
  * @generated from message nokku.v1.GetTargetFiltersResponse
@@ -539,7 +572,7 @@ export type GetTargetFiltersResponse = Message<"nokku.v1.GetTargetFiltersRespons
  * Use `create(GetTargetFiltersResponseSchema)` to create a new message.
  */
 export const GetTargetFiltersResponseSchema: GenMessage<GetTargetFiltersResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 16);
+  messageDesc(file_nokku_v1_target, 18);
 
 /**
  * @generated from message nokku.v1.AccessGraphFilter
@@ -571,7 +604,7 @@ export type AccessGraphFilter = Message<"nokku.v1.AccessGraphFilter"> & {
  * Use `create(AccessGraphFilterSchema)` to create a new message.
  */
 export const AccessGraphFilterSchema: GenMessage<AccessGraphFilter> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 17);
+  messageDesc(file_nokku_v1_target, 19);
 
 /**
  * @generated from message nokku.v1.GetAccessGraphRequest
@@ -588,7 +621,7 @@ export type GetAccessGraphRequest = Message<"nokku.v1.GetAccessGraphRequest"> & 
  * Use `create(GetAccessGraphRequestSchema)` to create a new message.
  */
 export const GetAccessGraphRequestSchema: GenMessage<GetAccessGraphRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 18);
+  messageDesc(file_nokku_v1_target, 20);
 
 /**
  * @generated from message nokku.v1.GetAccessGraphResponse
@@ -630,7 +663,7 @@ export type GetAccessGraphResponse = Message<"nokku.v1.GetAccessGraphResponse"> 
  * Use `create(GetAccessGraphResponseSchema)` to create a new message.
  */
 export const GetAccessGraphResponseSchema: GenMessage<GetAccessGraphResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 19);
+  messageDesc(file_nokku_v1_target, 21);
 
 /**
  * @generated from message nokku.v1.AccessGraphSubject
@@ -676,7 +709,7 @@ export type AccessGraphSubject = Message<"nokku.v1.AccessGraphSubject"> & {
  * Use `create(AccessGraphSubjectSchema)` to create a new message.
  */
 export const AccessGraphSubjectSchema: GenMessage<AccessGraphSubject> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 20);
+  messageDesc(file_nokku_v1_target, 22);
 
 /**
  * @generated from message nokku.v1.AccessGraphAccount
@@ -698,7 +731,7 @@ export type AccessGraphAccount = Message<"nokku.v1.AccessGraphAccount"> & {
  * Use `create(AccessGraphAccountSchema)` to create a new message.
  */
 export const AccessGraphAccountSchema: GenMessage<AccessGraphAccount> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 21);
+  messageDesc(file_nokku_v1_target, 23);
 
 /**
  * @generated from message nokku.v1.AccessGraphTag
@@ -729,7 +762,7 @@ export type AccessGraphTag = Message<"nokku.v1.AccessGraphTag"> & {
  * Use `create(AccessGraphTagSchema)` to create a new message.
  */
 export const AccessGraphTagSchema: GenMessage<AccessGraphTag> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 22);
+  messageDesc(file_nokku_v1_target, 24);
 
 /**
  * AccessGraphGrant is the edge from a subject to a login account.
@@ -758,7 +791,7 @@ export type AccessGraphGrant = Message<"nokku.v1.AccessGraphGrant"> & {
  * Use `create(AccessGraphGrantSchema)` to create a new message.
  */
 export const AccessGraphGrantSchema: GenMessage<AccessGraphGrant> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 23);
+  messageDesc(file_nokku_v1_target, 25);
 
 /**
  * AccessGraphReach is the edge from a login account to a tag.
@@ -787,7 +820,7 @@ export type AccessGraphReach = Message<"nokku.v1.AccessGraphReach"> & {
  * Use `create(AccessGraphReachSchema)` to create a new message.
  */
 export const AccessGraphReachSchema: GenMessage<AccessGraphReach> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 24);
+  messageDesc(file_nokku_v1_target, 26);
 
 /**
  * @generated from message nokku.v1.ListAccessGraphTargetsRequest
@@ -819,7 +852,7 @@ export type ListAccessGraphTargetsRequest = Message<"nokku.v1.ListAccessGraphTar
  * Use `create(ListAccessGraphTargetsRequestSchema)` to create a new message.
  */
 export const ListAccessGraphTargetsRequestSchema: GenMessage<ListAccessGraphTargetsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 25);
+  messageDesc(file_nokku_v1_target, 27);
 
 /**
  * @generated from message nokku.v1.ListAccessGraphTargetsResponse
@@ -841,7 +874,7 @@ export type ListAccessGraphTargetsResponse = Message<"nokku.v1.ListAccessGraphTa
  * Use `create(ListAccessGraphTargetsResponseSchema)` to create a new message.
  */
 export const ListAccessGraphTargetsResponseSchema: GenMessage<ListAccessGraphTargetsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 26);
+  messageDesc(file_nokku_v1_target, 28);
 
 /**
  * @generated from message nokku.v1.AccessGraphTarget
@@ -868,7 +901,7 @@ export type AccessGraphTarget = Message<"nokku.v1.AccessGraphTarget"> & {
  * Use `create(AccessGraphTargetSchema)` to create a new message.
  */
 export const AccessGraphTargetSchema: GenMessage<AccessGraphTarget> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 27);
+  messageDesc(file_nokku_v1_target, 29);
 
 /**
  * @generated from message nokku.v1.GetAccessMatrixRequest
@@ -911,7 +944,7 @@ export type GetAccessMatrixRequest = Message<"nokku.v1.GetAccessMatrixRequest"> 
  * Use `create(GetAccessMatrixRequestSchema)` to create a new message.
  */
 export const GetAccessMatrixRequestSchema: GenMessage<GetAccessMatrixRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 28);
+  messageDesc(file_nokku_v1_target, 30);
 
 /**
  * @generated from message nokku.v1.GetAccessMatrixResponse
@@ -949,7 +982,7 @@ export type GetAccessMatrixResponse = Message<"nokku.v1.GetAccessMatrixResponse"
  * Use `create(GetAccessMatrixResponseSchema)` to create a new message.
  */
 export const GetAccessMatrixResponseSchema: GenMessage<GetAccessMatrixResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 29);
+  messageDesc(file_nokku_v1_target, 31);
 
 /**
  * AccessMatrixRow is a person, team or service account holding a grant. A team's members get in through its row.
@@ -1006,7 +1039,7 @@ export type AccessMatrixRow = Message<"nokku.v1.AccessMatrixRow"> & {
  * Use `create(AccessMatrixRowSchema)` to create a new message.
  */
 export const AccessMatrixRowSchema: GenMessage<AccessMatrixRow> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 30);
+  messageDesc(file_nokku_v1_target, 32);
 
 /**
  * @generated from message nokku.v1.AccessMatrixCell
@@ -1049,7 +1082,7 @@ export type AccessMatrixCell = Message<"nokku.v1.AccessMatrixCell"> & {
  * Use `create(AccessMatrixCellSchema)` to create a new message.
  */
 export const AccessMatrixCellSchema: GenMessage<AccessMatrixCell> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target, 31);
+  messageDesc(file_nokku_v1_target, 33);
 
 /**
  * AccessBlock is why grants that stand let nobody in today.
@@ -1194,6 +1227,17 @@ export const TargetService: GenService<{
     methodKind: "unary";
     input: typeof SyncTargetUsersRequestSchema;
     output: typeof SyncTargetUsersResponseSchema;
+  },
+  /**
+   * ForgetHostKey drops the pinned host key of a server without a daemon, for a server that was reinstalled and
+   * whoever added it is not around to pin the new key. Nobody logs in to it until the next nk sync pins one.
+   *
+   * @generated from rpc nokku.v1.TargetService.ForgetHostKey
+   */
+  forgetHostKey: {
+    methodKind: "unary";
+    input: typeof ForgetHostKeyRequestSchema;
+    output: typeof ForgetHostKeyResponseSchema;
   },
   /**
    * @generated from rpc nokku.v1.TargetService.GetAccessGraph

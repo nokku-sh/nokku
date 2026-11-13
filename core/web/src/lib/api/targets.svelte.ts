@@ -16,6 +16,13 @@ import { usePatch } from './mask';
 
 export type AccessGraphFilter = MessageInitShape<typeof AccessGraphFilterSchema>;
 
+// What a delete takes with it, for the dialogs that ask first.
+export function deleteWarning(t: { name: string; daemonId: string }) {
+	return t.daemonId
+		? 'Everyone loses access to this server. Its login accounts, grants and daemon are removed.'
+		: `Everyone loses access to this server. Its login accounts and grants are removed. Run nk rm ${t.name} first, it removes what Nokku wrote on the server.`;
+}
+
 export const target = {
 	get: (id: MaybeGetter<string | undefined>) =>
 		useQuery(
@@ -79,6 +86,10 @@ export const target = {
 			onSuccess: () => toast.success('Server added')
 		}),
 	update: () => usePatch(TargetService.method.updateTarget),
+	forgetHostKey: () =>
+		useMutation(TargetService.method.forgetHostKey, {
+			onSuccess: () => toast.success('Host key forgotten')
+		}),
 	delete: () =>
 		useMutation(TargetService.method.deleteTarget, {
 			onSuccess: () => toast.success('Server deleted')

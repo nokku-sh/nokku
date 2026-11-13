@@ -24,7 +24,7 @@ import (
 var procedureAccess = loadProcedureAccess()
 
 // authorizationInterceptor applies the (access) option in this order: daemon,
-// nk, role or self, people only, fresh sign-in, plan feature, signing, cap.
+// nk, role or self, people only, browser, fresh sign-in, plan feature, signing, cap.
 type authorizationInterceptor struct {
 	cfg *config.Config
 }
@@ -108,7 +108,14 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	if access.GetPeopleOnly() && caller.Kind == actor.KindServiceAccount {
 		return connect.NewError(connect.CodePermissionDenied, "only people can do this, not a service account")
 	}
-	if access.GetFresh() {
+	browser := nokkuv1.Browser_BROWSER_UNSPECIFIED
+	if caller.Kind == actor.KindUser {
+		browser = access.GetBrowser()
+	}
+	if browser == nokkuv1.Browser_BROWSER_REFUSED {
+		return connect.NewError(connect.CodePermissionDenied, "do this with nk")
+	}
+	if access.GetFresh() || browser == nokkuv1.Browser_BROWSER_FRESH {
 		if err := a.fresh(ctx, caller); err != nil {
 			return err
 		}
@@ -162,8 +169,9 @@ func requestedFresh(msg any) bool {
 	case *nokkuv1.UpdateDaemonRequest:
 		return slices.Contains(req.GetUpdateMask().GetPaths(), "config.record_sessions")
 	case *nokkuv1.UpdateTargetRequest:
-		// Where logins go.
-		return slices.Contains(req.GetUpdateMask().GetPaths(), "endpoints")
+		// Where logins go, and the name people type to get there.
+		paths := req.GetUpdateMask().GetPaths()
+		return slices.Contains(paths, "endpoints") || slices.Contains(paths, "name")
 	}
 	return false
 }

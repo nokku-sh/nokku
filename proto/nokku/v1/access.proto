@@ -25,6 +25,17 @@ message Access {
   // cli lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
   // nothing else, so a phished or infected nk session can't change who may do what.
   bool cli = 11;
+  // browser sets a person's browser session apart on a call nk and service accounts make too.
+  Browser browser = 12;
+}
+
+enum Browser {
+  BROWSER_UNSPECIFIED = 0;
+  // Only the browser is asked for a sign-in from the last 10 minutes. The handler holds nk and service accounts to
+  // what they added.
+  BROWSER_FRESH = 1;
+  // The browser is kept out, the call is for nk and service accounts.
+  BROWSER_REFUSED = 2;
 }
 
 enum WorkspaceRole {

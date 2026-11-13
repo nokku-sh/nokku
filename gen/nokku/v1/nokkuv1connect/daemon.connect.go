@@ -114,6 +114,7 @@ type DaemonServiceClient interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
 	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
+	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
 	// A browser shell is a way onto a server, so a cookie alone does not open one.
@@ -168,6 +169,7 @@ type DaemonServiceHandler interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
 	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
+	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
 	// A browser shell is a way onto a server, so a cookie alone does not open one.

@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/access.proto.
  */
 export const file_nokku_v1_access: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIs0BCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEgwKBHNlbGYYAiABKAgSJQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGUSDgoGZGFlbW9uGAQgASgIEhMKC3Blb3BsZV9vbmx5GAUgASgIEg0KBWZyZXNoGAYgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEg0KBXNpZ25zGAkgASgIEg0KBXF1aWV0GAogASgIEgsKA2NsaRgLIAEoCCq0AQoNV29ya3NwYWNlUm9sZRIeChpXT1JLU1BBQ0VfUk9MRV9VTlNQRUNJRklFRBAAEhkKFVdPUktTUEFDRV9ST0xFX01FTUJFUhABEhkKFVdPUktTUEFDRV9ST0xFX1ZJRVdFUhACEhkKFVdPUktTUEFDRV9ST0xFX0VESVRPUhADEhgKFFdPUktTUEFDRV9ST0xFX0FETUlOEAQSGAoUV09SS1NQQUNFX1JPTEVfT1dORVIQBTpKCgZhY2Nlc3MSHi5nb29nbGUucHJvdG9idWYuTWV0aG9kT3B0aW9ucxi4jgMgASgLMhAubm9ra3UudjEuQWNjZXNzUgZhY2Nlc3NCjAEKDGNvbS5ub2trdS52MUILQWNjZXNzUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_google_protobuf_descriptor]);
+  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIvEBCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEgwKBHNlbGYYAiABKAgSJQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGUSDgoGZGFlbW9uGAQgASgIEhMKC3Blb3BsZV9vbmx5GAUgASgIEg0KBWZyZXNoGAYgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEg0KBXNpZ25zGAkgASgIEg0KBXF1aWV0GAogASgIEgsKA2NsaRgLIAEoCBIiCgdicm93c2VyGAwgASgOMhEubm9ra3UudjEuQnJvd3NlcipKCgdCcm93c2VyEhcKE0JST1dTRVJfVU5TUEVDSUZJRUQQABIRCg1CUk9XU0VSX0ZSRVNIEAESEwoPQlJPV1NFUl9SRUZVU0VEEAIqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzQowBCgxjb20ubm9ra3UudjFCC0FjY2Vzc1Byb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_google_protobuf_descriptor]);
 
 /**
  * @generated from message nokku.v1.Access
@@ -88,6 +88,13 @@ export type Access = Message<"nokku.v1.Access"> & {
    * @generated from field: bool cli = 11;
    */
   cli: boolean;
+
+  /**
+   * browser sets a person's browser session apart on a call nk and service accounts make too.
+   *
+   * @generated from field: nokku.v1.Browser browser = 12;
+   */
+  browser: Browser;
 };
 
 /**
@@ -96,6 +103,37 @@ export type Access = Message<"nokku.v1.Access"> & {
  */
 export const AccessSchema: GenMessage<Access> = /*@__PURE__*/
   messageDesc(file_nokku_v1_access, 0);
+
+/**
+ * @generated from enum nokku.v1.Browser
+ */
+export enum Browser {
+  /**
+   * @generated from enum value: BROWSER_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Only the browser is asked for a sign-in from the last 10 minutes. The handler holds nk and service accounts to
+   * what they added.
+   *
+   * @generated from enum value: BROWSER_FRESH = 1;
+   */
+  FRESH = 1,
+
+  /**
+   * The browser is kept out, the call is for nk and service accounts.
+   *
+   * @generated from enum value: BROWSER_REFUSED = 2;
+   */
+  REFUSED = 2,
+}
+
+/**
+ * Describes the enum nokku.v1.Browser.
+ */
+export const BrowserSchema: GenEnum<Browser> = /*@__PURE__*/
+  enumDesc(file_nokku_v1_access, 0);
 
 /**
  * @generated from enum nokku.v1.WorkspaceRole
@@ -136,7 +174,7 @@ export enum WorkspaceRole {
  * Describes the enum nokku.v1.WorkspaceRole.
  */
 export const WorkspaceRoleSchema: GenEnum<WorkspaceRole> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_access, 0);
+  enumDesc(file_nokku_v1_access, 1);
 
 /**
  * @generated from extension: nokku.v1.Access access = 51000;

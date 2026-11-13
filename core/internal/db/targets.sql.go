@@ -102,6 +102,19 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 	return &i, err
 }
 
+const forgetHostKey = `-- name: ForgetHostKey :exec
+UPDATE targets
+SET
+  host_public_key = NULL
+WHERE
+  id = $1
+`
+
+func (q *Queries) ForgetHostKey(ctx context.Context, targetID string) error {
+	_, err := q.db.Exec(ctx, forgetHostKey, targetID)
+	return err
+}
+
 const getTarget = `-- name: GetTarget :one
 SELECT
   id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
@@ -380,29 +393,56 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 	return items, nil
 }
 
+const lockTarget = `-- name: LockTarget :one
+SELECT
+  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
+FROM
+  targets
+WHERE
+  id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockTarget(ctx context.Context, targetID string) (*Target, error) {
+	row := q.db.QueryRow(ctx, lockTarget, targetID)
+	var i Target
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.DaemonID,
+		&i.Name,
+		&i.Description,
+		&i.Endpoints,
+		&i.HostPublicKey,
+		&i.Tags,
+		&i.Metadata,
+		&i.LastSyncAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const reportManualSync = `-- name: ReportManualSync :exec
 UPDATE targets
 SET
-  endpoints = COALESCE(NULLIF($1::TEXT[], '{}'), endpoints),
-  host_public_key = COALESCE($2, host_public_key)
+  host_public_key = $1
 WHERE
-  id = $3
-  AND (
-    COALESCE(NULLIF($1::TEXT[], '{}'), endpoints) IS DISTINCT FROM endpoints
-    OR COALESCE($2, host_public_key) IS DISTINCT FROM host_public_key
-  )
+  id = $2
+  AND $1::TEXT IS NOT NULL
+  AND host_public_key IS DISTINCT FROM $1
 `
 
 type ReportManualSyncParams struct {
-	Endpoints     []string `json:"endpoints"`
-	HostPublicKey *string  `json:"hostPublicKey"`
-	TargetID      string   `json:"targetId"`
+	HostPublicKey *string `json:"hostPublicKey"`
+	TargetID      string  `json:"targetId"`
 }
 
-// What nk sync reports about a host without a daemon. An empty value keeps what the target has, and an
-// unchanged report writes nothing. It is no edit, so updated_at stays.
+// The host key nk sync saw on a host without a daemon. No key keeps the one the target has, and an unchanged
+// report writes nothing. It is no edit, so updated_at stays.
 func (q *Queries) ReportManualSync(ctx context.Context, arg *ReportManualSyncParams) error {
-	_, err := q.db.Exec(ctx, reportManualSync, arg.Endpoints, arg.HostPublicKey, arg.TargetID)
+	_, err := q.db.Exec(ctx, reportManualSync, arg.HostPublicKey, arg.TargetID)
 	return err
 }
 

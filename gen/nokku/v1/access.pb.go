@@ -22,6 +22,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Browser int32
+
+const (
+	Browser_BROWSER_UNSPECIFIED Browser = 0
+	// Only the browser is asked for a sign-in from the last 10 minutes. The handler holds nk and service accounts to
+	// what they added.
+	Browser_BROWSER_FRESH Browser = 1
+	// The browser is kept out, the call is for nk and service accounts.
+	Browser_BROWSER_REFUSED Browser = 2
+)
+
+// Enum value maps for Browser.
+var (
+	Browser_name = map[int32]string{
+		0: "BROWSER_UNSPECIFIED",
+		1: "BROWSER_FRESH",
+		2: "BROWSER_REFUSED",
+	}
+	Browser_value = map[string]int32{
+		"BROWSER_UNSPECIFIED": 0,
+		"BROWSER_FRESH":       1,
+		"BROWSER_REFUSED":     2,
+	}
+)
+
+func (x Browser) Enum() *Browser {
+	p := new(Browser)
+	*p = x
+	return p
+}
+
+func (x Browser) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Browser) Descriptor() protoreflect.EnumDescriptor {
+	return file_nokku_v1_access_proto_enumTypes[0].Descriptor()
+}
+
+func (Browser) Type() protoreflect.EnumType {
+	return &file_nokku_v1_access_proto_enumTypes[0]
+}
+
+func (x Browser) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Browser.Descriptor instead.
+func (Browser) EnumDescriptor() ([]byte, []int) {
+	return file_nokku_v1_access_proto_rawDescGZIP(), []int{0}
+}
+
 type WorkspaceRole int32
 
 const (
@@ -64,11 +116,11 @@ func (x WorkspaceRole) String() string {
 }
 
 func (WorkspaceRole) Descriptor() protoreflect.EnumDescriptor {
-	return file_nokku_v1_access_proto_enumTypes[0].Descriptor()
+	return file_nokku_v1_access_proto_enumTypes[1].Descriptor()
 }
 
 func (WorkspaceRole) Type() protoreflect.EnumType {
-	return &file_nokku_v1_access_proto_enumTypes[0]
+	return &file_nokku_v1_access_proto_enumTypes[1]
 }
 
 func (x WorkspaceRole) Number() protoreflect.EnumNumber {
@@ -77,7 +129,7 @@ func (x WorkspaceRole) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WorkspaceRole.Descriptor instead.
 func (WorkspaceRole) EnumDescriptor() ([]byte, []int) {
-	return file_nokku_v1_access_proto_rawDescGZIP(), []int{0}
+	return file_nokku_v1_access_proto_rawDescGZIP(), []int{1}
 }
 
 type Access struct {
@@ -101,7 +153,9 @@ type Access struct {
 	Quiet *bool `protobuf:"varint,10,opt,name=quiet" json:"quiet,omitempty"`
 	// cli lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
 	// nothing else, so a phished or infected nk session can't change who may do what.
-	Cli           *bool `protobuf:"varint,11,opt,name=cli" json:"cli,omitempty"`
+	Cli *bool `protobuf:"varint,11,opt,name=cli" json:"cli,omitempty"`
+	// browser sets a person's browser session apart on a call nk and service accounts make too.
+	Browser       *Browser `protobuf:"varint,12,opt,name=browser,enum=nokku.v1.Browser" json:"browser,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -213,6 +267,13 @@ func (x *Access) GetCli() bool {
 	return false
 }
 
+func (x *Access) GetBrowser() Browser {
+	if x != nil && x.Browser != nil {
+		return *x.Browser
+	}
+	return Browser_BROWSER_UNSPECIFIED
+}
+
 var file_nokku_v1_access_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
@@ -234,7 +295,7 @@ var File_nokku_v1_access_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_access_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\xa0\x02\n" +
+	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\xcd\x02\n" +
 	"\x06Access\x12\x16\n" +
 	"\x06public\x18\x01 \x01(\bR\x06public\x12\x12\n" +
 	"\x04self\x18\x02 \x01(\bR\x04self\x12+\n" +
@@ -248,7 +309,12 @@ const file_nokku_v1_access_proto_rawDesc = "" +
 	"\x05signs\x18\t \x01(\bR\x05signs\x12\x14\n" +
 	"\x05quiet\x18\n" +
 	" \x01(\bR\x05quiet\x12\x10\n" +
-	"\x03cli\x18\v \x01(\bR\x03cli*\xb4\x01\n" +
+	"\x03cli\x18\v \x01(\bR\x03cli\x12+\n" +
+	"\abrowser\x18\f \x01(\x0e2\x11.nokku.v1.BrowserR\abrowser*J\n" +
+	"\aBrowser\x12\x17\n" +
+	"\x13BROWSER_UNSPECIFIED\x10\x00\x12\x11\n" +
+	"\rBROWSER_FRESH\x10\x01\x12\x13\n" +
+	"\x0fBROWSER_REFUSED\x10\x02*\xb4\x01\n" +
 	"\rWorkspaceRole\x12\x1e\n" +
 	"\x1aWORKSPACE_ROLE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15WORKSPACE_ROLE_MEMBER\x10\x01\x12\x19\n" +
@@ -271,22 +337,24 @@ func file_nokku_v1_access_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_access_proto_rawDescData
 }
 
-var file_nokku_v1_access_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_nokku_v1_access_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_nokku_v1_access_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_nokku_v1_access_proto_goTypes = []any{
-	(WorkspaceRole)(0),                 // 0: nokku.v1.WorkspaceRole
-	(*Access)(nil),                     // 1: nokku.v1.Access
-	(*descriptorpb.MethodOptions)(nil), // 2: google.protobuf.MethodOptions
+	(Browser)(0),                       // 0: nokku.v1.Browser
+	(WorkspaceRole)(0),                 // 1: nokku.v1.WorkspaceRole
+	(*Access)(nil),                     // 2: nokku.v1.Access
+	(*descriptorpb.MethodOptions)(nil), // 3: google.protobuf.MethodOptions
 }
 var file_nokku_v1_access_proto_depIdxs = []int32{
-	0, // 0: nokku.v1.Access.role:type_name -> nokku.v1.WorkspaceRole
-	2, // 1: nokku.v1.access:extendee -> google.protobuf.MethodOptions
-	1, // 2: nokku.v1.access:type_name -> nokku.v1.Access
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	2, // [2:3] is the sub-list for extension type_name
-	1, // [1:2] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 0: nokku.v1.Access.role:type_name -> nokku.v1.WorkspaceRole
+	0, // 1: nokku.v1.Access.browser:type_name -> nokku.v1.Browser
+	3, // 2: nokku.v1.access:extendee -> google.protobuf.MethodOptions
+	2, // 3: nokku.v1.access:type_name -> nokku.v1.Access
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	3, // [3:4] is the sub-list for extension type_name
+	2, // [2:3] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_access_proto_init() }
@@ -299,7 +367,7 @@ func file_nokku_v1_access_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_access_proto_rawDesc), len(file_nokku_v1_access_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   1,
 			NumExtensions: 1,
 			NumServices:   0,

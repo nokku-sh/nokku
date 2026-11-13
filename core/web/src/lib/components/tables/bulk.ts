@@ -8,10 +8,12 @@ export function bulkDelete<T>(opts: {
 	/** For nouns whose plural isn't noun + s. */
 	nouns?: string;
 	description?: string;
+	fresh?: boolean;
 	run: (selected: T[]) => unknown;
 }): BulkAction<T> {
 	return {
 		label: 'Delete',
+		fresh: opts.fresh,
 		icon: Trash,
 		variant: 'destructive',
 		confirm: (selected) => ({

@@ -67,7 +67,7 @@ func TestPartialUpdates(t *testing.T) {
 	resources = append(resources, partialWorkspace(t, cfg, srv)...)
 	resources = append(resources,
 		partialTeam(t, cfg, admin),
-		partialTarget(t, admin),
+		partialTarget(t, cfg, srv, admin),
 		partialAuditStream(t, cfg, srv),
 		partialServiceAccount(t, admin),
 	)
@@ -473,9 +473,12 @@ func partialTeam(t *testing.T, cfg *config.Config, admin *connect.Client) partia
 	}
 }
 
-func partialTarget(t *testing.T, admin *connect.Client) partialResource {
+func partialTarget(t *testing.T, cfg *config.Config, srv *httptest.Server, admin *connect.Client) partialResource {
 	t.Helper()
 	targets := nokkuv1connect.NewTargetServiceClient(admin)
+	// An address and a host key at the start take nk, the web app adds a server by name.
+	editor := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	nk := nokkuv1connect.NewTargetServiceClient(partialConn(srv, cliSessionFor(t, cfg, editor, partialHostKey(t))))
 	update := func(req *nokkuv1.UpdateTargetRequest) func(string) error {
 		return func(id string) error {
 			req.Id = &id
@@ -486,7 +489,7 @@ func partialTarget(t *testing.T, admin *connect.Client) partialResource {
 	return partialResource{
 		rpc: "TargetService.UpdateTarget",
 		create: func() string {
-			res, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
+			res, err := nk.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
 				Name:          new(uniq("partial")),
 				Description:   new("baseline"),
 				HostPublicKey: new(partialHostKey(t)),

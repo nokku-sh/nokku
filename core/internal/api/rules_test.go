@@ -50,7 +50,7 @@ func TestRulesGolden(t *testing.T) {
 		md, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		require.NoError(t, err, procedure)
 		lines = append(lines, fmt.Sprintf(
-			"%s public=%t self=%t role=%s daemon=%t cli=%t people_only=%t fresh=%t feature=%s capped=%t signs=%t audited=%t",
+			"%s public=%t self=%t role=%s daemon=%t cli=%t people_only=%t fresh=%t browser=%s feature=%s capped=%t signs=%t audited=%t",
 			procedure,
 			a.GetPublic(),
 			a.GetSelf(),
@@ -59,6 +59,7 @@ func TestRulesGolden(t *testing.T) {
 			a.GetCli(),
 			a.GetPeopleOnly(),
 			a.GetFresh(),
+			strings.TrimPrefix(a.GetBrowser().String(), "BROWSER_"),
 			a.GetFeature(),
 			a.GetCapped(),
 			a.GetSigns(),
@@ -152,8 +153,9 @@ func TestRequestedFresh(t *testing.T) {
 	server := func(paths ...string) *nokkuv1.UpdateTargetRequest {
 		return &nokkuv1.UpdateTargetRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}}
 	}
-	assert.True(t, requestedFresh(server("name", "endpoints")), "a server's address")
-	assert.False(t, requestedFresh(server("name", "description", "tags")), "the rest of a server stays free")
+	assert.True(t, requestedFresh(server("description", "endpoints")), "a server's address")
+	assert.True(t, requestedFresh(server("name", "tags")), "a server's name, a freed one fits another host")
+	assert.False(t, requestedFresh(server("description", "tags")), "the rest of a server stays free")
 
 	assert.True(t, requestedFresh(&nokkuv1.UpdateTeamRequest{ScimOpen: new(true)}), "opening a team for SCIM")
 	assert.False(t, requestedFresh(&nokkuv1.UpdateTeamRequest{ScimOpen: new(false)}), "closing it again stays quick")

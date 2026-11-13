@@ -4,6 +4,7 @@
 	import { XIcon } from '@lucide/svelte';
 	import { slide } from 'svelte/transition';
 	import { confirm } from '#lib/hooks/index.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import type { BulkAction } from './types';
 
 	type Props<TData> = {
@@ -17,8 +18,12 @@
 	};
 	let { items, actions, count, onClear }: Props<T> = $props();
 
+	function run(action: BulkAction<T>) {
+		return action.fresh ? whenFresh(() => void ask(action)) : ask(action);
+	}
+
 	// A cancelled confirm keeps the selection, so the user can try again.
-	async function run(action: BulkAction<T>) {
+	async function ask(action: BulkAction<T>) {
 		if (action.confirm) {
 			const ok = await confirm({
 				confirmText: action.label,

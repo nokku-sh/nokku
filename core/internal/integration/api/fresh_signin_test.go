@@ -191,6 +191,27 @@ func TestFreshSignInMatrix(t *testing.T) {
 				))
 			return refusedRPC(err)
 		}},
+		{"TargetService.UpdateTarget name", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).UpdateTarget(t.Context(),
+				masked(&nokkuv1.UpdateTargetRequest{Id: new(uuid.NewV7().String()), Name: new(uniq("renamed"))}))
+			return refusedRPC(err)
+		}},
+		{"DaemonService.DeleteDaemon", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewDaemonServiceClient(rpc(s)).DeleteDaemon(t.Context(),
+				&nokkuv1.DeleteDaemonRequest{Id: new(uuid.NewV7().String())})
+			return refusedRPC(err)
+		}},
+		// nk passes the fresh check and answers for the server itself, it deletes only what its person added.
+		{"TargetService.DeleteTarget", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).DeleteTarget(t.Context(),
+				&nokkuv1.DeleteTargetRequest{Id: new(uuid.NewV7().String())})
+			return refusedRPC(err)
+		}},
+		{"TargetService.ForgetHostKey", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).ForgetHostKey(t.Context(),
+				&nokkuv1.ForgetHostKeyRequest{Id: new(uuid.NewV7().String())})
+			return refusedRPC(err)
+		}},
 		{"SSOService.PutSSOProvider", owner, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewSSOServiceClient(rpc(s)).PutSSOProvider(t.Context(), provider)
 			return refusedRPC(err)

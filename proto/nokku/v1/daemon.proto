@@ -21,10 +21,11 @@ service DaemonService {
       people_only: true
     };
   }
+  // DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
   rpc DeleteDaemon(DeleteDaemonRequest) returns (DeleteDaemonResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      people_only: true
+      fresh: true
     };
   }
   rpc ListDaemons(ListDaemonsRequest) returns (ListDaemonsResponse) {

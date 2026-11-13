@@ -191,20 +191,45 @@ nk sync 10.0.0.5 --grant root=me --grant deploy=team:ops,alice@example.com --tag
 - The account has to be a login account on the server, root or a regular user with a shell. If it is not, the sync stops and writes nothing.
 - You get `root` on a new server, unless a `--grant` already names you. You have root there already, this only lets you in through Nokku too. A service account gets only the grants it asks for.
 - Grants and tags are set once, with the new target. On a server Nokku already knows they are ignored with a warning, so the web app stays the place to change access.
-- A service account syncs and removes only the servers it added itself. A person does both with any server.
+- A service account syncs and removes only the servers it added itself. On any other server `nk` stops before it writes anything. A person syncs any server, but pins a new host key or deletes the target only for a server they added. For the rest see [when a host key changes](#when-a-host-key-changes) and [removing a server](#removing-a-server).
 
 <details>
 <summary><b>Host keys, scripts and <code>nk rm</code></b></summary>
 
 - **Finding a server.** `nk sync` and `nk rm` take its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
 - **The first sync** trusts the server the way your own `ssh` does. When `ssh` asks about the host key, answer as you would for any server. Without a terminal, as in CI, connect once with `ssh root@host` first.
-- **Later syncs** pin the host key the first one saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key`. That drops the pin and your own `ssh` checks the host, as on the first sync, so a key it remembers from before shows its usual warning until you remove it with `ssh-keygen -R`.
+- **Later syncs** pin the host key the first one saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key`. That drops the pin and your own `ssh` checks the host, as on the first sync, so a key it remembers from before shows its usual warning until you remove it with `ssh-keygen -R`. Only whoever added the server can do this, see [when a host key changes](#when-a-host-key-changes).
 - **Your ssh config applies, but not its forwards.** The root `ssh` runs without an agent, X11 or port forwarding, whatever `ForwardAgent` or `LocalForward` your config sets.
 - **Order.** Nokku only hears about the sync once the server is written. A new target is created first, so if the write fails it is removed again.
 - **For scripts**, `--json` prints one object with the target and the files `nk sync` manages. Progress goes to stderr. With `--dry-run` it is the same object and nothing is written. A dry run of a new server has no target id yet, so the drop-in shows `<target-id>` in its place and `grants` lists the subjects per account as you typed them, with your default `root` as `me`.
-- **`nk rm`** checks the pinned host key first, then removes the drop-in and the CA over the same root `ssh`, reloads sshd, and only then deletes the target in Nokku. If sshd rejects its config without the drop-in, everything is put back and the target stays. Pass `--keep-host` when the server is already gone.
+- **`nk rm`** checks the pinned host key first, then removes the drop-in and the CA over the same root `ssh`, reloads sshd, and only then deletes the target in Nokku. If sshd rejects its config without the drop-in, everything is put back and the target stays. Pass `--keep-host` when the server is already gone. For a server someone else added see [removing a server](#removing-a-server).
 
 </details>
+
+### When a host key changes
+
+Nokku remembers the host key a server showed at its first sync. Everyone's `ssh` checks that key on each login, so nobody ends up on the wrong machine. A reinstall gives the server a new key, and logins to it stop until Nokku knows the new one.
+
+Not everyone may tell Nokku about a new key. The pinned key and the address decide where everyone's logins go. If any session could change them, one stolen laptop would be enough to send your colleagues to a fake server that reads what they type. So there are two ways, and each needs more than a stolen session of someone else:
+
+| Who you are                                         | What to do                                                                                   |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| The person or service account that added the server | `nk sync <host> --accept-host-key`                                                           |
+| Anyone else                                         | In the web app open the server, **Settings**, **Forget host key**. Then run `nk sync <host>` |
+
+- **You added the server.** `--accept-host-key` drops the pin for this run and pins the key the server shows. Automation keeps working this way: a service account that added its servers with Ansible or Terraform re-pins them after a rebuild, and nobody has to click.
+- **Someone else added it.** `nk sync --accept-host-key` stops before it writes anything and points you to the web app. **Forget host key** takes an editor who signed in within the last 10 minutes, so an old browser session or an `nk` session can't do it. After it nobody can log in to that server until the next `nk sync`. That sync is a first sync again, so your own `ssh` checks the host and the key it shows gets pinned.
+- **The address and the name** only change in the web app, also with a sign-in from the last 10 minutes. `nk sync` never changes either. A freed name would fit another host, so a rename counts like a move.
+- **A sync that keeps the key** is open to every editor. After a CA rollover anyone can sync every server again.
+
+### Removing a server
+
+`nk rm <host>` takes back everything `nk sync` wrote: the CA key, the sshd drop-in and the reload that goes with them. Nothing of Nokku stays on the server, and you never have to look up a file by hand. After that the target is deleted in Nokku.
+
+- **You added the server**, or the service account that added it runs this. Both steps happen in one go.
+- **Someone else added it.** `nk rm` cleans the server in the same way. Then it leaves the target and tells you to delete it in the web app, which takes a sign-in from the last 10 minutes. Any editor can do that, so nobody has to find the person who added it.
+- **Why the split.** Deleting a target takes everyone's access with it and frees its name for another host. A session lifted from someone's laptop must not do that to servers its person never added. Cleaning a server is different. That is your own root `ssh`, and it needs nothing from Nokku.
+- **Order.** Run `nk rm` first and delete in the web app after. Once the target is gone, `nk rm` no longer finds the server.
 
 ## Reference
 

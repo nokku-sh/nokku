@@ -18,6 +18,7 @@
 	import { Ellipsis, Hash, Link, Trash, type LucideIcon } from '@lucide/svelte';
 	import * as ButtonGroup from '#lib/components/ui/button-group/index.js';
 	import { confirm, sheetLink } from '#lib/hooks/index.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { toast } from 'svelte-sonner';
 
 	type Props = {
@@ -40,6 +41,8 @@
 			confirmText?: string;
 			/** Asks the user to type this first, for deletes that are hard to undo. */
 			typeToConfirm?: string;
+			/** The call takes a recent sign-in, so that is settled before the dialog opens. */
+			fresh?: boolean;
 		};
 	};
 
@@ -60,14 +63,17 @@
 	}
 
 	function askDelete() {
-		if (!deleteConfig) return;
-		void confirm({
-			title: deleteConfig.title ?? `Delete ${deleteConfig.itemName ?? 'item'}?`,
-			description: deleteConfig.description ?? 'This action cannot be undone.',
-			confirmText: deleteConfig.confirmText,
-			typeToConfirm: deleteConfig.typeToConfirm,
-			onConfirm: deleteConfig.onDelete
-		});
+		const config = deleteConfig;
+		if (!config) return;
+		const ask = () =>
+			confirm({
+				title: config.title ?? `Delete ${config.itemName ?? 'item'}?`,
+				description: config.description ?? 'This action cannot be undone.',
+				confirmText: config.confirmText,
+				typeToConfirm: config.typeToConfirm,
+				onConfirm: config.onDelete
+			});
+		void (config.fresh ? whenFresh(ask) : ask());
 	}
 </script>
 

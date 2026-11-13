@@ -205,8 +205,8 @@ func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, nokkuv1connect.DaemonServiceRelayProcedure, true},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, nokkuv1connect.RecordingServiceGetRecordingProcedure, false},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, nokkuv1connect.RecordingServiceGetRecordingProcedure, true},
-		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, nokkuv1connect.TargetServiceDeleteTargetProcedure, false},
-		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, nokkuv1connect.TargetServiceDeleteTargetProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER, nokkuv1connect.TargetAccountServiceGrantProcedure, false},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, nokkuv1connect.TargetAccountServiceGrantProcedure, true},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN, nokkuv1connect.SSOServicePutSSOProviderProcedure, false},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, true},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.TargetServiceListTargetsProcedure, false},
@@ -270,6 +270,20 @@ func TestMachinesOnlyReachTheNkSyncCalls(t *testing.T) {
 		nokkuv1connect.TargetServiceDeleteTargetProcedure,
 		nokkuv1connect.TargetServiceSyncTargetUsersProcedure,
 	}, reached)
+}
+
+// Only nk and a service account report a host, a cookie would move a server without the fresh sign-in.
+func TestABrowserReportsNoHost(t *testing.T) {
+	a := &authorizationInterceptor{}
+	as := func(kind actor.Kind) error {
+		ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{
+			ID: "u1", Kind: kind, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER,
+		})
+		return a.authorize(ctx, nokkuv1connect.TargetServiceSyncTargetUsersProcedure, nil)
+	}
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(as(actor.KindUser)), "a browser session sent a sync")
+	require.NoError(t, as(actor.KindCLI))
+	require.NoError(t, as(actor.KindServiceAccount))
 }
 
 func TestAuthorizeUnknownProcedure(t *testing.T) {

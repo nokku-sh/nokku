@@ -43,6 +43,9 @@ const (
 	// TargetServiceSyncTargetUsersProcedure is the procedure name of the TargetService's
 	// SyncTargetUsers RPC.
 	TargetServiceSyncTargetUsersProcedure = "/nokku.v1.TargetService/SyncTargetUsers"
+	// TargetServiceForgetHostKeyProcedure is the procedure name of the TargetService's ForgetHostKey
+	// RPC.
+	TargetServiceForgetHostKeyProcedure = "/nokku.v1.TargetService/ForgetHostKey"
 	// TargetServiceGetAccessGraphProcedure is the procedure name of the TargetService's GetAccessGraph
 	// RPC.
 	TargetServiceGetAccessGraphProcedure = "/nokku.v1.TargetService/GetAccessGraph"
@@ -115,6 +118,13 @@ var (
 			Procedure:  TargetServiceSyncTargetUsersProcedure,
 		}
 	})
+	targetServiceForgetHostKeySpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("ForgetHostKey"),
+			Procedure:  TargetServiceForgetHostKeyProcedure,
+		}
+	})
 	targetServiceGetAccessGraphSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType:       connect.StreamTypeUnary,
@@ -151,6 +161,9 @@ type TargetServiceClient interface {
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
+	// ForgetHostKey drops the pinned host key of a server without a daemon, for a server that was reinstalled and
+	// whoever added it is not around to pin the new key. Nobody logs in to it until the next nk sync pins one.
+	ForgetHostKey(context.Context, *v1.ForgetHostKeyRequest) (*v1.ForgetHostKeyResponse, error)
 	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
 	// GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
@@ -173,6 +186,9 @@ type TargetServiceHandler interface {
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
+	// ForgetHostKey drops the pinned host key of a server without a daemon, for a server that was reinstalled and
+	// whoever added it is not around to pin the new key. Nobody logs in to it until the next nk sync pins one.
+	ForgetHostKey(context.Context, *v1.ForgetHostKeyRequest) (*v1.ForgetHostKeyResponse, error)
 	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
 	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
 	// GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
@@ -192,6 +208,7 @@ func RegisterTargetServiceHandler(server *connect.Server, svc TargetServiceHandl
 		connect.Method{Spec: targetServiceGetSubjectAccessSpec(), Handler: adapter.getSubjectAccess},
 		connect.Method{Spec: targetServiceGetTargetFiltersSpec(), Handler: adapter.getTargetFilters},
 		connect.Method{Spec: targetServiceSyncTargetUsersSpec(), Handler: adapter.syncTargetUsers},
+		connect.Method{Spec: targetServiceForgetHostKeySpec(), Handler: adapter.forgetHostKey},
 		connect.Method{Spec: targetServiceGetAccessGraphSpec(), Handler: adapter.getAccessGraph},
 		connect.Method{Spec: targetServiceListAccessGraphTargetsSpec(), Handler: adapter.listAccessGraphTargets},
 		connect.Method{Spec: targetServiceGetAccessMatrixSpec(), Handler: adapter.getAccessMatrix},
@@ -231,6 +248,10 @@ func (UnimplementedTargetServiceHandler) GetTargetFilters(context.Context, *v1.G
 
 func (UnimplementedTargetServiceHandler) SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.SyncTargetUsers is not implemented")
+}
+
+func (UnimplementedTargetServiceHandler) ForgetHostKey(context.Context, *v1.ForgetHostKeyRequest) (*v1.ForgetHostKeyResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.ForgetHostKey is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error) {
@@ -308,6 +329,14 @@ func (c *targetServiceClient) GetTargetFilters(ctx context.Context, req *v1.GetT
 func (c *targetServiceClient) SyncTargetUsers(ctx context.Context, req *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error) {
 	var res v1.SyncTargetUsersResponse
 	if err := c.client.CallUnary(ctx, targetServiceSyncTargetUsersSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) ForgetHostKey(ctx context.Context, req *v1.ForgetHostKeyRequest) (*v1.ForgetHostKeyResponse, error) {
+	var res v1.ForgetHostKeyResponse
+	if err := c.client.CallUnary(ctx, targetServiceForgetHostKeySpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -429,6 +458,18 @@ func (h targetServiceHandler) syncTargetUsers(ctx context.Context, _ connect.Spe
 		return err
 	}
 	res, err := h.svc.SyncTargetUsers(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) forgetHostKey(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ForgetHostKeyRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ForgetHostKey(ctx, &req)
 	if err != nil {
 		return err
 	}

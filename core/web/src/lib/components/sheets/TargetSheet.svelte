@@ -2,7 +2,7 @@
 	import { ca, missedRollover } from '#lib/api/certificates.svelte.js';
 	import { daemon as daemonApi, useDaemonReview } from '#lib/api/daemons.svelte.js';
 	import { useConnect } from '#lib/api/connect.svelte.js';
-	import { target as targetApi } from '#lib/api/targets.svelte.js';
+	import { deleteWarning, target as targetApi } from '#lib/api/targets.svelte.js';
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { workspace } from '#lib/api/workspaces.svelte.js';
@@ -63,6 +63,7 @@
 
 	const update = targetApi.update();
 	const remove = targetApi.delete();
+	const forgetHostKey = targetApi.forgetHostKey();
 	const connect = useConnect();
 
 	const autoSave = useAutoSave(() =>
@@ -136,19 +137,33 @@
 		await saved;
 	}
 
+	// Only whoever added the server pins a new key with nk sync. This is the way for everyone else.
+	function askForgetHostKey() {
+		if (!entity) return;
+		void whenFresh(() =>
+			confirm({
+				title: `Forget the host key of ${entity.name}?`,
+				description:
+					'Do this after the server was reinstalled and shows a new key. Nobody can log in until someone runs nk sync on it again. That sync pins the key the server shows then, so check you reach the right host.',
+				confirmText: 'Forget host key',
+				onConfirm: () => forgetHostKey.mutateAsync({ id: entity.id })
+			})
+		);
+	}
+
 	function askDelete() {
 		if (!entity) return;
-		void confirm({
-			title: `Delete ${entity.name}?`,
-			description: entity.daemonId
-				? 'Everyone loses access to this server. Its login accounts, grants and daemon are removed.'
-				: 'Everyone loses access to this server. Its login accounts and grants are removed.',
-			typeToConfirm: entity.name,
-			onConfirm: async () => {
-				await remove.mutateAsync({ id: entity.id });
-				sheet.close();
-			}
-		});
+		void whenFresh(() =>
+			confirm({
+				title: `Delete ${entity.name}?`,
+				description: deleteWarning(entity),
+				typeToConfirm: entity.name,
+				onConfirm: async () => {
+					await remove.mutateAsync({ id: entity.id });
+					sheet.close();
+				}
+			})
+		);
 	}
 </script>
 
@@ -199,11 +214,12 @@
 	missing={query.isError}
 	title={model?.name ?? ''}
 	onRename={can.edit
-		? (name) => {
-				if (!model) return;
-				model.name = name;
-				save();
-			}
+		? (name) =>
+				void whenFresh(() => {
+					if (!model) return;
+					model.name = name;
+					save();
+				})
 		: undefined}
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
@@ -317,6 +333,12 @@
 						<p class="text-sm text-warning">
 							The certificate authority was rolled over after the last sync. Sync again, or this
 							server refuses new certificates.
+						</p>
+					{/if}
+					{#if lastSynced && !entity.hostPublicKey}
+						<p class="text-sm text-warning">
+							No host key is pinned. Nobody can log in until the next sync pins the one the server
+							shows.
 						</p>
 					{/if}
 					<CopyCommand command={syncCommand} class="py-2" />
@@ -485,11 +507,22 @@
 			{#if can.edit}
 				<DangerZone
 					actions={[
+						...(isManual && entity.hostPublicKey
+							? [
+									{
+										title: 'Forget host key',
+										description:
+											'For a reinstalled server that shows a new key. Logins stop until the next nk sync pins it.',
+										label: 'Forget',
+										onClick: askForgetHostKey
+									}
+								]
+							: []),
 						{
 							title: 'Delete server',
 							description: linkedDaemon
 								? 'Removes the server, its daemon, its login accounts and every grant.'
-								: 'Removes the server, its login accounts and every grant.',
+								: 'Removes the server, its login accounts and every grant. Run nk rm first to clean the server itself.',
 							label: 'Delete',
 							onClick: askDelete
 						}

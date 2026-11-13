@@ -3,7 +3,7 @@
 	import { plural } from '#lib/api/bulk.js';
 	import { ca } from '#lib/api/certificates.svelte.js';
 	import { daemon } from '#lib/api/daemons.svelte.js';
-	import { target } from '#lib/api/targets.svelte.js';
+	import { deleteWarning, target } from '#lib/api/targets.svelte.js';
 	import { token } from '#lib/api/tokens.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
@@ -185,10 +185,9 @@
 					deleteConfig: can.edit
 						? {
 								itemName: row.original.name,
-								description: row.original.daemonId
-									? 'Everyone loses access to this server. Its login accounts, grants and daemon are removed.'
-									: 'Everyone loses access to this server. Its login accounts and grants are removed.',
+								description: deleteWarning(row.original),
 								typeToConfirm: row.original.name,
+								fresh: true,
 								onDelete: () => deleteTarget.mutateAsync({ id: row.original.id })
 							}
 						: undefined
@@ -222,6 +221,7 @@
 		},
 		bulkDelete<Target>({
 			noun: 'server',
+			fresh: true,
 			run: (selected) => deleteTargets.mutateAsync(selected.map(({ id }) => ({ id })))
 		})
 	];

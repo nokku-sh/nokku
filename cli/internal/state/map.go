@@ -63,6 +63,7 @@ func MapTarget(t *nokkuv1.Target) Target {
 		Until:         untilAll(t.GetUsernameExpiresAt()),
 		HostPublicKey: t.GetHostPublicKey(),
 		LastSyncAt:    timeOf(t.GetLastSyncAt()),
+		CreatedBy:     t.GetCreatedBy(),
 	}
 }
 

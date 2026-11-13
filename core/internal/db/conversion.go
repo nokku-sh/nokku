@@ -170,6 +170,7 @@ func (t *Target) ToProto() *nokkuv1.Target {
 		CreatedAt:     SafeTimestamp(&t.CreatedAt),
 		UpdatedAt:     SafeTimestamp(&t.UpdatedAt),
 		LastSyncAt:    SafeTimestamp(t.LastSyncAt),
+		CreatedBy:     t.CreatedBy,
 	}
 }
 

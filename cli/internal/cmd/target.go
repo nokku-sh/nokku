@@ -71,7 +71,7 @@ func syncCMD() *cli.Command {
 			&cli.BoolFlag{Name: "dry-run", Usage: "Show what would be written and change nothing"},
 			&cli.BoolFlag{
 				Name: "accept-host-key",
-				Usage: "Go on when the host key changed since the last sync. " +
+				Usage: "Go on when the host key changed since the last sync, for a server you added. " +
 					"Your own ssh checks the host, then the key it shows is pinned",
 			},
 			jsonFlag,
@@ -113,10 +113,8 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 		if target, seeds, err = newTarget(ctx, c, cmd, dest); err != nil {
 			return err
 		}
-	} else if cmd.IsSet("grant") || cmd.IsSet("tag") {
-		// The web app owns access after the first sync, so a rerun leaves it.
-		warnf("%s is already a target, --grant and --tag only apply to a new one. "+
-			"Change its access in the web app", target.Name)
+	} else if err = knownTarget(c.State, cmd, target); err != nil {
+		return err
 	}
 
 	if dest, err = dest.trust(target, cmd.Bool("accept-host-key")); err != nil {
@@ -187,6 +185,50 @@ func probe(
 		}
 	}
 	return h, nil
+}
+
+// knownTarget checks the flags of a sync that found its target.
+func knownTarget(s *state.State, cmd *cli.Command, target *state.Target) error {
+	if err := machineOwns(s, target); err != nil {
+		return err
+	}
+	if cmd.IsSet("grant") || cmd.IsSet("tag") {
+		// The web app owns access after the first sync, so a rerun leaves it.
+		warnf("%s is already a target, --grant and --tag only apply to a new one. "+
+			"Change its access in the web app", target.Name)
+	}
+	if !cmd.Bool("accept-host-key") {
+		return nil
+	}
+	return canRepin(s, target)
+}
+
+// canRepin stops --accept-host-key early, the core would refuse the new key only after the host was written.
+func canRepin(s *state.State, target *state.Target) error {
+	if target.HostPublicKey == "" || !someoneElses(s, target) {
+		return nil
+	}
+	return fmt.Errorf(
+		"%s was added by someone else, so you can't pin a new host key for it, nothing was written. "+
+			"Forget its host key in the web app, in the server's settings, then run nk sync without --accept-host-key",
+		target.Name,
+	)
+}
+
+// machineOwns stops a service account before it writes to a server it did not add, the core refuses those.
+func machineOwns(s *state.State, target *state.Target) error {
+	sa := s.ServiceAccount
+	// A CI session learns its id with the first sync.
+	if sa == nil || sa.ID == "" || sa.ID == target.CreatedBy {
+		return nil
+	}
+	return fmt.Errorf("%s was added by someone else. A service account only syncs and removes "+
+		"the servers it added itself, nothing was written", target.Name)
+}
+
+// someoneElses is false for a service account and a session without its person, the core decides those.
+func someoneElses(s *state.State, target *state.Target) bool {
+	return s.ServiceAccount == nil && s.User != nil && s.User.ID != target.CreatedBy
 }
 
 // checkHostKey stops a sync that would hand a changed host key to every user.
@@ -286,6 +328,9 @@ func applyPlan(
 	if connectrpc.CodeOf(err) == connectrpc.CodeFailedPrecondition {
 		return errors.New("the keys of the certificate authority changed during this sync, run nk sync again")
 	}
+	if connectrpc.CodeOf(err) == connectrpc.CodePermissionDenied {
+		return fmt.Errorf("the host is up to date, but Nokku refused the report: %w", err)
+	}
 	if err != nil {
 		return fmt.Errorf("the host is up to date, but reporting to Nokku failed, run nk sync again: %w", err)
 	}
@@ -322,7 +367,8 @@ func rmCMD() *cli.Command {
 		Name:  "rm",
 		Usage: "Remove a server you added with nk sync",
 		Description: "Connects as root with your own ssh, removes the Nokku CA and the sshd drop-in, " +
-			"then deletes the target in Nokku.",
+			"then deletes the target in Nokku. A server someone else added is cleaned the same way, " +
+			"its target is then deleted in the web app.",
 		ArgsUsage: "<host | root@host | target-name>",
 		Flags: []cli.Flag{
 			portFlag,
@@ -354,6 +400,18 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	if target == nil {
 		return fmt.Errorf("no target matches %s, check the name in the Nokku web app", host)
 	}
+	if err = machineOwns(c.State, target); err != nil {
+		return err
+	}
+	// The core lets nk delete only its person's servers. Cleaning the host is their own ssh and always runs.
+	handoff := someoneElses(c.State, target)
+	if handoff && cmd.Bool("keep-host") {
+		return fmt.Errorf("%s was added by someone else, delete it in the web app", target.Name)
+	}
+	if handoff {
+		fmt.Printf("%s was added by someone else. nk cleans the server, the target is then deleted in the web app\n",
+			target.Name)
+	}
 
 	if !cmd.Bool("keep-host") {
 		if dest, err = dest.trust(target, cmd.Bool("accept-host-key")); err != nil {
@@ -378,6 +436,11 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
+	if handoff {
+		fmt.Printf("%s %s is clean, nothing of Nokku is left on it\n", ui.Green("✔"), target.Name)
+		warnf("%s is still a target in Nokku. Delete it in the web app, in the server's settings", target.Name)
+		return nil
+	}
 	if err = c.DeleteTarget(ctx, target); err != nil {
 		return fmt.Errorf("deleting %s in Nokku failed, run it again with --keep-host: %w", target.Name, err)
 	}
