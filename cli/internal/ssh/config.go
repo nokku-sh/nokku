@@ -201,8 +201,13 @@ func ensureInclude() error {
 	return nil
 }
 
+// Bare where ssh reads it the same, shell completers don't unquote the path.
 func includeLine() string {
-	return "Include " + configValue(paths.SSHConfigFile())
+	path := paths.SSHConfigFile()
+	if strings.ContainsAny(path, " \t\"'\\#") {
+		return "Include " + configValue(path)
+	}
+	return "Include " + path
 }
 
 func RemoveInclude() error {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -122,6 +123,18 @@ func TestInclude(t *testing.T) {
 	data, err = os.ReadFile(cfg)
 	require.NoError(t, err)
 	assert.Equal(t, original, string(data))
+}
+
+func TestIncludeLineQuotesOnlyWhenNeeded(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows paths have backslashes and stay quoted")
+	}
+	t.Setenv("HOME", "/home/jane")
+	assert.Equal(t, "Include /home/jane/.config/nk/ssh_config", includeLine(),
+		"zsh and bash completion read the path as written")
+
+	t.Setenv("HOME", "/Users/Jane Doe")
+	assert.Equal(t, `Include "/Users/Jane Doe/.config/nk/ssh_config"`, includeLine())
 }
 
 func TestIncludeKeepsSymlink(t *testing.T) {
