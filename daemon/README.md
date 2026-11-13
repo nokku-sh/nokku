@@ -170,7 +170,7 @@ sudo rm -rf /usr/bin/nokkud /usr/share/nokkud /usr/lib/systemd/system/nokkud.ser
 
 ## More
 
-- [Documentation](https://nokku.sh/docs), with the guide for [adding a server](https://nokku.sh/docs/guides/add-server-daemon)
+- [Documentation](https://nokku.sh/docs), with the guide for [adding a server](https://nokku.sh/docs/servers/add-server)
 - [SECURITY.md](./SECURITY.md), for how the daemon protects its key and how its SSH server behaves
 - [CONTRIBUTING.md](../CONTRIBUTING.md), for building from source
 
