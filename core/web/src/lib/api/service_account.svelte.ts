@@ -6,6 +6,15 @@ import { useQuery, useMutation } from '#lib/query/index.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { usePatch } from './mask';
+import { serverCount } from './targets.svelte';
+
+export async function serviceAccountDeleteWarning(id: string) {
+	const servers = await serverCount(id);
+	const grants = servers
+		? `its access to ${plural(servers, 'server')} is removed`
+		: 'every grant is removed';
+	return `Every token stops working right away and ${grants}.`;
+}
 
 export const serviceAccount = {
 	get: (id: MaybeGetter<string | undefined>) =>

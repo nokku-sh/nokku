@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
-	import { team as teamApi } from '#lib/api/team.svelte.js';
+	import { team as teamApi, teamDeleteWarning } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { users } from '#lib/api/workspaces.svelte.js';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
@@ -88,14 +88,14 @@
 		void autoSave.track(run).catch(() => {});
 	}
 
-	function askDelete() {
-		if (!entity) return;
+	async function askDelete() {
+		const team = entity;
+		if (!team) return;
 		void confirm({
-			title: `Delete ${entity.name}?`,
-			description: 'Members keep their own access, but lose everything granted through this team.',
-			typeToConfirm: entity.name,
+			title: `Delete ${team.name}?`,
+			description: await teamDeleteWarning(team.id, members.data?.length),
 			onConfirm: async () => {
-				await remove.mutateAsync({ id: entity.id });
+				await remove.mutateAsync({ id: team.id });
 				sheet.close();
 			}
 		});

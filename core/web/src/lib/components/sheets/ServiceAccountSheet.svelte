@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
-	import { serviceAccount as saApi } from '#lib/api/service_account.svelte.js';
+	import {
+		serviceAccount as saApi,
+		serviceAccountDeleteWarning
+	} from '#lib/api/service_account.svelte.js';
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
@@ -86,14 +89,14 @@
 		});
 	}
 
-	function askDelete() {
-		if (!entity) return;
+	async function askDelete() {
+		const account = entity;
+		if (!account) return;
 		void confirm({
-			title: `Delete ${entity.name}?`,
-			description: 'Every token stops working right away and every grant is removed.',
-			typeToConfirm: entity.name,
+			title: `Delete ${account.name}?`,
+			description: await serviceAccountDeleteWarning(account.id),
 			onConfirm: async () => {
-				await remove.mutateAsync({ id: entity.id });
+				await remove.mutateAsync({ id: account.id });
 				sheet.close();
 			}
 		});

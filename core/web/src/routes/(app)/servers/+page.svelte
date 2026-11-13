@@ -221,6 +221,8 @@
 		},
 		bulkDelete<Target>({
 			noun: 'server',
+			name: (t) => t.name,
+			typed: true,
 			fresh: true,
 			run: (selected) => deleteTargets.mutateAsync(selected.map(({ id }) => ({ id })))
 		})

@@ -4,7 +4,7 @@
 	import { team as teamApi } from '#lib/api/team.svelte.js';
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { users } from '#lib/api/workspaces.svelte.js';
+	import { userDeleteWarning, users } from '#lib/api/workspaces.svelte.js';
 	import RolePicker from '#lib/components/access/RolePicker.svelte';
 	import SubjectAccess from '#lib/components/access/SubjectAccess.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -170,13 +170,11 @@
 				description:
 					'Their access ends right away and cannot be restored. Inviting them again starts a new account.',
 				label: 'Delete',
-				onClick: () =>
+				onClick: async () =>
 					confirm({
 						title: `Delete ${name}?`,
-						description:
-							'Their access ends right away and cannot be restored. Inviting them again starts a new account.',
+						description: await userDeleteWarning(person.id),
 						confirmText: 'Delete',
-						typeToConfirm: person.email,
 						onConfirm: async () => {
 							await remove.mutateAsync({ userId: person.id });
 							sheet.close();

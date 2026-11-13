@@ -2,7 +2,7 @@
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { page } from '$app/state';
 	import { auth, whenFresh } from '#lib/api/auth.svelte.js';
-	import { users } from '#lib/api/workspaces.svelte.js';
+	import { userDeleteWarning, users } from '#lib/api/workspaces.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { roles } from '#lib/api/roles.svelte.js';
 	import { parseRole, roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
@@ -27,7 +27,7 @@
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
-	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
+	import { confirm, useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { CircleUser, PlusIcon, ShieldCheck, UserRoundX } from '@lucide/svelte';
 	import { Debounced } from 'runed';
 
@@ -59,13 +59,10 @@
 	const bulkActions: BulkAction<User>[] = [
 		bulkDelete<User>({
 			noun: 'account',
+			name: (u) => u.name || u.email,
+			skip: (u) => u.role === WorkspaceRole.OWNER || u.id === me.data?.id,
 			description: 'Their access ends right away. This cannot be undone.',
-			run: (selected) =>
-				removeMany.mutateAsync(
-					selected
-						.filter((u) => u.role !== WorkspaceRole.OWNER && u.id !== me.data?.id)
-						.map(({ id }) => ({ userId: id }))
-				)
+			run: (selected) => removeMany.mutateAsync(selected.map(({ id }) => ({ userId: id })))
 		})
 	];
 
@@ -126,7 +123,13 @@
 										icon: UserRoundX,
 										onClick: () =>
 											u.active
-												? setActive.mutate({ userId: u.id, active: false })
+												? confirm({
+														title: `Deactivate ${u.name || u.email}?`,
+														description:
+															'Every session ends right away. You can reactivate them later.',
+														confirmText: 'Deactivate',
+														onConfirm: () => setActive.mutateAsync({ userId: u.id, active: false })
+													})
 												: whenFresh(() => setActive.mutate({ userId: u.id, active: true }))
 									}
 								])
@@ -135,9 +138,8 @@
 						? undefined
 						: {
 								title: `Delete ${u.name || u.email}?`,
-								description: 'Their access ends right away. This cannot be undone.',
+								description: () => userDeleteWarning(u.id),
 								confirmText: 'Delete',
-								typeToConfirm: u.email,
 								onDelete: () => remove.mutateAsync({ userId: u.id })
 							}
 				});

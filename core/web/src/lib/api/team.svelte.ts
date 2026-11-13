@@ -5,6 +5,21 @@ import { plural, useBulkMutation } from './bulk';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { usePatch } from './mask';
+import { serverCount } from './targets.svelte';
+
+export async function teamDeleteWarning(id: string, members: number | undefined) {
+	if (members === 0) return 'It has no members, so nobody loses access.';
+	const servers = await serverCount(id);
+	if (servers === 0) return 'It grants no access, so nobody loses any.';
+	const who =
+		members === undefined
+			? 'Members lose'
+			: `${plural(members, 'member')} ${members === 1 ? 'loses' : 'lose'}`;
+	const what = servers
+		? `what this team grants on ${plural(servers, 'server')}`
+		: 'everything granted through this team';
+	return `${who} ${what}. Access they hold themselves stays.`;
+}
 
 export const team = {
 	get: (id: MaybeGetter<string | undefined>) =>

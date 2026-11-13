@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { serviceAccount } from '#lib/api/service_account.svelte.js';
+	import { serviceAccount, serviceAccountDeleteWarning } from '#lib/api/service_account.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import CreateServiceAccountModal from '#lib/components/modals/CreateServiceAccountModal.svelte';
 	import ServiceAccountSheet from '#lib/components/sheets/ServiceAccountSheet.svelte';
@@ -52,6 +52,7 @@
 	const bulkActions: BulkAction<ServiceAccount>[] = [
 		bulkDelete<ServiceAccount>({
 			noun: 'service account',
+			name: (sa) => sa.name,
 			run: (selected) => deleteSAs.mutateAsync(selected.map(({ id }) => ({ id })))
 		})
 	];
@@ -117,8 +118,7 @@
 					deleteConfig: can.edit
 						? {
 								itemName: row.original.name,
-								description: 'Every token stops working right away and every grant is removed.',
-								typeToConfirm: row.original.name,
+								description: () => serviceAccountDeleteWarning(row.original.id),
 								onDelete: () => deleteSA.mutateAsync({ id: row.original.id })
 							}
 						: undefined

@@ -37,7 +37,8 @@
 			onDelete: () => unknown;
 			itemName?: string;
 			title?: string;
-			description?: string;
+			/** A function is asked when the dialog opens, for a warning that counts what goes. */
+			description?: string | (() => Promise<string>);
 			confirmText?: string;
 			/** Asks the user to type this first, for deletes that are hard to undo. */
 			typeToConfirm?: string;
@@ -65,14 +66,18 @@
 	function askDelete() {
 		const config = deleteConfig;
 		if (!config) return;
-		const ask = () =>
-			confirm({
+		const ask = async () => {
+			const { description } = config;
+			return confirm({
 				title: config.title ?? `Delete ${config.itemName ?? 'item'}?`,
-				description: config.description ?? 'This action cannot be undone.',
+				description:
+					(typeof description === 'function' ? await description() : description) ??
+					'This action cannot be undone.',
 				confirmText: config.confirmText,
 				typeToConfirm: config.typeToConfirm,
 				onConfirm: config.onDelete
 			});
+		};
 		void (config.fresh ? whenFresh(ask) : ask());
 	}
 </script>

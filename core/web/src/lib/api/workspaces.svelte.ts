@@ -10,6 +10,13 @@ import { InvitationService } from '#lib/gen/nokku/v1/invitation_pb.js';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { usePatch } from './mask';
+import { serverCount } from './targets.svelte';
+
+export async function userDeleteWarning(id: string) {
+	const servers = await serverCount(id);
+	const access = servers ? `Their access to ${plural(servers, 'server')}` : 'Their access';
+	return `${access} ends right away and cannot be restored. Inviting them again starts a new account.`;
+}
 
 // The host picks the workspace, so none of these name one.
 export const workspace = {

@@ -1,11 +1,12 @@
 import { MAX_PAGE_SIZE } from '#lib/config.js';
-import { LIVE } from './client';
+import { authTransport, LIVE } from './client';
 import {
 	TargetService,
 	type AccessGraphFilterSchema,
 	type GetAccessMatrixRequestSchema,
 	type ListTargetsRequestSchema
 } from '#lib/gen/nokku/v1/target_pb.js';
+import { createClient } from '@connectrpc/connect';
 import { keepPreviousData } from '@tanstack/svelte-query';
 import type { MessageInitShape } from '@bufbuild/protobuf';
 import { toast } from 'svelte-sonner';
@@ -22,6 +23,15 @@ export function deleteWarning(t: { name: string; daemonId: string }) {
 		? 'Everyone loses access to this server. Its login accounts, grants and daemon are removed.'
 		: `Everyone loses access to this server. Its login accounts and grants are removed. Run nk rm ${t.name} first, it removes what Nokku wrote on the server.`;
 }
+
+const client = createClient(TargetService, authTransport);
+
+// How many servers a person, team or service account reaches, for the delete dialogs. They still ask without it.
+export const serverCount = (subjectId: string) =>
+	client.getSubjectAccess({ subjectId }).then(
+		(res) => res.targets.length,
+		() => undefined
+	);
 
 export const target = {
 	get: (id: MaybeGetter<string | undefined>) =>

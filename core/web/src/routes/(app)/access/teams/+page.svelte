@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { team } from '#lib/api/team.svelte.js';
+	import { team, teamDeleteWarning } from '#lib/api/team.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import CreateTeamModal from '#lib/components/modals/CreateTeamModal.svelte';
 	import TeamSheet from '#lib/components/sheets/TeamSheet.svelte';
@@ -43,6 +43,7 @@
 	const bulkActions: BulkAction<Team>[] = [
 		bulkDelete<Team>({
 			noun: 'team',
+			name: (t) => t.name,
 			run: (selected) => deleteTeams.mutateAsync(selected.map(({ id }) => ({ id })))
 		})
 	];
@@ -87,9 +88,7 @@
 					deleteConfig: can.edit
 						? {
 								itemName: row.original.name,
-								description:
-									'Members keep their own access, but lose everything granted through this team.',
-								typeToConfirm: row.original.name,
+								description: () => teamDeleteWarning(row.original.id, row.original.memberCount),
 								onDelete: () => deleteTeam.mutateAsync({ id: row.original.id })
 							}
 						: undefined
