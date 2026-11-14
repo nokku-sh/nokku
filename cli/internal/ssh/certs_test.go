@@ -18,10 +18,11 @@ import (
 func signCert(t testing.TB, signer ssh.Signer, validAfter, validBefore time.Time) []byte {
 	t.Helper()
 	c := &ssh.Certificate{
-		Key:         signer.PublicKey(),
-		CertType:    ssh.UserCert,
-		ValidAfter:  uint64(validAfter.Unix()),
-		ValidBefore: uint64(validBefore.Unix()),
+		Key:             signer.PublicKey(),
+		CertType:        ssh.UserCert,
+		ValidPrincipals: []string{"subject@target:deploy"},
+		ValidAfter:      uint64(validAfter.Unix()),
+		ValidBefore:     uint64(validBefore.Unix()),
 	}
 	require.NoError(t, c.SignCert(rand.Reader, signer))
 	return ssh.MarshalAuthorizedKey(c)

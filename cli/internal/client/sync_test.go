@@ -77,10 +77,11 @@ func newFakeCA(t *testing.T) *fakeCA {
 func (f *fakeCA) signCert(t *testing.T, key cryptossh.PublicKey, validFor time.Duration) string {
 	t.Helper()
 	cert := &cryptossh.Certificate{
-		Key:         key,
-		CertType:    cryptossh.UserCert,
-		ValidAfter:  uint64(time.Now().Add(-time.Hour).Unix()),
-		ValidBefore: uint64(time.Now().Add(validFor).Unix()),
+		Key:             key,
+		CertType:        cryptossh.UserCert,
+		ValidPrincipals: []string{"subject@target:deploy"},
+		ValidAfter:      uint64(time.Now().Add(-time.Hour).Unix()),
+		ValidBefore:     uint64(time.Now().Add(validFor).Unix()),
 	}
 	require.NoError(t, cert.SignCert(rand.Reader, f.signer))
 	return string(cryptossh.MarshalAuthorizedKey(cert))

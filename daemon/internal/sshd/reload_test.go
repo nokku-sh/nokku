@@ -70,11 +70,12 @@ func TestServerReloadRefreshesHostCerts(t *testing.T) {
 	hostPub, _, _, _, err := ssh.ParseAuthorizedKey(pubData)
 	must.NoError(err)
 	cert := &ssh.Certificate{
-		Key:         hostPub,
-		CertType:    ssh.HostCert,
-		KeyId:       "host-test",
-		ValidAfter:  0,
-		ValidBefore: ssh.CertTimeInfinity,
+		Key:             hostPub,
+		CertType:        ssh.HostCert,
+		KeyId:           "host-test",
+		ValidPrincipals: []string{"host-test"},
+		ValidAfter:      0,
+		ValidBefore:     ssh.CertTimeInfinity,
 	}
 	must.NoError(cert.SignCert(rand.Reader, ca.signer))
 	certPath := paths.HostKeyCert()
