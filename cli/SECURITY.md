@@ -8,7 +8,7 @@ Found a vulnerability? Don't open a public issue. See [SECURITY.md](../SECURITY.
 
 - **Your SSH key stays on the machine.** In a TPM or on a security key it can't even be copied off.
 - **Your sign-in gets certificates for its own key only.** Malware can't take your access to a key of its own.
-- **Everything under `~/.config/nk/` is a credential.** Protect it, `nk logout` removes it.
+- **Everything under `~/.config/nk/` is a credential.** Protect it. `nk logout` removes it, all but `signer.json`. That is the key the core knows this machine by, and it opens nothing without a sign-in. Delete the file to have the core forget this machine. Your next sign-in then counts as a new device.
 - **A service account key is a password.** Keep it in a secret store and pass it only as `NK_TOKEN`.
 - **The servers enforce access, not `nk`.**
 

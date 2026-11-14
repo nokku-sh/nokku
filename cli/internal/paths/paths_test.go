@@ -29,3 +29,21 @@ func TestEnsurePathsWithoutHome(t *testing.T) {
 	t.Setenv("HOME", "")
 	assert.Error(t, EnsureDirs(), "startup must stop when no home resolves")
 }
+
+func TestClearConfigDirKeepsOnlyTheSignerKey(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	require.NoError(t, EnsureDirs())
+	for _, f := range []string{SignerStateFile(), ConfigFile(), SSHSignerFile(), SSHCertificate("a")} {
+		require.NoError(t, os.WriteFile(f, []byte("x"), 0o600))
+	}
+
+	require.NoError(t, ClearConfigDir())
+
+	left, err := os.ReadDir(ConfigDir())
+	require.NoError(t, err)
+	require.Len(t, left, 1, "a logout left more than the signer key")
+	assert.Equal(t, "signer.json", left[0].Name())
+	require.NoError(t, ClearConfigDir(), "a second logout")
+}

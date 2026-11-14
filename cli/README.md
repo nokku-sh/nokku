@@ -47,7 +47,7 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 | `nk doctor`                  | Check the core, the TPM and your local SSH setup                              |
 | `nk sync <host>`             | Add a server without the daemon, or refresh one you added                     |
 | `nk rm <host>`               | Clean up a server you added with `nk sync` and delete its target              |
-| `nk logout`                  | Sign out, stop the agent and remove local credentials and state               |
+| `nk logout`                  | Sign out, stop the agent and remove local credentials and state. The machine's key stays, so signing in again sends no new sign-in mail |
 
 <details>
 <summary><b>Flags per command</b></summary>

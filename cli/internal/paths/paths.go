@@ -3,7 +3,9 @@ package paths
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -62,9 +64,24 @@ func SSHCertificates() ([]string, error) {
 	return filepath.Glob(filepath.Join(SSHCertDir(), "*-cert.pub"))
 }
 
-func RemoveConfigDir() error {
-	if err := os.RemoveAll(ConfigDir()); err != nil {
-		return fmt.Errorf("remove config dir: %w", err)
+// ClearConfigDir keeps the signer's key. The core knows this machine by it, so signing in again is no new
+// device and sends no mail. The key opens nothing without a session.
+func ClearConfigDir() error {
+	entries, err := os.ReadDir(ConfigDir())
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read config dir: %w", err)
+	}
+	keep := filepath.Base(SignerStateFile())
+	for _, e := range entries {
+		if e.Name() == keep {
+			continue
+		}
+		if err = os.RemoveAll(filepath.Join(ConfigDir(), e.Name())); err != nil {
+			return fmt.Errorf("clear config dir: %w", err)
+		}
 	}
 	return nil
 }

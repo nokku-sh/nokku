@@ -127,7 +127,7 @@ func logoutCMD() *cli.Command {
 			if err := ssh.RemoveInclude(); err != nil {
 				return err
 			}
-			if err := paths.RemoveConfigDir(); err != nil {
+			if err := paths.ClearConfigDir(); err != nil {
 				return err
 			}
 			fmt.Println("Signed out. Removed credentials, certificates, and cached state")
