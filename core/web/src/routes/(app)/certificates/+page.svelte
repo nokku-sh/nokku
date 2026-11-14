@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { plural } from '#lib/api/bulk.js';
-	import { ca, missedRollover } from '#lib/api/certificates.svelte.js';
+	import { ca } from '#lib/api/certificates.svelte.js';
 	import { target } from '#lib/api/targets.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
 	import { util, workspace } from '#lib/api/workspaces.svelte.js';
@@ -70,16 +70,12 @@
 	const manual = $derived(manualList.data?.targets ?? []);
 	const manualCount = $derived(manualList.data?.total ?? 0);
 	const manualNames = $derived(manual.map((t) => t.name));
-	const missingKey = $derived(
-		manual.filter((t) => missedRollover(entity?.rotatedAt, t.lastSyncAt)).map((t) => t.name)
-	);
+	// Only the count, nk sync --stale finds the servers itself.
+	const behind = target.list(() => ({ missedRollover: true, limit: 1 }));
+	const missing = $derived(behind.data?.total ?? 0);
 	const missingText = $derived(
-		`${plural(missingKey.length, 'server')} ${missingKey.length === 1 ? 'misses' : 'miss'} the new key`
+		`${plural(missing, 'server')} ${missing === 1 ? 'misses' : 'miss'} the new key`
 	);
-	const unchecked = $derived(manualCount - manual.length);
-	const syncCommands = (names: string[]) => names.map((name) => `nk sync ${name}`).join('\n');
-	// The warning is the count. The commands fold past this many, a fleet takes the file or the Ansible task.
-	const SYNC_PREVIEW = 5;
 
 	const midnight = timestampFromMs(new Date().setHours(0, 0, 0, 0));
 	const signedToday = util.getLogs(() => ({
@@ -107,8 +103,7 @@
 
 	// Only what we can tell. A daemon that is offline may still miss a new key.
 	const status = $derived.by((): { tone: Tone; text: string } => {
-		if (missingKey.length) return { tone: 'destructive', text: missingText };
-		if (unchecked > 0) return { tone: 'muted', text: `${plural(unchecked, 'server')} not checked` };
+		if (missing) return { tone: 'destructive', text: missingText };
 		return {
 			tone: 'success',
 			text: `In use since ${formatTs(entity?.rotatedAt ?? entity?.createdAt, 'short')}`
@@ -159,20 +154,18 @@
 	});
 
 	const callout = $derived.by(() => {
-		if (missingKey.length) {
+		if (missing) {
 			return {
 				tone: 'destructive' as const,
 				title: missingText,
-				text: 'They refuse new certificates until you run this on your own machine. A certificate from before the rollover still gets you in, for an hour at most.',
-				names: missingKey
+				text: 'They refuse new certificates until you run this on your own machine. A certificate from before the rollover still gets you in, for an hour at most.'
 			};
 		}
-		if (manual.length) {
+		if (manualCount) {
 			return {
 				tone: 'warning' as const,
 				title: 'Before you roll over',
-				text: `${plural(manualCount, 'server')} ${manualCount === 1 ? 'was' : 'were'} set up with nk sync and ${manualCount === 1 ? 'has' : 'have'} no daemon. Run this right after a rollover, new logins there fail until you do.`,
-				names: manualNames
+				text: `${plural(manualCount, 'server')} ${manualCount === 1 ? 'was' : 'were'} set up with nk sync and ${manualCount === 1 ? 'has' : 'have'} no daemon. Run this right after a rollover, new logins there fail until you do.`
 			};
 		}
 		return undefined;
@@ -373,24 +366,7 @@
 						<Alert.Title>{callout.title}</Alert.Title>
 						<Alert.Description class="flex flex-col gap-2">
 							<p>{callout.text}</p>
-							<CodeSnippet
-								code={syncCommands(callout.names)}
-								language="bash"
-								wrap
-								preview={SYNC_PREVIEW}
-								download={callout.names.length > SYNC_PREVIEW ? 'nk-sync.sh' : undefined}
-								class="w-full"
-							/>
-							{#if callout.names.length > SYNC_PREVIEW}
-								<p>For a whole inventory, the Ansible task below does the same.</p>
-							{/if}
-							{#if unchecked > 0}
-								<p>
-									{plural(unchecked, 'more server')}
-									{unchecked === 1 ? 'was' : 'were'} not checked,
-									<a href="/servers?status=manual" class="underline">find them under Servers</a>.
-								</p>
-							{/if}
+							<CodeSnippet code="nk sync --stale" language="bash" class="w-full" />
 						</Alert.Description>
 					</Alert.Root>
 				{/if}
