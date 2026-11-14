@@ -29,7 +29,7 @@ func proxyCMD() *cli.Command {
 	return &cli.Command{
 		Name:      "proxy",
 		Usage:     "Proxy an SSH connection (used by ssh)",
-		ArgsUsage: "<target-id> <port>",
+		ArgsUsage: "<server-id> <port>",
 		Hidden:    true,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "relay", Usage: "Always go through the Nokku relay"},
@@ -37,7 +37,7 @@ func proxyCMD() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			id, port := cmd.Args().Get(0), cmd.Args().Get(1)
 			if id == "" || port == "" {
-				return errors.New("usage: nk proxy <target-id> <port>")
+				return errors.New("usage: nk proxy <server-id> <port>")
 			}
 			s, err := loadState(cmd)
 			if err != nil {
@@ -131,7 +131,7 @@ func renewCert(ctx context.Context, cmd *cli.Command) error {
 	}
 	target := s.TargetByID(cmd.Args().First())
 	if target == nil {
-		return errors.New("unknown target")
+		return errors.New("unknown server")
 	}
 	if s.CA == nil || ssh.CertFresh(*target, *s.CA) {
 		return nil

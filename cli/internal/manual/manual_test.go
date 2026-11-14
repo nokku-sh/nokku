@@ -95,7 +95,7 @@ func TestNewPlanRefusesAnUnusableID(t *testing.T) {
 		"urn:uuid:" + testTargetID,
 	} {
 		_, err := NewPlan("ca-key", id)
-		assert.ErrorContains(t, err, "unusable target id", "%q", id)
+		assert.ErrorContains(t, err, "unusable server id", "%q", id)
 	}
 }
 

@@ -74,7 +74,7 @@ func NewPlan(caKey, targetID string) (Plan, error) {
 	if targetID != "" {
 		// The id lands in sshd_config, a line break would add a directive.
 		if !login.ValidID(targetID) {
-			return Plan{}, fmt.Errorf("the core sent an unusable target id %q, nothing was written", targetID)
+			return Plan{}, fmt.Errorf("the core sent an unusable server id %q, nothing was written", targetID)
 		}
 		shown = targetID
 	}
