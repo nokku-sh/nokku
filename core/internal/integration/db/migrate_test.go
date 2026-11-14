@@ -14,7 +14,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// admin-link and rotate-secrets run next to the server. Opening must not
+// recover and rotate-secrets run next to the server. Opening must not
 // migrate or reset the role passwords.
 func TestNewConnectionChangesNothing(t *testing.T) {
 	ctx := t.Context()

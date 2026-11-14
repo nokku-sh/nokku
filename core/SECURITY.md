@@ -124,7 +124,7 @@ A workspace has exactly one owner, and nobody else can hand the workspace on. Wh
 
 - **A passkey.** Always works for the owner, also when single sign-on is required.
 - **An email sign-in link.** Always works for the owner too. Whoever reads the owner's mailbox is the owner, so give that mailbox a strong second factor.
-- **`admin-link`.** `./nokku admin-link` prints a 24 hour sign-in link for the owner. The log never shows the link, but a server started in a terminal prints it there. Anyone who runs commands on the machine can become the owner, so keep that to people you trust with the workspace.
+- **`recover`.** `./nokku recover` prints a 24 hour sign-in link for the owner. The log never shows the link, but a server started in a terminal prints it there. Anyone who runs commands on the machine can become the owner, so keep that to people you trust with the workspace.
 - **A linked identity provider.** A provider never becomes the owner by matching the email address. The owner links it once while signed in, on their profile. After that, whoever controls that account at the provider is the owner.
 
 Requiring single sign-on closes passkeys and email links for everyone else, and signs out the sessions they started, in the browser and in `nk`. It leaves them open for the owner on purpose, so a broken provider can still be fixed.

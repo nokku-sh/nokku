@@ -24,7 +24,7 @@ type bootstrapConfig struct {
 	MicrosoftTenantID     string `env:"MICROSOFT_TENANT_ID"`
 }
 
-// Bootstrap reports whether the owner has no way in yet, see admin-link.
+// Bootstrap reports whether the owner has no way in yet, see nokku recover.
 func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (bool, error) {
 	cfg, err := env.ParseAs[bootstrapConfig]()
 	if err != nil {
@@ -113,8 +113,8 @@ func (s *Service) seedProvider(ctx context.Context, p SSOProvider) error {
 	return err
 }
 
-// AdminLink is the way back in for an owner who lost every passkey.
-func (s *Service) AdminLink(ctx context.Context, ws actor.Workspace) (*db.User, string, error) {
+// OwnerLink is the way back in for an owner who lost every passkey.
+func (s *Service) OwnerLink(ctx context.Context, ws actor.Workspace) (*db.User, string, error) {
 	ctx = actor.WithWorkspace(ctx, ws)
 	owner, err := s.conn.Tenant().GetOwner(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {

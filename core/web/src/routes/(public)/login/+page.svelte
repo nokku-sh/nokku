@@ -157,7 +157,7 @@
 			{/each}
 			{#if ownerRecovery && !options.data?.emailConfigured}
 				<p class="text-center text-sm text-muted-foreground">
-					This server sends no email. Without a passkey, run <code>nokku admin-link</code> on the server
+					This server sends no email. Without a passkey, run <code>nokku recover</code> on the server
 					for a sign-in link.
 				</p>
 			{/if}

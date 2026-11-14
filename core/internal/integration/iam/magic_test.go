@@ -180,9 +180,9 @@ func TestBootstrapMakesTheOwnerOnce(t *testing.T) {
 	assert.True(t, needsLink)
 	assert.Nil(t, e.userByEmail(t, ws, "other@"+testDomain()), "a second admin was made")
 
-	_, first, err := e.svc.AdminLink(t.Context(), ws)
+	_, first, err := e.svc.OwnerLink(t.Context(), ws)
 	require.NoError(t, err)
-	_, link, err := e.svc.AdminLink(t.Context(), ws)
+	_, link, err := e.svc.OwnerLink(t.Context(), ws)
 	require.NoError(t, err)
 	_, _, err = e.svc.ConsumeMagicLink(anon(t.Context(), ws), linkToken(t, first))
 	require.ErrorIs(t, err, iam.ErrInvalidToken, "a new link replaces the earlier one")

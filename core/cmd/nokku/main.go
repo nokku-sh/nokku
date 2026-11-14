@@ -57,13 +57,13 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			{
-				Name:  "admin-link",
+				Name:  "recover",
 				Usage: "Print a sign-in link for the workspace owner",
 				Description: "The way back in when the owner lost every passkey and no mail " +
 					"goes out. The link works for 24 hours and replaces earlier ones. " +
 					"Run it on the server with the same environment the server has.",
 				Action: func(ctx context.Context, _ *cli.Command) error {
-					return app.AdminLink(ctx)
+					return app.Recover(ctx)
 				},
 			},
 			{

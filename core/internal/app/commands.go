@@ -14,15 +14,15 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
-// AdminLink prints a sign-in link for the owner of a self-hosted server.
+// Recover prints a sign-in link for the owner of a self-hosted server.
 // It builds only db and iam, the server may be running next to it.
-func AdminLink(ctx context.Context) error {
+func Recover(ctx context.Context) error {
 	ec, err := env.ParseAs[EnvConfig]()
 	if err != nil {
 		return err
 	}
 	if ec.SaaS {
-		return errors.New("admin-link is for a self-hosted server")
+		return errors.New("recover is for a self-hosted server")
 	}
 	conn, err := db.NewConnection(ctx)
 	if err != nil {
@@ -43,7 +43,7 @@ func AdminLink(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	owner, link, err := svc.AdminLink(ctx, actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: ec.FullURL()})
+	owner, link, err := svc.OwnerLink(ctx, actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: ec.FullURL()})
 	if err != nil {
 		return err
 	}

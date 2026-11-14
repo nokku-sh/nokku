@@ -89,7 +89,7 @@ func (s *Server) Start(ctx context.Context) error {
 	go func() {
 		slog.Info("server listening", "bind_address", server.Addr, "public_url", s.cfg.FullURL())
 		if s.cfg.OwnerNeedsLink {
-			slog.Warn("the owner has no passkey yet, run nokku admin-link for a sign-in link")
+			slog.Warn("the owner has no passkey yet, run nokku recover for a sign-in link")
 			s.printOwnerLink(ctx)
 		}
 		err := server.Serve(listener)
@@ -135,7 +135,7 @@ func (s *Server) printOwnerLink(ctx context.Context) {
 	if fi, err := os.Stderr.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
 		return
 	}
-	owner, link, err := s.cfg.IAM.AdminLink(ctx, s.cfg.Tenant.Single())
+	owner, link, err := s.cfg.IAM.OwnerLink(ctx, s.cfg.Tenant.Single())
 	if err != nil {
 		slog.Error("failed to issue the owner's sign-in link", "error", err)
 		return

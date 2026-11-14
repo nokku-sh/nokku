@@ -44,7 +44,7 @@ Start it and get your sign-in link:
 
 ```bash
 docker compose -f compose.min.yml up -d
-docker compose -f compose.min.yml exec nokku nokku admin-link
+docker compose -f compose.min.yml exec nokku nokku recover
 ```
 
 Open the link and you are signed in as the owner. There is no password. Add a passkey on your profile, and the dashboard walks you through your first server.
@@ -209,7 +209,7 @@ A self-hosted core is one workspace, created on the first start. The owner is cr
 
 Other OIDC providers are added in the web app.
 
-`nokku admin-link` prints a fresh sign-in link for the owner whenever you run it, with the same environment the server runs with. It replaces the links before and works even when single sign-on is required. The log reminds you to run it until the owner has a passkey or a linked provider, but never logs the link itself. [SECURITY.md](./SECURITY.md#the-owner-account) lists every way into the owner account.
+`nokku recover` prints a fresh sign-in link for the owner whenever you run it, with the same environment the server runs with. It replaces the links before and works even when single sign-on is required. The log reminds you to run it until the owner has a passkey or a linked provider, but never logs the link itself. [SECURITY.md](./SECURITY.md#the-owner-account) lists every way into the owner account.
 
 </details>
 

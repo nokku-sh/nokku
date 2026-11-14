@@ -234,7 +234,7 @@ func TestOwnerLinkStaysOutOfTheLog(t *testing.T) {
 	fresh.OwnerNeedsLink = true
 	startCore(t, &fresh)
 
-	assert.Contains(t, out.String(), "run nokku admin-link")
+	assert.Contains(t, out.String(), "run nokku recover")
 	assert.NotContains(t, out.String(), "/login/verify")
 }
 

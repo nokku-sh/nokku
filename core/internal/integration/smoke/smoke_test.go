@@ -63,7 +63,7 @@ const (
 )
 
 var (
-	adminLink = regexp.MustCompile(`/login/verify\?token=(\S+)`)
+	ownerLink = regexp.MustCompile(`/login/verify\?token=(\S+)`)
 	userCode  = regexp.MustCompile(`the code (\S+) there`)
 )
 
@@ -98,7 +98,7 @@ type smoke struct {
 type core struct {
 	binary string
 	url    string
-	// admin-link runs with the server's environment.
+	// recover runs with the server's environment.
 	env []string
 	dir string
 	// The whole test, a server started in a phase must outlive it.
@@ -136,7 +136,7 @@ func TestSmoke(t *testing.T) {
 		name string
 		run  func(t *testing.T)
 	}{
-		{"owner signs in with admin-link", s.signInOwner},
+		{"owner signs in with recover", s.signInOwner},
 		{"daemon enrolls and comes online", s.enrollDaemon},
 		{"owner is granted the dev account", s.grantAccount},
 		{"nk signs in with the device flow", s.loginNK},
@@ -203,9 +203,9 @@ func setUp(t *testing.T) *smoke {
 }
 
 func (s *smoke) signInOwner(t *testing.T) {
-	out := run(t, s.core.command(bounded(t), "admin-link"))
-	link := adminLink.FindStringSubmatch(out)
-	require.NotNil(t, link, "admin-link printed no sign-in link: %s", out)
+	out := run(t, s.core.command(bounded(t), "recover"))
+	link := ownerLink.FindStringSubmatch(out)
+	require.NotNil(t, link, "recover printed no sign-in link: %s", out)
 
 	// The link opens the SPA, which trades the token for the cookie here.
 	res, err := s.auth.ConsumeMagicLink(t.Context(), &nokkuv1.ConsumeMagicLinkRequest{Token: &link[1]})
@@ -568,7 +568,7 @@ func (s *smoke) checkAuditLog(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"Login by user", // the admin link
+		"Login by user", // the recover link
 		"Login by cli",  // nk's device flow
 		"SignSSHCertificate by cli",
 		"CreateSession by user", // the web terminal

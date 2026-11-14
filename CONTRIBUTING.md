@@ -157,7 +157,7 @@ self-hosted ones, they have their own `hosted_*.golden` file.
 `task smoke` is the end-to-end check, and it needs Docker. It builds the real
 `nokku`, `nk` and `nokkud`, the daemon into a local `nokkud:smoke` image, and
 starts its own Postgres and Mailpit on random ports. Then it walks one owner
-through it all: the admin link, a daemon that enrolls, `nk login`, ssh direct
+through it all: the recover link, a daemon that enrolls, `nk login`, ssh direct
 and through the relay, the web terminal, the recordings, a revoke that ends a
 live session, and the audit log. Last, a CI job signs in with `nk login --ci`
 against a stand-in for GitHub Actions and reaches the server. nk and ssh run in

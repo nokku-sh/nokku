@@ -7,7 +7,7 @@ internal/api/lifecycle.go remindTrials Sys ListTrialsEnding
 internal/api/lifecycle.go remindTrials Sys SetTrialReminder
 internal/api/lifecycle.go warnDeletion Sys SetDeletionWarning
 internal/api/workspace.go workspaceService.mailWorkspaces Sys ListWorkspacesByEmail
-internal/app/commands.go AdminLink Sys GetFirstWorkspace
+internal/app/commands.go Recover Sys GetFirstWorkspace
 internal/audit/service.go Service.deleteAuditLogs SysTx EnableAuditRetention,del(q)
 internal/audit/service.go Service.retentionCleanup Sys ListWorkspaceAuditLogWorkspaceIDs
 internal/audit/stream.go Service.deliver Sys ClearAuditStreamFailure
