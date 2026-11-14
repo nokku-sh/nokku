@@ -34,18 +34,28 @@ func (s *targetAccountService) ListTargetAccounts(
 	ctx context.Context,
 	req *nokkuv1.ListTargetAccountsRequest,
 ) (*nokkuv1.ListTargetAccountsResponse, error) {
-	accounts, err := s.cfg.Conn.Tenant().ListTargetAccounts(ctx, &db.ListTargetAccountsParams{
+	q := s.cfg.Conn.Tenant()
+	params := &db.ListTargetAccountsParams{
 		TargetID: req.GetTargetId(),
 		Query:    req.Query,
 		Limit:    req.Limit,
 		Offset:   req.Offset,
-	})
+	}
+	accounts, err := q.ListTargetAccounts(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	count := int32(0)
-	if len(accounts) > 0 {
-		count = accounts[0].TotalCount
+	counted := accounts
+	if len(accounts) == 0 && req.GetOffset() > 0 {
+		// A page past the end has no row to carry the total, the first row does.
+		params.Limit, params.Offset = new(int32(1)), nil
+		if counted, err = q.ListTargetAccounts(ctx, params); err != nil {
+			return nil, err
+		}
+	}
+	var count int32
+	if len(counted) > 0 {
+		count = counted[0].TotalCount
 	}
 
 	return &nokkuv1.ListTargetAccountsResponse{

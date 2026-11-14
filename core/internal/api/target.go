@@ -315,7 +315,7 @@ func (s *targetService) ListTargets(
 		connected = s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx))
 	}
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
+		params := &db.ListTargetsParams{
 			Query:          req.Query,
 			DaemonID:       req.DaemonId,
 			Accounts:       req.GetAccounts(),
@@ -326,8 +326,21 @@ func (s *targetService) ListTargets(
 			MissedRollover: req.GetMissedRollover(),
 			Limit:          req.Limit,
 			Offset:         req.Offset,
-		})
-		if err != nil || len(rows) == 0 {
+		}
+		rows, err := q.ListTargets(ctx, params)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			if req.GetOffset() == 0 {
+				return nil
+			}
+			// A page past the end has no row to carry the total, the first row does.
+			params.Limit, params.Offset = new(int32(1)), nil
+			first, err := q.ListTargets(ctx, params)
+			if err == nil && len(first) > 0 {
+				count = first[0].TotalCount
+			}
 			return err
 		}
 		count = rows[0].TotalCount
@@ -701,7 +714,8 @@ func (s *targetService) ListAccessGraphTargets(
 	req *nokkuv1.ListAccessGraphTargetsRequest,
 ) (*nokkuv1.ListAccessGraphTargetsResponse, error) {
 	filter := cmp.Or(req.GetFilter(), &nokkuv1.AccessGraphFilter{})
-	rows, err := s.cfg.Conn.Tenant().ListAccessGraphTargets(ctx, &db.ListAccessGraphTargetsParams{
+	q := s.cfg.Conn.Tenant()
+	params := &db.ListAccessGraphTargetsParams{
 		Tag:       req.GetTag(),
 		FilterTag: filter.Tag,
 		SubjectID: filter.SubjectId,
@@ -709,15 +723,26 @@ func (s *targetService) ListAccessGraphTargets(
 		Username:  filter.Username,
 		Limit:     req.Limit,
 		Offset:    req.Offset,
-	})
+	}
+	rows, err := q.ListAccessGraphTargets(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-
+	counted := rows
+	if len(rows) == 0 && req.GetOffset() > 0 {
+		// A page past the end has no row to carry the total, the first row does.
+		params.Limit, params.Offset = new(int32(1)), nil
+		if counted, err = q.ListAccessGraphTargets(ctx, params); err != nil {
+			return nil, err
+		}
+	}
 	var total int32
+	if len(counted) > 0 {
+		total = counted[0].TotalCount
+	}
+
 	targets := make([]*nokkuv1.AccessGraphTarget, 0, len(rows))
 	for _, r := range rows {
-		total = r.TotalCount
 		targets = append(targets, &nokkuv1.AccessGraphTarget{
 			Id:      &r.ID,
 			Name:    &r.Name,

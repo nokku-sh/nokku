@@ -726,6 +726,33 @@ func TestListAccessGraphTargets(t *testing.T) {
 	assert.Equal(t, []string{"-db-1"}, got, "a tag filter only matches its own tag")
 }
 
+// A table on a last page that just emptied still needs the total to page back.
+func TestAPagePastTheEndKeepsTheTotal(t *testing.T) {
+	f := seedAccessGraph(t)
+	past := new(int32(100))
+
+	all, err := f.client.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{Limit: new(int32(10))})
+	require.NoError(t, err)
+	require.Positive(t, all.GetTotal())
+
+	targets, err := f.client.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{
+		Limit:  new(int32(10)),
+		Offset: past,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, targets.GetTargets())
+	assert.Equal(t, all.GetTotal(), targets.GetTotal())
+
+	graph, err := f.client.ListAccessGraphTargets(t.Context(), &nokkuv1.ListAccessGraphTargetsRequest{
+		Tag:    new("prod"),
+		Limit:  new(int32(10)),
+		Offset: past,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, graph.GetTargets())
+	assert.EqualValues(t, 3, graph.GetTotal())
+}
+
 // A server made by hand starts with the root account, no host reports one.
 func TestNewServerHasTheRootAccount(t *testing.T) {
 	cfg, srv := newTestAPI(t)

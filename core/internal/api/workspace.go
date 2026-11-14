@@ -257,18 +257,28 @@ func (s *workspaceService) ListUsers(
 	ctx context.Context,
 	req *nokkuv1.ListUsersRequest,
 ) (*nokkuv1.ListUsersResponse, error) {
-	rows, err := s.cfg.Conn.Tenant().ListUsers(ctx, &db.ListUsersParams{
+	q := s.cfg.Conn.Tenant()
+	params := &db.ListUsersParams{
 		Query:  req.Query,
 		Role:   req.GetRole(),
 		Limit:  req.Limit,
 		Offset: req.Offset,
-	})
+	}
+	rows, err := q.ListUsers(ctx, params)
 	if err != nil {
 		return nil, err
 	}
+	counted := rows
+	if len(rows) == 0 && req.GetOffset() > 0 {
+		// A page past the end has no row to carry the total, the first row does.
+		params.Limit, params.Offset = new(int32(1)), nil
+		if counted, err = q.ListUsers(ctx, params); err != nil {
+			return nil, err
+		}
+	}
 	var total int32
-	if len(rows) > 0 {
-		total = rows[0].TotalCount
+	if len(counted) > 0 {
+		total = counted[0].TotalCount
 	}
 	return &nokkuv1.ListUsersResponse{Users: db.UsersToProto(rows), Total: &total}, nil
 }

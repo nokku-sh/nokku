@@ -136,19 +136,29 @@ func (s *serviceAccountService) ListServiceAccounts(
 	ctx context.Context,
 	req *nokkuv1.ListServiceAccountsRequest,
 ) (*nokkuv1.ListServiceAccountsResponse, error) {
-	result, err := s.cfg.Conn.Tenant().ListServiceAccounts(ctx, &db.ListServiceAccountsParams{
+	q := s.cfg.Conn.Tenant()
+	params := &db.ListServiceAccountsParams{
 		Query:  req.Query,
 		Tags:   req.GetTags(),
 		Role:   req.GetRole(),
 		Limit:  req.Limit,
 		Offset: req.Offset,
-	})
+	}
+	result, err := q.ListServiceAccounts(ctx, params)
 	if err != nil {
 		return nil, err
 	}
+	counted := result
+	if len(result) == 0 && req.GetOffset() > 0 {
+		// A page past the end has no row to carry the total, the first row does.
+		params.Limit, params.Offset = new(int32(1)), nil
+		if counted, err = q.ListServiceAccounts(ctx, params); err != nil {
+			return nil, err
+		}
+	}
 	var count int32
-	if len(result) > 0 {
-		count = result[0].TotalCount
+	if len(counted) > 0 {
+		count = counted[0].TotalCount
 	}
 
 	return &nokkuv1.ListServiceAccountsResponse{

@@ -102,20 +102,30 @@ func (s *daemonService) ListDaemons(
 	ctx context.Context,
 	req *nokkuv1.ListDaemonsRequest,
 ) (*nokkuv1.ListDaemonsResponse, error) {
-	result, err := s.cfg.Conn.Tenant().ListDaemons(ctx, &db.ListDaemonsParams{
+	q := s.cfg.Conn.Tenant()
+	params := &db.ListDaemonsParams{
 		Query:     req.Query,
 		Status:    req.GetStatus(),
 		Online:    req.Online,
 		Connected: s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
 		Limit:     req.Limit,
 		Offset:    req.Offset,
-	})
+	}
+	result, err := q.ListDaemons(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	count := int32(0)
-	if len(result) > 0 {
-		count = result[0].TotalCount
+	counted := result
+	if len(result) == 0 && req.GetOffset() > 0 {
+		// A page past the end has no row to carry the total, the first row does.
+		params.Limit, params.Offset = new(int32(1)), nil
+		if counted, err = q.ListDaemons(ctx, params); err != nil {
+			return nil, err
+		}
+	}
+	var count int32
+	if len(counted) > 0 {
+		count = counted[0].TotalCount
 	}
 
 	daemons := db.DaemonsToProto(result, s.cfg.Pool.IsConnected)

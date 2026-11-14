@@ -81,17 +81,26 @@ func (s *teamService) ListTeams(
 	var result []*nokkuv1.Team
 	var count int32
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		teams, err := q.ListTeams(ctx, &db.ListTeamsParams{
+		params := &db.ListTeamsParams{
 			Query:  req.Query,
 			Tags:   req.GetTags(),
 			Limit:  req.Limit,
 			Offset: req.Offset,
-		})
+		}
+		teams, err := q.ListTeams(ctx, params)
 		if err != nil {
 			return err
 		}
-		if len(teams) > 0 {
-			count = teams[0].TotalCount
+		counted := teams
+		if len(teams) == 0 && req.GetOffset() > 0 {
+			// A page past the end has no row to carry the total, the first row does.
+			params.Limit, params.Offset = new(int32(1)), nil
+			if counted, err = q.ListTeams(ctx, params); err != nil {
+				return err
+			}
+		}
+		if len(counted) > 0 {
+			count = counted[0].TotalCount
 		}
 
 		ids := make([]string, 0, len(teams))

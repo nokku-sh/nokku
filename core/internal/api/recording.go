@@ -37,11 +37,23 @@ func (s *recordingService) ListRecordings(
 	}
 
 	var rows []*db.ListRecordingsRow
+	var total int32
 	var totalBytes int64
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		rows, err = q.ListRecordings(ctx, params)
 		if err != nil {
 			return err
+		}
+		counted := rows
+		if len(rows) == 0 && req.GetOffset() > 0 {
+			// A page past the end has no row to carry the total, the first row does.
+			params.Limit, params.Offset = new(int32(1)), nil
+			if counted, err = q.ListRecordings(ctx, params); err != nil {
+				return err
+			}
+		}
+		if len(counted) > 0 {
+			total = counted[0].TotalCount
 		}
 		totalBytes, err = q.SumRecordingBytes(ctx)
 		return err
@@ -50,11 +62,7 @@ func (s *recordingService) ListRecordings(
 	}
 
 	recordings := make([]*nokkuv1.Recording, 0, len(rows))
-	var total int32
 	for _, r := range rows {
-		if total == 0 {
-			total = r.TotalCount
-		}
 		rec := r.Recording.ToProto()
 		rec.Live = &r.Live
 		recordings = append(recordings, rec)

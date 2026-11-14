@@ -138,19 +138,31 @@ func (s *accessRequestService) ListAccessRequests(
 		status = &name
 	}
 
-	rows, err := s.cfg.Conn.Tenant().ListAccessRequests(ctx, &db.ListAccessRequestsParams{
+	q := s.cfg.Conn.Tenant()
+	params := &db.ListAccessRequestsParams{
 		Status:      status,
 		RequesterID: requester,
 		Limit:       req.Limit,
 		Offset:      req.Offset,
-	})
+	}
+	rows, err := q.ListAccessRequests(ctx, params)
 	if err != nil {
 		return nil, err
 	}
+	counted := rows
+	if len(rows) == 0 && req.GetOffset() > 0 {
+		// A page past the end has no row to carry the total, the first row does.
+		params.Limit, params.Offset = new(int32(1)), nil
+		if counted, err = q.ListAccessRequests(ctx, params); err != nil {
+			return nil, err
+		}
+	}
 	var total int32
+	if len(counted) > 0 {
+		total = counted[0].TotalCount
+	}
 	requests := make([]*nokkuv1.AccessRequest, len(rows))
 	for i, r := range rows {
-		total = r.TotalCount
 		requests[i] = r.AccessRequestDetail.ToProto()
 	}
 	return &nokkuv1.ListAccessRequestsResponse{Requests: requests, Total: &total}, nil
