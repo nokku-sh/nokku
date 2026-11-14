@@ -61,7 +61,6 @@ var (
 
 // BillingServiceClient is a client for the nokku.v1.BillingService service.
 type BillingServiceClient interface {
-	// GetBilling also asks the license server for the current key, so new seats show up at once.
 	GetBilling(context.Context, *v1.GetBillingRequest) (*v1.GetBillingResponse, error)
 	GetLicense(context.Context, *v1.GetLicenseRequest) (*v1.GetLicenseResponse, error)
 	ActivateLicense(context.Context, *v1.ActivateLicenseRequest) (*v1.ActivateLicenseResponse, error)
@@ -75,7 +74,6 @@ func NewBillingServiceClient(client *connect.Client) BillingServiceClient {
 
 // BillingServiceHandler is an implementation of the nokku.v1.BillingService service.
 type BillingServiceHandler interface {
-	// GetBilling also asks the license server for the current key, so new seats show up at once.
 	GetBilling(context.Context, *v1.GetBillingRequest) (*v1.GetBillingResponse, error)
 	GetLicense(context.Context, *v1.GetLicenseRequest) (*v1.GetLicenseResponse, error)
 	ActivateLicense(context.Context, *v1.ActivateLicenseRequest) (*v1.ActivateLicenseResponse, error)

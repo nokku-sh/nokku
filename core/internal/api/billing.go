@@ -23,12 +23,14 @@ type billingService struct {
 
 func (s *billingService) GetBilling(
 	ctx context.Context,
-	_ *nokkuv1.GetBillingRequest,
+	req *nokkuv1.GetBillingRequest,
 ) (*nokkuv1.GetBillingResponse, error) {
 	ws := actor.WorkspaceIDFromContext(ctx)
 	// Seats bought in the portal count once the owner is back on this page.
-	if err := s.cfg.Entitlements.RefreshLicense(ctx, ws); err != nil {
-		slog.Warn("license refresh failed", "error", err, "workspace_id", ws)
+	if req.GetRefresh() {
+		if err := s.cfg.Entitlements.RefreshLicense(ctx, ws); err != nil {
+			slog.Warn("license refresh failed", "error", err, "workspace_id", ws)
+		}
 	}
 	var userCount int64
 	var resourceCount int64

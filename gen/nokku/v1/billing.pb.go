@@ -24,7 +24,9 @@ const (
 )
 
 type GetBillingRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Asks the license server for the current key first, so new seats show up. That can take a moment.
+	Refresh       *bool `protobuf:"varint,1,opt,name=refresh" json:"refresh,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -57,6 +59,13 @@ func (x *GetBillingRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetBillingRequest.ProtoReflect.Descriptor instead.
 func (*GetBillingRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_billing_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *GetBillingRequest) GetRefresh() bool {
+	if x != nil && x.Refresh != nil {
+		return *x.Refresh
+	}
+	return false
 }
 
 type GetBillingResponse struct {
@@ -442,8 +451,9 @@ var File_nokku_v1_billing_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
-	"\x16nokku/v1/billing.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x13\n" +
-	"\x11GetBillingRequest\"\xda\x04\n" +
+	"\x16nokku/v1/billing.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"-\n" +
+	"\x11GetBillingRequest\x12\x18\n" +
+	"\arefresh\x18\x01 \x01(\bR\arefresh\"\xda\x04\n" +
 	"\x12GetBillingResponse\x12\x12\n" +
 	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x16\n" +
 	"\x06hosted\x18\x02 \x01(\bR\x06hosted\x12F\n" +

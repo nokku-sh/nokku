@@ -7,7 +7,6 @@ import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
 service BillingService {
-  // GetBilling also asks the license server for the current key, so new seats show up at once.
   rpc GetBilling(GetBillingRequest) returns (GetBillingResponse) {
     option (access) = {role: WORKSPACE_ROLE_ADMIN};
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -21,7 +20,10 @@ service BillingService {
   }
 }
 
-message GetBillingRequest {}
+message GetBillingRequest {
+  // Asks the license server for the current key first, so new seats show up. That can take a moment.
+  bool refresh = 1;
+}
 message GetBillingResponse {
   string plan = 1;
   bool hosted = 2;
