@@ -244,7 +244,7 @@ func (u *User) ToProto() *nokkuv1.User {
 		Active:      &u.Active,
 		CreatedAt:   SafeTimestamp(&u.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&u.UpdatedAt),
-		ScimManaged: new(u.ScimExternalID != nil),
+		ScimManaged: &u.ScimManaged,
 	}
 }
 
