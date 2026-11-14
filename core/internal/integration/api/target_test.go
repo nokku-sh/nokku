@@ -942,3 +942,31 @@ func TestAMachineManagesOnlyTheServersItAdded(t *testing.T) {
 	require.NoError(t, remove(person, byHand))
 	require.NoError(t, remove(terraform, own))
 }
+
+// The certificates page and nk ask for the servers a rollover left behind.
+func TestListTargetsKeepsTheOnesARolloverLeftBehind(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	admin := partialConn(srv, seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))
+	behind := seedTarget(t, cfg, testWorkspace.ID)
+	synced := seedTarget(t, cfg, testWorkspace.ID)
+	neverSynced := seedTarget(t, cfg, testWorkspace.ID)
+	touch := func(id string) {
+		inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error { return q.TouchTargetSync(t.Context(), id) })
+	}
+
+	touch(behind)
+	_, err := nokkuv1connect.NewCertificateServiceClient(admin).
+		RolloverCertificateAuthority(t.Context(), &nokkuv1.RolloverCertificateAuthorityRequest{})
+	require.NoError(t, err)
+	touch(synced)
+
+	list, err := nokkuv1connect.NewTargetServiceClient(admin).ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{
+		Limit:          new(int32(50)),
+		Ids:            []string{behind, synced, neverSynced},
+		MissedRollover: new(true),
+	})
+	require.NoError(t, err)
+	require.Len(t, list.GetTargets(), 1)
+	assert.Equal(t, behind, list.GetTargets()[0].GetId())
+	assert.EqualValues(t, 1, list.GetTotal())
+}

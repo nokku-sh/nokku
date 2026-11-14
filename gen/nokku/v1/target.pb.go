@@ -933,9 +933,11 @@ type ListTargetsRequest struct {
 	Tags     []string               `protobuf:"bytes,6,rep,name=tags" json:"tags,omitempty"`
 	Status   *TargetStatus          `protobuf:"varint,7,opt,name=status,enum=nokku.v1.TargetStatus" json:"status,omitempty"`
 	// ids keeps only these servers, like the ones a person picked.
-	Ids           []string `protobuf:"bytes,8,rep,name=ids" json:"ids,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Ids []string `protobuf:"bytes,8,rep,name=ids" json:"ids,omitempty"`
+	// missed_rollover keeps only the servers set up with nk sync whose last sync is older than the CA's rollover.
+	MissedRollover *bool `protobuf:"varint,9,opt,name=missed_rollover,json=missedRollover" json:"missed_rollover,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListTargetsRequest) Reset() {
@@ -1022,6 +1024,13 @@ func (x *ListTargetsRequest) GetIds() []string {
 		return x.Ids
 	}
 	return nil
+}
+
+func (x *ListTargetsRequest) GetMissedRollover() bool {
+	if x != nil && x.MissedRollover != nil {
+		return *x.MissedRollover
+	}
+	return false
 }
 
 type ListTargetsResponse struct {
@@ -2400,7 +2409,7 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"/\n" +
 	"\x13DeleteTargetRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x16\n" +
-	"\x14DeleteTargetResponse\"\x96\x02\n" +
+	"\x14DeleteTargetResponse\"\xbf\x02\n" +
 	"\x12ListTargetsRequest\x12\x1f\n" +
 	"\x05limit\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x14\n" +
@@ -2409,7 +2418,8 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\baccounts\x18\x05 \x03(\tR\baccounts\x12\x12\n" +
 	"\x04tags\x18\x06 \x03(\tR\x04tags\x128\n" +
 	"\x06status\x18\a \x01(\x0e2\x16.nokku.v1.TargetStatusB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06status\x12!\n" +
-	"\x03ids\x18\b \x03(\tB\x0f\xbaH\f\x92\x01\t\x10d\"\x05r\x03\xb0\x01\x01R\x03ids\"W\n" +
+	"\x03ids\x18\b \x03(\tB\x0f\xbaH\f\x92\x01\t\x10d\"\x05r\x03\xb0\x01\x01R\x03ids\x12'\n" +
+	"\x0fmissed_rollover\x18\t \x01(\bR\x0emissedRollover\"W\n" +
 	"\x13ListTargetsResponse\x12*\n" +
 	"\atargets\x18\x01 \x03(\v2\x10.nokku.v1.TargetR\atargets\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\"B\n" +

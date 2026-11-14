@@ -301,46 +301,62 @@ WHERE
     $5::UUID[] IS NULL
     OR t.id = ANY ($5::UUID[])
   )
+  -- A server without a daemon learns a new CA key only from nk sync.
+  AND (
+    NOT $6::BOOLEAN
+    OR (
+      t.daemon_id IS NULL
+      AND t.last_sync_at < (
+        SELECT
+          ca.rotated_at
+        FROM
+          ssh_cas ca
+        WHERE
+          ca.workspace_id = t.workspace_id
+      )
+    )
+  )
   -- Online comes from the pool, the caller passes the daemons connected now.
   AND (
-    $6::TEXT IS NULL
+    $7::TEXT IS NULL
     OR (
-      $6 = 'pending'
+      $7 = 'pending'
       AND d.status <> 2 -- accepted
     )
     OR (
-      $6 = 'online'
+      $7 = 'online'
       AND d.status = 2
-      AND d.id = ANY ($7::UUID[])
+      AND d.id = ANY ($8::UUID[])
     )
     OR (
-      $6 = 'offline'
+      $7 = 'offline'
       AND d.status = 2
-      AND NOT COALESCE(d.id = ANY ($7::UUID[]), FALSE)
+      AND NOT COALESCE(d.id = ANY ($8::UUID[]), FALSE)
     )
     OR (
-      $6 = 'manual'
+      $7 = 'manual'
       AND t.daemon_id IS NULL
     )
   )
 ORDER BY
   t.id ASC
 LIMIT
-  $9
+  $10
 OFFSET
-  $8
+  $9
 `
 
 type ListTargetsParams struct {
-	Query     *string  `json:"query"`
-	DaemonID  *string  `json:"daemonId"`
-	Accounts  []string `json:"accounts"`
-	Tags      []string `json:"tags"`
-	Ids       []string `json:"ids"`
-	Status    *string  `json:"status"`
-	Connected []string `json:"connected"`
-	Offset    *int32   `json:"offset"`
-	Limit     *int32   `json:"limit"`
+	Query          *string  `json:"query"`
+	DaemonID       *string  `json:"daemonId"`
+	Accounts       []string `json:"accounts"`
+	Tags           []string `json:"tags"`
+	Ids            []string `json:"ids"`
+	MissedRollover bool     `json:"missedRollover"`
+	Status         *string  `json:"status"`
+	Connected      []string `json:"connected"`
+	Offset         *int32   `json:"offset"`
+	Limit          *int32   `json:"limit"`
 }
 
 type ListTargetsRow struct {
@@ -355,6 +371,7 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 		arg.Accounts,
 		arg.Tags,
 		arg.Ids,
+		arg.MissedRollover,
 		arg.Status,
 		arg.Connected,
 		arg.Offset,

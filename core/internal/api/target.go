@@ -316,15 +316,16 @@ func (s *targetService) ListTargets(
 	}
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		rows, err := q.ListTargets(ctx, &db.ListTargetsParams{
-			Query:     req.Query,
-			DaemonID:  req.DaemonId,
-			Accounts:  req.GetAccounts(),
-			Tags:      req.GetTags(),
-			Ids:       req.GetIds(),
-			Status:    targetStatuses[req.GetStatus()],
-			Connected: connected,
-			Limit:     req.Limit,
-			Offset:    req.Offset,
+			Query:          req.Query,
+			DaemonID:       req.DaemonId,
+			Accounts:       req.GetAccounts(),
+			Tags:           req.GetTags(),
+			Ids:            req.GetIds(),
+			Status:         targetStatuses[req.GetStatus()],
+			Connected:      connected,
+			MissedRollover: req.GetMissedRollover(),
+			Limit:          req.Limit,
+			Offset:         req.Offset,
 		})
 		if err != nil || len(rows) == 0 {
 			return err

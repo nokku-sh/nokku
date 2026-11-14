@@ -216,6 +216,8 @@ message ListTargetsRequest {
       string: {uuid: true}
     }
   }];
+  // missed_rollover keeps only the servers set up with nk sync whose last sync is older than the CA's rollover.
+  bool missed_rollover = 9;
 }
 
 // TargetStatus is what a server's daemon is up to, or that it has none.

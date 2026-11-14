@@ -76,6 +76,21 @@ WHERE
     sqlc.narg('ids')::UUID[] IS NULL
     OR t.id = ANY (sqlc.narg('ids')::UUID[])
   )
+  -- A server without a daemon learns a new CA key only from nk sync.
+  AND (
+    NOT @missed_rollover::BOOLEAN
+    OR (
+      t.daemon_id IS NULL
+      AND t.last_sync_at < (
+        SELECT
+          ca.rotated_at
+        FROM
+          ssh_cas ca
+        WHERE
+          ca.workspace_id = t.workspace_id
+      )
+    )
+  )
   -- Online comes from the pool, the caller passes the daemons connected now.
   AND (
     sqlc.narg('status')::TEXT IS NULL
