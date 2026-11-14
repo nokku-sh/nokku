@@ -13,7 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -50,7 +50,7 @@ func main() {
 }
 
 func run(ctx context.Context, cmd *cli.Command) error {
-	ec, err := env.ParseAs[config.EnvConfig]()
+	ec, err := env.ParseAs[app.EnvConfig]()
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 // carries the first workspace, the keyset seals provider secrets.
 func open(
 	ctx context.Context,
-	ec config.EnvConfig,
+	ec app.EnvConfig,
 ) (context.Context, *db.Connection, *kms.Keyset, *db.Workspace, error) {
 	conn, err := db.NewConnection(ctx)
 	if err != nil {

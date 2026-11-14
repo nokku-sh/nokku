@@ -12,10 +12,15 @@ import (
 
 const expireTick = time.Minute
 
-// ExpireLoop deletes ended grants and ends unanswered requests. Resolvers skip
+// Start runs the expiry in the background until ctx ends.
+func Start(ctx context.Context, conn *db.Connection, write func(context.Context, *audit.Event) error) {
+	go expireLoop(ctx, conn, write)
+}
+
+// expireLoop deletes ended grants and ends unanswered requests. Resolvers skip
 // ended grants already, the delete makes hosts drop them and close their
 // sessions. Audit writes go one at a time, so a batch never floods the pool.
-func ExpireLoop(ctx context.Context, conn *db.Connection, write func(context.Context, *audit.Event) error) {
+func expireLoop(ctx context.Context, conn *db.Connection, write func(context.Context, *audit.Event) error) {
 	ticker := time.NewTicker(expireTick)
 	defer ticker.Stop()
 	for {

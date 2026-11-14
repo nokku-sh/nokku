@@ -14,15 +14,15 @@ import (
 	"github.com/nokku-sh/nokku/internal/dpop"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
 const actionExchangeWorkloadToken = "ExchangeWorkloadToken"
 
 type authService struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 func (s *authService) GetLoginOptions(

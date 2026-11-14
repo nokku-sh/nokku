@@ -10,7 +10,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/email"
 )
 
@@ -21,7 +21,7 @@ func TestCreateWorkspaceRefusesAnAddressOnCooldown(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, mail.SendOwnerLinkEmail(t.Context(), "ada@acme.test", "https://acme.nokku.test", time.Hour))
 
-	svc := &workspaceService{cfg: &config.Config{SaaS: true, Email: mail}}
+	svc := &workspaceService{cfg: &app.Config{SaaS: true, Email: mail}}
 	_, err = svc.CreateWorkspace(t.Context(), &nokkuv1.CreateWorkspaceRequest{
 		Slug: new("acme"), Name: new("Acme"), OwnerEmail: new(" Ada@Acme.test"),
 	})

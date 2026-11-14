@@ -6,19 +6,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/caarlos0/env/v11"
-	"github.com/jackc/pgx/v5"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/logx"
 	"github.com/mizuchilabs/kata/sigx"
 	"github.com/urfave/cli/v3"
 
-	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
-	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
-	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
 var errLockLost = errors.New("lost the server lock")
@@ -47,7 +42,7 @@ func main() {
 				}
 				return err
 			}
-			cfg, err := config.New(running, cmd)
+			cfg, err := app.New(running, cmd)
 			if err != nil {
 				return fmt.Errorf("failed to load configuration: %w", err)
 			}
@@ -67,43 +62,8 @@ func main() {
 				Description: "The way back in when the owner lost every passkey and no mail " +
 					"goes out. The link works for 24 hours and replaces earlier ones. " +
 					"Run it on the server with the same environment the server has.",
-				// Only db and iam, the server may be running next to this.
 				Action: func(ctx context.Context, _ *cli.Command) error {
-					ec, err := env.ParseAs[config.EnvConfig]()
-					if err != nil {
-						return err
-					}
-					if ec.SaaS {
-						return errors.New("admin-link is for a self-hosted server")
-					}
-					conn, err := db.NewConnection(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to connect to database: %w", err)
-					}
-					ws, err := conn.Sys().GetFirstWorkspace(ctx)
-					if errors.Is(err, pgx.ErrNoRows) {
-						return errors.New("there is no workspace yet, start the server once")
-					}
-					if err != nil {
-						return err
-					}
-					keys, err := kms.New(ctx, conn, false)
-					if err != nil {
-						return err
-					}
-					svc, err := iam.New(ctx, iam.Deps{Conn: conn, Keyset: keys})
-					if err != nil {
-						return err
-					}
-					owner, link, err := svc.AdminLink(
-						ctx,
-						actor.Workspace{ID: ws.ID, Slug: ws.Slug, BaseURL: ec.FullURL()},
-					)
-					if err != nil {
-						return err
-					}
-					fmt.Printf("Sign in as %s within 24 hours:\n\n  %s\n", owner.Email, link)
-					return nil
+					return app.AdminLink(ctx)
 				},
 			},
 			{
@@ -136,22 +96,7 @@ func main() {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					conn, err := db.NewConnection(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to connect to database: %w", err)
-					}
-					// False even when hosted, the secret may still wrap it.
-					enc, err := kms.New(ctx, conn, false)
-					if err != nil {
-						return fmt.Errorf("current keys: %w", err)
-					}
-					if err := enc.Rotate(ctx, cmd.String("new")); err != nil {
-						return fmt.Errorf("failed to rotate: %w", err)
-					}
-					fmt.Println(
-						"keys rotated, set NOKKU_SECRET or KMS_URI to the new value, remove the other and start the server",
-					)
-					return nil
+					return app.RotateSecrets(ctx, cmd.String("new"))
 				},
 			},
 		},

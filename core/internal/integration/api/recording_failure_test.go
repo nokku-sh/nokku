@@ -27,7 +27,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/recording"
 )
@@ -42,7 +42,7 @@ func randomBytes(n int) []byte {
 }
 
 // storedCopy is the recording as storage has it, nil with no object.
-func storedCopy(t *testing.T, cfg *config.Config, id string) []byte {
+func storedCopy(t *testing.T, cfg *app.Config, id string) []byte {
 	t.Helper()
 	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func finalOf(size int, cutReason string) *nokkuv1.UploadRecordingRequest {
 // uploadFile sends a file like nokkud: meta, chunks, then the final message.
 func uploadFile(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	srv *httptest.Server,
 	key *ecdsa.PrivateKey,
 	token, id string,
@@ -94,7 +94,7 @@ func sendLive(t *testing.T, stream uploadStream, data []byte) {
 }
 
 // waitHandled waits for the row, then gives chunks in flight a moment.
-func waitHandled(t *testing.T, cfg *config.Config, id string) {
+func waitHandled(t *testing.T, cfg *app.Config, id string) {
 	t.Helper()
 	require.Eventually(t, func() bool {
 		_, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
@@ -104,7 +104,7 @@ func waitHandled(t *testing.T, cfg *config.Config, id string) {
 }
 
 // waitStored waits until an upload stored size bytes of the recording.
-func waitStored(t *testing.T, cfg *config.Config, id string, size int) *db.Recording {
+func waitStored(t *testing.T, cfg *app.Config, id string, size int) *db.Recording {
 	t.Helper()
 	var rec *db.Recording
 	require.Eventually(t, func() bool {
@@ -116,7 +116,7 @@ func waitStored(t *testing.T, cfg *config.Config, id string, size int) *db.Recor
 }
 
 // startSecondCore runs a core on the shared config, stop is a deploy.
-func startSecondCore(t *testing.T, cfg *config.Config) (client *http.Client, base string, stop func()) {
+func startSecondCore(t *testing.T, cfg *app.Config) (client *http.Client, base string, stop func()) {
 	t.Helper()
 	free, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func startSecondCore(t *testing.T, cfg *config.Config) (client *http.Client, bas
 func openUploadAt(
 	ctx context.Context,
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	client *http.Client,
 	base string,
 	key *ecdsa.PrivateKey,

@@ -12,9 +12,9 @@ import (
 
 const retireTick = time.Minute
 
-// RetireLoop deletes ephemeral daemons away past retire_after. The session
+// retireLoop deletes ephemeral daemons away past retire_after. The session
 // stays, so a host that comes back is rejected and drops its cached principals.
-func RetireLoop(
+func retireLoop(
 	ctx context.Context,
 	conn connection,
 	connected func() []string,
@@ -35,7 +35,7 @@ func RetireLoop(
 	}
 }
 
-// Retire is one pass of RetireLoop. Nothing counts as away before started.
+// Retire is one pass of retireLoop. Nothing counts as away before started.
 func Retire(
 	ctx context.Context,
 	conn connection,

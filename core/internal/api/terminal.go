@@ -17,9 +17,9 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/cache"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/realip"
@@ -52,7 +52,7 @@ type sessionTicket struct {
 }
 
 type terminalHandler struct {
-	cfg     *config.Config
+	cfg     *app.Config
 	tickets *cache.TTL[string, sessionTicket]
 }
 

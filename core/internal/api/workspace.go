@@ -13,8 +13,8 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/email"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
@@ -26,7 +26,7 @@ const findMailTimeout = 30 * time.Second
 
 // Only CreateWorkspace and FindWorkspaces run outside the workspace of the request's host.
 type workspaceService struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 func (s *workspaceService) GetWorkspace(
@@ -184,7 +184,7 @@ func (s *workspaceService) mailWorkspaces(ctx context.Context, addr string) erro
 }
 
 // A deleted workspace's recording objects go through the delete queue.
-func deleteWorkspace(ctx context.Context, cfg *config.Config, ws actor.Workspace) error {
+func deleteWorkspace(ctx context.Context, cfg *app.Config, ws actor.Workspace) error {
 	ctx = actor.WithWorkspace(ctx, ws)
 	if err := cfg.Conn.Tenant().DeleteWorkspace(ctx, ws.ID); err != nil {
 		return err

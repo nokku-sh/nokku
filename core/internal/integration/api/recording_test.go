@@ -27,7 +27,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/recording"
 	"github.com/nokku-sh/nokku/core/internal/storage"
@@ -44,7 +44,7 @@ type cappedStorage struct{ recording.Limits }
 func openUpload(
 	ctx context.Context,
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	srv *httptest.Server,
 	key *ecdsa.PrivateKey,
 	token, id string,
@@ -70,7 +70,7 @@ func sendChunk(stream uploadStream, chunk []byte) error {
 // uploadMiB returns the answer the daemon got.
 func uploadMiB(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	srv *httptest.Server,
 	key *ecdsa.PrivateKey,
 	token, id string,
@@ -89,7 +89,7 @@ func uploadMiB(
 }
 
 // storedBytes is how much of a recording can be read back from storage.
-func storedBytes(t *testing.T, cfg *config.Config, id string) int64 {
+func storedBytes(t *testing.T, cfg *app.Config, id string) int64 {
 	t.Helper()
 	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
@@ -396,7 +396,7 @@ func (cappedStorage) RecordingStorageBytes(context.Context, string) (int64, erro
 }
 
 // capStorage caps the server. Earlier recordings would fill it, so they go.
-func capStorage(t *testing.T, cfg *config.Config) {
+func capStorage(t *testing.T, cfg *app.Config) {
 	t.Helper()
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
@@ -540,7 +540,7 @@ func storedObjects(t *testing.T, workspaceID string) []string {
 	return names
 }
 
-func objectOf(t *testing.T, cfg *config.Config, id string) string {
+func objectOf(t *testing.T, cfg *app.Config, id string) string {
 	t.Helper()
 	rec, err := cfg.Conn.Sys().GetRecording(t.Context(), id)
 	require.NoError(t, err)
@@ -548,7 +548,7 @@ func objectOf(t *testing.T, cfg *config.Config, id string) string {
 	return *rec.ObjectID
 }
 
-func deleteRecording(t *testing.T, cfg *config.Config, srv *httptest.Server, workspaceID, id string) {
+func deleteRecording(t *testing.T, cfg *app.Config, srv *httptest.Server, workspaceID, id string) {
 	t.Helper()
 	editor := clientOn(srv, header("Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)))

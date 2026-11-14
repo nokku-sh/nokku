@@ -12,8 +12,8 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -27,7 +27,7 @@ var subjectKinds = map[string]nokkuv1.SubjectKind{
 }
 
 type targetAccountService struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 func (s *targetAccountService) ListTargetAccounts(

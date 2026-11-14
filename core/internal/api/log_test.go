@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 )
 
 // Only a failed request gets a line. The rest is traced, or audited.
@@ -21,7 +21,7 @@ func TestWithLogger(t *testing.T) {
 
 	serve := func(status int, target string) string {
 		out.Reset()
-		s := &Server{cfg: &config.Config{}}
+		s := &Server{cfg: &app.Config{}}
 		s.withLogger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r.URL.Path = "/index.html" // what the static handler does
 			w.WriteHeader(status)
@@ -40,7 +40,7 @@ func TestWithLogger(t *testing.T) {
 }
 
 func TestWithRecover(t *testing.T) {
-	s := &Server{cfg: &config.Config{}}
+	s := &Server{cfg: &app.Config{}}
 
 	rec := httptest.NewRecorder()
 	s.withRecover(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {

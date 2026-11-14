@@ -22,8 +22,8 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/cache"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/web"
 )
 
@@ -41,10 +41,10 @@ var warnHTTP1 sync.Once
 
 type Server struct {
 	mux *http.ServeMux
-	cfg *config.Config
+	cfg *app.Config
 }
 
-func New(cfg *config.Config) *Server {
+func New(cfg *app.Config) *Server {
 	return &Server{
 		mux: http.NewServeMux(),
 		cfg: cfg,
@@ -111,32 +111,6 @@ func (s *Server) Start(ctx context.Context) error {
 
 	case err := <-serverErr:
 		return fmt.Errorf("server error: %w", err)
-	}
-}
-
-func recoverPanics(withStack bool) connect.ServerInterceptor {
-	return func(next connect.ServerFunc) connect.ServerFunc {
-		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
-			defer func() {
-				p := recover()
-				if p == nil {
-					return
-				}
-				if perr, ok := p.(error); ok && errors.Is(perr, http.ErrAbortHandler) {
-					panic(p)
-				}
-				attrs := []slog.Attr{
-					slog.String("procedure", spec.Procedure),
-					slog.String("panic_type", fmt.Sprintf("%T", p)),
-				}
-				if withStack {
-					attrs = append(attrs, slog.String("stack", string(debug.Stack())))
-				}
-				slog.LogAttrs(ctx, slog.LevelError, "rpc panic recovered", attrs...)
-				err = errInternal
-			}()
-			return next(ctx, spec, stream)
-		}
 	}
 }
 
@@ -282,5 +256,31 @@ func (s *Server) serverInterceptors(ctx context.Context) []connect.ServerInterce
 		mapErrors,
 		authorize(s.cfg),
 		validate.NewServerInterceptor(),
+	}
+}
+
+func recoverPanics(withStack bool) connect.ServerInterceptor {
+	return func(next connect.ServerFunc) connect.ServerFunc {
+		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) (err error) {
+			defer func() {
+				p := recover()
+				if p == nil {
+					return
+				}
+				if perr, ok := p.(error); ok && errors.Is(perr, http.ErrAbortHandler) {
+					panic(p)
+				}
+				attrs := []slog.Attr{
+					slog.String("procedure", spec.Procedure),
+					slog.String("panic_type", fmt.Sprintf("%T", p)),
+				}
+				if withStack {
+					attrs = append(attrs, slog.String("stack", string(debug.Stack())))
+				}
+				slog.LogAttrs(ctx, slog.LevelError, "rpc panic recovered", attrs...)
+				err = errInternal
+			}()
+			return next(ctx, spec, stream)
+		}
 	}
 }

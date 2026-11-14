@@ -10,7 +10,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -19,7 +19,7 @@ import (
 const defaultRetireAfter = 15 * time.Minute
 
 type joinTokenService struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 // CreateJoinToken returns the plaintext once, only its hash is stored.

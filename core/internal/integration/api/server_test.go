@@ -24,7 +24,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -193,7 +193,7 @@ func TestPlainHTTPIsForTheProxy(t *testing.T) {
 }
 
 // startCore runs cfg's real server on a free port and returns its address.
-func startCore(t *testing.T, cfg *config.Config) string {
+func startCore(t *testing.T, cfg *app.Config) string {
 	t.Helper()
 	free, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

@@ -8,12 +8,12 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 )
 
 // Refused before anything is stored. With no iam, getting that far panics.
 func TestHostedSSOProviderNeedsTLS(t *testing.T) {
-	svc := &ssoService{cfg: &config.Config{SaaS: true}}
+	svc := &ssoService{cfg: &app.Config{SaaS: true}}
 	_, err := svc.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{
 		ProviderId: new("lab"), Name: new("Lab"), IssuerUrl: new("http://idp.example/realms/lab"),
 		ClientId: new("nokku"), ClientSecret: new("s3cret"),

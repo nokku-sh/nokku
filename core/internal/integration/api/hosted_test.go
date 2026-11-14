@@ -23,7 +23,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 	"github.com/nokku-sh/nokku/core/internal/iam"
@@ -69,7 +69,7 @@ func selfHostedOnly(t *testing.T, why string) {
 }
 
 // withoutAPlan ends the hosted trial until restore, self-hosted has no plan.
-func withoutAPlan(t *testing.T, cfg *config.Config) (restore func()) {
+func withoutAPlan(t *testing.T, cfg *app.Config) (restore func()) {
 	t.Helper()
 	if !hosted {
 		return func() {}
@@ -86,7 +86,7 @@ func withoutAPlan(t *testing.T, cfg *config.Config) (restore func()) {
 }
 
 // keepLicense drops a test's key from the shared workspace afterwards, hosted it goes back on a trial.
-func keepLicense(t *testing.T, cfg *config.Config) {
+func keepLicense(t *testing.T, cfg *app.Config) {
 	t.Helper()
 	t.Cleanup(func() {
 		ctx := context.WithoutCancel(t.Context())
@@ -105,7 +105,7 @@ func keepLicense(t *testing.T, cfg *config.Config) {
 }
 
 // hostedWorkspace is the shared workspace, on the trial a signup gets.
-func hostedWorkspace(ctx context.Context, cfg *config.Config) (actor.Workspace, error) {
+func hostedWorkspace(ctx context.Context, cfg *app.Config) (actor.Workspace, error) {
 	if _, err := tenant.Create(ctx, cfg.Conn, cfg.Keyset, hostedSlug, "test", entitlement.TrialDays); err != nil {
 		return actor.Workspace{}, err
 	}
@@ -141,7 +141,7 @@ func onHost(t *testing.T, host string) *httptest.Server {
 	return srv
 }
 
-func newHostedWorkspace(t *testing.T, cfg *config.Config) actor.Workspace {
+func newHostedWorkspace(t *testing.T, cfg *app.Config) actor.Workspace {
 	t.Helper()
 	slug := "t" + strings.ReplaceAll(uuid.New().String(), "-", "")[:12]
 	_, err := tenant.Create(t.Context(), cfg.Conn, cfg.Keyset, slug, "other", entitlement.TrialDays)

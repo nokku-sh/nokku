@@ -26,8 +26,8 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -181,7 +181,7 @@ func partialConn(srv *httptest.Server, token string) *connect.Client {
 	return clientOn(srv, header("Authorization", "Bearer "+token))
 }
 
-func partialAccount(t *testing.T, cfg *config.Config, srv *httptest.Server) partialResource {
+func partialAccount(t *testing.T, cfg *app.Config, srv *httptest.Server) partialResource {
 	t.Helper()
 	tokens := map[string]string{}
 	self := func(id string) nokkuv1connect.AccountServiceClient {
@@ -268,7 +268,7 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 
 // partialDaemon starts pending with every switch away from its default. An
 // update ignores ephemeral and idle_timeout.
-func partialDaemon(t *testing.T, cfg *config.Config, srv *httptest.Server, admin *connect.Client) partialResource {
+func partialDaemon(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *connect.Client) partialResource {
 	t.Helper()
 	daemons := nokkuv1connect.NewDaemonServiceClient(admin)
 	update := func(req *nokkuv1.UpdateDaemonRequest) func(string) error {
@@ -317,7 +317,7 @@ func partialDaemon(t *testing.T, cfg *config.Config, srv *httptest.Server, admin
 }
 
 // partialWorkspace leaves enforce_sso off, and both calls on the workspace row share its baseline.
-func partialWorkspace(t *testing.T, cfg *config.Config, srv *httptest.Server) []partialResource {
+func partialWorkspace(t *testing.T, cfg *app.Config, srv *httptest.Server) []partialResource {
 	t.Helper()
 	ws := testWorkspace.ID
 	owner := nokkuv1connect.NewWorkspaceServiceClient(
@@ -404,7 +404,7 @@ func partialWorkspace(t *testing.T, cfg *config.Config, srv *httptest.Server) []
 	}
 }
 
-func restoreWorkspace(ctx context.Context, t *testing.T, cfg *config.Config, w *db.Workspace) {
+func restoreWorkspace(ctx context.Context, t *testing.T, cfg *app.Config, w *db.Workspace) {
 	t.Helper()
 	ctx = actor.WithWorkspace(ctx, actor.Workspace{ID: w.ID})
 	require.NoError(t, cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
@@ -428,7 +428,7 @@ func restoreWorkspace(ctx context.Context, t *testing.T, cfg *config.Config, w *
 	require.NoError(t, owner.Close(ctx))
 }
 
-func partialTeam(t *testing.T, cfg *config.Config, admin *connect.Client) partialResource {
+func partialTeam(t *testing.T, cfg *app.Config, admin *connect.Client) partialResource {
 	t.Helper()
 	teams := nokkuv1connect.NewTeamServiceClient(admin)
 	update := func(req *nokkuv1.UpdateTeamRequest) func(string) error {
@@ -473,7 +473,7 @@ func partialTeam(t *testing.T, cfg *config.Config, admin *connect.Client) partia
 	}
 }
 
-func partialTarget(t *testing.T, cfg *config.Config, srv *httptest.Server, admin *connect.Client) partialResource {
+func partialTarget(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *connect.Client) partialResource {
 	t.Helper()
 	targets := nokkuv1connect.NewTargetServiceClient(admin)
 	// An address and a host key at the start take nk, the web app adds a server by name.
@@ -532,7 +532,7 @@ func partialHostKey(t *testing.T) string {
 }
 
 // partialAuditStream skips delivery state. The secret comes from the row.
-func partialAuditStream(t *testing.T, cfg *config.Config, srv *httptest.Server) partialResource {
+func partialAuditStream(t *testing.T, cfg *app.Config, srv *httptest.Server) partialResource {
 	t.Helper()
 	ws := testWorkspace.ID
 	streams := nokkuv1connect.NewAuditStreamServiceClient(

@@ -35,7 +35,7 @@ type Keyset struct {
 
 	kek       tink.AEAD
 	primitive tink.AEAD
-	// vault is nil without a Vault. VaultTokenLoop renews the token on it.
+	// vault is nil without a Vault. vaultTokenLoop renews the token on it.
 	vault *api.Client
 
 	KMSURI     string `env:"KMS_URI"`
@@ -69,6 +69,10 @@ func New(ctx context.Context, conn *db.Connection, hosted bool) (*Keyset, error)
 	}
 	if err := k.load(ctx); err != nil {
 		return nil, err
+	}
+	// Rotate swaps k.vault, so the loop keeps the client it started with.
+	if k.vault != nil {
+		go vaultTokenLoop(ctx, k.vault)
 	}
 	return &k, nil
 }

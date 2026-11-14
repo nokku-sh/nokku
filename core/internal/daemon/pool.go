@@ -73,7 +73,7 @@ type Pool struct {
 	record  func(context.Context, *audit.Event)
 	started time.Time
 
-	// dirty are the workspaces Reconcile has to look at, wake tells it there are some.
+	// dirty are the workspaces reconcileLoop has to look at, wake tells it there are some.
 	dirtyMu sync.Mutex
 	dirty   map[string]struct{}
 	wake    chan struct{}
@@ -83,52 +83,16 @@ type Pool struct {
 	reportLimits map[string]*rate.Limiter
 }
 
-// want sets what the daemon should hold and wakes it when its last heartbeat said something else.
-func (c *daemonConn) want(hash []byte) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.wanted = hash
-	if c.heard && !bytes.Equal(c.applied, hash) {
-		c.poke()
-	}
+// New starts the loops that keep the daemons in step, they end with ctx.
+func New(ctx context.Context, conn *db.Connection, record func(context.Context, *audit.Event)) *Pool {
+	p := newPool(conn, record)
+	go p.listenLoop(ctx, conn.Pool.Config().ConnConfig)
+	go p.reconcileLoop(ctx)
+	go retireLoop(ctx, conn, p.Connected, record)
+	return p
 }
 
-// heartbeat takes what the daemon holds and wakes it when that is not what it should. It fell behind when it
-// still misses what was wanted one heartbeat ago, so a daemon busy with the latest change never counts.
-func (c *daemonConn) heartbeat(applied []byte) (fell bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.applied, c.heard = applied, true
-	if c.wanted == nil {
-		return false
-	}
-	current := bytes.Equal(applied, c.wanted)
-	if !current {
-		c.poke()
-	}
-	behind := !current && c.wantedAtBeat != nil && !bytes.Equal(applied, c.wantedAtBeat)
-	c.wantedAtBeat = c.wanted
-	if !behind {
-		c.behindSince.Store(nil)
-		return false
-	}
-	if !c.behindSince.CompareAndSwap(nil, new(time.Now())) || time.Since(c.reportedAt) < behindReportGap {
-		return false
-	}
-	c.reportedAt = time.Now()
-	return true
-}
-
-// update is the message a poke sends, with what the daemon should hold by now.
-func (c *daemonConn) update() *nokkuv1.ConnectResponse {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return &nokkuv1.ConnectResponse{
-		Msg: &nokkuv1.ConnectResponse_StateUpdate{StateUpdate: &nokkuv1.StateUpdate{StateHash: c.wanted}},
-	}
-}
-
-func New(conn connection, record func(context.Context, *audit.Event)) *Pool {
+func newPool(conn connection, record func(context.Context, *audit.Event)) *Pool {
 	return &Pool{
 		byID:          make(map[string]*daemonConn),
 		byWksp:        make(map[string]map[string]struct{}),
@@ -276,8 +240,8 @@ func (p *Pool) unregisterDaemon(daemonID string, c *daemonConn) {
 	p.reportMu.Unlock()
 }
 
-// Listen marks a workspace for Reconcile whenever its access changed.
-func (p *Pool) Listen(ctx context.Context, cfg *pgx.ConnConfig) {
+// listenLoop marks a workspace for reconcileLoop whenever its access changed.
+func (p *Pool) listenLoop(ctx context.Context, cfg *pgx.ConnConfig) {
 	for ctx.Err() == nil {
 		if err := p.listen(ctx, cfg); err != nil && ctx.Err() == nil {
 			slog.Warn("state listener disconnected", "error", err)
@@ -309,7 +273,7 @@ func (p *Pool) listen(ctx context.Context, cfg *pgx.ConnConfig) error {
 	}
 }
 
-// mark has Reconcile look at a workspace. A workspace waits once, however often it is marked.
+// mark has reconcileLoop look at a workspace. A workspace waits once, however often it is marked.
 func (p *Pool) mark(workspaceID string) {
 	p.dirtyMu.Lock()
 	p.dirty[workspaceID] = struct{}{}
@@ -330,9 +294,9 @@ func (p *Pool) markAll() {
 	}
 }
 
-// Reconcile runs until ctx ends. For each marked workspace it works out what every daemon should hold and wakes
+// reconcileLoop runs until ctx ends. For each marked workspace it works out what every daemon should hold and wakes
 // the ones that hold something else, so a change costs one pass and a sync per daemon it touches.
-func (p *Pool) Reconcile(ctx context.Context) {
+func (p *Pool) reconcileLoop(ctx context.Context) {
 	sweep := time.NewTicker(sweepEvery)
 	defer sweep.Stop()
 	for {
@@ -392,6 +356,51 @@ func (p *Pool) reconcile(ctx context.Context, workspaceID string) error {
 		c.want(hash)
 	}
 	return nil
+}
+
+// want sets what the daemon should hold and wakes it when its last heartbeat said something else.
+func (c *daemonConn) want(hash []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.wanted = hash
+	if c.heard && !bytes.Equal(c.applied, hash) {
+		c.poke()
+	}
+}
+
+// heartbeat takes what the daemon holds and wakes it when that is not what it should. It fell behind when it
+// still misses what was wanted one heartbeat ago, so a daemon busy with the latest change never counts.
+func (c *daemonConn) heartbeat(applied []byte) (fell bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.applied, c.heard = applied, true
+	if c.wanted == nil {
+		return false
+	}
+	current := bytes.Equal(applied, c.wanted)
+	if !current {
+		c.poke()
+	}
+	behind := !current && c.wantedAtBeat != nil && !bytes.Equal(applied, c.wantedAtBeat)
+	c.wantedAtBeat = c.wanted
+	if !behind {
+		c.behindSince.Store(nil)
+		return false
+	}
+	if !c.behindSince.CompareAndSwap(nil, new(time.Now())) || time.Since(c.reportedAt) < behindReportGap {
+		return false
+	}
+	c.reportedAt = time.Now()
+	return true
+}
+
+// update is the message a poke sends, with what the daemon should hold by now.
+func (c *daemonConn) update() *nokkuv1.ConnectResponse {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return &nokkuv1.ConnectResponse{
+		Msg: &nokkuv1.ConnectResponse_StateUpdate{StateUpdate: &nokkuv1.StateUpdate{StateHash: c.wanted}},
+	}
 }
 
 // poke never blocks, a pending update already covers this one.

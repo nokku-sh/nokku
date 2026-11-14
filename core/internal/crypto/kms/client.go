@@ -68,13 +68,10 @@ func (k *Keyset) vaultClient(hostPort string) (*api.Client, error) {
 	return client, nil
 }
 
-// VaultTokenLoop keeps VAULT_TOKEN alive, an ended one can't open the keyset.
-func (k *Keyset) VaultTokenLoop(ctx context.Context) {
-	if k.vault == nil {
-		return
-	}
+// vaultTokenLoop keeps VAULT_TOKEN alive, an ended one can't open the keyset.
+func vaultTokenLoop(ctx context.Context, vault *api.Client) {
 	for {
-		next, err := k.renewVaultToken(ctx)
+		next, err := renewVaultToken(ctx, vault)
 		if err != nil {
 			next = vaultTokenRetry
 			slog.Error("VAULT_TOKEN was not renewed, once it ends the core can't start", "error", err)
@@ -88,10 +85,10 @@ func (k *Keyset) VaultTokenLoop(ctx context.Context) {
 }
 
 // A token that isn't periodic hits Vault's limit, so it warns every time.
-func (k *Keyset) renewVaultToken(ctx context.Context) (time.Duration, error) {
+func renewVaultToken(ctx context.Context, vault *api.Client) (time.Duration, error) {
 	ctx, cancel := context.WithTimeout(ctx, vaultTokenTimeout)
 	defer cancel()
-	tokens := k.vault.Auth().Token()
+	tokens := vault.Auth().Token()
 	self, err := tokens.LookupSelfWithContext(ctx)
 	if err != nil {
 		return 0, err

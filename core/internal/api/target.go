@@ -16,8 +16,8 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	nokkudaemon "github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/namegen"
@@ -33,7 +33,7 @@ var targetStatuses = map[nokkuv1.TargetStatus]*string{
 }
 
 type targetService struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 func (s *targetService) GetTarget(

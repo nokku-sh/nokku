@@ -1,4 +1,4 @@
-package config
+package app
 
 import (
 	"cmp"
@@ -96,10 +96,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err := realip.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return nil, err
 	}
-	if err = db.Migrate(ctx); err != nil {
-		return nil, fmt.Errorf("migrating the database: %w", err)
-	}
-	cfg.Conn, err = db.NewConnection(ctx)
+	cfg.Conn, err = db.NewServerConnection(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +129,8 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Keyset, store, cfg.Entitlements, cfg.Audit)
-	cfg.Pool = daemon.New(cfg.Conn, cfg.Audit.Record)
-	go cfg.Pool.Listen(ctx, cfg.Conn.Pool.Config().ConnConfig)
-	go cfg.Pool.Reconcile(ctx)
-	go daemon.RetireLoop(ctx, cfg.Conn, cfg.Pool.Connected, cfg.Audit.Record)
-	go access.ExpireLoop(ctx, cfg.Conn, cfg.Audit.Append)
-	go cfg.Keyset.VaultTokenLoop(ctx)
+	cfg.Pool = daemon.New(ctx, cfg.Conn, cfg.Audit.Record)
+	access.Start(ctx, cfg.Conn, cfg.Audit.Append)
 
 	deps := iam.Deps{
 		Conn:    cfg.Conn,

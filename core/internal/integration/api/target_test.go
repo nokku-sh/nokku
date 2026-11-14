@@ -18,7 +18,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -42,7 +42,7 @@ type graphSeed struct {
 	targets map[string]string
 }
 
-func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
+func seedTarget(t *testing.T, cfg *app.Config, workspaceID string) string {
 	t.Helper()
 	var targetID string
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
@@ -62,7 +62,7 @@ func seedTarget(t *testing.T, cfg *config.Config, workspaceID string) string {
 // nkTargets is the target client of a new nk session of u.
 func nkTargets(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	srv *httptest.Server,
 	u *db.User,
 ) nokkuv1connect.TargetServiceClient {
@@ -73,7 +73,7 @@ func nkTargets(
 // webTargets is the target client of a new browser session of u, signed in age ago.
 func webTargets(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	srv *httptest.Server,
 	u *db.User,
 	age time.Duration,

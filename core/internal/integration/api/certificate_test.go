@@ -22,7 +22,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 	nklogin "github.com/nokku-sh/nokku/internal/login"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -214,7 +214,7 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 // setCA changes the shared workspace CA for one test, cleanup puts it back.
 func setCA(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	certs nokkuv1connect.CertificateServiceClient,
 	change *nokkuv1.UpdateCertificateAuthorityRequest,
 ) {

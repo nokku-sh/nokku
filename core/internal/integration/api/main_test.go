@@ -25,7 +25,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/egress"
@@ -54,7 +54,7 @@ var accessTokens = []crypto.TokenKind{
 
 // One server for the package, the tests share its workspace.
 var (
-	testCfg       *config.Config
+	testCfg       *app.Config
 	testServer    *httptest.Server
 	testHandler   http.Handler
 	testWorkspace actor.Workspace
@@ -85,7 +85,7 @@ func TestMain(m *testing.M) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var err error
-	testCfg, err = config.New(ctx, nil)
+	testCfg, err = app.New(ctx, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "boot the test server: %v\n", err)
 		stop()
@@ -129,7 +129,7 @@ func trustHTTPTest() error {
 }
 
 // newTestAPI is the real config and a server behind the real middleware.
-func newTestAPI(t *testing.T) (*config.Config, *httptest.Server) {
+func newTestAPI(t *testing.T) (*app.Config, *httptest.Server) {
 	t.Helper()
 	return testCfg, testServer
 }
@@ -143,7 +143,7 @@ func workspaceName(ctx context.Context, conn *db.Connection) (string, error) {
 }
 
 // seedOtherWorkspace makes a workspace no request can reach or see.
-func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
+func seedOtherWorkspace(t *testing.T, cfg *app.Config) string {
 	t.Helper()
 	ws, err := tenant.Create(t.Context(), cfg.Conn, cfg.Keyset, uuid.NewV7().String(), "other", 0)
 	require.NoError(t, err)
@@ -151,7 +151,7 @@ func seedOtherWorkspace(t *testing.T, cfg *config.Config) string {
 }
 
 // workspaceCA reads the shared CA. A test that changes it uses setCA.
-func workspaceCA(t *testing.T, cfg *config.Config) *nokkuv1.CertificateAuthority {
+func workspaceCA(t *testing.T, cfg *app.Config) *nokkuv1.CertificateAuthority {
 	t.Helper()
 	var ca *db.SSHCA
 	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) (err error) {
@@ -162,7 +162,7 @@ func workspaceCA(t *testing.T, cfg *config.Config) *nokkuv1.CertificateAuthority
 }
 
 // inWorkspace runs fn like a request does: nokku_app, pinned to the workspace.
-func inWorkspace(t *testing.T, cfg *config.Config, workspaceID string, fn func(q *db.Queries) error) {
+func inWorkspace(t *testing.T, cfg *app.Config, workspaceID string, fn func(q *db.Queries) error) {
 	t.Helper()
 	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: workspaceID})
 	require.NoError(t, cfg.Conn.TenantTx(ctx, fn))
@@ -174,7 +174,7 @@ func wsCtx(t *testing.T) context.Context {
 	return actor.WithWorkspace(t.Context(), testWorkspace)
 }
 
-func seedUser(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1.WorkspaceRole) *db.User {
+func seedUser(t *testing.T, cfg *app.Config, workspaceID string, role nokkuv1.WorkspaceRole) *db.User {
 	t.Helper()
 	var u *db.User
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
@@ -189,7 +189,7 @@ func seedUser(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1
 }
 
 // seedOwner is the owner of the test workspace, made on first use.
-func seedOwner(t *testing.T, cfg *config.Config) *db.User {
+func seedOwner(t *testing.T, cfg *app.Config) *db.User {
 	t.Helper()
 	var owner *db.User
 	err := cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
@@ -203,7 +203,7 @@ func seedOwner(t *testing.T, cfg *config.Config) *db.User {
 	return owner
 }
 
-func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
+func sessionFor(t *testing.T, cfg *app.Config, u *db.User) string {
 	t.Helper()
 	_, token, err := cfg.IAM.IssueSignIn(
 		wsCtx(t),
@@ -215,7 +215,7 @@ func sessionFor(t *testing.T, cfg *config.Config, u *db.User) string {
 }
 
 // cliSessionFor is an nk session for sshKey with no DPoP key bound, so no proof is asked.
-func cliSessionFor(t *testing.T, cfg *config.Config, u *db.User, sshKey string) string {
+func cliSessionFor(t *testing.T, cfg *app.Config, u *db.User, sshKey string) string {
 	t.Helper()
 	key, err := ssh.NormalizeKey(sshKey)
 	require.NoError(t, err)
@@ -229,7 +229,7 @@ func cliSessionFor(t *testing.T, cfg *config.Config, u *db.User, sshKey string) 
 }
 
 // seedMember adds a user with role and returns a session token for them.
-func seedMember(t *testing.T, cfg *config.Config, workspaceID string, role nokkuv1.WorkspaceRole) string {
+func seedMember(t *testing.T, cfg *app.Config, workspaceID string, role nokkuv1.WorkspaceRole) string {
 	t.Helper()
 	if role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER {
 		return sessionFor(t, cfg, seedOwner(t, cfg))

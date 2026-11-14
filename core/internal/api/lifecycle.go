@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/email"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
@@ -34,7 +34,7 @@ var (
 type lapseAction int
 
 // runLifecycle mails owners and deletes lapsed workspaces to free their names.
-func runLifecycle(ctx context.Context, cfg *config.Config) {
+func runLifecycle(ctx context.Context, cfg *app.Config) {
 	tick := time.Tick(time.Hour)
 	for {
 		remindTrials(ctx, cfg)
@@ -48,7 +48,7 @@ func runLifecycle(ctx context.Context, cfg *config.Config) {
 }
 
 // A reminder is marked only once it went out, so a mail outage retries it.
-func remindTrials(ctx context.Context, cfg *config.Config) {
+func remindTrials(ctx context.Context, cfg *app.Config) {
 	// Without SMTP a mail goes nowhere, and marking it would skip it for good.
 	if !cfg.Email.HasSMTP() {
 		return
@@ -85,7 +85,7 @@ func remindTrials(ctx context.Context, cfg *config.Config) {
 	}
 }
 
-func purgeLapsed(ctx context.Context, cfg *config.Config) {
+func purgeLapsed(ctx context.Context, cfg *app.Config) {
 	rows, err := cfg.Conn.Sys().ListLapsedWorkspaces(ctx)
 	if err != nil {
 		slog.Error("listing lapsed workspaces failed", "error", err)
@@ -168,7 +168,7 @@ func billingPage(baseURL string) string {
 
 func warnDeletion(
 	ctx context.Context,
-	cfg *config.Config,
+	cfg *app.Config,
 	row *db.ListLapsedWorkspacesRow,
 	due int32,
 	deleteAt time.Time,

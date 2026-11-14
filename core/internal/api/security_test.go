@@ -7,11 +7,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 )
 
 func TestWithHeadersCachePolicy(t *testing.T) {
-	s := &Server{cfg: &config.Config{}}
+	s := &Server{cfg: &app.Config{}}
 	serve := func(h http.HandlerFunc) string {
 		w := httptest.NewRecorder()
 		s.withHeaders(h).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/nokku.v1.TargetService/ListTargets", nil))
@@ -27,13 +27,13 @@ func TestWithHeadersCachePolicy(t *testing.T) {
 
 // Browsers keep HSTS for a year and for every port, so localhost gets none.
 func TestHSTSIsNotSetOnLocalhost(t *testing.T) {
-	hsts := func(cfg *config.Config) string {
+	hsts := func(cfg *app.Config) string {
 		w := httptest.NewRecorder()
 		(&Server{cfg: cfg}).withHeaders(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).
 			ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 		return w.Header().Get("Strict-Transport-Security")
 	}
 
-	assert.NotEmpty(t, hsts(&config.Config{BaseURL: "nokku.example.com"}))
-	assert.Empty(t, hsts(&config.Config{Port: "3000"}), "localhost")
+	assert.NotEmpty(t, hsts(&app.Config{BaseURL: "nokku.example.com"}))
+	assert.Empty(t, hsts(&app.Config{Port: "3000"}), "localhost")
 }

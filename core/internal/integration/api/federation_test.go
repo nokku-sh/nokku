@@ -32,7 +32,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/dpopclient"
 
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
@@ -51,7 +51,7 @@ type jobIssuer struct {
 }
 
 type federation struct {
-	cfg      *config.Config
+	cfg      *app.Config
 	srv      *httptest.Server
 	accounts nokkuv1connect.ServiceAccountServiceClient
 	issuer   *jobIssuer

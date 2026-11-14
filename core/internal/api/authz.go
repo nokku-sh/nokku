@@ -15,7 +15,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
@@ -26,7 +26,7 @@ var procedureAccess = loadProcedureAccess()
 // authorizationInterceptor applies the (access) option in this order: daemon,
 // nk, role or self, people only, browser, fresh sign-in, plan feature, signing, cap.
 type authorizationInterceptor struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 type authorizedStream struct {
@@ -54,7 +54,7 @@ func loadProcedureAccess() map[string]*nokkuv1.Access {
 	return out
 }
 
-func authorize(cfg *config.Config) connect.ServerInterceptor {
+func authorize(cfg *app.Config) connect.ServerInterceptor {
 	return (&authorizationInterceptor{cfg: cfg}).intercept
 }
 

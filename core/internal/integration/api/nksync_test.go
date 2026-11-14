@@ -29,7 +29,7 @@ import (
 	nklogin "github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
@@ -37,7 +37,7 @@ import (
 
 // nkSync is an admin who hands out grants and a key that asks for certificates.
 type nkSync struct {
-	cfg      *config.Config
+	cfg      *app.Config
 	srv      *httptest.Server
 	accounts nokkuv1connect.TargetAccountServiceClient
 	certs    nokkuv1connect.CertificateServiceClient

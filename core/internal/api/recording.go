@@ -14,13 +14,13 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/recording"
 )
 
 type recordingService struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 func (s *recordingService) ListRecordings(

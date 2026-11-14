@@ -18,13 +18,13 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 )
 
 // Unset, any peer on a private network could name the client address that
 // source-address limits are checked against.
 func TestHostedServiceNeedsTrustedProxies(t *testing.T) {
-	cfg := &config.Config{}
+	cfg := &app.Config{}
 	cfg.SaaS = true
 	require.ErrorContains(t, New(cfg).Start(t.Context()), "NOKKU_TRUSTED_PROXIES")
 	cfg.TrustedProxies = []string{" "}
@@ -34,7 +34,7 @@ func TestHostedServiceNeedsTrustedProxies(t *testing.T) {
 // A proxy without h2c is the likeliest setup mistake, and a bare 505 from
 // connect names no fix. nokkud and nk print what the core answers.
 func TestDuplexStreamOverHTTP1NamesTheFix(t *testing.T) {
-	s := New(&config.Config{})
+	s := New(&app.Config{})
 	reached := false
 	core := httptest.NewServer(s.withDuplex(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		reached = true

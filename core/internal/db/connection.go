@@ -63,7 +63,23 @@ func NewConnection(ctx context.Context) (*Connection, error) {
 	return c, nil
 }
 
-// Only NewConnection calls it, a start reads the settings three times.
+// NewServerConnection is the server's NewConnection, it migrates first.
+func NewServerConnection(ctx context.Context) (*Connection, error) {
+	c, config, err := settings()
+	if err != nil {
+		return nil, err
+	}
+	if err := c.setupSchema(ctx, config.ConnConfig); err != nil {
+		return nil, fmt.Errorf("migrating the database: %w", err)
+	}
+	warnDefaults(config.ConnConfig.Host)
+	if err := c.createPools(ctx, config); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// Not for the server lock, a start would warn twice.
 func warnDefaults(host string) {
 	if os.Getenv("PGPASSWORD") == "" {
 		slog.Warn("PGPASSWORD is not set, the default is only fit for a local try")
@@ -214,14 +230,21 @@ func pinWorkspace(ctx context.Context, conn *pgx.Conn) (bool, error) {
 	return true, nil
 }
 
-// System code only calls queries that name the workspace.
-
 // Tenant runs as nokku_app, each statement pinned to the ctx's workspace.
 func (c *Connection) Tenant() *Queries { return c.tenant }
 
 // TenantTx fails closed without a workspace, actor.WithWorkspace pins one.
 func (c *Connection) TenantTx(ctx context.Context, fn func(*Queries) error) error {
 	return pgx.BeginFunc(ctx, c.Pool, func(tx pgx.Tx) error { return fn(New(tx)) })
+}
+
+// Sys runs as nokku_system (BYPASSRLS), for pre-auth lookups and jobs.
+// It is never pinned, so system code only calls queries that name the workspace.
+func (c *Connection) Sys() *Queries { return c.sys }
+
+// SysTx bypasses RLS, only cross-tenant work belongs here.
+func (c *Connection) SysTx(ctx context.Context, fn func(*Queries) error) error {
+	return pgx.BeginFunc(ctx, c.sysPool, func(tx pgx.Tx) error { return fn(New(tx)) })
 }
 
 // HoldServerLock waits while another core runs, then holds the lock until hold ends.
@@ -280,6 +303,7 @@ func keepServerLock(ctx context.Context, conn *pgx.Conn, session string, lost fu
 	}
 }
 
+// The settings are read on every try, a retake logs in with what is set by then.
 func tryServerLock(ctx context.Context, session string) (*pgx.Conn, bool, error) {
 	_, config, err := settings()
 	if err != nil {
@@ -319,12 +343,4 @@ func tryServerLock(ctx context.Context, session string) (*pgx.Conn, bool, error)
 		return nil, false, fmt.Errorf("taking the server lock: %w", err)
 	}
 	return conn, free, nil
-}
-
-// Sys runs as nokku_system (BYPASSRLS), for pre-auth lookups and jobs.
-func (c *Connection) Sys() *Queries { return c.sys }
-
-// SysTx bypasses RLS, only cross-tenant work belongs here.
-func (c *Connection) SysTx(ctx context.Context, fn func(*Queries) error) error {
-	return pgx.BeginFunc(ctx, c.sysPool, func(tx pgx.Tx) error { return fn(New(tx)) })
 }

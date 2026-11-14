@@ -16,7 +16,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
 )
@@ -29,7 +29,7 @@ func enterpriseServer(t *testing.T) *httptest.Server {
 }
 
 // enterprise licenses the shared workspace and each of also, hosted the shared server reads it as inactive meanwhile.
-func enterprise(t *testing.T, also ...string) (*config.Config, *httptest.Server) {
+func enterprise(t *testing.T, also ...string) (*app.Config, *httptest.Server) {
 	t.Helper()
 	cfg, _ := newTestAPI(t)
 	pubHex, key := issueLicense(t)

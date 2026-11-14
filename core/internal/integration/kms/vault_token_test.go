@@ -67,9 +67,8 @@ func TestCoreKeepsAPeriodicVaultTokenAlive(t *testing.T) {
 
 	t.Setenv("VAULT_TOKEN", docToken(t, root, kek, "5s"))
 	t.Setenv("KMS_URI", kekURI)
-	keys, err := openKeyset(t, conn, "")
+	_, err = openKeyset(t, conn, "")
 	require.NoError(t, err)
-	go keys.VaultTokenLoop(t.Context())
 
 	require.Eventually(t, func() bool {
 		_, err := unrenewed.Auth().Token().LookupSelfWithContext(t.Context())
@@ -88,10 +87,9 @@ func TestCoreWarnsAboutAVaultTokenThatEnds(t *testing.T) {
 	root, kek, kekURI := testVaultKey(t)
 	t.Setenv("VAULT_TOKEN", docToken(t, root, kek, ""))
 	t.Setenv("KMS_URI", kekURI)
-	keys, err := openKeyset(t, conn, "")
+	_, err := openKeyset(t, conn, "")
 	require.NoError(t, err)
 
-	go keys.VaultTokenLoop(t.Context())
 	require.Eventually(t, func() bool { return logs.has("not periodic") }, 5*time.Second, 50*time.Millisecond)
 }
 
@@ -101,9 +99,8 @@ func TestCoreLeavesARootVaultTokenAlone(t *testing.T) {
 	conn := freshDB(t)
 	_, _, kekURI := testVaultKey(t)
 	t.Setenv("KMS_URI", kekURI)
-	keys, err := openKeyset(t, conn, "")
+	_, err := openKeyset(t, conn, "")
 	require.NoError(t, err)
 
-	go keys.VaultTokenLoop(t.Context())
 	assert.Never(t, func() bool { return logs.has("VAULT_TOKEN") }, time.Second, 50*time.Millisecond)
 }

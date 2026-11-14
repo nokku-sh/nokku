@@ -12,11 +12,11 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-func seedAccount(t *testing.T, cfg *config.Config) (*db.User, nokkuv1connect.AccountServiceClient) {
+func seedAccount(t *testing.T, cfg *app.Config) (*db.User, nokkuv1connect.AccountServiceClient) {
 	t.Helper()
 	u := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	_, srv := newTestAPI(t)

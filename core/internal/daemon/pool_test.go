@@ -28,7 +28,7 @@ func (stubConn) TenantTx(context.Context, func(*db.Queries) error) error {
 
 func newTestPool(t *testing.T) *Pool {
 	t.Helper()
-	return New(stubConn{}, nil)
+	return newPool(stubConn{}, nil)
 }
 
 // waitRelayPending stops registerRelay winning a race the test isn't about.

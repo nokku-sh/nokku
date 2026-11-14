@@ -23,8 +23,8 @@ import (
 	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	nokkudaemon "github.com/nokku-sh/nokku/core/internal/daemon"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
@@ -57,7 +57,7 @@ const (
 type daemonControlService struct {
 	*nokkudaemon.Pool
 
-	cfg *config.Config
+	cfg *app.Config
 
 	uploadsMu sync.Mutex
 	uploads   map[string]int   // open uploads by daemon
@@ -65,7 +65,7 @@ type daemonControlService struct {
 	heldTotal int64
 }
 
-func newDaemonControlService(cfg *config.Config) *daemonControlService {
+func newDaemonControlService(cfg *app.Config) *daemonControlService {
 	return &daemonControlService{Pool: cfg.Pool, cfg: cfg, uploads: map[string]int{}, held: map[string]int64{}}
 }
 

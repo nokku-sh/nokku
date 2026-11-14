@@ -27,7 +27,7 @@ import (
 	nklogin "github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/realip"
 )
 
@@ -52,7 +52,7 @@ type fakeDaemon struct {
 }
 
 type fakeFleet struct {
-	cfg     *config.Config
+	cfg     *app.Config
 	srv     *httptest.Server
 	syncs   atomic.Int64
 	failed  atomic.Int64

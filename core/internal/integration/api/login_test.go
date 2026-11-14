@@ -26,7 +26,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/api"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
@@ -81,7 +81,7 @@ func (b *inbox) next(t *testing.T, to string) string {
 }
 
 // mailServer turns mail on. iam's links land in inbox, the API's go nowhere.
-func mailServer(t *testing.T, base *config.Config) (*config.Config, *httptest.Server, *inbox) {
+func mailServer(t *testing.T, base *app.Config) (*app.Config, *httptest.Server, *inbox) {
 	t.Helper()
 	box := &inbox{links: map[string][]string{}}
 	mailer := *base.Email
@@ -102,7 +102,7 @@ func mailServer(t *testing.T, base *config.Config) (*config.Config, *httptest.Se
 }
 
 // iamServer serves base with an iam of its own and base's seat cap.
-func iamServer(t *testing.T, base *config.Config, mail iam.Deps) (*config.Config, *httptest.Server) {
+func iamServer(t *testing.T, base *app.Config, mail iam.Deps) (*app.Config, *httptest.Server) {
 	t.Helper()
 	mail.Conn = base.Conn
 	mail.Keyset = base.Keyset
@@ -121,7 +121,7 @@ func iamServer(t *testing.T, base *config.Config, mail iam.Deps) (*config.Config
 }
 
 // browserSession is a cookie session of u, signed in age ago.
-func browserSession(t *testing.T, cfg *config.Config, u *db.User, age time.Duration) login {
+func browserSession(t *testing.T, cfg *app.Config, u *db.User, age time.Duration) login {
 	t.Helper()
 	tok, token, err := cfg.IAM.IssueSignIn(
 		wsCtx(t),
@@ -147,7 +147,7 @@ func ageSession(t *testing.T, id string, age time.Duration) {
 }
 
 // sessionAfter tells whether the session still signs in.
-func sessionAfter(t *testing.T, cfg *config.Config, token string) string {
+func sessionAfter(t *testing.T, cfg *app.Config, token string) string {
 	t.Helper()
 	if _, _, err := cfg.IAM.AuthenticateToken(wsCtx(t), token, accessTokens...); err != nil {
 		return "session ended"
@@ -156,7 +156,7 @@ func sessionAfter(t *testing.T, cfg *config.Config, token string) string {
 }
 
 // signedIn sends s on every unary call, each call of nk with a new proof.
-func signedIn(t *testing.T, cfg *config.Config, s login) connect.ClientInterceptor {
+func signedIn(t *testing.T, cfg *app.Config, s login) connect.ClientInterceptor {
 	t.Helper()
 	return func(next connect.ClientFunc) connect.ClientFunc {
 		return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {
@@ -241,7 +241,7 @@ func startDevice(t *testing.T, srv *httptest.Server) deviceGrant {
 
 func pollDevice(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	srv *httptest.Server,
 	deviceCode string,
 	key *ecdsa.PrivateKey,
@@ -263,7 +263,7 @@ func sshKeyOf(t *testing.T, key *ecdsa.PrivateKey) string {
 }
 
 // deviceLogin signs nk in as u by the device flow, approved in u's browser.
-func deviceLogin(t *testing.T, cfg *config.Config, srv *httptest.Server, u *db.User) login {
+func deviceLogin(t *testing.T, cfg *app.Config, srv *httptest.Server, u *db.User) login {
 	t.Helper()
 	grant := startDevice(t, srv)
 	approver := browserSession(t, cfg, u, 0)

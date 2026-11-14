@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 )
 
 func TestUploadSlotsLimitOneDaemon(t *testing.T) {
@@ -39,7 +39,7 @@ func TestUploadMemoryIsBounded(t *testing.T) {
 		}
 	}
 
-	hosted := &daemonControlService{cfg: &config.Config{SaaS: true}, held: map[string]int64{}}
+	hosted := &daemonControlService{cfg: &app.Config{SaaS: true}, held: map[string]int64{}}
 	held, ok := hosted.holdUploadMemory("a", maxUploadMemory, 1<<20)
 	assert.True(t, ok, "an upload past what it can hold costs nothing more")
 	assert.Equal(t, int64(maxUploadMemory), held)
@@ -56,7 +56,7 @@ func TestUploadMemoryIsBounded(t *testing.T) {
 	assert.Zero(t, hosted.heldTotal)
 
 	// One self-hosted workspace has the whole core.
-	selfHosted := &daemonControlService{cfg: &config.Config{}, held: map[string]int64{}}
+	selfHosted := &daemonControlService{cfg: &app.Config{}, held: map[string]int64{}}
 	fill(selfHosted, "only", maxCoreUploadMemory)
 	_, ok = selfHosted.holdUploadMemory("only", 0, maxUploadMemory)
 	assert.False(t, ok, "the core went past its limit")

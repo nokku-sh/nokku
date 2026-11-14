@@ -14,8 +14,8 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/audit"
-	"github.com/nokku-sh/nokku/core/internal/config"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/email"
 )
@@ -29,7 +29,7 @@ const (
 )
 
 type accessRequestService struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 func (s *accessRequestService) ListRequestableAccounts(

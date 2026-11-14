@@ -25,7 +25,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -66,7 +66,7 @@ type matrixReportRow struct {
 }
 
 type matrixFixture struct {
-	cfg       *config.Config
+	cfg       *app.Config
 	srv       *httptest.Server
 	admin     connect.ClientInterceptor
 	publicKey string

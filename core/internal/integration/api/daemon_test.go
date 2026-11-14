@@ -30,14 +30,14 @@ import (
 	nklogin "github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/core/internal/access"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 	"github.com/nokku-sh/nokku/core/internal/sshclient/sshtest"
 )
 
 // dpopProof signs like nokkud. Only a session proof carries the token hash.
-func dpopProof(t *testing.T, cfg *config.Config, key *ecdsa.PrivateKey, procedure, token string) string {
+func dpopProof(t *testing.T, cfg *app.Config, key *ecdsa.PrivateKey, procedure, token string) string {
 	t.Helper()
 	return dpopProofWithNonce(t, key, procedure, token, cfg.IAM.DPoP.CurrentNonce())
 }
@@ -436,7 +436,7 @@ func TestCreateSession(t *testing.T) {
 // daemonAuth signs one call the way nokkud does.
 func daemonAuth(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	key *ecdsa.PrivateKey,
 	token, procedure string,
 ) connect.ClientInterceptor {
@@ -448,7 +448,7 @@ func daemonAuth(
 
 func enrollTestDaemon(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	srv *httptest.Server,
 	workspaceID string,
 	autoApprove bool,
@@ -611,7 +611,7 @@ func TestDaemonThatFallsBehindShows(t *testing.T) {
 // update covers the next.
 func holdControlStream(
 	t *testing.T,
-	cfg *config.Config,
+	cfg *app.Config,
 	srv *httptest.Server,
 	key *ecdsa.PrivateKey,
 	token string,
@@ -895,7 +895,7 @@ func blockAuditWrites(t *testing.T) (restore func()) {
 }
 
 // certificateKeyIDs reads the key id of every certificate the log holds.
-func certificateKeyIDs(t *testing.T, cfg *config.Config) []string {
+func certificateKeyIDs(t *testing.T, cfg *app.Config) []string {
 	t.Helper()
 	var rows []*db.ListAuditLogsRow
 	require.NoError(t, cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {

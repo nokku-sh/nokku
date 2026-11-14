@@ -27,7 +27,7 @@ tasks:
     env:
       NOKKU_DEV_UI: "http://localhost:5173"
     cmds:
-      - go run {{ if .NOKKU_LICENSE_PUBLIC_KEY }}-ldflags="-X github.com/nokku-sh/nokku/core/internal/config.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}"{{ end }} ./cmd/nokku
+      - go run {{ if .NOKKU_LICENSE_PUBLIC_KEY }}-ldflags="-X github.com/nokku-sh/nokku/core/internal/app.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}"{{ end }} ./cmd/nokku
 
   frontend:
     desc: Run frontend
@@ -39,7 +39,7 @@ tasks:
     desc: Build binary
     cmds:
       - go generate ./...
-      - go build -ldflags="-s -w{{ if .NOKKU_LICENSE_PUBLIC_KEY }} -X github.com/nokku-sh/nokku/core/internal/config.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}{{ end }}" -trimpath -o bin/nokku ./cmd/nokku
+      - go build -ldflags="-s -w{{ if .NOKKU_LICENSE_PUBLIC_KEY }} -X github.com/nokku-sh/nokku/core/internal/app.licensePublicKey={{ .NOKKU_LICENSE_PUBLIC_KEY }}{{ end }}" -trimpath -o bin/nokku ./cmd/nokku
 
   test:integration:
     desc: Run the integration tests, they start Postgres, Keycloak and Vault in Docker

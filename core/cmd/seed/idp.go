@@ -19,7 +19,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
@@ -103,7 +103,7 @@ var users = []struct {
 var errNotFound = errors.New("not found")
 
 func runIDP(ctx context.Context, _ *cli.Command) error {
-	ec, err := env.ParseAs[config.EnvConfig]()
+	ec, err := env.ParseAs[app.EnvConfig]()
 	if err != nil {
 		return err
 	}

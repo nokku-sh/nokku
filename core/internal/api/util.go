@@ -7,18 +7,16 @@ import (
 	"math"
 	"time"
 
-	"google.golang.org/protobuf/types/known/durationpb"
-
 	"connectrpc.com/connect/v2"
 	"github.com/mizuchilabs/kata/buildinfo"
-
-	"github.com/nokku-sh/nokku/core/internal/access"
-	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/audit"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/access"
+	"github.com/nokku-sh/nokku/core/internal/actor"
+	"github.com/nokku-sh/nokku/core/internal/app"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -30,7 +28,7 @@ var auditOutcomes = map[nokkuv1.AuditOutcome]string{
 }
 
 type utilService struct {
-	cfg *config.Config
+	cfg *app.Config
 }
 
 func (s *utilService) GetVersion(
@@ -110,14 +108,6 @@ func (s *utilService) ListMyActivity(
 	return &nokkuv1.ListMyActivityResponse{Logs: eventLogs(events), Total: &total}, nil
 }
 
-func eventLogs(events []*audit.Event) []*nokkuv1.EventLog {
-	logs := make([]*nokkuv1.EventLog, 0, len(events))
-	for _, e := range events {
-		logs = append(logs, e.ToProto())
-	}
-	return logs
-}
-
 func (s *utilService) ExportAuditLogs(
 	ctx context.Context,
 	req *nokkuv1.ExportAuditLogsRequest,
@@ -137,7 +127,7 @@ func (s *utilService) ExportAuditLogs(
 	}
 	return &nokkuv1.ExportAuditLogsResponse{
 		Data:        data,
-		Filename:    new(fmt.Sprintf("audit-logs-%s.%s.gz", time.Now().Format("2006-01-02"), ext)),
+		Filename:    new(fmt.Sprintf("audit-logs-%s.%s.gz", time.Now().Format(time.DateOnly), ext)),
 		ContentType: new("application/gzip"),
 	}, nil
 }
@@ -164,6 +154,14 @@ func (s *utilService) ExportAccessReport(
 		Filename:    new(fmt.Sprintf("access-report-%s.%s", time.Now().Format(time.DateOnly), ext)),
 		ContentType: new(contentType),
 	}, nil
+}
+
+func eventLogs(events []*audit.Event) []*nokkuv1.EventLog {
+	logs := make([]*nokkuv1.EventLog, 0, len(events))
+	for _, e := range events {
+		logs = append(logs, e.ToProto())
+	}
+	return logs
 }
 
 // auditParams defaults to 14 days. The audit service fills in the workspace.

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/integration/testenv"
 )
 
@@ -95,7 +95,7 @@ func TestCoreStartsWithAKMSAndNoSecret(t *testing.T) {
 	t.Setenv("NOKKU_STORAGE_URL", "file://"+t.TempDir())
 	t.Setenv("NOKKU_LICENSE_OFFLINE", "true")
 
-	cfg, err := config.New(t.Context(), nil)
+	cfg, err := app.New(t.Context(), nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, cfg.IAM.DPoP.CurrentNonce())
 }

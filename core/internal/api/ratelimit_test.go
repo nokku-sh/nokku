@@ -10,7 +10,7 @@ import (
 
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 )
 
 func TestRateLimited(t *testing.T) {
@@ -48,7 +48,7 @@ func TestRateLimited(t *testing.T) {
 }
 
 func TestWithRateLimit(t *testing.T) {
-	s := &Server{cfg: &config.Config{}}
+	s := &Server{cfg: &app.Config{}}
 	h := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -96,7 +96,7 @@ func TestWithRateLimit(t *testing.T) {
 
 // Anyone can start a device login, and every start parks a grant.
 func TestWithRateLimitDeviceStart(t *testing.T) {
-	s := &Server{cfg: &config.Config{}}
+	s := &Server{cfg: &app.Config{}}
 	h := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -121,7 +121,7 @@ func TestWithRateLimitDeviceStart(t *testing.T) {
 
 // Anyone can sign up when hosted, and each signup makes a workspace and a mail.
 func TestWithRateLimitSignup(t *testing.T) {
-	s := &Server{cfg: &config.Config{}}
+	s := &Server{cfg: &app.Config{}}
 	h := s.withRateLimit(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))

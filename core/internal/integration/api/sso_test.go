@@ -20,7 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/config"
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
@@ -237,7 +237,7 @@ func TestPlanGateReadsOnlyMaskedFields(t *testing.T) {
 
 // seedProvider is an enabled provider. Call it before saving what the test
 // restores, so enforcement is off by the time it goes.
-func seedProvider(t *testing.T, cfg *config.Config) {
+func seedProvider(t *testing.T, cfg *app.Config) {
 	t.Helper()
 	id := uniq("provider")
 	_, err := cfg.IAM.PutSSOProvider(wsCtx(t), iam.SSOProvider{
