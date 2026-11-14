@@ -72,6 +72,8 @@ func (s *Service) AuthenticateToken(
 		p.Role = sa.Role
 	case actor.KindSCIM:
 		p.ID = tok.ID
+		// The label, like "okta", is the only name a SCIM token has. The audit log shows it.
+		p.Name = tok.Label
 	case actor.KindDaemon:
 	}
 	return p, tok, nil

@@ -729,6 +729,7 @@ func TestSCIMGroupChangesAreAudited(t *testing.T) {
 		require.NoError(t, json.Unmarshal(r.Details, &details))
 		assert.Equal(t, "scim", details["method"], "%s is not marked as SCIM's", r.Action)
 		assert.True(t, r.Ok, "%s", r.Action)
+		assert.Equal(t, "okta", r.ActorName, "%s does not name the token it came with", r.Action)
 		got = append(got, strings.TrimSpace(fmt.Sprintf("%s %s %v %v", r.Action, r.Target,
 			cmp.Or(details["name"], ""), cmp.Or(details["member"], ""))))
 	}
