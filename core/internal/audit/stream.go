@@ -28,6 +28,8 @@ const (
 	streamTimeout = 10 * time.Second
 	// Wait after a failed delivery. The cursor stays, so nothing is lost.
 	streamRetry = time.Minute
+	// Goes up when an event's fields change in a way a receiver has to follow.
+	webhookSchema = "1"
 )
 
 // Stream kinds, the same as the audit_streams CHECK.
@@ -115,14 +117,18 @@ func (s *Service) sendNew(ctx context.Context, st *db.AuditStream) error {
 			return err
 		}
 		last := events[len(events)-1]
-		if err := s.conn.Sys().AdvanceAuditStream(ctx, &db.AdvanceAuditStreamParams{
+		moved, err := s.conn.Sys().AdvanceAuditStream(ctx, &db.AdvanceAuditStreamParams{
 			ID:       st.ID,
 			CursorTs: last.Timestamp,
 			CursorID: last.ID,
 			FromTs:   st.CursorTs,
 			FromID:   st.CursorID,
-		}); err != nil {
+		})
+		if err != nil {
 			return err
+		}
+		if moved == 0 {
+			return errors.New("the cursor moved during the send, someone else delivers this stream")
 		}
 		st.CursorTs, st.CursorID = last.Timestamp, last.ID
 		if len(rows) < streamBatch {
@@ -162,6 +168,7 @@ func (s *Service) send(ctx context.Context, st *db.AuditStream, events []*Event)
 	case StreamWebhook:
 		stamp := strconv.FormatInt(time.Now().Unix(), 10)
 		req.Header.Set("X-Nokku-Timestamp", stamp)
+		req.Header.Set("X-Nokku-Schema", webhookSchema)
 		req.Header.Set("X-Nokku-Signature", "sha256="+sign(secret, stamp, body))
 	case StreamSplunk:
 		req.Header.Set("Authorization", "Splunk "+secret)
@@ -226,8 +233,10 @@ func streamBody(kind string, events []*Event) ([]byte, error) {
 			logs[i] = map[string]any{
 				"ddsource": "nokku",
 				"service":  "nokku",
-				"message":  strings.TrimSpace(e.Action + " " + e.Target),
-				"nokku":    e,
+				// Datadog reads the date only up here, without it a log gets the time it arrived.
+				"timestamp": e.Timestamp.UnixMilli(),
+				"message":   strings.TrimSpace(e.Action + " " + e.Target),
+				"nokku":     e,
 			}
 		}
 		return json.Marshal(logs)

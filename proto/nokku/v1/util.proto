@@ -24,6 +24,14 @@ service UtilService {
     option (access) = {role: WORKSPACE_ROLE_VIEWER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  // PollAuditLogs is for a SIEM that fetches. It reads forward from a cursor, oldest first, and never skips an event.
+  rpc PollAuditLogs(PollAuditLogsRequest) returns (PollAuditLogsResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      feature: "audit_streaming"
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
   rpc ExportAuditLogs(ExportAuditLogsRequest) returns (ExportAuditLogsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
@@ -117,6 +125,21 @@ message ListAuditLogsResponse {
   repeated EventLog logs = 1;
   int32 total = 2;
   int32 retention_days = 3;
+}
+
+message PollAuditLogsRequest {
+  // cursor is the one the last answer gave. Empty starts at the oldest event the log still keeps.
+  string cursor = 1 [(buf.validate.field).string.max_len = 80];
+  int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 1000
+  }];
+}
+message PollAuditLogsResponse {
+  // Oldest first. An event shows up about a minute after it happened.
+  repeated EventLog logs = 1;
+  // cursor goes into the next call, also when no event came.
+  string cursor = 2;
 }
 
 message ExportAuditLogsRequest {

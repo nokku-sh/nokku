@@ -87,19 +87,20 @@ type AuditAuditLog struct {
 }
 
 type AuditStream struct {
-	ID           string        `json:"id"`
-	WorkspaceID  string        `json:"workspaceId"`
-	Kind         string        `json:"kind"`
-	URL          string        `json:"url"`
-	Secret       crypto.Sealed `json:"secret"`
-	Enabled      bool          `json:"enabled"`
-	CursorTs     time.Time     `json:"cursorTs"`
-	CursorID     string        `json:"cursorId"`
-	LastSentAt   *time.Time    `json:"lastSentAt"`
-	LastError    string        `json:"lastError"`
-	FailingSince *time.Time    `json:"failingSince"`
-	RetryAt      *time.Time    `json:"retryAt"`
-	CreatedAt    time.Time     `json:"createdAt"`
+	ID              string        `json:"id"`
+	WorkspaceID     string        `json:"workspaceId"`
+	Kind            string        `json:"kind"`
+	URL             string        `json:"url"`
+	Secret          crypto.Sealed `json:"secret"`
+	Enabled         bool          `json:"enabled"`
+	CursorTs        time.Time     `json:"cursorTs"`
+	CursorID        string        `json:"cursorId"`
+	LastSentAt      *time.Time    `json:"lastSentAt"`
+	LastError       string        `json:"lastError"`
+	FailingSince    *time.Time    `json:"failingSince"`
+	FailureMailedAt *time.Time    `json:"failureMailedAt"`
+	RetryAt         *time.Time    `json:"retryAt"`
+	CreatedAt       time.Time     `json:"createdAt"`
 }
 
 type Credential struct {

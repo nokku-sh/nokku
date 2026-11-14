@@ -128,9 +128,9 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 	})
 	// An event past the stream's settle window, and cursors from before it.
 	_, err = owner.Exec(t.Context(), `
-		UPDATE audit_streams SET cursor_ts = NOW() - INTERVAL '1 minute' WHERE id = ANY($1);
+		UPDATE audit_streams SET cursor_ts = NOW() - INTERVAL '10 minutes' WHERE id = ANY($1);
 		INSERT INTO audit.audit_logs (workspace_id, action, ok, timestamp)
-		VALUES ($2, 'StreamProbe', TRUE, NOW() - INTERVAL '30 seconds');
+		VALUES ($2, 'StreamProbe', TRUE, NOW() - INTERVAL '2 minutes');
 	`, pgx.QueryExecModeSimpleProtocol, ids, ws)
 	require.NoError(t, err)
 
@@ -186,9 +186,9 @@ func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
 		_ = owner.Close(ctx)
 	})
 	_, err = owner.Exec(t.Context(), `
-		UPDATE audit_streams SET cursor_ts = NOW() - INTERVAL '1 minute' WHERE id = ANY($1);
+		UPDATE audit_streams SET cursor_ts = NOW() - INTERVAL '10 minutes' WHERE id = ANY($1);
 		INSERT INTO audit.audit_logs (workspace_id, action, ok, timestamp)
-		VALUES ($2, 'StreamProbe', TRUE, NOW() - INTERVAL '30 seconds'), ($3, 'StreamProbe', TRUE, NOW() - INTERVAL '30 seconds');
+		VALUES ($2, 'StreamProbe', TRUE, NOW() - INTERVAL '2 minutes'), ($3, 'StreamProbe', TRUE, NOW() - INTERVAL '2 minutes');
 	`, pgx.QueryExecModeSimpleProtocol, ids, broken, good)
 	require.NoError(t, err)
 

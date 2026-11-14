@@ -21,8 +21,9 @@ import (
 const (
 	// maxTarget is stored before the request is validated.
 	maxTarget = 256
-	// auditWriteTimeout bounds what a slow database adds to a request.
-	auditWriteTimeout = 10 * time.Second
+	// auditWriteTimeout bounds what a slow database adds to a request. Far under
+	// the minute a stream waits before it reads a row, see ListAuditLogsAfter.
+	auditWriteTimeout = 5 * time.Second
 )
 
 type eventKey struct{}
@@ -191,7 +192,7 @@ func (s *Service) nameActor(ctx context.Context, e *Event) {
 			e.ActorName = names[0]
 		}
 	case actor.KindServiceAccount, actor.KindSCIM:
-		// A service account's principal has its name already, a SCIM token has none.
+		// Both principals have their name already, a SCIM token goes by its label.
 	}
 }
 

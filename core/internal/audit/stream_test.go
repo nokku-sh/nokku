@@ -75,6 +75,7 @@ func TestStreamBodyDatadogNamesItsSource(t *testing.T) {
 	assert.Equal(t, "nokku", got[0]["ddsource"])
 	assert.Equal(t, "Login", got[0]["message"], "no trailing space without a target")
 	assert.Equal(t, "DeleteTarget t1", got[1]["message"])
+	assert.InDelta(t, 1792324800500, got[0]["timestamp"], 0.5, "the event's own time, in milliseconds at the top")
 }
 
 func TestSendSetsEachDestinationsAuth(t *testing.T) {

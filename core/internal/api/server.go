@@ -61,6 +61,7 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 		go runLifecycle(ctx, s.cfg)
 	}
+	go runStreamAlerts(ctx, s.cfg)
 
 	proto := new(http.Protocols)
 	proto.SetHTTP1(true)

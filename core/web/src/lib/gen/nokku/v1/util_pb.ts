@@ -15,7 +15,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/util.proto.
  */
 export const file_nokku_v1_util: GenFile = /*@__PURE__*/
-  fileDesc("ChNub2trdS92MS91dGlsLnByb3RvEghub2trdS52MSITChFHZXRWZXJzaW9uUmVxdWVzdCIlChJHZXRWZXJzaW9uUmVzcG9uc2USDwoHdmVyc2lvbhgBIAEoCSIYChZHZXRJbnN0YW5jZUluZm9SZXF1ZXN0ItMBChdHZXRJbnN0YW5jZUluZm9SZXNwb25zZRIVCg1vcGVyYXRvcl9uYW1lGAEgASgJEhUKDXN1cHBvcnRfZW1haWwYAiABKAkSEwoLd2Vic2l0ZV91cmwYAyABKAkSEQoJdGVybXNfdXJsGAQgASgJEhMKC3ByaXZhY3lfdXJsGAUgASgJEhMKC2ltcHJpbnRfdXJsGAYgASgJEg4KBmhvc3RlZBgHIAEoCBIOCgZzaWdudXAYCCABKAgSGAoQd29ya3NwYWNlX2RvbWFpbhgJIAEoCSJCCgRSb2xlEiUKBHJvbGUYASABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEhMKC2Rlc2NyaXB0aW9uGAIgASgJIhIKEExpc3RSb2xlc1JlcXVlc3QiMgoRTGlzdFJvbGVzUmVzcG9uc2USHQoFcm9sZXMYASADKAsyDi5ub2trdS52MS5Sb2xlIvUBCghFdmVudExvZxIKCgJpZBgBIAEoCRIQCghhY3Rvcl9pZBgCIAEoCRISCgphY3Rvcl9raW5kGAMgASgJEhIKCmFjdG9yX25hbWUYBCABKAkSDgoGYWN0aW9uGAUgASgJEg4KBnRhcmdldBgGIAEoCRIKCgJvaxgHIAEoCBIKCgJpcBgIIAEoCRISCgp1c2VyX2FnZW50GAkgASgJEigKB2RldGFpbHMYCiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Ei0KCXRpbWVzdGFtcBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiowIKDkF1ZGl0TG9nRmlsdGVyEg4KBnNlYXJjaBgBIAEoCRIgCglhY3Rvcl9pZHMYAiADKAlCDbpICpIBByIFcgOwAQESEwoLYWN0b3Jfa2luZHMYAyADKAkSDwoHYWN0aW9ucxgEIAMoCRIOCgZ0YXJnZXQYBSABKAkSMQoHb3V0Y29tZRgGIAEoDjIWLm5va2t1LnYxLkF1ZGl0T3V0Y29tZUIIukgFggECEAESLgoKc3RhcnRfZGF0ZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLAoIZW5kX2RhdGUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhgKEGV4Y2x1ZGVkX2FjdGlvbnMYCSADKAkicwoUTGlzdEF1ZGl0TG9nc1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASKAoGZmlsdGVyGAMgASgLMhgubm9ra3UudjEuQXVkaXRMb2dGaWx0ZXIiYAoVTGlzdEF1ZGl0TG9nc1Jlc3BvbnNlEiAKBGxvZ3MYASADKAsyEi5ub2trdS52MS5FdmVudExvZxINCgV0b3RhbBgCIAEoBRIWCg5yZXRlbnRpb25fZGF5cxgDIAEoBSLIAQoWRXhwb3J0QXVkaXRMb2dzUmVxdWVzdBJBCgZmb3JtYXQYASABKA4yJy5ub2trdS52MS5FeHBvcnRBdWRpdExvZ3NSZXF1ZXN0LkZvcm1hdEIIukgFggECEAESKAoGZmlsdGVyGAIgASgLMhgubm9ra3UudjEuQXVkaXRMb2dGaWx0ZXIiQQoGRm9ybWF0EhYKEkZPUk1BVF9VTlNQRUNJRklFRBAAEg4KCkZPUk1BVF9DU1YQARIPCgtGT1JNQVRfSlNPThACIk8KF0V4cG9ydEF1ZGl0TG9nc1Jlc3BvbnNlEgwKBGRhdGEYASABKAwSEAoIZmlsZW5hbWUYAiABKAkSFAoMY29udGVudF90eXBlGAMgASgJImAKGUV4cG9ydEFjY2Vzc1JlcG9ydFJlcXVlc3QSQwoGZm9ybWF0GAEgASgOMicubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdC5Gb3JtYXRCCrpIB4IBBBABIAAiUgoaRXhwb3J0QWNjZXNzUmVwb3J0UmVzcG9uc2USDAoEZGF0YRgBIAEoDBIQCghmaWxlbmFtZRgCIAEoCRIUCgxjb250ZW50X3R5cGUYAyABKAkidAoVTGlzdE15QWN0aXZpdHlSZXF1ZXN0EhgKBWxpbWl0GAEgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAIgASgFQge6SAQaAigAEigKBmZpbHRlchgDIAEoCzIYLm5va2t1LnYxLkF1ZGl0TG9nRmlsdGVyIkkKFkxpc3RNeUFjdGl2aXR5UmVzcG9uc2USIAoEbG9ncxgBIAMoCzISLm5va2t1LnYxLkV2ZW50TG9nEg0KBXRvdGFsGAIgASgFKn4KDEF1ZGl0T3V0Y29tZRIdChlBVURJVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASGwoXQVVESVRfT1VUQ09NRV9TVUNDRUVERUQQARIYChRBVURJVF9PVVRDT01FX0ZBSUxFRBACEhgKFEFVRElUX09VVENPTUVfREVOSUVEEAMyuAUKC1V0aWxTZXJ2aWNlElIKCkdldFZlcnNpb24SGy5ub2trdS52MS5HZXRWZXJzaW9uUmVxdWVzdBocLm5va2t1LnYxLkdldFZlcnNpb25SZXNwb25zZSIJkAIBwvMYAggBEmEKD0dldEluc3RhbmNlSW5mbxIgLm5va2t1LnYxLkdldEluc3RhbmNlSW5mb1JlcXVlc3QaIS5ub2trdS52MS5HZXRJbnN0YW5jZUluZm9SZXNwb25zZSIJkAIBwvMYAggBEk8KCUxpc3RSb2xlcxIaLm5va2t1LnYxLkxpc3RSb2xlc1JlcXVlc3QaGy5ub2trdS52MS5MaXN0Um9sZXNSZXNwb25zZSIJkAIBwvMYAhABElsKDUxpc3RBdWRpdExvZ3MSHi5ub2trdS52MS5MaXN0QXVkaXRMb2dzUmVxdWVzdBofLm5va2t1LnYxLkxpc3RBdWRpdExvZ3NSZXNwb25zZSIJkAIBwvMYAhgCEmwKD0V4cG9ydEF1ZGl0TG9ncxIgLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QaIS5ub2trdS52MS5FeHBvcnRBdWRpdExvZ3NSZXNwb25zZSIUwvMYEBgCOgxhdWRpdF9leHBvcnQSdgoSRXhwb3J0QWNjZXNzUmVwb3J0EiMubm9ra3UudjEuRXhwb3J0QWNjZXNzUmVwb3J0UmVxdWVzdBokLm5va2t1LnYxLkV4cG9ydEFjY2Vzc1JlcG9ydFJlc3BvbnNlIhXC8xgRGAI6DWFjY2Vzc19yZXZpZXcSXgoOTGlzdE15QWN0aXZpdHkSHy5ub2trdS52MS5MaXN0TXlBY3Rpdml0eVJlcXVlc3QaIC5ub2trdS52MS5MaXN0TXlBY3Rpdml0eVJlc3BvbnNlIgmQAgHC8xgCEAFCigEKDGNvbS5ub2trdS52MUIJVXRpbFByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_struct, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChNub2trdS92MS91dGlsLnByb3RvEghub2trdS52MSITChFHZXRWZXJzaW9uUmVxdWVzdCIlChJHZXRWZXJzaW9uUmVzcG9uc2USDwoHdmVyc2lvbhgBIAEoCSIYChZHZXRJbnN0YW5jZUluZm9SZXF1ZXN0ItMBChdHZXRJbnN0YW5jZUluZm9SZXNwb25zZRIVCg1vcGVyYXRvcl9uYW1lGAEgASgJEhUKDXN1cHBvcnRfZW1haWwYAiABKAkSEwoLd2Vic2l0ZV91cmwYAyABKAkSEQoJdGVybXNfdXJsGAQgASgJEhMKC3ByaXZhY3lfdXJsGAUgASgJEhMKC2ltcHJpbnRfdXJsGAYgASgJEg4KBmhvc3RlZBgHIAEoCBIOCgZzaWdudXAYCCABKAgSGAoQd29ya3NwYWNlX2RvbWFpbhgJIAEoCSJCCgRSb2xlEiUKBHJvbGUYASABKA4yFy5ub2trdS52MS5Xb3Jrc3BhY2VSb2xlEhMKC2Rlc2NyaXB0aW9uGAIgASgJIhIKEExpc3RSb2xlc1JlcXVlc3QiMgoRTGlzdFJvbGVzUmVzcG9uc2USHQoFcm9sZXMYASADKAsyDi5ub2trdS52MS5Sb2xlIvUBCghFdmVudExvZxIKCgJpZBgBIAEoCRIQCghhY3Rvcl9pZBgCIAEoCRISCgphY3Rvcl9raW5kGAMgASgJEhIKCmFjdG9yX25hbWUYBCABKAkSDgoGYWN0aW9uGAUgASgJEg4KBnRhcmdldBgGIAEoCRIKCgJvaxgHIAEoCBIKCgJpcBgIIAEoCRISCgp1c2VyX2FnZW50GAkgASgJEigKB2RldGFpbHMYCiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Ei0KCXRpbWVzdGFtcBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiowIKDkF1ZGl0TG9nRmlsdGVyEg4KBnNlYXJjaBgBIAEoCRIgCglhY3Rvcl9pZHMYAiADKAlCDbpICpIBByIFcgOwAQESEwoLYWN0b3Jfa2luZHMYAyADKAkSDwoHYWN0aW9ucxgEIAMoCRIOCgZ0YXJnZXQYBSABKAkSMQoHb3V0Y29tZRgGIAEoDjIWLm5va2t1LnYxLkF1ZGl0T3V0Y29tZUIIukgFggECEAESLgoKc3RhcnRfZGF0ZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLAoIZW5kX2RhdGUYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhgKEGV4Y2x1ZGVkX2FjdGlvbnMYCSADKAkicwoUTGlzdEF1ZGl0TG9nc1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASKAoGZmlsdGVyGAMgASgLMhgubm9ra3UudjEuQXVkaXRMb2dGaWx0ZXIiYAoVTGlzdEF1ZGl0TG9nc1Jlc3BvbnNlEiAKBGxvZ3MYASADKAsyEi5ub2trdS52MS5FdmVudExvZxINCgV0b3RhbBgCIAEoBRIWCg5yZXRlbnRpb25fZGF5cxgDIAEoBSJKChRQb2xsQXVkaXRMb2dzUmVxdWVzdBIXCgZjdXJzb3IYASABKAlCB7pIBHICGFASGQoFbGltaXQYAiABKAVCCrpIBxoFGOgHKAEiSQoVUG9sbEF1ZGl0TG9nc1Jlc3BvbnNlEiAKBGxvZ3MYASADKAsyEi5ub2trdS52MS5FdmVudExvZxIOCgZjdXJzb3IYAiABKAkiyAEKFkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QSQQoGZm9ybWF0GAEgASgOMicubm9ra3UudjEuRXhwb3J0QXVkaXRMb2dzUmVxdWVzdC5Gb3JtYXRCCLpIBYIBAhABEigKBmZpbHRlchgCIAEoCzIYLm5va2t1LnYxLkF1ZGl0TG9nRmlsdGVyIkEKBkZvcm1hdBIWChJGT1JNQVRfVU5TUEVDSUZJRUQQABIOCgpGT1JNQVRfQ1NWEAESDwoLRk9STUFUX0pTT04QAiJPChdFeHBvcnRBdWRpdExvZ3NSZXNwb25zZRIMCgRkYXRhGAEgASgMEhAKCGZpbGVuYW1lGAIgASgJEhQKDGNvbnRlbnRfdHlwZRgDIAEoCSJgChlFeHBvcnRBY2Nlc3NSZXBvcnRSZXF1ZXN0EkMKBmZvcm1hdBgBIAEoDjInLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QuRm9ybWF0Qgq6SAeCAQQQASAAIlIKGkV4cG9ydEFjY2Vzc1JlcG9ydFJlc3BvbnNlEgwKBGRhdGEYASABKAwSEAoIZmlsZW5hbWUYAiABKAkSFAoMY29udGVudF90eXBlGAMgASgJInQKFUxpc3RNeUFjdGl2aXR5UmVxdWVzdBIYCgVsaW1pdBgBIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgCIAEoBUIHukgEGgIoABIoCgZmaWx0ZXIYAyABKAsyGC5ub2trdS52MS5BdWRpdExvZ0ZpbHRlciJJChZMaXN0TXlBY3Rpdml0eVJlc3BvbnNlEiAKBGxvZ3MYASADKAsyEi5ub2trdS52MS5FdmVudExvZxINCgV0b3RhbBgCIAEoBSp+CgxBdWRpdE91dGNvbWUSHQoZQVVESVRfT1VUQ09NRV9VTlNQRUNJRklFRBAAEhsKF0FVRElUX09VVENPTUVfU1VDQ0VFREVEEAESGAoUQVVESVRfT1VUQ09NRV9GQUlMRUQQAhIYChRBVURJVF9PVVRDT01FX0RFTklFRBADMqYGCgtVdGlsU2VydmljZRJSCgpHZXRWZXJzaW9uEhsubm9ra3UudjEuR2V0VmVyc2lvblJlcXVlc3QaHC5ub2trdS52MS5HZXRWZXJzaW9uUmVzcG9uc2UiCZACAcLzGAIIARJhCg9HZXRJbnN0YW5jZUluZm8SIC5ub2trdS52MS5HZXRJbnN0YW5jZUluZm9SZXF1ZXN0GiEubm9ra3UudjEuR2V0SW5zdGFuY2VJbmZvUmVzcG9uc2UiCZACAcLzGAIIARJPCglMaXN0Um9sZXMSGi5ub2trdS52MS5MaXN0Um9sZXNSZXF1ZXN0Ghsubm9ra3UudjEuTGlzdFJvbGVzUmVzcG9uc2UiCZACAcLzGAIQARJbCg1MaXN0QXVkaXRMb2dzEh4ubm9ra3UudjEuTGlzdEF1ZGl0TG9nc1JlcXVlc3QaHy5ub2trdS52MS5MaXN0QXVkaXRMb2dzUmVzcG9uc2UiCZACAcLzGAIYAhJsCg1Qb2xsQXVkaXRMb2dzEh4ubm9ra3UudjEuUG9sbEF1ZGl0TG9nc1JlcXVlc3QaHy5ub2trdS52MS5Qb2xsQXVkaXRMb2dzUmVzcG9uc2UiGpACAcLzGBMYAjoPYXVkaXRfc3RyZWFtaW5nEmwKD0V4cG9ydEF1ZGl0TG9ncxIgLm5va2t1LnYxLkV4cG9ydEF1ZGl0TG9nc1JlcXVlc3QaIS5ub2trdS52MS5FeHBvcnRBdWRpdExvZ3NSZXNwb25zZSIUwvMYEBgCOgxhdWRpdF9leHBvcnQSdgoSRXhwb3J0QWNjZXNzUmVwb3J0EiMubm9ra3UudjEuRXhwb3J0QWNjZXNzUmVwb3J0UmVxdWVzdBokLm5va2t1LnYxLkV4cG9ydEFjY2Vzc1JlcG9ydFJlc3BvbnNlIhXC8xgRGAI6DWFjY2Vzc19yZXZpZXcSXgoOTGlzdE15QWN0aXZpdHkSHy5ub2trdS52MS5MaXN0TXlBY3Rpdml0eVJlcXVlc3QaIC5ub2trdS52MS5MaXN0TXlBY3Rpdml0eVJlc3BvbnNlIgmQAgHC8xgCEAFCigEKDGNvbS5ub2trdS52MUIJVXRpbFByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_struct, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.GetVersionRequest
@@ -352,6 +352,56 @@ export const ListAuditLogsResponseSchema: GenMessage<ListAuditLogsResponse> = /*
   messageDesc(file_nokku_v1_util, 10);
 
 /**
+ * @generated from message nokku.v1.PollAuditLogsRequest
+ */
+export type PollAuditLogsRequest = Message<"nokku.v1.PollAuditLogsRequest"> & {
+  /**
+   * cursor is the one the last answer gave. Empty starts at the oldest event the log still keeps.
+   *
+   * @generated from field: string cursor = 1;
+   */
+  cursor: string;
+
+  /**
+   * @generated from field: int32 limit = 2;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message nokku.v1.PollAuditLogsRequest.
+ * Use `create(PollAuditLogsRequestSchema)` to create a new message.
+ */
+export const PollAuditLogsRequestSchema: GenMessage<PollAuditLogsRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 11);
+
+/**
+ * @generated from message nokku.v1.PollAuditLogsResponse
+ */
+export type PollAuditLogsResponse = Message<"nokku.v1.PollAuditLogsResponse"> & {
+  /**
+   * Oldest first. An event shows up about a minute after it happened.
+   *
+   * @generated from field: repeated nokku.v1.EventLog logs = 1;
+   */
+  logs: EventLog[];
+
+  /**
+   * cursor goes into the next call, also when no event came.
+   *
+   * @generated from field: string cursor = 2;
+   */
+  cursor: string;
+};
+
+/**
+ * Describes the message nokku.v1.PollAuditLogsResponse.
+ * Use `create(PollAuditLogsResponseSchema)` to create a new message.
+ */
+export const PollAuditLogsResponseSchema: GenMessage<PollAuditLogsResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_util, 12);
+
+/**
  * @generated from message nokku.v1.ExportAuditLogsRequest
  */
 export type ExportAuditLogsRequest = Message<"nokku.v1.ExportAuditLogsRequest"> & {
@@ -371,7 +421,7 @@ export type ExportAuditLogsRequest = Message<"nokku.v1.ExportAuditLogsRequest"> 
  * Use `create(ExportAuditLogsRequestSchema)` to create a new message.
  */
 export const ExportAuditLogsRequestSchema: GenMessage<ExportAuditLogsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_util, 11);
+  messageDesc(file_nokku_v1_util, 13);
 
 /**
  * @generated from enum nokku.v1.ExportAuditLogsRequest.Format
@@ -397,7 +447,7 @@ export enum ExportAuditLogsRequest_Format {
  * Describes the enum nokku.v1.ExportAuditLogsRequest.Format.
  */
 export const ExportAuditLogsRequest_FormatSchema: GenEnum<ExportAuditLogsRequest_Format> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_util, 11, 0);
+  enumDesc(file_nokku_v1_util, 13, 0);
 
 /**
  * @generated from message nokku.v1.ExportAuditLogsResponse
@@ -424,7 +474,7 @@ export type ExportAuditLogsResponse = Message<"nokku.v1.ExportAuditLogsResponse"
  * Use `create(ExportAuditLogsResponseSchema)` to create a new message.
  */
 export const ExportAuditLogsResponseSchema: GenMessage<ExportAuditLogsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_util, 12);
+  messageDesc(file_nokku_v1_util, 14);
 
 /**
  * @generated from message nokku.v1.ExportAccessReportRequest
@@ -441,7 +491,7 @@ export type ExportAccessReportRequest = Message<"nokku.v1.ExportAccessReportRequ
  * Use `create(ExportAccessReportRequestSchema)` to create a new message.
  */
 export const ExportAccessReportRequestSchema: GenMessage<ExportAccessReportRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_util, 13);
+  messageDesc(file_nokku_v1_util, 15);
 
 /**
  * @generated from message nokku.v1.ExportAccessReportResponse
@@ -468,7 +518,7 @@ export type ExportAccessReportResponse = Message<"nokku.v1.ExportAccessReportRes
  * Use `create(ExportAccessReportResponseSchema)` to create a new message.
  */
 export const ExportAccessReportResponseSchema: GenMessage<ExportAccessReportResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_util, 14);
+  messageDesc(file_nokku_v1_util, 16);
 
 /**
  * @generated from message nokku.v1.ListMyActivityRequest
@@ -497,7 +547,7 @@ export type ListMyActivityRequest = Message<"nokku.v1.ListMyActivityRequest"> & 
  * Use `create(ListMyActivityRequestSchema)` to create a new message.
  */
 export const ListMyActivityRequestSchema: GenMessage<ListMyActivityRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_util, 15);
+  messageDesc(file_nokku_v1_util, 17);
 
 /**
  * @generated from message nokku.v1.ListMyActivityResponse
@@ -519,7 +569,7 @@ export type ListMyActivityResponse = Message<"nokku.v1.ListMyActivityResponse"> 
  * Use `create(ListMyActivityResponseSchema)` to create a new message.
  */
 export const ListMyActivityResponseSchema: GenMessage<ListMyActivityResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_util, 16);
+  messageDesc(file_nokku_v1_util, 18);
 
 /**
  * @generated from enum nokku.v1.AuditOutcome
@@ -587,6 +637,16 @@ export const UtilService: GenService<{
     methodKind: "unary";
     input: typeof ListAuditLogsRequestSchema;
     output: typeof ListAuditLogsResponseSchema;
+  },
+  /**
+   * PollAuditLogs is for a SIEM that fetches. It reads forward from a cursor, oldest first, and never skips an event.
+   *
+   * @generated from rpc nokku.v1.UtilService.PollAuditLogs
+   */
+  pollAuditLogs: {
+    methodKind: "unary";
+    input: typeof PollAuditLogsRequestSchema;
+    output: typeof PollAuditLogsResponseSchema;
   },
   /**
    * @generated from rpc nokku.v1.UtilService.ExportAuditLogs

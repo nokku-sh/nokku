@@ -3,14 +3,17 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json/v2"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 	"uuid"
 
 	"connectrpc.com/connect/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -267,4 +270,49 @@ func TestAuditNamesTheApproval(t *testing.T) {
 	var details map[string]any
 	require.NoError(t, json.Unmarshal(rows[0].Details, &details))
 	assert.NotEmpty(t, details["name"])
+}
+
+// A SIEM that fetches reads forward, oldest first, and the cursor it got takes it on from there.
+func TestPollAuditLogsReadsForwardFromTheCursor(t *testing.T) {
+	cfg, srv := enterprise(t)
+	viewer := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	util := nokkuv1connect.NewUtilServiceClient(clientOn(srv, header("Authorization", "Bearer "+viewer)))
+
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = owner.Close(context.WithoutCancel(t.Context())) })
+	base := time.Now().Add(-3 * time.Hour).Truncate(time.Microsecond)
+	_, err = owner.Exec(t.Context(), `
+		INSERT INTO audit.audit_logs (workspace_id, action, ok, timestamp) VALUES
+			($1, 'PollFirst', TRUE, $2), ($1, 'PollSecond', TRUE, $3), ($1, 'PollFresh', TRUE, NOW());
+	`, pgx.QueryExecModeSimpleProtocol, testWorkspace.ID, base, base.Add(time.Second))
+	require.NoError(t, err, "seed")
+
+	poll := func(cursor string, limit int32) *nokkuv1.PollAuditLogsResponse {
+		res, err := util.PollAuditLogs(t.Context(), &nokkuv1.PollAuditLogsRequest{Cursor: &cursor, Limit: &limit})
+		require.NoError(t, err, "poll from %q", cursor)
+		return res
+	}
+	before := strconv.FormatInt(base.UnixMicro()-1, 10) + "." + uuid.Nil().String()
+
+	first := poll(before, 1)
+	require.Len(t, first.GetLogs(), 1)
+	assert.Equal(t, "PollFirst", first.GetLogs()[0].GetAction())
+	second := poll(first.GetCursor(), 1)
+	require.Len(t, second.GetLogs(), 1, "the cursor skipped or repeated an event")
+	assert.Equal(t, "PollSecond", second.GetLogs()[0].GetAction())
+
+	rest := poll(second.GetCursor(), 1000)
+	for _, l := range rest.GetLogs() {
+		assert.NotEqual(t, "PollFresh", l.GetAction(), "an event younger than the settle window went out")
+	}
+	if len(rest.GetLogs()) == 0 {
+		assert.Equal(t, second.GetCursor(), rest.GetCursor(), "an empty answer keeps the cursor")
+	}
+
+	_, err = util.PollAuditLogs(
+		t.Context(),
+		&nokkuv1.PollAuditLogsRequest{Cursor: new("yesterday"), Limit: new(int32(1))},
+	)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a made up cursor")
 }

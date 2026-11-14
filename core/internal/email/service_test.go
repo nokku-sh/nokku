@@ -178,6 +178,24 @@ func TestRenderTemplates(t *testing.T) {
 			},
 		},
 		{
+			name: "stream-failing",
+			data: streamFailingTemplateData{
+				Workspace: "Acme",
+				Kind:      "splunk",
+				Host:      "hec.example.com",
+				Since:     "13 Nov 2026, 09:30 UTC",
+				Error:     "the destination answered 403 Forbidden: <b>bad token</b>",
+				URL:       "https://acme.nokku.sh/audit",
+			},
+			contains: []string{
+				"An audit stream stopped delivering.",
+				"hec.example.com",
+				"13 Nov 2026, 09:30 UTC",
+				"403 Forbidden",
+				"https://acme.nokku.sh/audit",
+			},
+		},
+		{
 			name: "workspace-deletion",
 			data: deletionTemplateData{
 				Workspace:  "Acme",

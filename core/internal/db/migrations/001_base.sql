@@ -657,6 +657,7 @@ CREATE TABLE audit_streams (
   last_sent_at TIMESTAMPTZ,
   last_error TEXT NOT NULL DEFAULT '',
   failing_since TIMESTAMPTZ,
+  failure_mailed_at TIMESTAMPTZ, -- the owner is told once per failure
   retry_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

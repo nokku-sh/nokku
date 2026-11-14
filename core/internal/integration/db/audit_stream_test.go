@@ -17,7 +17,7 @@ import (
 func TestAuditLogsAfterTheCursor(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	old := time.Now().Add(-time.Minute)
+	old := time.Now().Add(-5 * time.Minute)
 	_, err := pinnedConn(t, c, f.ws).Exec(t.Context(), `
 		INSERT INTO audit.audit_logs (workspace_id, action, ok, timestamp) VALUES
 			($1, 'First', TRUE, $2), ($1, 'Second', TRUE, $3), ($1, 'Fresh', TRUE, NOW());

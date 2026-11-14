@@ -86,7 +86,7 @@ ORDER BY
 
 -- name: ListAuditLogsAfter :many
 -- The events after the cursor in a stable order. A row is stamped when its insert starts and commits a moment
--- later, so the newest seconds wait until nothing older can still arrive.
+-- later, so the newest minute waits until nothing older can still arrive. Every write gives up long before that.
 SELECT
   *
 FROM
@@ -94,14 +94,14 @@ FROM
 WHERE
   a.workspace_id = @workspace_id
   AND (a.timestamp, a.id) > (@cursor_ts::TIMESTAMPTZ, @cursor_id::UUID)
-  AND a.timestamp < NOW() - INTERVAL '10 seconds'
+  AND a.timestamp < NOW() - INTERVAL '60 seconds'
 ORDER BY
   a.timestamp,
   a.id
 LIMIT
   @max_rows;
 
--- name: AdvanceAuditStream :exec
+-- name: AdvanceAuditStream :execrows
 -- Only the stamps, so a delivery wakes no console. It moves only from where the batch was read.
 UPDATE audit_streams
 SET
@@ -118,6 +118,7 @@ UPDATE audit_streams
 SET
   last_error = '',
   failing_since = NULL,
+  failure_mailed_at = NULL,
   retry_at = NULL
 WHERE
   id = @id;
@@ -128,5 +129,36 @@ SET
   last_error = @last_error,
   failing_since = COALESCE(failing_since, NOW()),
   retry_at = NOW() + @wait::INTERVAL
+WHERE
+  id = @id;
+
+-- name: ListAuditStreamsFailingLong :many
+-- Enabled streams that failed for longer than the wait and whose owner has not heard of it. Runs as nokku_system.
+SELECT
+  s.id,
+  s.workspace_id,
+  s.kind,
+  s.url,
+  s.last_error,
+  s.failing_since::TIMESTAMPTZ AS failing_since,
+  w.slug,
+  w.name AS workspace_name,
+  u.id AS owner_id,
+  u.email AS owner_email
+FROM
+  audit_streams s
+  JOIN workspaces w ON w.id = s.workspace_id
+  JOIN users u ON u.workspace_id = s.workspace_id
+  AND u.role = 5 -- owner
+  AND u.active
+WHERE
+  s.enabled
+  AND s.failure_mailed_at IS NULL
+  AND s.failing_since < NOW() - @wait::INTERVAL;
+
+-- name: SetAuditStreamFailureMailed :exec
+UPDATE audit_streams
+SET
+  failure_mailed_at = NOW()
 WHERE
   id = @id;

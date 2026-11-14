@@ -100,6 +100,15 @@ type TrialEnding struct {
 	Ends, Deleted         time.Time
 }
 
+type StreamFailing struct {
+	UserID, Email   string
+	Workspace       string
+	StreamID, Kind  string
+	Host, LastError string
+	URL             string
+	Since           time.Time
+}
+
 type DeletionWarning struct {
 	UserID, Email   string
 	Workspace, Slug string
@@ -353,6 +362,26 @@ func (s *Service) SendTrialEndingEmail(ctx context.Context, t TrialEnding) error
 			DeleteDate: t.Deleted.UTC().Format(mailDate),
 			BillingURL: t.BillingURL,
 			Next:       inDays(int(t.Next)),
+		},
+	})
+}
+
+// SendStreamFailingEmail shows the destination's host only, a URL can hold a token.
+func (s *Service) SendStreamFailingEmail(ctx context.Context, f StreamFailing) error {
+	return s.sendTemplate(ctx, sendRequest{
+		userID:   f.UserID,
+		to:       f.Email,
+		ref:      f.StreamID,
+		subject:  "An audit stream of " + f.Workspace + " stopped delivering",
+		template: "stream-failing",
+		data: streamFailingTemplateData{
+			Operator:  s.Operator,
+			Workspace: f.Workspace,
+			Kind:      f.Kind,
+			Host:      f.Host,
+			Since:     f.Since.UTC().Format(mailTime),
+			Error:     f.LastError,
+			URL:       f.URL,
 		},
 	})
 }

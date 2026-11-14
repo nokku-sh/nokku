@@ -33,6 +33,8 @@ const (
 	UtilServiceListRolesProcedure = "/nokku.v1.UtilService/ListRoles"
 	// UtilServiceListAuditLogsProcedure is the procedure name of the UtilService's ListAuditLogs RPC.
 	UtilServiceListAuditLogsProcedure = "/nokku.v1.UtilService/ListAuditLogs"
+	// UtilServicePollAuditLogsProcedure is the procedure name of the UtilService's PollAuditLogs RPC.
+	UtilServicePollAuditLogsProcedure = "/nokku.v1.UtilService/PollAuditLogs"
 	// UtilServiceExportAuditLogsProcedure is the procedure name of the UtilService's ExportAuditLogs
 	// RPC.
 	UtilServiceExportAuditLogsProcedure = "/nokku.v1.UtilService/ExportAuditLogs"
@@ -76,6 +78,14 @@ var (
 			IdempotencyLevel: connect.IdempotencyNoSideEffects,
 		}
 	})
+	utilServicePollAuditLogsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_util_proto.Services().ByName("UtilService").Methods().ByName("PollAuditLogs"),
+			Procedure:        UtilServicePollAuditLogsProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
 	utilServiceExportAuditLogsSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -106,6 +116,8 @@ type UtilServiceClient interface {
 	GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error)
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
+	// PollAuditLogs is for a SIEM that fetches. It reads forward from a cursor, oldest first, and never skips an event.
+	PollAuditLogs(context.Context, *v1.PollAuditLogsRequest) (*v1.PollAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
 	ExportAccessReport(context.Context, *v1.ExportAccessReportRequest) (*v1.ExportAccessReportResponse, error)
 	ListMyActivity(context.Context, *v1.ListMyActivityRequest) (*v1.ListMyActivityResponse, error)
@@ -123,6 +135,8 @@ type UtilServiceHandler interface {
 	GetInstanceInfo(context.Context, *v1.GetInstanceInfoRequest) (*v1.GetInstanceInfoResponse, error)
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error)
+	// PollAuditLogs is for a SIEM that fetches. It reads forward from a cursor, oldest first, and never skips an event.
+	PollAuditLogs(context.Context, *v1.PollAuditLogsRequest) (*v1.PollAuditLogsResponse, error)
 	ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error)
 	ExportAccessReport(context.Context, *v1.ExportAccessReportRequest) (*v1.ExportAccessReportResponse, error)
 	ListMyActivity(context.Context, *v1.ListMyActivityRequest) (*v1.ListMyActivityResponse, error)
@@ -136,6 +150,7 @@ func RegisterUtilServiceHandler(server *connect.Server, svc UtilServiceHandler) 
 		connect.Method{Spec: utilServiceGetInstanceInfoSpec(), Handler: adapter.getInstanceInfo},
 		connect.Method{Spec: utilServiceListRolesSpec(), Handler: adapter.listRoles},
 		connect.Method{Spec: utilServiceListAuditLogsSpec(), Handler: adapter.listAuditLogs},
+		connect.Method{Spec: utilServicePollAuditLogsSpec(), Handler: adapter.pollAuditLogs},
 		connect.Method{Spec: utilServiceExportAuditLogsSpec(), Handler: adapter.exportAuditLogs},
 		connect.Method{Spec: utilServiceExportAccessReportSpec(), Handler: adapter.exportAccessReport},
 		connect.Method{Spec: utilServiceListMyActivitySpec(), Handler: adapter.listMyActivity},
@@ -159,6 +174,10 @@ func (UnimplementedUtilServiceHandler) ListRoles(context.Context, *v1.ListRolesR
 
 func (UnimplementedUtilServiceHandler) ListAuditLogs(context.Context, *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.UtilService.ListAuditLogs is not implemented")
+}
+
+func (UnimplementedUtilServiceHandler) PollAuditLogs(context.Context, *v1.PollAuditLogsRequest) (*v1.PollAuditLogsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.UtilService.PollAuditLogs is not implemented")
 }
 
 func (UnimplementedUtilServiceHandler) ExportAuditLogs(context.Context, *v1.ExportAuditLogsRequest) (*v1.ExportAuditLogsResponse, error) {
@@ -204,6 +223,14 @@ func (c *utilServiceClient) ListRoles(ctx context.Context, req *v1.ListRolesRequ
 func (c *utilServiceClient) ListAuditLogs(ctx context.Context, req *v1.ListAuditLogsRequest) (*v1.ListAuditLogsResponse, error) {
 	var res v1.ListAuditLogsResponse
 	if err := c.client.CallUnary(ctx, utilServiceListAuditLogsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *utilServiceClient) PollAuditLogs(ctx context.Context, req *v1.PollAuditLogsRequest) (*v1.PollAuditLogsResponse, error) {
+	var res v1.PollAuditLogsResponse
+	if err := c.client.CallUnary(ctx, utilServicePollAuditLogsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -277,6 +304,18 @@ func (h utilServiceHandler) listAuditLogs(ctx context.Context, _ connect.Spec, s
 		return err
 	}
 	res, err := h.svc.ListAuditLogs(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h utilServiceHandler) pollAuditLogs(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.PollAuditLogsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.PollAuditLogs(ctx, &req)
 	if err != nil {
 		return err
 	}

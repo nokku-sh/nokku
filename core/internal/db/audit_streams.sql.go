@@ -12,7 +12,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 )
 
-const advanceAuditStream = `-- name: AdvanceAuditStream :exec
+const advanceAuditStream = `-- name: AdvanceAuditStream :execrows
 UPDATE audit_streams
 SET
   cursor_ts = $1,
@@ -33,15 +33,18 @@ type AdvanceAuditStreamParams struct {
 }
 
 // Only the stamps, so a delivery wakes no console. It moves only from where the batch was read.
-func (q *Queries) AdvanceAuditStream(ctx context.Context, arg *AdvanceAuditStreamParams) error {
-	_, err := q.db.Exec(ctx, advanceAuditStream,
+func (q *Queries) AdvanceAuditStream(ctx context.Context, arg *AdvanceAuditStreamParams) (int64, error) {
+	result, err := q.db.Exec(ctx, advanceAuditStream,
 		arg.CursorTs,
 		arg.CursorID,
 		arg.ID,
 		arg.FromTs,
 		arg.FromID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const clearAuditStreamFailure = `-- name: ClearAuditStreamFailure :exec
@@ -49,6 +52,7 @@ UPDATE audit_streams
 SET
   last_error = '',
   failing_since = NULL,
+  failure_mailed_at = NULL,
   retry_at = NULL
 WHERE
   id = $1
@@ -167,7 +171,7 @@ func (q *Queries) FailAuditStream(ctx context.Context, arg *FailAuditStreamParam
 
 const getAuditStream = `-- name: GetAuditStream :one
 SELECT
-  id, workspace_id, kind, url, secret, enabled, cursor_ts, cursor_id, last_sent_at, last_error, failing_since, retry_at, created_at
+  id, workspace_id, kind, url, secret, enabled, cursor_ts, cursor_id, last_sent_at, last_error, failing_since, failure_mailed_at, retry_at, created_at
 FROM
   audit_streams
 WHERE
@@ -189,6 +193,7 @@ func (q *Queries) GetAuditStream(ctx context.Context, id string) (*AuditStream, 
 		&i.LastSentAt,
 		&i.LastError,
 		&i.FailingSince,
+		&i.FailureMailedAt,
 		&i.RetryAt,
 		&i.CreatedAt,
 	)
@@ -203,7 +208,7 @@ FROM
 WHERE
   a.workspace_id = $1
   AND (a.timestamp, a.id) > ($2::TIMESTAMPTZ, $3::UUID)
-  AND a.timestamp < NOW() - INTERVAL '10 seconds'
+  AND a.timestamp < NOW() - INTERVAL '60 seconds'
 ORDER BY
   a.timestamp,
   a.id
@@ -219,7 +224,7 @@ type ListAuditLogsAfterParams struct {
 }
 
 // The events after the cursor in a stable order. A row is stamped when its insert starts and commits a moment
-// later, so the newest seconds wait until nothing older can still arrive.
+// later, so the newest minute waits until nothing older can still arrive. Every write gives up long before that.
 func (q *Queries) ListAuditLogsAfter(ctx context.Context, arg *ListAuditLogsAfterParams) ([]*AuditAuditLog, error) {
 	rows, err := q.db.Query(ctx, listAuditLogsAfter,
 		arg.WorkspaceID,
@@ -314,9 +319,78 @@ func (q *Queries) ListAuditStreams(ctx context.Context) ([]*ListAuditStreamsRow,
 	return items, nil
 }
 
+const listAuditStreamsFailingLong = `-- name: ListAuditStreamsFailingLong :many
+SELECT
+  s.id,
+  s.workspace_id,
+  s.kind,
+  s.url,
+  s.last_error,
+  s.failing_since::TIMESTAMPTZ AS failing_since,
+  w.slug,
+  w.name AS workspace_name,
+  u.id AS owner_id,
+  u.email AS owner_email
+FROM
+  audit_streams s
+  JOIN workspaces w ON w.id = s.workspace_id
+  JOIN users u ON u.workspace_id = s.workspace_id
+  AND u.role = 5 -- owner
+  AND u.active
+WHERE
+  s.enabled
+  AND s.failure_mailed_at IS NULL
+  AND s.failing_since < NOW() - $1::INTERVAL
+`
+
+type ListAuditStreamsFailingLongRow struct {
+	ID            string    `json:"id"`
+	WorkspaceID   string    `json:"workspaceId"`
+	Kind          string    `json:"kind"`
+	URL           string    `json:"url"`
+	LastError     string    `json:"lastError"`
+	FailingSince  time.Time `json:"failingSince"`
+	Slug          string    `json:"slug"`
+	WorkspaceName string    `json:"workspaceName"`
+	OwnerID       string    `json:"ownerId"`
+	OwnerEmail    string    `json:"ownerEmail"`
+}
+
+// Enabled streams that failed for longer than the wait and whose owner has not heard of it. Runs as nokku_system.
+func (q *Queries) ListAuditStreamsFailingLong(ctx context.Context, wait time.Duration) ([]*ListAuditStreamsFailingLongRow, error) {
+	rows, err := q.db.Query(ctx, listAuditStreamsFailingLong, wait)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ListAuditStreamsFailingLongRow
+	for rows.Next() {
+		var i ListAuditStreamsFailingLongRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Kind,
+			&i.URL,
+			&i.LastError,
+			&i.FailingSince,
+			&i.Slug,
+			&i.WorkspaceName,
+			&i.OwnerID,
+			&i.OwnerEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDueAuditStreams = `-- name: ListDueAuditStreams :many
 SELECT
-  id, workspace_id, kind, url, secret, enabled, cursor_ts, cursor_id, last_sent_at, last_error, failing_since, retry_at, created_at
+  id, workspace_id, kind, url, secret, enabled, cursor_ts, cursor_id, last_sent_at, last_error, failing_since, failure_mailed_at, retry_at, created_at
 FROM
   audit_streams
 WHERE
@@ -351,6 +425,7 @@ func (q *Queries) ListDueAuditStreams(ctx context.Context) ([]*AuditStream, erro
 			&i.LastSentAt,
 			&i.LastError,
 			&i.FailingSince,
+			&i.FailureMailedAt,
 			&i.RetryAt,
 			&i.CreatedAt,
 		); err != nil {
@@ -362,6 +437,19 @@ func (q *Queries) ListDueAuditStreams(ctx context.Context) ([]*AuditStream, erro
 		return nil, err
 	}
 	return items, nil
+}
+
+const setAuditStreamFailureMailed = `-- name: SetAuditStreamFailureMailed :exec
+UPDATE audit_streams
+SET
+  failure_mailed_at = NOW()
+WHERE
+  id = $1
+`
+
+func (q *Queries) SetAuditStreamFailureMailed(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, setAuditStreamFailureMailed, id)
+	return err
 }
 
 const updateAuditStream = `-- name: UpdateAuditStream :one

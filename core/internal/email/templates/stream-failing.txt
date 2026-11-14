@@ -1,0 +1,31 @@
+nokku.
+
+Audit stream
+
+
+An audit stream stopped delivering.
+
+The {{ .Kind }} stream of {{ .Workspace }} to {{ .Host }} has failed since {{ .Since }}.
+
+Last answer: {{ .Error }}
+
+Until it works: events wait in the log for up to 365 days and go out in order once it does.
+
+Check the URL and the secret under Streaming, or pause the stream if it is no longer needed.
+
+Open the audit log {{ .URL }}
+
+You get this because you own this workspace. No other mail comes for this failure.
+
+This is an email about your workspace on {{ if .Operator.Name }}{{ .Operator.Name }}{{ else }}Nokku{{ end }}.{{ if .Operator.SupportEmail }} Questions? Write to {{ .Operator.SupportEmail }}.{{ end }}
+
+{{ if or .Operator.WebsiteURL .Operator.PrivacyURL .Operator.TermsURL .Operator.ImprintURL }}
+
+{{ if .Operator.WebsiteURL }}Website {{ .Operator.WebsiteURL }}{{ end }}{{ if .Operator.PrivacyURL }}Privacy {{ .Operator.PrivacyURL }}{{ end }}{{ if .Operator.TermsURL }}Terms {{ .Operator.TermsURL }}{{ end }}{{ if .Operator.ImprintURL }}Imprint {{ .Operator.ImprintURL }}{{ end }}
+
+{{ end }}{{ if .Operator.Name }}
+
+© {{ year }} {{ .Operator.Name }}{{ if .Operator.Address }}
+{{ .Operator.Address }}{{ end }}
+
+{{ end }}

@@ -88,6 +88,20 @@ func (s *utilService) ListAuditLogs(
 	return &nokkuv1.ListAuditLogsResponse{Logs: eventLogs(events), Total: &total, RetentionDays: &retention}, nil
 }
 
+func (s *utilService) PollAuditLogs(
+	ctx context.Context,
+	req *nokkuv1.PollAuditLogsRequest,
+) (*nokkuv1.PollAuditLogsResponse, error) {
+	events, cursor, err := s.cfg.Audit.Poll(ctx, req.GetCursor(), req.GetLimit())
+	if errors.Is(err, audit.ErrCursor) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err.Error())
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &nokkuv1.PollAuditLogsResponse{Logs: eventLogs(events), Cursor: &cursor}, nil
+}
+
 func (s *utilService) ListMyActivity(
 	ctx context.Context,
 	req *nokkuv1.ListMyActivityRequest,

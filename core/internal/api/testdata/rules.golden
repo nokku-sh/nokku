@@ -114,6 +114,7 @@
 /nokku.v1.UtilService/ListAuditLogs public=false self=false role=VIEWER daemon=false cli=false people_only=false fresh=false browser=UNSPECIFIED feature= capped=false signs=false audited=false
 /nokku.v1.UtilService/ListMyActivity public=false self=true role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false browser=UNSPECIFIED feature= capped=false signs=false audited=false
 /nokku.v1.UtilService/ListRoles public=false self=true role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false browser=UNSPECIFIED feature= capped=false signs=false audited=false
+/nokku.v1.UtilService/PollAuditLogs public=false self=false role=VIEWER daemon=false cli=false people_only=false fresh=false browser=UNSPECIFIED feature=audit_streaming capped=false signs=false audited=false
 /nokku.v1.WorkspaceService/ClearUserIdentities public=false self=false role=ADMIN daemon=false cli=false people_only=false fresh=true browser=UNSPECIFIED feature= capped=false signs=false audited=true
 /nokku.v1.WorkspaceService/CreateWorkspace public=true self=false role=UNSPECIFIED daemon=false cli=false people_only=false fresh=false browser=UNSPECIFIED feature= capped=false signs=false audited=true
 /nokku.v1.WorkspaceService/DeleteUser public=false self=false role=ADMIN daemon=false cli=false people_only=false fresh=false browser=UNSPECIFIED feature= capped=false signs=false audited=true

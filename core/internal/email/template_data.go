@@ -60,6 +60,17 @@ type trialTemplateData struct {
 	Next       string
 }
 
+type streamFailingTemplateData struct {
+	Operator Operator
+
+	Workspace string
+	Kind      string
+	Host      string
+	Since     string
+	Error     string
+	URL       string
+}
+
 type deletionTemplateData struct {
 	Operator Operator
 

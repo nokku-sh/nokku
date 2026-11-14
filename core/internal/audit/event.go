@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 
@@ -23,8 +24,12 @@ const (
 	maxExportRows = 100_000
 )
 
-// ErrExportLimit means the caller has to narrow the export, not retry it.
-var ErrExportLimit = errors.New("export limit")
+var (
+	// ErrExportLimit means the caller has to narrow the export, not retry it.
+	ErrExportLimit = errors.New("export limit")
+	// ErrCursor means the cursor is not one a poll gave out.
+	ErrCursor = errors.New("unknown cursor")
+)
 
 type Event struct {
 	ID          string         `json:"id"`
@@ -118,6 +123,42 @@ func (s *Service) List(ctx context.Context, p *db.ListAuditLogsParams) ([]*Event
 		})
 	}
 	return events, total, nil
+}
+
+// Poll reads forward from the cursor, oldest first, for a SIEM that fetches. The cursor names the last event
+// read, the same way a stream's does, so a poll skips nothing either.
+func (s *Service) Poll(ctx context.Context, cursor string, limit int32) ([]*Event, string, error) {
+	ts, id := time.UnixMicro(0), uuid.Nil().String()
+	if cursor != "" {
+		micros, rest, _ := strings.Cut(cursor, ".")
+		n, err := strconv.ParseInt(micros, 10, 64)
+		if err != nil {
+			return nil, "", ErrCursor
+		}
+		parsed, err := uuid.Parse(rest)
+		if err != nil {
+			return nil, "", ErrCursor
+		}
+		ts, id = time.UnixMicro(n), parsed.String()
+	}
+	rows, err := s.conn.Tenant().ListAuditLogsAfter(ctx, &db.ListAuditLogsAfterParams{
+		WorkspaceID: actor.WorkspaceIDFromContext(ctx),
+		CursorTs:    ts,
+		CursorID:    id,
+		MaxRows:     limit,
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("querying events: %w", err)
+	}
+	events := make([]*Event, len(rows))
+	for i, r := range rows {
+		events[i] = eventFromRow(r)
+	}
+	if len(rows) > 0 {
+		last := rows[len(rows)-1]
+		cursor = strconv.FormatInt(last.Timestamp.UnixMicro(), 10) + "." + last.ID
+	}
+	return events, cursor, nil
 }
 
 func (s *Service) Export(
