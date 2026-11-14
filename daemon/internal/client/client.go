@@ -33,13 +33,19 @@ import (
 const (
 	dialTimeout   = 30 * time.Second
 	enrollTimeout = 30 * time.Second
-	syncTimeout   = 15 * time.Second
+	// How long a busy core is retried. A rollout past its rate limit drains within minutes.
+	enrollRetryFor = 5 * time.Minute
+	syncTimeout    = 15 * time.Second
 	// A full sync with nothing to trigger it. It is how the core hears of new accounts on the host, and how a
 	// daemon knows that what it saved is still what the core says.
 	resyncEvery = 4 * time.Hour
 )
 
-var errDaemonRejected = errors.New("daemon rejected by core")
+var (
+	errDaemonRejected = errors.New("daemon rejected by core")
+
+	enrollRetryFirst = 2 * time.Second
+)
 
 type Client struct {
 	state *state.State
@@ -99,17 +105,41 @@ func New(ctx context.Context, st *state.State, requireTPM bool, enrollToken stri
 
 // The proof is unbound, the server binds the new session to the daemon's key.
 func (c *Client) enroll(ctx context.Context, token string) error {
-	ctx, cancel := context.WithTimeout(ctx, enrollTimeout)
-	defer cancel()
-	// The hostname in the report may become the daemon's name.
-	res, err := c.ctl.EnrollDaemon(ctx, &nokkuv1.EnrollDaemonRequest{Token: &token, Metadata: sysutil.Metadata()})
-	if err != nil {
-		return fmt.Errorf("enroll: %w", err)
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = enrollRetryFirst
+	b.MaxInterval = time.Minute
+	giveUp := time.Now().Add(enrollRetryFor)
+	var res *nokkuv1.EnrollDaemonResponse
+	for {
+		callCtx, cancel := context.WithTimeout(ctx, enrollTimeout)
+		// The hostname in the report may become the daemon's name.
+		var err error
+		res, err = c.ctl.EnrollDaemon(
+			callCtx,
+			&nokkuv1.EnrollDaemonRequest{Token: &token, Metadata: sysutil.Metadata()},
+		)
+		cancel()
+		if err == nil {
+			break
+		}
+		// The core's rate limit answers a bare 429, which reads as unavailable.
+		code := connect.CodeOf(err)
+		next := b.NextBackOff()
+		if code != connect.CodeUnavailable && code != connect.CodeResourceExhausted ||
+			time.Now().Add(next).After(giveUp) {
+			return fmt.Errorf("enroll: %w", err)
+		}
+		slog.Warn("the core is busy, retrying the enrollment", "error", err, "retry_in", next.Round(time.Millisecond))
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("enroll: %w", ctx.Err())
+		case <-time.After(next):
+		}
 	}
 	if res.GetTargetId() == "" || res.GetId() == "" || res.GetAccessToken() == "" {
 		return errors.New("enroll: core returned an incomplete enrollment")
 	}
-	if err = sshd.CreateHostKey(); err != nil {
+	if err := sshd.CreateHostKey(); err != nil {
 		return fmt.Errorf("enroll: %w", err)
 	}
 	c.state.TargetID = res.GetTargetId()

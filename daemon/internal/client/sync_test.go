@@ -45,6 +45,10 @@ type fakeCore struct {
 	// answer replaces the accepted sync answer when set.
 	answer   atomic.Pointer[nokkuv1.SyncDaemonResponse]
 	enrolled atomic.Pointer[nokkuv1.EnrollDaemonRequest]
+	// The first enrollFails enrollments answer enrollErrs.
+	enrollErrs  atomic.Pointer[error]
+	enrollFails atomic.Int32
+	enrollCalls atomic.Int32
 	// heartbeats gets the state hash of each stream's first heartbeat.
 	heartbeats chan string
 	syncs      atomic.Int32
@@ -56,6 +60,10 @@ func (b *fakeCore) EnrollDaemon(
 	_ context.Context,
 	req *nokkuv1.EnrollDaemonRequest,
 ) (*nokkuv1.EnrollDaemonResponse, error) {
+	b.enrollCalls.Add(1)
+	if err := b.enrollErrs.Load(); err != nil && b.enrollCalls.Load() <= b.enrollFails.Load() {
+		return nil, *err
+	}
 	b.enrolled.Store(req)
 	return &nokkuv1.EnrollDaemonResponse{
 		Id:          new("daemon-1"),
@@ -234,6 +242,33 @@ func TestEnrollReportsTheHost(t *testing.T) {
 	assert.Equal(t, hostname, req.GetMetadata()["hostname"])
 	assert.Equal(t, "daemon-1", c.state.DaemonID)
 	assert.True(t, c.state.Access().DaemonConfig.GetEphemeral(), "the enroll config is what the daemon keeps")
+}
+
+// A rollout past the core's rate limit must not leave servers out.
+func TestEnrollRetriesABusyCore(t *testing.T) {
+	enrollRetryFirst = time.Millisecond
+	t.Cleanup(func() { enrollRetryFirst = 2 * time.Second })
+	core := &fakeCore{ca: newTestCAKey(t)}
+	core.enrollErrs.Store(new(error(connect.NewError(connect.CodeResourceExhausted, "slow down"))))
+	core.enrollFails.Store(2)
+	c := newSyncClient(t, core)
+
+	require.NoError(t, c.enroll(t.Context(), "token"))
+
+	assert.EqualValues(t, 3, core.enrollCalls.Load())
+	assert.Equal(t, "daemon-1", c.state.DaemonID)
+}
+
+func TestEnrollGivesUpOnARefusedToken(t *testing.T) {
+	core := &fakeCore{ca: newTestCAKey(t)}
+	core.enrollErrs.Store(new(error(connect.NewError(connect.CodeUnauthenticated, "bad token"))))
+	core.enrollFails.Store(5)
+	c := newSyncClient(t, core)
+
+	require.Error(t, c.enroll(t.Context(), "token"))
+
+	assert.EqualValues(t, 1, core.enrollCalls.Load(), "a refused token was tried again")
+	assert.Empty(t, c.state.DaemonID)
 }
 
 // Enrollment and access share a file: a restart finds both, re-enroll resets.
