@@ -268,3 +268,10 @@ func TestPlainWriterDropsEscapeSequences(t *testing.T) {
 	assert.Equal(t, len(in), n, "the whole input counts as written, or the copy stops")
 	assert.Equal(t, "sh: denied[2J\n]0;title1A", out.String())
 }
+
+func TestSyncStaleTakesNoServer(t *testing.T) {
+	for _, args := range [][]string{{"web-1"}, {"--name", "web"}, {"--port", "2222"}} {
+		err := Root().Run(t.Context(), append([]string{"nk", "sync", "--stale"}, args...))
+		assert.ErrorContains(t, err, "--stale picks the servers itself", "args %v", args)
+	}
+}

@@ -56,7 +56,7 @@ func syncCMD() *cli.Command {
 		Usage: "Add a server to Nokku without the daemon, or refresh one you added",
 		Description: "Connects as root with your own ssh, then writes the Nokku CA and an sshd drop-in. " +
 			"Access changes need no rerun, a rotated CA does.",
-		ArgsUsage: "<host | root@host | target-name>",
+		ArgsUsage: "<host | root@host | target-name | --stale>",
 		// A --grant lists its subjects with commas.
 		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
@@ -74,6 +74,10 @@ func syncCMD() *cli.Command {
 				Usage: "Go on when the host key changed since the last sync, for a server you added. " +
 					"Your own ssh checks the host, then the key it shows is pinned",
 			},
+			&cli.BoolFlag{
+				Name:  "stale",
+				Usage: "Refresh every server set up with nk sync that was last synced before the CA was rotated",
+			},
 			jsonFlag,
 		},
 		Action: targetSync,
@@ -81,15 +85,67 @@ func syncCMD() *cli.Command {
 }
 
 func targetSync(ctx context.Context, cmd *cli.Command) error {
+	if cmd.Bool("stale") {
+		return syncStale(ctx, cmd)
+	}
 	host, err := rootHost(cmd)
 	if err != nil {
 		return err
 	}
-
 	c, err := connect(ctx, cmd)
 	if err != nil {
 		return err
 	}
+	return syncHost(ctx, cmd, c, host)
+}
+
+// One server that fails does not keep the rest on the old key.
+func syncStale(ctx context.Context, cmd *cli.Command) error {
+	if cmd.Args().Present() || cmd.IsSet("name") || cmd.IsSet("grant") || cmd.IsSet("tag") || cmd.IsSet("port") {
+		return errors.New("--stale picks the servers itself, it takes no server, --name, --grant, --tag or --port")
+	}
+	c, err := connect(ctx, cmd)
+	if err != nil {
+		return err
+	}
+	targets, err := c.ListAllTargets(ctx)
+	if err != nil {
+		return fmt.Errorf("listing targets: %w", err)
+	}
+	ca, err := c.WorkspaceCA(ctx)
+	if err != nil {
+		return fmt.Errorf("reading the certificate authority: %w", err)
+	}
+	if ca == nil {
+		return errors.New("the core sent no certificate authority")
+	}
+	var failed []string
+	synced := 0
+	for _, t := range targets {
+		if !t.Behind(*ca) {
+			continue
+		}
+		if err = syncHost(ctx, cmd, c, t.Name); err != nil {
+			if ctx.Err() != nil {
+				return err
+			}
+			warnf("%s: %v", t.Name, err)
+			failed = append(failed, t.Name)
+			continue
+		}
+		synced++
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("%d of %d servers still miss the new key: %s",
+			len(failed), len(failed)+synced, strings.Join(failed, ", "))
+	}
+	if synced == 0 && !cmd.Bool(jsonFlag.Name) {
+		fmt.Println("No server missed a rollover.")
+	}
+	return nil
+}
+
+func syncHost(ctx context.Context, cmd *cli.Command, c *client.Client, host string) error {
 	dryRun := cmd.Bool("dry-run")
 	asJSON := cmd.Bool(jsonFlag.Name)
 	var progress io.Writer = os.Stdout
