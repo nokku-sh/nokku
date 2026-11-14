@@ -399,6 +399,8 @@ CREATE TABLE targets (
 -- A daemon serves one target, a manual target has none. The daemon goes by its target's name.
 CREATE UNIQUE INDEX idx_targets_daemon_id ON targets (daemon_id);
 
+CREATE INDEX idx_targets_tags ON targets USING gin (tags);
+
 -- A local account on a server, like root. Grants point here.
 CREATE TABLE target_accounts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
@@ -441,7 +443,8 @@ CREATE TABLE grants (
 
 CREATE INDEX idx_grants_subject ON grants (subject_id);
 
-CREATE INDEX idx_grants_workspace_id ON grants (workspace_id);
+-- Ending soon reads one workspace's grants by expiry.
+CREATE INDEX idx_grants_workspace_expires_at ON grants (workspace_id, expires_at);
 
 CREATE INDEX idx_grants_expires_at ON grants (expires_at)
 WHERE
