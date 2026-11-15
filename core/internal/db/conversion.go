@@ -252,7 +252,8 @@ func UsersToProto(rows []*ListUsersRow) []*nokkuv1.User {
 	return mapSlice(rows, func(r *ListUsersRow) *nokkuv1.User { return r.User.ToProto() })
 }
 
-// DefaultDaemonConfig must match nokkud's defaultPolicy, used until first sync.
+// DefaultDaemonConfig must match nokkud's defaultPolicy, used until first sync. KillOnRevoke is the exception,
+// nokkud reads an unset one as off.
 func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 	return &nokkuv1.DaemonConfig{
 		RecordSessions:       new(true),
@@ -260,6 +261,7 @@ func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 		AllowAgentForwarding: new(true),
 		GatewayPorts:         new(false),
 		Ephemeral:            new(false),
+		KillOnRevoke:         new(true),
 	}
 }
 

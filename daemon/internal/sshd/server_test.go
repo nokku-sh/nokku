@@ -110,7 +110,7 @@ func startTestServer(t *testing.T, ca testCA) (addr string, closeFn func()) {
 func startTestServerOpts(t *testing.T, ca testCA, tweaks ...func(*Server)) (addr string, closeFn func()) {
 	t.Helper()
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil, nil)
+	srv, err := New(nil, nil, nil)
 	require.NoError(t, err, "new server")
 	srv.SetAccess(testAccess(t, ca))
 	for _, tweak := range tweaks {
@@ -366,7 +366,7 @@ func TestNewWithoutTrustedCA(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil, nil)
+	srv, err := New(nil, nil, nil)
 	must.NoError(err, "expected server to start without a trusted CA")
 	is.Empty(srv.access.Load().ca)
 }
@@ -376,7 +376,7 @@ func TestServerLivePrincipals(t *testing.T) {
 	ca := newTestCA(t)
 
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil, nil)
+	srv, err := New(nil, nil, nil)
 	must.NoError(err, "new server")
 	granted := testAccess(t, ca)
 	srv.SetAccess(&state.Access{UserCA: granted.UserCA, DaemonConfig: granted.DaemonConfig, SyncedAt: granted.SyncedAt})
@@ -407,9 +407,13 @@ func TestPolicyFrom(t *testing.T) {
 	is.Equal(defaultPolicy, policyFrom(nil))
 	is.Equal(defaultPolicy, policyFrom(&nokkuv1.DaemonConfig{}))
 
-	got := policyFrom(&nokkuv1.DaemonConfig{RecordSessions: new(false), GatewayPorts: new(true)})
+	got := policyFrom(&nokkuv1.DaemonConfig{
+		RecordSessions: new(false), GatewayPorts: new(true), KillOnRevoke: new(true),
+	})
 	is.False(got.Record)
 	is.True(got.GatewayPorts)
+	is.True(got.KillOnRevoke)
+	is.False(policyFrom(nil).KillOnRevoke, "a core that sends no rule has no switch for it")
 	is.True(got.AllowForwarding, "unset field lost its default")
 }
 
@@ -471,7 +475,7 @@ func TestServeConnReportsRelayedClient(t *testing.T) {
 // Relayed connections hold at most half the slots, so direct logins stay open.
 func TestRelayCapLeavesRoomForDirectLogins(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil, nil)
+	srv, err := New(nil, nil, nil)
 	require.NoError(t, err)
 	assert.Less(t, cap(srv.relayed), cap(srv.conns), "relayed connections could take every slot")
 

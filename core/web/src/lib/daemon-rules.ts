@@ -2,7 +2,7 @@ import type { DaemonConfig } from '#lib/gen/nokku/v1/daemon_pb.js';
 
 export type DaemonRule = keyof Pick<
 	DaemonConfig,
-	'recordSessions' | 'allowForwarding' | 'allowAgentForwarding' | 'gatewayPorts'
+	'recordSessions' | 'allowForwarding' | 'allowAgentForwarding' | 'gatewayPorts' | 'killOnRevoke'
 >;
 
 export type RuleValues = Partial<Record<DaemonRule, boolean>>;
@@ -42,6 +42,12 @@ export const daemonRules: {
 		title: 'Public remote forwards',
 		description: 'A -R forward may listen on every address, not only on localhost.',
 		directive: 'GatewayPorts'
+	},
+	{
+		key: 'killOnRevoke',
+		title: 'End processes on revoke',
+		description:
+			'When access ends, what the person left running is killed, like tmux or a background job. A server without cgroups only closes the connection.'
 	}
 ];
 

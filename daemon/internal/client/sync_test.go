@@ -148,7 +148,7 @@ func newSyncClient(t *testing.T, core *fakeCore) *Client {
 	api.StartTLS()
 	t.Cleanup(api.Close)
 
-	srv, err := sshd.New(nil, nil)
+	srv, err := sshd.New(nil, nil, nil)
 	require.NoError(t, err)
 	// Serve owns the host key, so it has to run for the key to be released.
 	l, err := net.Listen("tcp", "127.0.0.1:0")

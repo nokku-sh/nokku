@@ -66,8 +66,8 @@ func shellJoin(argv []string) string {
 	return strings.Join(quoted, " ")
 }
 
-func dialAs(ctx context.Context, a *account, addr string) (net.Conn, error) {
-	f, err := openSocketAs(ctx, a, forwardDial, addr)
+func (s *Server) dialAs(ctx context.Context, st *connState, addr string) (net.Conn, error) {
+	f, err := s.openSocketAs(ctx, st, forwardDial, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +84,8 @@ func dialAs(ctx context.Context, a *account, addr string) (net.Conn, error) {
 	return c, nil
 }
 
-func listenAs(ctx context.Context, a *account, addr string) (net.Listener, error) {
-	f, err := openSocketAs(ctx, a, forwardListen, addr)
+func (s *Server) listenAs(ctx context.Context, st *connState, addr string) (net.Listener, error) {
+	f, err := s.openSocketAs(ctx, st, forwardListen, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func listenAs(ctx context.Context, a *account, addr string) (net.Listener, error
 }
 
 // A socket keeps its maker's credentials, so firewall owner rules see the user.
-func openSocketAs(ctx context.Context, a *account, mode, addr string) (*os.File, error) {
+func (s *Server) openSocketAs(ctx context.Context, st *connState, mode, addr string) (*os.File, error) {
 	if len(addr) > maxForwardAddr {
 		return nil, errors.New("forward address too long")
 	}
@@ -122,13 +122,13 @@ func openSocketAs(ctx context.Context, a *account, mode, addr string) (*os.File,
 	}
 	defer conn.Close()
 
-	cmd, err := helperCmd(ctx, a, helperForward)
+	cmd, err := helperCmd(ctx, st.user, helperForward)
 	if err != nil {
 		_ = theirs.Close()
 		return nil, err
 	}
 	cmd.ExtraFiles = []*os.File{theirs}
-	err = cmd.Start()
+	err = s.start(st.principal, cmd)
 	_ = theirs.Close()
 	if err != nil {
 		return nil, err
@@ -244,7 +244,10 @@ func (sess *session) signalProc(pid int, name string) {
 	defer cancel()
 	cmd, err := helperCmd(ctx, sess.sysUser, helperSignal, strconv.Itoa(pid), name)
 	if err == nil {
-		err = cmd.Run()
+		err = sess.server.start(sess.principal, cmd)
+	}
+	if err == nil {
+		err = cmd.Wait()
 	}
 	if err != nil {
 		slog.Debug("signal session process failed", "signal", name, "error", err)

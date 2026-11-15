@@ -34,7 +34,7 @@ The server shows up in the web app. Unless the token approves it automatically, 
 
 ## What it does
 
-- Checks Nokku certificates and keeps the list of who may log in up to date. A revoke closes open connections as soon as the daemon syncs.
+- Checks Nokku certificates and keeps the list of who may log in up to date. A revoke closes open connections as soon as the daemon syncs, and where the server has cgroups it kills what the person left running. [The limits](./SECURITY.md#revokes-and-outages) are in SECURITY.md.
 - Serves every SSH connection itself. There is no proxy in the path.
 - Keeps working when the core is down, from the last synced access list.
 - Records sessions, when recording is on, and sends the recordings to the core.

@@ -222,7 +222,7 @@ func TestPlainSessionRecorded(t *testing.T) {
 
 	cur := currentUser(t)
 	ca := newTestCA(t)
-	srv, err := New(nil, nil)
+	srv, err := New(nil, nil, nil)
 	must.NoError(err, "new server")
 	srv.SetAccess(testAccess(t, ca))
 	withPolicy(policy{Record: true})(srv)
@@ -314,7 +314,7 @@ func recordingIDFor(t *testing.T, keyID string) string {
 
 	cur := currentUser(t)
 	ca := newTestCA(t)
-	srv, err := New(nil, nil)
+	srv, err := New(nil, nil, nil)
 	must.NoError(err, "new server")
 	srv.SetAccess(testAccess(t, ca))
 	withPolicy(policy{Record: true})(srv)

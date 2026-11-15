@@ -26,7 +26,8 @@ func TestSessionsRunAsTheUserInAContainer(t *testing.T) {
 	require.NoError(t, err, "build the test binary: %s", out)
 	require.NoError(t, os.Chmod(bin, 0o755))
 
-	created, err := exec.CommandContext(t.Context(), "docker", "create", asRootImage,
+	// Privileged, or the container's cgroup tree is read-only and no session gets a cgroup.
+	created, err := exec.CommandContext(t.Context(), "docker", "create", "--privileged", asRootImage,
 		"/usr/local/bin/sshd.test", "-test.run", "^TestSessionsRunAsTheUser$", "-test.v",
 	).Output()
 	require.NoError(t, err, "create the container")

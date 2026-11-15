@@ -36,7 +36,7 @@ func (sess *session) runSFTP() {
 	var stdin io.WriteCloser
 	var stdout io.ReadCloser
 	cmd, notice, err := sess.startInHome(sess.shellCmd, func(cmd *exec.Cmd) (err error) {
-		stdin, stdout, err = startPiped(cmd)
+		stdin, stdout, err = sess.startPiped(cmd)
 		return err
 	})
 	if err != nil {

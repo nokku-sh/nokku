@@ -422,7 +422,7 @@ func TestServerForwardingLargeTransfer(t *testing.T) {
 // A forward request racing connection teardown must not leak a listener.
 func TestTCPIPForwardAfterClose(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	srv, err := New(nil, nil)
+	srv, err := New(nil, nil, nil)
 	require.NoError(t, err)
 	withPolicy(policy{AllowForwarding: true})(srv)
 
@@ -443,11 +443,11 @@ func TestDialAsReportsTheDialError(t *testing.T) {
 	closed := ln.Addr().String()
 	require.NoError(t, ln.Close())
 
-	_, err = dialAs(t.Context(), sysUser, closed)
+	_, err = (&Server{}).dialAs(t.Context(), &connState{user: sysUser}, closed)
 	require.ErrorContains(t, err, "connection refused", "the client is told why a forward failed")
 
 	// A cut address could name another host than the one in the audit log.
-	_, err = dialAs(t.Context(), sysUser, strings.Repeat("a", maxForwardAddr+1))
+	_, err = (&Server{}).dialAs(t.Context(), &connState{user: sysUser}, strings.Repeat("a", maxForwardAddr+1))
 	require.ErrorContains(t, err, "too long")
 }
 
@@ -460,7 +460,7 @@ func TestDialAsStopsWithItsContext(t *testing.T) {
 
 	start := time.Now()
 	// TEST-NET-1 never answers, so only the ctx can end this.
-	_, err = dialAs(ctx, sysUser, "192.0.2.1:9")
+	_, err = (&Server{}).dialAs(ctx, &connState{user: sysUser}, "192.0.2.1:9")
 	require.Error(t, err)
 	assert.Less(t, time.Since(start), forwardTimeout/2, "the dial waited for its timeout")
 }
@@ -474,12 +474,12 @@ func TestForwardSocketsBelongToTheUser(t *testing.T) {
 	sysUser := &account{Name: "nobody", UID: nobody, GID: nobody, Home: "/"}
 	helperForEveryone(t)
 
-	ln, err := listenAs(t.Context(), sysUser, "127.0.0.1:0")
+	ln, err := (&Server{}).listenAs(t.Context(), &connState{user: sysUser}, "127.0.0.1:0")
 	require.NoError(t, err)
 	defer ln.Close()
 	assert.Equal(t, nobody, tcpSocketUID(t, ln.Addr(), nil), "listener of a remote forward")
 
-	c, err := dialAs(t.Context(), sysUser, ln.Addr().String())
+	c, err := (&Server{}).dialAs(t.Context(), &connState{user: sysUser}, ln.Addr().String())
 	require.NoError(t, err)
 	defer c.Close()
 	assert.Equal(t, nobody, tcpSocketUID(t, c.LocalAddr(), c.RemoteAddr()), "connection of a direct forward")

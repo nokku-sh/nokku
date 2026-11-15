@@ -1533,11 +1533,11 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB2\xbaH/\xc8\x01\x01\xe2\x01)\x12\x04name\x12\vdescription\x12\x14settings.enforce_ssoR\n" +
 	"updateMask\"L\n" +
 	"\x17UpdateWorkspaceResponse\x121\n" +
-	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\xca\x03\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\xf0\x03\n" +
 	"\x1bUpdateDaemonDefaultsRequest\x12J\n" +
 	"\x15default_daemon_config\x18\x01 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\x12[\n" +
-	"\x14session_idle_timeout\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x0e\xbaH\v\xaa\x01\b\"\x04\b\x80\xa3\x052\x00R\x12sessionIdleTimeout\x12\x81\x02\n" +
-	"\vupdate_mask\x18\x03 \x01(\v2\x1a.google.protobuf.FieldMaskB\xc3\x01\xbaH\xbf\x01\xc8\x01\x01\xe2\x01\xb8\x01\x12%default_daemon_config.record_sessions\x12&default_daemon_config.allow_forwarding\x12,default_daemon_config.allow_agent_forwarding\x12#default_daemon_config.gateway_ports\x12\x14session_idle_timeoutR\n" +
+	"\x14session_idle_timeout\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x0e\xbaH\v\xaa\x01\b\"\x04\b\x80\xa3\x052\x00R\x12sessionIdleTimeout\x12\xa7\x02\n" +
+	"\vupdate_mask\x18\x03 \x01(\v2\x1a.google.protobuf.FieldMaskB\xe9\x01\xbaH\xe5\x01\xc8\x01\x01\xe2\x01\xde\x01\x12%default_daemon_config.record_sessions\x12&default_daemon_config.allow_forwarding\x12,default_daemon_config.allow_agent_forwarding\x12#default_daemon_config.gateway_ports\x12$default_daemon_config.kill_on_revoke\x12\x14session_idle_timeoutR\n" +
 	"updateMask\"Q\n" +
 	"\x1cUpdateDaemonDefaultsResponse\x121\n" +
 	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\x18\n" +

@@ -8,7 +8,7 @@ Found a vulnerability? Don't open a public issue. See [SECURITY.md](../SECURITY.
 
 - **Keep `/var/lib/nokkud` to root.** It holds the server's identity in Nokku and its SSH host key.
 - **Logins need a certificate.** No passwords, no plain keys, no PAM.
-- **A revoke closes open connections** as soon as the daemon syncs. Processes a user detached, like `nohup` or a tmux server, keep running.
+- **A revoke closes open connections** as soon as the daemon syncs, and kills what the person left running, like `nohup` or a tmux server. The kill needs cgroups on the server, [and has limits](#revokes-and-outages).
 - **A daemon cut off from the core for seven days takes no new logins** until it syncs again.
 - **Your own `sshd` on port 22 is never touched.** It is your way back in, and outside Nokku's checks. [Keep its keys out of home directories](#your-own-sshd), or a revoked user can come back through it.
 - **Recordings are not redacted.** Treat them like the server they come from.
@@ -104,7 +104,10 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 
 ### Revokes and outages
 
-- **A daemon that syncs applies a revoke at once** and closes the connections that were open on it. Processes the user detached from the session keep running, like `nohup`, `setsid` or a tmux server, as with sshd.
+- **A daemon that syncs applies a revoke at once** and closes the connections that were open on it.
+- **A revoke also kills what the person left running.** The daemon keeps every process a person starts as an account in one cgroup, and detaching with `nohup`, `setsid` or tmux never leaves it. Once the person's access to that account is gone, all of it is killed: what an open session runs, what an earlier session left, and what was started before the daemon last restarted. A removed grant, an expired one, a removed person and a server set back to pending all count. A hangup alone kills nothing, like sshd, and neither does a CA rollover or deleting the server from Nokku. The rule **End processes on revoke** turns it off per server. Turned back on, it also kills what people left who were revoked while it was off.
+- **The kill is best effort.** It needs cgroup v2 the daemon may write and Linux 5.14 or newer. The daemon's log says at start which it found. Without that, like in most containers, a revoke closes the connections and leaves detached processes running. A root session can move its processes out of the cgroup. Nothing reaches work that was handed to another service, like cron, `at`, `systemd-run --user` or a container runtime.
+- **A process belongs to whoever started its parent.** On a shared account two people can share one tmux or screen server. What the second person runs in it sits in the first person's cgroup, so it dies with the first person's revoke and outlives their own. The cgroup's name is the certificate principal, and every local user can read it in `/proc/<pid>/cgroup`.
 - **When the core is unreachable**, logins still work against the cached CA key and access list, for seven days. An open session runs on until a sync that revokes it, or until it ends.
 - **After seven days with no word from the core, new logins stop.** Seven days is the longest a certificate lasts, so what the daemon saved is then older than anything it could vouch for, and it may still trust a CA you rolled over since. The daemon syncs every few hours and at every start, so this only meets a server that is cut off. A client reads why, sessions that are open go on, and the first sync brings logins back with nobody touching the server. Until then port 22 is the way in.
 - **A revoke that never reaches the daemon** still stops new logins once the user's last certificate expires, since the core signs no new one without the grant. A relayed connection ends after 8 hours at most.

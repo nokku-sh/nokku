@@ -80,7 +80,7 @@ func TestRunServesFromCacheWhenCoreIsDown(t *testing.T) {
 
 	st, err := state.Load()
 	must.NoError(err)
-	srv, err := sshd.New(nil, nil)
+	srv, err := sshd.New(nil, nil, nil)
 	must.NoError(err)
 	// As run does in cmd/nokkud, which needs root and has no test itself.
 	srv.SetAccess(st.Access())

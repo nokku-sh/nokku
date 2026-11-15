@@ -82,7 +82,7 @@ func (s *Server) serveDirectTCPIP(ctx context.Context, st *connState, newCh ssh.
 	}
 
 	dest := net.JoinHostPort(d.DestAddr, strconv.FormatUint(uint64(d.DestPort), 10))
-	dconn, err := dialAs(ctx, st.user, dest)
+	dconn, err := s.dialAs(ctx, st, dest)
 	if err != nil {
 		slog.Debug("direct-tcpip dial failed", "addr", dest, "error", err)
 		_ = newCh.Reject(ssh.ConnectionFailed, err.Error())
@@ -138,7 +138,7 @@ func (s *Server) tcpipForward(ctx context.Context, st *connState, payload []byte
 	if st.forwards == nil || st.forwards[forwardKey(f)] != nil || !st.acquireChannel() {
 		return false, nil
 	}
-	ln, err := listenAs(ctx, st.user, forwardAddr(f, s.access.Load().policy.GatewayPorts))
+	ln, err := s.listenAs(ctx, st, forwardAddr(f, s.access.Load().policy.GatewayPorts))
 	if err != nil {
 		st.releaseChannel()
 		return false, nil

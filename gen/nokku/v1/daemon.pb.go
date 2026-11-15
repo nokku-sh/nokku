@@ -204,7 +204,10 @@ type DaemonConfig struct {
 	Ephemeral            *bool                  `protobuf:"varint,5,opt,name=ephemeral" json:"ephemeral,omitempty"`
 	// idle_timeout closes an interactive session nobody typed into for that long. It is the workspace's
 	// session_idle_timeout, filled in by the core on sync and ignored when sent.
-	IdleTimeout   *durationpb.Duration `protobuf:"bytes,6,opt,name=idle_timeout,json=idleTimeout" json:"idle_timeout,omitempty"`
+	IdleTimeout *durationpb.Duration `protobuf:"bytes,6,opt,name=idle_timeout,json=idleTimeout" json:"idle_timeout,omitempty"`
+	// kill_on_revoke ends every process a person left on the server once their access to the account is gone. Only
+	// a daemon that can keep sessions in cgroups does it, the others close the connections as before.
+	KillOnRevoke  *bool `protobuf:"varint,7,opt,name=kill_on_revoke,json=killOnRevoke" json:"kill_on_revoke,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -279,6 +282,13 @@ func (x *DaemonConfig) GetIdleTimeout() *durationpb.Duration {
 		return x.IdleTimeout
 	}
 	return nil
+}
+
+func (x *DaemonConfig) GetKillOnRevoke() bool {
+	if x != nil && x.KillOnRevoke != nil {
+		return *x.KillOnRevoke
+	}
+	return false
 }
 
 type GetDaemonRequest struct {
@@ -2441,24 +2451,25 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"lastSeenAt\x12\x18\n" +
 	"\aversion\x18\t \x01(\tR\aversion\x12=\n" +
 	"\fbehind_since\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\vbehindSince\"\x99\x02\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\vbehindSince\"\xbf\x02\n" +
 	"\fDaemonConfig\x12'\n" +
 	"\x0frecord_sessions\x18\x01 \x01(\bR\x0erecordSessions\x12)\n" +
 	"\x10allow_forwarding\x18\x02 \x01(\bR\x0fallowForwarding\x124\n" +
 	"\x16allow_agent_forwarding\x18\x03 \x01(\bR\x14allowAgentForwarding\x12#\n" +
 	"\rgateway_ports\x18\x04 \x01(\bR\fgatewayPorts\x12\x1c\n" +
 	"\tephemeral\x18\x05 \x01(\bR\tephemeral\x12<\n" +
-	"\fidle_timeout\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\vidleTimeout\",\n" +
+	"\fidle_timeout\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\vidleTimeout\x12$\n" +
+	"\x0ekill_on_revoke\x18\a \x01(\bR\fkillOnRevoke\",\n" +
 	"\x10GetDaemonRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"=\n" +
 	"\x11GetDaemonResponse\x12(\n" +
-	"\x06daemon\x18\x01 \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"\xd2\x02\n" +
+	"\x06daemon\x18\x01 \x01(\v2\x10.nokku.v1.DaemonR\x06daemon\"\xec\x02\n" +
 	"\x13UpdateDaemonRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12:\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x16.nokku.v1.DaemonStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12.\n" +
-	"\x06config\x18\x03 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x12\xb4\x01\n" +
-	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskBw\xbaHt\xc8\x01\x01\xe2\x01n\x12\x06status\x12\x16config.record_sessions\x12\x17config.allow_forwarding\x12\x1dconfig.allow_agent_forwarding\x12\x14config.gateway_portsR\n" +
+	"\x06config\x18\x03 \x01(\v2\x16.nokku.v1.DaemonConfigR\x06config\x12\xce\x01\n" +
+	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB\x90\x01\xbaH\x8c\x01\xc8\x01\x01\xe2\x01\x85\x01\x12\x06status\x12\x16config.record_sessions\x12\x17config.allow_forwarding\x12\x1dconfig.allow_agent_forwarding\x12\x14config.gateway_ports\x12\x15config.kill_on_revokeR\n" +
 	"updateMask\"\x16\n" +
 	"\x14UpdateDaemonResponse\"/\n" +
 	"\x13DeleteDaemonRequest\x12\x18\n" +

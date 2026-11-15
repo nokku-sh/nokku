@@ -294,6 +294,7 @@ func partialDaemon(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *c
 					AllowForwarding:      new(false),
 					AllowAgentForwarding: new(false),
 					GatewayPorts:         new(true),
+					KillOnRevoke:         new(false),
 				},
 			}))
 			require.NoError(t, err)
@@ -355,6 +356,7 @@ func partialWorkspace(t *testing.T, cfg *app.Config, srv *httptest.Server) []par
 				AllowForwarding:      new(false),
 				AllowAgentForwarding: new(false),
 				GatewayPorts:         new(true),
+				KillOnRevoke:         new(false),
 			},
 			SessionIdleTimeout: durationpb.New(10 * time.Minute),
 		}))

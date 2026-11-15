@@ -17,7 +17,10 @@ RestartPreventExitStatus=78
 RestartSec=5s
 # A restart only signals the daemon. Live connections still end with it.
 KillMode=process
-# Sessions share this cgroup. One OOM kill in a session must not stop the unit.
+# nokkud keeps each person's sessions in a cgroup of their own below this one, so a revoke can end what they left.
+# Naming one controller hands over the subtree without turning on the others for every service.
+Delegate=pids
+# One OOM kill in a session must not stop the unit.
 OOMPolicy=continue
 LimitNOFILE=65536
 

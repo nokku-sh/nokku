@@ -113,6 +113,9 @@ message DaemonConfig {
   // idle_timeout closes an interactive session nobody typed into for that long. It is the workspace's
   // session_idle_timeout, filled in by the core on sync and ignored when sent.
   google.protobuf.Duration idle_timeout = 6;
+  // kill_on_revoke ends every process a person left on the server once their access to the account is gone. Only
+  // a daemon that can keep sessions in cgroups does it, the others close the connections as before.
+  bool kill_on_revoke = 7;
 }
 
 message GetDaemonRequest {
@@ -138,7 +141,8 @@ message UpdateDaemonRequest {
         "config.record_sessions",
         "config.allow_forwarding",
         "config.allow_agent_forwarding",
-        "config.gateway_ports"
+        "config.gateway_ports",
+        "config.kill_on_revoke"
       ]
     }
   ];

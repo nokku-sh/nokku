@@ -22,6 +22,7 @@ import (
 	"github.com/urfave/cli/v3"
 	"golang.org/x/term"
 
+	"github.com/nokku-sh/nokku/daemon/internal/cgroup"
 	"github.com/nokku-sh/nokku/daemon/internal/client"
 	"github.com/nokku-sh/nokku/daemon/internal/paths"
 	"github.com/nokku-sh/nokku/daemon/internal/sshd"
@@ -173,7 +174,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	stopped := make(chan time.Time, 1)
 	context.AfterFunc(ctx, func() { stopped <- time.Now() })
 	uploads := cl.StartUploads(ctx)
-	srv, err := sshd.New(uploads, cl.Reports())
+	srv, err := sshd.New(uploads, cl.Reports(), cgroup.Open(ctx))
 	if err != nil {
 		return err
 	}

@@ -28,6 +28,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+
+	"github.com/nokku-sh/nokku/daemon/internal/cgroup"
+	"github.com/nokku-sh/nokku/daemon/internal/state"
 )
 
 // Far from the usual ids, so the account never owns the builder's files.
@@ -44,7 +47,7 @@ var procIDs = regexp.MustCompile(`(Uid|Gid|Groups):[ \t]*([0-9 \t]*)`)
 func TestSessionsRunAsTheUser(t *testing.T) {
 	require.Zero(t, os.Geteuid(), "this test needs root, run it with task daemon:test:root")
 	addUser(t)
-	client := dialAsUser(t)
+	srv, granted, client := dialAsUser(t)
 	want := strconv.Itoa(asUserID)
 
 	t.Run("shell", func(t *testing.T) {
@@ -139,6 +142,19 @@ func TestSessionsRunAsTheUser(t *testing.T) {
 		assert.True(t, signalReaches(t, client, os.Args[0]), "a signal to the user's own process got lost")
 		assert.False(t, signalReaches(t, client, setuidCopy(t)), "a signal reached a process that became root")
 	})
+
+	// Last, it ends the connection.
+	t.Run("revoke", func(t *testing.T) {
+		require.NotNil(t, srv.groups, "this needs a writable cgroup tree, task daemon:test:root has one")
+		sess, err := client.NewSession()
+		require.NoError(t, err)
+		defer sess.Close()
+		// The root of the tree is where the daemon runs, a process there would outlive the revoke.
+		out, err := sess.CombinedOutput("echo $$ > /sys/fs/cgroup/cgroup.procs")
+		require.Error(t, err, "the user moved a process out of the session's cgroup: %s", out)
+
+		checkRevokeKills(t, srv, client, granted)
+	})
 }
 
 // Not a test: the signal's target. It turns fully root first when setuid.
@@ -169,11 +185,11 @@ func addUser(t *testing.T) {
 	t.Cleanup(func() { _ = exec.Command("userdel", "--remove", asUser).Run() })
 }
 
-func dialAsUser(t *testing.T) *ssh.Client {
+func dialAsUser(t *testing.T) (*Server, *state.Access, *ssh.Client) {
 	t.Helper()
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 	ca := newTestCA(t)
-	srv, err := New(nil, nil)
+	srv, err := New(nil, nil, cgroup.Open(t.Context()))
 	require.NoError(t, err)
 	a := testAccess(t, ca)
 	a.Principals = map[string][]string{asUser: {testPrincipal}}
@@ -186,7 +202,7 @@ func dialAsUser(t *testing.T) *ssh.Client {
 	client, err := dial(t, l.Addr().String(), asUser, userCert(t, ca, testPrincipal))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = client.Close() })
-	return client
+	return srv, a, client
 }
 
 // assertIDs checks the real, effective, saved and fs ids in /proc/<pid>/status.

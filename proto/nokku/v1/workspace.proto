@@ -154,6 +154,7 @@ message UpdateDaemonDefaultsRequest {
         "default_daemon_config.allow_forwarding",
         "default_daemon_config.allow_agent_forwarding",
         "default_daemon_config.gateway_ports",
+        "default_daemon_config.kill_on_revoke",
         "session_idle_timeout"
       ]
     }

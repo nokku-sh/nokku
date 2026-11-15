@@ -46,6 +46,16 @@ func (a *access) trusts(wire string) bool {
 	return a.ca != "" && wire == a.ca
 }
 
+// grants is true while some account still lists the principal.
+func (a *access) grants(principal string) bool {
+	for _, allowed := range a.principals {
+		if slices.Contains(allowed, principal) {
+			return true
+		}
+	}
+	return false
+}
+
 // SetAccess gates new logins, DropRevoked open ones. A CA key that does not parse trusts none.
 func (s *Server) SetAccess(sa *state.Access) {
 	a := &access{

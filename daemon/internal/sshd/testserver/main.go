@@ -69,7 +69,7 @@ func main() {
 		access.Principals = map[string][]string{self.Username: access.Principals[self.Username]}
 	}
 
-	srv, err := sshd.New(nil, nil)
+	srv, err := sshd.New(nil, nil, nil)
 	if err != nil {
 		fail(err.Error())
 	}

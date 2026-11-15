@@ -19,6 +19,7 @@ const (
 	eventRemoteForward     eventType = "remote_forward"
 	eventRecordingDegraded eventType = "recording_degraded"
 	eventSessionIdle       eventType = "session_idle"
+	eventRevokeKill        eventType = "revoke_kill"
 )
 
 // Operators filter the "audit" log lines on the type, keep the names stable.

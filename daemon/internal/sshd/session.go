@@ -377,7 +377,7 @@ func (sess *session) runPTY() {
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = sess.tty, sess.tty, sess.tty
 		cmd.SysProcAttr.Setctty = true
 		cmd.WaitDelay = hangupGrace
-		return cmd.Start()
+		return sess.server.start(sess.principal, cmd)
 	})
 	if err != nil {
 		slog.Debug("start pty command failed", "error", err)
@@ -532,7 +532,7 @@ func (sess *session) runPlain() {
 	cmd, notice, err := sess.startInHome(sess.shellCmd, func(cmd *exec.Cmd) (err error) {
 		// Extended data, as interleaving breaks length-prefixed protocols.
 		cmd.Stderr = recOut{w: sess.Stderr(), rec: sess.rec}
-		stdin, stdout, err = startPiped(cmd)
+		stdin, stdout, err = sess.startPiped(cmd)
 		return err
 	})
 	if err != nil {
@@ -632,7 +632,7 @@ func (t recOut) Write(p []byte) (int, error) {
 }
 
 // A failed start closes both pipes.
-func startPiped(cmd *exec.Cmd) (stdin io.WriteCloser, stdout io.ReadCloser, err error) {
+func (sess *session) startPiped(cmd *exec.Cmd) (stdin io.WriteCloser, stdout io.ReadCloser, err error) {
 	if stdin, err = cmd.StdinPipe(); err != nil {
 		return nil, nil, err
 	}
@@ -642,7 +642,13 @@ func startPiped(cmd *exec.Cmd) (stdin io.WriteCloser, stdout io.ReadCloser, err 
 	}
 	// Bounds Wait if a background process holds stderr, and the hangup grace.
 	cmd.WaitDelay = time.Second
-	return stdin, stdout, cmd.Start()
+	if err = sess.server.start(sess.principal, cmd); err != nil {
+		// A start that failed before the fork left them open.
+		_ = stdin.Close()
+		_ = stdout.Close()
+		return nil, nil, err
+	}
+	return stdin, stdout, nil
 }
 
 func (sess *session) relay(cmd *exec.Cmd, stdin io.WriteCloser, stdout io.ReadCloser) {

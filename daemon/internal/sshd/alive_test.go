@@ -216,7 +216,7 @@ func TestServerMaxStartupsReleasedAfterHandshake(t *testing.T) {
 // A few addresses that hold the first slots must not keep everyone else out for certain.
 func TestStartupsDropEarlyAtRandom(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	s, err := New(nil, nil)
+	s, err := New(nil, nil, nil)
 	require.NoError(t, err)
 	s.startupsStart, s.startupsFull = 2, 4
 
@@ -421,7 +421,7 @@ func TestStartupSlotsPerSource(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
-	s, err := New(nil, nil)
+	s, err := New(nil, nil, nil)
 	must.NoError(err)
 	// A hard cap, so nothing here is up to chance.
 	s.startupsStart, s.startupsFull = 10, 10

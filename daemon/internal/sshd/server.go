@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/netip"
+	"os/exec"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/login"
 
+	"github.com/nokku-sh/nokku/daemon/internal/cgroup"
 	"github.com/nokku-sh/nokku/daemon/internal/recording"
 	"github.com/nokku-sh/nokku/daemon/internal/report"
 	"github.com/nokku-sh/nokku/daemon/internal/safe"
@@ -57,7 +59,8 @@ var (
 	errShare = errors.New("sshd: too many connections of one subject")
 )
 
-// defaultPolicy also fills any field the core leaves unset.
+// defaultPolicy also fills any field the core leaves unset. KillOnRevoke stays off then: an older core has no
+// switch for it, and the access of a deleted server carries no rules at all.
 var defaultPolicy = policy{Record: true, AllowForwarding: true, AllowAgentForwarding: true}
 
 // policy is set by the core and applies to new sessions without a restart.
@@ -69,6 +72,8 @@ type policy struct {
 	GatewayPorts bool
 	// IdleTimeout ends an interactive session without input. Zero never does.
 	IdleTimeout time.Duration
+	// KillOnRevoke ends what a revoked principal left running. Needs a host with cgroups.
+	KillOnRevoke bool
 }
 
 type Server struct {
@@ -77,7 +82,9 @@ type Server struct {
 	uploads *recording.Uploads
 	// reports takes the open and the close of every connection for the core's audit log. Nil reports nothing.
 	reports *report.Spool
-	access  atomic.Pointer[access]
+	// groups keeps every process of a principal in one cgroup. Nil on a host that has none to offer.
+	groups *cgroup.Tree
+	access atomic.Pointer[access]
 	// Tests point it away from /etc/nologin.
 	nologinFile string
 	// Tests swap the lookup to shape the account.
@@ -111,11 +118,12 @@ type Server struct {
 }
 
 // New trusts no CA. Every login is refused until SetAccess.
-func New(uploads *recording.Uploads, reports *report.Spool) (*Server, error) {
+func New(uploads *recording.Uploads, reports *report.Spool, groups *cgroup.Tree) (*Server, error) {
 	s := &Server{
 		log:            slog.Default(),
 		uploads:        uploads,
 		reports:        reports,
+		groups:         groups,
 		nologinFile:    nologinPath,
 		lookupAccount:  lookupAccount,
 		conns:          make(chan struct{}, maxConns),
@@ -154,6 +162,7 @@ func policyFrom(cfg *nokkuv1.DaemonConfig) policy {
 	set(&p.AllowForwarding, cfg.AllowForwarding)           //nolint:protogetter // presence check
 	set(&p.AllowAgentForwarding, cfg.AllowAgentForwarding) //nolint:protogetter // presence check
 	set(&p.GatewayPorts, cfg.GatewayPorts)                 //nolint:protogetter // presence check
+	set(&p.KillOnRevoke, cfg.KillOnRevoke)                 //nolint:protogetter // presence check
 	p.IdleTimeout = cfg.GetIdleTimeout().AsDuration()
 	return p
 }
@@ -221,8 +230,13 @@ func (s *Server) ServeConn(ctx context.Context, nc net.Conn) {
 	s.handleConn(ctx, nc, true)
 }
 
-// DropRevoked ends open sessions on a revoke, SetAccess only gates new logins.
+// DropRevoked applies a revoke to what already runs, SetAccess only gates new logins.
 func (s *Server) DropRevoked() {
+	s.closeRevoked()
+	s.killRevoked()
+}
+
+func (s *Server) closeRevoked() {
 	a := s.access.Load()
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
@@ -234,6 +248,38 @@ func (s *Server) DropRevoked() {
 		slog.Info("closing connection, access was revoked", "user", conn.User(), "remote", conn.RemoteAddr())
 		_ = conn.Close()
 	}
+}
+
+// killRevoked ends what principals without access left running, in an open session or long after one. A
+// certificate of a CA that was rolled over is not a revoke, its principal keeps the access.
+func (s *Server) killRevoked() {
+	a := s.access.Load()
+	if s.groups == nil || !a.policy.KillOnRevoke {
+		return
+	}
+	for _, principal := range s.groups.KillExcept(a.grants) {
+		ev := auditEvent{Type: eventRevokeKill, Principal: principal}
+		if parts, ok := login.ParsePrincipal(principal); ok {
+			ev.User = parts.Username
+		}
+		s.emit(ev)
+	}
+}
+
+// start runs a process of a session in the cgroup of its principal. Helpers go there too, they run as the
+// user, who could take one over to get a process outside.
+func (s *Server) start(principal string, cmd *exec.Cmd) error {
+	if s.groups == nil {
+		return cmd.Start()
+	}
+	if err := s.groups.Start(cmd, principal); err != nil {
+		return err
+	}
+	// A revoke that ran before the process joined its group did not see it.
+	if !s.access.Load().grants(principal) {
+		s.killRevoked()
+	}
+	return nil
 }
 
 // ctx closes the connection, which ends its sessions like a client hanging up.
@@ -268,7 +314,7 @@ func (s *Server) handleConn(ctx context.Context, nc net.Conn, relayed bool) {
 	s.report(conn, id, relayed, false)
 	defer s.report(conn, id, relayed, true)
 	// A sync that ran during the handshake could not see this connection yet.
-	s.DropRevoked()
+	s.closeRevoked()
 
 	st := newConnState(conn, s.maxChannels)
 	defer st.close()
