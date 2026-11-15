@@ -78,6 +78,8 @@ func TestSettingsLeavesTheEnvironmentAlone(t *testing.T) {
 
 // Unset means prefer: TLS first, plain when the server has none.
 func TestSettingsPrefersTLSWithoutAMode(t *testing.T) {
+	// A socket PGHOST from the outside never gets TLS.
+	t.Setenv("PGHOST", "localhost")
 	t.Setenv("PGSSLMODE", "")
 	_, config, err := settings()
 	require.NoError(t, err)
