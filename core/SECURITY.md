@@ -27,7 +27,7 @@ Out of scope:
 - [`nk`](../cli/SECURITY.md) and [`nokkud`](../daemon/SECURITY.md), which have their own files
 - The SSH protocol itself, and vulnerabilities in OpenSSH or `sshd`
 - Operating system, container runtime and database engine issues
-- The infrastructure behind the hosted service, and outages of third-party providers
+- The infrastructure that hosts the core, and outages of third-party providers
 
 ## Running Nokku securely
 
@@ -79,7 +79,7 @@ Then set `KMS_URI` to the same value, remove `NOKKU_SECRET` and start the core.
 - **Keys change only through `rotate-secrets`**, with the core stopped. It moves the keyset to another secret or KMS, re-encrypts every secret, and with the same `kms:` URI wraps the keyset onto the newest version of the KMS key. Run that before you retire old key versions in the KMS, like Vault's `min_decryption_version`, or the core can't open its keyset at the next start.
 - **At Scaleway**, leave key protection on for the key, so nobody deletes it by accident.
 - **From one Vault to another** needs a `VAULT_TOKEN` that works on both. Without one, go through a secret in two steps: `rotate-secrets --new secret:...`, then `--new kms:...` with the new token.
-- **The hosted service** always runs with a KMS. With `NOKKU_SAAS`, the core refuses to start without `KMS_URI`.
+- **Hosted mode** needs a KMS. With `NOKKU_SAAS`, the core refuses to start without `KMS_URI`.
 
 <details>
 <summary><b>A Vault policy with no more than the core needs</b></summary>

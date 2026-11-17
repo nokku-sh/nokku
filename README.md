@@ -37,7 +37,7 @@ Each one has its own README. Pick where you want to start.
 
 Don't want a daemon on a server? [`nk sync`](./cli#servers-without-the-daemon) sets up its plain `sshd` instead, with no recording and no relay.
 
-Use the hosted service, or run the core yourself for free. The guides are at [nokku.sh/docs](https://nokku.sh/docs).
+Run the core yourself, for free. A hosted version comes later. The guides are at [nokku.sh/docs](https://nokku.sh/docs).
 
 ## What you get
 

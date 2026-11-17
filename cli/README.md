@@ -25,7 +25,7 @@ nk ls                                      # lists the servers you can reach
 ssh user@target                            # plain OpenSSH
 ```
 
-`--api` is the address you open Nokku at, self-hosted or hosted. `nk` remembers it, so later it is just `nk login`. The web app shows the command with your address filled in.
+`--api` is the address you open Nokku at. `nk` remembers it, so later it is just `nk login`. The web app shows the command with your address filled in.
 
 Something not working? Run `nk doctor`. It checks the core, your key and your SSH setup, and `nk doctor --fix` repairs what it can.
 

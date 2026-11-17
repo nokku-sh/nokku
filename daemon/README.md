@@ -28,7 +28,7 @@ sudo nokkud --api https://nokku.example.com enroll  # paste the token, it is not
 sudo systemctl restart nokkud
 ```
 
-`--api` is the address you open Nokku at, self-hosted or hosted. `nokkud` keeps it with the enrollment. The web app shows these commands with your address filled in.
+`--api` is the address you open Nokku at. `nokkud` keeps it with the enrollment. The web app shows these commands with your address filled in.
 
 The server shows up in the web app. Unless the token approves it automatically, someone approves it there before it serves logins.
 

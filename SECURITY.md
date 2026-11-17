@@ -6,19 +6,19 @@ Please do not open a public issue for a suspected vulnerability. Use GitHub's pr
 
 1. Open this repository's **Security** tab.
 2. Select **Report a vulnerability**.
-3. Tell us as much of this as you can:
-   - Which part and version, and how it runs (your platform, self-hosted or hosted)
+3. Include as much of this as you can:
+   - Which part and version, and the platform it runs on
    - What the issue is and what an attacker gains
    - Steps to reproduce, or a minimal proof of concept
    - Logs that help, with secrets and tokens removed
 
 Reports are handled confidentially. If you would like credit in the advisory or the changelog, say so.
 
-What to expect:
+Nokku is built and maintained by one person, so this is best effort:
 
-- **Acknowledgement** within 48 hours
-- **Triage** and a severity within 5 business days
-- **A fix or clear guidance** within 30 days, depending on complexity and impact
+- **A reply**, usually within a week
+- **Serious issues first.** Anything that lets someone into a server or the core goes ahead of everything else
+- **A fix or clear guidance** as soon as possible, depending on complexity and impact
 
 Only the latest release gets security fixes. Older releases are not patched, so upgrade to the newest one.
 
