@@ -47,8 +47,8 @@ func TestInvalidRowsAreRefused(t *testing.T) {
 		},
 		"a token past its uses":      {joinToken, []any{f.ws, id(), 1, 2, nil}},
 		"a token that retires early": {joinToken, []any{f.ws, id(), nil, 0, "-1 minute"}},
-		"a request for no time":      {request, []any{f.ws, f.u, f.account, "0", "pending"}},
-		"a decision with no time":    {request, []any{f.ws, f.u, f.account, "1 hour", "approved"}},
+		"a request for no time":      {request, []any{f.ws, f.u, f.account, "0", 1}},
+		"a decision with no time":    {request, []any{f.ws, f.u, f.account, "1 hour", 2}},
 		"a time with no decision": {
 			`INSERT INTO access_requests (workspace_id, requester_id, account_id, duration, reason, decided_at)
 				VALUES ($1, $2, $3, '1 hour', 'because', NOW())`,

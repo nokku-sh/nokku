@@ -425,8 +425,8 @@ func (s graphSeed) account(name string, tags []string, username string) string {
 }
 
 func (s graphSeed) grant(accountID, kind, subjectID string) {
-	require.NoError(s.t, s.q.PutGrant(s.t.Context(), &db.PutGrantParams{
-		AccountID:   accountID,
+	require.NoError(s.t, s.q.PutGrants(s.t.Context(), &db.PutGrantsParams{
+		AccountIds:  []string{accountID},
 		SubjectKind: kind,
 		SubjectID:   subjectID,
 	}))

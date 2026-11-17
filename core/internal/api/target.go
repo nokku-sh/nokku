@@ -149,10 +149,6 @@ func (s *targetService) insertTarget(
 	name string,
 ) (*nokkuv1.CreateTargetResponse, error) {
 	var result *db.Target
-	var createdBy *string
-	if caller, ok := actor.PrincipalFromContext(ctx); ok && caller.ID != "" {
-		createdBy = &caller.ID
-	}
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
 			Name:          name,
@@ -160,7 +156,7 @@ func (s *targetService) insertTarget(
 			Endpoints:     req.GetEndpoints(),
 			Tags:          req.GetTags(),
 			HostPublicKey: trimmed(req.HostPublicKey),
-			CreatedBy:     createdBy,
+			CreatedBy:     callerID(ctx),
 		})
 		if err != nil {
 			return err
@@ -205,10 +201,11 @@ func seedTargetGrants(ctx context.Context, q *db.Queries, targetID string, grant
 		}
 		for kind, ids := range subjects {
 			for _, id := range ids {
-				if err := q.PutGrant(ctx, &db.PutGrantParams{
-					AccountID:   account.ID,
+				if err := q.PutGrants(ctx, &db.PutGrantsParams{
+					AccountIds:  []string{account.ID},
 					SubjectKind: kind,
 					SubjectID:   id,
+					GrantedBy:   callerID(ctx),
 				}); err != nil {
 					return err
 				}

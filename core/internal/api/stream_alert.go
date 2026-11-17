@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/app"
+	"github.com/nokku-sh/nokku/core/internal/audit"
 	"github.com/nokku-sh/nokku/core/internal/email"
 )
 
@@ -48,7 +49,7 @@ func warnFailingStreams(ctx context.Context, cfg *app.Config) {
 			Email:     row.OwnerEmail,
 			Workspace: row.WorkspaceName,
 			StreamID:  row.ID,
-			Kind:      row.Kind,
+			Kind:      audit.KindName(row.Kind),
 			Host:      host,
 			LastError: row.LastError,
 			URL:       cfg.Tenant.BaseURL(row.Slug) + "/audit",

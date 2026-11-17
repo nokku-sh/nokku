@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nokku-sh/nokku/core/internal/crypto"
+	nokku "github.com/nokku-sh/nokku/gen/nokku/v1"
 )
 
 const advanceAuditStream = `-- name: AdvanceAuditStream :execrows
@@ -94,21 +95,21 @@ RETURNING
 `
 
 type CreateAuditStreamParams struct {
-	ID     string        `json:"id"`
-	Kind   string        `json:"kind"`
-	URL    string        `json:"url"`
-	Secret crypto.Sealed `json:"secret"`
+	ID     string                `json:"id"`
+	Kind   nokku.AuditStreamKind `json:"kind"`
+	URL    string                `json:"url"`
+	Secret crypto.Sealed         `json:"secret"`
 }
 
 type CreateAuditStreamRow struct {
-	ID           string     `json:"id"`
-	Kind         string     `json:"kind"`
-	URL          string     `json:"url"`
-	Enabled      bool       `json:"enabled"`
-	LastSentAt   *time.Time `json:"lastSentAt"`
-	LastError    string     `json:"lastError"`
-	FailingSince *time.Time `json:"failingSince"`
-	CreatedAt    time.Time  `json:"createdAt"`
+	ID           string                `json:"id"`
+	Kind         nokku.AuditStreamKind `json:"kind"`
+	URL          string                `json:"url"`
+	Enabled      bool                  `json:"enabled"`
+	LastSentAt   *time.Time            `json:"lastSentAt"`
+	LastError    string                `json:"lastError"`
+	FailingSince *time.Time            `json:"failingSince"`
+	CreatedAt    time.Time             `json:"createdAt"`
 }
 
 // A new stream starts with the events from now on. Never the secret back, it is not shown again. The id comes from
@@ -280,14 +281,14 @@ ORDER BY
 `
 
 type ListAuditStreamsRow struct {
-	ID           string     `json:"id"`
-	Kind         string     `json:"kind"`
-	URL          string     `json:"url"`
-	Enabled      bool       `json:"enabled"`
-	LastSentAt   *time.Time `json:"lastSentAt"`
-	LastError    string     `json:"lastError"`
-	FailingSince *time.Time `json:"failingSince"`
-	CreatedAt    time.Time  `json:"createdAt"`
+	ID           string                `json:"id"`
+	Kind         nokku.AuditStreamKind `json:"kind"`
+	URL          string                `json:"url"`
+	Enabled      bool                  `json:"enabled"`
+	LastSentAt   *time.Time            `json:"lastSentAt"`
+	LastError    string                `json:"lastError"`
+	FailingSince *time.Time            `json:"failingSince"`
+	CreatedAt    time.Time             `json:"createdAt"`
 }
 
 func (q *Queries) ListAuditStreams(ctx context.Context) ([]*ListAuditStreamsRow, error) {
@@ -344,16 +345,16 @@ WHERE
 `
 
 type ListAuditStreamsFailingLongRow struct {
-	ID            string    `json:"id"`
-	WorkspaceID   string    `json:"workspaceId"`
-	Kind          string    `json:"kind"`
-	URL           string    `json:"url"`
-	LastError     string    `json:"lastError"`
-	FailingSince  time.Time `json:"failingSince"`
-	Slug          string    `json:"slug"`
-	WorkspaceName string    `json:"workspaceName"`
-	OwnerID       string    `json:"ownerId"`
-	OwnerEmail    string    `json:"ownerEmail"`
+	ID            string                `json:"id"`
+	WorkspaceID   string                `json:"workspaceId"`
+	Kind          nokku.AuditStreamKind `json:"kind"`
+	URL           string                `json:"url"`
+	LastError     string                `json:"lastError"`
+	FailingSince  time.Time             `json:"failingSince"`
+	Slug          string                `json:"slug"`
+	WorkspaceName string                `json:"workspaceName"`
+	OwnerID       string                `json:"ownerId"`
+	OwnerEmail    string                `json:"ownerEmail"`
 }
 
 // Enabled streams that failed for longer than the wait and whose owner has not heard of it. Runs as nokku_system.
@@ -480,14 +481,14 @@ type UpdateAuditStreamParams struct {
 }
 
 type UpdateAuditStreamRow struct {
-	ID           string     `json:"id"`
-	Kind         string     `json:"kind"`
-	URL          string     `json:"url"`
-	Enabled      bool       `json:"enabled"`
-	LastSentAt   *time.Time `json:"lastSentAt"`
-	LastError    string     `json:"lastError"`
-	FailingSince *time.Time `json:"failingSince"`
-	CreatedAt    time.Time  `json:"createdAt"`
+	ID           string                `json:"id"`
+	Kind         nokku.AuditStreamKind `json:"kind"`
+	URL          string                `json:"url"`
+	Enabled      bool                  `json:"enabled"`
+	LastSentAt   *time.Time            `json:"lastSentAt"`
+	LastError    string                `json:"lastError"`
+	FailingSince *time.Time            `json:"failingSince"`
+	CreatedAt    time.Time             `json:"createdAt"`
 }
 
 // A new secret replaces the old one, none keeps it. Enabling clears a failure, so the next tick tries at once.

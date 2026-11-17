@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/core/internal/crypto/kms"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -36,7 +38,7 @@ func testEvents() []*Event {
 }
 
 func TestStreamBodyWebhookIsTheExportShape(t *testing.T) {
-	body, err := streamBody(StreamWebhook, testEvents())
+	body, err := streamBody(nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK, testEvents())
 	require.NoError(t, err)
 
 	var got []map[string]any
@@ -47,7 +49,7 @@ func TestStreamBodyWebhookIsTheExportShape(t *testing.T) {
 }
 
 func TestStreamBodySplunkIsOneEventAfterAnother(t *testing.T) {
-	body, err := streamBody(StreamSplunk, testEvents())
+	body, err := streamBody(nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK, testEvents())
 	require.NoError(t, err)
 
 	dec := jsontext.NewDecoder(bytes.NewReader(body))
@@ -67,7 +69,7 @@ func TestStreamBodySplunkIsOneEventAfterAnother(t *testing.T) {
 }
 
 func TestStreamBodyDatadogNamesItsSource(t *testing.T) {
-	body, err := streamBody(StreamDatadog, testEvents())
+	body, err := streamBody(nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_DATADOG, testEvents())
 	require.NoError(t, err)
 
 	var got []map[string]any
@@ -80,18 +82,30 @@ func TestStreamBodyDatadogNamesItsSource(t *testing.T) {
 
 func TestSendSetsEachDestinationsAuth(t *testing.T) {
 	tests := []struct {
-		kind   string
+		kind   nokkuv1.AuditStreamKind
 		header string
 		want   func(r *http.Request, body []byte) string
 	}{
-		{StreamWebhook, "X-Nokku-Signature", func(r *http.Request, body []byte) string {
-			return "sha256=" + sign("s3cret-key", r.Header.Get("X-Nokku-Timestamp"), body)
-		}},
-		{StreamSplunk, "Authorization", func(*http.Request, []byte) string { return "Splunk s3cret-key" }},
-		{StreamDatadog, "DD-API-KEY", func(*http.Request, []byte) string { return "s3cret-key" }},
+		{
+			nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK,
+			"X-Nokku-Signature",
+			func(r *http.Request, body []byte) string {
+				return "sha256=" + sign("s3cret-key", r.Header.Get("X-Nokku-Timestamp"), body)
+			},
+		},
+		{
+			nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK,
+			"Authorization",
+			func(*http.Request, []byte) string { return "Splunk s3cret-key" },
+		},
+		{
+			nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_DATADOG,
+			"DD-API-KEY",
+			func(*http.Request, []byte) string { return "s3cret-key" },
+		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.kind, func(t *testing.T) {
+		t.Run(tt.kind.String(), func(t *testing.T) {
 			var got, want string
 			srv := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 				body, _ := io.ReadAll(r.Body)
@@ -117,7 +131,11 @@ func TestSendRefusesARedirect(t *testing.T) {
 	client.CheckRedirect = refuseRedirect
 	sut := &Service{egress: client, keys: testKeys(t)}
 
-	err := sut.send(t.Context(), testStream(t, sut, StreamDatadog, srv.URL, "key"), testEvents())
+	err := sut.send(
+		t.Context(),
+		testStream(t, sut, nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_DATADOG, srv.URL, "key"),
+		testEvents(),
+	)
 
 	require.ErrorContains(t, err, "302", "a redirect must fail the delivery, not follow it with the key")
 }
@@ -130,7 +148,7 @@ func testKeys(t *testing.T) *kms.Keyset {
 }
 
 // testStream seals secret the way CreateAuditStream stores it.
-func testStream(t *testing.T, s *Service, kind, url, secret string) *db.AuditStream {
+func testStream(t *testing.T, s *Service, kind nokkuv1.AuditStreamKind, url, secret string) *db.AuditStream {
 	t.Helper()
 	st := &db.AuditStream{ID: "s1", WorkspaceID: "w1", Kind: kind, URL: url}
 	sealed, err := s.keys.Seal(SecretAAD(st.WorkspaceID, st.ID), []byte(secret))

@@ -126,8 +126,8 @@ func TestSyncAnswer(t *testing.T) {
 				require.NoError(t, err)
 				accounts[key] = account.ID
 			}
-			require.NoError(t, q.PutGrant(f.ctx, &db.PutGrantParams{
-				AccountID: accounts[key], SubjectKind: kind, SubjectID: subject, ExpiresAt: ends,
+			require.NoError(t, q.PutGrants(f.ctx, &db.PutGrantsParams{
+				AccountIds: []string{accounts[key]}, SubjectKind: kind, SubjectID: subject, ExpiresAt: ends,
 			}))
 		}
 

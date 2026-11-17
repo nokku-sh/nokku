@@ -148,6 +148,20 @@ func TestAccessRequestFlow(t *testing.T) {
 	require.NotNil(t, rows[0].Until(), "the grant must end")
 	assert.WithinDuration(t, until, *rows[0].Until(), time.Second)
 
+	assert.Equal(t, admin.ID, grantedBy(t, cfg, target.ID, member.ID), "the grant must name who approved it")
+
+	answered, err := asAdmin.ListAccessRequests(ctx, &nokkuv1.ListAccessRequestsRequest{
+		Status: nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED.Enum(),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, answered.GetRequests(), "the status filter dropped the approved request")
+	for _, r := range answered.GetRequests() {
+		assert.Equal(t, nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED, r.GetStatus())
+	}
+	every, err := asAdmin.ListAccessRequests(ctx, &nokkuv1.ListAccessRequestsRequest{})
+	require.NoError(t, err)
+	assert.NotEmpty(t, every.GetRequests(), "a list with no status filter came back empty")
+
 	_, err = asAdmin.DenyAccessRequest(ctx, &nokkuv1.DenyAccessRequestRequest{Id: new(req.GetId())})
 	assert.Equal(
 		t,

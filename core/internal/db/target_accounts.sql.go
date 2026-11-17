@@ -124,26 +124,32 @@ func (q *Queries) DeleteTargetAccount(ctx context.Context, id string) error {
 
 const extendGrant = `-- name: ExtendGrant :exec
 INSERT INTO
-  grants (account_id, user_id, expires_at)
+  grants (account_id, user_id, expires_at, granted_by)
 VALUES
-  ($1, $2::UUID, $3::TIMESTAMPTZ)
+  ($1, $2::UUID, $3::TIMESTAMPTZ, $4::UUID)
 ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
-  expires_at = CASE
-    WHEN grants.expires_at IS NULL THEN NULL
-    ELSE GREATEST(grants.expires_at, EXCLUDED.expires_at)
-  END
+  expires_at = EXCLUDED.expires_at,
+  granted_by = EXCLUDED.granted_by
+WHERE
+  grants.expires_at < EXCLUDED.expires_at
 `
 
 type ExtendGrantParams struct {
 	AccountID string    `json:"accountId"`
 	UserID    string    `json:"userId"`
 	ExpiresAt time.Time `json:"expiresAt"`
+	GrantedBy *string   `json:"grantedBy"`
 }
 
 // An approved request never shortens access the user already has. A grant for good stays one.
 func (q *Queries) ExtendGrant(ctx context.Context, arg *ExtendGrantParams) error {
-	_, err := q.db.Exec(ctx, extendGrant, arg.AccountID, arg.UserID, arg.ExpiresAt)
+	_, err := q.db.Exec(ctx, extendGrant,
+		arg.AccountID,
+		arg.UserID,
+		arg.ExpiresAt,
+		arg.GrantedBy,
+	)
 	return err
 }
 
@@ -764,52 +770,6 @@ func (q *Queries) ListWorkspacesWithExpiredGrants(ctx context.Context) ([]string
 	return items, nil
 }
 
-const putGrant = `-- name: PutGrant :exec
-INSERT INTO
-  grants (
-    account_id,
-    user_id,
-    team_id,
-    service_account_id,
-    expires_at
-  )
-VALUES
-  (
-    $1,
-    CASE
-      WHEN $2::TEXT = 'user' THEN $3::UUID
-    END,
-    CASE
-      WHEN $2::TEXT = 'team' THEN $3::UUID
-    END,
-    CASE
-      WHEN $2::TEXT = 'service_account' THEN $3::UUID
-    END,
-    $4::TIMESTAMPTZ
-  )
-ON CONFLICT (account_id, subject_id) DO UPDATE
-SET
-  expires_at = EXCLUDED.expires_at
-`
-
-type PutGrantParams struct {
-	AccountID   string     `json:"accountId"`
-	SubjectKind string     `json:"subjectKind"`
-	SubjectID   string     `json:"subjectId"`
-	ExpiresAt   *time.Time `json:"expiresAt"`
-}
-
-// An admin's grant, the expiry is set exactly as asked. It can extend, shorten or end an expiry.
-func (q *Queries) PutGrant(ctx context.Context, arg *PutGrantParams) error {
-	_, err := q.db.Exec(ctx, putGrant,
-		arg.AccountID,
-		arg.SubjectKind,
-		arg.SubjectID,
-		arg.ExpiresAt,
-	)
-	return err
-}
-
 const putGrants = `-- name: PutGrants :exec
 INSERT INTO
   grants (
@@ -817,7 +777,8 @@ INSERT INTO
     user_id,
     team_id,
     service_account_id,
-    expires_at
+    expires_at,
+    granted_by
   )
 SELECT
   account_id,
@@ -830,27 +791,33 @@ SELECT
   CASE
     WHEN $1::TEXT = 'service_account' THEN $2::UUID
   END,
-  $3::TIMESTAMPTZ
+  $3::TIMESTAMPTZ,
+  $4::UUID
 FROM
-  unnest($4::UUID[]) AS account_id
+  unnest($5::UUID[]) AS account_id
 ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
-  expires_at = EXCLUDED.expires_at
+  expires_at = EXCLUDED.expires_at,
+  granted_by = EXCLUDED.granted_by
+WHERE
+  grants.expires_at IS DISTINCT FROM EXCLUDED.expires_at
 `
 
 type PutGrantsParams struct {
 	SubjectKind string     `json:"subjectKind"`
 	SubjectID   string     `json:"subjectId"`
 	ExpiresAt   *time.Time `json:"expiresAt"`
+	GrantedBy   *string    `json:"grantedBy"`
 	AccountIds  []string   `json:"accountIds"`
 }
 
-// PutGrant for many accounts in one statement.
+// An admin's grant on each account, the expiry is set exactly as asked. It can extend, shorten or end an expiry.
 func (q *Queries) PutGrants(ctx context.Context, arg *PutGrantsParams) error {
 	_, err := q.db.Exec(ctx, putGrants,
 		arg.SubjectKind,
 		arg.SubjectID,
 		arg.ExpiresAt,
+		arg.GrantedBy,
 		arg.AccountIds,
 	)
 	return err

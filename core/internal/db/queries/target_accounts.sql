@@ -154,34 +154,6 @@ FROM
 WHERE
   p.id = @account_id;
 
--- name: PutGrant :exec
--- An admin's grant, the expiry is set exactly as asked. It can extend, shorten or end an expiry.
-INSERT INTO
-  grants (
-    account_id,
-    user_id,
-    team_id,
-    service_account_id,
-    expires_at
-  )
-VALUES
-  (
-    @account_id,
-    CASE
-      WHEN @subject_kind::TEXT = 'user' THEN @subject_id::UUID
-    END,
-    CASE
-      WHEN @subject_kind::TEXT = 'team' THEN @subject_id::UUID
-    END,
-    CASE
-      WHEN @subject_kind::TEXT = 'service_account' THEN @subject_id::UUID
-    END,
-    sqlc.narg('expires_at')::TIMESTAMPTZ
-  )
-ON CONFLICT (account_id, subject_id) DO UPDATE
-SET
-  expires_at = EXCLUDED.expires_at;
-
 -- name: GrantWhere :many
 -- The servers a batch grant names, by id or by tag, each with the account asked for if it has one.
 SELECT
@@ -227,14 +199,15 @@ WHERE
   AND subject_id = @subject_id;
 
 -- name: PutGrants :exec
--- PutGrant for many accounts in one statement.
+-- An admin's grant on each account, the expiry is set exactly as asked. It can extend, shorten or end an expiry.
 INSERT INTO
   grants (
     account_id,
     user_id,
     team_id,
     service_account_id,
-    expires_at
+    expires_at,
+    granted_by
   )
 SELECT
   account_id,
@@ -247,25 +220,29 @@ SELECT
   CASE
     WHEN @subject_kind::TEXT = 'service_account' THEN @subject_id::UUID
   END,
-  sqlc.narg('expires_at')::TIMESTAMPTZ
+  sqlc.narg('expires_at')::TIMESTAMPTZ,
+  sqlc.narg('granted_by')::UUID
 FROM
   unnest(@account_ids::UUID[]) AS account_id
 ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
-  expires_at = EXCLUDED.expires_at;
+  expires_at = EXCLUDED.expires_at,
+  granted_by = EXCLUDED.granted_by
+WHERE
+  grants.expires_at IS DISTINCT FROM EXCLUDED.expires_at;
 
 -- name: ExtendGrant :exec
 -- An approved request never shortens access the user already has. A grant for good stays one.
 INSERT INTO
-  grants (account_id, user_id, expires_at)
+  grants (account_id, user_id, expires_at, granted_by)
 VALUES
-  (@account_id, @user_id::UUID, @expires_at::TIMESTAMPTZ)
+  (@account_id, @user_id::UUID, @expires_at::TIMESTAMPTZ, sqlc.narg('granted_by')::UUID)
 ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
-  expires_at = CASE
-    WHEN grants.expires_at IS NULL THEN NULL
-    ELSE GREATEST(grants.expires_at, EXCLUDED.expires_at)
-  END;
+  expires_at = EXCLUDED.expires_at,
+  granted_by = EXCLUDED.granted_by
+WHERE
+  grants.expires_at < EXCLUDED.expires_at;
 
 -- name: ListWorkspacesWithExpiredGrants :many
 SELECT DISTINCT

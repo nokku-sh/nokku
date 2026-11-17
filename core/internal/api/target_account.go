@@ -82,11 +82,12 @@ func (s *targetAccountService) AddSubjects(
 			expiresAt = new(req.GetExpiresAt().AsTime())
 		}
 		for _, subjectID := range req.GetSubjectIds() {
-			if err := q.PutGrant(ctx, &db.PutGrantParams{
-				AccountID:   req.GetId(),
+			if err := q.PutGrants(ctx, &db.PutGrantsParams{
+				AccountIds:  []string{req.GetId()},
 				SubjectKind: kind,
 				SubjectID:   subjectID,
 				ExpiresAt:   expiresAt,
+				GrantedBy:   callerID(ctx),
 			}); err != nil {
 				return err
 			}
@@ -249,6 +250,7 @@ func (s *targetAccountService) grant(
 			}
 			if err := q.PutGrants(ctx, &db.PutGrantsParams{
 				AccountIds: put, SubjectKind: kind, SubjectID: subject.GetId(), ExpiresAt: expiresAt,
+				GrantedBy: callerID(ctx),
 			}); err != nil {
 				return err
 			}

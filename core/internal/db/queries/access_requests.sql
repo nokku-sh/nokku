@@ -86,8 +86,8 @@ FROM
   access_request_details r
 WHERE
   (
-    sqlc.narg('status')::TEXT IS NULL
-    OR r.status = sqlc.narg('status')::TEXT
+    r.status = @status
+    OR @status = 0 -- every status
   )
   AND (
     sqlc.narg('requester_id')::UUID IS NULL
@@ -109,7 +109,7 @@ SET
   decided_at = NOW()
 WHERE
   id = @id
-  AND status = 'pending'
+  AND status = 1 -- pending
   AND requester_id <> @decided_by::UUID
 RETURNING
   *;
@@ -117,18 +117,18 @@ RETURNING
 -- name: CancelAccessRequest :execrows
 UPDATE access_requests
 SET
-  status = 'cancelled'
+  status = 4 -- cancelled
 WHERE
   id = @id
-  AND requester_id = @requester_id
-  AND status = 'pending';
+  AND status = 1 -- pending
+  AND requester_id = @requester_id;
 
 -- name: ExpireAccessRequests :many
 UPDATE access_requests
 SET
-  status = 'expired'
+  status = 5 -- expired
 WHERE
-  status = 'pending'
+  status = 1 -- pending
   AND created_at < NOW() - INTERVAL '1 day'
 RETURNING
   id,

@@ -254,8 +254,8 @@ func TestCreateSession(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		return q.PutGrant(t.Context(), &db.PutGrantParams{
-			AccountID: p.ID, SubjectKind: "user", SubjectID: memberPrincipal.ID,
+		return q.PutGrants(t.Context(), &db.PutGrantsParams{
+			AccountIds: []string{p.ID}, SubjectKind: "user", SubjectID: memberPrincipal.ID,
 		})
 	})
 	// With the grant the relay gets past the check, the daemon is just offline.
@@ -928,8 +928,8 @@ func TestAccessTellsRecording(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		return q.PutGrant(t.Context(), &db.PutGrantParams{
-			AccountID: p.ID, SubjectKind: db.SubjectKindUser, SubjectID: person.ID,
+		return q.PutGrants(t.Context(), &db.PutGrantsParams{
+			AccountIds: []string{p.ID}, SubjectKind: db.SubjectKindUser, SubjectID: person.ID,
 		})
 	})
 	editor := nokkuv1connect.NewDaemonServiceClient(clientOn(srv, header("Authorization",

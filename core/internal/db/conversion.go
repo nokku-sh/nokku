@@ -3,7 +3,6 @@ package db
 import (
 	"encoding/json"
 	"log/slog"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -16,12 +15,6 @@ import (
 
 // MaxTargetAccounts stops a host from reporting accounts without bound.
 const MaxTargetAccounts = 1000
-
-// The status and kind columns hold the enum names, lower case, no prefix.
-const (
-	accessRequestStatusPrefix = "ACCESS_REQUEST_STATUS_"
-	auditStreamKindPrefix     = "AUDIT_STREAM_KIND_"
-)
 
 func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	if w == nil {
@@ -348,16 +341,8 @@ func (p *ListTargetAccountsRow) ToProto() *nokkuv1.TargetAccount {
 	return out
 }
 
-func AccessRequestStatus(status nokkuv1.AccessRequestStatus) string {
-	if status == nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_UNSPECIFIED {
-		return ""
-	}
-	return strings.ToLower(strings.TrimPrefix(status.String(), accessRequestStatusPrefix))
-}
-
 func (r *AccessRequestDetail) GrantedUntil() *time.Time {
-	if r.Status != AccessRequestStatus(nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED) ||
-		r.DecidedAt == nil {
+	if r.Status != nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED || r.DecidedAt == nil {
 		return nil
 	}
 	return new(r.DecidedAt.Add(r.Duration))
@@ -367,9 +352,6 @@ func (r *AccessRequestDetail) ToProto() *nokkuv1.AccessRequest {
 	if r == nil {
 		return nil
 	}
-	status := nokkuv1.AccessRequestStatus(
-		nokkuv1.AccessRequestStatus_value[accessRequestStatusPrefix+strings.ToUpper(r.Status)],
-	)
 	return &nokkuv1.AccessRequest{
 		Id:             &r.ID,
 		RequesterId:    &r.RequesterID,
@@ -380,7 +362,7 @@ func (r *AccessRequestDetail) ToProto() *nokkuv1.AccessRequest {
 		Username:       &r.Username,
 		Duration:       durationpb.New(r.Duration),
 		Reason:         &r.Reason,
-		Status:         &status,
+		Status:         &r.Status,
 		DecidedBy:      r.DecidedBy,
 		DeciderName:    &r.DeciderName,
 		DecidedAt:      SafeTimestamp(r.DecidedAt),
@@ -389,15 +371,10 @@ func (r *AccessRequestDetail) ToProto() *nokkuv1.AccessRequest {
 	}
 }
 
-func AuditStreamKind(kind nokkuv1.AuditStreamKind) string {
-	return strings.ToLower(strings.TrimPrefix(kind.String(), auditStreamKindPrefix))
-}
-
 func (r *ListAuditStreamsRow) ToProto() *nokkuv1.AuditStream {
-	kind := nokkuv1.AuditStreamKind(nokkuv1.AuditStreamKind_value[auditStreamKindPrefix+strings.ToUpper(r.Kind)])
 	return &nokkuv1.AuditStream{
 		Id:           &r.ID,
-		Kind:         &kind,
+		Kind:         &r.Kind,
 		Url:          &r.URL,
 		Enabled:      &r.Enabled,
 		LastSentAt:   SafeTimestamp(r.LastSentAt),

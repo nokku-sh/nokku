@@ -173,8 +173,8 @@ func grant(ctx context.Context, q *db.Queries, targetID string, who subjects) er
 			db.SubjectKindServiceAccount: sample(who.serviceAccounts, roll(2)),
 		} {
 			for _, id := range ids {
-				if err := q.PutGrant(ctx, &db.PutGrantParams{
-					AccountID: p.ID, SubjectKind: kind, SubjectID: id,
+				if err := q.PutGrants(ctx, &db.PutGrantsParams{
+					AccountIds: []string{p.ID}, SubjectKind: kind, SubjectID: id,
 				}); err != nil {
 					return fmt.Errorf("grant: %w", err)
 				}

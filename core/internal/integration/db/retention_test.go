@@ -82,7 +82,7 @@ func TestRetentionWaitsForEnabledStreams(t *testing.T) {
 	var stream string
 	require.NoError(t, c.sysPool.QueryRow(t.Context(),
 		`INSERT INTO audit_streams (workspace_id, kind, url, secret, enabled, cursor_ts)
-		VALUES ($1, 'webhook', 'https://siem.example', '\x00', TRUE, $2) RETURNING id`,
+		VALUES ($1, 1, 'https://siem.example', '\x00', TRUE, $2) RETURNING id`,
 		f.ws, now.Add(-150*day),
 	).Scan(&stream), "seed stream")
 

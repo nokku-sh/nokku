@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect/v2"
@@ -125,7 +126,7 @@ func (s *accessRequestService) ListAccessRequests(
 	ctx context.Context,
 	req *nokkuv1.ListAccessRequestsRequest,
 ) (*nokkuv1.ListAccessRequestsResponse, error) {
-	var requester, status *string
+	var requester *string
 	if callerRole(ctx) < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN {
 		userID := actor.UserIDFromContext(ctx)
 		// Only people ask, so a service account has no requests of its own.
@@ -134,13 +135,10 @@ func (s *accessRequestService) ListAccessRequests(
 		}
 		requester = &userID
 	}
-	if name := db.AccessRequestStatus(req.GetStatus()); name != "" {
-		status = &name
-	}
 
 	q := s.cfg.Conn.Tenant()
 	params := &db.ListAccessRequestsParams{
-		Status:      status,
+		Status:      req.GetStatus(),
 		RequesterID: requester,
 		Limit:       req.Limit,
 		Offset:      req.Offset,
@@ -201,7 +199,7 @@ func (s *accessRequestService) decide(
 	var row *db.AccessRequestDetail
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		_, err := q.DecideAccessRequest(ctx, &db.DecideAccessRequestParams{
-			Status:    db.AccessRequestStatus(status),
+			Status:    status,
 			DecidedBy: caller,
 			ID:        id,
 		})
@@ -219,6 +217,7 @@ func (s *accessRequestService) decide(
 				AccountID: row.AccountID,
 				UserID:    row.RequesterID,
 				ExpiresAt: *until,
+				GrantedBy: &caller,
 			})
 		}
 		return nil
@@ -244,7 +243,8 @@ func whyUndecided(ctx context.Context, q *db.Queries, id, caller string) error {
 	case r.RequesterID == caller:
 		return connect.NewError(connect.CodePermissionDenied, "another admin has to answer your own request")
 	}
-	return connect.NewError(connect.CodeFailedPrecondition, "the request is "+r.Status+" already")
+	state := strings.ToLower(strings.TrimPrefix(r.Status.String(), "ACCESS_REQUEST_STATUS_"))
+	return connect.NewError(connect.CodeFailedPrecondition, "the request is "+state+" already")
 }
 
 func (s *accessRequestService) CancelAccessRequest(

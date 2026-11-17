@@ -22,8 +22,8 @@ const (
 // syncInputs hold the CA keys and idle timeout a sync reads as well.
 var syncInputs = []string{"ssh_cas", "workspaces"}
 
-// fixedColumns are read by the access view but no query updates them. Keys
-// (id, workspace_id) are left out, nothing updates those.
+// fixedColumns are read by the access view and need no trigger, each for the
+// reason beside it. Keys (id, workspace_id) are left out, nothing updates those.
 var fixedColumns = map[string]string{
 	"grants.account_id":         "a grant is deleted and made anew, never moved",
 	"grants.user_id":            "a grant is deleted and made anew, never moved",
@@ -32,6 +32,7 @@ var fixedColumns = map[string]string{
 	"grants.subject_id":         "generated from the subject columns",
 	"grants.subject_kind":       "generated from the subject columns",
 	"grants.created_at":         "set on insert",
+	"grants.granted_by":         "names who set the end, and it grants nothing",
 	"target_accounts.target_id": "accounts are added and removed, never changed",
 	"target_accounts.username":  "accounts are added and removed, never changed",
 	"targets.daemon_id":         "a target's daemon never changes",

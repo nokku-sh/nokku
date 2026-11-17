@@ -219,3 +219,11 @@ func callerRole(ctx context.Context) nokkuv1.WorkspaceRole {
 	p, _ := actor.PrincipalFromContext(ctx)
 	return p.Role
 }
+
+// callerID is what a created_by or granted_by column stores, nil without a principal.
+func callerID(ctx context.Context) *string {
+	if id := actor.SubjectFromContext(ctx); id != "" {
+		return &id
+	}
+	return nil
+}

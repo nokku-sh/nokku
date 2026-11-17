@@ -8,17 +8,18 @@ package db
 import (
 	"context"
 
+	nokku "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"time"
 )
 
 const cancelAccessRequest = `-- name: CancelAccessRequest :execrows
 UPDATE access_requests
 SET
-  status = 'cancelled'
+  status = 4 -- cancelled
 WHERE
   id = $1
+  AND status = 1 -- pending
   AND requester_id = $2
-  AND status = 'pending'
 `
 
 type CancelAccessRequestParams struct {
@@ -87,16 +88,16 @@ SET
   decided_at = NOW()
 WHERE
   id = $3
-  AND status = 'pending'
+  AND status = 1 -- pending
   AND requester_id <> $2::UUID
 RETURNING
   id, workspace_id, requester_id, account_id, duration, reason, status, decided_by, decided_at, created_at
 `
 
 type DecideAccessRequestParams struct {
-	Status    string `json:"status"`
-	DecidedBy string `json:"decidedBy"`
-	ID        string `json:"id"`
+	Status    nokku.AccessRequestStatus `json:"status"`
+	DecidedBy string                    `json:"decidedBy"`
+	ID        string                    `json:"id"`
 }
 
 // Only a pending request is decided, and never by the one who asked.
@@ -121,9 +122,9 @@ func (q *Queries) DecideAccessRequest(ctx context.Context, arg *DecideAccessRequ
 const expireAccessRequests = `-- name: ExpireAccessRequests :many
 UPDATE access_requests
 SET
-  status = 'expired'
+  status = 5 -- expired
 WHERE
-  status = 'pending'
+  status = 1 -- pending
   AND created_at < NOW() - INTERVAL '1 day'
 RETURNING
   id,
@@ -157,7 +158,7 @@ func (q *Queries) ExpireAccessRequests(ctx context.Context) ([]*ExpireAccessRequ
 
 const getAccessRequest = `-- name: GetAccessRequest :one
 SELECT
-  id, workspace_id, requester_id, account_id, duration, reason, status, decided_by, decided_at, created_at, target_id, target_name, username, requester_name, requester_email, decider_name
+  target_id, target_name, username, requester_name, requester_email, decider_name, id, workspace_id, requester_id, account_id, duration, reason, status, decided_by, decided_at, created_at
 FROM
   access_request_details
 WHERE
@@ -168,6 +169,12 @@ func (q *Queries) GetAccessRequest(ctx context.Context, id string) (*AccessReque
 	row := q.db.QueryRow(ctx, getAccessRequest, id)
 	var i AccessRequestDetail
 	err := row.Scan(
+		&i.TargetID,
+		&i.TargetName,
+		&i.Username,
+		&i.RequesterName,
+		&i.RequesterEmail,
+		&i.DeciderName,
 		&i.ID,
 		&i.WorkspaceID,
 		&i.RequesterID,
@@ -178,12 +185,6 @@ func (q *Queries) GetAccessRequest(ctx context.Context, id string) (*AccessReque
 		&i.DecidedBy,
 		&i.DecidedAt,
 		&i.CreatedAt,
-		&i.TargetID,
-		&i.TargetName,
-		&i.Username,
-		&i.RequesterName,
-		&i.RequesterEmail,
-		&i.DeciderName,
 	)
 	return &i, err
 }
@@ -225,14 +226,14 @@ func (q *Queries) GetRequestableAccount(ctx context.Context, arg *GetRequestable
 
 const listAccessRequests = `-- name: ListAccessRequests :many
 SELECT
-  r.id, r.workspace_id, r.requester_id, r.account_id, r.duration, r.reason, r.status, r.decided_by, r.decided_at, r.created_at, r.target_id, r.target_name, r.username, r.requester_name, r.requester_email, r.decider_name,
+  r.target_id, r.target_name, r.username, r.requester_name, r.requester_email, r.decider_name, r.id, r.workspace_id, r.requester_id, r.account_id, r.duration, r.reason, r.status, r.decided_by, r.decided_at, r.created_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   access_request_details r
 WHERE
   (
-    $1::TEXT IS NULL
-    OR r.status = $1::TEXT
+    r.status = $1
+    OR $1 = 0 -- every status
   )
   AND (
     $2::UUID IS NULL
@@ -247,10 +248,10 @@ OFFSET
 `
 
 type ListAccessRequestsParams struct {
-	Status      *string `json:"status"`
-	RequesterID *string `json:"requesterId"`
-	Offset      *int32  `json:"offset"`
-	Limit       *int32  `json:"limit"`
+	Status      nokku.AccessRequestStatus `json:"status"`
+	RequesterID *string                   `json:"requesterId"`
+	Offset      *int32                    `json:"offset"`
+	Limit       *int32                    `json:"limit"`
 }
 
 type ListAccessRequestsRow struct {
@@ -273,6 +274,12 @@ func (q *Queries) ListAccessRequests(ctx context.Context, arg *ListAccessRequest
 	for rows.Next() {
 		var i ListAccessRequestsRow
 		if err := rows.Scan(
+			&i.AccessRequestDetail.TargetID,
+			&i.AccessRequestDetail.TargetName,
+			&i.AccessRequestDetail.Username,
+			&i.AccessRequestDetail.RequesterName,
+			&i.AccessRequestDetail.RequesterEmail,
+			&i.AccessRequestDetail.DeciderName,
 			&i.AccessRequestDetail.ID,
 			&i.AccessRequestDetail.WorkspaceID,
 			&i.AccessRequestDetail.RequesterID,
@@ -283,12 +290,6 @@ func (q *Queries) ListAccessRequests(ctx context.Context, arg *ListAccessRequest
 			&i.AccessRequestDetail.DecidedBy,
 			&i.AccessRequestDetail.DecidedAt,
 			&i.AccessRequestDetail.CreatedAt,
-			&i.AccessRequestDetail.TargetID,
-			&i.AccessRequestDetail.TargetName,
-			&i.AccessRequestDetail.Username,
-			&i.AccessRequestDetail.RequesterName,
-			&i.AccessRequestDetail.RequesterEmail,
-			&i.AccessRequestDetail.DeciderName,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

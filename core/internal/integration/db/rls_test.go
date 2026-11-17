@@ -74,7 +74,7 @@ func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 		INSERT INTO access_usage (workspace_id, target_id, subject_id) VALUES ($1, $3, $2);
 		INSERT INTO access_requests (workspace_id, requester_id, account_id, duration, reason)
 		VALUES ($1, $2, $4, '1 hour', 'fix');
-		INSERT INTO audit_streams (workspace_id, kind, url, secret) VALUES ($1, 'webhook', 'https://siem.test', 'key');
+		INSERT INTO audit_streams (workspace_id, kind, url, secret) VALUES ($1, 1, 'https://siem.test', 'key');
 	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.u, f.target, f.account)
 	require.NoError(t, err, "seed every table")
 }
@@ -157,6 +157,27 @@ func TestEveryTenantTableHasThePolicy(t *testing.T) {
 		assert.Equal(t, new("current_workspace_id()"), def, wantColumn, table)
 		assert.Equal(t, "NO", nullable, wantColumn, table)
 	}
+}
+
+// A new table or view the default privileges hand to the app role needs row security, or a REVOKE.
+func TestAppRoleReachesNoTablePastRowSecurity(t *testing.T) {
+	c := testConnection(t)
+	rows, err := c.sysPool.Query(t.Context(), `
+		SELECT n.nspname || '.' || c.relname
+		FROM pg_class c
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+			AND has_table_privilege('nokku_app', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE')
+			AND CASE c.relkind
+				WHEN 'v' THEN NOT COALESCE(c.reloptions @> ARRAY['security_invoker=true'], FALSE)
+				WHEN 'm' THEN TRUE
+				ELSE c.relkind IN ('r', 'p') AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
+			END
+		ORDER BY 1`)
+	require.NoError(t, err, "list open tables")
+	open, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	require.NoError(t, err, "list open tables")
+	assert.Empty(t, open, "the app role reaches these tables and views with no row security")
 }
 
 // The app role cannot bypass row security, or become the role that does.

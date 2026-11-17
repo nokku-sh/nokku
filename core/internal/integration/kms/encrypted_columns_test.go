@@ -374,7 +374,7 @@ func seedAuditStream(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws, ur
 	require.NoError(t, err)
 	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) error {
 		if _, err := q.CreateAuditStream(t.Context(), &db.CreateAuditStreamParams{
-			ID: id, Kind: audit.StreamSplunk, URL: url, Secret: sealed,
+			ID: id, Kind: nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK, URL: url, Secret: sealed,
 		}); err != nil {
 			return err
 		}

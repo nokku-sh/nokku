@@ -41,7 +41,6 @@ func (s *auditStreamService) CreateAuditStream(
 	ctx context.Context,
 	req *nokkuv1.CreateAuditStreamRequest,
 ) (*nokkuv1.CreateAuditStreamResponse, error) {
-	kind := db.AuditStreamKind(req.GetKind())
 	id := uuid.NewV7().String()
 	secret, err := s.cfg.Keyset.Seal(audit.SecretAAD(actor.WorkspaceIDFromContext(ctx), id), []byte(req.GetSecret()))
 	if err != nil {
@@ -59,7 +58,7 @@ func (s *auditStreamService) CreateAuditStream(
 		}
 		row, err = q.CreateAuditStream(ctx, &db.CreateAuditStreamParams{
 			ID:     id,
-			Kind:   kind,
+			Kind:   req.GetKind(),
 			URL:    req.GetUrl(),
 			Secret: secret,
 		})
@@ -68,7 +67,7 @@ func (s *auditStreamService) CreateAuditStream(
 		return nil, err
 	}
 	audit.SetTarget(ctx, row.ID)
-	audit.Set(ctx, "kind", kind)
+	audit.Set(ctx, "kind", audit.KindName(req.GetKind()))
 	audit.Set(ctx, "url", req.GetUrl())
 	return &nokkuv1.CreateAuditStreamResponse{Stream: (*db.ListAuditStreamsRow)(row).ToProto()}, nil
 }

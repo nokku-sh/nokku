@@ -1,6 +1,6 @@
 -- Every tenant table carries workspace_id and its foreign keys include it, so no row points into another workspace.
 -- Searches and tag filters scan one workspace's rows, found through UNIQUE (workspace_id, id), so names and tags
--- have no index of their own.
+-- have no index of their own. Only targets.tags has one, idx_targets_tags.
 -- Tenancy --------------------------------------------------------------------
 CREATE FUNCTION current_workspace_id () RETURNS UUID AS $$
   SELECT NULLIF(current_setting('nokku.workspace_id', TRUE), '')::UUID
@@ -355,8 +355,6 @@ CREATE TABLE join_tokens (
   UNIQUE (workspace_id, id)
 );
 
-CREATE INDEX idx_join_tokens_workspace ON join_tokens (workspace_id);
-
 CREATE TABLE daemons (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -430,6 +428,8 @@ CREATE TABLE grants (
     END
   ) STORED,
   subject_id UUID GENERATED ALWAYS AS (COALESCE(user_id, team_id, service_account_id)) STORED,
+  -- Who last set its end, an approver too. NULL from a join token. No foreign key, like targets.created_by.
+  granted_by UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- NULL is for good. Resolvers skip an ended grant at once, the expiry job deletes it within a minute.
   expires_at TIMESTAMPTZ,
@@ -487,11 +487,12 @@ CREATE TABLE access_requests (
   account_id UUID NOT NULL,
   duration INTERVAL NOT NULL CHECK (duration > INTERVAL '0'),
   reason TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'cancelled', 'expired')),
+  -- AccessRequestStatus: 1=pending, 2=approved, 3=denied, 4=cancelled, 5=expired
+  status INTEGER NOT NULL DEFAULT 1 CHECK (status BETWEEN 1 AND 5),
   decided_by UUID,
   decided_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK ((status IN ('approved', 'denied')) = (decided_at IS NOT NULL)),
+  CHECK ((status IN (2, 3)) = (decided_at IS NOT NULL)), -- approved or denied
   FOREIGN KEY (workspace_id, requester_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, account_id) REFERENCES target_accounts (workspace_id, id) ON DELETE CASCADE,
   FOREIGN KEY (workspace_id, decided_by) REFERENCES users (workspace_id, id) ON DELETE SET NULL (decided_by)
@@ -500,7 +501,7 @@ CREATE TABLE access_requests (
 -- One open request per person and account.
 CREATE UNIQUE INDEX idx_access_requests_pending ON access_requests (requester_id, account_id)
 WHERE
-  status = 'pending';
+  status = 1; -- pending
 
 CREATE INDEX idx_access_requests_workspace ON access_requests (workspace_id, created_at DESC);
 
@@ -573,17 +574,18 @@ FROM
   LEFT JOIN daemons d ON d.workspace_id = t.workspace_id
   AND d.id = t.daemon_id;
 
+-- The request's own columns come last. A view only takes a new column at its end, so CREATE OR REPLACE keeps working.
 CREATE VIEW access_request_details
 WITH
   (security_invoker = TRUE) AS
 SELECT
-  r.*,
   t.id AS target_id,
   t.name AS target_name,
   p.username,
   u.name AS requester_name,
   u.email AS requester_email,
-  COALESCE(d.name, d.email, '') AS decider_name
+  COALESCE(d.name, d.email, '') AS decider_name,
+  r.*
 FROM
   access_requests r
   JOIN target_accounts p ON p.id = r.account_id
@@ -651,7 +653,7 @@ CREATE INDEX idx_recording_deletes_due ON recording_deletes (next_try_at);
 CREATE TABLE audit_streams (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   workspace_id UUID NOT NULL DEFAULT current_workspace_id () REFERENCES workspaces (id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('webhook', 'splunk', 'datadog')),
+  kind INTEGER NOT NULL CHECK (kind BETWEEN 1 AND 3), -- AuditStreamKind: 1=webhook, 2=splunk, 3=datadog
   url TEXT NOT NULL,
   secret BYTEA NOT NULL, -- the HMAC key, HEC token or API key, sealed
   enabled BOOLEAN NOT NULL DEFAULT TRUE,

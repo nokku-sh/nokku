@@ -18,6 +18,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
@@ -223,15 +224,13 @@ func TestRevokeOnATag(t *testing.T) {
 			return err
 		}
 		outsideServer, outside = serverID, ids[0]
-		for _, id := range append(slices.Clone(onTag), outside) {
-			if err := q.PutGrant(t.Context(), &db.PutGrantParams{
-				AccountID: id, SubjectKind: db.SubjectKindTeam, SubjectID: team,
-			}); err != nil {
-				return err
-			}
+		if err := q.PutGrants(t.Context(), &db.PutGrantsParams{
+			AccountIds: append(slices.Clone(onTag), outside), SubjectKind: db.SubjectKindTeam, SubjectID: team,
+		}); err != nil {
+			return err
 		}
-		return q.PutGrant(t.Context(), &db.PutGrantParams{
-			AccountID: onTag[0], SubjectKind: db.SubjectKindUser, SubjectID: person.ID,
+		return q.PutGrants(t.Context(), &db.PutGrantsParams{
+			AccountIds: []string{onTag[0]}, SubjectKind: db.SubjectKindUser, SubjectID: person.ID,
 		})
 	})
 	held := func(subject string, accounts ...string) int {
@@ -323,4 +322,68 @@ func TestRevokeOnATag(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	assert.Zero(t, held(team, outside))
+}
+
+// grantedBy reads who a grant on a server names, no query returns it yet.
+func grantedBy(t *testing.T, cfg *app.Config, targetID, subjectID string) string {
+	t.Helper()
+	var by string
+	require.NoError(t, cfg.Conn.Pool.QueryRow(wsCtx(t), `
+		SELECT g.granted_by FROM grants g JOIN target_accounts a ON a.id = g.account_id
+		WHERE a.target_id = $1 AND g.subject_id = $2`, targetID, subjectID).Scan(&by), "read who granted")
+	return by
+}
+
+// The access matrix will show who granted, so every way to grant stores it.
+func TestGrantsNameWhoMadeThem(t *testing.T) {
+	cfg, srv := enterprise(t)
+	ws := testWorkspace.ID
+	editor := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	client := clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, editor)))
+	accounts := nokkuv1connect.NewTargetAccountServiceClient(client)
+	one := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	two := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	tag := uniq("named")
+
+	var target, account string
+	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+		created, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{
+			Name: uniq("named"), Tags: []string{tag}, Endpoints: []string{},
+		})
+		if err != nil {
+			return err
+		}
+		target = created.ID
+		made, err := q.CreateTargetAccount(t.Context(), &db.CreateTargetAccountParams{
+			TargetID: target, Username: "deploy",
+		})
+		if err != nil {
+			return err
+		}
+		account = made.ID
+		return nil
+	})
+
+	_, err := accounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
+		Id: &account, SubjectIds: []string{one.ID}, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, editor.ID, grantedBy(t, cfg, target, one.ID), "AddSubjects left the grant unnamed")
+
+	_, err = accounts.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{
+		Subjects: []*nokkuv1.GrantSubject{{Id: &two.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
+		Tags:     []string{tag},
+		Username: new("deploy"),
+	}})
+	require.NoError(t, err)
+	assert.Equal(t, editor.ID, grantedBy(t, cfg, target, two.ID), "Grant left the grant unnamed")
+
+	seeded, err := nokkuv1connect.NewTargetServiceClient(client).CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
+		Name:   new(uniq("named")),
+		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("root"), UserIds: []string{one.ID}}},
+	})
+	require.NoError(t, err)
+	assert.Equal(
+		t, editor.ID, grantedBy(t, cfg, seeded.GetTarget().GetId(), one.ID), "CreateTarget left the grant unnamed",
+	)
 }

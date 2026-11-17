@@ -72,6 +72,18 @@ sql:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
               type: "WorkspaceRole"
               pointer: true
+          - column: "access_requests.status"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "AccessRequestStatus"
+          - column: "access_request_details.status"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "AccessRequestStatus"
+          - column: "audit_streams.kind"
+            go_type:
+              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
+              type: "AuditStreamKind"
 
           # JSON overrides
           - column: "service_account_federations.claims"

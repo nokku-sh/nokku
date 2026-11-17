@@ -12,35 +12,35 @@ import (
 )
 
 type AccessRequest struct {
-	ID          string        `json:"id"`
-	WorkspaceID string        `json:"workspaceId"`
-	RequesterID string        `json:"requesterId"`
-	AccountID   string        `json:"accountId"`
-	Duration    time.Duration `json:"duration"`
-	Reason      string        `json:"reason"`
-	Status      string        `json:"status"`
-	DecidedBy   *string       `json:"decidedBy"`
-	DecidedAt   *time.Time    `json:"decidedAt"`
-	CreatedAt   time.Time     `json:"createdAt"`
+	ID          string                    `json:"id"`
+	WorkspaceID string                    `json:"workspaceId"`
+	RequesterID string                    `json:"requesterId"`
+	AccountID   string                    `json:"accountId"`
+	Duration    time.Duration             `json:"duration"`
+	Reason      string                    `json:"reason"`
+	Status      nokku.AccessRequestStatus `json:"status"`
+	DecidedBy   *string                   `json:"decidedBy"`
+	DecidedAt   *time.Time                `json:"decidedAt"`
+	CreatedAt   time.Time                 `json:"createdAt"`
 }
 
 type AccessRequestDetail struct {
-	ID             string        `json:"id"`
-	WorkspaceID    string        `json:"workspaceId"`
-	RequesterID    string        `json:"requesterId"`
-	AccountID      string        `json:"accountId"`
-	Duration       time.Duration `json:"duration"`
-	Reason         string        `json:"reason"`
-	Status         string        `json:"status"`
-	DecidedBy      *string       `json:"decidedBy"`
-	DecidedAt      *time.Time    `json:"decidedAt"`
-	CreatedAt      time.Time     `json:"createdAt"`
-	TargetID       string        `json:"targetId"`
-	TargetName     string        `json:"targetName"`
-	Username       string        `json:"username"`
-	RequesterName  string        `json:"requesterName"`
-	RequesterEmail string        `json:"requesterEmail"`
-	DeciderName    string        `json:"deciderName"`
+	TargetID       string                    `json:"targetId"`
+	TargetName     string                    `json:"targetName"`
+	Username       string                    `json:"username"`
+	RequesterName  string                    `json:"requesterName"`
+	RequesterEmail string                    `json:"requesterEmail"`
+	DeciderName    string                    `json:"deciderName"`
+	ID             string                    `json:"id"`
+	WorkspaceID    string                    `json:"workspaceId"`
+	RequesterID    string                    `json:"requesterId"`
+	AccountID      string                    `json:"accountId"`
+	Duration       time.Duration             `json:"duration"`
+	Reason         string                    `json:"reason"`
+	Status         nokku.AccessRequestStatus `json:"status"`
+	DecidedBy      *string                   `json:"decidedBy"`
+	DecidedAt      *time.Time                `json:"decidedAt"`
+	CreatedAt      time.Time                 `json:"createdAt"`
 }
 
 type AccessToken struct {
@@ -87,20 +87,20 @@ type AuditAuditLog struct {
 }
 
 type AuditStream struct {
-	ID              string        `json:"id"`
-	WorkspaceID     string        `json:"workspaceId"`
-	Kind            string        `json:"kind"`
-	URL             string        `json:"url"`
-	Secret          crypto.Sealed `json:"secret"`
-	Enabled         bool          `json:"enabled"`
-	CursorTs        time.Time     `json:"cursorTs"`
-	CursorID        string        `json:"cursorId"`
-	LastSentAt      *time.Time    `json:"lastSentAt"`
-	LastError       string        `json:"lastError"`
-	FailingSince    *time.Time    `json:"failingSince"`
-	FailureMailedAt *time.Time    `json:"failureMailedAt"`
-	RetryAt         *time.Time    `json:"retryAt"`
-	CreatedAt       time.Time     `json:"createdAt"`
+	ID              string                `json:"id"`
+	WorkspaceID     string                `json:"workspaceId"`
+	Kind            nokku.AuditStreamKind `json:"kind"`
+	URL             string                `json:"url"`
+	Secret          crypto.Sealed         `json:"secret"`
+	Enabled         bool                  `json:"enabled"`
+	CursorTs        time.Time             `json:"cursorTs"`
+	CursorID        string                `json:"cursorId"`
+	LastSentAt      *time.Time            `json:"lastSentAt"`
+	LastError       string                `json:"lastError"`
+	FailingSince    *time.Time            `json:"failingSince"`
+	FailureMailedAt *time.Time            `json:"failureMailedAt"`
+	RetryAt         *time.Time            `json:"retryAt"`
+	CreatedAt       time.Time             `json:"createdAt"`
 }
 
 type Credential struct {
@@ -169,6 +169,7 @@ type Grant struct {
 	ServiceAccountID *string    `json:"serviceAccountId"`
 	SubjectKind      *string    `json:"subjectKind"`
 	SubjectID        string     `json:"subjectId"`
+	GrantedBy        *string    `json:"grantedBy"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	ExpiresAt        *time.Time `json:"expiresAt"`
 }
@@ -227,6 +228,7 @@ type LiveGrant struct {
 	ServiceAccountID *string    `json:"serviceAccountId"`
 	SubjectKind      *string    `json:"subjectKind"`
 	SubjectID        string     `json:"subjectId"`
+	GrantedBy        *string    `json:"grantedBy"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	ExpiresAt        *time.Time `json:"expiresAt"`
 }

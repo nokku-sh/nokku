@@ -17,6 +17,8 @@ import (
 	"time"
 	"uuid"
 
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+
 	"github.com/nokku-sh/nokku/core/internal/crypto"
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/entitlement"
@@ -30,13 +32,6 @@ const (
 	streamRetry = time.Minute
 	// Goes up when an event's fields change in a way a receiver has to follow.
 	webhookSchema = "1"
-)
-
-// Stream kinds, the same as the audit_streams CHECK.
-const (
-	StreamWebhook = "webhook"
-	StreamSplunk  = "splunk"
-	StreamDatadog = "datadog"
 )
 
 // Each stream sends on its own, so a slow one holds up no other.
@@ -164,16 +159,19 @@ func (s *Service) send(ctx context.Context, st *db.AuditStream, events []*Event)
 	secret := string(plain)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "nokku-audit-stream")
+	//nolint:exhaustive // any other kind is refused in the default
 	switch st.Kind {
-	case StreamWebhook:
+	case nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK:
 		stamp := strconv.FormatInt(time.Now().Unix(), 10)
 		req.Header.Set("X-Nokku-Timestamp", stamp)
 		req.Header.Set("X-Nokku-Schema", webhookSchema)
 		req.Header.Set("X-Nokku-Signature", "sha256="+sign(secret, stamp, body))
-	case StreamSplunk:
+	case nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK:
 		req.Header.Set("Authorization", "Splunk "+secret)
-	case StreamDatadog:
+	case nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_DATADOG:
 		req.Header.Set("Dd-Api-Key", secret)
+	default:
+		return errors.New("unknown stream kind " + st.Kind.String())
 	}
 
 	res, err := s.egress.Do(req)
@@ -194,6 +192,11 @@ func SecretAAD(workspaceID, streamID string) crypto.AAD {
 	return crypto.AAD{Table: "audit_streams", Column: "secret", Workspace: workspaceID, Row: streamID}
 }
 
+// KindName is how a mail or an audit row names a stream kind, like splunk.
+func KindName(kind nokkuv1.AuditStreamKind) string {
+	return strings.ToLower(strings.TrimPrefix(kind.String(), "AUDIT_STREAM_KIND_"))
+}
+
 // refuseRedirect keeps the API key or signature off hosts nobody chose.
 func refuseRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
@@ -207,11 +210,12 @@ func sign(secret, stamp string, body []byte) string {
 }
 
 // Every event keeps its id, so a receiver drops what a retry sends twice.
-func streamBody(kind string, events []*Event) ([]byte, error) {
+func streamBody(kind nokkuv1.AuditStreamKind, events []*Event) ([]byte, error) {
+	//nolint:exhaustive // any other kind is refused below
 	switch kind {
-	case StreamWebhook:
+	case nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK:
 		return json.Marshal(events)
-	case StreamSplunk:
+	case nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK:
 		// HEC takes events one after another, not as an array.
 		var buf bytes.Buffer
 		for _, e := range events {
@@ -227,7 +231,7 @@ func streamBody(kind string, events []*Event) ([]byte, error) {
 			buf.Write(line)
 		}
 		return buf.Bytes(), nil
-	case StreamDatadog:
+	case nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_DATADOG:
 		logs := make([]map[string]any, len(events))
 		for i, e := range events {
 			logs[i] = map[string]any{
@@ -241,7 +245,7 @@ func streamBody(kind string, events []*Event) ([]byte, error) {
 		}
 		return json.Marshal(logs)
 	}
-	return nil, errors.New("unknown stream kind " + kind)
+	return nil, errors.New("unknown stream kind " + kind.String())
 }
 
 func eventFromRow(r *db.AuditAuditLog) *Event {

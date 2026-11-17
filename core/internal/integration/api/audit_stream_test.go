@@ -108,7 +108,7 @@ func TestSlowAuditStreamHoldsUpNoOther(t *testing.T) {
 			}
 			if _, err := q.CreateAuditStream(t.Context(), &db.CreateAuditStreamParams{
 				ID:     id,
-				Kind:   audit.StreamWebhook,
+				Kind:   nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK,
 				URL:    url,
 				Secret: secret,
 			}); err != nil {
@@ -171,7 +171,7 @@ func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
 		require.NoError(t, err)
 		inWorkspace(t, cfg, ws, func(q *db.Queries) error {
 			_, err := q.CreateAuditStream(t.Context(), &db.CreateAuditStreamParams{
-				ID: id, Kind: audit.StreamWebhook, URL: siem.URL, Secret: secret,
+				ID: id, Kind: nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK, URL: siem.URL, Secret: secret,
 			})
 			return err
 		})

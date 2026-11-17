@@ -111,8 +111,8 @@ func TestDashboardEndingGrants(t *testing.T) {
 		s := graphSeed{t: t, q: q, targets: map[string]string{}}
 		mia = s.member("Mia")
 		grant := func(accountID string, expiresAt *time.Time) {
-			require.NoError(t, q.PutGrant(t.Context(), &db.PutGrantParams{
-				AccountID: accountID, SubjectKind: db.SubjectKindUser, SubjectID: mia, ExpiresAt: expiresAt,
+			require.NoError(t, q.PutGrants(t.Context(), &db.PutGrantsParams{
+				AccountIds: []string{accountID}, SubjectKind: db.SubjectKindUser, SubjectID: mia, ExpiresAt: expiresAt,
 			}))
 		}
 		grant(s.account("web-2", nil, "deploy"), &soon)

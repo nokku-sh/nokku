@@ -240,8 +240,8 @@ func (f *matrixFixture) seedSubjects(t *testing.T) {
 				accounts[username] = a.ID
 			}
 			grant := func(username, kind, subjectID string, expiresAt *time.Time) {
-				require.NoError(t, q.PutGrant(t.Context(), &db.PutGrantParams{
-					AccountID:   accounts[username],
+				require.NoError(t, q.PutGrants(t.Context(), &db.PutGrantsParams{
+					AccountIds:  []string{accounts[username]},
 					SubjectKind: kind,
 					SubjectID:   subjectID,
 					ExpiresAt:   expiresAt,
