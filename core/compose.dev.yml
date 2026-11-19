@@ -46,7 +46,7 @@ services:
     restart: unless-stopped
 
   vault:
-    image: docker.io/hashicorp/vault:2.2.1
+    image: docker.io/hashicorp/vault:2.2.2
     container_name: vault
     # TLS from a CA made at every start, nokku only talks https to Vault. task containers copies the CA to
     # data/vault/vault-ca.pem, where VAULT_CACERT points, and creates the transit key for KMS_URI.
