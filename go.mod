@@ -26,7 +26,7 @@ require (
 	github.com/jackc/tern/v2 v2.4.3
 	github.com/mizuchilabs/inkan/license v0.3.0
 	github.com/mizuchilabs/kata v0.2.0
-	github.com/moby/moby/api v1.56.1
+	github.com/moby/moby/api v1.57.0
 	github.com/pkg/sftp v1.13.12
 	github.com/scaleway/scaleway-sdk-go v1.39.0
 	github.com/scaleway/tink-go-scwkms v0.1.2
