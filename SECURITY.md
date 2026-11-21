@@ -4,7 +4,7 @@
 
 Please do not open a public issue for a suspected vulnerability. Use GitHub's private reporting instead:
 
-1. Open this repository's **Security** tab.
+1. Open this repository's **Security and quality** tab.
 2. Select **Report a vulnerability**.
 3. Include as much of this as you can:
    - Which part and version, and the platform it runs on
