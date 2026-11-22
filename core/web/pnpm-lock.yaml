@@ -22,7 +22,7 @@ importers:
         version: 6.0.0
       asciinema-player:
         specifier: ^3.18.0
-        version: 3.18.0
+        version: 3.18.1
     devDependencies:
       '@bufbuild/protobuf':
         specifier: ^2.17.0
@@ -1110,8 +1110,8 @@ packages:
     resolution: {integrity: sha512-Z/ZeOgVl7bcSYZ/u/rh0fOpvEpq//LZmdbkXyc7syVzjPAhfOa9ebsdTSjEBDU4vs5nC98Kfduj1uFo0qyET3g==}
     engines: {node: '>= 0.4'}
 
-  asciinema-player@3.18.0:
-    resolution: {integrity: sha512-5gpt2ipFcy4NKmgkv+c/QXnJ9zMicxqWROCOuJqgwwtiYKM8Qe9hnDOvfqke5bW6M2DW/seO3uQYkQ0xeUUVtw==}
+  asciinema-player@3.18.1:
+    resolution: {integrity: sha512-H3blHwZYerDkjUVNABB0zjIzZhZu+JT0/FXT7Skc+4cpa2i7bDab49uOztsIguej4Ppfw6JS0V8J5/6VNqIIkQ==}
 
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
@@ -2759,7 +2759,7 @@ snapshots:
 
   aria-query@5.3.1: {}
 
-  asciinema-player@3.18.0:
+  asciinema-player@3.18.1:
     dependencies:
       solid-js: 1.9.19
 
