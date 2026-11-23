@@ -24,7 +24,6 @@ import (
 
 type scimUserHandler struct {
 	svc *Service
-	ws  actor.Workspace
 }
 
 func (h scimUserHandler) Create(r *http.Request, attrs scim.ResourceAttributes) (scim.Resource, error) {

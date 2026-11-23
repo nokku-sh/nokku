@@ -120,11 +120,7 @@ func (s *targetService) CreateTarget(
 
 	name := strings.TrimSpace(req.GetName())
 	if name != "" {
-		created, err := s.insertTarget(ctx, req, name)
-		if err != nil {
-			return nil, err
-		}
-		return created, nil
+		return s.insertTarget(ctx, req, name)
 	}
 
 	for attempt := 0; ; attempt++ {

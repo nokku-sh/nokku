@@ -87,6 +87,20 @@ func TestSendTemplate_CooldownPerTemplate(t *testing.T) {
 	assert.ErrorIs(t, err, ErrCooldown, "repeat of same template")
 }
 
+// Hosted, the link in a sign-in mail goes to the person's workspace, the bare domain serves none.
+func TestSignInMailsLinkToTheWorkspace(t *testing.T) {
+	sender := &mockSender{}
+	svc := newTestService(sender)
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "w1", BaseURL: "https://acme.nokku.test"})
+
+	require.NoError(t, svc.SendNewLoginEmail(ctx, "user-1", "a@b.io", "d1", "Chrome", "Vienna"))
+	require.NoError(t, svc.SendNewWayInEmail(ctx, "user-1", "a@b.io", "c1", "a passkey", "Vienna"))
+	require.Len(t, sender.sent, 2)
+	for _, msg := range sender.sent {
+		assert.Contains(t, msg.HTML, "https://acme.nokku.test/profile/security", msg.Subject)
+	}
+}
+
 // Another workspace is not held back, and learns nothing of the first invite.
 func TestSendInviteEmail_CooldownPerWorkspace(t *testing.T) {
 	sender := &mockSender{}

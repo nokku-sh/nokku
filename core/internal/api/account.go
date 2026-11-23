@@ -114,7 +114,7 @@ func (s *accountService) ListCredentials(
 	ctx context.Context,
 	_ *nokkuv1.ListCredentialsRequest,
 ) (*nokkuv1.ListCredentialsResponse, error) {
-	creds, err := s.cfg.IAM.ListCredentials(ctx)
+	creds, err := s.cfg.Conn.Tenant().ListUserCredentials(ctx, actor.UserIDFromContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,11 @@ func (s *accountService) RenameCredential(
 	ctx context.Context,
 	req *nokkuv1.RenameCredentialRequest,
 ) (*nokkuv1.RenameCredentialResponse, error) {
-	if err := s.cfg.IAM.RenameCredential(ctx, req.GetId(), req.GetLabel()); err != nil {
+	if err := s.cfg.Conn.Tenant().RenameCredential(ctx, &db.RenameCredentialParams{
+		UserID: actor.UserIDFromContext(ctx),
+		ID:     req.GetId(),
+		Label:  req.GetLabel(),
+	}); err != nil {
 		return nil, err
 	}
 	return &nokkuv1.RenameCredentialResponse{}, nil

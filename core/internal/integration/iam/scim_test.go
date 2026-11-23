@@ -383,13 +383,16 @@ func TestSCIMLinkIsNoCredential(t *testing.T) {
 		ID: "pk-" + u.ID, UserID: u.ID, Type: string(iam.MethodPasskey), Data: []byte{},
 	})
 
-	creds, err := e.svc.ListCredentials(ctx)
-	require.NoError(t, err)
+	var creds []*db.Credential
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
+		creds, err = q.ListUserCredentials(t.Context(), u.ID)
+		return err
+	}))
 	assert.Len(t, creds, 1, "the link is listed as a sign-in method")
 	// The id the link had while it was a row in credentials.
 	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "scim:"+o.ws.ID+":okta-7"), iam.ErrNotFound)
 
-	_, _, err = e.svc.RequestEmailChange(ctx, u, "other@"+testDomain())
+	_, _, err := e.svc.RequestEmailChange(ctx, u, "other@"+testDomain())
 	require.ErrorIs(t, err, iam.ErrManagedAccount)
 
 	// A second account cannot take the same id.

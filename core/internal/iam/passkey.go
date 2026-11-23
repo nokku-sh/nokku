@@ -15,15 +15,12 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 
 	"github.com/nokku-sh/nokku/core/internal/actor"
-	"github.com/nokku-sh/nokku/core/internal/cache"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
 const (
-	challengeTTL        = 5 * time.Minute
-	ceremonyCookieName  = "webauthn_session"
-	relyingPartyTTL     = time.Hour
-	relyingPartyEntries = 10_000
+	challengeTTL       = 5 * time.Minute
+	ceremonyCookieName = "webauthn_session"
 )
 
 type webUser struct {
@@ -33,7 +30,6 @@ type webUser struct {
 
 type passkeyFlow struct {
 	svc   *Service
-	rps   *cache.TTL[string, *webauthn.WebAuthn]
 	state *sealed[webauthn.SessionData]
 }
 
@@ -45,7 +41,6 @@ func (u *webUser) WebAuthnCredentials() []webauthn.Credential { return u.creds }
 func newPasskeyFlow(svc *Service) *passkeyFlow {
 	return &passkeyFlow{
 		svc: svc,
-		rps: cache.New[string, *webauthn.WebAuthn](relyingPartyEntries, relyingPartyTTL),
 		state: &sealed[webauthn.SessionData]{
 			svc: svc, cookie: ceremonyCookieName, use: "webauthn:session", ttl: challengeTTL,
 		},
@@ -274,9 +269,6 @@ func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
 	if !ok {
 		return nil, db.ErrWorkspaceNotPinned
 	}
-	if wa, ok := f.rps.Get(ws.ID); ok {
-		return wa, nil
-	}
 	u, err := url.Parse(ws.BaseURL)
 	if err != nil {
 		return nil, err
@@ -285,7 +277,7 @@ func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
 	if err != nil {
 		return nil, err
 	}
-	wa, err := webauthn.New(&webauthn.Config{
+	return webauthn.New(&webauthn.Config{
 		RPDisplayName: cmp.Or(row.Name, "Nokku"),
 		RPID:          u.Hostname(),
 		RPOrigins:     []string{ws.BaseURL},
@@ -295,9 +287,4 @@ func (f *passkeyFlow) rp(ctx context.Context) (*webauthn.WebAuthn, error) {
 		},
 		AttestationPreference: protocol.PreferNoAttestation,
 	})
-	if err != nil {
-		return nil, err
-	}
-	f.rps.Set(ws.ID, wa)
-	return wa, nil
 }

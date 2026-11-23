@@ -8,8 +8,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -155,4 +157,25 @@ func testStream(t *testing.T, s *Service, kind nokkuv1.AuditStreamKind, url, sec
 	require.NoError(t, err)
 	st.Secret = sealed
 	return st
+}
+
+// The answer is cut at 200 bytes, which can be inside a rune, and it is stored as the stream's last error. Postgres
+// refuses such text, and a failure that is not stored never retries later or alerts.
+func TestAFailedSendCanBeStored(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = io.WriteString(w, strings.Repeat("x", 199)+"é\x00 and more")
+	}))
+	t.Cleanup(srv.Close)
+	sut := &Service{egress: srv.Client(), keys: testKeys(t)}
+
+	err := sut.send(
+		t.Context(),
+		testStream(t, sut, nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK, srv.URL, "key"),
+		testEvents(),
+	)
+
+	require.ErrorContains(t, err, "502")
+	assert.True(t, utf8.ValidString(err.Error()), "the error ends inside a rune: %q", err.Error())
+	assert.NotContains(t, err.Error(), "\x00")
 }

@@ -3,6 +3,7 @@ package iam
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -71,6 +72,10 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (bool, erro
 	}
 
 	if cfg.AdminEmail == "" {
+		// Said at every start until there is one, or the server runs with nobody who can sign in.
+		if _, err := s.conn.Tenant().GetOwner(ctx); errors.Is(err, pgx.ErrNoRows) {
+			slog.Warn("this workspace has no owner, so nobody can sign in. Set NOKKU_ADMIN_EMAIL and start again")
+		}
 		return false, nil
 	}
 	if cfg.AdminName == "" {

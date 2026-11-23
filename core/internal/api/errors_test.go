@@ -83,8 +83,11 @@ func TestInternalErrorIsLoggedOnce(t *testing.T) {
 
 	err := toConnectError(t.Context(), fmt.Errorf("listing: %w", &pgconn.PgError{Code: pgerrcode.DiskFull}))
 
-	assert.Equal(t, errInternal, err)
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err))
 	assert.Equal(t, 1, strings.Count(out.String(), "internal error"))
+	// The client gets a reference that finds the line, not the cause.
+	ref := err.Error()[len(err.Error())-8:]
+	assert.Contains(t, out.String(), "ref="+ref)
 	assert.Contains(t, out.String(), "pg_code="+pgerrcode.DiskFull)
 	assert.NotContains(t, err.Error(), "listing", "the cause reached the client")
 

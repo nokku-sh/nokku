@@ -325,6 +325,20 @@ func TestServerNamesDifferByMoreThanCase(t *testing.T) {
 		"a second server took the name in lowercase: %v",
 		err,
 	)
+	require.ErrorContains(t, err, "a server with this name already exists")
+
+	// A name that is taken says what kind of thing has it.
+	as := header("Authorization", "Bearer "+sessionFor(t, cfg, editor))
+	teams := nokkuv1connect.NewTeamServiceClient(clientOn(srv, as))
+	_, err = teams.CreateTeam(t.Context(), &nokkuv1.CreateTeamRequest{Name: &name})
+	require.NoError(t, err)
+	_, err = teams.CreateTeam(t.Context(), &nokkuv1.CreateTeamRequest{Name: &name})
+	require.ErrorContains(t, err, "a team with this name already exists")
+	sas := nokkuv1connect.NewServiceAccountServiceClient(clientOn(srv, as))
+	_, err = sas.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{Name: &name})
+	require.NoError(t, err)
+	_, err = sas.CreateServiceAccount(t.Context(), &nokkuv1.CreateServiceAccountRequest{Name: &name})
+	require.ErrorContains(t, err, "a service account with this name already exists")
 
 	other, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("other"))})
 	require.NoError(t, err)

@@ -49,10 +49,7 @@ func (s *invitationService) AcceptInvitation(
 	ctx context.Context,
 	req *nokkuv1.AcceptInvitationRequest,
 ) (*nokkuv1.AcceptInvitationResponse, error) {
-	ci, err := callInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
+	ci, _ := connect.CallInfoForServerContext(ctx)
 	u, cookie, err := s.cfg.IAM.AcceptInvite(ctx, req.GetToken(), req.GetName())
 	switch {
 	case errors.Is(err, iam.ErrEmailTaken):

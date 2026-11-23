@@ -22,7 +22,7 @@ func scimResourceTypes(svc *Service, ws actor.Workspace) []scim.ResourceType {
 			Name:     "User",
 			Endpoint: scimUserEndpoint,
 			Schema:   scimUserSchema(),
-			Handler:  scimUserHandler{svc: svc, ws: ws},
+			Handler:  scimUserHandler{svc: svc},
 		},
 		{
 			ID:       optional.NewString("Group"),

@@ -8,18 +8,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-func (s *Service) ListCredentials(ctx context.Context) ([]*db.Credential, error) {
-	return s.conn.Tenant().ListUserCredentials(ctx, actor.UserIDFromContext(ctx))
-}
-
-func (s *Service) RenameCredential(ctx context.Context, id, label string) error {
-	return s.conn.Tenant().RenameCredential(ctx, &db.RenameCredentialParams{
-		UserID: actor.UserIDFromContext(ctx),
-		ID:     id,
-		Label:  label,
-	})
-}
-
 // DeleteCredential keeps the last way in unless a sign-in link can replace it.
 func (s *Service) DeleteCredential(ctx context.Context, id string) error {
 	return s.conn.TenantTx(ctx, func(q *db.Queries) error {

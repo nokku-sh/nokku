@@ -1,7 +1,9 @@
 package api
 
 import (
+	"cmp"
 	"context"
+	"crypto/rand"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -17,6 +19,13 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/storage"
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
+
+// taken says what a unique constraint is about, for the ones a person runs into by picking a name.
+var taken = map[string]string{
+	"idx_targets_name":                       "a server with this name already exists",
+	"idx_teams_workspace_name":               "a team with this name already exists",
+	"service_accounts_workspace_id_name_key": "a service account with this name already exists",
+}
 
 var (
 	errInternal = connect.NewError(
@@ -167,7 +176,9 @@ func toConnectError(ctx context.Context, err error) error {
 	case errors.Is(err, pgx.ErrNoRows):
 		return errNotFound
 	case code == pgerrcode.UniqueViolation, code == pgerrcode.ExclusionViolation:
-		return connect.NewError(connect.CodeAlreadyExists, "a record with this value already exists")
+		pgErr, _ := errors.AsType[*pgconn.PgError](err)
+		return connect.NewError(connect.CodeAlreadyExists,
+			cmp.Or(taken[pgErr.ConstraintName], "a record with this value already exists"))
 	case code == pgerrcode.ForeignKeyViolation, code == pgerrcode.RestrictViolation:
 		return connect.NewError(connect.CodeFailedPrecondition, "a related record is missing or still in use")
 	case code == pgerrcode.NotNullViolation, code == pgerrcode.CheckViolation, pgerrcode.IsDataException(code):
@@ -184,8 +195,11 @@ func toConnectError(ctx context.Context, err error) error {
 	if ci, ok := connect.CallInfoForServerContext(ctx); ok {
 		procedure = ci.Spec.Procedure
 	}
-	slog.ErrorContext(ctx, "internal error", "procedure", procedure, "pg_code", code, "error", err)
-	return errInternal
+	// The client gets no cause, so it gets something to find the cause by.
+	ref := rand.Text()[:8]
+	slog.ErrorContext(ctx, "internal error", "ref", ref, "procedure", procedure, "pg_code", code, "error", err)
+	return connect.NewError(connect.CodeInternal,
+		"something went wrong, please try again. The server's log has it under "+ref)
 }
 
 func writeJSONError(w http.ResponseWriter, status int, message string) {

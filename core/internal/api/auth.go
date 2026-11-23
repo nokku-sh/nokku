@@ -68,10 +68,7 @@ func (s *authService) ConsumeMagicLink(
 	ctx context.Context,
 	req *nokkuv1.ConsumeMagicLinkRequest,
 ) (*nokkuv1.ConsumeMagicLinkResponse, error) {
-	ci, err := callInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
+	ci, _ := connect.CallInfoForServerContext(ctx)
 	u, cookie, err := s.cfg.IAM.ConsumeMagicLink(ctx, req.GetToken())
 	switch {
 	case errors.Is(err, iam.ErrInactive):
@@ -107,10 +104,7 @@ func (s *authService) Logout(
 	ctx context.Context,
 	_ *nokkuv1.LogoutRequest,
 ) (*nokkuv1.LogoutResponse, error) {
-	ci, err := callInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
+	ci, _ := connect.CallInfoForServerContext(ctx)
 	setCookie(ci, s.cfg.IAM.ClearSessionCookie())
 	meta, _ := actor.RequestMetaFromContext(ctx)
 	// Public endpoint, so Logout authenticates the credential before revoking.
@@ -167,10 +161,7 @@ func (s *authService) ExchangeWorkloadToken(
 	ctx context.Context,
 	req *nokkuv1.ExchangeWorkloadTokenRequest,
 ) (*nokkuv1.ExchangeWorkloadTokenResponse, error) {
-	ci, err := callInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
+	ci, _ := connect.CallInfoForServerContext(ctx)
 	// First, so a client that has to sign again has not spent its job token.
 	binding, err := s.workloadBinding(ctx)
 	if errors.Is(err, dpop.ErrNonce) {
@@ -262,15 +253,4 @@ func (s *authService) refuseWorkload(ctx context.Context, r *iam.WorkloadRefused
 		s.cfg.Audit.Record(ctx, e)
 	}
 	return errWorkloadRefused
-}
-
-func callInfo(ctx context.Context) (*connect.CallInfo, error) {
-	ci, ok := connect.CallInfoForServerContext(ctx)
-	if !ok {
-		return nil, connect.NewError(
-			connect.CodeInternal,
-			"no call info in context",
-		)
-	}
-	return ci, nil
 }

@@ -307,6 +307,16 @@ func (s *Service) SendEmailMovedNotice(ctx context.Context, userID, email, newEm
 	})
 }
 
+// profileURL is where a person looks at their sign-ins. Hosted, every workspace has an address of its own and
+// the bare domain serves none.
+func (s *Service) profileURL(ctx context.Context) string {
+	base := s.appURL
+	if ws, ok := actor.WorkspaceFromContext(ctx); ok && ws.BaseURL != "" {
+		base = ws.BaseURL
+	}
+	return base + "/profile/security"
+}
+
 // SendNewLoginEmail cools down per device, so a second device gets its own.
 func (s *Service) SendNewLoginEmail(
 	ctx context.Context,
@@ -320,7 +330,7 @@ func (s *Service) SendNewLoginEmail(
 		ref:      deviceID,
 		data: newLoginTemplateData{
 			Operator:   s.Operator,
-			ProfileURL: s.appURL + "/profile/security",
+			ProfileURL: s.profileURL(ctx),
 			DeviceID:   deviceID,
 			DeviceName: deviceName,
 			IPAddress:  ip,
@@ -339,7 +349,7 @@ func (s *Service) SendNewWayInEmail(ctx context.Context, userID, email, credenti
 		ref:      credentialID,
 		data: newWayInTemplateData{
 			Operator:   s.Operator,
-			ProfileURL: s.appURL + "/profile/security",
+			ProfileURL: s.profileURL(ctx),
 			What:       what,
 			IPAddress:  ip,
 			EventTime:  time.Now().UTC().Format(mailTime),
