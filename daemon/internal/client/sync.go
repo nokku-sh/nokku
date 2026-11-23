@@ -1,11 +1,13 @@
 package client
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"net"
+	"net/netip"
+	"net/url"
 	"os/exec"
-	"strconv"
 	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -32,7 +34,7 @@ func (c *Client) syncDaemon(ctx context.Context) error {
 		passwd = nil
 	}
 	res, err := c.ctl.SyncDaemon(ctx, &nokkuv1.SyncDaemonRequest{
-		PrivateIps: c.sshEndpoints(),
+		PrivateIps: c.sshEndpoints(ctx),
 		Users:      login.Accounts(string(passwd)),
 		Metadata:   sysutil.Metadata(),
 	})
@@ -91,11 +93,21 @@ func (c *Client) signHostCert(ctx context.Context, pub []byte) (string, error) {
 	return res.GetSignedCertificate(), nil
 }
 
-func (c *Client) sshEndpoints() []string {
-	port := strconv.Itoa(int(c.sshAddr.Port()))
-	var endpoints []string
-	for _, ip := range sysutil.PrivateIPs() {
-		endpoints = append(endpoints, net.JoinHostPort(ip, port))
+// sshEndpoints is the address this host reaches the core from. A UDP connect sends nothing, it asks the kernel.
+func (c *Client) sshEndpoints(ctx context.Context) []string {
+	core, err := url.Parse(c.state.APIURL)
+	if err != nil {
+		return nil
 	}
-	return endpoints
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "udp4", net.JoinHostPort(core.Hostname(), cmp.Or(core.Port(), "443")))
+	if err != nil {
+		return nil
+	}
+	defer conn.Close()
+	local, err := netip.ParseAddrPort(conn.LocalAddr().String())
+	if err != nil || local.Addr().IsLoopback() {
+		return nil
+	}
+	return []string{netip.AddrPortFrom(local.Addr(), c.sshAddr.Port()).String()}
 }
