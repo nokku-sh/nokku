@@ -84,9 +84,10 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*nokkuv1.SyncDaem
 	return res, nil
 }
 
-func Hashes(ctx context.Context, conn connection) (hashes map[string][]byte, accepted map[string]bool, err error) {
-	hashes, accepted = map[string][]byte{}, map[string]bool{}
-	err = conn.TenantTx(ctx, func(q *db.Queries) error {
+// Answers is what every daemon of the workspace is told, by id.
+func Answers(ctx context.Context, conn connection) (map[string]*nokkuv1.SyncDaemonResponse, error) {
+	answers := map[string]*nokkuv1.SyncDaemonResponse{}
+	err := conn.TenantTx(ctx, func(q *db.Queries) error {
 		workspace, err := q.GetWorkspace(ctx)
 		if err != nil {
 			return err
@@ -112,12 +113,11 @@ func Hashes(ctx context.Context, conn connection) (hashes map[string][]byte, acc
 			if err != nil {
 				return err
 			}
-			hashes[d.Daemon.ID] = res.GetStateHash()
-			accepted[d.Daemon.ID] = d.Daemon.Status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
+			answers[d.Daemon.ID] = res
 		}
 		return nil
 	})
-	return hashes, accepted, err
+	return answers, err
 }
 
 // answer is what one daemon is told to enforce, with its hash. A daemon that is gone is nil, and one that is not

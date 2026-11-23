@@ -32,7 +32,7 @@ func eachScimOp(
 	apply func(opName, attr string, expr filter.Expression, value any) error,
 ) error {
 	for _, op := range ops {
-		value := scimNamed(op.Value)
+		value := op.Value
 		if op.Path != nil {
 			// Give a sub-attribute the path-less shape, handlers read one form.
 			if sub := cmp.Or(op.Path.SubAttributeName(), op.Path.AttributePath.SubAttributeName()); sub != "" {
@@ -49,7 +49,7 @@ func eachScimOp(
 			return scimerrors.ScimErrorBadRequest("missing attribute path")
 		}
 		for attr, value := range m {
-			if err := apply(op.Op, attr, nil, value); err != nil {
+			if err := apply(op.Op, scimName(attr), nil, value); err != nil {
 				return err
 			}
 		}
@@ -59,20 +59,4 @@ func eachScimOp(
 
 func scimName(name string) string {
 	return cmp.Or(scimNames[strings.ToLower(name)], name)
-}
-
-func scimNamed(v any) any {
-	switch v := v.(type) {
-	case map[string]any:
-		named := make(map[string]any, len(v))
-		for k, e := range v {
-			named[scimName(k)] = scimNamed(e)
-		}
-		return named
-	case []any:
-		for i, e := range v {
-			v[i] = scimNamed(e)
-		}
-	}
-	return v
 }

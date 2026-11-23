@@ -206,10 +206,10 @@ func TestSendTemplate_UnknownTemplate(t *testing.T) {
 func TestSendTemplate_MessageAndData(t *testing.T) {
 	sender := &mockSender{}
 	svc := newTestService(sender)
-	svc.appURL = "https://acme.nokku.sh"
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: "w1", BaseURL: "https://acme.nokku.sh"})
 
 	err := svc.SendNewLoginEmail(
-		t.Context(),
+		ctx,
 		"user-1",
 		"ada@example.com",
 		"device-42",

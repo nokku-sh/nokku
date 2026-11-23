@@ -198,11 +198,10 @@ func TestSyncAnswer(t *testing.T) {
 	assert.NotEqual(t, hash, res.GetStateHash(), "a person switched off must change it")
 
 	// The pass over the workspace and a sync must agree, a poke compares the two.
-	hashes, accepted, err := daemon.Hashes(f.ctx, f.conn)
+	answers, err := daemon.Answers(f.ctx, f.conn)
 	require.NoError(t, err)
-	assert.Equal(t, res.GetStateHash(), hashes[web.DaemonID])
-	assert.Equal(t, other.GetStateHash(), hashes[db1.DaemonID])
-	assert.True(t, accepted[web.DaemonID])
+	assert.Equal(t, res.GetStateHash(), answers[web.DaemonID].GetStateHash())
+	assert.Equal(t, other.GetStateHash(), answers[db1.DaemonID].GetStateHash())
 
 	waiting, err := enroll(t, f, daemon.EnrollInput{Token: pendingToken, ReqMetadata: hostname("new")})
 	require.NoError(t, err)
@@ -212,10 +211,11 @@ func TestSyncAnswer(t *testing.T) {
 	assert.Empty(t, res.GetPrincipals(), "a pending daemon lets nobody in")
 	assert.Empty(t, res.GetUserCaPublicKey(), "a pending daemon trusts no CA")
 	// The pool cuts the stream of a daemon the pass does not name as accepted.
-	_, accepted, err = daemon.Hashes(f.ctx, f.conn)
+	answers, err = daemon.Answers(f.ctx, f.conn)
 	require.NoError(t, err)
-	assert.False(t, accepted[waiting.DaemonID], "a pending daemon may keep a control stream")
-	assert.True(t, accepted[web.DaemonID])
+	accepted := nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
+	assert.NotEqual(t, accepted, answers[waiting.DaemonID].GetStatus(), "a pending daemon may keep a control stream")
+	assert.Equal(t, accepted, answers[web.DaemonID].GetStatus())
 
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
 		_, err := q.DeleteDaemon(f.ctx, db1.DaemonID)

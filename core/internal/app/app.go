@@ -100,7 +100,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Email, err = email.New(ctx, cfg.FullURL())
+	cfg.Email, err = email.New(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -57,14 +57,12 @@ func WriteConfigs(s *state.State) error {
 
 func HostName(name string) string { return strings.ToLower(name) + HostSuffix }
 
-func HostAliases(s *state.State) map[string]string {
-	aliases := make(map[string]string, len(s.Targets))
-	for _, t := range s.Targets {
-		if usable(t) {
-			aliases[t.ID] = HostName(t.Name)
-		}
+// Host is the name ssh has for a server, empty when nk writes none for it.
+func Host(t state.Target) string {
+	if !usable(t) {
+		return ""
 	}
-	return aliases
+	return HostName(t.Name)
 }
 
 // No line takes a token like %h, which would hand a host name to a shell.
@@ -78,7 +76,6 @@ func renderSSHConfig(nk string) []byte {
 }
 
 func renderSSHHosts(s *state.State, nk string) []byte {
-	aliases := HostAliases(s)
 	identity, agent := configValue(paths.PubKeyFile()), configValue(paths.AgentSocket())
 	if s.SecurityKey {
 		// ssh talks to the key itself and asks for the touch, the handle is no secret.
@@ -86,8 +83,8 @@ func renderSSHHosts(s *state.State, nk string) []byte {
 	}
 	var hosts []hostBlock
 	for _, t := range s.Targets {
-		host, ok := aliases[t.ID]
-		if !ok {
+		host := Host(t)
+		if host == "" {
 			continue
 		}
 		hosts = append(hosts, hostBlock{

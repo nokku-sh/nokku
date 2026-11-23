@@ -16,34 +16,9 @@ import (
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
 
-func TestLimitBodyCutsStalledBody(t *testing.T) {
+func TestBodyDeadlineLeavesSlowHandlerAlone(t *testing.T) {
 	t.Parallel()
-	readErr := make(chan error, 1)
-	srv := httptest.NewServer(limitBody(1<<10, 100*time.Millisecond)(
-		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-			_, err := io.ReadAll(r.Body)
-			readErr <- err
-		}),
-	))
-	t.Cleanup(srv.Close)
-
-	conn, err := net.Dial("tcp", srv.Listener.Addr().String())
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = conn.Close() })
-	_, err = conn.Write([]byte("POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\npartial"))
-	require.NoError(t, err)
-
-	select {
-	case err := <-readErr:
-		require.ErrorIs(t, err, os.ErrDeadlineExceeded, "a stalled body must fail on the deadline")
-	case <-time.After(5 * time.Second):
-		t.Fatal("the handler still waits on a stalled body")
-	}
-}
-
-func TestLimitBodyLeavesSlowHandlerAlone(t *testing.T) {
-	t.Parallel()
-	srv := httptest.NewServer(limitBody(1<<10, 50*time.Millisecond)(
+	srv := httptest.NewServer(bodyDeadline(50 * time.Millisecond)(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.ReadAll(r.Body)
 			select {

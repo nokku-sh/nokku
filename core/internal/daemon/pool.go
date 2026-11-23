@@ -54,7 +54,6 @@ type daemonConn struct {
 	wantedAtBeat []byte
 	reportedAt   time.Time
 	behindSince  atomic.Pointer[time.Time]
-	dropping     atomic.Bool
 }
 
 // connection lets tests stub db.Connection without Postgres.
@@ -341,7 +340,7 @@ func (p *Pool) reconcile(ctx context.Context, workspaceID string) error {
 	if len(daemons) == 0 {
 		return nil
 	}
-	hashes, accepted, err := Hashes(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), p.conn)
+	answers, err := Answers(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), p.conn)
 	if err != nil {
 		return err
 	}
@@ -351,22 +350,16 @@ func (p *Pool) reconcile(ctx context.Context, workspaceID string) error {
 		return err
 	}
 	for _, c := range daemons {
-		hash, ok := hashes[c.daemonID]
+		res, ok := answers[c.daemonID]
 		if !ok {
-			hash = gone.GetStateHash()
+			res = gone
 		}
-		c.want(hash)
-		if !accepted[c.daemonID] {
-			c.dropSoon()
+		c.want(res.GetStateHash())
+		if res.GetStatus() != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+			time.AfterFunc(dropGrace, c.cancel)
 		}
 	}
 	return nil
-}
-
-func (c *daemonConn) dropSoon() {
-	if c.dropping.CompareAndSwap(false, true) {
-		time.AfterFunc(dropGrace, c.cancel)
-	}
 }
 
 // The heartbeat is up to 30 s old, so a revoke right after a grant reads as held.

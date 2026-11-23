@@ -56,7 +56,6 @@ var (
 type Service struct {
 	sender sender
 	cache  *cache.TTL[string, struct{}]
-	appURL string
 
 	SMTPFrom     string `env:"NOKKU_SMTP_FROM"`
 	SMTPHost     string `env:"NOKKU_SMTP_HOST"`
@@ -139,12 +138,12 @@ type body struct {
 	html string
 }
 
-func New(ctx context.Context, appURL string) (*Service, error) {
+func New(ctx context.Context) (*Service, error) {
 	svc, err := env.ParseAs[Service]()
 	if err != nil {
 		return nil, err
 	}
-	svc.appURL, svc.cache, svc.sender = appURL, cache.New[string, struct{}](cooldownEntries, cooldown), noopSender{}
+	svc.cache, svc.sender = cache.New[string, struct{}](cooldownEntries, cooldown), noopSender{}
 
 	if svc.SMTPHost == "" {
 		slog.Warn("email delivery disabled, set NOKKU_SMTP_HOST to enable it")
@@ -307,12 +306,9 @@ func (s *Service) SendEmailMovedNotice(ctx context.Context, userID, email, newEm
 	})
 }
 
-func (s *Service) profileURL(ctx context.Context) string {
-	base := s.appURL
-	if ws, ok := actor.WorkspaceFromContext(ctx); ok && ws.BaseURL != "" {
-		base = ws.BaseURL
-	}
-	return base + "/profile/security"
+func profileURL(ctx context.Context) string {
+	ws, _ := actor.WorkspaceFromContext(ctx)
+	return ws.BaseURL + "/profile/security"
 }
 
 // SendNewLoginEmail cools down per device, so a second device gets its own.
@@ -328,7 +324,7 @@ func (s *Service) SendNewLoginEmail(
 		ref:      deviceID,
 		data: newLoginTemplateData{
 			Operator:   s.Operator,
-			ProfileURL: s.profileURL(ctx),
+			ProfileURL: profileURL(ctx),
 			DeviceID:   deviceID,
 			DeviceName: deviceName,
 			IPAddress:  ip,
@@ -347,7 +343,7 @@ func (s *Service) SendNewWayInEmail(ctx context.Context, userID, email, credenti
 		ref:      credentialID,
 		data: newWayInTemplateData{
 			Operator:   s.Operator,
-			ProfileURL: s.profileURL(ctx),
+			ProfileURL: profileURL(ctx),
 			What:       what,
 			IPAddress:  ip,
 			EventTime:  time.Now().UTC().Format(mailTime),

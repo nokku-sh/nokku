@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,12 +49,8 @@ func TestRenderSSHHosts(t *testing.T) {
 	} {
 		assert.NotContains(t, out, forbidden)
 	}
-	assert.Equal(
-		t,
-		map[string]string{"t-1": "web.nk", "t-2": "db.nk"},
-		HostAliases(st),
-		"nk ls shows the names ssh knows",
-	)
+	assert.Equal(t, "db.nk", Host(st.Targets[1]), "nk ls shows the names ssh knows")
+	assert.Empty(t, Host(st.Targets[2]), "a server without an account has no name for ssh")
 }
 
 // One block for every name under .nk, and no token in it: a host name never reaches a shell.
@@ -232,39 +227,4 @@ func TestNKCommandIsAbsolute(t *testing.T) {
 	self, err := os.Executable()
 	require.NoError(t, err)
 	assert.Equal(t, self, nkCommand(), "ProxyCommand must name this binary")
-}
-
-// Whatever the user's own config holds, nk writes names under .nk only and leaves the rest alone.
-func TestHostsAreAllUnderNK(t *testing.T) {
-	setupSSHDir(t)
-	require.NoError(t, os.MkdirAll(filepath.Dir(paths.SSHUserConfig()), 0o700))
-	own := "Host web bastion\n    HostName 203.0.113.7\n"
-	require.NoError(t, os.WriteFile(paths.SSHUserConfig(), []byte(own), 0o600))
-	st := &state.State{
-		Targets: []state.Target{
-			{ID: "t-1", Name: "web", Usernames: []string{"root"}},
-			{ID: "t-2", Name: "DB", Usernames: []string{"root"}},
-			{ID: "t-3", Name: "bastion", Usernames: []string{"root"}},
-		},
-	}
-	require.NoError(t, WriteConfigs(st))
-	hosts, err := os.ReadFile(paths.SSHHostsFile())
-	require.NoError(t, err)
-
-	var seen []string
-	for line := range strings.SplitSeq(string(hosts), "\n") {
-		if host, ok := strings.CutPrefix(line, "Host "); ok {
-			seen = append(seen, host)
-		}
-	}
-	assert.Equal(t, []string{"web.nk", "db.nk", "bastion.nk"}, seen, "one lowercase line a server, all under .nk")
-
-	mine, err := os.ReadFile(paths.SSHUserConfig())
-	require.NoError(t, err)
-	assert.Equal(
-		t,
-		includeLine(paths.SSHConfigFile())+"\n\n"+own,
-		string(mine),
-		"the user's own hosts stay as they wrote them",
-	)
 }

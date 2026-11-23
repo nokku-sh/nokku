@@ -183,7 +183,6 @@ func syncHost(
 	if err != nil {
 		return err
 	}
-	dest.user = at.user
 	if ca == nil || strings.TrimSpace(ca.UserPublicKey) == "" {
 		return errors.New("the core sent no certificate authority key, nothing was written")
 	}
@@ -502,7 +501,6 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	if target == nil {
 		return fmt.Errorf("no target matches %s, check the name in the Nokku web app", at.host)
 	}
-	dest.user = at.user
 	if err = machineOwns(c.State, target); err != nil {
 		return err
 	}
@@ -581,9 +579,9 @@ func remoteArg(cmd *cli.Command) (remote, error) {
 	return at, nil
 }
 
-// Lists all targets, the snapshot misses those the operator can't log in to.
 func findRemoteTarget(ctx context.Context, targets []state.Target, dest remote) (*state.Target, remote, error) {
 	target, at, err := findTarget(targets, dest)
+	at.user = dest.user
 	if target != nil || err != nil {
 		return target, at, err
 	}

@@ -18,7 +18,7 @@ func TestListJSON(t *testing.T) {
 		{ID: "t-2", Name: "bare"},
 	}
 
-	b, err := json.Marshal(listJSON(s, map[string]string{"t-1": "web.nk"}))
+	b, err := json.Marshal(listJSON(s))
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"targets":[
 		{"name":"web","host":"web.nk","users":["root"],"manual":false},

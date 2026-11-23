@@ -89,7 +89,7 @@ UPDATE workspaces
 SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
-  settings = @settings,
+  settings = COALESCE(sqlc.narg('settings'), settings),
   updated_at = NOW()
 WHERE
   id = current_workspace_id ()

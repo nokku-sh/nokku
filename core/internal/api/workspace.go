@@ -58,20 +58,10 @@ func (s *workspaceService) UpdateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceRequest,
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
-	var workspace *db.Workspace
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		// Locked, so two tabs saving different settings at once keep both.
-		base, err := q.GetWorkspaceForUpdate(ctx)
-		if err != nil {
-			return err
-		}
-		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
-			Name:        req.Name,
-			Description: req.Description,
-			Settings:    base.Settings,
-		})
-		return err
-	}); err != nil {
+	workspace, err := s.cfg.Conn.Tenant().UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
+		Name: req.Name, Description: req.Description,
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &nokkuv1.UpdateWorkspaceResponse{Workspace: workspace.ToProto()}, nil
@@ -84,7 +74,7 @@ func (s *workspaceService) SetEnforceSSO(
 	audit.Set(ctx, "enforce_sso", req.GetEnforceSso())
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		// Locked like UpdateWorkspace, both write the same settings.
+		// Locked, so two tabs saving different settings at once keep both.
 		base, err := q.GetWorkspaceForUpdate(ctx)
 		if err != nil {
 			return err
@@ -130,7 +120,7 @@ func (s *workspaceService) UpdateDaemonDefaults(
 ) (*nokkuv1.UpdateDaemonDefaultsResponse, error) {
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		// Locked like UpdateWorkspace, both write the same settings.
+		// Locked, so two tabs saving different settings at once keep both.
 		base, err := q.GetWorkspaceForUpdate(ctx)
 		if err != nil {
 			return err

@@ -46,11 +46,12 @@ func endWith(ctx, root context.Context) (context.Context, func()) {
 	}
 }
 
-// unaryTimeout cannot interrupt a body read.
+// bodyDeadline bounds the time a body has to arrive, a handler's timeout cannot interrupt the read.
 func bodyDeadline(timeout time.Duration) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if unaryProcedures[r.URL.Path] && r.Body != http.NoBody {
+			// Without a body the server already watches the connection, a deadline would cancel the request.
+			if !streamProcedures[r.URL.Path] && r.Body != http.NoBody {
 				_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(timeout))
 			}
 			h.ServeHTTP(w, r)

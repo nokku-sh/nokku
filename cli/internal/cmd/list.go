@@ -26,9 +26,8 @@ func listCMD() *cli.Command {
 				return err
 			}
 			s := c.State
-			aliases := ssh.HostAliases(s)
 			if cmd.Bool(jsonFlag.Name) {
-				return printJSON(listJSON(s, aliases))
+				return printJSON(listJSON(s))
 			}
 			if len(s.Targets) == 0 {
 				fmt.Println("You have no servers yet. Ask an admin for access.")
@@ -44,7 +43,7 @@ func listCMD() *cli.Command {
 				if t.Manual() {
 					note = "(manual)"
 				}
-				name := cmp.Or(aliases[t.ID], t.Name)
+				name := cmp.Or(ssh.Host(t), t.Name)
 				fmt.Printf("  %-24s %s %s\n", name, users, ui.Dim(note))
 			}
 			fmt.Println("\nConnect with: ssh <server>.nk or ssh <user>@<server>.nk")
@@ -72,7 +71,7 @@ func untilLabel(end time.Time) string {
 	return end.Format("Jan 2 15:04")
 }
 
-func listJSON(s *state.State, aliases map[string]string) any {
+func listJSON(s *state.State) any {
 	type listedTarget struct {
 		Name string `json:"name"`
 		// Host is ssh's name for it, empty when it stays out of ssh_config.
@@ -87,7 +86,7 @@ func listJSON(s *state.State, aliases map[string]string) any {
 	for _, t := range s.Targets {
 		out.Targets = append(out.Targets, listedTarget{
 			Name:   t.Name,
-			Host:   aliases[t.ID],
+			Host:   ssh.Host(t),
 			Users:  append([]string{}, t.Usernames...),
 			Until:  t.Until,
 			Manual: t.Manual(),

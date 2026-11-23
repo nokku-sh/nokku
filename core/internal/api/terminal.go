@@ -56,13 +56,6 @@ type terminalHandler struct {
 	tickets *cache.TTL[string, sessionTicket]
 }
 
-func (t *terminalHandler) appOrigin(r *http.Request) string {
-	if ws, ok := actor.WorkspaceFromContext(r.Context()); ok && t.cfg.SaaS {
-		return ws.BaseURL
-	}
-	return t.cfg.FullURL()
-}
-
 // handleWebSocket runs one shell. A reload or a dropped connection ends it.
 func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("session_id")
@@ -110,7 +103,8 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{t.appOrigin(r)}})
+	ws, _ := actor.WorkspaceFromContext(ctx)
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{ws.BaseURL}})
 	if err != nil {
 		slog.Error("websocket upgrade failed", "error", err)
 		return

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -79,7 +78,7 @@ func waitForAnswer(ctx context.Context, c *client.Client, id string) error {
 			if err = c.Sync(ctx, false); err != nil {
 				return err
 			}
-			host := cmp.Or(ssh.HostAliases(c.State)[req.GetTargetId()], ssh.HostName(ui.PlainLine(req.GetTargetName())))
+			host := ssh.HostName(ui.PlainLine(req.GetTargetName()))
 			fmt.Printf("%s Approved by %s until %s\n", ui.Green("✔"), ui.PlainLine(req.GetDeciderName()),
 				untilLabel(req.GetGrantedUntil().AsTime()))
 			fmt.Printf("  Connect with: ssh %s@%s\n", req.GetUsername(), host)

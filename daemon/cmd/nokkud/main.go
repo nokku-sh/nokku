@@ -55,9 +55,6 @@ var (
 	errRestart = cli.Exit("nokkud: restarting for the new binary", 75)
 )
 
-// setupError exits 78, which the unit does not restart.
-type setupError struct{ error }
-
 func main() {
 	cmd := &cli.Command{
 		EnableShellCompletion: true,
@@ -141,9 +138,8 @@ enrolled yet, which is how a container joins. Once enrolled, the variable is ign
 	}
 }
 
-func (e setupError) Error() string { return "nokkud: " + e.error.Error() }
-func (e setupError) Unwrap() error { return e.error }
-func (setupError) ExitCode() int   { return exConfig }
+// setupError exits 78, which the unit does not restart.
+func setupError(err error) error { return cli.Exit(fmt.Errorf("nokkud: %w", err), exConfig) }
 
 // A DPoP proof from an unsynced clock or a proxy's 401 may pass on the next start.
 func cannotRetry(err error) bool {
@@ -292,17 +288,17 @@ func enroll(ctx context.Context, cmd *cli.Command) error {
 func enrollHost(ctx context.Context, cmd *cli.Command, token string, st *state.State) (*client.Client, error) {
 	if token != "" {
 		if err := checkEnrollToken(token); err != nil {
-			return nil, setupError{err}
+			return nil, setupError(err)
 		}
 	}
 	cl, err := newDaemonClient(ctx, cmd, token, st)
 	if trust.Untrusted(err) {
-		return nil, setupError{fmt.Errorf(
+		return nil, setupError(fmt.Errorf(
 			"this machine does not trust the certificate of %s. If it comes from a private CA, "+
 				"point NOKKUD_CA_FILE at that CA: %w",
 			st.APIURL,
 			err,
-		)}
+		))
 	}
 	if err == nil && token != "" {
 		warnHomeKeys(ctx)
@@ -351,7 +347,7 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	}
 	st, err := state.Load()
 	if err != nil {
-		return nil, setupError{err}
+		return nil, setupError(err)
 	}
 	if api := strings.TrimRight(cmd.String("api"), "/"); cmd.IsSet("api") && api != st.APIURL {
 		// The CA of one Nokku is never trusted for another.
@@ -359,20 +355,20 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	}
 	// Every workspace has an address of its own, so there is none to fall back to.
 	if st.APIURL == "" {
-		return nil, setupError{errors.New("this host does not know its Nokku yet. Pass the address with --api or " +
-			"NOKKUD_API_URL, the web app shows the full command")}
+		return nil, setupError(errors.New("this host does not know its Nokku yet. Pass the address with --api or " +
+			"NOKKUD_API_URL, the web app shows the full command"))
 	}
 	if err = checkAPIURL(st.APIURL); err != nil {
-		return nil, setupError{err}
+		return nil, setupError(err)
 	}
 	if path := cmd.String("ca-file"); path != "" {
 		// #nosec G304 -- the operator names the file
 		ca, readErr := os.ReadFile(path)
 		if readErr != nil {
-			return nil, setupError{fmt.Errorf("CA file: %w", readErr)}
+			return nil, setupError(fmt.Errorf("CA file: %w", readErr))
 		}
 		if err = trust.CheckBundle(ca); err != nil {
-			return nil, setupError{fmt.Errorf("CA file %s: %w", path, err)}
+			return nil, setupError(fmt.Errorf("CA file %s: %w", path, err))
 		}
 		st.APICA = string(ca)
 	}
@@ -423,13 +419,13 @@ func enrollToken() (string, error) {
 func newDaemonClient(ctx context.Context, cmd *cli.Command, token string, st *state.State) (*client.Client, error) {
 	cl, err := client.New(ctx, st, cmd.Bool("require-tpm"), token)
 	if errors.Is(err, tpm.ErrIdentityChanged) {
-		return nil, setupError{fmt.Errorf(
+		return nil, setupError(fmt.Errorf(
 			"the daemon signing key no longer matches this machine, re-enroll with `sudo nokkud enroll`: %w",
 			err,
-		)}
+		))
 	}
 	if cannotRetry(err) {
-		return nil, setupError{fmt.Errorf("initialize daemon client: %w", err)}
+		return nil, setupError(fmt.Errorf("initialize daemon client: %w", err))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("initialize daemon client: %w", err)

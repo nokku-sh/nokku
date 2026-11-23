@@ -20,10 +20,7 @@ import (
 )
 
 // procedureAccess holds each RPC's (access) option. Without one it is denied.
-var (
-	procedureAccess = loadProcedureAccess()
-	unaryProcedures = loadUnaryProcedures()
-)
+var procedureAccess, streamProcedures = loadProcedures()
 
 // authorizationInterceptor applies the (access) option in this order: daemon,
 // nk, role or self, people only, browser, fresh sign-in, plan feature, signing, cap.
@@ -39,37 +36,25 @@ type authorizedStream struct {
 	a         *authorizationInterceptor
 }
 
-func loadProcedureAccess() map[string]*nokkuv1.Access {
-	out := make(map[string]*nokkuv1.Access)
+func loadProcedures() (map[string]*nokkuv1.Access, map[string]bool) {
+	access, streams := make(map[string]*nokkuv1.Access), make(map[string]bool)
 	protoregistry.GlobalFiles.RangeFilesByPackage("nokku.v1", func(fd protoreflect.FileDescriptor) bool {
 		for i := range fd.Services().Len() {
 			svc := fd.Services().Get(i)
 			for j := range svc.Methods().Len() {
 				m := svc.Methods().Get(j)
+				name := "/" + string(svc.FullName()) + "/" + string(m.Name())
 				if a, ok := proto.GetExtension(m.Options(), nokkuv1.E_Access).(*nokkuv1.Access); ok && a != nil {
-					out["/"+string(svc.FullName())+"/"+string(m.Name())] = a
+					access[name] = a
+				}
+				if m.IsStreamingClient() || m.IsStreamingServer() {
+					streams[name] = true
 				}
 			}
 		}
 		return true
 	})
-	return out
-}
-
-func loadUnaryProcedures() map[string]bool {
-	out := make(map[string]bool)
-	protoregistry.GlobalFiles.RangeFilesByPackage("nokku.v1", func(fd protoreflect.FileDescriptor) bool {
-		for i := range fd.Services().Len() {
-			svc := fd.Services().Get(i)
-			for j := range svc.Methods().Len() {
-				if m := svc.Methods().Get(j); !m.IsStreamingClient() && !m.IsStreamingServer() {
-					out["/"+string(svc.FullName())+"/"+string(m.Name())] = true
-				}
-			}
-		}
-		return true
-	})
-	return out
+	return access, streams
 }
 
 func authorize(cfg *app.Config) connect.ServerInterceptor {

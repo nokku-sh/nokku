@@ -72,7 +72,7 @@ func setRelayEnv(t *testing.T, port int) {
 func TestNew_RejectedLoginFailsTheStart(t *testing.T) {
 	setRelayEnv(t, fakeRelay(t, "535 5.7.8 Authentication Failed"))
 
-	_, err := New(t.Context(), "http://localhost")
+	_, err := New(t.Context())
 	require.Error(t, err, "a relay that rejects the credentials let the server start")
 	assert.Contains(t, err.Error(), "NOKKU_SMTP_PASSWORD", "the error does not name the setting")
 	assert.NotContains(t, err.Error(), "wrong-or-right", "the password is in the error")
@@ -81,7 +81,7 @@ func TestNew_RejectedLoginFailsTheStart(t *testing.T) {
 func TestNew_AcceptedLoginStarts(t *testing.T) {
 	setRelayEnv(t, fakeRelay(t, "235 2.7.0 ok"))
 
-	svc, err := New(t.Context(), "http://localhost")
+	svc, err := New(t.Context())
 	require.NoError(t, err)
 	assert.True(t, svc.HasSMTP())
 }
@@ -94,7 +94,7 @@ func TestNew_UnreachableRelayStillStarts(t *testing.T) {
 	require.NoError(t, ln.Close())
 	setRelayEnv(t, port)
 
-	svc, err := New(t.Context(), "http://localhost")
+	svc, err := New(t.Context())
 	require.NoError(t, err, "a relay that does not answer stopped the start")
 	assert.True(t, svc.HasSMTP())
 }
@@ -118,7 +118,7 @@ func TestNew_HungRelayDoesNotHoldUpTheStart(t *testing.T) {
 	t.Cleanup(func() { relayCheckTimeout = 3 * time.Second })
 
 	start := time.Now()
-	svc, err := New(t.Context(), "http://localhost")
+	svc, err := New(t.Context())
 	require.NoError(t, err, "a relay that hangs stopped the start")
 	assert.True(t, svc.HasSMTP())
 	assert.Less(t, time.Since(start), 2*time.Second, "the check waited out the relay")

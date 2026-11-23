@@ -17,7 +17,7 @@ import (
 // Refused before a workspace is made. With no database, going on would panic.
 func TestCreateWorkspaceRefusesAnAddressOnCooldown(t *testing.T) {
 	t.Setenv("NOKKU_SMTP_HOST", "")
-	mail, err := email.New(t.Context(), "https://nokku.test")
+	mail, err := email.New(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, mail.SendOwnerLinkEmail(t.Context(), "ada@acme.test", "https://acme.nokku.test", time.Hour))
 

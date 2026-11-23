@@ -291,7 +291,7 @@ UPDATE workspaces
 SET
   name = COALESCE($1, name),
   description = COALESCE($2, description),
-  settings = $3,
+  settings = COALESCE($3, settings),
   updated_at = NOW()
 WHERE
   id = current_workspace_id ()
