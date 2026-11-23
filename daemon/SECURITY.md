@@ -141,7 +141,7 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 ### Audit and recording
 
 - **The idle timeout ends sessions with a terminal only.** It counts what is typed into a shell. A remote command, `ssh -T`, sftp and a forward without a shell have no typing to count and stay open as long as the connection does.
-- **Audit events go to the daemon's log** as `audit` lines with a `type`: logins, sessions, commands, subsystems, forwards and idle timeouts. Under systemd that is journald, under OpenRC `/var/log/nokkud.log`.
+- **Audit events go to the daemon's log** as `audit` lines with a `type`: logins, sessions, commands, subsystems, forwards and idle timeouts. Under systemd that is journald, under OpenRC syslog with the tag `nokkud`. Alpine's default syslogd keeps about 200 KB, raise that in `/etc/conf.d/syslog`.
 - **Every connection is reported to the core's audit log**, once when it opens and once when it is gone: who, as which account, from where, with which certificate. Commands, forwards and refused logins stay in the daemon's log only.
 - **The report is the daemon's word.** Root on a server can make its daemon report anything, or nothing. So the core's audit log names the daemon as the one who said it and the person as who it is about, and keeps its own time next to the daemon's. A certificate the core signed is in the log either way, as something the core saw itself.
 - **Reports wait for the core.** While the core is away the daemon keeps up to 10,000 events in `connections.jsonl` and sends them when it is back. Past that it drops new ones and tells the core how many, which the audit log shows. A machine that loses power can lose the last few events, the file is not synced on every login.

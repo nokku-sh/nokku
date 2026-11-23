@@ -434,6 +434,23 @@ func TestOIDCFlowTakesANewAddressFromTheProvider(t *testing.T) {
 	assert.Nil(t, e.userByEmail(t, h.org.ws, first), "the old address still finds the account")
 }
 
+// Two providers would each undo the other, so neither moves the address.
+func TestOIDCFlowKeepsTheAddressWithTwoProviders(t *testing.T) {
+	h := newOIDCIdP(t)
+	e, svc := h.setup(t, true)
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	first := h.email
+	u := e.userByEmail(t, h.org.ws, first)
+	require.NotNil(t, u, "JIT provisioned user missing")
+	e.putCredential(t, h.org.ws, db.UpsertCredentialParams{
+		ID: "second", UserID: u.ID, Type: string(iam.MethodOIDC), Provider: "other", Subject: "alice", Data: []byte{},
+	})
+
+	h.email = "alice.moved@" + testDomain()
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	assert.NotNil(t, e.userByEmail(t, h.org.ws, first), "one of two providers moved the address")
+}
+
 // A provider may give a leaver's address to someone new, with a new subject.
 // That person must not land on the account.
 func TestOIDCFlowRefusesASecondSubjectOnAnAccount(t *testing.T) {

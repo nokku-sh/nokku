@@ -17,10 +17,10 @@ service DaemonService {
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  // Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
   rpc UpdateDaemon(UpdateDaemonRequest) returns (UpdateDaemonResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
+  // Takes a fresh sign-in, so a stolen session can't hide what it does next.
   rpc SetDaemonSafeguards(SetDaemonSafeguardsRequest) returns (SetDaemonSafeguardsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR

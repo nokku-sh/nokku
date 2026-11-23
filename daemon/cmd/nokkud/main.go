@@ -147,7 +147,7 @@ func (setupError) ExitCode() int   { return exConfig }
 
 // A DPoP proof from an unsynced clock or a proxy's 401 may pass on the next start.
 func cannotRetry(err error) bool {
-	return errors.Is(err, tpm.ErrSoftwareKey) || connect.CodeOf(err) == connect.CodeFailedPrecondition
+	return errors.Is(err, tpm.ErrSoftwareKey) || connect.CodeOf(err) == connect.CodeNotFound
 }
 
 func helper(ctx context.Context, cmd *cli.Command) error {

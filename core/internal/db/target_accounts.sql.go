@@ -888,8 +888,7 @@ type RevokeWhereRow struct {
 	OtherTags bool   `json:"otherTags"`
 }
 
-// One subject's own grants on the servers a revoke names: by id, by tag, or all of them. A username keeps it to one
-// account.
+// One subject's own grants on the servers a revoke names. A username keeps it to one account.
 func (q *Queries) RevokeWhere(ctx context.Context, arg *RevokeWhereParams) ([]*RevokeWhereRow, error) {
 	rows, err := q.db.Query(ctx, revokeWhere,
 		arg.SubjectKind,

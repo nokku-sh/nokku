@@ -88,7 +88,6 @@ func TestFindTarget(t *testing.T) {
 		{ID: "t-5", Name: "nat-a", Endpoints: []string{"1.2.3.4:2201"}},
 		{ID: "t-6", Name: "nat-b", Endpoints: []string{"1.2.3.4:2202"}},
 	}
-	aliases := map[string]string{"t-1": "web.nk"}
 
 	tests := []struct {
 		name   string
@@ -140,7 +139,7 @@ func TestFindTarget(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, at, err := findTarget(targets, aliases, tt.dest)
+			got, at, err := findTarget(targets, tt.dest)
 			if tt.errMsg != "" {
 				require.ErrorContains(t, err, tt.errMsg)
 				return

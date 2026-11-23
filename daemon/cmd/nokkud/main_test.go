@@ -58,7 +58,8 @@ func TestOnlyAnAnswerThatComesAgainIsASetupError(t *testing.T) {
 		want bool
 	}{
 		// The core's answer for a token that ran out or was used.
-		{connect.CodeFailedPrecondition, true},
+		{connect.CodeNotFound, true},
+		{connect.CodeFailedPrecondition, false},
 		// A DPoP proof from a clock that is not synced yet, and a proxy's 401 or 403.
 		{connect.CodeInvalidArgument, false},
 		{connect.CodeUnauthenticated, false},

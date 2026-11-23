@@ -831,8 +831,7 @@ UPDATE OF expires_at ON grants FOR EACH ROW WHEN (OLD.expires_at IS DISTINCT FRO
 EXECUTE FUNCTION notify_state_change ();
 
 -- Roles ----------------------------------------------------------------------
--- nokku_app serves requests under RLS, nokku_system bypasses it. Neither is a member of the other, and neither
--- can log in: the core logs in as the owner and switches with SET ROLE.
+-- nokku_app serves requests under RLS, nokku_system bypasses it. Neither can log in, the core switches with SET ROLE.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nokku_app') THEN

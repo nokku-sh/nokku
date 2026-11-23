@@ -60,9 +60,9 @@ func syncCMD() *cli.Command {
 	return &cli.Command{
 		Name:  "sync",
 		Usage: "Add a server to Nokku without the daemon, or refresh one you added",
-		Description: "Connects as root with your own ssh, then writes the Nokku CA and an sshd drop-in. " +
-			"Access changes need no rerun, a rotated CA does.",
-		ArgsUsage: "<host | root@host | target-name | --stale>",
+		Description: "Connects as root with your own ssh, or as user@host with sudo, then writes the Nokku CA and an " +
+			"sshd drop-in. Access changes need no rerun, a rotated CA does.",
+		ArgsUsage: "<host | user@host | target-name | --stale>",
 		// A --grant lists its subjects with commas.
 		DisableSliceFlagSeparator: true,
 		Flags: []cli.Flag{
@@ -179,7 +179,7 @@ func syncHost(
 		progress = os.Stderr
 	}
 
-	target, dest, err := findRemoteTarget(ctx, targets, c.State, at)
+	target, dest, err := findRemoteTarget(ctx, targets, at)
 	if err != nil {
 		return err
 	}
@@ -464,10 +464,10 @@ func rmCMD() *cli.Command {
 	return &cli.Command{
 		Name:  "rm",
 		Usage: "Remove a server you added with nk sync",
-		Description: "Connects as root with your own ssh, removes the Nokku CA and the sshd drop-in, " +
+		Description: "Connects as root with your own ssh, or as user@host with sudo, removes the Nokku CA and the sshd drop-in, " +
 			"then deletes the target in Nokku. A server someone else added is cleaned the same way, " +
 			"its target is then deleted in the web app.",
-		ArgsUsage: "<host | root@host | target-name>",
+		ArgsUsage: "<host | user@host | target-name>",
 		Flags: []cli.Flag{
 			portFlag,
 			&cli.BoolFlag{Name: "keep-host", Usage: "Delete the target only and leave the server as it is"},
@@ -495,7 +495,7 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("listing targets: %w", err)
 	}
-	target, dest, err := findRemoteTarget(ctx, targets, c.State, at)
+	target, dest, err := findRemoteTarget(ctx, targets, at)
 	if err != nil {
 		return err
 	}
@@ -582,23 +582,17 @@ func remoteArg(cmd *cli.Command) (remote, error) {
 }
 
 // Lists all targets, the snapshot misses those the operator can't log in to.
-func findRemoteTarget(
-	ctx context.Context,
-	targets []state.Target,
-	s *state.State,
-	dest remote,
-) (*state.Target, remote, error) {
-	aliases := ssh.HostAliases(s)
-	target, at, err := findTarget(targets, aliases, dest)
+func findRemoteTarget(ctx context.Context, targets []state.Target, dest remote) (*state.Target, remote, error) {
+	target, at, err := findTarget(targets, dest)
 	if target != nil || err != nil {
 		return target, at, err
 	}
 	// Resolve an ssh alias to match stored addresses, but connect through it.
-	target, _, err = findTarget(targets, aliases, dest.resolve(ctx))
+	target, _, err = findTarget(targets, dest.resolve(ctx))
 	return target, dest, err
 }
 
-func findTarget(targets []state.Target, aliases map[string]string, dest remote) (*state.Target, remote, error) {
+func findTarget(targets []state.Target, dest remote) (*state.Target, remote, error) {
 	type match struct {
 		t  *state.Target
 		at remote
@@ -606,7 +600,7 @@ func findTarget(targets []state.Target, aliases map[string]string, dest remote) 
 	var named, reached []match
 	for i := range targets {
 		t := &targets[i]
-		if t.Name == dest.host || (aliases[t.ID] != "" && strings.EqualFold(aliases[t.ID], dest.host)) {
+		if t.Name == dest.host || strings.EqualFold(ssh.HostName(t.Name), dest.host) {
 			at := dest
 			if len(t.Endpoints) > 0 {
 				at = endpointRemote(t.Endpoints[0], dest.port)

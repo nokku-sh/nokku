@@ -42,7 +42,7 @@ func proxyCMD() *cli.Command {
 				return err
 			}
 			if id == "" {
-				return unknownHost(ctx, s)
+				return errors.New("nk has no server by that name, nk ls shows the names you can use")
 			}
 			if port == "" {
 				return errors.New("usage: nk proxy <server-id> <port>")
@@ -99,17 +99,6 @@ func proxyCMD() *cli.Command {
 			return ssh.Proxy(ctx, target, port, relay, cmd.Bool("relay"))
 		},
 	}
-}
-
-// ssh read the hosts file already, so the sync only helps the next try.
-func unknownHost(ctx context.Context, s *state.State) error {
-	if !s.SyncFailedWithin(syncRetryAfter) {
-		if c, err := newClient(s); err == nil {
-			_ = c.SyncOrCache(ctx, false)
-		}
-	}
-	return errors.New("nk has no server by that name. It read your access again just now, so try once more " +
-		"if the server is new to you. nk ls shows the names you can use")
 }
 
 func prepareCMD() *cli.Command {

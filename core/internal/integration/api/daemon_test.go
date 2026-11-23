@@ -198,9 +198,9 @@ func TestEnrollDaemon(t *testing.T) {
 	otherKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	_, err = enroll(created.GetSecret(), otherKey)
-	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "used up token, got %v", err)
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "used up token, got %v", err)
 	_, err = enroll("nk_not-a-token", otherKey)
-	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "bad token, got %v", err)
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "bad token, got %v", err)
 }
 
 func TestCreateSession(t *testing.T) {

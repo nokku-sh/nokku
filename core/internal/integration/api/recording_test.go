@@ -434,6 +434,7 @@ func TestRecordingStorageCap(t *testing.T) {
 	require.ErrorIs(t, err, pgx.ErrNoRows, "a refused upload leaves no recording behind")
 	_, err = cfg.Conn.Sys().GetRecording(t.Context(), old)
 	require.NoError(t, err, "the oldest recording was deleted to make room")
+	require.NoError(t, upload(recent, 6), "a retry of a recording the core holds was refused for room")
 
 	// Once a recording is gone there is room again, and the daemon's next try gets through.
 	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {

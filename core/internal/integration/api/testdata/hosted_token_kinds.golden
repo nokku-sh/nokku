@@ -26,7 +26,7 @@ cli session | tampered | GetSubjectAccess unauthenticated: iam: invalid credenti
 cli session | without its proof | GetSubjectAccess unauthenticated: iam: dpop proof required
 cli session | verifies | GetSubjectAccess as user
 enroll token | shape | nk_enroll_<base32:26><crc32 hex:8> (44 chars)
-enroll token | tampered | EnrollDaemon failed_precondition: invalid or expired enrollment token
+enroll token | tampered | EnrollDaemon not_found: invalid or expired enrollment token
 enroll token | verifies | EnrollDaemon ok
 daemon session | shape | nk_daemon_<base32:26><crc32 hex:8> (44 chars)
 daemon session | tampered | SyncDaemon unauthenticated: iam: invalid credentials

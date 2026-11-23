@@ -42,7 +42,7 @@ func SetTarget(ctx context.Context, target string) {
 	}
 }
 
-// SetAction names what a call did, where one RPC does two things, like approving or rejecting a daemon.
+// SetAction names what a call did where the RPC's own name says less, like approving a daemon.
 func SetAction(ctx context.Context, action string) {
 	if e, ok := ctx.Value(eventKey{}).(*Event); ok {
 		e.Action = action

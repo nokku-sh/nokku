@@ -291,18 +291,25 @@ func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool
 	return u, linked && !created, nil
 }
 
-// follow takes the name and the address the provider has now. An admin's address is a way back in and stays, as
-// with SCIM.
+// follow takes the name and address the provider has now. With SCIM too, an admin's address is a way back in and stays.
 func follow(ctx context.Context, q *db.Queries, u *db.User, id oidcIdentity) (*db.User, error) {
+	creds, err := q.ListUserCredentials(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	creds = slices.DeleteFunc(creds, func(c *db.Credential) bool { return c.Type != string(MethodOIDC) })
+	// Two providers would each undo the other, and a refused sign-in changes nothing.
+	if !u.Active || len(creds) != 1 {
+		return u, nil
+	}
 	if id.Name != "" && id.Name != u.Name {
-		var err error
 		if u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Name: &id.Name}); err != nil {
 			return nil, err
 		}
 	}
 	email := NormalizeEmail(id.Email)
-	if email == "" || email == u.Email || u.Role >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN ||
-		(!id.EmailVerified && !id.TrustUnverifiedEmail) {
+	vouched := id.EmailVerified || (id.TrustUnverifiedEmail && !id.EmailUnverified)
+	if email == "" || email == u.Email || !vouched || u.Role >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN {
 		return u, nil
 	}
 	if _, err := q.GetUserByEmail(ctx, email); !errors.Is(err, pgx.ErrNoRows) {

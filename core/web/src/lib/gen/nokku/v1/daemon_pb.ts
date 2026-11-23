@@ -1126,8 +1126,6 @@ export const DaemonService: GenService<{
     output: typeof GetDaemonResponseSchema;
   },
   /**
-   * Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
-   *
    * @generated from rpc nokku.v1.DaemonService.UpdateDaemon
    */
   updateDaemon: {
@@ -1136,6 +1134,8 @@ export const DaemonService: GenService<{
     output: typeof UpdateDaemonResponseSchema;
   },
   /**
+   * Takes a fresh sign-in, so a stolen session can't hide what it does next.
+   *
    * @generated from rpc nokku.v1.DaemonService.SetDaemonSafeguards
    */
   setDaemonSafeguards: {

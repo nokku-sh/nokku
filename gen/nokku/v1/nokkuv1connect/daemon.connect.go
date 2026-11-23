@@ -122,8 +122,8 @@ var (
 // DaemonServiceClient is a client for the nokku.v1.DaemonService service.
 type DaemonServiceClient interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
-	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
+	// Takes a fresh sign-in, so a stolen session can't hide what it does next.
 	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
 	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
@@ -178,8 +178,8 @@ func (s DaemonServiceRelayClientStream) Close() error {
 // DaemonServiceHandler is an implementation of the nokku.v1.DaemonService service.
 type DaemonServiceHandler interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
-	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
+	// Takes a fresh sign-in, so a stolen session can't hide what it does next.
 	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
 	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)

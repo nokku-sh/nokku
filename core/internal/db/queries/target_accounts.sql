@@ -283,8 +283,7 @@ FROM
   LEFT JOIN service_accounts s ON s.id = gone.subject_id;
 
 -- name: RevokeWhere :many
--- One subject's own grants on the servers a revoke names: by id, by tag, or all of them. A username keeps it to one
--- account.
+-- One subject's own grants on the servers a revoke names. A username keeps it to one account.
 SELECT
   g.account_id,
   a.username,

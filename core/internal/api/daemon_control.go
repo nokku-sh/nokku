@@ -96,7 +96,7 @@ func (s *daemonControlService) EnrollDaemon(
 		},
 	})
 	if errors.Is(err, nokkudaemon.ErrEnrollToken) {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, err.Error())
+		return nil, connect.NewError(connect.CodeNotFound, err.Error())
 	}
 	if err != nil {
 		return nil, err
@@ -215,11 +215,8 @@ func (s *daemonControlService) UploadRecording(
 	}
 	defer release()
 
-	// Before the row exists, so a refused upload leaves nothing behind.
-	if !s.cfg.Record.HasRoom(ctx, actor.WorkspaceIDFromContext(ctx)) {
-		return nil, errRecordingStorageFull
-	}
-	rec, err := s.resolveUpload(ctx, daemonID, meta)
+	room := s.cfg.Record.HasRoom(ctx, actor.WorkspaceIDFromContext(ctx))
+	rec, err := s.resolveUpload(ctx, daemonID, meta, room)
 	if err != nil {
 		return nil, err
 	}
@@ -479,6 +476,7 @@ func (s *daemonControlService) resolveUpload(
 	ctx context.Context,
 	daemonID string,
 	rm *nokkuv1.RecordingMeta,
+	room bool,
 ) (*db.Recording, error) {
 	// The id is in the key's AAD, and Postgres would lowercase a capital one.
 	if !login.ValidID(rm.GetRecordingId()) {
@@ -496,6 +494,9 @@ func (s *daemonControlService) resolveUpload(
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
+		}
+		if !room {
+			return errRecordingStorageFull
 		}
 		var startedAt *time.Time
 		if t := rm.GetStartedAt(); t.IsValid() {
