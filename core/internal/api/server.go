@@ -128,6 +128,7 @@ func (s *Server) Handler(ctx context.Context) http.Handler {
 		s.withRecover,
 		s.withRequestMeta,
 		s.withTenant,
+		bodyDeadline(unaryTime),
 	)(s.mux.ServeHTTP)
 }
 

@@ -60,7 +60,7 @@
 	const logs = util.getLogs(() => ({ ...pager.args, filter }));
 	const streams = auditStreams.list();
 	const live = $derived((streams.data ?? []).filter((s) => s.enabled));
-	const failing = $derived(live.some((s) => s.lastError));
+	const failing = $derived(live.some((s) => s.failingSince));
 	const exportLogs = util.exportLogs();
 
 	// Exports need both bounds, an open ended range ends now.

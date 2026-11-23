@@ -14,6 +14,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
+	"github.com/nokku-sh/nokku/core/internal/storage"
 	"github.com/nokku-sh/nokku/core/internal/tenant"
 )
 
@@ -57,7 +58,7 @@ var errTooManyUploads = connect.NewError(
 // errRecordingStorageFull is not InvalidArgument, a daemon gives up on that.
 var errRecordingStorageFull = connect.NewError(
 	connect.CodeResourceExhausted,
-	"the recording storage of this workspace is full",
+	"the recording storage is full",
 )
 
 // errMailNotSent is not Unavailable, clients read that as the server gone.
@@ -140,6 +141,9 @@ func toConnectError(ctx context.Context, err error) error {
 		return errSSORequired
 	case errors.Is(err, iam.ErrInviteSpent):
 		return errInviteInvalid
+	// A folder on a nearly full disk. The daemon keeps its file and tries again later.
+	case errors.Is(err, storage.ErrFull):
+		return errRecordingStorageFull
 	case errors.Is(err, iam.ErrLastSSOProvider):
 		return connect.NewError(connect.CodeFailedPrecondition,
 			"this is the last provider that can sign people in, turn off required single sign-on first")

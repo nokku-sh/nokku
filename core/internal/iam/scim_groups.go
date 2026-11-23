@@ -84,7 +84,7 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 		if team, err = linkTeamSCIM(ctx, q, team, scimAttrString(attrs["externalId"])); err != nil {
 			return err
 		}
-		if err := setTeamMembers(ctx, q, team.ID, scimMemberRefs(attrs["members"])); err != nil {
+		if _, err := setTeamMembers(ctx, q, team.ID, scimMemberRefs(attrs["members"]), true); err != nil {
 			return err
 		}
 		changes, err := memberEvents(ctx, q, team, before)
@@ -137,10 +137,10 @@ func (h scimGroupHandler) GetAll(r *http.Request, params scim.ListRequestParams)
 }
 
 func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.ResourceAttributes) (scim.Resource, error) {
-	if err := h.svc.requirePlan(r.Context()); err != nil {
-		return scim.Resource{}, err
-	}
 	ctx := r.Context()
+	// Off the plan a group only loses members. The rest is skipped, and the provider hears planErr.
+	planErr := h.svc.requirePlan(ctx)
+	skipped := false
 	var res scim.Resource
 	var events []*audit.Event
 	err := h.tx(ctx, id, func(q *db.Queries) error {
@@ -152,18 +152,28 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 		if err != nil {
 			return err
 		}
-		if name := scimAttrString(attrs["displayName"]); name != "" && name != team.Name {
+		name, externalID := scimAttrString(attrs["displayName"]), scimAttrString(attrs["externalId"])
+		rename := name != "" && name != team.Name
+		relink := externalID != "" && (team.ScimExternalID == nil || *team.ScimExternalID != externalID)
+		if planErr != nil {
+			skipped, rename, relink = rename || relink, false, false
+		}
+		if rename {
 			if team, err = q.UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, Name: &name}); err != nil {
 				return err
 			}
 			events = append(events, groupEvent(actionUpdateTeam, id, map[string]any{"name": team.Name}))
 		}
-		if team, err = linkTeamSCIM(ctx, q, team, scimAttrString(attrs["externalId"])); err != nil {
+		if relink {
+			if team, err = linkTeamSCIM(ctx, q, team, externalID); err != nil {
+				return err
+			}
+		}
+		left, err := setTeamMembers(ctx, q, id, scimMemberRefs(attrs["members"]), planErr == nil)
+		if err != nil {
 			return err
 		}
-		if err := setTeamMembers(ctx, q, id, scimMemberRefs(attrs["members"])); err != nil {
-			return err
-		}
+		skipped = skipped || left
 		changes, err := memberEvents(ctx, q, team, before)
 		if err != nil {
 			return err
@@ -175,13 +185,14 @@ func (h scimGroupHandler) Replace(r *http.Request, id string, attrs scim.Resourc
 	if err == nil {
 		h.log(ctx, events)
 	}
+	if err == nil && skipped {
+		return res, planErr
+	}
 	return res, err
 }
 
+// Delete takes access away, so it needs no plan.
 func (h scimGroupHandler) Delete(r *http.Request, id string) error {
-	if err := h.svc.requirePlan(r.Context()); err != nil {
-		return err
-	}
 	var name string
 	err := h.tx(r.Context(), id, func(q *db.Queries) (err error) {
 		name, err = q.DeleteSCIMTeam(r.Context(), id)
@@ -194,10 +205,10 @@ func (h scimGroupHandler) Delete(r *http.Request, id string) error {
 }
 
 func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
-	if err := h.svc.requirePlan(r.Context()); err != nil {
-		return scim.Resource{}, err
-	}
 	ctx := r.Context()
+	// Like Replace: off the plan only a removal goes through.
+	planErr := h.svc.requirePlan(ctx)
+	skipped := false
 	var res scim.Resource
 	var events []*audit.Event
 	changed := false
@@ -214,7 +225,12 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 			switch attr {
 			case "displayName":
 				name := scimAttrString(value)
-				if name == "" {
+				// The same name changes nothing, so it is no change to refuse off the plan.
+				if name == "" || name == team.Name {
+					return nil
+				}
+				if planErr != nil {
+					skipped = true
 					return nil
 				}
 				changed = true
@@ -224,6 +240,13 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 				events = append(events, groupEvent(actionUpdateTeam, id, map[string]any{"name": team.Name}))
 				return nil
 			case "externalId":
+				if equalTo(team.ScimExternalID, scimAttrString(value)) {
+					return nil
+				}
+				if planErr != nil {
+					skipped = true
+					return nil
+				}
 				changed = true
 				team, err = linkTeamSCIM(ctx, q, team, scimAttrString(value))
 				return err
@@ -232,12 +255,20 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 				ids := scimMemberRefs(value)
 				switch {
 				case opName == "replace" && expr == nil:
-					return setTeamMembers(ctx, q, id, ids)
+					left, err := setTeamMembers(ctx, q, id, ids, planErr == nil)
+					skipped = skipped || left
+					return err
+				case opName != "remove" && planErr != nil:
+					// Only someone who is not in yet would get in.
+					skipped = skipped ||
+						slices.ContainsFunc(ids, func(id string) bool { _, in := before[id]; return !in })
+					return nil
 				case opName != "remove":
 					return q.AddTeamMembers(ctx, &db.AddTeamMembersParams{TeamID: id, UserIds: ids})
 				case value == nil && expr == nil:
 					// A bare remove takes every value (RFC 7644 3.5.2.2).
-					return setTeamMembers(ctx, q, id, nil)
+					_, err := setTeamMembers(ctx, q, id, nil, false)
+					return err
 				}
 				if len(ids) == 0 {
 					// Okta puts the id in the filter: members[value eq "id"].
@@ -265,6 +296,9 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 	if err == nil {
 		h.log(ctx, events)
 	}
+	if err == nil && skipped {
+		return res, planErr
+	}
 	return res, err
 }
 
@@ -279,10 +313,17 @@ func linkTeamSCIM(ctx context.Context, q *db.Queries, team *db.Team, externalID 
 	return team, err
 }
 
-func setTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs []string) error {
+// setTeamMembers only takes members out without add, and says whether that left someone to add.
+func setTeamMembers(
+	ctx context.Context,
+	q *db.Queries,
+	teamID string,
+	userIDs []string,
+	add bool,
+) (left bool, err error) {
 	current, err := q.ListTeamMembers(ctx, teamID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	for _, m := range current {
 		if i := slices.Index(userIDs, m.User.ID); i >= 0 {
@@ -291,13 +332,19 @@ func setTeamMembers(ctx context.Context, q *db.Queries, teamID string, userIDs [
 			continue
 		}
 		if err := q.RemoveTeamMember(ctx, &db.RemoveTeamMemberParams{TeamID: teamID, UserID: m.User.ID}); err != nil {
-			return err
+			return false, err
 		}
 	}
-	return q.AddTeamMembers(ctx, &db.AddTeamMembersParams{TeamID: teamID, UserIds: userIDs})
+	if !add {
+		return len(userIDs) > 0, nil
+	}
+	return false, q.AddTeamMembers(ctx, &db.AddTeamMembersParams{TeamID: teamID, UserIds: userIDs})
 }
 
 // teamMembers maps member ids to the names the audit log shows for them.
+// equalTo is true when p is set to v.
+func equalTo(p *string, v string) bool { return p != nil && *p == v }
+
 func teamMembers(ctx context.Context, q *db.Queries, teamID string) (map[string]string, error) {
 	rows, err := q.ListTeamMembers(ctx, teamID)
 	if err != nil {

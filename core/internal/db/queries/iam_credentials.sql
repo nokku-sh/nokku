@@ -69,6 +69,13 @@ DELETE FROM credentials
 WHERE
   user_id = @user_id;
 
+-- name: DeleteUserCredentialsSince :exec
+-- What was added while someone else may have held a session.
+DELETE FROM credentials
+WHERE
+  user_id = @user_id
+  AND created_at >= @since;
+
 -- name: DeleteUserOIDCCredentials :exec
 DELETE FROM credentials
 WHERE

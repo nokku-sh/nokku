@@ -17,6 +17,7 @@ import (
 
 	"github.com/nokku-sh/nokku/core/internal/db"
 	"github.com/nokku-sh/nokku/core/internal/iam"
+	"github.com/nokku-sh/nokku/core/internal/storage"
 )
 
 func TestToConnectErrorGroups(t *testing.T) {
@@ -62,6 +63,11 @@ func TestToConnectErrorIAMRefusals(t *testing.T) {
 		{errors.Join(iam.ErrSeatLimit, plan), errSeatLimit},
 		{fmt.Errorf("tx: %w", iam.ErrSSORequired), errSSORequired},
 		{iam.ErrInviteSpent, errInviteInvalid},
+		// An upload on a nearly full disk, so the daemon keeps its file and waits.
+		{
+			fmt.Errorf("recording x: %w", fmt.Errorf("write recording object: %w", storage.ErrFull)),
+			errRecordingStorageFull,
+		},
 	}
 	for _, tt := range tests {
 		assert.Same(t, tt.want, toConnectError(t.Context(), tt.err), "%v", tt.err)

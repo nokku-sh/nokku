@@ -179,7 +179,7 @@ The rest, grouped by topic. Key management and rotating the secret are in [SECUR
 | `PGSSLMODE`          | `prefer`    | libpq SSL mode, see below                        |
 | `NOKKU_DB_MAX_CONNS` | `20`        | Largest pool size                                |
 
-`PGUSER` is the only user you create. On start the core makes two more roles for itself, `nokku_app` and `nokku_system`, and gives them the same password. The user of the official PostgreSQL image is a superuser and just works. A user you create yourself needs to own the database and have `CREATEROLE` and `BYPASSRLS`:
+`PGUSER` is the only user you create and the only one that logs in. On its first start the core makes two roles for itself, `nokku_app` and `nokku_system`. They cannot log in and have no password, the core switches to them after it connected. The user of the official PostgreSQL image is a superuser and just works. A user you create yourself needs to own the database and have `CREATEROLE` and `BYPASSRLS`:
 
 ```sql
 CREATE ROLE nokku LOGIN PASSWORD '...' CREATEROLE BYPASSRLS;
@@ -239,7 +239,7 @@ Session recordings go to a local folder by default. They are encrypted before th
 | `AWS_ACCESS_KEY_ID`     |                 | S3 access key, with an `s3://` URL        |
 | `AWS_SECRET_ACCESS_KEY` |                 | S3 secret key                             |
 
-- **A folder** is `file:///var/lib/nokku/recordings`, created when it is missing. The image runs as user 65532, so that user must own it.
+- **A folder** is `file:///var/lib/nokku/recordings`, created when it is missing. The image runs as user 65532, so that user must own it. With less than 1 GiB free on its disk it takes no recordings, the core's log says so and daemons keep theirs until there is room. That keeps one server from filling a disk PostgreSQL shares.
 - **A bucket** is `s3://nokku?region=auto&endpoint=https://s3.example.com&use_path_style=true`. Leave out `endpoint` for AWS itself, `use_path_style` is for MinIO. The URL takes the parameters of [gocloud's S3 driver](https://gocloud.dev/howto/blob/#s3).
 - **Stores other than AWS** often want `request_checksum_calculation=when_required`. On Scaleway that is `s3://nokku?region=fr-par&endpoint=https://s3.fr-par.scw.cloud&request_checksum_calculation=when_required`.
 - **Startup.** The core starts while a bucket can't be reached and logs a warning, daemons keep their recordings until it is back. A bucket that refuses the credentials stops the start.

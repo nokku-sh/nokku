@@ -130,7 +130,9 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 	return nil
 }
 
-// CancelEmailChange also undoes a finished change, then ends every way in.
+// CancelEmailChange says the change was not the account's own, so whoever asked for it held a session. A change
+// still pending ends every session and takes what was added since the request. A finished one is undone, and
+// every way in ends.
 func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
 	reverted := false
@@ -148,7 +150,13 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 			return err
 		}
 		if u.Email == row.Email {
-			return nil
+			if err := q.DeleteUserCredentialsSince(ctx, &db.DeleteUserCredentialsSinceParams{
+				UserID: u.ID, Since: row.CreatedAt,
+			}); err != nil {
+				return err
+			}
+			_, err = q.DeleteSubjectTokens(ctx, u.ID)
+			return err
 		}
 		if u, err = q.SetUserEmail(
 			ctx,
@@ -167,8 +175,15 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 		_, err = q.DeleteSubjectTokens(ctx, u.ID)
 		return err
 	})
-	if err != nil || !reverted {
+	if err != nil {
 		return err
+	}
+	if !reverted {
+		s.record(ctx, event{
+			Action: actionSessionRevoked, Kind: actor.KindUser, UserID: u.ID, Email: u.Email,
+			Detail: "email change canceled",
+		})
+		return nil
 	}
 	s.record(
 		ctx,

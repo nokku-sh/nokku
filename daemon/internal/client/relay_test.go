@@ -126,6 +126,28 @@ func TestRelayConnWriteAndClose(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled, "a closed relay still reads")
 }
 
+// The core takes no frame over 64 KiB, so a write larger than a frame goes out in pieces and in order.
+func TestRelayConnWritesInFrames(t *testing.T) {
+	t.Parallel()
+	conn, stream := newTestRelayConn(t)
+	big := make([]byte, 2*relayFrame+100)
+	for i := range big {
+		big[i] = byte(i)
+	}
+
+	n, err := conn.Write(big)
+	require.NoError(t, err)
+	assert.Equal(t, len(big), n)
+	var got []byte
+	for range 3 {
+		frame := (<-stream.sent).GetData()
+		assert.LessOrEqual(t, len(frame), relayFrame)
+		got = append(got, frame...)
+	}
+	assert.Equal(t, big, got)
+	assert.Empty(t, stream.sent)
+}
+
 // A deadline is what bounds a relayed peer that never finishes the handshake.
 func TestRelayConnDeadline(t *testing.T) {
 	t.Parallel()

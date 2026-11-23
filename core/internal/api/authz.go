@@ -20,7 +20,10 @@ import (
 )
 
 // procedureAccess holds each RPC's (access) option. Without one it is denied.
-var procedureAccess = loadProcedureAccess()
+var (
+	procedureAccess = loadProcedureAccess()
+	unaryProcedures = loadUnaryProcedures()
+)
 
 // authorizationInterceptor applies the (access) option in this order: daemon,
 // nk, role or self, people only, browser, fresh sign-in, plan feature, signing, cap.
@@ -45,6 +48,23 @@ func loadProcedureAccess() map[string]*nokkuv1.Access {
 				m := svc.Methods().Get(j)
 				if a, ok := proto.GetExtension(m.Options(), nokkuv1.E_Access).(*nokkuv1.Access); ok && a != nil {
 					out["/"+string(svc.FullName())+"/"+string(m.Name())] = a
+				}
+			}
+		}
+		return true
+	})
+	return out
+}
+
+// loadUnaryProcedures lists the calls that take one message and answer with one.
+func loadUnaryProcedures() map[string]bool {
+	out := make(map[string]bool)
+	protoregistry.GlobalFiles.RangeFilesByPackage("nokku.v1", func(fd protoreflect.FileDescriptor) bool {
+		for i := range fd.Services().Len() {
+			svc := fd.Services().Get(i)
+			for j := range svc.Methods().Len() {
+				if m := svc.Methods().Get(j); !m.IsStreamingClient() && !m.IsStreamingServer() {
+					out["/"+string(svc.FullName())+"/"+string(m.Name())] = true
 				}
 			}
 		}

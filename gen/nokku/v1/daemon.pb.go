@@ -2085,6 +2085,7 @@ type RelayRequest_Start struct {
 }
 
 type RelayRequest_Data struct {
+	// The core holds a few frames per relay in memory, so a frame is small. nk sends 32 KiB at most.
 	Data []byte `protobuf:"bytes,2,opt,name=data,oneof"`
 }
 
@@ -2677,10 +2678,10 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"clientAddr\"6\n" +
 	"\n" +
 	"RelayStart\x12(\n" +
-	"\tdaemon_id\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\"Y\n" +
+	"\tdaemon_id\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\bdaemonId\"d\n" +
 	"\fRelayRequest\x12,\n" +
-	"\x05start\x18\x01 \x01(\v2\x14.nokku.v1.RelayStartH\x00R\x05start\x12\x14\n" +
-	"\x04data\x18\x02 \x01(\fH\x00R\x04dataB\x05\n" +
+	"\x05start\x18\x01 \x01(\v2\x14.nokku.v1.RelayStartH\x00R\x05start\x12\x1f\n" +
+	"\x04data\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04H\x00R\x04dataB\x05\n" +
 	"\x03msg\"'\n" +
 	"\n" +
 	"RelayReady\x12\x19\n" +
@@ -2690,10 +2691,10 @@ const file_nokku_v1_daemon_proto_rawDesc = "" +
 	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x12/\n" +
 	"\x06closed\x18\x03 \x01(\v2\x15.nokku.v1.RelayClosedH\x00R\x06closedB\x05\n" +
 	"\x03msg\"\r\n" +
-	"\vRelayClosed\"\x9c\x01\n" +
+	"\vRelayClosed\"\xa7\x01\n" +
 	"\x12DaemonRelayRequest\x122\n" +
-	"\x05ready\x18\x01 \x01(\v2\x1a.nokku.v1.DaemonRelayReadyH\x00R\x05ready\x12\x14\n" +
-	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x125\n" +
+	"\x05ready\x18\x01 \x01(\v2\x1a.nokku.v1.DaemonRelayReadyH\x00R\x05ready\x12\x1f\n" +
+	"\x04data\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04H\x00R\x04data\x125\n" +
 	"\x06closed\x18\x03 \x01(\v2\x1b.nokku.v1.DaemonRelayClosedH\x00R\x06closedB\x05\n" +
 	"\x03msg\"i\n" +
 	"\x13DaemonRelayResponse\x12\x14\n" +

@@ -84,11 +84,11 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*nokkuv1.SyncDaem
 	return res, nil
 }
 
-// Hashes is the pass over a workspace: the hash of what each of its daemons would be told right now, by id. One
-// transaction, and every answer built the way Sync builds it.
-func Hashes(ctx context.Context, conn connection) (map[string][]byte, error) {
-	hashes := map[string][]byte{}
-	err := conn.TenantTx(ctx, func(q *db.Queries) error {
+// Hashes is the pass over a workspace: the hash of what each of its daemons would be told right now, by id, and
+// which of them are accepted. One transaction, and every answer built the way Sync builds it.
+func Hashes(ctx context.Context, conn connection) (hashes map[string][]byte, accepted map[string]bool, err error) {
+	hashes, accepted = map[string][]byte{}, map[string]bool{}
+	err = conn.TenantTx(ctx, func(q *db.Queries) error {
 		workspace, err := q.GetWorkspace(ctx)
 		if err != nil {
 			return err
@@ -115,10 +115,11 @@ func Hashes(ctx context.Context, conn connection) (map[string][]byte, error) {
 				return err
 			}
 			hashes[d.Daemon.ID] = res.GetStateHash()
+			accepted[d.Daemon.ID] = d.Daemon.Status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
 		}
 		return nil
 	})
-	return hashes, err
+	return hashes, accepted, err
 }
 
 // answer is what one daemon is told to enforce, with its hash. A daemon that is gone is nil, and one that is not

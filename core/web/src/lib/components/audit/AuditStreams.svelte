@@ -86,7 +86,10 @@
 
 	function status(s: AuditStream) {
 		if (!s.enabled) return 'Paused';
-		if (s.lastError) return `Failing since ${formatTs(s.failingSince, 'relative')}: ${s.lastError}`;
+		// Only the owner gets the error itself.
+		if (s.failingSince) {
+			return `Failing since ${formatTs(s.failingSince, 'relative')}${s.lastError ? `: ${s.lastError}` : ''}`;
+		}
 		if (s.lastSentAt) return `Sent ${formatTs(s.lastSentAt, 'relative')}`;
 		return 'Waiting for the first event';
 	}
@@ -98,7 +101,7 @@
 			<Button {...props} variant="outline">
 				<Radio data-icon="inline-start" />
 				Streaming
-				{#if streams.data?.some((s) => s.lastError)}<Badge variant="destructive">Failing</Badge
+				{#if streams.data?.some((s) => s.failingSince)}<Badge variant="destructive">Failing</Badge
 					>{/if}
 			</Button>
 		{/snippet}
@@ -159,7 +162,7 @@
 							<Item.Content class="min-w-0">
 								<Item.Title>{label(s.kind)}</Item.Title>
 								<Item.Description class="truncate font-mono text-xs">{s.url}</Item.Description>
-								<Item.Description class={s.lastError ? 'text-destructive' : ''}>
+								<Item.Description class={s.failingSince ? 'text-destructive' : ''}>
 									{status(s)}
 								</Item.Description>
 							</Item.Content>

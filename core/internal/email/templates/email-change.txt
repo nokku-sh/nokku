@@ -11,7 +11,7 @@ New address
 
 {{ .NewEmail }}
 
-If this was you, there is nothing to do. If it was not, cancel the change. That also works after the change went through: it puts this address back and signs the account out everywhere. Check your passkeys and signed-in devices afterwards.
+If this was you, there is nothing to do. If it was not, cancel the change. That signs the account out everywhere, and after the change went through it also puts this address back. Check your passkeys and signed-in devices afterwards.
 
 This wasn't me, cancel the change {{ .CancelURL }}
 

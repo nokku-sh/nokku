@@ -831,7 +831,8 @@ UPDATE OF expires_at ON grants FOR EACH ROW WHEN (OLD.expires_at IS DISTINCT FRO
 EXECUTE FUNCTION notify_state_change ();
 
 -- Roles ----------------------------------------------------------------------
--- nokku_app serves requests under RLS, nokku_system bypasses it. Neither is a member of the other.
+-- nokku_app serves requests under RLS, nokku_system bypasses it. Neither is a member of the other, and neither
+-- can log in: the core logs in as the owner and switches with SET ROLE.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nokku_app') THEN
@@ -841,6 +842,9 @@ BEGIN
     CREATE ROLE nokku_system NOLOGIN BYPASSRLS;
   END IF;
 END $$;
+
+GRANT nokku_app,
+nokku_system TO CURRENT_USER;
 
 GRANT USAGE ON SCHEMA public TO nokku_app,
 nokku_system;

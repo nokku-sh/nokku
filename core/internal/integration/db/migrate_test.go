@@ -14,23 +14,12 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// recover and rotate-secrets run next to the server. Opening must not
-// migrate or reset the role passwords.
+// recover and rotate-secrets run next to the server. Opening must not migrate.
 func TestNewConnectionChangesNothing(t *testing.T) {
 	ctx := t.Context()
 	owner, err := pgx.Connect(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = owner.Close(context.WithoutCancel(ctx)) })
-	// The hash is salted, so setting the same password again still changes it.
-	password := func() string {
-		var p string
-		require.NoError(
-			t,
-			owner.QueryRow(ctx, "SELECT rolpassword FROM pg_authid WHERE rolname = 'nokku_app'").Scan(&p),
-		)
-		return p
-	}
-	before := password()
 
 	_, err = owner.Exec(ctx, "CREATE DATABASE nokku_open_only")
 	require.NoError(t, err)
@@ -48,7 +37,24 @@ func TestNewConnectionChangesNothing(t *testing.T) {
 	var migrated bool
 	require.NoError(t, fresh.QueryRow(ctx, "SELECT to_regclass('public.schema_version') IS NOT NULL").Scan(&migrated))
 	assert.False(t, migrated, "opening a connection migrated the database")
-	assert.Equal(t, before, password(), "opening a connection reset the role password")
+}
+
+// A role that cannot log in has no password to set at a start, to read in a Postgres log or to share with a second
+// database of the cluster.
+func TestRuntimeRolesCannotLogIn(t *testing.T) {
+	c := testConnection(t)
+	rows, err := c.sysPool.Query(t.Context(), `
+		SELECT rolname::TEXT, rolcanlogin FROM pg_roles WHERE rolname IN ('nokku_app', 'nokku_system')`)
+	require.NoError(t, err)
+	roles, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
+		var name string
+		var login bool
+		err := row.Scan(&name, &login)
+		assert.False(t, login, "%s can log in", name)
+		return name, err
+	})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"nokku_app", "nokku_system"}, roles)
 }
 
 // Only the owner migrates. A runtime role moving it breaks the next start.

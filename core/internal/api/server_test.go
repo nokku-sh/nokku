@@ -75,3 +75,29 @@ func TestDuplexProceduresAreAllListed(t *testing.T) {
 		assert.Equal(t, md.IsStreamingClient() && md.IsStreamingServer(), duplexProcedures[procedure], procedure)
 	}
 }
+
+// Hosted, the base address is the bare domain of the public site. A script there must not post to a workspace
+// with the visitor's session cookie, like to approve an nk login.
+func TestThePublicSiteIsNoTrustedOrigin(t *testing.T) {
+	post := func(saas bool, host, origin, site string) int {
+		cfg := &app.Config{}
+		cfg.BaseURL, cfg.SaaS = "nokku.example", saas
+		reached := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"https://"+host+"/auth/device/verify",
+			strings.NewReader("user_code=x"),
+		)
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Sec-Fetch-Site", site)
+		rec := httptest.NewRecorder()
+		New(cfg).withCSRF(reached).ServeHTTP(rec, req)
+		return rec.Code
+	}
+	assert.Equal(t, http.StatusBadRequest, post(true, "acme.nokku.example", "https://nokku.example", "same-site"),
+		"the public site posted into a workspace")
+	assert.Equal(t, http.StatusOK, post(true, "acme.nokku.example", "https://acme.nokku.example", "same-origin"),
+		"a workspace could not post to itself")
+	assert.Equal(t, http.StatusOK, post(false, "nokku.example", "https://nokku.example", "same-origin"))
+	assert.Equal(t, http.StatusBadRequest, post(false, "nokku.example", "https://evil.example", "cross-site"))
+}

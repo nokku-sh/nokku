@@ -23,7 +23,8 @@ WHERE
   AND expires_at > NOW()
 RETURNING
   user_id::UUID AS user_id,
-  email::TEXT AS email
+  email::TEXT AS email,
+  created_at
 `
 
 type ConsumeEmailTokenParams struct {
@@ -32,14 +33,15 @@ type ConsumeEmailTokenParams struct {
 }
 
 type ConsumeEmailTokenRow struct {
-	UserID string `json:"userId"`
-	Email  string `json:"email"`
+	UserID    string    `json:"userId"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 func (q *Queries) ConsumeEmailToken(ctx context.Context, arg *ConsumeEmailTokenParams) (*ConsumeEmailTokenRow, error) {
 	row := q.db.QueryRow(ctx, consumeEmailToken, arg.TokenHash, arg.Purpose)
 	var i ConsumeEmailTokenRow
-	err := row.Scan(&i.UserID, &i.Email)
+	err := row.Scan(&i.UserID, &i.Email, &i.CreatedAt)
 	return &i, err
 }
 

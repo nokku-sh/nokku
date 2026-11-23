@@ -7,10 +7,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -1034,4 +1036,39 @@ func TestServersCarryTheirDaemon(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, picked.GetTargets(), 1, "the ids filter keeps only the picked servers")
 	assert.Equal(t, manual, picked.GetTargets()[0].GetId())
+}
+
+// The core holds a few frames of every relay in memory, so it takes no large one. nk and nokkud send 32 KiB.
+func TestRelayRefusesALargeFrame(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ctx, info := connect.NewClientContext(t.Context())
+	info.RequestHeader().Set("Authorization",
+		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER))
+	stream, err := nokkuv1connect.NewDaemonServiceClient(clientOn(srv)).Relay(ctx)
+	require.NoError(t, err)
+	defer func() { _ = stream.Close() }()
+
+	_ = stream.Send(&nokkuv1.RelayRequest{Msg: &nokkuv1.RelayRequest_Data{Data: make([]byte, 64<<10+1)}})
+	_, err = stream.Receive()
+	require.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
+	assert.Contains(t, err.Error(), "65536", "refused for another reason than its size")
+}
+
+// A public call fed a trickle is cut through the whole handler chain, the unary timeout alone cannot stop a read.
+func TestAStalledUnaryBodyIsCutOff(t *testing.T) {
+	_, srv := newTestAPI(t)
+	transport, ok := srv.Client().Transport.(*http.Transport)
+	require.True(t, ok)
+	// No ALPN, so the test server speaks HTTP/1.1 and the request can be written by hand.
+	conn, err := tls.Dial("tcp", srv.Listener.Addr().String(), &tls.Config{RootCAs: transport.TLSClientConfig.RootCAs})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	_, err = conn.Write([]byte("POST " + nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure + " HTTP/1.1\r\n" +
+		"Host: " + srv.Listener.Addr().String() + "\r\nContent-Type: application/proto\r\nContent-Length: 100\r\n\r\npartial"))
+	require.NoError(t, err)
+
+	// The server answers or hangs up once the deadline passes. Without one this read never returns.
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(20*time.Second)))
+	_, err = conn.Read(make([]byte, 1))
+	assert.NotErrorIs(t, err, os.ErrDeadlineExceeded, "the core still waits on a stalled body after 20 s")
 }

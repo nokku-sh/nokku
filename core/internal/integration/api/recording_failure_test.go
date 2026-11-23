@@ -20,6 +20,7 @@ import (
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -364,9 +365,13 @@ func TestRacingFirstUploadIsToldToRetry(t *testing.T) {
 	<-made
 
 	stream := openUpload(t.Context(), t, cfg, srv, key, enrolled.GetAccessToken(), id)
+	// As the owner, the app role does not get to read what the sessions of the owner's login run.
+	owner, err := pgx.Connect(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = owner.Close(context.WithoutCancel(t.Context())) })
 	require.Eventually(t, func() bool {
 		var waiting bool
-		err := cfg.Conn.Pool.QueryRow(wsCtx(t), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+		err := owner.QueryRow(t.Context(), `SELECT EXISTS (SELECT 1 FROM pg_stat_activity
 			WHERE wait_event_type = 'Lock' AND query LIKE '%name: CreateRecording%')`).Scan(&waiting)
 		return err == nil && waiting
 	}, 5*time.Second, 20*time.Millisecond, "the upload never waited on the other row")

@@ -2,10 +2,14 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"connectrpc.com/connect/v2"
 )
+
+// unaryTime is what a unary call gets, its request body included.
+const unaryTime = 10 * time.Second
 
 // unaryTimeout caps unary calls, an earlier client deadline holds.
 func unaryTimeout(next connect.ServerFunc) connect.ServerFunc {
@@ -13,7 +17,7 @@ func unaryTimeout(next connect.ServerFunc) connect.ServerFunc {
 		if spec.StreamType != connect.StreamTypeUnary {
 			return next(ctx, spec, stream)
 		}
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, unaryTime)
 		defer cancel()
 		return next(ctx, spec, stream)
 	}
@@ -40,5 +44,19 @@ func endWith(ctx, root context.Context) (context.Context, func()) {
 	return ctx, func() {
 		stop()
 		cancel()
+	}
+}
+
+// bodyDeadline gives a client as long to send the body of a unary call as the call has. unaryTimeout cannot
+// interrupt a read, so a public call fed a trickle held its connection for as long as the client liked. A stream
+// has no deadline, and a slow handler is not cut, the deadline ends with the body.
+func bodyDeadline(timeout time.Duration) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if unaryProcedures[r.URL.Path] && r.Body != http.NoBody {
+				_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(timeout))
+			}
+			h.ServeHTTP(w, r)
+		})
 	}
 }

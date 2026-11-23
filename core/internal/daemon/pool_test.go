@@ -134,8 +134,12 @@ func TestPool_PokeCoalesces(t *testing.T) {
 	require.Equal(t, []byte{99}, c.update().GetStateUpdate().GetStateHash(), "the update carries an old hash")
 	require.Empty(t, other.state, "the other daemon got state updates")
 
+	// The daemon may have synced since its last heartbeat, so a change back to what that one held wakes it too.
 	c.want([]byte("a"))
-	require.Empty(t, c.state, "woken for the hash it already holds")
+	require.Len(t, c.state, 1, "not woken for a change back to what it last said it holds")
+	<-c.state
+	c.want([]byte("a"))
+	require.Empty(t, c.state, "woken by a pass that changed nothing")
 }
 
 // Coalescing state updates never drops a queued control message.
@@ -452,4 +456,50 @@ func TestHeartbeatFindsADaemonThatFellBehind(t *testing.T) {
 	c.want([]byte("11"))
 	assert.False(t, c.heartbeat(v6), "flapping back behind right away is not reported again")
 	require.NotNil(t, c.behindSince.Load(), "the console still sees it as behind")
+}
+
+// A daemon heartbeats every 30 s, so what the core last heard is stale right after a sync. A revoke that brings
+// the answer back to what it was before a grant must still wake the daemon.
+func TestARevokeRightAfterAGrantWakesTheDaemon(t *testing.T) {
+	c := &daemonConn{state: make(chan struct{}, 1)}
+	before, granted := []byte("before the grant"), []byte("with the grant")
+	woken := func() bool {
+		select {
+		case <-c.state:
+			return true
+		default:
+			return false
+		}
+	}
+
+	c.want(before)
+	c.heartbeat(before)
+	require.False(t, woken(), "a daemon in step was woken")
+	c.want(before)
+	require.False(t, woken(), "a pass that changed nothing woke the daemon")
+
+	c.want(granted)
+	require.True(t, woken(), "the grant did not wake the daemon")
+	// The daemon syncs and holds the grant now. Its next heartbeat is up to 30 s away.
+	c.want(before)
+	assert.True(t, woken(), "the revoke waits for the next heartbeat")
+}
+
+// A daemon that was deleted or rejected hears it, then loses its stream. One that ignored the update once stayed
+// online and went on reporting logins.
+func TestADaemonThatIsGoneLosesItsStream(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPool(t)
+		c := p.registerDaemon(t.Context(), "d1", "w1")
+		c.heartbeat([]byte("what it held"))
+
+		// The stub database knows no daemon, so this one reads as deleted.
+		require.NoError(t, p.reconcile(t.Context(), "w1"))
+		require.Len(t, c.state, 1, "the daemon was not told")
+		require.NoError(t, c.ctx.Err(), "cut before an honest daemon could sync")
+
+		time.Sleep(dropGrace + time.Second)
+		synctest.Wait()
+		require.Error(t, c.ctx.Err(), "a daemon that is gone kept its stream")
+	})
 }

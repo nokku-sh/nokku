@@ -12,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 )
 
 func TestLimitBodyCutsStalledBody(t *testing.T) {
@@ -61,5 +63,40 @@ func TestLimitBodyLeavesSlowHandlerAlone(t *testing.T) {
 		require.NoError(t, err)
 		_ = res.Body.Close()
 		assert.Equal(t, http.StatusNoContent, res.StatusCode, "body %q, the deadline must end with the body", body)
+	}
+}
+
+// A unary call fed a trickle is cut, a stream may be as slow as it likes.
+func TestBodyDeadlineIsForUnaryCalls(t *testing.T) {
+	t.Parallel()
+	readErr := make(chan error, 2)
+	srv := httptest.NewServer(bodyDeadline(100 * time.Millisecond)(
+		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			_, err := io.ReadAll(r.Body)
+			readErr <- err
+		}),
+	))
+	t.Cleanup(srv.Close)
+	stall := func(path string) {
+		conn, err := net.Dial("tcp", srv.Listener.Addr().String())
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = conn.Close() })
+		_, err = conn.Write([]byte("POST " + path + " HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\npartial"))
+		require.NoError(t, err)
+	}
+
+	stall(nokkuv1connect.DaemonControlServiceEnrollDaemonProcedure)
+	select {
+	case err := <-readErr:
+		require.ErrorIs(t, err, os.ErrDeadlineExceeded, "a stalled unary body must fail on the deadline")
+	case <-time.After(5 * time.Second):
+		t.Fatal("the handler still waits on a stalled unary body")
+	}
+
+	stall(nokkuv1connect.DaemonControlServiceUploadRecordingProcedure)
+	select {
+	case err := <-readErr:
+		t.Fatalf("a stream's body was cut: %v", err)
+	case <-time.After(500 * time.Millisecond):
 	}
 }

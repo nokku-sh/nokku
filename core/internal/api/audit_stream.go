@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"uuid"
 
 	"connectrpc.com/connect/v2"
@@ -30,11 +31,28 @@ func (s *auditStreamService) ListAuditStreams(
 	if err != nil {
 		return nil, err
 	}
+	// The error holds part of what the destination answered, and an address can hold a token. Both are for the
+	// owner who set it up, everyone else learns where events go and whether that works.
+	owner := callerRole(ctx) >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER
 	streams := make([]*nokkuv1.AuditStream, len(rows))
 	for i, r := range rows {
 		streams[i] = r.ToProto()
+		if !owner {
+			streams[i].LastError = nil
+			streams[i].Url = new(streamPlace(r.URL))
+		}
 	}
 	return &nokkuv1.ListAuditStreamsResponse{Streams: streams}, nil
+}
+
+// streamPlace is the address without what could be a credential: a user and password, a query, a fragment.
+func streamPlace(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	u.User, u.RawQuery, u.ForceQuery, u.Fragment = nil, "", false, ""
+	return u.String()
 }
 
 func (s *auditStreamService) CreateAuditStream(

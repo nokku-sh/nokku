@@ -251,25 +251,38 @@ func TestEmailChange(t *testing.T) {
 	require.ErrorIs(t, e.svc.CancelEmailChange(ctx, cancel), iam.ErrInvalidToken, "second revert")
 }
 
+// "This wasn't me" on a change nobody confirmed. Whoever asked for it held a fresh session, so that ends, with
+// the passkey they added since.
 func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	u := e.user(t, o.ws, "old@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	ctx := as(t.Context(), o.ws, u)
+	passkey := func(id string) {
+		e.putCredential(t, o.ws, db.UpsertCredentialParams{
+			ID: id, UserID: u.ID, Type: string(iam.MethodPasskey), Subject: id, Data: []byte{},
+		})
+	}
+	passkey("own-" + u.ID)
 	confirm, cancel, err := e.svc.RequestEmailChange(ctx, u, "new@"+testDomain())
 	require.NoError(t, err)
 	_, session := e.session(t, o.ws, u, actor.KindUser)
-	e.putCredential(t, o.ws, db.UpsertCredentialParams{
-		ID: "pk-" + u.ID, UserID: u.ID, Type: string(iam.MethodPasskey), Subject: "pk-" + u.ID, Data: []byte{},
-	})
+	passkey("added-" + u.ID)
 
 	require.NoError(t, e.svc.CancelEmailChange(ctx, cancel))
-	assert.Equal(t, 1, e.passkeys(t, o.ws, u.ID), "cancel of a pending change dropped a passkey")
+	var left []string
+	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
+		rows, listErr := q.ListUserCredentials(t.Context(), u.ID)
+		for _, c := range rows {
+			left = append(left, c.ID)
+		}
+		return listErr
+	}))
+	assert.Equal(t, []string{"own-" + u.ID}, left, "the passkey added after the request stays, or the owner's went")
 	require.ErrorIs(t, e.svc.ConfirmEmailChange(ctx, confirm), iam.ErrInvalidToken, "confirm after cancel")
 	require.NotNil(t, e.userByEmail(t, o.ws, u.Email), "cancel changed the address")
-	// Nothing changed yet, so nobody is signed out.
 	_, _, err = e.svc.AuthenticateToken(ctx, session, accessTokens...)
-	require.NoError(t, err, "cancel of a pending change ended the session")
+	require.Error(t, err, "the session of whoever asked for the change survived")
 }
 
 // An identity provider owns the address of the accounts it vouches for.

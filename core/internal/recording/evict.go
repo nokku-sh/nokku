@@ -15,6 +15,11 @@ const minEvictAge = 24 * time.Hour
 // MakeRoom evicts the oldest recordings over the cap, and a failed lookup never
 // refuses. Open uploads can pass the cap, which is only a stop for abuse.
 func (s *Service) MakeRoom(ctx context.Context, workspaceID, recordingID string) bool {
+	// No eviction frees a disk others fill too, so a folder that is nearly full takes nothing new.
+	if !s.store.HasRoom() {
+		slog.Warn("the disk of the recordings folder is nearly full, daemons keep their recordings until there is room")
+		return false
+	}
 	capBytes, err := s.limits.RecordingStorageBytes(ctx, workspaceID)
 	if err != nil {
 		slog.Warn("recording storage cap lookup failed", "error", err, "workspace_id", workspaceID)

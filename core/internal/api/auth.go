@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"connectrpc.com/connect/v2"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -84,8 +85,11 @@ func (s *authService) ConsumeMagicLink(
 			connect.CodeAlreadyExists,
 			"an account with this email already exists, sign in instead",
 		)
-	case err != nil:
+	case errors.Is(err, iam.ErrInvalidToken), errors.Is(err, pgx.ErrNoRows):
 		return nil, errLinkInvalid
+	case err != nil:
+		// Not the link's fault. It is logged and reads as a failure of ours, the link is spent by then.
+		return nil, err
 	}
 	setCookie(ci, cookie)
 	meta, _ := actor.RequestMetaFromContext(ctx)
@@ -128,8 +132,11 @@ func (s *authService) ConfirmEmailChange(
 	if errors.Is(err, iam.ErrEmailTaken) {
 		return nil, connect.NewError(connect.CodeAlreadyExists, "an account with this email already exists")
 	}
-	if err != nil {
+	if errors.Is(err, iam.ErrInvalidToken) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "this confirmation link is invalid or expired")
+	}
+	if err != nil {
+		return nil, err
 	}
 	return &nokkuv1.ConfirmEmailChangeResponse{}, nil
 }
@@ -145,8 +152,11 @@ func (s *authService) CancelEmailChange(
 			"another account uses the old address by now, contact your administrator",
 		)
 	}
-	if err != nil {
+	if errors.Is(err, iam.ErrInvalidToken) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "this link is invalid or expired")
+	}
+	if err != nil {
+		return nil, err
 	}
 	return &nokkuv1.CancelEmailChangeResponse{}, nil
 }

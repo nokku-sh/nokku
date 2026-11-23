@@ -27,8 +27,11 @@ func (s *accountService) GetAccount(
 	_ *nokkuv1.GetAccountRequest,
 ) (*nokkuv1.GetAccountResponse, error) {
 	u, err := s.cfg.IAM.GetUser(ctx)
-	if err != nil {
+	if errors.Is(err, iam.ErrNotFound) {
 		return nil, errAccountNotFound
+	}
+	if err != nil {
+		return nil, err
 	}
 	user := u.ToProto()
 	if pending := s.cfg.IAM.PendingEmail(ctx, u.ID); pending != "" {
@@ -54,8 +57,11 @@ func (s *accountService) RequestEmailChange(
 	req *nokkuv1.RequestEmailChangeRequest,
 ) (*nokkuv1.RequestEmailChangeResponse, error) {
 	u, err := s.cfg.IAM.GetUser(ctx)
-	if err != nil {
+	if errors.Is(err, iam.ErrNotFound) {
 		return nil, errAccountNotFound
+	}
+	if err != nil {
+		return nil, err
 	}
 	if !s.cfg.Email.HasSMTP() {
 		return nil, connect.NewError(connect.CodeUnimplemented, "this server sends no mail, ask your administrator")

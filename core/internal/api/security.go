@@ -11,8 +11,11 @@ import (
 // The UI is same-origin, so no CORS. The terminal websocket checks its origin.
 func (s *Server) withCSRF(h http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
-	if err := cop.AddTrustedOrigin(s.cfg.FullURL()); err != nil {
-		panic(err)
+	// Hosted, the base address is the public site, and a script there must not post into a workspace.
+	if !s.cfg.SaaS {
+		if err := cop.AddTrustedOrigin(s.cfg.FullURL()); err != nil {
+			panic(err)
+		}
 	}
 	cop.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("csrf validation failed", "method", r.Method)

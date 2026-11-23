@@ -162,6 +162,93 @@ func TestSCIMOffThePlanOnlyOffboards(t *testing.T) {
 		"offboarding waited on the plan")
 }
 
+// Off the plan a group still loses members and can go. What would add is skipped,
+// and the provider hears that.
+func TestSCIMOffThePlanGroupsOnlyShrink(t *testing.T) {
+	onPlan := true
+	e := newTestEnvWith(t, iam.Deps{
+		HasSCIM: func(context.Context, string) (bool, error) { return onPlan, nil },
+	})
+	c := e.scim(t, e.org(t))
+	var alice, bob, carol scimResource
+	c.do(http.MethodPost, "/Users", scimUser("alice@"+testDomain(), ""), &alice)
+	c.do(http.MethodPost, "/Users", scimUser("bob@"+testDomain(), ""), &bob)
+	c.do(http.MethodPost, "/Users", scimUser("carol@"+testDomain(), ""), &carol)
+	ref := func(u scimResource) []any { return []any{map[string]any{"value": u.ID}} }
+	groupOf := func(name string, members []any) map[string]any {
+		return map[string]any{
+			"schemas":     []string{"urn:ietf:params:scim:schemas:core:2.0:Group"},
+			"displayName": name,
+			"members":     members,
+		}
+	}
+	var group scimResource
+	require.Equal(t, http.StatusCreated,
+		c.do(http.MethodPost, "/Groups", groupOf("ops", append(ref(alice), ref(bob)...)), &group))
+	path := "/Groups/" + group.ID
+	now := func() (string, []string) {
+		var got scimResource
+		require.Equal(t, http.StatusOK, c.do(http.MethodGet, path, nil, &got))
+		ids := []string{}
+		for _, m := range got.Members {
+			ids = append(ids, m.Value)
+		}
+		return got.DisplayName, ids
+	}
+
+	onPlan = false
+	remove := func(u scimResource) map[string]any {
+		return map[string]any{"op": "remove", "path": `members[value eq "` + u.ID + `"]`}
+	}
+	assert.Equal(
+		t,
+		http.StatusOK,
+		c.do(http.MethodPatch, path, patchOps(remove(bob)), nil),
+		"a leaver stayed in the team",
+	)
+	_, members := now()
+	assert.Equal(t, []string{alice.ID}, members)
+
+	assert.Equal(t, http.StatusForbidden, c.do(http.MethodPatch, path, patchOp("add", "members", ref(carol)), nil))
+	assert.Equal(
+		t,
+		http.StatusForbidden,
+		c.do(http.MethodPatch, path, patchOp("replace", "displayName", "admins"), nil),
+	)
+	assert.Equal(
+		t,
+		http.StatusForbidden,
+		c.do(http.MethodPut, path, groupOf("admins", append(ref(alice), ref(carol)...)), nil),
+	)
+	name, members := now()
+	assert.Equal(t, "ops", name, "a group was renamed off the plan")
+	assert.Equal(t, []string{alice.ID}, members, "a person got in off the plan")
+
+	// A change that changes nothing is no change to refuse: the name it has, a member who is in already.
+	assert.NotEqual(
+		t,
+		http.StatusForbidden,
+		c.do(http.MethodPatch, path, patchOp("replace", "displayName", "ops"), nil),
+		"the same name was refused off the plan",
+	)
+	assert.NotEqual(t, http.StatusForbidden, c.do(http.MethodPatch, path, patchOp("add", "members", ref(alice)), nil),
+		"a member who is in already was refused off the plan")
+
+	// One request that takes one out and puts one in: the removal lands, the provider hears of the rest.
+	both := patchOps(map[string]any{"op": "add", "path": "members", "value": ref(carol)}, remove(alice))
+	assert.Equal(t, http.StatusForbidden, c.do(http.MethodPatch, path, both, nil), "a skipped add read as done")
+	_, members = now()
+	assert.Empty(t, members, "a removal waited on the plan")
+
+	assert.Equal(
+		t,
+		http.StatusOK,
+		c.do(http.MethodPut, path, groupOf("ops", nil), nil),
+		"a full sync that adds nothing",
+	)
+	assert.Equal(t, http.StatusNoContent, c.do(http.MethodDelete, path, nil, nil), "a group could not go")
+}
+
 // A big group is a real request, past that the provider hears why it was
 // refused. Nothing without a token gets read.
 func TestSCIMBodyLimit(t *testing.T) {
@@ -493,6 +580,51 @@ func TestSCIMPatchNameParts(t *testing.T) {
 	var got scimResource
 	require.Equal(t, http.StatusOK, c.do(http.MethodGet, "/Users/"+created.ID, nil, &got))
 	assert.Equal(t, "Jane Roe", got.DisplayName, "half a name replaced the whole one")
+}
+
+// Attribute names ignore case (RFC 7643 2.1). An unread name once switched nobody off and answered success.
+func TestSCIMPatchReadsNamesWithoutCase(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.scim(t, e.org(t))
+	var u, member scimResource
+	c.do(http.MethodPost, "/Users", scimUser("case@"+testDomain(), "c1"), &u)
+	c.do(http.MethodPost, "/Users", scimUser("member@"+testDomain(), "c2"), &member)
+
+	patched := func(path string, body map[string]any) scimResource {
+		t.Helper()
+		var got scimResource
+		assert.Equal(t, http.StatusOK, c.do(http.MethodPatch, path, body, &got))
+		return got
+	}
+	assert.False(t, patched("/Users/"+u.ID, patchOp("Replace", "Active", false)).Active, "a path in another case")
+	on := patchOps(map[string]any{"op": "replace", "value": map[string]any{"Active": true}})
+	assert.True(t, patched("/Users/"+u.ID, on).Active, "a name in the value in another case")
+	assert.Equal(
+		t,
+		"Casey Jones",
+		patched("/Users/"+u.ID, patchOp("replace", "DisplayName", "Casey Jones")).DisplayName,
+	)
+	parts := patchOps(
+		map[string]any{"op": "replace", "path": "Name.GivenName", "value": "Kay"},
+		map[string]any{"op": "replace", "path": "Name.FamilyName", "value": "Smith"},
+	)
+	assert.Equal(t, "Kay Smith", patched("/Users/"+u.ID, parts).DisplayName, "name parts in another case")
+	nested := patchOps(map[string]any{"op": "replace", "value": map[string]any{
+		"Name": map[string]any{"GivenName": "Jo", "FamilyName": "Doe"},
+	}})
+	assert.Equal(t, "Jo Doe", patched("/Users/"+u.ID, nested).DisplayName, "name parts in a value in another case")
+	assert.Equal(t, "c9", patched("/Users/"+u.ID, patchOp("replace", "ExternalId", "c9")).ExternalID)
+
+	var group scimResource
+	require.Equal(t, http.StatusCreated, c.do(http.MethodPost, "/Groups", map[string]any{
+		"schemas":     []string{"urn:ietf:params:scim:schemas:core:2.0:Group"},
+		"displayName": "cases",
+	}, &group))
+	ref := []any{map[string]any{"value": member.ID}}
+	assert.Len(t, patched("/Groups/"+group.ID, patchOp("Add", "Members", ref)).Members, 1, "a member was not added")
+	assert.Equal(t, "Cases", patched("/Groups/"+group.ID, patchOp("replace", "DisplayName", "Cases")).DisplayName)
+	gone := patched("/Groups/"+group.ID, patchOp("Remove", `Members[Value eq "`+member.ID+`"]`, nil))
+	assert.Empty(t, gone.Members, "a member was not removed")
 }
 
 func TestSCIMGroupPatchMembers(t *testing.T) {

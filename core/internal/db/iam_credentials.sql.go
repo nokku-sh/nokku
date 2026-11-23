@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 const deleteCredential = `-- name: DeleteCredential :exec
@@ -54,6 +55,24 @@ WHERE
 
 func (q *Queries) DeleteUserCredentials(ctx context.Context, userID string) error {
 	_, err := q.db.Exec(ctx, deleteUserCredentials, userID)
+	return err
+}
+
+const deleteUserCredentialsSince = `-- name: DeleteUserCredentialsSince :exec
+DELETE FROM credentials
+WHERE
+  user_id = $1
+  AND created_at >= $2
+`
+
+type DeleteUserCredentialsSinceParams struct {
+	UserID string    `json:"userId"`
+	Since  time.Time `json:"since"`
+}
+
+// What was added while someone else may have held a session.
+func (q *Queries) DeleteUserCredentialsSince(ctx context.Context, arg *DeleteUserCredentialsSinceParams) error {
+	_, err := q.db.Exec(ctx, deleteUserCredentialsSince, arg.UserID, arg.Since)
 	return err
 }
 

@@ -365,7 +365,8 @@ message RelayStart {
 message RelayRequest {
   oneof msg {
     RelayStart start = 1;
-    bytes data = 2;
+    // The core holds a few frames per relay in memory, so a frame is small. nk sends 32 KiB at most.
+    bytes data = 2 [(buf.validate.field).bytes.max_len = 65536];
   }
 }
 
@@ -386,7 +387,7 @@ message RelayClosed {}
 message DaemonRelayRequest {
   oneof msg {
     DaemonRelayReady ready = 1;
-    bytes data = 2;
+    bytes data = 2 [(buf.validate.field).bytes.max_len = 65536];
     DaemonRelayClosed closed = 3;
   }
 }

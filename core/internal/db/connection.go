@@ -151,9 +151,11 @@ func (c *Connection) poolConfig(connString string) (*pgxpool.Config, error) {
 	return config, nil
 }
 
-// Two runtime roles, so no runtime path holds owner rights. They log in with the owner's password.
+// Both pools log in as the owner and switch to a runtime role that cannot log in, so no role has a password to
+// set or to leak. A session could switch back with RESET ROLE. Only injected SQL would, and every query is a
+// parameterized one from sqlc.
 func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config) error {
-	appConfig.ConnConfig.User = "nokku_app"
+	appConfig.AfterConnect = setRole("nokku_app")
 	appConfig.PrepareConn = pinWorkspace
 
 	var err error
@@ -164,7 +166,7 @@ func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config)
 	c.tenant = New(c.Pool)
 
 	sysConfig := appConfig.Copy()
-	sysConfig.ConnConfig.User = "nokku_system"
+	sysConfig.AfterConnect = setRole("nokku_system")
 	// Never pinned, a leftover pin would send an insert to the wrong workspace.
 	sysConfig.PrepareConn = nil
 	sysConfig.MaxConns = min(c.MaxConns, 4)
@@ -193,29 +195,17 @@ func (c *Connection) setupSchema(ctx context.Context, owner *pgx.ConnConfig) err
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtext('nokku_schema'))"); err != nil {
 		return fmt.Errorf("acquiring schema lock: %w", err)
 	}
-	if err := runMigrations(ctx, conn); err != nil {
-		return err
-	}
-	return setupRoles(ctx, conn, owner.Password)
+	return runMigrations(ctx, conn)
 }
 
-// The migration creates the runtime roles without a password.
-func setupRoles(ctx context.Context, conn *pgx.Conn, password string) error {
-	for _, role := range []string{"nokku_app", "nokku_system"} {
-		// ALTER ROLE takes no bind parameters, format() quotes it server-side.
-		var stmt string
-		if err := conn.QueryRow(
-			ctx,
-			"SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', $1::text, $2::text)",
-			role, password,
-		).Scan(&stmt); err != nil {
-			return fmt.Errorf("building role statement: %w", err)
+// setRole takes a role name from this file only, SET ROLE has no bind parameter.
+func setRole(role string) func(context.Context, *pgx.Conn) error {
+	return func(ctx context.Context, conn *pgx.Conn) error {
+		if _, err := conn.Exec(ctx, "SET ROLE "+role); err != nil {
+			return fmt.Errorf("switching to %s: %w", role, err)
 		}
-		if _, err := conn.Exec(ctx, stmt); err != nil {
-			return fmt.Errorf("granting login to %s: %w", role, err)
-		}
+		return nil
 	}
-	return nil
 }
 
 // pinWorkspace runs on every acquire and refuses a ctx without a workspace.

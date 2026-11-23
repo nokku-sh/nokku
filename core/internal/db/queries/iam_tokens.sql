@@ -25,7 +25,8 @@ WHERE
   AND expires_at > NOW()
 RETURNING
   user_id::UUID AS user_id,
-  email::TEXT AS email;
+  email::TEXT AS email,
+  created_at;
 
 -- name: DeleteUserTokens :exec
 DELETE FROM one_time_tokens

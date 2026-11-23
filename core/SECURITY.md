@@ -126,6 +126,7 @@ A workspace has exactly one owner, and nobody else can hand the workspace on. Wh
 - **An email sign-in link.** Always works for the owner too. Whoever reads the owner's mailbox is the owner, so give that mailbox a strong second factor.
 - **`recover`.** `./nokku recover` prints a 24 hour sign-in link for the owner. The log never shows the link, but a server started in a terminal prints it there. Anyone who runs commands on the machine can become the owner, so keep that to people you trust with the workspace.
 - **A linked identity provider.** A provider never becomes the owner by matching the email address. The owner links it once while signed in, on their profile. After that, whoever controls that account at the provider is the owner.
+- **The old mailbox, for a week after an address change.** The notice to the old address can undo the change for 7 days. That puts the old address back and ends every passkey and session, so a mail link to it signs in. Until the week is over, treat the old mailbox like the new one.
 
 Requiring single sign-on closes passkeys and email links for everyone else, and signs out the sessions they started, in the browser and in `nk`. It leaves them open for the owner on purpose, so a broken provider can still be fixed.
 
@@ -151,7 +152,7 @@ Requiring single sign-on closes passkeys and email links for everyone else, and 
 ### Database
 
 - **Three roles.** The owner (`PGUSER`) runs migrations at start. Requests run as `nokku_app`, under row-level security. Work that spans workspaces, like background jobs, runs as `nokku_system`, which bypasses it. `core/internal/db/testdata/bypass.golden` lists every such query, and a new one fails the tests until someone reviews it.
-- **One password.** The core sets the password of `nokku_app` and `nokku_system` to `PGPASSWORD` at every start. It holds the owner's login anyway, so a second password would protect nothing.
+- **One login.** Only the owner logs in. `nokku_app` and `nokku_system` cannot, they have no password, and the core switches to them with `SET ROLE` on every connection. So no password of theirs is set at a start or shows in a PostgreSQL log. A session could switch back to the owner, which a query of the core never does, and none is built from what a client sends.
 - **Use `PGSSLMODE=verify-full`** when PostgreSQL is on another host.
 
 ### Tokens
@@ -245,6 +246,6 @@ What a rule can't check is how the platform is set up. An `environment` only lim
 
 **Audit log retention.** The log keeps rows for the workspace's retention. An enabled audit stream holds back what it has not sent, up to 365 days, so a stream that is down loses nothing in that time. A paused stream holds nothing back. The owner gets one mail when a stream has failed for a day. A SIEM can also fetch the log itself with `PollAuditLogs`, which a service account with the viewer role may call. Streams and polls see an event about a minute after it happened, so none that commits late is skipped. Deleting a user or a server deletes their access requests too, the audit log keeps who asked and who decided.
 
-**Row-level security is a safety net, not a wall.** A request only sees the rows of its own workspace, and a connection with no workspace set sees nothing. The policy is the only workspace filter. Audit events are always written as `nokku_app` into their own workspace, `nokku_system` can't write them. This protects against application bugs, not against a compromised core, which holds the password of `nokku_system` too. Queries are parameterized through sqlc, which is the defense against injection.
+**Row-level security is a safety net, not a wall.** A request only sees the rows of its own workspace, and a connection with no workspace set sees nothing. The policy is the only workspace filter. Audit events are always written as `nokku_app` into their own workspace, `nokku_system` can't write them. This protects against application bugs, not against a compromised core, which logs in as the owner. Queries are parameterized through sqlc, which is the defense against injection.
 
 **Licensing.** A self-hosted core runs without a key. License keys are Ed25519-signed and verified offline against a public key built into the binary. An expired key never stops the core. Licensed features turn off, except required single sign-on and the idle session timeout, which stay as set so a lapsed key opens nothing up. Data beyond the limits of a core without a key is kept for 30 more days. A core that holds a key sends it, and nothing else, to `license.nokku.sh` for the renewed one about once a day, and when an admin opens Billing, at most every 30 seconds per workspace. `NOKKU_LICENSE_OFFLINE=true` turns that off.

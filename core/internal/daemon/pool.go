@@ -27,6 +27,8 @@ const (
 	behindReportGap = 10 * time.Minute
 	// reconnectWindow outlasts nokkud's longest reconnect backoff, a minute plus jitter.
 	reconnectWindow = 2 * time.Minute
+	// dropGrace is how long a daemon that is gone or no longer accepted keeps its stream, to sync and stop itself.
+	dropGrace = 10 * time.Second
 	// Access changes come in bursts, like a grant on many servers. The first is acted on at once, then the passes
 	// over the workspace come this far apart.
 	mergeWindow = 200 * time.Millisecond
@@ -53,6 +55,7 @@ type daemonConn struct {
 	wantedAtBeat []byte
 	reportedAt   time.Time
 	behindSince  atomic.Pointer[time.Time]
+	dropping     atomic.Bool
 }
 
 // connection lets tests stub db.Connection without Postgres.
@@ -339,7 +342,7 @@ func (p *Pool) reconcile(ctx context.Context, workspaceID string) error {
 	if len(daemons) == 0 {
 		return nil
 	}
-	hashes, err := Hashes(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), p.conn)
+	hashes, accepted, err := Hashes(actor.WithWorkspace(ctx, actor.Workspace{ID: workspaceID}), p.conn)
 	if err != nil {
 		return err
 	}
@@ -354,16 +357,29 @@ func (p *Pool) reconcile(ctx context.Context, workspaceID string) error {
 			hash = gone.GetStateHash()
 		}
 		c.want(hash)
+		if !accepted[c.daemonID] {
+			c.dropSoon()
+		}
 	}
 	return nil
 }
 
-// want sets what the daemon should hold and wakes it when its last heartbeat said something else.
+// dropSoon ends the stream of a daemon that is gone or no longer accepted. The update before it tells an honest
+// daemon, which syncs and stops by itself. One that ignores it must not stay online and report logins.
+func (c *daemonConn) dropSoon() {
+	if c.dropping.CompareAndSwap(false, true) {
+		time.AfterFunc(dropGrace, c.cancel)
+	}
+}
+
+// want sets what the daemon should hold and wakes it when that changed or its last heartbeat said something
+// else. The heartbeat is up to 30 s old, so after a grant and its sync a revoke reads as held already.
 func (c *daemonConn) want(hash []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	changed := c.wanted != nil && !bytes.Equal(c.wanted, hash)
 	c.wanted = hash
-	if c.heard && !bytes.Equal(c.applied, hash) {
+	if c.heard && (changed || !bytes.Equal(c.applied, hash)) {
 		c.poke()
 	}
 }

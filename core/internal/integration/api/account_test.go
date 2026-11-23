@@ -55,9 +55,12 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 		_, err = auth.ConfirmEmailChange(t.Context(), &nokkuv1.ConfirmEmailChangeRequest{Token: &confirm})
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "confirm after cancel: %v", err)
 
-		got, err := email(account)
-		require.NoError(t, err, "cancelling a pending change must not sign the user out")
-		assert.Equal(t, u.Email, got)
+		// Whoever asked for the change held a session, "this wasn't me" ends it.
+		_, err = email(account)
+		assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the cancel signs everyone out: %v", err)
+		kept, err := cfg.Conn.Tenant().GetUserByEmail(wsCtx(t), u.Email)
+		require.NoError(t, err)
+		assert.Equal(t, u.ID, kept.ID)
 	})
 
 	t.Run("confirm then revert", func(t *testing.T) {

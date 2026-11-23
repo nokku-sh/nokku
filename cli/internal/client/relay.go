@@ -12,6 +12,9 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
+// ssh packets stay under this, so one write is one frame in practice.
+const relayFrame = 32 << 10
+
 // Read and Write each have exactly one caller, the ProxyCommand pipes.
 type relayStream struct {
 	stream  nokkuv1connect.DaemonServiceRelayClientStream
@@ -82,11 +85,16 @@ func (r *relayStream) Read(p []byte) (int, error) {
 }
 
 func (r *relayStream) Write(p []byte) (int, error) {
-	// Send marshals synchronously, so p is not retained by the stream.
-	if err := r.stream.Send(&nokkuv1.RelayRequest{
-		Msg: &nokkuv1.RelayRequest_Data{Data: p},
-	}); err != nil {
-		return 0, fmt.Errorf("relay send: %w", err)
+	// The core takes no frame over 64 KiB, so a large write goes out in pieces.
+	for sent := 0; sent < len(p); {
+		n := min(len(p)-sent, relayFrame)
+		// Send marshals synchronously, so p is not retained by the stream.
+		if err := r.stream.Send(&nokkuv1.RelayRequest{
+			Msg: &nokkuv1.RelayRequest_Data{Data: p[sent : sent+n]},
+		}); err != nil {
+			return sent, fmt.Errorf("relay send: %w", err)
+		}
+		sent += n
 	}
 	return len(p), nil
 }

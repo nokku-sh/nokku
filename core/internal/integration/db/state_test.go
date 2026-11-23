@@ -78,9 +78,12 @@ func testConnection(t testing.TB) *conn {
 	t.Cleanup(cancel)
 	c, err := db.NewConnection(t.Context())
 	require.NoError(t, err, "connect")
-	// The system role logs in with the app role's password and is never pinned.
+	// The system role is switched to after the login, like the core does, and is never pinned.
 	cfg := c.Pool.Config()
-	cfg.ConnConfig.User = "nokku_system"
+	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET ROLE nokku_system")
+		return err
+	}
 	cfg.PrepareConn = nil
 	sysPool, err := pgxpool.NewWithConfig(t.Context(), cfg)
 	require.NoError(t, err, "connect as nokku_system")

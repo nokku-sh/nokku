@@ -171,3 +171,29 @@ func TestNewRefusesAFolderItCannotRead(t *testing.T) {
 	_, err := New(t.Context())
 	require.Error(t, err, "a folder the core can't read let it start")
 }
+
+// A folder often shares its disk with PostgreSQL. One server that floods recordings must not fill it.
+func TestAFolderOnAFullDiskTakesNoRecording(t *testing.T) {
+	t.Setenv("NOKKU_STORAGE_URL", "file://"+t.TempDir())
+	s, err := New(t.Context())
+	require.NoError(t, err)
+	require.True(t, s.HasRoom(), "an empty test folder reads as full")
+	w, err := s.CreateWriter(t.Context(), "videos/a/one.cast.gz")
+	require.NoError(t, err)
+
+	// No disk has this much free, so from here the folder counts as full.
+	minFreeDisk = 1 << 62
+	t.Cleanup(func() { minFreeDisk = 1 << 30 })
+	assert.False(t, s.HasRoom())
+	_, err = s.CreateWriter(t.Context(), "videos/a/two.cast.gz")
+	require.ErrorIs(t, err, ErrFull, "a new recording started on a full disk")
+	_, err = w.Write(make([]byte, roomCheckEvery))
+	require.ErrorIs(t, err, ErrFull, "an open recording kept growing on a full disk")
+	require.NoError(t, w.Close())
+}
+
+func TestABucketAlwaysHasRoom(t *testing.T) {
+	minFreeDisk = 1 << 62
+	t.Cleanup(func() { minFreeDisk = 1 << 30 })
+	assert.True(t, (&Storage{}).HasRoom(), "a bucket has no disk of ours to fill")
+}

@@ -207,3 +207,51 @@ func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
 		return err == nil && lastError != ""
 	}, 10*time.Second, 100*time.Millisecond, "the broken stream is not marked as failing")
 }
+
+// A failing stream's error holds part of what the destination answered. The owner set it up and reads it, everyone
+// else only learns that it fails.
+func TestOnlyTheOwnerReadsAStreamsError(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	ws := testWorkspace.ID
+	id := uuid.NewV7().String()
+	secret, err := cfg.Keyset.Seal(audit.SecretAAD(ws, id), []byte("stream-secret"))
+	require.NoError(t, err)
+	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
+		_, err := q.CreateAuditStream(t.Context(), &db.CreateAuditStreamParams{
+			ID:     id,
+			Kind:   nokkuv1.AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK,
+			URL:    "https://ingest:hunter2@siem.invalid/in?token=abc",
+			Secret: secret,
+		})
+		return err
+	})
+	t.Cleanup(func() {
+		_, _ = cfg.Conn.Pool.Exec(context.WithoutCancel(wsCtx(t)), "DELETE FROM audit_streams WHERE id = $1", id)
+	})
+	_, err = cfg.Conn.Pool.Exec(wsCtx(t),
+		"UPDATE audit_streams SET last_error = 'HTTP 403: token abc', failing_since = NOW() WHERE id = $1", id)
+	require.NoError(t, err)
+
+	read := func(role nokkuv1.WorkspaceRole) *nokkuv1.AuditStream {
+		t.Helper()
+		client := nokkuv1connect.NewAuditStreamServiceClient(clientOn(srv, header(
+			"Authorization", "Bearer "+seedMember(t, cfg, ws, role),
+		)))
+		res, err := client.ListAuditStreams(t.Context(), &nokkuv1.ListAuditStreamsRequest{})
+		require.NoError(t, err)
+		for _, s := range res.GetStreams() {
+			if s.GetId() == id {
+				return s
+			}
+		}
+		t.Fatal("the stream is not in the list")
+		return nil
+	}
+	owner := read(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
+	assert.Equal(t, "HTTP 403: token abc", owner.GetLastError())
+	assert.Equal(t, "https://ingest:hunter2@siem.invalid/in?token=abc", owner.GetUrl())
+	admin := read(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
+	assert.Empty(t, admin.GetLastError(), "an admin read what the destination answered")
+	assert.Equal(t, "https://siem.invalid/in", admin.GetUrl(), "an admin read a token in the address")
+	assert.NotNil(t, admin.GetFailingSince(), "an admin no longer sees that the stream fails")
+}
