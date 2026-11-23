@@ -130,7 +130,7 @@ type AccessRequest struct {
 type AccessDecision struct {
 	UserID, Email                       string
 	RequestID, Decider, Target, Account string
-	URL                                 string
+	Reason, URL                         string
 	Until                               *time.Time
 }
 
@@ -444,6 +444,7 @@ func (s *Service) SendAccessDecisionEmail(ctx context.Context, d AccessDecision)
 			Target:     d.Target,
 			Account:    d.Account,
 			Until:      until,
+			Reason:     d.Reason,
 			RequestURL: d.URL,
 			RequestID:  d.RequestID,
 		},

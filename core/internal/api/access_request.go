@@ -21,7 +21,7 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/email"
 )
 
-// maxDailyRequests stops asking and cancelling from flooding admins' inboxes.
+// maxDailyRequests stops asking and cancelling from flooding the inboxes of those who answer.
 const (
 	maxDailyRequests = 50
 
@@ -107,6 +107,12 @@ func (s *accessRequestService) CreateAccessRequest(
 	return &nokkuv1.CreateAccessRequestResponse{Request: row.ToProto()}, nil
 }
 
+// answersRequests is a person who may grant, the ones who see every request. A service account may grant as an
+// editor but answers none, so it sees none.
+func answersRequests(ctx context.Context) bool {
+	return callerRole(ctx) >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR && actor.UserIDFromContext(ctx) != ""
+}
+
 func (s *accessRequestService) GetAccessRequest(
 	ctx context.Context,
 	req *nokkuv1.GetAccessRequestRequest,
@@ -115,8 +121,7 @@ func (s *accessRequestService) GetAccessRequest(
 	if err != nil {
 		return nil, err
 	}
-	if callerRole(ctx) < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN &&
-		row.RequesterID != actor.UserIDFromContext(ctx) {
+	if !answersRequests(ctx) && row.RequesterID != actor.UserIDFromContext(ctx) {
 		return nil, connect.NewError(connect.CodeNotFound, "no such request")
 	}
 	return &nokkuv1.GetAccessRequestResponse{Request: row.ToProto()}, nil
@@ -127,7 +132,7 @@ func (s *accessRequestService) ListAccessRequests(
 	req *nokkuv1.ListAccessRequestsRequest,
 ) (*nokkuv1.ListAccessRequestsResponse, error) {
 	var requester *string
-	if callerRole(ctx) < nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN {
+	if !answersRequests(ctx) {
 		userID := actor.UserIDFromContext(ctx)
 		// Only people ask, so a service account has no requests of its own.
 		if userID == "" {
@@ -170,7 +175,7 @@ func (s *accessRequestService) ApproveAccessRequest(
 	ctx context.Context,
 	req *nokkuv1.ApproveAccessRequestRequest,
 ) (*nokkuv1.ApproveAccessRequestResponse, error) {
-	row, err := s.decide(ctx, req.GetId(), nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED)
+	row, err := s.decide(ctx, req.GetId(), nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED, "")
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +186,9 @@ func (s *accessRequestService) DenyAccessRequest(
 	ctx context.Context,
 	req *nokkuv1.DenyAccessRequestRequest,
 ) (*nokkuv1.DenyAccessRequestResponse, error) {
-	row, err := s.decide(ctx, req.GetId(), nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_DENIED)
+	row, err := s.decide(
+		ctx, req.GetId(), nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_DENIED, strings.TrimSpace(req.GetReason()),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +200,7 @@ func (s *accessRequestService) decide(
 	ctx context.Context,
 	id string,
 	status nokkuv1.AccessRequestStatus,
+	reason string,
 ) (*db.AccessRequestDetail, error) {
 	caller := actor.UserIDFromContext(ctx)
 
@@ -201,6 +209,7 @@ func (s *accessRequestService) decide(
 		_, err := q.DecideAccessRequest(ctx, &db.DecideAccessRequestParams{
 			Status:    status,
 			DecidedBy: caller,
+			Reason:    reason,
 			ID:        id,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -241,7 +250,7 @@ func whyUndecided(ctx context.Context, q *db.Queries, id, caller string) error {
 	case err != nil:
 		return err
 	case r.RequesterID == caller:
-		return connect.NewError(connect.CodePermissionDenied, "another admin has to answer your own request")
+		return connect.NewError(connect.CodePermissionDenied, "someone else has to answer your own request")
 	}
 	state := strings.ToLower(strings.TrimPrefix(r.Status.String(), "ACCESS_REQUEST_STATUS_"))
 	return connect.NewError(connect.CodeFailedPrecondition, "the request is "+state+" already")
@@ -312,6 +321,7 @@ func (s *accessRequestService) notifyRequester(ctx context.Context, r *db.Access
 		Decider:   r.DeciderName,
 		Target:    r.TargetName,
 		Account:   r.Username,
+		Reason:    r.DecisionReason,
 		URL:       requestURL(ctx, r.ID),
 		Until:     r.GrantedUntil(),
 	}); err != nil {

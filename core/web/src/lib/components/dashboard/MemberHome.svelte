@@ -43,7 +43,7 @@
 	);
 
 	const canAsk = $derived(has('access_requests') === true);
-	// Only the newest few, and no poll, they change when an admin answers.
+	// Only the newest few, and no poll, they change when someone answers.
 	const requests = accessRequests.list({ limit: RECENT }, { when: () => canAsk, live: false });
 	const mine = $derived(requests.data?.requests ?? []);
 </script>
@@ -102,7 +102,7 @@
 			<Card.Title><h2>Ask for a while</h2></Card.Title>
 			<Card.Description>
 				{canAsk
-					? 'An admin approves it and it ends by itself. Ask here or from your terminal.'
+					? 'Someone who manages access approves it and it ends by itself. Ask here or from your terminal.'
 					: 'Ask an admin of this workspace for an account on the server you need.'}
 			</Card.Description>
 		</Card.Header>
@@ -142,9 +142,9 @@
 							</Item.Title>
 							<Item.Description>
 								{r.status === AccessRequestStatus.PENDING
-									? `Asked ${formatTs(r.createdAt, 'relative')}. An admin gets to it soon.`
+									? `Asked ${formatTs(r.createdAt, 'relative')}. It waits a week for an answer.`
 									: r.deciderName
-										? `${requestState(r)} by ${r.deciderName}`
+										? `${requestState(r)} by ${r.deciderName}${r.decisionReason ? `: ${r.decisionReason}` : ''}`
 										: `Asked ${formatTs(r.createdAt, 'relative')}`}
 							</Item.Description>
 						</Item.Content>

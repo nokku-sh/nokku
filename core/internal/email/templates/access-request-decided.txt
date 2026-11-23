@@ -13,7 +13,9 @@ Account: {{ .Account }}
 
 Decided by: {{ .Decider }}
 
-{{ if .Until }}Connect with ssh as usual. Access ends by itself.{{ else }}Ask again with more detail, or talk to an admin.{{ end }}
+{{ if .Reason }}Reason: {{ .Reason }}
+
+{{ end }}{{ if .Until }}Connect with ssh as usual. Access ends by itself.{{ else }}Ask again with more detail, or talk to {{ .Decider }}.{{ end }}
 
 Open the request {{ .RequestURL }}
 

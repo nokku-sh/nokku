@@ -45,7 +45,7 @@ Run the core yourself, for free. A hosted version comes later. The guides are at
 - **No passwords anywhere.** People sign in with a passkey or your identity provider.
 - **Access you can read.** This person or team, on this server, as this account.
 - **Revokes that land.** At once on daemon servers, open sessions included. Within the hour on `nk sync` servers.
-- **Access that runs out.** Grant a server for a while, or let people ask and an admin approve.
+- **Access that runs out.** Grant a server for a while, or let people ask and have it approved.
 - **Keys that stay in hardware.** In a TPM or on a FIDO2 security key where there is one.
 - **No bastion in the path.** Every server serves its own SSH. When the core is down, a certificate you hold still logs in, on a daemon server for up to a week.
 - **No open ports needed.** Servers behind NAT are reached through an end-to-end encrypted relay.

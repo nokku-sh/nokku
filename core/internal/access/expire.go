@@ -72,7 +72,7 @@ func Expire(ctx context.Context, conn *db.Connection, write func(context.Context
 	return nil
 }
 
-// expireRequests ends the requests nobody answered within a day.
+// expireRequests ends the requests nobody answered within a week.
 func expireRequests(ctx context.Context, conn *db.Connection, write func(context.Context, *audit.Event) error) error {
 	expired, err := conn.Sys().ExpireAccessRequests(ctx)
 	if err != nil {

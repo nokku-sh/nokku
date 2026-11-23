@@ -36,21 +36,22 @@ export function useRequestAnswers() {
 		deny(r: AccessRequest) {
 			void confirm({
 				title: 'Deny this request?',
-				description: `${requester(r)} gets an email that it was denied.`,
+				description: `${requester(r)} gets an email that it was denied, with your reason.`,
 				confirmText: 'Deny',
-				onConfirm: () => deny.mutateAsync({ id: r.id })
+				input: { label: 'Reason' },
+				onConfirm: (reason) => deny.mutateAsync({ id: r.id, reason: reason.trim() })
 			});
 		}
 	};
 }
 
-// useWaitingRequests is what admins still have to answer, on a plan that has requests.
+// useWaitingRequests is what is still to answer, for whoever may grant, on a plan that has requests.
 export function useWaitingRequests(live = false) {
 	const can = user.can();
 	const has = useFeatures();
 	const list = accessRequests.list(
 		{ status: AccessRequestStatus.PENDING, limit: 100 },
-		{ when: () => can.admin && has('access_requests') === true, live }
+		{ when: () => can.edit && has('access_requests') === true, live }
 	);
 	return {
 		get list() {

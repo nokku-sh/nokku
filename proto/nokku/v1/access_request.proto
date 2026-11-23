@@ -38,14 +38,15 @@ service AccessRequestService {
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
+  // Requests are an inbox, not a second pair of eyes: whoever may grant may answer one, only not their own.
   rpc ApproveAccessRequest(ApproveAccessRequestRequest) returns (ApproveAccessRequestResponse) {
     option (access) = {
-      role: WORKSPACE_ROLE_ADMIN
+      role: WORKSPACE_ROLE_EDITOR
       feature: "access_requests"
     };
   }
   rpc DenyAccessRequest(DenyAccessRequestRequest) returns (DenyAccessRequestResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc CancelAccessRequest(CancelAccessRequestRequest) returns (CancelAccessRequestResponse) {
     option (access) = {role: WORKSPACE_ROLE_MEMBER};
@@ -83,6 +84,8 @@ message AccessRequest {
   google.protobuf.Timestamp decided_at = 13;
   google.protobuf.Timestamp created_at = 14;
   google.protobuf.Timestamp granted_until = 15;
+  // decision_reason is what whoever answered wrote for the requester.
+  string decision_reason = 16;
 }
 
 message RequestableTarget {
@@ -151,6 +154,8 @@ message ApproveAccessRequestResponse {
 
 message DenyAccessRequestRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
+  // reason goes to the requester, in the mail and on the request.
+  string reason = 2 [(buf.validate.field).string.max_len = 1000];
 }
 message DenyAccessRequestResponse {
   AccessRequest request = 1;

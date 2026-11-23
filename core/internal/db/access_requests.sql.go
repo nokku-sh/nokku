@@ -85,24 +85,31 @@ UPDATE access_requests
 SET
   status = $1,
   decided_by = $2::UUID,
-  decided_at = NOW()
+  decided_at = NOW(),
+  decision_reason = $3
 WHERE
-  id = $3
+  id = $4
   AND status = 1 -- pending
   AND requester_id <> $2::UUID
 RETURNING
-  id, workspace_id, requester_id, account_id, duration, reason, status, decided_by, decided_at, created_at
+  id, workspace_id, requester_id, account_id, duration, reason, status, decided_by, decided_at, decision_reason, created_at
 `
 
 type DecideAccessRequestParams struct {
 	Status    nokku.AccessRequestStatus `json:"status"`
 	DecidedBy string                    `json:"decidedBy"`
+	Reason    string                    `json:"reason"`
 	ID        string                    `json:"id"`
 }
 
 // Only a pending request is decided, and never by the one who asked.
 func (q *Queries) DecideAccessRequest(ctx context.Context, arg *DecideAccessRequestParams) (*AccessRequest, error) {
-	row := q.db.QueryRow(ctx, decideAccessRequest, arg.Status, arg.DecidedBy, arg.ID)
+	row := q.db.QueryRow(ctx, decideAccessRequest,
+		arg.Status,
+		arg.DecidedBy,
+		arg.Reason,
+		arg.ID,
+	)
 	var i AccessRequest
 	err := row.Scan(
 		&i.ID,
@@ -114,6 +121,7 @@ func (q *Queries) DecideAccessRequest(ctx context.Context, arg *DecideAccessRequ
 		&i.Status,
 		&i.DecidedBy,
 		&i.DecidedAt,
+		&i.DecisionReason,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -125,7 +133,7 @@ SET
   status = 5 -- expired
 WHERE
   status = 1 -- pending
-  AND created_at < NOW() - INTERVAL '1 day'
+  AND created_at < NOW() - INTERVAL '7 days'
 RETURNING
   id,
   workspace_id
@@ -158,7 +166,7 @@ func (q *Queries) ExpireAccessRequests(ctx context.Context) ([]*ExpireAccessRequ
 
 const getAccessRequest = `-- name: GetAccessRequest :one
 SELECT
-  target_id, target_name, username, requester_name, requester_email, decider_name, id, workspace_id, requester_id, account_id, duration, reason, status, decided_by, decided_at, created_at
+  target_id, target_name, username, requester_name, requester_email, decider_name, id, workspace_id, requester_id, account_id, duration, reason, status, decided_by, decided_at, decision_reason, created_at
 FROM
   access_request_details
 WHERE
@@ -184,6 +192,7 @@ func (q *Queries) GetAccessRequest(ctx context.Context, id string) (*AccessReque
 		&i.Status,
 		&i.DecidedBy,
 		&i.DecidedAt,
+		&i.DecisionReason,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -226,7 +235,7 @@ func (q *Queries) GetRequestableAccount(ctx context.Context, arg *GetRequestable
 
 const listAccessRequests = `-- name: ListAccessRequests :many
 SELECT
-  r.target_id, r.target_name, r.username, r.requester_name, r.requester_email, r.decider_name, r.id, r.workspace_id, r.requester_id, r.account_id, r.duration, r.reason, r.status, r.decided_by, r.decided_at, r.created_at,
+  r.target_id, r.target_name, r.username, r.requester_name, r.requester_email, r.decider_name, r.id, r.workspace_id, r.requester_id, r.account_id, r.duration, r.reason, r.status, r.decided_by, r.decided_at, r.decision_reason, r.created_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   access_request_details r
@@ -289,6 +298,7 @@ func (q *Queries) ListAccessRequests(ctx context.Context, arg *ListAccessRequest
 			&i.AccessRequestDetail.Status,
 			&i.AccessRequestDetail.DecidedBy,
 			&i.AccessRequestDetail.DecidedAt,
+			&i.AccessRequestDetail.DecisionReason,
 			&i.AccessRequestDetail.CreatedAt,
 			&i.TotalCount,
 		); err != nil {
@@ -310,7 +320,7 @@ SELECT
 FROM
   users
 WHERE
-  role >= 4
+  role >= 3
   AND active
   AND id <> $1
 `
@@ -321,6 +331,7 @@ type ListApproversRow struct {
 	Email string `json:"email"`
 }
 
+// Whoever may grant may answer a request, that is an editor and up.
 func (q *Queries) ListApprovers(ctx context.Context, requesterID string) ([]*ListApproversRow, error) {
 	rows, err := q.db.Query(ctx, listApprovers, requesterID)
 	if err != nil {

@@ -17,7 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 )
 
-// A request may wait a day, so the poll slows down.
+// A request may wait a week, so the poll slows down.
 const (
 	requestPollFirst = 3 * time.Second
 	requestPollLast  = 30 * time.Second
@@ -26,11 +26,11 @@ const (
 func requestCMD() *cli.Command {
 	return &cli.Command{
 		Name:      "request",
-		Usage:     "Ask an admin for an account on a server, for a while",
+		Usage:     "Ask for an account on a server, for a while",
 		ArgsUsage: "<server> <account>",
 		Flags: []cli.Flag{
 			&cli.DurationFlag{Name: "for", Value: time.Hour, Usage: "How long you need it, from 15m to 168h"},
-			&cli.StringFlag{Name: "reason", Aliases: []string{"r"}, Usage: "Why you need it, the admins see it"},
+			&cli.StringFlag{Name: "reason", Aliases: []string{"r"}, Usage: "Why you need it, whoever answers reads it"},
 			&cli.BoolFlag{Name: "no-wait", Usage: "Return once the request is sent"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -52,7 +52,7 @@ func requestCMD() *cli.Command {
 				fmt.Println("  You get an email with the answer. Then ssh as usual.")
 				return nil
 			}
-			fmt.Println("  Waiting for an admin. Ctrl-C stops waiting, the request stays open.")
+			fmt.Println("  Waiting for an answer. Ctrl-C stops waiting, the request stays open for a week.")
 			return waitForAnswer(ctx, c, req.GetId())
 		},
 	}
@@ -85,7 +85,10 @@ func waitForAnswer(ctx context.Context, c *client.Client, id string) error {
 			fmt.Printf("  Connect with: ssh %s@%s\n", req.GetUsername(), host)
 			return nil
 		}
-		return fmt.Errorf("the request was %s",
-			strings.ToLower(strings.TrimPrefix(req.GetStatus().String(), "ACCESS_REQUEST_STATUS_")))
+		state := strings.ToLower(strings.TrimPrefix(req.GetStatus().String(), "ACCESS_REQUEST_STATUS_"))
+		if reason := ui.PlainLine(req.GetDecisionReason()); reason != "" {
+			return fmt.Errorf("the request was %s by %s: %s", state, ui.PlainLine(req.GetDeciderName()), reason)
+		}
+		return fmt.Errorf("the request was %s", state)
 	}
 }

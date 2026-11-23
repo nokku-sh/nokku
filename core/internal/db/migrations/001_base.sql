@@ -491,6 +491,7 @@ CREATE TABLE access_requests (
   status INTEGER NOT NULL DEFAULT 1 CHECK (status BETWEEN 1 AND 5),
   decided_by UUID,
   decided_at TIMESTAMPTZ,
+  decision_reason TEXT NOT NULL DEFAULT '', -- what the requester reads, mostly on a denial
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK ((status IN (2, 3)) = (decided_at IS NOT NULL)), -- approved or denied
   FOREIGN KEY (workspace_id, requester_id) REFERENCES users (workspace_id, id) ON DELETE CASCADE,

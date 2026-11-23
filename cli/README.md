@@ -43,7 +43,7 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 | ---------------------------- | ----------------------------------------------------------------------------- |
 | `nk login`                   | Sign in and sync local state                                                  |
 | `nk ls` / `nk list`          | List the servers you can reach, and until when for access that ends           |
-| `nk request <host> <user>`   | Ask an admin for an account on a server for a while, then wait for the answer |
+| `nk request <host> <user>`   | Ask for an account on a server for a while, then wait for the answer          |
 | `nk doctor`                  | Check the core, the TPM and your local SSH setup                              |
 | `nk sync <host>`             | Add a server without the daemon, or refresh one you added                     |
 | `nk rm <host>`               | Clean up a server you added with `nk sync` and delete its target              |

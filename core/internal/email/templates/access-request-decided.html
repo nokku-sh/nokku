@@ -125,7 +125,7 @@
                             </table>
                             <p
                               style="font-size:16px;line-height:28px;margin:0;color:rgb(20,25,32);margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">
-                              {{ if .Until }}Connect with ssh as usual. Access ends by itself.{{ else }}Ask again with more detail, or talk to an admin.{{ end }}
+                              {{ if .Reason }}Reason: {{ .Reason }}<br /><br />{{ end }}{{ if .Until }}Connect with ssh as usual. Access ends by itself.{{ else }}Ask again with more detail, or talk to {{ .Decider }}.{{ end }}
                             </p>
                             <table
                               align="center"

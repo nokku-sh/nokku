@@ -103,6 +103,7 @@ type accessDecisionTemplateData struct {
 	Target     string
 	Account    string
 	Until      string
+	Reason     string
 	RequestURL string
 	RequestID  string
 }

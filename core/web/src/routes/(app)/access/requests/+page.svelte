@@ -58,7 +58,7 @@
 
 <PageHeader
 	title="Access requests"
-	description="Ask for an account for a while. An admin approves it, and it ends by itself."
+	description="Ask for an account for a while. Someone who manages access approves it, and it ends by itself."
 >
 	{#if available}
 		<Button onclick={() => (asking = true)} disabled={!tags.length}>
@@ -76,8 +76,8 @@
 				<PlanBadge feature="access_requests" />
 			</Card.Title>
 			<Card.Description>
-				People ask for an account when they need it, and an admin approves it for a few hours or
-				days. Requests already made can still be answered or cancelled.
+				People ask for an account when they need it, and someone who manages access approves it for
+				a few hours or days. Requests already made can still be answered or cancelled.
 			</Card.Description>
 		</Card.Header>
 		{#if can.admin}
@@ -147,7 +147,9 @@
 							Approved by {r.deciderName}, until {formatTs(r.grantedUntil, 'withTime')}
 						</Item.Description>
 					{:else if r.deciderName}
-						<Item.Description>{requestState(r)} by {r.deciderName}</Item.Description>
+						<Item.Description>
+							{requestState(r)} by {r.deciderName}{r.decisionReason ? `: ${r.decisionReason}` : ''}
+						</Item.Description>
 					{/if}
 				</Item.Content>
 				{#if r.status === AccessRequestStatus.PENDING}
@@ -156,7 +158,7 @@
 							<Button variant="ghost" size="sm" onclick={() => cancel.mutate({ id: r.id })}>
 								Cancel
 							</Button>
-						{:else if can.admin}
+						{:else if can.edit}
 							<Button variant="ghost" size="sm" onclick={() => answer.deny(r)}>Deny</Button>
 							<Button size="sm" onclick={() => answer.approve(r)} disabled={!available}
 								>Approve</Button

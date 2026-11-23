@@ -131,8 +131,11 @@ func TestAccessRequestFlow(t *testing.T) {
 	_, err = asMember.ApproveAccessRequest(ctx, &nokkuv1.ApproveAccessRequestRequest{Id: new(req.GetId())})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "a member must not approve, got %v", err)
 
-	approved, err := asAdmin.ApproveAccessRequest(ctx, &nokkuv1.ApproveAccessRequestRequest{Id: new(req.GetId())})
-	require.NoError(t, err)
+	// Whoever may grant may answer, a request is an inbox and no second pair of eyes.
+	editor := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	asEditor := as(editor)
+	approved, err := asEditor.ApproveAccessRequest(ctx, &nokkuv1.ApproveAccessRequestRequest{Id: new(req.GetId())})
+	require.NoError(t, err, "an editor grants, so an editor answers")
 	until := approved.GetRequest().GetGrantedUntil().AsTime()
 	assert.WithinDuration(t, time.Now().Add(time.Hour), until, time.Minute)
 
@@ -148,7 +151,7 @@ func TestAccessRequestFlow(t *testing.T) {
 	require.NotNil(t, rows[0].Until(), "the grant must end")
 	assert.WithinDuration(t, until, *rows[0].Until(), time.Second)
 
-	assert.Equal(t, admin.ID, grantedBy(t, cfg, target.ID, member.ID), "the grant must name who approved it")
+	assert.Equal(t, editor.ID, grantedBy(t, cfg, target.ID, member.ID), "the grant must name who approved it")
 
 	answered, err := asAdmin.ListAccessRequests(ctx, &nokkuv1.ListAccessRequestsRequest{
 		Status: nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED.Enum(),
@@ -186,6 +189,67 @@ func TestAccessRequestFlow(t *testing.T) {
 
 	_, err = asAdmin.CancelAccessRequest(ctx, &nokkuv1.CancelAccessRequestRequest{Id: new(own.GetId())})
 	require.NoError(t, err)
+
+	// A request waits a week, one from Friday is still there on Monday.
+	other := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	late, err := ask(as(other), target.Name)
+	require.NoError(t, err)
+	aged := func(days int) nokkuv1.AccessRequestStatus {
+		_, err := cfg.Conn.Pool.Exec(
+			wsCtx(t),
+			"UPDATE access_requests SET created_at = NOW() - make_interval(days => $2) WHERE id = $1",
+			late.GetId(),
+			days,
+		)
+		require.NoError(t, err)
+		// The query the expiry job runs every minute.
+		_, err = cfg.Conn.Sys().ExpireAccessRequests(ctx)
+		require.NoError(t, err)
+		got, err := asEditor.GetAccessRequest(ctx, &nokkuv1.GetAccessRequestRequest{Id: new(late.GetId())})
+		require.NoError(t, err, "whoever answers requests sees them")
+		return got.GetRequest().GetStatus()
+	}
+	require.Equal(
+		t,
+		nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_PENDING,
+		aged(6),
+		"gone before the week was over",
+	)
+
+	// An editor service account may grant, but answers no request, so it reads none either.
+	accounts := nokkuv1connect.NewServiceAccountServiceClient(clientOn(srv, header("Authorization",
+		"Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN))))
+	made, err := accounts.CreateServiceAccount(ctx, &nokkuv1.CreateServiceAccountRequest{
+		Name: new(uniq("ci")), Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR.Enum(),
+	})
+	require.NoError(t, err)
+	machine := nokkuv1connect.NewAccessRequestServiceClient(clientOn(srv, header("Authorization",
+		"Bearer "+serviceAccountToken(t, accounts, made.GetServiceAccount().GetId(), nil))))
+	seenByMachine, err := machine.ListAccessRequests(ctx, &nokkuv1.ListAccessRequestsRequest{})
+	require.NoError(t, err)
+	assert.Empty(t, seenByMachine.GetRequests(), "an editor service account read the requests")
+	_, err = machine.GetAccessRequest(ctx, &nokkuv1.GetAccessRequestRequest{Id: new(late.GetId())})
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "an editor service account opened a request: %v", err)
+
+	// The one who asked reads why it was denied.
+	denied, err := asEditor.DenyAccessRequest(ctx, &nokkuv1.DenyAccessRequestRequest{
+		Id: new(late.GetId()), Reason: new(" use the read replica "),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "use the read replica", denied.GetRequest().GetDecisionReason())
+	seen, err := as(other).GetAccessRequest(ctx, &nokkuv1.GetAccessRequestRequest{Id: new(late.GetId())})
+	require.NoError(t, err)
+	assert.Equal(t, "use the read replica", seen.GetRequest().GetDecisionReason())
+
+	late, err = ask(as(other), target.Name)
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_EXPIRED,
+		aged(8),
+		"a request waits a week, no longer",
+	)
+
 	_, err = asAdmin.SetRequestableTags(ctx, &nokkuv1.SetRequestableTagsRequest{})
 	require.NoError(t, err)
 }

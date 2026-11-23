@@ -118,6 +118,7 @@ type AccessRequestServiceClient interface {
 	CreateAccessRequest(context.Context, *v1.CreateAccessRequestRequest) (*v1.CreateAccessRequestResponse, error)
 	GetAccessRequest(context.Context, *v1.GetAccessRequestRequest) (*v1.GetAccessRequestResponse, error)
 	ListAccessRequests(context.Context, *v1.ListAccessRequestsRequest) (*v1.ListAccessRequestsResponse, error)
+	// Requests are an inbox, not a second pair of eyes: whoever may grant may answer one, only not their own.
 	ApproveAccessRequest(context.Context, *v1.ApproveAccessRequestRequest) (*v1.ApproveAccessRequestResponse, error)
 	DenyAccessRequest(context.Context, *v1.DenyAccessRequestRequest) (*v1.DenyAccessRequestResponse, error)
 	CancelAccessRequest(context.Context, *v1.CancelAccessRequestRequest) (*v1.CancelAccessRequestResponse, error)
@@ -136,6 +137,7 @@ type AccessRequestServiceHandler interface {
 	CreateAccessRequest(context.Context, *v1.CreateAccessRequestRequest) (*v1.CreateAccessRequestResponse, error)
 	GetAccessRequest(context.Context, *v1.GetAccessRequestRequest) (*v1.GetAccessRequestResponse, error)
 	ListAccessRequests(context.Context, *v1.ListAccessRequestsRequest) (*v1.ListAccessRequestsResponse, error)
+	// Requests are an inbox, not a second pair of eyes: whoever may grant may answer one, only not their own.
 	ApproveAccessRequest(context.Context, *v1.ApproveAccessRequestRequest) (*v1.ApproveAccessRequestResponse, error)
 	DenyAccessRequest(context.Context, *v1.DenyAccessRequestRequest) (*v1.DenyAccessRequestResponse, error)
 	CancelAccessRequest(context.Context, *v1.CancelAccessRequestRequest) (*v1.CancelAccessRequestResponse, error)

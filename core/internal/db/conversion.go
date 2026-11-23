@@ -368,6 +368,7 @@ func (r *AccessRequestDetail) ToProto() *nokkuv1.AccessRequest {
 		DecidedAt:      SafeTimestamp(r.DecidedAt),
 		CreatedAt:      SafeTimestamp(&r.CreatedAt),
 		GrantedUntil:   SafeTimestamp(r.GrantedUntil()),
+		DecisionReason: &r.DecisionReason,
 	}
 }
 

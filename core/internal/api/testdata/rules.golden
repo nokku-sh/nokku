@@ -1,7 +1,7 @@
-/nokku.v1.AccessRequestService/ApproveAccessRequest public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=false feature=access_requests capped=false signs=false audited=true
+/nokku.v1.AccessRequestService/ApproveAccessRequest public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature=access_requests capped=false signs=false audited=true
 /nokku.v1.AccessRequestService/CancelAccessRequest public=false self=false role=MEMBER daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
 /nokku.v1.AccessRequestService/CreateAccessRequest public=false self=false role=MEMBER daemon=false browser=SESSION nk=true machine=false feature=access_requests capped=false signs=false audited=true
-/nokku.v1.AccessRequestService/DenyAccessRequest public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
+/nokku.v1.AccessRequestService/DenyAccessRequest public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
 /nokku.v1.AccessRequestService/GetAccessRequest public=false self=false role=MEMBER daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
 /nokku.v1.AccessRequestService/ListAccessRequests public=false self=false role=MEMBER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
 /nokku.v1.AccessRequestService/ListRequestableAccounts public=false self=false role=MEMBER daemon=false browser=SESSION nk=false machine=true feature=access_requests capped=false signs=false audited=false

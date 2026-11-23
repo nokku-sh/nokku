@@ -13,7 +13,7 @@ Account: {{ .Account }}
 
 Reason: {{ .Reason }}
 
-They cannot approve it themselves. Without an answer it ends after a day.
+They cannot approve it themselves. Without an answer it ends after a week.
 
 Review the request {{ .RequestURL }}
 

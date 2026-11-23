@@ -37,7 +37,7 @@
 <FormModal
 	bind:open
 	title="Request access"
-	description="An admin approves it. The account then works for as long as you asked, and ends by itself."
+	description="Someone who manages access approves it. The account then works for as long as you asked, and ends by itself."
 	icon={Hand}
 	submitLabel="Send request"
 	submitDisabled={!target || !username || reason.trim().length < 3}
@@ -99,6 +99,6 @@
 			placeholder="Ticket OPS-123, the replica is lagging"
 			maxlength={1000}
 		/>
-		<Field.Description>Goes to the admins and into the audit log.</Field.Description>
+		<Field.Description>Goes to whoever answers and into the audit log.</Field.Description>
 	</Field.Field>
 </FormModal>

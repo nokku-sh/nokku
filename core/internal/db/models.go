@@ -12,16 +12,17 @@ import (
 )
 
 type AccessRequest struct {
-	ID          string                    `json:"id"`
-	WorkspaceID string                    `json:"workspaceId"`
-	RequesterID string                    `json:"requesterId"`
-	AccountID   string                    `json:"accountId"`
-	Duration    time.Duration             `json:"duration"`
-	Reason      string                    `json:"reason"`
-	Status      nokku.AccessRequestStatus `json:"status"`
-	DecidedBy   *string                   `json:"decidedBy"`
-	DecidedAt   *time.Time                `json:"decidedAt"`
-	CreatedAt   time.Time                 `json:"createdAt"`
+	ID             string                    `json:"id"`
+	WorkspaceID    string                    `json:"workspaceId"`
+	RequesterID    string                    `json:"requesterId"`
+	AccountID      string                    `json:"accountId"`
+	Duration       time.Duration             `json:"duration"`
+	Reason         string                    `json:"reason"`
+	Status         nokku.AccessRequestStatus `json:"status"`
+	DecidedBy      *string                   `json:"decidedBy"`
+	DecidedAt      *time.Time                `json:"decidedAt"`
+	DecisionReason string                    `json:"decisionReason"`
+	CreatedAt      time.Time                 `json:"createdAt"`
 }
 
 type AccessRequestDetail struct {
@@ -40,6 +41,7 @@ type AccessRequestDetail struct {
 	Status         nokku.AccessRequestStatus `json:"status"`
 	DecidedBy      *string                   `json:"decidedBy"`
 	DecidedAt      *time.Time                `json:"decidedAt"`
+	DecisionReason string                    `json:"decisionReason"`
 	CreatedAt      time.Time                 `json:"createdAt"`
 }
 

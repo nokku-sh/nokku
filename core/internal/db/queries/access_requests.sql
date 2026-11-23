@@ -106,7 +106,8 @@ UPDATE access_requests
 SET
   status = @status,
   decided_by = @decided_by::UUID,
-  decided_at = NOW()
+  decided_at = NOW(),
+  decision_reason = @reason
 WHERE
   id = @id
   AND status = 1 -- pending
@@ -129,12 +130,13 @@ SET
   status = 5 -- expired
 WHERE
   status = 1 -- pending
-  AND created_at < NOW() - INTERVAL '1 day'
+  AND created_at < NOW() - INTERVAL '7 days'
 RETURNING
   id,
   workspace_id;
 
 -- name: ListApprovers :many
+-- Whoever may grant may answer a request, that is an editor and up.
 SELECT
   id,
   name,
@@ -142,6 +144,6 @@ SELECT
 FROM
   users
 WHERE
-  role >= 4
+  role >= 3
   AND active
   AND id <> @requester_id;
