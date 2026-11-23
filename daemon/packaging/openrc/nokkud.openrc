@@ -5,9 +5,9 @@ description="Nokku Daemon"
 command="/usr/bin/nokkud"
 pidfile="/run/${RC_SVCNAME}.pid"
 command_background=true
-# The log carries the audit events, it must not be discarded.
-output_log="/var/log/nokkud.log"
-error_log="/var/log/nokkud.log"
+# The output carries the audit events. syslog rotates it.
+output_logger="logger -t nokkud"
+error_logger="logger -t nokkud"
 
 depend() {
     need net
