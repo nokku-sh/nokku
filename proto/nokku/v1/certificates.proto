@@ -13,27 +13,29 @@ service CertificateService {
   rpc GetCertificateAuthority(GetCertificateAuthorityRequest) returns (GetCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      cli: true
+      nk: true
+      machine: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateCertificateAuthority(UpdateCertificateAuthorityRequest) returns (UpdateCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc RolloverCertificateAuthority(RolloverCertificateAuthorityRequest) returns (RolloverCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc SignSSHCertificate(SignSSHCertificateRequest) returns (SignSSHCertificateResponse) {
     option (access) = {
       self: true
+      nk: true
+      machine: true
       signs: true
-      cli: true
     };
   }
 }

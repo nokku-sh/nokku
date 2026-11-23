@@ -58,22 +58,39 @@ func (s *workspaceService) UpdateWorkspace(
 	ctx context.Context,
 	req *nokkuv1.UpdateWorkspaceRequest,
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
-	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
-		return nil, err
-	}
 	var workspace *db.Workspace
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		// Locked, so two tabs saving different settings at once keep both.
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		// Locked, the settings are written back whole and a save in another tab must not get lost.
 		base, err := q.GetWorkspaceForUpdate(ctx)
 		if err != nil {
 			return err
 		}
-		wasEnforced := base.Settings.GetEnforceSso()
-		if req.GetSettings() != nil {
-			base.Settings = cmp.Or(base.Settings, &nokkuv1.WorkspaceSettings{})
-			mergeSet(base.Settings.ProtoReflect(), req.GetSettings().ProtoReflect())
+		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
+			Name:        req.Name,
+			Description: req.Description,
+			Settings:    base.Settings,
+		})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.UpdateWorkspaceResponse{Workspace: workspace.ToProto()}, nil
+}
+
+func (s *workspaceService) SetEnforceSSO(
+	ctx context.Context,
+	req *nokkuv1.SetEnforceSSORequest,
+) (*nokkuv1.SetEnforceSSOResponse, error) {
+	audit.Set(ctx, "enforce_sso", req.GetEnforceSso())
+	var workspace *db.Workspace
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		// Locked like UpdateWorkspace, both write the same settings.
+		base, err := q.GetWorkspaceForUpdate(ctx)
+		if err != nil {
+			return err
 		}
-		if !wasEnforced && base.Settings.GetEnforceSso() {
+		turnedOn := req.GetEnforceSso() && !base.Settings.GetEnforceSso()
+		if turnedOn {
 			has, err := iam.HasSSOProvider(ctx, q)
 			if err != nil {
 				return err
@@ -85,12 +102,10 @@ func (s *workspaceService) UpdateWorkspace(
 				)
 			}
 		}
-		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
-			Name:        req.Name,
-			Description: req.Description,
-			Settings:    base.Settings,
-		})
-		if err != nil || wasEnforced || !base.Settings.GetEnforceSso() {
+		base.Settings = cmp.Or(base.Settings, &nokkuv1.WorkspaceSettings{})
+		base.Settings.EnforceSso = req.EnforceSso
+		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{Settings: base.Settings})
+		if err != nil || !turnedOn {
 			return err
 		}
 		// A passkey session would outlive the rule by up to 30 days otherwise.
@@ -105,16 +120,13 @@ func (s *workspaceService) UpdateWorkspace(
 	}); err != nil {
 		return nil, err
 	}
-	return &nokkuv1.UpdateWorkspaceResponse{Workspace: workspace.ToProto()}, nil
+	return &nokkuv1.SetEnforceSSOResponse{Workspace: workspace.ToProto()}, nil
 }
 
 func (s *workspaceService) UpdateDaemonDefaults(
 	ctx context.Context,
 	req *nokkuv1.UpdateDaemonDefaultsRequest,
 ) (*nokkuv1.UpdateDaemonDefaultsResponse, error) {
-	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
-		return nil, err
-	}
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		// Locked like UpdateWorkspace, both write the same settings.
@@ -133,6 +145,30 @@ func (s *workspaceService) UpdateDaemonDefaults(
 		return nil, err
 	}
 	return &nokkuv1.UpdateDaemonDefaultsResponse{Workspace: workspace.ToProto()}, nil
+}
+
+func (s *workspaceService) SetDefaultSafeguards(
+	ctx context.Context,
+	req *nokkuv1.SetDefaultSafeguardsRequest,
+) (*nokkuv1.SetDefaultSafeguardsResponse, error) {
+	var workspace *db.Workspace
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		// Locked like UpdateWorkspace, both write the same settings.
+		base, err := q.GetWorkspaceForUpdate(ctx)
+		if err != nil {
+			return err
+		}
+		base.Settings = cmp.Or(base.Settings, &nokkuv1.WorkspaceSettings{})
+		base.Settings.DefaultDaemonConfig = cmp.Or(base.Settings.GetDefaultDaemonConfig(), &nokkuv1.DaemonConfig{})
+		setSafeguards(ctx, base.Settings.GetDefaultDaemonConfig(), &nokkuv1.SetDaemonSafeguardsRequest{
+			RecordSessions: req.RecordSessions, KillOnRevoke: req.KillOnRevoke,
+		})
+		workspace, err = q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{Settings: base.Settings})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.SetDefaultSafeguardsResponse{Workspace: workspace.ToProto()}, nil
 }
 
 // DeleteWorkspace is hosted only, a self-hosted server serves nothing else.
@@ -320,35 +356,47 @@ func (s *workspaceService) UpdateUserRole(
 	return &nokkuv1.UpdateUserRoleResponse{}, nil
 }
 
-// SetUserActive ends a deactivated user's sessions. Grants stay for a return.
-func (s *workspaceService) SetUserActive(
+// DeactivateUser ends the user's sessions. Grants stay for a return.
+func (s *workspaceService) DeactivateUser(
 	ctx context.Context,
-	req *nokkuv1.SetUserActiveRequest,
-) (*nokkuv1.SetUserActiveResponse, error) {
+	req *nokkuv1.DeactivateUserRequest,
+) (*nokkuv1.DeactivateUserResponse, error) {
+	if err := s.setUserActive(ctx, req.GetUserId(), false); err != nil {
+		return nil, err
+	}
+	if _, err := s.cfg.IAM.RevokeUser(ctx, req.GetUserId()); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.DeactivateUserResponse{}, nil
+}
+
+func (s *workspaceService) ReactivateUser(
+	ctx context.Context,
+	req *nokkuv1.ReactivateUserRequest,
+) (*nokkuv1.ReactivateUserResponse, error) {
+	if err := s.setUserActive(ctx, req.GetUserId(), true); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.ReactivateUserResponse{}, nil
+}
+
+func (s *workspaceService) setUserActive(ctx context.Context, userID string, active bool) error {
 	// The same actions SCIM records, so the log reads the same whoever did it.
 	action := "UserDeactivated"
-	if req.GetActive() {
+	if active {
 		action = "UserActivated"
 	}
 	audit.SetAction(ctx, action)
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		if err := checkCanManageUser(ctx, q, req.GetUserId()); err != nil {
+	return s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		if err := checkCanManageUser(ctx, q, userID); err != nil {
 			return err
 		}
-		if err := auditName(ctx, q, "name", req.GetUserId()); err != nil {
+		if err := auditName(ctx, q, "name", userID); err != nil {
 			return err
 		}
-		_, err := s.cfg.IAM.SetUserActive(ctx, q, req.GetUserId(), req.GetActive())
+		_, err := s.cfg.IAM.SetUserActive(ctx, q, userID, active)
 		return err
-	}); err != nil {
-		return nil, err
-	}
-	if !req.GetActive() {
-		if _, err := s.cfg.IAM.RevokeUser(ctx, req.GetUserId()); err != nil {
-			return nil, err
-		}
-	}
-	return &nokkuv1.SetUserActiveResponse{}, nil
+	})
 }
 
 // DeleteUser takes the user's grants and team seats with them.

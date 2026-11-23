@@ -26,8 +26,8 @@ type Browser int32
 
 const (
 	Browser_BROWSER_UNSPECIFIED Browser = 0
-	// Only the browser is asked for a sign-in from the last 10 minutes. The handler holds nk and service accounts to
-	// what they added.
+	// A sign-in from the last 10 minutes, so a stolen session cannot add a way in. With neither nk nor machine set,
+	// only a person who just signed in makes the call.
 	Browser_BROWSER_FRESH Browser = 1
 	// The browser is kept out, the call is for nk and service accounts.
 	Browser_BROWSER_REFUSED Browser = 2
@@ -132,17 +132,14 @@ func (WorkspaceRole) EnumDescriptor() ([]byte, []int) {
 	return file_nokku_v1_access_proto_rawDescGZIP(), []int{1}
 }
 
+// Access says who may make a call. public, self, role and daemon pick the class. Next to the role there are three
+// questions, one per kind of caller that has one: browser, nk and machine.
 type Access struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Public *bool                  `protobuf:"varint,1,opt,name=public" json:"public,omitempty"`
 	Self   *bool                  `protobuf:"varint,2,opt,name=self" json:"self,omitempty"`
 	Role   *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
 	Daemon *bool                  `protobuf:"varint,4,opt,name=daemon" json:"daemon,omitempty"`
-	// people_only refuses service accounts, so a leaked token cannot mint more credentials for itself. fresh implies it.
-	PeopleOnly *bool `protobuf:"varint,5,opt,name=people_only,json=peopleOnly" json:"people_only,omitempty"`
-	// fresh needs a person's browser session from the last 10 minutes. It refuses nk and service accounts, so a stolen
-	// session or key cannot add a way in.
-	Fresh *bool `protobuf:"varint,6,opt,name=fresh" json:"fresh,omitempty"`
 	// feature is the plan feature the call needs.
 	Feature *string `protobuf:"bytes,7,opt,name=feature" json:"feature,omitempty"`
 	// capped counts the create against the plan's resource cap.
@@ -151,11 +148,14 @@ type Access struct {
 	Signs *bool `protobuf:"varint,9,opt,name=signs" json:"signs,omitempty"`
 	// quiet changes something, but the handler records what matters, so the audit log skips the call.
 	Quiet *bool `protobuf:"varint,10,opt,name=quiet" json:"quiet,omitempty"`
-	// cli lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
+	// nk lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
 	// nothing else, so a phished or infected nk session can't change who may do what.
-	Cli *bool `protobuf:"varint,11,opt,name=cli" json:"cli,omitempty"`
-	// browser sets a person's browser session apart on a call nk and service accounts make too.
-	Browser       *Browser `protobuf:"varint,12,opt,name=browser,enum=nokku.v1.Browser" json:"browser,omitempty"`
+	Nk *bool `protobuf:"varint,11,opt,name=nk" json:"nk,omitempty"`
+	// browser is a person in the web app. Any session may make the call unless this says otherwise.
+	Browser *Browser `protobuf:"varint,12,opt,name=browser,enum=nokku.v1.Browser" json:"browser,omitempty"`
+	// machine lets a service account make the call. Without it a leaked key reads and changes nothing here, so it
+	// cannot mint more credentials for itself.
+	Machine       *bool `protobuf:"varint,13,opt,name=machine" json:"machine,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -218,20 +218,6 @@ func (x *Access) GetDaemon() bool {
 	return false
 }
 
-func (x *Access) GetPeopleOnly() bool {
-	if x != nil && x.PeopleOnly != nil {
-		return *x.PeopleOnly
-	}
-	return false
-}
-
-func (x *Access) GetFresh() bool {
-	if x != nil && x.Fresh != nil {
-		return *x.Fresh
-	}
-	return false
-}
-
 func (x *Access) GetFeature() string {
 	if x != nil && x.Feature != nil {
 		return *x.Feature
@@ -260,9 +246,9 @@ func (x *Access) GetQuiet() bool {
 	return false
 }
 
-func (x *Access) GetCli() bool {
-	if x != nil && x.Cli != nil {
-		return *x.Cli
+func (x *Access) GetNk() bool {
+	if x != nil && x.Nk != nil {
+		return *x.Nk
 	}
 	return false
 }
@@ -272,6 +258,13 @@ func (x *Access) GetBrowser() Browser {
 		return *x.Browser
 	}
 	return Browser_BROWSER_UNSPECIFIED
+}
+
+func (x *Access) GetMachine() bool {
+	if x != nil && x.Machine != nil {
+		return *x.Machine
+	}
+	return false
 }
 
 var file_nokku_v1_access_proto_extTypes = []protoimpl.ExtensionInfo{
@@ -295,22 +288,20 @@ var File_nokku_v1_access_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_access_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\xcd\x02\n" +
+	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\xce\x02\n" +
 	"\x06Access\x12\x16\n" +
 	"\x06public\x18\x01 \x01(\bR\x06public\x12\x12\n" +
 	"\x04self\x18\x02 \x01(\bR\x04self\x12+\n" +
 	"\x04role\x18\x03 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x12\x16\n" +
-	"\x06daemon\x18\x04 \x01(\bR\x06daemon\x12\x1f\n" +
-	"\vpeople_only\x18\x05 \x01(\bR\n" +
-	"peopleOnly\x12\x14\n" +
-	"\x05fresh\x18\x06 \x01(\bR\x05fresh\x12\x18\n" +
+	"\x06daemon\x18\x04 \x01(\bR\x06daemon\x12\x18\n" +
 	"\afeature\x18\a \x01(\tR\afeature\x12\x16\n" +
 	"\x06capped\x18\b \x01(\bR\x06capped\x12\x14\n" +
 	"\x05signs\x18\t \x01(\bR\x05signs\x12\x14\n" +
 	"\x05quiet\x18\n" +
-	" \x01(\bR\x05quiet\x12\x10\n" +
-	"\x03cli\x18\v \x01(\bR\x03cli\x12+\n" +
-	"\abrowser\x18\f \x01(\x0e2\x11.nokku.v1.BrowserR\abrowser*J\n" +
+	" \x01(\bR\x05quiet\x12\x0e\n" +
+	"\x02nk\x18\v \x01(\bR\x02nk\x12+\n" +
+	"\abrowser\x18\f \x01(\x0e2\x11.nokku.v1.BrowserR\abrowser\x12\x18\n" +
+	"\amachine\x18\r \x01(\bR\amachineJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aR\vpeople_onlyR\x05fresh*J\n" +
 	"\aBrowser\x12\x17\n" +
 	"\x13BROWSER_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rBROWSER_FRESH\x10\x01\x12\x13\n" +

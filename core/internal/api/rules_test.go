@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +14,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -50,16 +50,18 @@ func TestRulesGolden(t *testing.T) {
 		md, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		require.NoError(t, err, procedure)
 		lines = append(lines, fmt.Sprintf(
-			"%s public=%t self=%t role=%s daemon=%t cli=%t people_only=%t fresh=%t browser=%s feature=%s capped=%t signs=%t audited=%t",
+			"%s public=%t self=%t role=%s daemon=%t browser=%s nk=%t machine=%t feature=%s capped=%t signs=%t audited=%t",
 			procedure,
 			a.GetPublic(),
 			a.GetSelf(),
 			strings.TrimPrefix(a.GetRole().String(), "WORKSPACE_ROLE_"),
 			a.GetDaemon(),
-			a.GetCli(),
-			a.GetPeopleOnly(),
-			a.GetFresh(),
-			strings.TrimPrefix(a.GetBrowser().String(), "BROWSER_"),
+			cmp.Or(
+				strings.TrimPrefix(strings.TrimPrefix(a.GetBrowser().String(), "BROWSER_"), "UNSPECIFIED"),
+				"SESSION",
+			),
+			a.GetNk(),
+			a.GetMachine(),
 			a.GetFeature(),
 			a.GetCapped(),
 			a.GetSigns(),
@@ -98,12 +100,22 @@ func TestEveryFeatureIsGated(t *testing.T) {
 	}
 }
 
+// onlyAFreshPerson is the strictest answer to the three questions: a person who just signed in, no nk, no machine.
+func onlyAFreshPerson(a *nokkuv1.Access) bool {
+	return a.GetBrowser() == nokkuv1.Browser_BROWSER_FRESH && !a.GetNk() && !a.GetMachine()
+}
+
 // Handing out a credential takes a recent sign-in, or a stolen cookie lasts.
 func TestEveryTokenCallIsFresh(t *testing.T) {
 	for _, procedure := range allProcedures(t) {
 		_, method, _ := strings.Cut(strings.TrimPrefix(procedure, "/"), "/")
 		if strings.HasPrefix(method, "Create") && strings.HasSuffix(method, "Token") {
-			assert.True(t, procedureAccess[procedure].GetFresh(), "%s hands out a credential, mark it fresh", procedure)
+			assert.True(
+				t,
+				onlyAFreshPerson(procedureAccess[procedure]),
+				"%s hands out a credential, mark it fresh",
+				procedure,
+			)
 		}
 	}
 }
@@ -121,45 +133,8 @@ func TestSignInAndAuditChangesAreFresh(t *testing.T) {
 		nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure,
 		nokkuv1connect.RecordingServiceDeleteRecordingProcedure,
 	} {
-		assert.True(t, procedureAccess[procedure].GetFresh(), "%s needs a recent sign-in", procedure)
+		assert.True(t, onlyAFreshPerson(procedureAccess[procedure]), "%s needs a recent sign-in", procedure)
 	}
-}
-
-func TestRequestedFresh(t *testing.T) {
-	update := func(s *nokkuv1.WorkspaceSettings) *nokkuv1.UpdateWorkspaceRequest {
-		return &nokkuv1.UpdateWorkspaceRequest{Name: new("renamed"), Settings: s}
-	}
-	assert.True(t, requestedFresh(update(&nokkuv1.WorkspaceSettings{EnforceSso: new(true)})), "turning SSO on")
-	assert.True(t, requestedFresh(update(&nokkuv1.WorkspaceSettings{EnforceSso: new(false)})), "turning SSO off")
-	assert.False(t, requestedFresh(update(nil)), "a rename stays free")
-	assert.False(t, requestedFresh(update(&nokkuv1.WorkspaceSettings{})), "other settings stay free")
-	assert.False(t, requestedFresh(&nokkuv1.GetVersionRequest{}), "another call")
-
-	assert.True(t, requestedFresh(&nokkuv1.SetUserActiveRequest{Active: new(true)}), "reactivating")
-	assert.False(t, requestedFresh(&nokkuv1.SetUserActiveRequest{Active: new(false)}), "deactivating stays quick")
-
-	sa := func(paths ...string) *nokkuv1.UpdateServiceAccountRequest {
-		return &nokkuv1.UpdateServiceAccountRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}}
-	}
-	assert.True(t, requestedFresh(sa("role")), "a service account's role")
-	assert.False(t, requestedFresh(sa("name", "tags")), "a service account's name and tags stay free")
-
-	daemon := func(paths ...string) *nokkuv1.UpdateDaemonRequest {
-		return &nokkuv1.UpdateDaemonRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}}
-	}
-	assert.True(t, requestedFresh(daemon("config.record_sessions")), "turning recording off")
-	assert.False(t, requestedFresh(daemon("status", "config.allow_forwarding")), "other daemon settings stay free")
-
-	server := func(paths ...string) *nokkuv1.UpdateTargetRequest {
-		return &nokkuv1.UpdateTargetRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}}
-	}
-	assert.True(t, requestedFresh(server("description", "endpoints")), "a server's address")
-	assert.True(t, requestedFresh(server("name", "tags")), "a server's name, a freed one fits another host")
-	assert.False(t, requestedFresh(server("description", "tags")), "the rest of a server stays free")
-
-	assert.True(t, requestedFresh(&nokkuv1.UpdateTeamRequest{ScimOpen: new(true)}), "opening a team for SCIM")
-	assert.False(t, requestedFresh(&nokkuv1.UpdateTeamRequest{ScimOpen: new(false)}), "closing it again stays quick")
-	assert.False(t, requestedFresh(&nokkuv1.UpdateTeamRequest{Name: new("renamed")}), "a team's name stays free")
 }
 
 // An uncapped create is unbounded when hosted, so each is capped or named here.

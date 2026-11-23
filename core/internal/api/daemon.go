@@ -60,9 +60,6 @@ func (s *daemonService) UpdateDaemon(
 	ctx context.Context,
 	req *nokkuv1.UpdateDaemonRequest,
 ) (*nokkuv1.UpdateDaemonResponse, error) {
-	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
-		return nil, err
-	}
 	// The row lock stops two updates writing each other's old config back.
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		var config *nokkuv1.DaemonConfig
@@ -83,12 +80,8 @@ func (s *daemonService) UpdateDaemon(
 			return err
 		}
 		audit.Set(ctx, "name", name)
-		//nolint:exhaustive // other statuses stay an UpdateDaemon
-		switch req.GetStatus() {
-		case nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED:
+		if req.GetStatus() == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 			audit.SetAction(ctx, "ApproveDaemon")
-		case nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED:
-			audit.SetAction(ctx, "RejectDaemon")
 		}
 		return nil
 	}); err != nil {
@@ -96,6 +89,42 @@ func (s *daemonService) UpdateDaemon(
 	}
 
 	return &nokkuv1.UpdateDaemonResponse{}, nil
+}
+
+func (s *daemonService) SetDaemonSafeguards(
+	ctx context.Context,
+	req *nokkuv1.SetDaemonSafeguardsRequest,
+) (*nokkuv1.SetDaemonSafeguardsResponse, error) {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		// Locked like UpdateDaemon, so neither writes the other's old config back.
+		stored, err := q.GetDaemonConfigForUpdate(ctx, req.GetId())
+		if err != nil {
+			return err
+		}
+		config := cmp.Or(stored, &nokkuv1.DaemonConfig{})
+		setSafeguards(ctx, config, req)
+		name, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{DaemonID: req.GetId(), Config: config})
+		if err != nil {
+			return err
+		}
+		audit.Set(ctx, "name", name)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.SetDaemonSafeguardsResponse{}, nil
+}
+
+// setSafeguards writes the rules a request names into config, and into the audit event. A rule it leaves out stays.
+func setSafeguards(ctx context.Context, config *nokkuv1.DaemonConfig, req *nokkuv1.SetDaemonSafeguardsRequest) {
+	if req.RecordSessions != nil {
+		config.RecordSessions = req.RecordSessions
+		audit.Set(ctx, "record_sessions", req.GetRecordSessions())
+	}
+	if req.KillOnRevoke != nil {
+		config.KillOnRevoke = req.KillOnRevoke
+		audit.Set(ctx, "kill_on_revoke", req.GetKillOnRevoke())
+	}
 }
 
 func (s *daemonService) ListDaemons(

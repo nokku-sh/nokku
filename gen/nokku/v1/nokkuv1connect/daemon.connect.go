@@ -30,6 +30,9 @@ const (
 	DaemonServiceGetDaemonProcedure = "/nokku.v1.DaemonService/GetDaemon"
 	// DaemonServiceUpdateDaemonProcedure is the procedure name of the DaemonService's UpdateDaemon RPC.
 	DaemonServiceUpdateDaemonProcedure = "/nokku.v1.DaemonService/UpdateDaemon"
+	// DaemonServiceSetDaemonSafeguardsProcedure is the procedure name of the DaemonService's
+	// SetDaemonSafeguards RPC.
+	DaemonServiceSetDaemonSafeguardsProcedure = "/nokku.v1.DaemonService/SetDaemonSafeguards"
 	// DaemonServiceDeleteDaemonProcedure is the procedure name of the DaemonService's DeleteDaemon RPC.
 	DaemonServiceDeleteDaemonProcedure = "/nokku.v1.DaemonService/DeleteDaemon"
 	// DaemonServiceListDaemonsProcedure is the procedure name of the DaemonService's ListDaemons RPC.
@@ -78,6 +81,13 @@ var (
 			Procedure:  DaemonServiceUpdateDaemonProcedure,
 		}
 	})
+	daemonServiceSetDaemonSafeguardsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonService").Methods().ByName("SetDaemonSafeguards"),
+			Procedure:  DaemonServiceSetDaemonSafeguardsProcedure,
+		}
+	})
 	daemonServiceDeleteDaemonSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -114,6 +124,10 @@ type DaemonServiceClient interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
 	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
+	// SetDaemonSafeguards changes the two rules that work against whoever is logged in: recording their sessions,
+	// and ending what they left running once their access is gone. Off helps someone cover their tracks or stay,
+	// so either takes a fresh sign-in.
+	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
 	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
@@ -169,6 +183,10 @@ type DaemonServiceHandler interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
 	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
+	// SetDaemonSafeguards changes the two rules that work against whoever is logged in: recording their sessions,
+	// and ending what they left running once their access is gone. Off helps someone cover their tracks or stay,
+	// so either takes a fresh sign-in.
+	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
 	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
@@ -184,6 +202,7 @@ func RegisterDaemonServiceHandler(server *connect.Server, svc DaemonServiceHandl
 	server.Register(
 		connect.Method{Spec: daemonServiceGetDaemonSpec(), Handler: adapter.getDaemon},
 		connect.Method{Spec: daemonServiceUpdateDaemonSpec(), Handler: adapter.updateDaemon},
+		connect.Method{Spec: daemonServiceSetDaemonSafeguardsSpec(), Handler: adapter.setDaemonSafeguards},
 		connect.Method{Spec: daemonServiceDeleteDaemonSpec(), Handler: adapter.deleteDaemon},
 		connect.Method{Spec: daemonServiceListDaemonsSpec(), Handler: adapter.listDaemons},
 		connect.Method{Spec: daemonServiceCreateSessionSpec(), Handler: adapter.createSession},
@@ -226,6 +245,10 @@ func (UnimplementedDaemonServiceHandler) UpdateDaemon(context.Context, *v1.Updat
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.UpdateDaemon is not implemented")
 }
 
+func (UnimplementedDaemonServiceHandler) SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.SetDaemonSafeguards is not implemented")
+}
+
 func (UnimplementedDaemonServiceHandler) DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.DeleteDaemon is not implemented")
 }
@@ -257,6 +280,14 @@ func (c *daemonServiceClient) GetDaemon(ctx context.Context, req *v1.GetDaemonRe
 func (c *daemonServiceClient) UpdateDaemon(ctx context.Context, req *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error) {
 	var res v1.UpdateDaemonResponse
 	if err := c.client.CallUnary(ctx, daemonServiceUpdateDaemonSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *daemonServiceClient) SetDaemonSafeguards(ctx context.Context, req *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error) {
+	var res v1.SetDaemonSafeguardsResponse
+	if err := c.client.CallUnary(ctx, daemonServiceSetDaemonSafeguardsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -314,6 +345,18 @@ func (h daemonServiceHandler) updateDaemon(ctx context.Context, _ connect.Spec, 
 		return err
 	}
 	res, err := h.svc.UpdateDaemon(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h daemonServiceHandler) setDaemonSafeguards(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetDaemonSafeguardsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetDaemonSafeguards(ctx, &req)
 	if err != nil {
 		return err
 	}

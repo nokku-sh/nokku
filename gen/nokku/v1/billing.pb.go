@@ -488,13 +488,13 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\x16ActivateLicenseRequest\x12\x1c\n" +
 	"\x03key\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80 R\x03key\"\x19\n" +
-	"\x17ActivateLicenseResponse2\x98\x02\n" +
-	"\x0eBillingService\x12R\n" +
+	"\x17ActivateLicenseResponse2\x9e\x02\n" +
+	"\x0eBillingService\x12T\n" +
 	"\n" +
-	"GetBilling\x12\x1b.nokku.v1.GetBillingRequest\x1a\x1c.nokku.v1.GetBillingResponse\"\t\xc2\xf3\x18\x02\x18\x04\x90\x02\x01\x12R\n" +
+	"GetBilling\x12\x1b.nokku.v1.GetBillingRequest\x1a\x1c.nokku.v1.GetBillingResponse\"\v\xc2\xf3\x18\x04\x18\x04h\x01\x90\x02\x01\x12T\n" +
 	"\n" +
-	"GetLicense\x12\x1b.nokku.v1.GetLicenseRequest\x1a\x1c.nokku.v1.GetLicenseResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12^\n" +
-	"\x0fActivateLicense\x12 .nokku.v1.ActivateLicenseRequest\x1a!.nokku.v1.ActivateLicenseResponse\"\x06\xc2\xf3\x18\x02\x18\x05B\x8d\x01\n" +
+	"GetLicense\x12\x1b.nokku.v1.GetLicenseRequest\x1a\x1c.nokku.v1.GetLicenseResponse\"\v\xc2\xf3\x18\x04\x10\x01h\x01\x90\x02\x01\x12`\n" +
+	"\x0fActivateLicense\x12 .nokku.v1.ActivateLicenseRequest\x1a!.nokku.v1.ActivateLicenseResponse\"\b\xc2\xf3\x18\x04\x18\x05h\x01B\x8d\x01\n" +
 	"\fcom.nokku.v1B\fBillingProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

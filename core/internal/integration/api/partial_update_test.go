@@ -287,14 +287,16 @@ func partialDaemon(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *c
 					&nokkuv1.DeleteDaemonRequest{Id: enrolled.Id})
 				require.NoError(t, err)
 			})
-			_, err := daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
+			_, err := daemons.SetDaemonSafeguards(t.Context(), &nokkuv1.SetDaemonSafeguardsRequest{
+				Id: enrolled.Id, RecordSessions: new(false), KillOnRevoke: new(false),
+			})
+			require.NoError(t, err)
+			_, err = daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
 				Id: enrolled.Id,
 				Config: &nokkuv1.DaemonConfig{
-					RecordSessions:       new(false),
 					AllowForwarding:      new(false),
 					AllowAgentForwarding: new(false),
 					GatewayPorts:         new(true),
-					KillOnRevoke:         new(false),
 				},
 			}))
 			require.NoError(t, err)
@@ -312,6 +314,18 @@ func partialDaemon(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *c
 			{"config.allow_forwarding", update(&nokkuv1.UpdateDaemonRequest{
 				Config: &nokkuv1.DaemonConfig{AllowForwarding: new(true)},
 			})},
+			{"config.record_sessions", func(id string) error {
+				_, err := daemons.SetDaemonSafeguards(t.Context(), &nokkuv1.SetDaemonSafeguardsRequest{
+					Id: &id, RecordSessions: new(true),
+				})
+				return err
+			}},
+			{"config.kill_on_revoke", func(id string) error {
+				_, err := daemons.SetDaemonSafeguards(t.Context(), &nokkuv1.SetDaemonSafeguardsRequest{
+					Id: &id, KillOnRevoke: new(true),
+				})
+				return err
+			}},
 			{"nothing", update(&nokkuv1.UpdateDaemonRequest{})},
 		},
 	}
@@ -352,14 +366,16 @@ func partialWorkspace(t *testing.T, cfg *app.Config, srv *httptest.Server) []par
 		require.NoError(t, err)
 		_, err = owner.UpdateDaemonDefaults(t.Context(), masked(&nokkuv1.UpdateDaemonDefaultsRequest{
 			DefaultDaemonConfig: &nokkuv1.DaemonConfig{
-				RecordSessions:       new(false),
 				AllowForwarding:      new(false),
 				AllowAgentForwarding: new(false),
 				GatewayPorts:         new(true),
-				KillOnRevoke:         new(false),
 			},
 			SessionIdleTimeout: durationpb.New(10 * time.Minute),
 		}))
+		require.NoError(t, err)
+		_, err = owner.SetDefaultSafeguards(t.Context(), &nokkuv1.SetDefaultSafeguardsRequest{
+			RecordSessions: new(false), KillOnRevoke: new(false),
+		})
 		require.NoError(t, err)
 		inWorkspace(t, cfg, ws, func(q *db.Queries) error {
 			return q.SetRequestableTags(t.Context(), []string{"prod", "web"})
@@ -394,8 +410,14 @@ func partialWorkspace(t *testing.T, cfg *app.Config, srv *httptest.Server) []par
 			create: create,
 			read:   read,
 			cases: []partialCase{
-				{"default_daemon_config.record_sessions", defaults(&nokkuv1.UpdateDaemonDefaultsRequest{
-					DefaultDaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(true)},
+				{"default_daemon_config.record_sessions", func(string) error {
+					_, err := owner.SetDefaultSafeguards(t.Context(), &nokkuv1.SetDefaultSafeguardsRequest{
+						RecordSessions: new(true),
+					})
+					return err
+				}},
+				{"default_daemon_config.gateway_ports", defaults(&nokkuv1.UpdateDaemonDefaultsRequest{
+					DefaultDaemonConfig: &nokkuv1.DaemonConfig{GatewayPorts: new(false)},
 				})},
 				{"session_idle_timeout", defaults(&nokkuv1.UpdateDaemonDefaultsRequest{
 					SessionIdleTimeout: durationpb.New(20 * time.Minute),
@@ -469,7 +491,10 @@ func partialTeam(t *testing.T, cfg *app.Config, admin *connect.Client) partialRe
 				"tags to none",
 				update(&nokkuv1.UpdateTeamRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}}}),
 			},
-			{"scim_open", update(&nokkuv1.UpdateTeamRequest{ScimOpen: new(true)})},
+			{"scim_open", func(id string) error {
+				_, err := teams.OpenTeamToSCIM(t.Context(), &nokkuv1.OpenTeamToSCIMRequest{Id: &id})
+				return err
+			}},
 			{"nothing", update(&nokkuv1.UpdateTeamRequest{})},
 		},
 	}
@@ -507,18 +532,28 @@ func partialTarget(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *c
 			return partialFields(res.GetTarget(), "id")
 		},
 		cases: []partialCase{
-			{"name", update(&nokkuv1.UpdateTargetRequest{Name: new(uniq("renamed"))})},
+			{"name", func(id string) error {
+				_, err := targets.RenameTarget(t.Context(), &nokkuv1.RenameTargetRequest{
+					Id: &id, Name: new(uniq("renamed")),
+				})
+				return err
+			}},
 			{"description", update(&nokkuv1.UpdateTargetRequest{Description: new("changed")})},
-			{"endpoints", update(&nokkuv1.UpdateTargetRequest{Endpoints: []string{"10.0.0.3:22"}})},
+			{"endpoints", func(id string) error {
+				_, err := targets.SetTargetEndpoints(t.Context(), &nokkuv1.SetTargetEndpointsRequest{
+					Id: &id, Endpoints: []string{"10.0.0.3:22"},
+				})
+				return err
+			}},
 			{"tags", update(&nokkuv1.UpdateTargetRequest{Tags: []string{"staging"}})},
 			{
 				"tags to none",
 				update(&nokkuv1.UpdateTargetRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}}}),
 			},
-			{
-				"endpoints to none",
-				update(&nokkuv1.UpdateTargetRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"endpoints"}}}),
-			},
+			{"endpoints to none", func(id string) error {
+				_, err := targets.SetTargetEndpoints(t.Context(), &nokkuv1.SetTargetEndpointsRequest{Id: &id})
+				return err
+			}},
 			{"nothing", update(&nokkuv1.UpdateTargetRequest{})},
 		},
 	}
@@ -629,9 +664,12 @@ func partialServiceAccount(t *testing.T, admin *connect.Client) partialResource 
 		cases: []partialCase{
 			{"name", update(&nokkuv1.UpdateServiceAccountRequest{Name: new(uniq("renamed"))})},
 			{"description", update(&nokkuv1.UpdateServiceAccountRequest{Description: new("changed")})},
-			{"role", update(&nokkuv1.UpdateServiceAccountRequest{
-				Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER.Enum(),
-			})},
+			{"role", func(id string) error {
+				_, err := accounts.SetServiceAccountRole(t.Context(), &nokkuv1.SetServiceAccountRoleRequest{
+					Id: &id, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER.Enum(),
+				})
+				return err
+			}},
 			{"tags", update(&nokkuv1.UpdateServiceAccountRequest{Tags: []string{"staging"}})},
 			{
 				"tags to none",
@@ -639,8 +677,18 @@ func partialServiceAccount(t *testing.T, admin *connect.Client) partialResource 
 					&nokkuv1.UpdateServiceAccountRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}}},
 				),
 			},
-			{"force_command", update(&nokkuv1.UpdateServiceAccountRequest{ForceCommand: new("/usr/bin/other")})},
-			{"source_address", update(&nokkuv1.UpdateServiceAccountRequest{SourceAddress: new("192.0.2.0/24")})},
+			{"force_command", func(id string) error {
+				_, err := accounts.SetServiceAccountLimits(t.Context(), &nokkuv1.SetServiceAccountLimitsRequest{
+					Id: &id, ForceCommand: new("/usr/bin/other"),
+				})
+				return err
+			}},
+			{"source_address", func(id string) error {
+				_, err := accounts.SetServiceAccountLimits(t.Context(), &nokkuv1.SetServiceAccountLimitsRequest{
+					Id: &id, SourceAddress: new("192.0.2.0/24"),
+				})
+				return err
+			}},
 			{"nothing", update(&nokkuv1.UpdateServiceAccountRequest{})},
 		},
 	}
@@ -672,9 +720,9 @@ func TestConcurrentSettingsKeepBoth(t *testing.T) {
 			errs <- err
 		}()
 		go func() {
-			_, err := owner.UpdateDaemonDefaults(t.Context(), masked(&nokkuv1.UpdateDaemonDefaultsRequest{
-				DefaultDaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(record)},
-			}))
+			_, err := owner.SetDefaultSafeguards(t.Context(), &nokkuv1.SetDefaultSafeguardsRequest{
+				RecordSessions: &record,
+			})
 			errs <- err
 		}()
 		require.NoError(t, <-errs)

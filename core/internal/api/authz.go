@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"slices"
 
 	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
@@ -97,7 +96,7 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 		return a.daemonAccepted(ctx, caller.ID, procedure)
 	}
 	// nk gets what nk needs, so a phished or infected nk session can't run the workspace.
-	if caller.Kind == actor.KindCLI && !access.GetCli() {
+	if caller.Kind == actor.KindCLI && !access.GetNk() {
 		return connect.NewError(connect.CodePermissionDenied, "do this in the web app")
 	}
 	// An RPC that names no role stays denied.
@@ -105,17 +104,17 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	if !access.GetSelf() && (required == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || caller.Role < required) {
 		return db.ErrPermissionDenied
 	}
-	if access.GetPeopleOnly() && caller.Kind == actor.KindServiceAccount {
+	// A leaked key reaches only what names machines.
+	if caller.Kind == actor.KindServiceAccount && !access.GetMachine() {
 		return connect.NewError(connect.CodePermissionDenied, "only people can do this, not a service account")
 	}
-	browser := nokkuv1.Browser_BROWSER_UNSPECIFIED
-	if caller.Kind == actor.KindUser {
-		browser = access.GetBrowser()
-	}
-	if browser == nokkuv1.Browser_BROWSER_REFUSED {
+	browser := access.GetBrowser()
+	if caller.Kind == actor.KindUser && browser == nokkuv1.Browser_BROWSER_REFUSED {
 		return connect.NewError(connect.CodePermissionDenied, "do this with nk")
 	}
-	if access.GetFresh() || browser == nokkuv1.Browser_BROWSER_FRESH {
+	// nk and a service account are in by the two checks above. The handler holds them to what they added.
+	machineOrNk := caller.Kind == actor.KindCLI || caller.Kind == actor.KindServiceAccount
+	if browser == nokkuv1.Browser_BROWSER_FRESH && !machineOrNk {
 		if err := a.fresh(ctx, caller); err != nil {
 			return err
 		}
@@ -126,12 +125,6 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	// A plan gate must not read a field the mask leaves out.
 	if req, ok := msg.(maskedRequest); ok {
 		if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
-			return err
-		}
-	}
-	// After the mask, a field it leaves out changes nothing.
-	if !access.GetFresh() && requestedFresh(msg) {
-		if err := a.fresh(ctx, caller); err != nil {
 			return err
 		}
 	}
@@ -152,28 +145,6 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 		return ent.CheckResources(ctx, ws)
 	}
 	return nil
-}
-
-// requestedFresh finds fields that need a fresh sign-in in an ordinary update.
-func requestedFresh(msg any) bool {
-	switch req := msg.(type) {
-	case *nokkuv1.UpdateWorkspaceRequest:
-		return req.GetSettings() != nil && req.GetSettings().EnforceSso != nil
-	case *nokkuv1.UpdateServiceAccountRequest:
-		return req.ForceCommand != nil || req.SourceAddress != nil ||
-			slices.Contains(req.GetUpdateMask().GetPaths(), "role")
-	case *nokkuv1.SetUserActiveRequest:
-		return req.GetActive()
-	case *nokkuv1.UpdateTeamRequest:
-		return req.GetScimOpen()
-	case *nokkuv1.UpdateDaemonRequest:
-		return slices.Contains(req.GetUpdateMask().GetPaths(), "config.record_sessions")
-	case *nokkuv1.UpdateTargetRequest:
-		// Where logins go, and the name people type to get there.
-		paths := req.GetUpdateMask().GetPaths()
-		return slices.Contains(paths, "endpoints") || slices.Contains(paths, "name")
-	}
-	return false
 }
 
 // fresh lets only a person's browser session from the last 10 minutes through.

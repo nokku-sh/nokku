@@ -10,37 +10,61 @@ import "nokku/v1/access.proto";
 
 service AccountService {
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
   }
   rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse) {
     option (access) = {
       self: true
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc ListCredentials(ListCredentialsRequest) returns (ListCredentialsResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc RenameCredential(RenameCredentialRequest) returns (RenameCredentialResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
   }
   rpc RemoveCredential(RemoveCredentialRequest) returns (RemoveCredentialResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
   }
   rpc ListAccountSessions(ListAccountSessionsRequest) returns (ListAccountSessionsResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc RemoveSession(RemoveSessionRequest) returns (RemoveSessionResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
   }
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      browser: BROWSER_FRESH
+    };
   }
 }
 

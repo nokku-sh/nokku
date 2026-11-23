@@ -263,9 +263,7 @@ func (s *targetService) UpdateTarget(
 	}
 	params := &db.UpdateTargetParams{
 		TargetID:    req.GetId(),
-		Name:        req.Name,
 		Description: req.Description,
-		Endpoints:   maskedList(named("endpoints"), req.GetEndpoints()),
 		Tags:        maskedList(named("tags"), req.GetTags()),
 	}
 	result, err := s.cfg.Conn.Tenant().UpdateTarget(ctx, params)
@@ -277,6 +275,36 @@ func (s *targetService) UpdateTarget(
 	return &nokkuv1.UpdateTargetResponse{
 		Target: result.ToProto(),
 	}, nil
+}
+
+func (s *targetService) RenameTarget(
+	ctx context.Context,
+	req *nokkuv1.RenameTargetRequest,
+) (*nokkuv1.RenameTargetResponse, error) {
+	result, err := s.cfg.Conn.Tenant().UpdateTarget(ctx, &db.UpdateTargetParams{
+		TargetID: req.GetId(), Name: req.Name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	audit.Set(ctx, "name", result.Name)
+	return &nokkuv1.RenameTargetResponse{Target: result.ToProto()}, nil
+}
+
+func (s *targetService) SetTargetEndpoints(
+	ctx context.Context,
+	req *nokkuv1.SetTargetEndpointsRequest,
+) (*nokkuv1.SetTargetEndpointsResponse, error) {
+	// The query keeps the stored list for nil, so an empty one is never nil.
+	result, err := s.cfg.Conn.Tenant().UpdateTarget(ctx, &db.UpdateTargetParams{
+		TargetID: req.GetId(), Endpoints: append([]string{}, req.GetEndpoints()...),
+	})
+	if err != nil {
+		return nil, err
+	}
+	audit.Set(ctx, "name", result.Name)
+	audit.Set(ctx, "endpoints", result.Endpoints)
+	return &nokkuv1.SetTargetEndpointsResponse{Target: result.ToProto()}, nil
 }
 
 func (s *targetService) DeleteTarget(

@@ -51,10 +51,10 @@ func TestUpdateServiceAccount(t *testing.T) {
 		"unset fields stay as they are",
 	)
 
-	kept, err := client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+	kept, err := client.SetServiceAccountRole(t.Context(), &nokkuv1.SetServiceAccountRoleRequest{
 		Id:   &id,
 		Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER.Enum(),
-	}))
+	})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ci", "prod"}, kept.GetServiceAccount().GetTags(), "a role change wiped the tags")
 
@@ -91,20 +91,20 @@ func TestServiceAccountLimits(t *testing.T) {
 	assert.Equal(t, "/usr/local/bin/deploy", account.GetForceCommand())
 	assert.Equal(t, "10.0.0.0/8,192.0.2.7", account.GetSourceAddress())
 
-	_, err = client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+	_, err = client.SetServiceAccountLimits(t.Context(), &nokkuv1.SetServiceAccountLimitsRequest{
 		Id: account.Id, SourceAddress: new("the office"),
-	}))
+	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)
 
-	// An update naming neither keeps both, an empty one takes the limit away.
+	// An update keeps both, a limit left out stays, an empty one takes the limit away.
 	renamed, err := client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
 		Id: account.Id, Description: new("changed"),
 	}))
 	require.NoError(t, err)
 	assert.Equal(t, "10.0.0.0/8,192.0.2.7", renamed.GetServiceAccount().GetSourceAddress())
-	cleared, err := client.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+	cleared, err := client.SetServiceAccountLimits(t.Context(), &nokkuv1.SetServiceAccountLimitsRequest{
 		Id: account.Id, SourceAddress: new(""),
-	}))
+	})
 	require.NoError(t, err)
 	assert.Empty(t, cleared.GetServiceAccount().GetSourceAddress())
 	assert.Equal(t, "/usr/local/bin/deploy", cleared.GetServiceAccount().GetForceCommand())
@@ -137,9 +137,12 @@ func TestMachinesDoNotChangeTheirLimits(t *testing.T) {
 	machine := clientOn(
 		srv, header("Authorization", "Bearer "+minted.GetSecret()),
 	)
-	_, err = nokkuv1connect.NewServiceAccountServiceClient(machine).UpdateServiceAccount(t.Context(),
-		masked(&nokkuv1.UpdateServiceAccountRequest{Id: id, ForceCommand: new(""), SourceAddress: new("")}))
+	_, err = nokkuv1connect.NewServiceAccountServiceClient(machine).SetServiceAccountLimits(t.Context(),
+		&nokkuv1.SetServiceAccountLimitsRequest{Id: id, ForceCommand: new(""), SourceAddress: new("")})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "lifting its own limits: %v", err)
+	_, err = nokkuv1connect.NewServiceAccountServiceClient(machine).SetServiceAccountRole(t.Context(),
+		&nokkuv1.SetServiceAccountRoleRequest{Id: id, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER.Enum()})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "changing its own role: %v", err)
 
 	authority := nokkuv1connect.NewCertificateServiceClient(machine)
 	_, err = authority.UpdateCertificateAuthority(t.Context(),
@@ -160,23 +163,14 @@ func TestMachinesDoNotChangeTheirLimits(t *testing.T) {
 		masked(&nokkuv1.UpdateServiceAccountRequest{Id: id, Description: new("changed")}))
 	require.NoError(t, err)
 
-	// A field outside the mask asks for nothing, the web app sends them all.
-	_, err = oldAccounts.UpdateServiceAccount(t.Context(), &nokkuv1.UpdateServiceAccountRequest{
-		Id:           id,
-		Description:  new("changed again"),
-		ForceCommand: new(""),
-		UpdateMask:   &fieldmaskpb.FieldMask{Paths: []string{"description"}},
-	})
-	require.NoError(t, err)
+	// The limits are, and the same old sign-in may not lift them.
+	_, err = oldAccounts.SetServiceAccountLimits(t.Context(),
+		&nokkuv1.SetServiceAccountLimitsRequest{Id: id, ForceCommand: new("")})
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "an old sign-in lifted a limit: %v", err)
 	got, err = accounts.GetServiceAccount(t.Context(), &nokkuv1.GetServiceAccountRequest{Id: id})
 	require.NoError(t, err)
-	assert.Equal(t, "changed again", got.GetServiceAccount().GetDescription())
-	assert.Equal(
-		t,
-		"/usr/local/bin/deploy",
-		got.GetServiceAccount().GetForceCommand(),
-		"a field outside the mask changed",
-	)
+	assert.Equal(t, "changed", got.GetServiceAccount().GetDescription())
+	assert.Equal(t, "/usr/local/bin/deploy", got.GetServiceAccount().GetForceCommand())
 }
 
 func TestServiceAccountRole(t *testing.T) {
@@ -198,9 +192,9 @@ func TestServiceAccountRole(t *testing.T) {
 		"no role is the member")
 
 	update := func(role *nokkuv1.WorkspaceRole) (nokkuv1.WorkspaceRole, error) {
-		res, err := client.UpdateServiceAccount(
+		res, err := client.SetServiceAccountRole(
 			t.Context(),
-			masked(&nokkuv1.UpdateServiceAccountRequest{Id: &id, Role: role}),
+			&nokkuv1.SetServiceAccountRoleRequest{Id: &id, Role: role},
 		)
 		return res.GetServiceAccount().GetRole(), err
 	}
@@ -208,9 +202,8 @@ func TestServiceAccountRole(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, got)
 
-	got, err = update(nil)
-	require.NoError(t, err)
-	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, got, "an update without a role keeps it")
+	_, err = update(nil)
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a role change has to name a role")
 
 	got, err = update(new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER))
 	require.NoError(t, err)

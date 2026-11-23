@@ -74,7 +74,8 @@
 	const teamIds = $derived(new Set((userTeams.data ?? []).map((t) => t.id)));
 
 	const updateRole = users.updateRole();
-	const setActive = users.setActive();
+	const deactivate = users.deactivate();
+	const reactivate = users.reactivate();
 	const remove = users.delete();
 	const clearIdentities = users.clearIdentities();
 	const transfer = users.transferOwnership();
@@ -145,9 +146,9 @@
 								title: `Deactivate ${name}?`,
 								description: 'Every session ends right away. You can reactivate them later.',
 								confirmText: 'Deactivate',
-								onConfirm: () => setActive.mutateAsync({ userId: person.id, active: false })
+								onConfirm: () => deactivate.mutateAsync({ userId: person.id })
 							})
-						: whenFresh(() => setActive.mutate({ userId: person.id, active: true }))
+						: whenFresh(() => reactivate.mutate({ userId: person.id }))
 			});
 			actions.push({
 				title: 'Unlink sign-in providers',
@@ -170,16 +171,19 @@
 				description:
 					'Their access ends right away and cannot be restored. Inviting them again starts a new account.',
 				label: 'Delete',
-				onClick: async () =>
-					confirm({
-						title: `Delete ${name}?`,
-						description: await userDeleteWarning(person.id),
-						confirmText: 'Delete',
-						onConfirm: async () => {
-							await remove.mutateAsync({ userId: person.id });
-							sheet.close();
-						}
-					})
+				onClick: () =>
+					whenFresh(
+						async () =>
+							void confirm({
+								title: `Delete ${name}?`,
+								description: await userDeleteWarning(person.id),
+								confirmText: 'Delete',
+								onConfirm: async () => {
+									await remove.mutateAsync({ userId: person.id });
+									sheet.close();
+								}
+							})
+					)
 			});
 		}
 		return actions;

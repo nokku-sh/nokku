@@ -8,70 +8,46 @@ import "nokku/v1/access.proto";
 
 service TargetAccountService {
   rpc ListTargetAccounts(ListTargetAccountsRequest) returns (ListTargetAccountsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc AddTargetAccount(AddTargetAccountRequest) returns (AddTargetAccountResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc RemoveTargetAccount(RemoveTargetAccountRequest) returns (RemoveTargetAccountResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc AddSubjects(AddSubjectsRequest) returns (AddSubjectsResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc RemoveSubjects(RemoveSubjectsRequest) returns (RemoveSubjectsResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc RevokeAllAccess(RevokeAllAccessRequest) returns (RevokeAllAccessResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   // PlanGrant says what Grant would do with the same request, and changes nothing.
   rpc PlanGrant(PlanGrantRequest) returns (PlanGrantResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
   // access change, however many servers.
   rpc Grant(GrantRequest) returns (GrantResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   // PlanRevoke says what Revoke would do with the same request, and changes nothing.
   rpc PlanRevoke(PlanRevokeRequest) returns (PlanRevokeResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // Revoke takes one subject's own grants off many servers, the servers by id or by tag. Like Grant it is one
   // transaction and one access change.
   rpc Revoke(RevokeRequest) returns (RevokeResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
 }
 

@@ -12,13 +12,15 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import { differing, ruleValue } from '#lib/daemon-rules.js';
+	import { whenFresh } from '#lib/api/auth.svelte.js';
+	import { daemonRules, differing, ruleValue } from '#lib/daemon-rules.js';
 	import { useAutoSave } from '#lib/hooks/index.js';
 	import { durationFromMs, durationMs } from '@bufbuild/protobuf/wkt';
 
 	const ws = workspace.get();
 	const can = user.can();
 	const update = workspace.updateDaemonDefaults();
+	const setSafeguards = workspace.setDefaultSafeguards();
 	const saving = useAutoSave();
 
 	// Unset defaults read as all off, like the daemon reads them.
@@ -53,6 +55,21 @@
 		idleChoices.find((c) => c.minutes === idleMinutes)?.label ?? `After ${idleMinutes} minutes`
 	);
 
+	// Only the flipped rule goes out, so one the plan no longer allows never blocks the others. A fresh rule
+	// steps up first, and a step-up that is turned down starts no save.
+	async function setRule(rule: (typeof daemonRules)[number], value: boolean) {
+		if (!rule.fresh) {
+			return saving.track(() =>
+				update.mutateAsync({ defaultDaemonConfig: ruleValue(rule.key, value) })
+			);
+		}
+		let saved: Promise<unknown> | undefined;
+		await whenFresh(() => {
+			saved = saving.track(() => setSafeguards.mutateAsync(ruleValue(rule.key, value)));
+		});
+		return saved;
+	}
+
 	// The global mutation handler toasts a failure, the footer offers the retry.
 	const setIdle = (minutes: number) =>
 		saving
@@ -83,13 +100,7 @@
 		</Card.Description>
 	</Card.Header>
 	<Card.Content class="flex flex-col gap-3">
-		<!-- Only the flipped rule goes out, so one the plan no longer allows never blocks the others. -->
-		<DaemonRules
-			values={defaults}
-			disabled={!can.admin}
-			onChange={(rule, value) =>
-				saving.track(() => update.mutateAsync({ defaultDaemonConfig: ruleValue(rule.key, value) }))}
-		/>
+		<DaemonRules values={defaults} disabled={!can.admin} onChange={setRule} />
 		<p class="text-xs text-muted-foreground">
 			Auto-approval is not a default. It is set on each enrollment token.
 		</p>

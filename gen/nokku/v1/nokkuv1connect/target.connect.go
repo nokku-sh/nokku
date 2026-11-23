@@ -32,6 +32,11 @@ const (
 	TargetServiceCreateTargetProcedure = "/nokku.v1.TargetService/CreateTarget"
 	// TargetServiceUpdateTargetProcedure is the procedure name of the TargetService's UpdateTarget RPC.
 	TargetServiceUpdateTargetProcedure = "/nokku.v1.TargetService/UpdateTarget"
+	// TargetServiceRenameTargetProcedure is the procedure name of the TargetService's RenameTarget RPC.
+	TargetServiceRenameTargetProcedure = "/nokku.v1.TargetService/RenameTarget"
+	// TargetServiceSetTargetEndpointsProcedure is the procedure name of the TargetService's
+	// SetTargetEndpoints RPC.
+	TargetServiceSetTargetEndpointsProcedure = "/nokku.v1.TargetService/SetTargetEndpoints"
 	// TargetServiceDeleteTargetProcedure is the procedure name of the TargetService's DeleteTarget RPC.
 	TargetServiceDeleteTargetProcedure = "/nokku.v1.TargetService/DeleteTarget"
 	// TargetServiceGetSubjectAccessProcedure is the procedure name of the TargetService's
@@ -86,6 +91,20 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("UpdateTarget"),
 			Procedure:  TargetServiceUpdateTargetProcedure,
+		}
+	})
+	targetServiceRenameTargetSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("RenameTarget"),
+			Procedure:  TargetServiceRenameTargetProcedure,
+		}
+	})
+	targetServiceSetTargetEndpointsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("SetTargetEndpoints"),
+			Procedure:  TargetServiceSetTargetEndpointsProcedure,
 		}
 	})
 	targetServiceDeleteTargetSpec = sync.OnceValue(func() connect.Spec {
@@ -157,6 +176,11 @@ type TargetServiceClient interface {
 	ListTargets(context.Context, *v1.ListTargetsRequest) (*v1.ListTargetsResponse, error)
 	CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error)
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
+	// RenameTarget changes the name people type to get there. A freed name fits another host, so it takes a fresh
+	// sign-in.
+	RenameTarget(context.Context, *v1.RenameTargetRequest) (*v1.RenameTargetResponse, error)
+	// SetTargetEndpoints replaces where logins to the server go, an empty list clears it.
+	SetTargetEndpoints(context.Context, *v1.SetTargetEndpointsRequest) (*v1.SetTargetEndpointsResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
@@ -182,6 +206,11 @@ type TargetServiceHandler interface {
 	ListTargets(context.Context, *v1.ListTargetsRequest) (*v1.ListTargetsResponse, error)
 	CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error)
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
+	// RenameTarget changes the name people type to get there. A freed name fits another host, so it takes a fresh
+	// sign-in.
+	RenameTarget(context.Context, *v1.RenameTargetRequest) (*v1.RenameTargetResponse, error)
+	// SetTargetEndpoints replaces where logins to the server go, an empty list clears it.
+	SetTargetEndpoints(context.Context, *v1.SetTargetEndpointsRequest) (*v1.SetTargetEndpointsResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
@@ -204,6 +233,8 @@ func RegisterTargetServiceHandler(server *connect.Server, svc TargetServiceHandl
 		connect.Method{Spec: targetServiceListTargetsSpec(), Handler: adapter.listTargets},
 		connect.Method{Spec: targetServiceCreateTargetSpec(), Handler: adapter.createTarget},
 		connect.Method{Spec: targetServiceUpdateTargetSpec(), Handler: adapter.updateTarget},
+		connect.Method{Spec: targetServiceRenameTargetSpec(), Handler: adapter.renameTarget},
+		connect.Method{Spec: targetServiceSetTargetEndpointsSpec(), Handler: adapter.setTargetEndpoints},
 		connect.Method{Spec: targetServiceDeleteTargetSpec(), Handler: adapter.deleteTarget},
 		connect.Method{Spec: targetServiceGetSubjectAccessSpec(), Handler: adapter.getSubjectAccess},
 		connect.Method{Spec: targetServiceGetTargetFiltersSpec(), Handler: adapter.getTargetFilters},
@@ -232,6 +263,14 @@ func (UnimplementedTargetServiceHandler) CreateTarget(context.Context, *v1.Creat
 
 func (UnimplementedTargetServiceHandler) UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.UpdateTarget is not implemented")
+}
+
+func (UnimplementedTargetServiceHandler) RenameTarget(context.Context, *v1.RenameTargetRequest) (*v1.RenameTargetResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.RenameTarget is not implemented")
+}
+
+func (UnimplementedTargetServiceHandler) SetTargetEndpoints(context.Context, *v1.SetTargetEndpointsRequest) (*v1.SetTargetEndpointsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.SetTargetEndpoints is not implemented")
 }
 
 func (UnimplementedTargetServiceHandler) DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error) {
@@ -297,6 +336,22 @@ func (c *targetServiceClient) CreateTarget(ctx context.Context, req *v1.CreateTa
 func (c *targetServiceClient) UpdateTarget(ctx context.Context, req *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error) {
 	var res v1.UpdateTargetResponse
 	if err := c.client.CallUnary(ctx, targetServiceUpdateTargetSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) RenameTarget(ctx context.Context, req *v1.RenameTargetRequest) (*v1.RenameTargetResponse, error) {
+	var res v1.RenameTargetResponse
+	if err := c.client.CallUnary(ctx, targetServiceRenameTargetSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetServiceClient) SetTargetEndpoints(ctx context.Context, req *v1.SetTargetEndpointsRequest) (*v1.SetTargetEndpointsResponse, error) {
+	var res v1.SetTargetEndpointsResponse
+	if err := c.client.CallUnary(ctx, targetServiceSetTargetEndpointsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -410,6 +465,30 @@ func (h targetServiceHandler) updateTarget(ctx context.Context, _ connect.Spec, 
 		return err
 	}
 	res, err := h.svc.UpdateTarget(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) renameTarget(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.RenameTargetRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.RenameTarget(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetServiceHandler) setTargetEndpoints(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetTargetEndpointsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetTargetEndpoints(ctx, &req)
 	if err != nil {
 		return err
 	}

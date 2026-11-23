@@ -11,15 +11,21 @@ service JoinTokenService {
   rpc CreateJoinToken(CreateJoinTokenRequest) returns (CreateJoinTokenResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc ListJoinTokens(ListJoinTokensRequest) returns (ListJoinTokensResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc DeleteJoinToken(DeleteJoinTokenRequest) returns (DeleteJoinTokenResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      machine: true
+    };
   }
 }
 

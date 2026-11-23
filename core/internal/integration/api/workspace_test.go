@@ -85,16 +85,13 @@ func TestManageUsers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, got.GetUser().GetRole())
 
-	_, err = workspaces.SetUserActive(t.Context(), &nokkuv1.SetUserActiveRequest{UserId: &owner.ID, Active: new(false)})
+	_, err = workspaces.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{UserId: &owner.ID})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "an admin switched the owner off: %v", err)
-	_, err = workspaces.SetUserActive(t.Context(), &nokkuv1.SetUserActiveRequest{UserId: &admin.ID, Active: new(false)})
+	_, err = workspaces.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{UserId: &admin.ID})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "an admin switched themselves off: %v", err)
 
 	viewerToken := sessionFor(t, cfg, viewer)
-	_, err = workspaces.SetUserActive(
-		t.Context(),
-		&nokkuv1.SetUserActiveRequest{UserId: &viewer.ID, Active: new(false)},
-	)
+	_, err = workspaces.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{UserId: &viewer.ID})
 	require.NoError(t, err)
 	_, _, err = cfg.IAM.AuthenticateToken(wsCtx(t), viewerToken, accessTokens...)
 	require.Error(t, err, "a deactivated user kept their session")

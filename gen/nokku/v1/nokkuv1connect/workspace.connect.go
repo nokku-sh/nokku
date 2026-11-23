@@ -30,9 +30,15 @@ const (
 	// WorkspaceServiceUpdateWorkspaceProcedure is the procedure name of the WorkspaceService's
 	// UpdateWorkspace RPC.
 	WorkspaceServiceUpdateWorkspaceProcedure = "/nokku.v1.WorkspaceService/UpdateWorkspace"
+	// WorkspaceServiceSetEnforceSSOProcedure is the procedure name of the WorkspaceService's
+	// SetEnforceSSO RPC.
+	WorkspaceServiceSetEnforceSSOProcedure = "/nokku.v1.WorkspaceService/SetEnforceSSO"
 	// WorkspaceServiceUpdateDaemonDefaultsProcedure is the procedure name of the WorkspaceService's
 	// UpdateDaemonDefaults RPC.
 	WorkspaceServiceUpdateDaemonDefaultsProcedure = "/nokku.v1.WorkspaceService/UpdateDaemonDefaults"
+	// WorkspaceServiceSetDefaultSafeguardsProcedure is the procedure name of the WorkspaceService's
+	// SetDefaultSafeguards RPC.
+	WorkspaceServiceSetDefaultSafeguardsProcedure = "/nokku.v1.WorkspaceService/SetDefaultSafeguards"
 	// WorkspaceServiceDeleteWorkspaceProcedure is the procedure name of the WorkspaceService's
 	// DeleteWorkspace RPC.
 	WorkspaceServiceDeleteWorkspaceProcedure = "/nokku.v1.WorkspaceService/DeleteWorkspace"
@@ -43,9 +49,12 @@ const (
 	// WorkspaceServiceUpdateUserRoleProcedure is the procedure name of the WorkspaceService's
 	// UpdateUserRole RPC.
 	WorkspaceServiceUpdateUserRoleProcedure = "/nokku.v1.WorkspaceService/UpdateUserRole"
-	// WorkspaceServiceSetUserActiveProcedure is the procedure name of the WorkspaceService's
-	// SetUserActive RPC.
-	WorkspaceServiceSetUserActiveProcedure = "/nokku.v1.WorkspaceService/SetUserActive"
+	// WorkspaceServiceDeactivateUserProcedure is the procedure name of the WorkspaceService's
+	// DeactivateUser RPC.
+	WorkspaceServiceDeactivateUserProcedure = "/nokku.v1.WorkspaceService/DeactivateUser"
+	// WorkspaceServiceReactivateUserProcedure is the procedure name of the WorkspaceService's
+	// ReactivateUser RPC.
+	WorkspaceServiceReactivateUserProcedure = "/nokku.v1.WorkspaceService/ReactivateUser"
 	// WorkspaceServiceDeleteUserProcedure is the procedure name of the WorkspaceService's DeleteUser
 	// RPC.
 	WorkspaceServiceDeleteUserProcedure = "/nokku.v1.WorkspaceService/DeleteUser"
@@ -79,11 +88,25 @@ var (
 			Procedure:  WorkspaceServiceUpdateWorkspaceProcedure,
 		}
 	})
+	workspaceServiceSetEnforceSSOSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("SetEnforceSSO"),
+			Procedure:  WorkspaceServiceSetEnforceSSOProcedure,
+		}
+	})
 	workspaceServiceUpdateDaemonDefaultsSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("UpdateDaemonDefaults"),
 			Procedure:  WorkspaceServiceUpdateDaemonDefaultsProcedure,
+		}
+	})
+	workspaceServiceSetDefaultSafeguardsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("SetDefaultSafeguards"),
+			Procedure:  WorkspaceServiceSetDefaultSafeguardsProcedure,
 		}
 	})
 	workspaceServiceDeleteWorkspaceSpec = sync.OnceValue(func() connect.Spec {
@@ -116,11 +139,18 @@ var (
 			Procedure:  WorkspaceServiceUpdateUserRoleProcedure,
 		}
 	})
-	workspaceServiceSetUserActiveSpec = sync.OnceValue(func() connect.Spec {
+	workspaceServiceDeactivateUserSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("SetUserActive"),
-			Procedure:  WorkspaceServiceSetUserActiveProcedure,
+			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("DeactivateUser"),
+			Procedure:  WorkspaceServiceDeactivateUserProcedure,
+		}
+	})
+	workspaceServiceReactivateUserSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("ReactivateUser"),
+			Procedure:  WorkspaceServiceReactivateUserProcedure,
 		}
 	})
 	workspaceServiceDeleteUserSpec = sync.OnceValue(func() connect.Spec {
@@ -164,14 +194,24 @@ var (
 type WorkspaceServiceClient interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
+	// SetEnforceSSO turns required single sign-on on or off. It decides who may sign in, so it takes a fresh
+	// sign-in. On ends every session that did not come through a provider.
+	SetEnforceSSO(context.Context, *v1.SetEnforceSSORequest) (*v1.SetEnforceSSOResponse, error)
 	// UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
 	UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error)
+	// SetDefaultSafeguards is SetDaemonSafeguards for the rules a new daemon starts with.
+	SetDefaultSafeguards(context.Context, *v1.SetDefaultSafeguardsRequest) (*v1.SetDefaultSafeguardsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
-	// Reactivating takes a fresh sign-in. Deactivating does not, it is the emergency brake.
-	SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error)
+	// DeactivateUser ends the user's sessions and keeps their grants for a return. It asks for no fresh sign-in, it is
+	// the emergency brake.
+	DeactivateUser(context.Context, *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error)
+	// ReactivateUser lets someone back in with the access they had.
+	ReactivateUser(context.Context, *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error)
+	// DeleteUser takes grants and team seats for good, so in a browser it takes a fresh sign-in. Deactivating is
+	// the quick one.
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
 	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
 	// them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
@@ -192,14 +232,24 @@ func NewWorkspaceServiceClient(client *connect.Client) WorkspaceServiceClient {
 type WorkspaceServiceHandler interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
+	// SetEnforceSSO turns required single sign-on on or off. It decides who may sign in, so it takes a fresh
+	// sign-in. On ends every session that did not come through a provider.
+	SetEnforceSSO(context.Context, *v1.SetEnforceSSORequest) (*v1.SetEnforceSSOResponse, error)
 	// UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
 	UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error)
+	// SetDefaultSafeguards is SetDaemonSafeguards for the rules a new daemon starts with.
+	SetDefaultSafeguards(context.Context, *v1.SetDefaultSafeguardsRequest) (*v1.SetDefaultSafeguardsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
-	// Reactivating takes a fresh sign-in. Deactivating does not, it is the emergency brake.
-	SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error)
+	// DeactivateUser ends the user's sessions and keeps their grants for a return. It asks for no fresh sign-in, it is
+	// the emergency brake.
+	DeactivateUser(context.Context, *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error)
+	// ReactivateUser lets someone back in with the access they had.
+	ReactivateUser(context.Context, *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error)
+	// DeleteUser takes grants and team seats for good, so in a browser it takes a fresh sign-in. Deactivating is
+	// the quick one.
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
 	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
 	// them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
@@ -217,12 +267,15 @@ func RegisterWorkspaceServiceHandler(server *connect.Server, svc WorkspaceServic
 	server.Register(
 		connect.Method{Spec: workspaceServiceGetWorkspaceSpec(), Handler: adapter.getWorkspace},
 		connect.Method{Spec: workspaceServiceUpdateWorkspaceSpec(), Handler: adapter.updateWorkspace},
+		connect.Method{Spec: workspaceServiceSetEnforceSSOSpec(), Handler: adapter.setEnforceSSO},
 		connect.Method{Spec: workspaceServiceUpdateDaemonDefaultsSpec(), Handler: adapter.updateDaemonDefaults},
+		connect.Method{Spec: workspaceServiceSetDefaultSafeguardsSpec(), Handler: adapter.setDefaultSafeguards},
 		connect.Method{Spec: workspaceServiceDeleteWorkspaceSpec(), Handler: adapter.deleteWorkspace},
 		connect.Method{Spec: workspaceServiceListUsersSpec(), Handler: adapter.listUsers},
 		connect.Method{Spec: workspaceServiceGetUserSpec(), Handler: adapter.getUser},
 		connect.Method{Spec: workspaceServiceUpdateUserRoleSpec(), Handler: adapter.updateUserRole},
-		connect.Method{Spec: workspaceServiceSetUserActiveSpec(), Handler: adapter.setUserActive},
+		connect.Method{Spec: workspaceServiceDeactivateUserSpec(), Handler: adapter.deactivateUser},
+		connect.Method{Spec: workspaceServiceReactivateUserSpec(), Handler: adapter.reactivateUser},
 		connect.Method{Spec: workspaceServiceDeleteUserSpec(), Handler: adapter.deleteUser},
 		connect.Method{Spec: workspaceServiceClearUserIdentitiesSpec(), Handler: adapter.clearUserIdentities},
 		connect.Method{Spec: workspaceServiceTransferOwnershipSpec(), Handler: adapter.transferOwnership},
@@ -242,8 +295,16 @@ func (UnimplementedWorkspaceServiceHandler) UpdateWorkspace(context.Context, *v1
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.UpdateWorkspace is not implemented")
 }
 
+func (UnimplementedWorkspaceServiceHandler) SetEnforceSSO(context.Context, *v1.SetEnforceSSORequest) (*v1.SetEnforceSSOResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.SetEnforceSSO is not implemented")
+}
+
 func (UnimplementedWorkspaceServiceHandler) UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.UpdateDaemonDefaults is not implemented")
+}
+
+func (UnimplementedWorkspaceServiceHandler) SetDefaultSafeguards(context.Context, *v1.SetDefaultSafeguardsRequest) (*v1.SetDefaultSafeguardsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.SetDefaultSafeguards is not implemented")
 }
 
 func (UnimplementedWorkspaceServiceHandler) DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error) {
@@ -262,8 +323,12 @@ func (UnimplementedWorkspaceServiceHandler) UpdateUserRole(context.Context, *v1.
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.UpdateUserRole is not implemented")
 }
 
-func (UnimplementedWorkspaceServiceHandler) SetUserActive(context.Context, *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.SetUserActive is not implemented")
+func (UnimplementedWorkspaceServiceHandler) DeactivateUser(context.Context, *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.DeactivateUser is not implemented")
+}
+
+func (UnimplementedWorkspaceServiceHandler) ReactivateUser(context.Context, *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.ReactivateUser is not implemented")
 }
 
 func (UnimplementedWorkspaceServiceHandler) DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
@@ -306,9 +371,25 @@ func (c *workspaceServiceClient) UpdateWorkspace(ctx context.Context, req *v1.Up
 	return &res, nil
 }
 
+func (c *workspaceServiceClient) SetEnforceSSO(ctx context.Context, req *v1.SetEnforceSSORequest) (*v1.SetEnforceSSOResponse, error) {
+	var res v1.SetEnforceSSOResponse
+	if err := c.client.CallUnary(ctx, workspaceServiceSetEnforceSSOSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 func (c *workspaceServiceClient) UpdateDaemonDefaults(ctx context.Context, req *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error) {
 	var res v1.UpdateDaemonDefaultsResponse
 	if err := c.client.CallUnary(ctx, workspaceServiceUpdateDaemonDefaultsSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *workspaceServiceClient) SetDefaultSafeguards(ctx context.Context, req *v1.SetDefaultSafeguardsRequest) (*v1.SetDefaultSafeguardsResponse, error) {
+	var res v1.SetDefaultSafeguardsResponse
+	if err := c.client.CallUnary(ctx, workspaceServiceSetDefaultSafeguardsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -346,9 +427,17 @@ func (c *workspaceServiceClient) UpdateUserRole(ctx context.Context, req *v1.Upd
 	return &res, nil
 }
 
-func (c *workspaceServiceClient) SetUserActive(ctx context.Context, req *v1.SetUserActiveRequest) (*v1.SetUserActiveResponse, error) {
-	var res v1.SetUserActiveResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceSetUserActiveSpec(), req, &res); err != nil {
+func (c *workspaceServiceClient) DeactivateUser(ctx context.Context, req *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error) {
+	var res v1.DeactivateUserResponse
+	if err := c.client.CallUnary(ctx, workspaceServiceDeactivateUserSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *workspaceServiceClient) ReactivateUser(ctx context.Context, req *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error) {
+	var res v1.ReactivateUserResponse
+	if err := c.client.CallUnary(ctx, workspaceServiceReactivateUserSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -420,12 +509,36 @@ func (h workspaceServiceHandler) updateWorkspace(ctx context.Context, _ connect.
 	return stream.Send(res)
 }
 
+func (h workspaceServiceHandler) setEnforceSSO(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetEnforceSSORequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetEnforceSSO(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
 func (h workspaceServiceHandler) updateDaemonDefaults(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
 	var req v1.UpdateDaemonDefaultsRequest
 	if err := stream.Receive(&req); err != nil {
 		return err
 	}
 	res, err := h.svc.UpdateDaemonDefaults(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h workspaceServiceHandler) setDefaultSafeguards(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetDefaultSafeguardsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetDefaultSafeguards(ctx, &req)
 	if err != nil {
 		return err
 	}
@@ -480,12 +593,24 @@ func (h workspaceServiceHandler) updateUserRole(ctx context.Context, _ connect.S
 	return stream.Send(res)
 }
 
-func (h workspaceServiceHandler) setUserActive(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.SetUserActiveRequest
+func (h workspaceServiceHandler) deactivateUser(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.DeactivateUserRequest
 	if err := stream.Receive(&req); err != nil {
 		return err
 	}
-	res, err := h.svc.SetUserActive(ctx, &req)
+	res, err := h.svc.DeactivateUser(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h workspaceServiceHandler) reactivateUser(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ReactivateUserRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ReactivateUser(ctx, &req)
 	if err != nil {
 		return err
 	}

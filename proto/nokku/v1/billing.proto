@@ -8,15 +8,24 @@ import "nokku/v1/access.proto";
 
 service BillingService {
   rpc GetBilling(GetBillingRequest) returns (GetBillingResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetLicense(GetLicenseRequest) returns (GetLicenseResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ActivateLicense(ActivateLicenseRequest) returns (ActivateLicenseResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      machine: true
+    };
   }
 }
 

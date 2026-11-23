@@ -523,9 +523,9 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\x0erecent_changes\x18\x0e \x03(\v2\x12.nokku.v1.EventLogR\rrecentChanges\x12%\n" +
 	"\x0edaemons_behind\x18\x0f \x01(\x05R\rdaemonsBehind\x12:\n" +
 	"\rending_grants\x18\x10 \x03(\v2\x15.nokku.v1.EndingGrantR\fendingGrants\x12.\n" +
-	"\x13ending_grants_total\x18\x11 \x01(\x05R\x11endingGrantsTotal2l\n" +
-	"\x10DashboardService\x12X\n" +
-	"\fGetDashboard\x12\x1d.nokku.v1.GetDashboardRequest\x1a\x1e.nokku.v1.GetDashboardResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01B\x8f\x01\n" +
+	"\x13ending_grants_total\x18\x11 \x01(\x05R\x11endingGrantsTotal2n\n" +
+	"\x10DashboardService\x12Z\n" +
+	"\fGetDashboard\x12\x1d.nokku.v1.GetDashboardRequest\x1a\x1e.nokku.v1.GetDashboardResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eDashboardProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

@@ -45,6 +45,8 @@ export const serviceAccount = {
 			onSuccess: () => toast.success('Service account created')
 		}),
 	update: () => usePatch(ServiceAccountService.method.updateServiceAccount),
+	setRole: () => useMutation(ServiceAccountService.method.setServiceAccountRole),
+	setLimits: () => useMutation(ServiceAccountService.method.setServiceAccountLimits),
 	delete: () => useMutation(ServiceAccountService.method.deleteServiceAccount),
 	deleteMany: () =>
 		useBulkMutation(

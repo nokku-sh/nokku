@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/team.proto.
  */
 export const file_nokku_v1_team: GenFile = /*@__PURE__*/
-  fileDesc("ChNub2trdS92MS90ZWFtLnByb3RvEghub2trdS52MSLiAQoEVGVhbRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEgwKBHRhZ3MYBCADKAkSFAoMbWVtYmVyX2NvdW50GAUgASgFEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhQKDHNjaW1fbWFuYWdlZBgIIAEoCBIRCglzY2ltX29wZW4YCSABKAgiJgoOR2V0VGVhbVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIi8KD0dldFRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSJaChFDcmVhdGVUZWFtUmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxIMCgR0YWdzGAMgAygJIjIKEkNyZWF0ZVRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSLjAQoRVXBkYXRlVGVhbVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEgwKBHRhZ3MYBCADKAkSEQoJc2NpbV9vcGVuGAYgASgIEl4KC3VwZGF0ZV9tYXNrGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0ItukgqyAEB4gEkEgRuYW1lEgtkZXNjcmlwdGlvbhIEdGFncxIJc2NpbV9vcGVuIjIKElVwZGF0ZVRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSIpChFEZWxldGVUZWFtUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVGVhbVJlc3BvbnNlImIKEExpc3RUZWFtc1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSDAoEdGFncxgEIAMoCSJBChFMaXN0VGVhbXNSZXNwb25zZRIdCgV0ZWFtcxgBIAMoCzIOLm5va2t1LnYxLlRlYW0SDQoFdG90YWwYAiABKAUiTAoUQWRkVGVhbU1lbWJlclJlcXVlc3QSGQoHdGVhbV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgCIAEoCUIIukgFcgOwAQEiFwoVQWRkVGVhbU1lbWJlclJlc3BvbnNlIk8KF1JlbW92ZVRlYW1NZW1iZXJSZXF1ZXN0EhkKB3RlYW1faWQYASABKAlCCLpIBXIDsAEBEhkKB3VzZXJfaWQYAiABKAlCCLpIBXIDsAEBIhoKGFJlbW92ZVRlYW1NZW1iZXJSZXNwb25zZSIzChZMaXN0VGVhbU1lbWJlcnNSZXF1ZXN0EhkKB3RlYW1faWQYASABKAlCCLpIBXIDsAEBIjoKF0xpc3RUZWFtTWVtYmVyc1Jlc3BvbnNlEh8KB21lbWJlcnMYASADKAsyDi5ub2trdS52MS5Vc2VyIjQKF0xpc3RUZWFtc0ZvclVzZXJSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBIjkKGExpc3RUZWFtc0ZvclVzZXJSZXNwb25zZRIdCgV0ZWFtcxgBIAMoCzIOLm5va2t1LnYxLlRlYW0ysAYKC1RlYW1TZXJ2aWNlEkkKB0dldFRlYW0SGC5ub2trdS52MS5HZXRUZWFtUmVxdWVzdBoZLm5va2t1LnYxLkdldFRlYW1SZXNwb25zZSIJkAIBwvMYAhgCElEKCUxpc3RUZWFtcxIaLm5va2t1LnYxLkxpc3RUZWFtc1JlcXVlc3QaGy5ub2trdS52MS5MaXN0VGVhbXNSZXNwb25zZSILkAIBwvMYBBgCWAESUwoKQ3JlYXRlVGVhbRIbLm5va2t1LnYxLkNyZWF0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuQ3JlYXRlVGVhbVJlc3BvbnNlIgrC8xgGGAMoAUABElEKClVwZGF0ZVRlYW0SGy5ub2trdS52MS5VcGRhdGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLlVwZGF0ZVRlYW1SZXNwb25zZSIIwvMYBBgDKAESUQoKRGVsZXRlVGVhbRIbLm5va2t1LnYxLkRlbGV0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuRGVsZXRlVGVhbVJlc3BvbnNlIgjC8xgEGAMoARJaCg1BZGRUZWFtTWVtYmVyEh4ubm9ra3UudjEuQWRkVGVhbU1lbWJlclJlcXVlc3QaHy5ub2trdS52MS5BZGRUZWFtTWVtYmVyUmVzcG9uc2UiCMLzGAQYAygBEmMKEFJlbW92ZVRlYW1NZW1iZXISIS5ub2trdS52MS5SZW1vdmVUZWFtTWVtYmVyUmVxdWVzdBoiLm5va2t1LnYxLlJlbW92ZVRlYW1NZW1iZXJSZXNwb25zZSIIwvMYBBgDKAESYQoPTGlzdFRlYW1NZW1iZXJzEiAubm9ra3UudjEuTGlzdFRlYW1NZW1iZXJzUmVxdWVzdBohLm5va2t1LnYxLkxpc3RUZWFtTWVtYmVyc1Jlc3BvbnNlIgmQAgHC8xgCGAISZAoQTGlzdFRlYW1zRm9yVXNlchIhLm5va2t1LnYxLkxpc3RUZWFtc0ZvclVzZXJSZXF1ZXN0GiIubm9ra3UudjEuTGlzdFRlYW1zRm9yVXNlclJlc3BvbnNlIgmQAgHC8xgCGAJCigEKDGNvbS5ub2trdS52MUIJVGVhbVByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account]);
+  fileDesc("ChNub2trdS92MS90ZWFtLnByb3RvEghub2trdS52MSLiAQoEVGVhbRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEgwKBHRhZ3MYBCADKAkSFAoMbWVtYmVyX2NvdW50GAUgASgFEi4KCmNyZWF0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhQKDHNjaW1fbWFuYWdlZBgIIAEoCBIRCglzY2ltX29wZW4YCSABKAgiJgoOR2V0VGVhbVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBIi8KD0dldFRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSJaChFDcmVhdGVUZWFtUmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRABGIACEh0KC2Rlc2NyaXB0aW9uGAIgASgJQgi6SAVyAxjoBxIMCgR0YWdzGAMgAygJIjIKEkNyZWF0ZVRlYW1SZXNwb25zZRIcCgR0ZWFtGAEgASgLMg4ubm9ra3UudjEuVGVhbSLWAQoRVXBkYXRlVGVhbVJlcXVlc3QSFAoCaWQYASABKAlCCLpIBXIDsAEBEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISHQoLZGVzY3JpcHRpb24YAyABKAlCCLpIBXIDGOgHEgwKBHRhZ3MYBCADKAkSUwoLdXBkYXRlX21hc2sYBSABKAsyGi5nb29nbGUucHJvdG9idWYuRmllbGRNYXNrQiK6SB/IAQHiARkSBG5hbWUSC2Rlc2NyaXB0aW9uEgR0YWdzSgQIBhAHUglzY2ltX29wZW4iMgoSVXBkYXRlVGVhbVJlc3BvbnNlEhwKBHRlYW0YASABKAsyDi5ub2trdS52MS5UZWFtIi0KFU9wZW5UZWFtVG9TQ0lNUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiGAoWT3BlblRlYW1Ub1NDSU1SZXNwb25zZSIuChZDbG9zZVRlYW1Ub1NDSU1SZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIZChdDbG9zZVRlYW1Ub1NDSU1SZXNwb25zZSIpChFEZWxldGVUZWFtUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiFAoSRGVsZXRlVGVhbVJlc3BvbnNlImIKEExpc3RUZWFtc1JlcXVlc3QSGAoFbGltaXQYASABKAVCCbpIBhoEGGQoARIXCgZvZmZzZXQYAiABKAVCB7pIBBoCKAASDQoFcXVlcnkYAyABKAkSDAoEdGFncxgEIAMoCSJBChFMaXN0VGVhbXNSZXNwb25zZRIdCgV0ZWFtcxgBIAMoCzIOLm5va2t1LnYxLlRlYW0SDQoFdG90YWwYAiABKAUiTAoUQWRkVGVhbU1lbWJlclJlcXVlc3QSGQoHdGVhbV9pZBgBIAEoCUIIukgFcgOwAQESGQoHdXNlcl9pZBgCIAEoCUIIukgFcgOwAQEiFwoVQWRkVGVhbU1lbWJlclJlc3BvbnNlIk8KF1JlbW92ZVRlYW1NZW1iZXJSZXF1ZXN0EhkKB3RlYW1faWQYASABKAlCCLpIBXIDsAEBEhkKB3VzZXJfaWQYAiABKAlCCLpIBXIDsAEBIhoKGFJlbW92ZVRlYW1NZW1iZXJSZXNwb25zZSIzChZMaXN0VGVhbU1lbWJlcnNSZXF1ZXN0EhkKB3RlYW1faWQYASABKAlCCLpIBXIDsAEBIjoKF0xpc3RUZWFtTWVtYmVyc1Jlc3BvbnNlEh8KB21lbWJlcnMYASADKAsyDi5ub2trdS52MS5Vc2VyIjQKF0xpc3RUZWFtc0ZvclVzZXJSZXF1ZXN0EhkKB3VzZXJfaWQYASABKAlCCLpIBXIDsAEBIjkKGExpc3RUZWFtc0ZvclVzZXJSZXNwb25zZRIdCgV0ZWFtcxgBIAMoCzIOLm5va2t1LnYxLlRlYW0y7QcKC1RlYW1TZXJ2aWNlEksKB0dldFRlYW0SGC5ub2trdS52MS5HZXRUZWFtUmVxdWVzdBoZLm5va2t1LnYxLkdldFRlYW1SZXNwb25zZSILkAIBwvMYBBgCaAESUwoJTGlzdFRlYW1zEhoubm9ra3UudjEuTGlzdFRlYW1zUmVxdWVzdBobLm5va2t1LnYxLkxpc3RUZWFtc1Jlc3BvbnNlIg2QAgHC8xgGGAJYAWgBElEKCkNyZWF0ZVRlYW0SGy5ub2trdS52MS5DcmVhdGVUZWFtUmVxdWVzdBocLm5va2t1LnYxLkNyZWF0ZVRlYW1SZXNwb25zZSIIwvMYBBgDQAESTwoKVXBkYXRlVGVhbRIbLm5va2t1LnYxLlVwZGF0ZVRlYW1SZXF1ZXN0Ghwubm9ra3UudjEuVXBkYXRlVGVhbVJlc3BvbnNlIgbC8xgCGAMSXQoOT3BlblRlYW1Ub1NDSU0SHy5ub2trdS52MS5PcGVuVGVhbVRvU0NJTVJlcXVlc3QaIC5ub2trdS52MS5PcGVuVGVhbVRvU0NJTVJlc3BvbnNlIgjC8xgEGANgARJeCg9DbG9zZVRlYW1Ub1NDSU0SIC5ub2trdS52MS5DbG9zZVRlYW1Ub1NDSU1SZXF1ZXN0GiEubm9ra3UudjEuQ2xvc2VUZWFtVG9TQ0lNUmVzcG9uc2UiBsLzGAIYAxJPCgpEZWxldGVUZWFtEhsubm9ra3UudjEuRGVsZXRlVGVhbVJlcXVlc3QaHC5ub2trdS52MS5EZWxldGVUZWFtUmVzcG9uc2UiBsLzGAIYAxJYCg1BZGRUZWFtTWVtYmVyEh4ubm9ra3UudjEuQWRkVGVhbU1lbWJlclJlcXVlc3QaHy5ub2trdS52MS5BZGRUZWFtTWVtYmVyUmVzcG9uc2UiBsLzGAIYAxJhChBSZW1vdmVUZWFtTWVtYmVyEiEubm9ra3UudjEuUmVtb3ZlVGVhbU1lbWJlclJlcXVlc3QaIi5ub2trdS52MS5SZW1vdmVUZWFtTWVtYmVyUmVzcG9uc2UiBsLzGAIYAxJjCg9MaXN0VGVhbU1lbWJlcnMSIC5ub2trdS52MS5MaXN0VGVhbU1lbWJlcnNSZXF1ZXN0GiEubm9ra3UudjEuTGlzdFRlYW1NZW1iZXJzUmVzcG9uc2UiC5ACAcLzGAQYAmgBEmYKEExpc3RUZWFtc0ZvclVzZXISIS5ub2trdS52MS5MaXN0VGVhbXNGb3JVc2VyUmVxdWVzdBoiLm5va2t1LnYxLkxpc3RUZWFtc0ZvclVzZXJSZXNwb25zZSILkAIBwvMYBBgCaAFCigEKDGNvbS5ub2trdS52MUIJVGVhbVByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_account]);
 
 /**
  * @generated from message nokku.v1.Team
@@ -183,13 +183,6 @@ export type UpdateTeamRequest = Message<"nokku.v1.UpdateTeamRequest"> & {
   tags: string[];
 
   /**
-   * Opening a team for SCIM takes a fresh sign-in, it hands its access to whoever runs the identity provider.
-   *
-   * @generated from field: bool scim_open = 6;
-   */
-  scimOpen: boolean;
-
-  /**
    * @generated from field: google.protobuf.FieldMask update_mask = 5;
    */
   updateMask?: FieldMask | undefined;
@@ -220,6 +213,66 @@ export const UpdateTeamResponseSchema: GenMessage<UpdateTeamResponse> = /*@__PUR
   messageDesc(file_nokku_v1_team, 6);
 
 /**
+ * @generated from message nokku.v1.OpenTeamToSCIMRequest
+ */
+export type OpenTeamToSCIMRequest = Message<"nokku.v1.OpenTeamToSCIMRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message nokku.v1.OpenTeamToSCIMRequest.
+ * Use `create(OpenTeamToSCIMRequestSchema)` to create a new message.
+ */
+export const OpenTeamToSCIMRequestSchema: GenMessage<OpenTeamToSCIMRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 7);
+
+/**
+ * @generated from message nokku.v1.OpenTeamToSCIMResponse
+ */
+export type OpenTeamToSCIMResponse = Message<"nokku.v1.OpenTeamToSCIMResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.OpenTeamToSCIMResponse.
+ * Use `create(OpenTeamToSCIMResponseSchema)` to create a new message.
+ */
+export const OpenTeamToSCIMResponseSchema: GenMessage<OpenTeamToSCIMResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 8);
+
+/**
+ * @generated from message nokku.v1.CloseTeamToSCIMRequest
+ */
+export type CloseTeamToSCIMRequest = Message<"nokku.v1.CloseTeamToSCIMRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message nokku.v1.CloseTeamToSCIMRequest.
+ * Use `create(CloseTeamToSCIMRequestSchema)` to create a new message.
+ */
+export const CloseTeamToSCIMRequestSchema: GenMessage<CloseTeamToSCIMRequest> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 9);
+
+/**
+ * @generated from message nokku.v1.CloseTeamToSCIMResponse
+ */
+export type CloseTeamToSCIMResponse = Message<"nokku.v1.CloseTeamToSCIMResponse"> & {
+};
+
+/**
+ * Describes the message nokku.v1.CloseTeamToSCIMResponse.
+ * Use `create(CloseTeamToSCIMResponseSchema)` to create a new message.
+ */
+export const CloseTeamToSCIMResponseSchema: GenMessage<CloseTeamToSCIMResponse> = /*@__PURE__*/
+  messageDesc(file_nokku_v1_team, 10);
+
+/**
  * @generated from message nokku.v1.DeleteTeamRequest
  */
 export type DeleteTeamRequest = Message<"nokku.v1.DeleteTeamRequest"> & {
@@ -234,7 +287,7 @@ export type DeleteTeamRequest = Message<"nokku.v1.DeleteTeamRequest"> & {
  * Use `create(DeleteTeamRequestSchema)` to create a new message.
  */
 export const DeleteTeamRequestSchema: GenMessage<DeleteTeamRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 7);
+  messageDesc(file_nokku_v1_team, 11);
 
 /**
  * @generated from message nokku.v1.DeleteTeamResponse
@@ -247,7 +300,7 @@ export type DeleteTeamResponse = Message<"nokku.v1.DeleteTeamResponse"> & {
  * Use `create(DeleteTeamResponseSchema)` to create a new message.
  */
 export const DeleteTeamResponseSchema: GenMessage<DeleteTeamResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 8);
+  messageDesc(file_nokku_v1_team, 12);
 
 /**
  * @generated from message nokku.v1.ListTeamsRequest
@@ -279,7 +332,7 @@ export type ListTeamsRequest = Message<"nokku.v1.ListTeamsRequest"> & {
  * Use `create(ListTeamsRequestSchema)` to create a new message.
  */
 export const ListTeamsRequestSchema: GenMessage<ListTeamsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 9);
+  messageDesc(file_nokku_v1_team, 13);
 
 /**
  * @generated from message nokku.v1.ListTeamsResponse
@@ -301,7 +354,7 @@ export type ListTeamsResponse = Message<"nokku.v1.ListTeamsResponse"> & {
  * Use `create(ListTeamsResponseSchema)` to create a new message.
  */
 export const ListTeamsResponseSchema: GenMessage<ListTeamsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 10);
+  messageDesc(file_nokku_v1_team, 14);
 
 /**
  * @generated from message nokku.v1.AddTeamMemberRequest
@@ -323,7 +376,7 @@ export type AddTeamMemberRequest = Message<"nokku.v1.AddTeamMemberRequest"> & {
  * Use `create(AddTeamMemberRequestSchema)` to create a new message.
  */
 export const AddTeamMemberRequestSchema: GenMessage<AddTeamMemberRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 11);
+  messageDesc(file_nokku_v1_team, 15);
 
 /**
  * @generated from message nokku.v1.AddTeamMemberResponse
@@ -336,7 +389,7 @@ export type AddTeamMemberResponse = Message<"nokku.v1.AddTeamMemberResponse"> & 
  * Use `create(AddTeamMemberResponseSchema)` to create a new message.
  */
 export const AddTeamMemberResponseSchema: GenMessage<AddTeamMemberResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 12);
+  messageDesc(file_nokku_v1_team, 16);
 
 /**
  * @generated from message nokku.v1.RemoveTeamMemberRequest
@@ -358,7 +411,7 @@ export type RemoveTeamMemberRequest = Message<"nokku.v1.RemoveTeamMemberRequest"
  * Use `create(RemoveTeamMemberRequestSchema)` to create a new message.
  */
 export const RemoveTeamMemberRequestSchema: GenMessage<RemoveTeamMemberRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 13);
+  messageDesc(file_nokku_v1_team, 17);
 
 /**
  * @generated from message nokku.v1.RemoveTeamMemberResponse
@@ -371,7 +424,7 @@ export type RemoveTeamMemberResponse = Message<"nokku.v1.RemoveTeamMemberRespons
  * Use `create(RemoveTeamMemberResponseSchema)` to create a new message.
  */
 export const RemoveTeamMemberResponseSchema: GenMessage<RemoveTeamMemberResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 14);
+  messageDesc(file_nokku_v1_team, 18);
 
 /**
  * @generated from message nokku.v1.ListTeamMembersRequest
@@ -388,7 +441,7 @@ export type ListTeamMembersRequest = Message<"nokku.v1.ListTeamMembersRequest"> 
  * Use `create(ListTeamMembersRequestSchema)` to create a new message.
  */
 export const ListTeamMembersRequestSchema: GenMessage<ListTeamMembersRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 15);
+  messageDesc(file_nokku_v1_team, 19);
 
 /**
  * @generated from message nokku.v1.ListTeamMembersResponse
@@ -405,7 +458,7 @@ export type ListTeamMembersResponse = Message<"nokku.v1.ListTeamMembersResponse"
  * Use `create(ListTeamMembersResponseSchema)` to create a new message.
  */
 export const ListTeamMembersResponseSchema: GenMessage<ListTeamMembersResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 16);
+  messageDesc(file_nokku_v1_team, 20);
 
 /**
  * @generated from message nokku.v1.ListTeamsForUserRequest
@@ -422,7 +475,7 @@ export type ListTeamsForUserRequest = Message<"nokku.v1.ListTeamsForUserRequest"
  * Use `create(ListTeamsForUserRequestSchema)` to create a new message.
  */
 export const ListTeamsForUserRequestSchema: GenMessage<ListTeamsForUserRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 17);
+  messageDesc(file_nokku_v1_team, 21);
 
 /**
  * @generated from message nokku.v1.ListTeamsForUserResponse
@@ -439,7 +492,7 @@ export type ListTeamsForUserResponse = Message<"nokku.v1.ListTeamsForUserRespons
  * Use `create(ListTeamsForUserResponseSchema)` to create a new message.
  */
 export const ListTeamsForUserResponseSchema: GenMessage<ListTeamsForUserResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_team, 18);
+  messageDesc(file_nokku_v1_team, 22);
 
 /**
  * @generated from service nokku.v1.TeamService
@@ -476,6 +529,27 @@ export const TeamService: GenService<{
     methodKind: "unary";
     input: typeof UpdateTeamRequestSchema;
     output: typeof UpdateTeamResponseSchema;
+  },
+  /**
+   * OpenTeamToSCIM lets a SCIM group of the same name take the team over. That hands its access to whoever runs
+   * the identity provider.
+   *
+   * @generated from rpc nokku.v1.TeamService.OpenTeamToSCIM
+   */
+  openTeamToSCIM: {
+    methodKind: "unary";
+    input: typeof OpenTeamToSCIMRequestSchema;
+    output: typeof OpenTeamToSCIMResponseSchema;
+  },
+  /**
+   * CloseTeamToSCIM takes that back, and stays quick.
+   *
+   * @generated from rpc nokku.v1.TeamService.CloseTeamToSCIM
+   */
+  closeTeamToSCIM: {
+    methodKind: "unary";
+    input: typeof CloseTeamToSCIMRequestSchema;
+    output: typeof CloseTeamToSCIMResponseSchema;
   },
   /**
    * @generated from rpc nokku.v1.TeamService.DeleteTeam

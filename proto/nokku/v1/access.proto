@@ -4,16 +4,16 @@ package nokku.v1;
 
 import "google/protobuf/descriptor.proto";
 
+// Access says who may make a call. public, self, role and daemon pick the class. Next to the role there are three
+// questions, one per kind of caller that has one: browser, nk and machine.
 message Access {
+  reserved 5, 6;
+  reserved people_only, fresh;
+
   bool public = 1;
   bool self = 2;
   WorkspaceRole role = 3;
   bool daemon = 4;
-  // people_only refuses service accounts, so a leaked token cannot mint more credentials for itself. fresh implies it.
-  bool people_only = 5;
-  // fresh needs a person's browser session from the last 10 minutes. It refuses nk and service accounts, so a stolen
-  // session or key cannot add a way in.
-  bool fresh = 6;
   // feature is the plan feature the call needs.
   string feature = 7;
   // capped counts the create against the plan's resource cap.
@@ -22,17 +22,20 @@ message Access {
   bool signs = 9;
   // quiet changes something, but the handler records what matters, so the audit log skips the call.
   bool quiet = 10;
-  // cli lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
+  // nk lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
   // nothing else, so a phished or infected nk session can't change who may do what.
-  bool cli = 11;
-  // browser sets a person's browser session apart on a call nk and service accounts make too.
+  bool nk = 11;
+  // browser is a person in the web app. Any session may make the call unless this says otherwise.
   Browser browser = 12;
+  // machine lets a service account make the call. Without it a leaked key reads and changes nothing here, so it
+  // cannot mint more credentials for itself.
+  bool machine = 13;
 }
 
 enum Browser {
   BROWSER_UNSPECIFIED = 0;
-  // Only the browser is asked for a sign-in from the last 10 minutes. The handler holds nk and service accounts to
-  // what they added.
+  // A sign-in from the last 10 minutes, so a stolen session cannot add a way in. With neither nk nor machine set,
+  // only a person who just signed in makes the call.
   BROWSER_FRESH = 1;
   // The browser is kept out, the call is for nk and service accounts.
   BROWSER_REFUSED = 2;

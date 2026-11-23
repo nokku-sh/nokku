@@ -57,7 +57,8 @@ func TestProcedureRoles(t *testing.T) {
 		},
 
 		{nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
-		{nokkuv1connect.WorkspaceServiceSetUserActiveProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.WorkspaceServiceDeactivateUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.WorkspaceServiceReactivateUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 		{nokkuv1connect.WorkspaceServiceDeleteUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 		{nokkuv1connect.JoinTokenServiceCreateJoinTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 		{nokkuv1connect.BillingServiceGetBillingProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
@@ -123,9 +124,10 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 			classes++
 		}
 		assert.Equal(t, 1, classes, "%s must be in exactly one authorization class", procedure)
-		if access.GetPeopleOnly() {
-			assert.NotEqual(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, access.GetRole(),
-				"%s is people_only without a role", procedure)
+		// The three questions only have an answer where a role or self lets a principal in.
+		if access.GetPublic() || daemonOnly(access) {
+			assert.False(t, access.GetNk() || access.GetMachine() || access.GetBrowser() != 0,
+				"%s answers who may call, but no principal reaches it", procedure)
 		}
 	}
 }
@@ -221,7 +223,7 @@ func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 // A service account token must not mint credentials that outlive revoking it.
 func TestAuthorizePeopleOnly(t *testing.T) {
 	a := &authorizationInterceptor{}
-	// Even the top role, so only people_only can refuse.
+	// Even the top role, so only a call without machine can refuse.
 	owner := nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER
 	as := func(kind actor.Kind) context.Context {
 		return actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "p1", Kind: kind, Role: owner})
@@ -310,7 +312,7 @@ func TestAuthorizeCLIOnlyWhatNkNeeds(t *testing.T) {
 			continue
 		}
 		err := a.authorize(ctx, procedure, nil)
-		if access.GetCli() {
+		if access.GetNk() {
 			allowed++
 			assert.NoError(t, err, "nk needs %s", procedure)
 			continue
@@ -331,7 +333,7 @@ func TestAuthorizeFreshNeedsAPerson(t *testing.T) {
 		)
 		fresh := 0
 		for _, procedure := range allProcedures(t) {
-			if !procedureAccess[procedure].GetFresh() {
+			if !onlyAFreshPerson(procedureAccess[procedure]) {
 				continue
 			}
 			fresh++

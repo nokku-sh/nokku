@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -206,9 +207,7 @@ func TestEnforceSSOIsGated(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER),
 	)
 	_, err := nokkuv1connect.NewWorkspaceServiceClient(clientOn(srv, owner)).
-		UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
-		}))
+		SetEnforceSSO(t.Context(), &nokkuv1.SetEnforceSSORequest{EnforceSso: new(true)})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "got %v", err)
 }
 
@@ -226,13 +225,18 @@ func TestPlanGateReadsOnlyMaskedFields(t *testing.T) {
 	got, err := workspaces.GetWorkspace(t.Context(), &nokkuv1.GetWorkspaceRequest{})
 	require.NoError(t, err)
 
-	updated, err := workspaces.UpdateWorkspace(t.Context(), &nokkuv1.UpdateWorkspaceRequest{
-		Description: new(got.GetWorkspace().GetDescription()),
-		Settings:    &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
-		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"description"}},
+	settings := got.GetWorkspace().GetSettings()
+	updated, err := workspaces.UpdateDaemonDefaults(t.Context(), &nokkuv1.UpdateDaemonDefaultsRequest{
+		DefaultDaemonConfig: &nokkuv1.DaemonConfig{
+			GatewayPorts: new(settings.GetDefaultDaemonConfig().GetGatewayPorts()),
+		},
+		SessionIdleTimeout: durationpb.New(settings.GetSessionIdleTimeout().AsDuration() + time.Minute),
+		UpdateMask:         &fieldmaskpb.FieldMask{Paths: []string{"default_daemon_config.gateway_ports"}},
 	})
 	require.NoError(t, err, "a gated field outside the mask refused the call")
-	assert.False(t, updated.GetWorkspace().GetSettings().GetEnforceSso(), "a field outside the mask was stored")
+	assert.Equal(t, settings.GetSessionIdleTimeout().AsDuration(),
+		updated.GetWorkspace().GetSettings().GetSessionIdleTimeout().AsDuration(),
+		"a field outside the mask was stored")
 }
 
 // seedProvider is an enabled provider. Call it before saving what the test
@@ -271,9 +275,7 @@ func TestEnforcedSSOKeepsAProvider(t *testing.T) {
 	sso := nokkuv1connect.NewSSOServiceClient(owner)
 	issuer := fakeIssuer(t).URL
 	enforce := func(on bool) error {
-		_, err := workspaces.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-			Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(on)},
-		}))
+		_, err := workspaces.SetEnforceSSO(t.Context(), &nokkuv1.SetEnforceSSORequest{EnforceSso: &on})
 		return err
 	}
 	put := func(id string, enabled bool) error {
@@ -349,9 +351,7 @@ func TestEnforceSSOEndsOtherSessions(t *testing.T) {
 	// Shared workspace, a mailed link would fail in every later test.
 	t.Cleanup(func() { restoreWorkspace(context.WithoutCancel(t.Context()), t, cfg, original) })
 
-	_, err := workspaces.UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
-	}))
+	_, err := workspaces.SetEnforceSSO(t.Context(), &nokkuv1.SetEnforceSSORequest{EnforceSso: new(true)})
 	require.NoError(t, err)
 
 	for token, stays := range sessions {
@@ -387,9 +387,7 @@ func TestEnforcedSSONeedsARecentSignIn(t *testing.T) {
 		))
 	}
 
-	_, err := client(time.Hour).UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)},
-	}))
+	_, err := client(time.Hour).SetEnforceSSO(t.Context(), &nokkuv1.SetEnforceSSORequest{EnforceSso: new(false)})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "an old session changed enforced SSO: %v", err)
 
 	_, err = client(
@@ -397,9 +395,7 @@ func TestEnforcedSSONeedsARecentSignIn(t *testing.T) {
 	).UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{Name: new("renamed")}))
 	require.NoError(t, err, "a rename asked for a recent sign-in")
 
-	_, err = client(0).UpdateWorkspace(t.Context(), masked(&nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)},
-	}))
+	_, err = client(0).SetEnforceSSO(t.Context(), &nokkuv1.SetEnforceSSORequest{EnforceSso: new(true)})
 	require.NoError(t, err, "a recent sign-in was refused")
 }
 

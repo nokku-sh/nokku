@@ -1100,16 +1100,16 @@ const file_nokku_v1_access_request_proto_rawDesc = "" +
 	"\x1eACCESS_REQUEST_STATUS_APPROVED\x10\x02\x12 \n" +
 	"\x1cACCESS_REQUEST_STATUS_DENIED\x10\x03\x12#\n" +
 	"\x1fACCESS_REQUEST_STATUS_CANCELLED\x10\x04\x12!\n" +
-	"\x1dACCESS_REQUEST_STATUS_EXPIRED\x10\x052\xba\a\n" +
-	"\x14AccessRequestService\x12\x8a\x01\n" +
-	"\x17ListRequestableAccounts\x12(.nokku.v1.ListRequestableAccountsRequest\x1a).nokku.v1.ListRequestableAccountsResponse\"\x1a\xc2\xf3\x18\x13\x18\x01:\x0faccess_requests\x90\x02\x01\x12\x7f\n" +
-	"\x13CreateAccessRequest\x12$.nokku.v1.CreateAccessRequestRequest\x1a%.nokku.v1.CreateAccessRequestResponse\"\x1b\xc2\xf3\x18\x17\x18\x01(\x01:\x0faccess_requestsX\x01\x12f\n" +
-	"\x10GetAccessRequest\x12!.nokku.v1.GetAccessRequestRequest\x1a\".nokku.v1.GetAccessRequestResponse\"\v\xc2\xf3\x18\x04\x18\x01X\x01\x90\x02\x01\x12j\n" +
-	"\x12ListAccessRequests\x12#.nokku.v1.ListAccessRequestsRequest\x1a$.nokku.v1.ListAccessRequestsResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12\x80\x01\n" +
-	"\x14ApproveAccessRequest\x12%.nokku.v1.ApproveAccessRequestRequest\x1a&.nokku.v1.ApproveAccessRequestResponse\"\x19\xc2\xf3\x18\x15\x18\x04(\x01:\x0faccess_requests\x12f\n" +
-	"\x11DenyAccessRequest\x12\".nokku.v1.DenyAccessRequestRequest\x1a#.nokku.v1.DenyAccessRequestResponse\"\b\xc2\xf3\x18\x04\x18\x04(\x01\x12l\n" +
-	"\x13CancelAccessRequest\x12$.nokku.v1.CancelAccessRequestRequest\x1a%.nokku.v1.CancelAccessRequestResponse\"\b\xc2\xf3\x18\x04\x18\x01(\x01\x12g\n" +
-	"\x12SetRequestableTags\x12#.nokku.v1.SetRequestableTagsRequest\x1a$.nokku.v1.SetRequestableTagsResponse\"\x06\xc2\xf3\x18\x02\x18\x04B\x93\x01\n" +
+	"\x1dACCESS_REQUEST_STATUS_EXPIRED\x10\x052\xb9\a\n" +
+	"\x14AccessRequestService\x12\x8c\x01\n" +
+	"\x17ListRequestableAccounts\x12(.nokku.v1.ListRequestableAccountsRequest\x1a).nokku.v1.ListRequestableAccountsResponse\"\x1c\xc2\xf3\x18\x15\x18\x01:\x0faccess_requestsh\x01\x90\x02\x01\x12}\n" +
+	"\x13CreateAccessRequest\x12$.nokku.v1.CreateAccessRequestRequest\x1a%.nokku.v1.CreateAccessRequestResponse\"\x19\xc2\xf3\x18\x15\x18\x01:\x0faccess_requestsX\x01\x12h\n" +
+	"\x10GetAccessRequest\x12!.nokku.v1.GetAccessRequestRequest\x1a\".nokku.v1.GetAccessRequestResponse\"\r\xc2\xf3\x18\x06\x18\x01X\x01h\x01\x90\x02\x01\x12l\n" +
+	"\x12ListAccessRequests\x12#.nokku.v1.ListAccessRequestsRequest\x1a$.nokku.v1.ListAccessRequestsResponse\"\v\xc2\xf3\x18\x04\x18\x01h\x01\x90\x02\x01\x12~\n" +
+	"\x14ApproveAccessRequest\x12%.nokku.v1.ApproveAccessRequestRequest\x1a&.nokku.v1.ApproveAccessRequestResponse\"\x17\xc2\xf3\x18\x13\x18\x04:\x0faccess_requests\x12d\n" +
+	"\x11DenyAccessRequest\x12\".nokku.v1.DenyAccessRequestRequest\x1a#.nokku.v1.DenyAccessRequestResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12j\n" +
+	"\x13CancelAccessRequest\x12$.nokku.v1.CancelAccessRequestRequest\x1a%.nokku.v1.CancelAccessRequestResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12i\n" +
+	"\x12SetRequestableTags\x12#.nokku.v1.SetRequestableTagsRequest\x1a$.nokku.v1.SetRequestableTagsResponse\"\b\xc2\xf3\x18\x04\x18\x04h\x01B\x93\x01\n" +
 	"\fcom.nokku.v1B\x12AccessRequestProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

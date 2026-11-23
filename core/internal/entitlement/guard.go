@@ -43,8 +43,8 @@ func (s *Service) CheckSigning(ctx context.Context) error {
 func RequestedFeatures(msg any) []string {
 	var features []string
 	switch req := msg.(type) {
-	case *nokkuv1.UpdateWorkspaceRequest:
-		if req.GetSettings().GetEnforceSso() {
+	case *nokkuv1.SetEnforceSSORequest:
+		if req.GetEnforceSso() {
 			features = append(features, FeatureEnforceSSO)
 		}
 	case *nokkuv1.UpdateDaemonDefaultsRequest:

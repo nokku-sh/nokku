@@ -12,9 +12,12 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/access.proto.
  */
 export const file_nokku_v1_access: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIvEBCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEgwKBHNlbGYYAiABKAgSJQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGUSDgoGZGFlbW9uGAQgASgIEhMKC3Blb3BsZV9vbmx5GAUgASgIEg0KBWZyZXNoGAYgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEg0KBXNpZ25zGAkgASgIEg0KBXF1aWV0GAogASgIEgsKA2NsaRgLIAEoCBIiCgdicm93c2VyGAwgASgOMhEubm9ra3UudjEuQnJvd3NlcipKCgdCcm93c2VyEhcKE0JST1dTRVJfVU5TUEVDSUZJRUQQABIRCg1CUk9XU0VSX0ZSRVNIEAESEwoPQlJPV1NFUl9SRUZVU0VEEAIqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzQowBCgxjb20ubm9ra3UudjFCC0FjY2Vzc1Byb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_google_protobuf_descriptor]);
+  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIv0BCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEgwKBHNlbGYYAiABKAgSJQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGUSDgoGZGFlbW9uGAQgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEg0KBXNpZ25zGAkgASgIEg0KBXF1aWV0GAogASgIEgoKAm5rGAsgASgIEiIKB2Jyb3dzZXIYDCABKA4yES5ub2trdS52MS5Ccm93c2VyEg8KB21hY2hpbmUYDSABKAhKBAgFEAZKBAgGEAdSC3Blb3BsZV9vbmx5UgVmcmVzaCpKCgdCcm93c2VyEhcKE0JST1dTRVJfVU5TUEVDSUZJRUQQABIRCg1CUk9XU0VSX0ZSRVNIEAESEwoPQlJPV1NFUl9SRUZVU0VEEAIqtAEKDVdvcmtzcGFjZVJvbGUSHgoaV09SS1NQQUNFX1JPTEVfVU5TUEVDSUZJRUQQABIZChVXT1JLU1BBQ0VfUk9MRV9NRU1CRVIQARIZChVXT1JLU1BBQ0VfUk9MRV9WSUVXRVIQAhIZChVXT1JLU1BBQ0VfUk9MRV9FRElUT1IQAxIYChRXT1JLU1BBQ0VfUk9MRV9BRE1JThAEEhgKFFdPUktTUEFDRV9ST0xFX09XTkVSEAU6SgoGYWNjZXNzEh4uZ29vZ2xlLnByb3RvYnVmLk1ldGhvZE9wdGlvbnMYuI4DIAEoCzIQLm5va2t1LnYxLkFjY2Vzc1IGYWNjZXNzQowBCgxjb20ubm9ra3UudjFCC0FjY2Vzc1Byb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_google_protobuf_descriptor]);
 
 /**
+ * Access says who may make a call. public, self, role and daemon pick the class. Next to the role there are three
+ * questions, one per kind of caller that has one: browser, nk and machine.
+ *
  * @generated from message nokku.v1.Access
  */
 export type Access = Message<"nokku.v1.Access"> & {
@@ -37,21 +40,6 @@ export type Access = Message<"nokku.v1.Access"> & {
    * @generated from field: bool daemon = 4;
    */
   daemon: boolean;
-
-  /**
-   * people_only refuses service accounts, so a leaked token cannot mint more credentials for itself. fresh implies it.
-   *
-   * @generated from field: bool people_only = 5;
-   */
-  peopleOnly: boolean;
-
-  /**
-   * fresh needs a person's browser session from the last 10 minutes. It refuses nk and service accounts, so a stolen
-   * session or key cannot add a way in.
-   *
-   * @generated from field: bool fresh = 6;
-   */
-  fresh: boolean;
 
   /**
    * feature is the plan feature the call needs.
@@ -82,19 +70,27 @@ export type Access = Message<"nokku.v1.Access"> & {
   quiet: boolean;
 
   /**
-   * cli lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
+   * nk lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
    * nothing else, so a phished or infected nk session can't change who may do what.
    *
-   * @generated from field: bool cli = 11;
+   * @generated from field: bool nk = 11;
    */
-  cli: boolean;
+  nk: boolean;
 
   /**
-   * browser sets a person's browser session apart on a call nk and service accounts make too.
+   * browser is a person in the web app. Any session may make the call unless this says otherwise.
    *
    * @generated from field: nokku.v1.Browser browser = 12;
    */
   browser: Browser;
+
+  /**
+   * machine lets a service account make the call. Without it a leaked key reads and changes nothing here, so it
+   * cannot mint more credentials for itself.
+   *
+   * @generated from field: bool machine = 13;
+   */
+  machine: boolean;
 };
 
 /**
@@ -114,8 +110,8 @@ export enum Browser {
   UNSPECIFIED = 0,
 
   /**
-   * Only the browser is asked for a sign-in from the last 10 minutes. The handler holds nk and service accounts to
-   * what they added.
+   * A sign-in from the last 10 minutes, so a stolen session cannot add a way in. With neither nk nor machine set,
+   * only a person who just signed in makes the call.
    *
    * @generated from enum value: BROWSER_FRESH = 1;
    */

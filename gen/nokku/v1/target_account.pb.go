@@ -1808,19 +1808,19 @@ const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\x18SUBJECT_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11SUBJECT_KIND_USER\x10\x01\x12\x15\n" +
 	"\x11SUBJECT_KIND_TEAM\x10\x02\x12 \n" +
-	"\x1cSUBJECT_KIND_SERVICE_ACCOUNT\x10\x032\xa0\a\n" +
-	"\x14TargetAccountService\x12j\n" +
-	"\x12ListTargetAccounts\x12#.nokku.v1.ListTargetAccountsRequest\x1a$.nokku.v1.ListTargetAccountsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12c\n" +
-	"\x10AddTargetAccount\x12!.nokku.v1.AddTargetAccountRequest\x1a\".nokku.v1.AddTargetAccountResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12l\n" +
-	"\x13RemoveTargetAccount\x12$.nokku.v1.RemoveTargetAccountRequest\x1a%.nokku.v1.RemoveTargetAccountResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12T\n" +
-	"\vAddSubjects\x12\x1c.nokku.v1.AddSubjectsRequest\x1a\x1d.nokku.v1.AddSubjectsResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12]\n" +
-	"\x0eRemoveSubjects\x12\x1f.nokku.v1.RemoveSubjectsRequest\x1a .nokku.v1.RemoveSubjectsResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12`\n" +
-	"\x0fRevokeAllAccess\x12 .nokku.v1.RevokeAllAccessRequest\x1a!.nokku.v1.RevokeAllAccessResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12Q\n" +
-	"\tPlanGrant\x12\x1a.nokku.v1.PlanGrantRequest\x1a\x1b.nokku.v1.PlanGrantResponse\"\v\xc2\xf3\x18\x04\x18\x03(\x01\x90\x02\x01\x12B\n" +
-	"\x05Grant\x12\x16.nokku.v1.GrantRequest\x1a\x17.nokku.v1.GrantResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01\x12T\n" +
+	"\x1cSUBJECT_KIND_SERVICE_ACCOUNT\x10\x032\x90\a\n" +
+	"\x14TargetAccountService\x12l\n" +
+	"\x12ListTargetAccounts\x12#.nokku.v1.ListTargetAccountsRequest\x1a$.nokku.v1.ListTargetAccountsResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12a\n" +
+	"\x10AddTargetAccount\x12!.nokku.v1.AddTargetAccountRequest\x1a\".nokku.v1.AddTargetAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12j\n" +
+	"\x13RemoveTargetAccount\x12$.nokku.v1.RemoveTargetAccountRequest\x1a%.nokku.v1.RemoveTargetAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12R\n" +
+	"\vAddSubjects\x12\x1c.nokku.v1.AddSubjectsRequest\x1a\x1d.nokku.v1.AddSubjectsResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12[\n" +
+	"\x0eRemoveSubjects\x12\x1f.nokku.v1.RemoveSubjectsRequest\x1a .nokku.v1.RemoveSubjectsResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12^\n" +
+	"\x0fRevokeAllAccess\x12 .nokku.v1.RevokeAllAccessRequest\x1a!.nokku.v1.RevokeAllAccessResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12O\n" +
+	"\tPlanGrant\x12\x1a.nokku.v1.PlanGrantRequest\x1a\x1b.nokku.v1.PlanGrantResponse\"\t\xc2\xf3\x18\x02\x18\x03\x90\x02\x01\x12@\n" +
+	"\x05Grant\x12\x16.nokku.v1.GrantRequest\x1a\x17.nokku.v1.GrantResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12R\n" +
 	"\n" +
-	"PlanRevoke\x12\x1b.nokku.v1.PlanRevokeRequest\x1a\x1c.nokku.v1.PlanRevokeResponse\"\v\xc2\xf3\x18\x04\x18\x03(\x01\x90\x02\x01\x12E\n" +
-	"\x06Revoke\x12\x17.nokku.v1.RevokeRequest\x1a\x18.nokku.v1.RevokeResponse\"\b\xc2\xf3\x18\x04\x18\x03(\x01B\x93\x01\n" +
+	"PlanRevoke\x12\x1b.nokku.v1.PlanRevokeRequest\x1a\x1c.nokku.v1.PlanRevokeResponse\"\t\xc2\xf3\x18\x02\x18\x03\x90\x02\x01\x12C\n" +
+	"\x06Revoke\x12\x17.nokku.v1.RevokeRequest\x1a\x18.nokku.v1.RevokeResponse\"\x06\xc2\xf3\x18\x02\x18\x03B\x93\x01\n" +
 	"\fcom.nokku.v1B\x12TargetAccountProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

@@ -58,8 +58,19 @@
 	const tokenList = $derived(tokens.data ?? []);
 	const revokeToken = saApi.tokens.revoke();
 
+	const setRole = saApi.setRole();
+	const setLimits = saApi.setLimits();
+
+	// The role and the login limits have calls of their own, each takes a recent sign-in. The rest is one update.
 	const autoSave = useAutoSave(() =>
-		draft.save((changes) => update.mutateAsync({ ...changes, id: model?.id }))
+		draft.save(async ({ role, forceCommand, sourceAddress, ...rest }) => {
+			const id = sheet.id;
+			if (role !== undefined) await setRole.mutateAsync({ id, role });
+			if (forceCommand !== undefined || sourceAddress !== undefined) {
+				await setLimits.mutateAsync({ id, forceCommand, sourceAddress });
+			}
+			if (Object.keys(rest).length) await update.mutateAsync({ ...rest, id });
+		})
 	);
 	const save = () => autoSave.save();
 

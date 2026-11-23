@@ -62,6 +62,8 @@ export const team = {
 			onSuccess: () => toast.success('Team created')
 		}),
 	update: () => usePatch(TeamService.method.updateTeam),
+	openToSCIM: () => useMutation(TeamService.method.openTeamToSCIM),
+	closeToSCIM: () => useMutation(TeamService.method.closeTeamToSCIM),
 	delete: () =>
 		useMutation(TeamService.method.deleteTeam, {
 			onSuccess: () => toast.success('Team deleted')

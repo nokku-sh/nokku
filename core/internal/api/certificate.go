@@ -53,9 +53,6 @@ func (s *certificateService) UpdateCertificateAuthority(
 	ctx context.Context,
 	req *nokkuv1.UpdateCertificateAuthorityRequest,
 ) (*nokkuv1.UpdateCertificateAuthorityResponse, error) {
-	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
-		return nil, err
-	}
 	params := &db.UpdateCAParams{UserTtl: optDuration(req.GetUserTtl())}
 	// Unset keeps what the CA has, empty takes the list away.
 	if req.SourceAddress != nil {

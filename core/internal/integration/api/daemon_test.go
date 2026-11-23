@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
@@ -130,11 +131,33 @@ func TestEnrollDaemon(t *testing.T) {
 	assert.True(t, proto.Equal(db.DefaultDaemonConfig(), got.GetDaemon().GetConfig()),
 		"the API reads the same config back, got %v", got.GetDaemon().GetConfig())
 
-	_, err = daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
-		Id:     new(res.GetId()),
-		Config: &nokkuv1.DaemonConfig{RecordSessions: new(false)},
-	}))
+	_, err = daemons.SetDaemonSafeguards(t.Context(), &nokkuv1.SetDaemonSafeguardsRequest{
+		Id: new(res.GetId()), RecordSessions: new(false),
+	})
 	require.NoError(t, err)
+	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+		Id:         new(res.GetId()),
+		Config:     &nokkuv1.DaemonConfig{RecordSessions: new(true)},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"config.record_sessions"}},
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err),
+		"an ordinary update turned recording back on: %v", err)
+	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+		Id:         new(res.GetId()),
+		Config:     &nokkuv1.DaemonConfig{KillOnRevoke: new(false)},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"config.kill_on_revoke"}},
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err),
+		"an ordinary update turned kill on revoke off: %v", err)
+	// Rejecting stops the server like a delete does, and a delete takes a fresh sign-in.
+	for _, status := range []nokkuv1.DaemonStatus{
+		nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING,
+	} {
+		_, err = daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
+			Id: new(res.GetId()), Status: &status,
+		}))
+		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an ordinary update set %s: %v", status, err)
+	}
 	got, err = daemons.GetDaemon(
 		t.Context(),
 		&nokkuv1.GetDaemonRequest{Id: new(res.GetId())},
@@ -938,9 +961,13 @@ func TestAccessTellsRecording(t *testing.T) {
 		"Bearer "+sessionFor(t, cfg, person))))
 
 	records := func(on bool) *nokkuv1.DaemonConfig {
-		_, err := editor.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
+		_, err := editor.SetDaemonSafeguards(t.Context(), &nokkuv1.SetDaemonSafeguardsRequest{
+			Id: new(enrolled.GetId()), RecordSessions: &on,
+		})
+		require.NoError(t, err)
+		_, err = editor.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
 			Id:     new(enrolled.GetId()),
-			Config: &nokkuv1.DaemonConfig{RecordSessions: new(on), AllowForwarding: new(true)},
+			Config: &nokkuv1.DaemonConfig{AllowForwarding: new(true)},
 		}))
 		require.NoError(t, err)
 		res, err := self.GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{SubjectId: &person.ID})

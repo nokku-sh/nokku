@@ -9,7 +9,8 @@ export type RuleValues = Partial<Record<DaemonRule, boolean>>;
 
 /**
  * The SSH rules a daemon follows, named the same on the daemon and in the defaults new ones start with. A fresh rule
- * takes a recent sign-in to change on a daemon. The directive is what sshd_config calls the same thing.
+ * works against whoever is logged in, so it takes a recent sign-in to change and goes through the safeguards call.
+ * The directive is what sshd_config calls the same thing.
  */
 export const daemonRules: {
 	key: DaemonRule;
@@ -47,7 +48,8 @@ export const daemonRules: {
 		key: 'killOnRevoke',
 		title: 'End processes on revoke',
 		description:
-			'When access ends, what the person left running is killed, like tmux or a background job. A server without cgroups only closes the connection.'
+			'When access ends, what the person left running is killed, like tmux or a background job. A server without cgroups only closes the connection.',
+		fresh: true
 	}
 ];
 

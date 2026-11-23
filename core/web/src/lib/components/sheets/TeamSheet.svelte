@@ -69,15 +69,15 @@
 	);
 	const save = () => autoSave.save();
 
-	// Opening hands the team's access to whoever runs the identity provider, so that takes a recent sign-in.
+	const openToSCIM = teamApi.openToSCIM();
+	const closeToSCIM = teamApi.closeToSCIM();
+
+	// Opening hands the team's access to whoever runs the identity provider, so that takes a recent sign-in. The
+	// switch follows the refetch, the draft never holds it.
 	function setScimOpen(open: boolean) {
-		const apply = () => {
-			if (!model) return;
-			model.scimOpen = open;
-			save();
-		};
-		if (open) void whenFresh(apply);
-		else apply();
+		const id = sheet.id;
+		if (open) void whenFresh(() => openToSCIM.mutate({ id }));
+		else closeToSCIM.mutate({ id });
 	}
 
 	function toggleMember(userId: string) {

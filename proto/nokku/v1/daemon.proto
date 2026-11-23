@@ -11,40 +11,53 @@ import "nokku/v1/recordings.proto";
 
 service DaemonService {
   rpc GetDaemon(GetDaemonRequest) returns (GetDaemonResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
   rpc UpdateDaemon(UpdateDaemonRequest) returns (UpdateDaemonResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  // SetDaemonSafeguards changes the two rules that work against whoever is logged in: recording their sessions,
+  // and ending what they left running once their access is gone. Off helps someone cover their tracks or stay,
+  // so either takes a fresh sign-in.
+  rpc SetDaemonSafeguards(SetDaemonSafeguardsRequest) returns (SetDaemonSafeguardsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      people_only: true
+      browser: BROWSER_FRESH
     };
   }
   // DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
   rpc DeleteDaemon(DeleteDaemonRequest) returns (DeleteDaemonResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc ListDaemons(ListDaemonsRequest) returns (ListDaemonsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // A browser shell is a way onto a server, so a cookie alone does not open one.
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      fresh: true
+      browser: BROWSER_FRESH
       signs: true
     };
   }
   rpc Relay(stream RelayRequest) returns (stream RelayResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
+      nk: true
+      machine: true
       quiet: true
-      cli: true
     };
   }
 }
@@ -127,9 +140,9 @@ message GetDaemonResponse {
 
 message UpdateDaemonRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
+  // status only approves. Rejecting takes the server along, which DeleteDaemon does with a fresh sign-in.
   DaemonStatus status = 2 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0] /* Prevent UNSPECIFIED */
+    in: [2]
   }];
   DaemonConfig config = 3;
   // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
@@ -138,17 +151,23 @@ message UpdateDaemonRequest {
     (buf.validate.field).field_mask = {
       in: [
         "status",
-        "config.record_sessions",
         "config.allow_forwarding",
         "config.allow_agent_forwarding",
-        "config.gateway_ports",
-        "config.kill_on_revoke"
+        "config.gateway_ports"
       ]
     }
   ];
 }
 
 message UpdateDaemonResponse {}
+
+// A rule left out stays as it is.
+message SetDaemonSafeguardsRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  bool record_sessions = 2;
+  bool kill_on_revoke = 3;
+}
+message SetDaemonSafeguardsResponse {}
 
 message DeleteDaemonRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];

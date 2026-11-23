@@ -12,58 +12,102 @@ import "nokku/v1/daemon.proto";
 
 service WorkspaceService {
   rpc GetWorkspace(GetWorkspaceRequest) returns (GetWorkspaceResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateWorkspace(UpdateWorkspaceRequest) returns (UpdateWorkspaceResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      machine: true
+    };
+  }
+  // SetEnforceSSO turns required single sign-on on or off. It decides who may sign in, so it takes a fresh
+  // sign-in. On ends every session that did not come through a provider.
+  rpc SetEnforceSSO(SetEnforceSSORequest) returns (SetEnforceSSOResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      browser: BROWSER_FRESH
+    };
   }
   // UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
   rpc UpdateDaemonDefaults(UpdateDaemonDefaultsRequest) returns (UpdateDaemonDefaultsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      machine: true
+    };
+  }
+  // SetDefaultSafeguards is SetDaemonSafeguards for the rules a new daemon starts with.
+  rpc SetDefaultSafeguards(SetDefaultSafeguardsRequest) returns (SetDefaultSafeguardsResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      browser: BROWSER_FRESH
+    };
   }
   rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (DeleteWorkspaceResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      cli: true
+      nk: true
+      machine: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetUser(GetUserRequest) returns (GetUserResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
-  // Reactivating takes a fresh sign-in. Deactivating does not, it is the emergency brake.
-  rpc SetUserActive(SetUserActiveRequest) returns (SetUserActiveResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+  // DeactivateUser ends the user's sessions and keeps their grants for a return. It asks for no fresh sign-in, it is
+  // the emergency brake.
+  rpc DeactivateUser(DeactivateUserRequest) returns (DeactivateUserResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      machine: true
+    };
   }
+  // ReactivateUser lets someone back in with the access they had.
+  rpc ReactivateUser(ReactivateUserRequest) returns (ReactivateUserResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      browser: BROWSER_FRESH
+    };
+  }
+  // DeleteUser takes grants and team seats for good, so in a browser it takes a fresh sign-in. Deactivating is
+  // the quick one.
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      browser: BROWSER_FRESH
+    };
   }
   // ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
   // them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
   rpc ClearUserIdentities(ClearUserIdentitiesRequest) returns (ClearUserIdentitiesResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc TransferOwnership(TransferOwnershipRequest) returns (TransferOwnershipResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {
@@ -119,22 +163,31 @@ message PlanFeature {
 }
 
 message UpdateWorkspaceRequest {
+  // settings went to SetEnforceSSO and UpdateDaemonDefaults.
+  reserved 3;
+  reserved settings;
+
   string name = 1 [(buf.validate.field).string = {
     min_len: 3
     max_len: 256
   }];
   string description = 2 [(buf.validate.field).string.max_len = 1000];
-  WorkspaceSettings settings = 3;
   google.protobuf.FieldMask update_mask = 4 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
         "name",
-        "description",
-        "settings.enforce_sso"
+        "description"
       ]
     }
   ];
+}
+
+message SetEnforceSSORequest {
+  bool enforce_sso = 1 [(buf.validate.field).required = true];
+}
+message SetEnforceSSOResponse {
+  Workspace workspace = 1;
 }
 message UpdateWorkspaceResponse {
   Workspace workspace = 1;
@@ -150,17 +203,24 @@ message UpdateDaemonDefaultsRequest {
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
-        "default_daemon_config.record_sessions",
         "default_daemon_config.allow_forwarding",
         "default_daemon_config.allow_agent_forwarding",
         "default_daemon_config.gateway_ports",
-        "default_daemon_config.kill_on_revoke",
         "session_idle_timeout"
       ]
     }
   ];
 }
 message UpdateDaemonDefaultsResponse {
+  Workspace workspace = 1;
+}
+
+// A rule left out stays as it is.
+message SetDefaultSafeguardsRequest {
+  bool record_sessions = 1;
+  bool kill_on_revoke = 2;
+}
+message SetDefaultSafeguardsResponse {
   Workspace workspace = 1;
 }
 
@@ -224,11 +284,15 @@ message UpdateUserRoleRequest {
 }
 message UpdateUserRoleResponse {}
 
-message SetUserActiveRequest {
+message DeactivateUserRequest {
   string user_id = 1 [(buf.validate.field).string.uuid = true];
-  bool active = 2;
 }
-message SetUserActiveResponse {}
+message DeactivateUserResponse {}
+
+message ReactivateUserRequest {
+  string user_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ReactivateUserResponse {}
 
 message DeleteUserRequest {
   string user_id = 1 [(buf.validate.field).string.uuid = true];

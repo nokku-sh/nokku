@@ -89,18 +89,39 @@ func (s *serviceAccountService) UpdateServiceAccount(
 	if err != nil {
 		return nil, err
 	}
-	// No role keeps the one it has.
-	role := req.GetRole()
-	if role != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED && !db.CanAssign(callerRole(ctx), role) {
-		return nil, connect.NewError(connect.CodePermissionDenied, "role cannot be granted by you")
-	}
-	params := &db.UpdateServiceAccountParams{
+	result, err := s.update(ctx, &db.UpdateServiceAccountParams{
 		ServiceAccountID: req.GetId(),
 		Name:             req.Name,
 		Description:      req.Description,
-		Role:             role,
 		Tags:             maskedList(named("tags"), req.GetTags()),
+	})
+	if err != nil {
+		return nil, err
 	}
+	return &nokkuv1.UpdateServiceAccountResponse{ServiceAccount: result.ToProto()}, nil
+}
+
+func (s *serviceAccountService) SetServiceAccountRole(
+	ctx context.Context,
+	req *nokkuv1.SetServiceAccountRoleRequest,
+) (*nokkuv1.SetServiceAccountRoleResponse, error) {
+	if !db.CanAssign(callerRole(ctx), req.GetRole()) {
+		return nil, connect.NewError(connect.CodePermissionDenied, "role cannot be granted by you")
+	}
+	result, err := s.update(ctx, &db.UpdateServiceAccountParams{
+		ServiceAccountID: req.GetId(), Role: req.GetRole(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &nokkuv1.SetServiceAccountRoleResponse{ServiceAccount: result.ToProto()}, nil
+}
+
+func (s *serviceAccountService) SetServiceAccountLimits(
+	ctx context.Context,
+	req *nokkuv1.SetServiceAccountLimitsRequest,
+) (*nokkuv1.SetServiceAccountLimitsResponse, error) {
+	params := &db.UpdateServiceAccountParams{ServiceAccountID: req.GetId()}
 	// Unset keeps what the account has, empty takes the limit away.
 	if req.ForceCommand != nil {
 		params.ForceCommand = new(strings.TrimSpace(req.GetForceCommand()))
@@ -112,10 +133,20 @@ func (s *serviceAccountService) UpdateServiceAccount(
 		}
 		params.SourceAddress = &list
 	}
+	result, err := s.update(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return &nokkuv1.SetServiceAccountLimitsResponse{ServiceAccount: result.ToProto()}, nil
+}
 
+func (s *serviceAccountService) update(
+	ctx context.Context,
+	params *db.UpdateServiceAccountParams,
+) (*db.ServiceAccount, error) {
 	var result *db.ServiceAccount
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if err := checkCanManageServiceAccount(ctx, q, req.GetId()); err != nil {
+	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		if err := checkCanManageServiceAccount(ctx, q, params.ServiceAccountID); err != nil {
 			return err
 		}
 		updatedID, err := q.UpdateServiceAccount(ctx, params)
@@ -124,12 +155,8 @@ func (s *serviceAccountService) UpdateServiceAccount(
 		}
 		result, err = q.GetServiceAccount(ctx, updatedID)
 		return err
-	}); err != nil {
-		return nil, err
-	}
-	return &nokkuv1.UpdateServiceAccountResponse{
-		ServiceAccount: result.ToProto(),
-	}, nil
+	})
+	return result, err
 }
 
 func (s *serviceAccountService) ListServiceAccounts(

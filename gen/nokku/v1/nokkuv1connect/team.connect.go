@@ -32,6 +32,11 @@ const (
 	TeamServiceCreateTeamProcedure = "/nokku.v1.TeamService/CreateTeam"
 	// TeamServiceUpdateTeamProcedure is the procedure name of the TeamService's UpdateTeam RPC.
 	TeamServiceUpdateTeamProcedure = "/nokku.v1.TeamService/UpdateTeam"
+	// TeamServiceOpenTeamToSCIMProcedure is the procedure name of the TeamService's OpenTeamToSCIM RPC.
+	TeamServiceOpenTeamToSCIMProcedure = "/nokku.v1.TeamService/OpenTeamToSCIM"
+	// TeamServiceCloseTeamToSCIMProcedure is the procedure name of the TeamService's CloseTeamToSCIM
+	// RPC.
+	TeamServiceCloseTeamToSCIMProcedure = "/nokku.v1.TeamService/CloseTeamToSCIM"
 	// TeamServiceDeleteTeamProcedure is the procedure name of the TeamService's DeleteTeam RPC.
 	TeamServiceDeleteTeamProcedure = "/nokku.v1.TeamService/DeleteTeam"
 	// TeamServiceAddTeamMemberProcedure is the procedure name of the TeamService's AddTeamMember RPC.
@@ -76,6 +81,20 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_nokku_v1_team_proto.Services().ByName("TeamService").Methods().ByName("UpdateTeam"),
 			Procedure:  TeamServiceUpdateTeamProcedure,
+		}
+	})
+	teamServiceOpenTeamToSCIMSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_team_proto.Services().ByName("TeamService").Methods().ByName("OpenTeamToSCIM"),
+			Procedure:  TeamServiceOpenTeamToSCIMProcedure,
+		}
+	})
+	teamServiceCloseTeamToSCIMSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_team_proto.Services().ByName("TeamService").Methods().ByName("CloseTeamToSCIM"),
+			Procedure:  TeamServiceCloseTeamToSCIMProcedure,
 		}
 	})
 	teamServiceDeleteTeamSpec = sync.OnceValue(func() connect.Spec {
@@ -123,6 +142,11 @@ type TeamServiceClient interface {
 	ListTeams(context.Context, *v1.ListTeamsRequest) (*v1.ListTeamsResponse, error)
 	CreateTeam(context.Context, *v1.CreateTeamRequest) (*v1.CreateTeamResponse, error)
 	UpdateTeam(context.Context, *v1.UpdateTeamRequest) (*v1.UpdateTeamResponse, error)
+	// OpenTeamToSCIM lets a SCIM group of the same name take the team over. That hands its access to whoever runs
+	// the identity provider.
+	OpenTeamToSCIM(context.Context, *v1.OpenTeamToSCIMRequest) (*v1.OpenTeamToSCIMResponse, error)
+	// CloseTeamToSCIM takes that back, and stays quick.
+	CloseTeamToSCIM(context.Context, *v1.CloseTeamToSCIMRequest) (*v1.CloseTeamToSCIMResponse, error)
 	DeleteTeam(context.Context, *v1.DeleteTeamRequest) (*v1.DeleteTeamResponse, error)
 	AddTeamMember(context.Context, *v1.AddTeamMemberRequest) (*v1.AddTeamMemberResponse, error)
 	RemoveTeamMember(context.Context, *v1.RemoveTeamMemberRequest) (*v1.RemoveTeamMemberResponse, error)
@@ -142,6 +166,11 @@ type TeamServiceHandler interface {
 	ListTeams(context.Context, *v1.ListTeamsRequest) (*v1.ListTeamsResponse, error)
 	CreateTeam(context.Context, *v1.CreateTeamRequest) (*v1.CreateTeamResponse, error)
 	UpdateTeam(context.Context, *v1.UpdateTeamRequest) (*v1.UpdateTeamResponse, error)
+	// OpenTeamToSCIM lets a SCIM group of the same name take the team over. That hands its access to whoever runs
+	// the identity provider.
+	OpenTeamToSCIM(context.Context, *v1.OpenTeamToSCIMRequest) (*v1.OpenTeamToSCIMResponse, error)
+	// CloseTeamToSCIM takes that back, and stays quick.
+	CloseTeamToSCIM(context.Context, *v1.CloseTeamToSCIMRequest) (*v1.CloseTeamToSCIMResponse, error)
 	DeleteTeam(context.Context, *v1.DeleteTeamRequest) (*v1.DeleteTeamResponse, error)
 	AddTeamMember(context.Context, *v1.AddTeamMemberRequest) (*v1.AddTeamMemberResponse, error)
 	RemoveTeamMember(context.Context, *v1.RemoveTeamMemberRequest) (*v1.RemoveTeamMemberResponse, error)
@@ -157,6 +186,8 @@ func RegisterTeamServiceHandler(server *connect.Server, svc TeamServiceHandler) 
 		connect.Method{Spec: teamServiceListTeamsSpec(), Handler: adapter.listTeams},
 		connect.Method{Spec: teamServiceCreateTeamSpec(), Handler: adapter.createTeam},
 		connect.Method{Spec: teamServiceUpdateTeamSpec(), Handler: adapter.updateTeam},
+		connect.Method{Spec: teamServiceOpenTeamToSCIMSpec(), Handler: adapter.openTeamToSCIM},
+		connect.Method{Spec: teamServiceCloseTeamToSCIMSpec(), Handler: adapter.closeTeamToSCIM},
 		connect.Method{Spec: teamServiceDeleteTeamSpec(), Handler: adapter.deleteTeam},
 		connect.Method{Spec: teamServiceAddTeamMemberSpec(), Handler: adapter.addTeamMember},
 		connect.Method{Spec: teamServiceRemoveTeamMemberSpec(), Handler: adapter.removeTeamMember},
@@ -182,6 +213,14 @@ func (UnimplementedTeamServiceHandler) CreateTeam(context.Context, *v1.CreateTea
 
 func (UnimplementedTeamServiceHandler) UpdateTeam(context.Context, *v1.UpdateTeamRequest) (*v1.UpdateTeamResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TeamService.UpdateTeam is not implemented")
+}
+
+func (UnimplementedTeamServiceHandler) OpenTeamToSCIM(context.Context, *v1.OpenTeamToSCIMRequest) (*v1.OpenTeamToSCIMResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TeamService.OpenTeamToSCIM is not implemented")
+}
+
+func (UnimplementedTeamServiceHandler) CloseTeamToSCIM(context.Context, *v1.CloseTeamToSCIMRequest) (*v1.CloseTeamToSCIMResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TeamService.CloseTeamToSCIM is not implemented")
 }
 
 func (UnimplementedTeamServiceHandler) DeleteTeam(context.Context, *v1.DeleteTeamRequest) (*v1.DeleteTeamResponse, error) {
@@ -235,6 +274,22 @@ func (c *teamServiceClient) CreateTeam(ctx context.Context, req *v1.CreateTeamRe
 func (c *teamServiceClient) UpdateTeam(ctx context.Context, req *v1.UpdateTeamRequest) (*v1.UpdateTeamResponse, error) {
 	var res v1.UpdateTeamResponse
 	if err := c.client.CallUnary(ctx, teamServiceUpdateTeamSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *teamServiceClient) OpenTeamToSCIM(ctx context.Context, req *v1.OpenTeamToSCIMRequest) (*v1.OpenTeamToSCIMResponse, error) {
+	var res v1.OpenTeamToSCIMResponse
+	if err := c.client.CallUnary(ctx, teamServiceOpenTeamToSCIMSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *teamServiceClient) CloseTeamToSCIM(ctx context.Context, req *v1.CloseTeamToSCIMRequest) (*v1.CloseTeamToSCIMResponse, error) {
+	var res v1.CloseTeamToSCIMResponse
+	if err := c.client.CallUnary(ctx, teamServiceCloseTeamToSCIMSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -324,6 +379,30 @@ func (h teamServiceHandler) updateTeam(ctx context.Context, _ connect.Spec, stre
 		return err
 	}
 	res, err := h.svc.UpdateTeam(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h teamServiceHandler) openTeamToSCIM(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.OpenTeamToSCIMRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.OpenTeamToSCIM(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h teamServiceHandler) closeTeamToSCIM(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.CloseTeamToSCIMRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.CloseTeamToSCIM(ctx, &req)
 	if err != nil {
 		return err
 	}

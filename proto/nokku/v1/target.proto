@@ -15,52 +15,75 @@ import "nokku/v1/target_account.proto";
 
 service TargetService {
   rpc GetTarget(GetTargetRequest) returns (GetTargetResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      cli: true
+      nk: true
+      machine: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateTarget(CreateTargetRequest) returns (CreateTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
+      nk: true
+      machine: true
       capped: true
-      cli: true
     };
   }
   rpc UpdateTarget(UpdateTargetRequest) returns (UpdateTargetResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  // RenameTarget changes the name people type to get there. A freed name fits another host, so it takes a fresh
+  // sign-in.
+  rpc RenameTarget(RenameTargetRequest) returns (RenameTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      people_only: true
+      browser: BROWSER_FRESH
+    };
+  }
+  // SetTargetEndpoints replaces where logins to the server go, an empty list clears it.
+  rpc SetTargetEndpoints(SetTargetEndpointsRequest) returns (SetTargetEndpointsResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_EDITOR
+      browser: BROWSER_FRESH
     };
   }
   rpc DeleteTarget(DeleteTargetRequest) returns (DeleteTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      cli: true
       browser: BROWSER_FRESH
+      nk: true
+      machine: true
     };
   }
   rpc GetSubjectAccess(GetSubjectAccessRequest) returns (GetSubjectAccessResponse) {
     option (access) = {
       self: true
-      cli: true
+      nk: true
+      machine: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetTargetFilters(GetTargetFiltersRequest) returns (GetTargetFiltersResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc SyncTargetUsers(SyncTargetUsersRequest) returns (SyncTargetUsersResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      cli: true
       browser: BROWSER_REFUSED
+      nk: true
+      machine: true
     };
   }
   // ForgetHostKey drops the pinned host key of a server without a daemon, for a server that was reinstalled and
@@ -68,20 +91,29 @@ service TargetService {
   rpc ForgetHostKey(ForgetHostKeyRequest) returns (ForgetHostKeyResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc GetAccessGraph(GetAccessGraphRequest) returns (GetAccessGraphResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListAccessGraphTargets(ListAccessGraphTargetsRequest) returns (ListAccessGraphTargetsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
   rpc GetAccessMatrix(GetAccessMatrixRequest) returns (GetAccessMatrixResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -166,28 +198,47 @@ message CreateTargetResponse {
 }
 
 message UpdateTargetRequest {
+  // name and endpoints went to RenameTarget and SetTargetEndpoints.
+  reserved 2, 4;
+  reserved name, endpoints;
+
   string id = 1 [(buf.validate.field).string.uuid = true];
-  string name = 2 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 256
-    pattern: "^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
-  }];
   string description = 3 [(buf.validate.field).string.max_len = 1000];
-  repeated string endpoints = 4;
   repeated string tags = 5;
   // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-  // The pinned host key is not among them, only nk sync on the server sets it.
+  // The name and the endpoints have calls of their own. The pinned host key is set by nk sync on the server only.
   google.protobuf.FieldMask update_mask = 6 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
-        "name",
         "description",
-        "endpoints",
         "tags"
       ]
     }
   ];
+}
+
+message RenameTargetRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string = {
+      min_len: 1
+      max_len: 256
+      pattern: "^[a-zA-Z0-9][a-zA-Z0-9-_]*$"
+    }
+  ];
+}
+message RenameTargetResponse {
+  Target target = 1;
+}
+
+message SetTargetEndpointsRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  repeated string endpoints = 2;
+}
+message SetTargetEndpointsResponse {
+  Target target = 1;
 }
 message UpdateTargetResponse {
   Target target = 1;

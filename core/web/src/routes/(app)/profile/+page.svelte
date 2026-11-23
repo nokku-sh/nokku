@@ -53,13 +53,16 @@
 
 	// The crop comes at full size. The server keeps 128px, so a small copy is all it needs.
 	function askDelete() {
-		void confirm({
-			title: 'Delete your account?',
-			description:
-				'This deletes your account and every grant you have here. This cannot be undone.',
-			typeToConfirm: me.data?.email,
-			onConfirm: () => deleteAccount.mutateAsync({})
-		});
+		void whenFresh(
+			() =>
+				void confirm({
+					title: 'Delete your account?',
+					description:
+						'This deletes your account and every grant you have here. This cannot be undone.',
+					typeToConfirm: me.data?.email,
+					onConfirm: () => deleteAccount.mutateAsync({})
+				})
+		);
 	}
 </script>
 

@@ -22,16 +22,16 @@ func TestRequestedFeatures(t *testing.T) {
 	}{
 		{
 			name: "enforcing SSO is gated",
-			msg:  &nokkuv1.UpdateWorkspaceRequest{Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(true)}},
+			msg:  &nokkuv1.SetEnforceSSORequest{EnforceSso: new(true)},
 			want: []string{FeatureEnforceSSO},
 		},
 		{
 			name: "relaxing SSO is never gated",
-			msg:  &nokkuv1.UpdateWorkspaceRequest{Settings: &nokkuv1.WorkspaceSettings{EnforceSso: new(false)}},
+			msg:  &nokkuv1.SetEnforceSSORequest{EnforceSso: new(false)},
 		},
 		{
 			name: "other workspace updates are not gated",
-			msg:  &nokkuv1.UpdateWorkspaceRequest{Name: new("renamed"), Settings: &nokkuv1.WorkspaceSettings{}},
+			msg:  &nokkuv1.UpdateWorkspaceRequest{Name: new("renamed")},
 		},
 		{
 			name: "an idle timeout is gated",

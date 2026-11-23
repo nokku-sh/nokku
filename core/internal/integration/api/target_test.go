@@ -290,9 +290,8 @@ func TestAServerIsNotSwappedByDeletingIt(t *testing.T) {
 	require.NoError(t, err, "a refused delete removed the server")
 
 	// A rename frees the name just like a delete.
-	_, err = webTargets(t, cfg, srv, bob, oldSignIn).UpdateTarget(t.Context(), masked(
-		&nokkuv1.UpdateTargetRequest{Id: &first, Name: new(uniq("moved"))},
-	))
+	_, err = webTargets(t, cfg, srv, bob, oldSignIn).RenameTarget(t.Context(),
+		&nokkuv1.RenameTargetRequest{Id: &first, Name: new(uniq("moved"))})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "an old cookie renamed a server, got %v", err)
 
 	_, err = add(bobWeb, &nokkuv1.CreateTargetRequest{Endpoints: []string{"203.0.113.66:22"}})
@@ -331,9 +330,9 @@ func TestRenameReachesTheDaemon(t *testing.T) {
 	}
 
 	name := uniq("renamed")
-	_, err := editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
+	_, err := editor.RenameTarget(t.Context(), &nokkuv1.RenameTargetRequest{
 		Id: new(first.GetTargetId()), Name: &name,
-	}))
+	})
 	require.NoError(t, err)
 	assert.Equal(t, name, daemonName(first.GetId()))
 
@@ -344,9 +343,9 @@ func TestRenameReachesTheDaemon(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, before, daemonName(second.GetId()), "an update without a name renamed the daemon")
 
-	_, err = editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
+	_, err = editor.RenameTarget(t.Context(), &nokkuv1.RenameTargetRequest{
 		Id: new(second.GetTargetId()), Name: &name,
-	}))
+	})
 	require.Error(t, err, "two daemons got one name")
 	assert.Equal(t, before, daemonName(second.GetId()), "a refused rename still reached the daemon")
 }
@@ -366,22 +365,21 @@ func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 	)
 
 	updated, err := editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
-		Id:        &targetID,
-		Endpoints: []string{"10.0.0.1:22"},
-		Tags:      []string{"prod"},
+		Id:   &targetID,
+		Tags: []string{"prod"},
 	}))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"prod"}, updated.GetTarget().GetTags())
 	name := updated.GetTarget().GetName()
 
-	updated, err = editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
+	moved, err := editor.SetTargetEndpoints(t.Context(), &nokkuv1.SetTargetEndpointsRequest{
 		Id:        &targetID,
 		Endpoints: []string{"10.0.0.9:22"},
-	}))
+	})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"prod"}, updated.GetTarget().GetTags(), "a list the update leaves out stays")
-	assert.Equal(t, []string{"10.0.0.9:22"}, updated.GetTarget().GetEndpoints())
-	assert.Equal(t, name, updated.GetTarget().GetName(), "unset fields stay as they are")
+	assert.Equal(t, []string{"prod"}, moved.GetTarget().GetTags(), "a list the call does not carry stays")
+	assert.Equal(t, []string{"10.0.0.9:22"}, moved.GetTarget().GetEndpoints())
+	assert.Equal(t, name, moved.GetTarget().GetName(), "unset fields stay as they are")
 
 	updated, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
 		Id:         &targetID,
@@ -396,6 +394,15 @@ func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"host_public_key"}},
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "only nk sync on the server pins a host key")
+	_, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
+		Id:         &targetID,
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an ordinary update renamed a server")
+
+	cleared, err := editor.SetTargetEndpoints(t.Context(), &nokkuv1.SetTargetEndpointsRequest{Id: &targetID})
+	require.NoError(t, err)
+	assert.Empty(t, cleared.GetTarget().GetEndpoints(), "an empty list clears the endpoints")
 }
 
 func (s graphSeed) member(name string) string {
@@ -921,9 +928,9 @@ func TestAMachineManagesOnlyTheServersItAdded(t *testing.T) {
 		})
 		require.NoError(t, err)
 		id := created.GetServiceAccount().GetId()
-		_, err = accounts.UpdateServiceAccount(t.Context(), masked(&nokkuv1.UpdateServiceAccountRequest{
+		_, err = accounts.SetServiceAccountRole(t.Context(), &nokkuv1.SetServiceAccountRoleRequest{
 			Id: &id, Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
-		}))
+		})
 		require.NoError(t, err)
 		key := serviceAccountToken(t, accounts, id, nil)
 		return nokkuv1connect.NewTargetServiceClient(clientOn(srv, header("Authorization", "Bearer "+key)))

@@ -11,6 +11,7 @@ service AccessRequestService {
   rpc ListRequestableAccounts(ListRequestableAccountsRequest) returns (ListRequestableAccountsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
+      machine: true
       feature: "access_requests"
     };
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -18,43 +19,42 @@ service AccessRequestService {
   rpc CreateAccessRequest(CreateAccessRequestRequest) returns (CreateAccessRequestResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
+      nk: true
       feature: "access_requests"
-      people_only: true
-      cli: true
     };
   }
   rpc GetAccessRequest(GetAccessRequestRequest) returns (GetAccessRequestResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      cli: true
+      nk: true
+      machine: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListAccessRequests(ListAccessRequestsRequest) returns (ListAccessRequestsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_MEMBER};
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ApproveAccessRequest(ApproveAccessRequestRequest) returns (ApproveAccessRequestResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
       feature: "access_requests"
-      people_only: true
     };
   }
   rpc DenyAccessRequest(DenyAccessRequestRequest) returns (DenyAccessRequestResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_ADMIN
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_ADMIN};
   }
   rpc CancelAccessRequest(CancelAccessRequestRequest) returns (CancelAccessRequestResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_MEMBER
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
   }
   rpc SetRequestableTags(SetRequestableTagsRequest) returns (SetRequestableTagsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      machine: true
+    };
   }
 }
 

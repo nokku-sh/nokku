@@ -25,18 +25,33 @@ CertificateService.RolloverCertificateAuthority | cli | refused | permission_den
 CertificateService.UpdateCertificateAuthority | browser fresh | accepted | ok | session kept
 CertificateService.UpdateCertificateAuthority | browser old | refused | unauthenticated: sign in again to continue | session ended
 CertificateService.UpdateCertificateAuthority | cli | refused | permission_denied: do this in the web app | session kept
-ServiceAccountService.UpdateServiceAccount limits | browser fresh | accepted | ok | session kept
-ServiceAccountService.UpdateServiceAccount limits | browser old | refused | unauthenticated: sign in again to continue | session ended
-ServiceAccountService.UpdateServiceAccount limits | cli | refused | permission_denied: do this in the web app | session kept
-ServiceAccountService.UpdateServiceAccount role | browser fresh | accepted | ok | session kept
-ServiceAccountService.UpdateServiceAccount role | browser old | refused | unauthenticated: sign in again to continue | session ended
-ServiceAccountService.UpdateServiceAccount role | cli | refused | permission_denied: do this in the web app | session kept
+ServiceAccountService.SetServiceAccountLimits | browser fresh | accepted | ok | session kept
+ServiceAccountService.SetServiceAccountLimits | browser old | refused | unauthenticated: sign in again to continue | session ended
+ServiceAccountService.SetServiceAccountLimits | cli | refused | permission_denied: do this in the web app | session kept
+ServiceAccountService.SetServiceAccountRole | browser fresh | accepted | ok | session kept
+ServiceAccountService.SetServiceAccountRole | browser old | refused | unauthenticated: sign in again to continue | session ended
+ServiceAccountService.SetServiceAccountRole | cli | refused | permission_denied: do this in the web app | session kept
 WorkspaceService.UpdateUserRole | browser fresh | accepted | not_found: the requested resource was not found | session kept
 WorkspaceService.UpdateUserRole | browser old | refused | unauthenticated: sign in again to continue | session ended
 WorkspaceService.UpdateUserRole | cli | refused | permission_denied: do this in the web app | session kept
-WorkspaceService.SetUserActive reactivate | browser fresh | accepted | not_found: the requested resource was not found | session kept
-WorkspaceService.SetUserActive reactivate | browser old | refused | unauthenticated: sign in again to continue | session ended
-WorkspaceService.SetUserActive reactivate | cli | refused | permission_denied: do this in the web app | session kept
+WorkspaceService.ReactivateUser | browser fresh | accepted | not_found: the requested resource was not found | session kept
+WorkspaceService.ReactivateUser | browser old | refused | unauthenticated: sign in again to continue | session ended
+WorkspaceService.ReactivateUser | cli | refused | permission_denied: do this in the web app | session kept
+DaemonService.SetDaemonSafeguards | browser fresh | accepted | not_found: the requested resource was not found | session kept
+DaemonService.SetDaemonSafeguards | browser old | refused | unauthenticated: sign in again to continue | session ended
+DaemonService.SetDaemonSafeguards | cli | refused | permission_denied: do this in the web app | session kept
+WorkspaceService.SetDefaultSafeguards | browser fresh | accepted | ok | session kept
+WorkspaceService.SetDefaultSafeguards | browser old | refused | unauthenticated: sign in again to continue | session ended
+WorkspaceService.SetDefaultSafeguards | cli | refused | permission_denied: do this in the web app | session kept
+WorkspaceService.SetEnforceSSO off | browser fresh | accepted | ok | session kept
+WorkspaceService.SetEnforceSSO off | browser old | refused | unauthenticated: sign in again to continue | session ended
+WorkspaceService.SetEnforceSSO off | cli | refused | permission_denied: do this in the web app | session kept
+WorkspaceService.DeleteUser | browser fresh | accepted | not_found: the requested resource was not found | session kept
+WorkspaceService.DeleteUser | browser old | refused | unauthenticated: sign in again to continue | session ended
+WorkspaceService.DeleteUser | cli | refused | permission_denied: do this in the web app | session kept
+TeamService.OpenTeamToSCIM | browser fresh | accepted | not_found: the requested resource was not found | session kept
+TeamService.OpenTeamToSCIM | browser old | refused | unauthenticated: sign in again to continue | session ended
+TeamService.OpenTeamToSCIM | cli | refused | permission_denied: do this in the web app | session kept
 JoinTokenService.CreateJoinToken | browser fresh | accepted | ok | session kept
 JoinTokenService.CreateJoinToken | browser old | refused | unauthenticated: sign in again to continue | session ended
 JoinTokenService.CreateJoinToken | cli | refused | permission_denied: do this in the web app | session kept
@@ -52,12 +67,12 @@ ServiceAccountService.RemoveServiceAccountFederation | cli | refused | permissio
 SCIMService.CreateSCIMToken | browser fresh | accepted | ok | session kept
 SCIMService.CreateSCIMToken | browser old | refused | unauthenticated: sign in again to continue | session ended
 SCIMService.CreateSCIMToken | cli | refused | permission_denied: do this in the web app | session kept
-TargetService.UpdateTarget address | browser fresh | accepted | not_found: the requested resource was not found | session kept
-TargetService.UpdateTarget address | browser old | refused | unauthenticated: sign in again to continue | session ended
-TargetService.UpdateTarget address | cli | refused | permission_denied: do this in the web app | session kept
-TargetService.UpdateTarget name | browser fresh | accepted | not_found: the requested resource was not found | session kept
-TargetService.UpdateTarget name | browser old | refused | unauthenticated: sign in again to continue | session ended
-TargetService.UpdateTarget name | cli | refused | permission_denied: do this in the web app | session kept
+TargetService.SetTargetEndpoints | browser fresh | accepted | not_found: the requested resource was not found | session kept
+TargetService.SetTargetEndpoints | browser old | refused | unauthenticated: sign in again to continue | session ended
+TargetService.SetTargetEndpoints | cli | refused | permission_denied: do this in the web app | session kept
+TargetService.RenameTarget | browser fresh | accepted | not_found: the requested resource was not found | session kept
+TargetService.RenameTarget | browser old | refused | unauthenticated: sign in again to continue | session ended
+TargetService.RenameTarget | cli | refused | permission_denied: do this in the web app | session kept
 DaemonService.DeleteDaemon | browser fresh | accepted | not_found: the requested resource was not found | session kept
 DaemonService.DeleteDaemon | browser old | refused | unauthenticated: sign in again to continue | session ended
 DaemonService.DeleteDaemon | cli | refused | permission_denied: do this in the web app | session kept

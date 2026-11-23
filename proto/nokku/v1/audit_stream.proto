@@ -9,31 +9,35 @@ import "nokku/v1/access.proto";
 
 service AuditStreamService {
   rpc ListAuditStreams(ListAuditStreamsRequest) returns (ListAuditStreamsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateAuditStream(CreateAuditStreamRequest) returns (CreateAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      fresh: true
+      browser: BROWSER_FRESH
       feature: "audit_streaming"
     };
   }
   rpc UpdateAuditStream(UpdateAuditStreamRequest) returns (UpdateAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc DeleteAuditStream(DeleteAuditStreamRequest) returns (DeleteAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc TestAuditStream(TestAuditStreamRequest) returns (TestAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
+      machine: true
       feature: "audit_streaming"
     };
   }

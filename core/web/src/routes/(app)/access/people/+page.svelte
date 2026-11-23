@@ -53,7 +53,8 @@
 	const remove = users.delete();
 	const removeMany = users.deleteMany();
 
-	const setActive = users.setActive();
+	const deactivate = users.deactivate();
+	const reactivate = users.reactivate();
 
 	// The owner and you are never in a bulk delete, the server refuses both.
 	const bulkActions: BulkAction<User>[] = [
@@ -62,6 +63,7 @@
 			name: (u) => u.name || u.email,
 			skip: (u) => u.role === WorkspaceRole.OWNER || u.id === me.data?.id,
 			description: 'Their access ends right away. This cannot be undone.',
+			fresh: true,
 			run: (selected) => removeMany.mutateAsync(selected.map(({ id }) => ({ userId: id })))
 		})
 	];
@@ -128,9 +130,9 @@
 														description:
 															'Every session ends right away. You can reactivate them later.',
 														confirmText: 'Deactivate',
-														onConfirm: () => setActive.mutateAsync({ userId: u.id, active: false })
+														onConfirm: () => deactivate.mutateAsync({ userId: u.id })
 													})
-												: whenFresh(() => setActive.mutate({ userId: u.id, active: true }))
+												: whenFresh(() => reactivate.mutate({ userId: u.id }))
 									}
 								])
 					],
@@ -140,6 +142,7 @@
 								title: `Delete ${u.name || u.email}?`,
 								description: () => userDeleteWarning(u.id),
 								confirmText: 'Delete',
+								fresh: true,
 								onDelete: () => remove.mutateAsync({ userId: u.id })
 							}
 				});

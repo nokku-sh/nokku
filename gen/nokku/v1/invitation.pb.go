@@ -605,13 +605,13 @@ const file_nokku_v1_invitation_proto_rawDesc = "" +
 	"\vinvitations\x18\x01 \x03(\v2\x14.nokku.v1.InvitationR\vinvitations\"8\n" +
 	"\x17DeleteInvitationRequest\x12\x1d\n" +
 	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"\x1a\n" +
-	"\x18DeleteInvitationResponse2\xfe\x03\n" +
+	"\x18DeleteInvitationResponse2\x82\x04\n" +
 	"\x11InvitationService\x12[\n" +
 	"\rGetInvitation\x12\x1e.nokku.v1.GetInvitationRequest\x1a\x1f.nokku.v1.GetInvitationResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12a\n" +
 	"\x10AcceptInvitation\x12!.nokku.v1.AcceptInvitationRequest\x1a\".nokku.v1.AcceptInvitationResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12c\n" +
-	"\x10CreateInvitation\x12!.nokku.v1.CreateInvitationRequest\x1a\".nokku.v1.CreateInvitationResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12a\n" +
-	"\x0fListInvitations\x12 .nokku.v1.ListInvitationsRequest\x1a!.nokku.v1.ListInvitationsResponse\"\t\xc2\xf3\x18\x02\x18\x04\x90\x02\x01\x12a\n" +
-	"\x10DeleteInvitation\x12!.nokku.v1.DeleteInvitationRequest\x1a\".nokku.v1.DeleteInvitationResponse\"\x06\xc2\xf3\x18\x02\x18\x04B\x90\x01\n" +
+	"\x10CreateInvitation\x12!.nokku.v1.CreateInvitationRequest\x1a\".nokku.v1.CreateInvitationResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12c\n" +
+	"\x0fListInvitations\x12 .nokku.v1.ListInvitationsRequest\x1a!.nokku.v1.ListInvitationsResponse\"\v\xc2\xf3\x18\x04\x18\x04h\x01\x90\x02\x01\x12c\n" +
+	"\x10DeleteInvitation\x12!.nokku.v1.DeleteInvitationRequest\x1a\".nokku.v1.DeleteInvitationResponse\"\b\xc2\xf3\x18\x04\x18\x04h\x01B\x90\x01\n" +
 	"\fcom.nokku.v1B\x0fInvitationProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

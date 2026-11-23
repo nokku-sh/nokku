@@ -36,6 +36,13 @@ func TestFreshSignInMatrix(t *testing.T) {
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	owner := seedOwner(t, cfg)
+	// SetEnforceSSO writes the shared workspace, which other tests read field by field.
+	var original *db.Workspace
+	inWorkspace(t, cfg, ws, func(q *db.Queries) (err error) {
+		original, err = q.GetWorkspace(t.Context())
+		return err
+	})
+	t.Cleanup(func() { restoreWorkspace(context.WithoutCancel(t.Context()), t, cfg, original) })
 
 	rpc := func(s login) *connect.Client {
 		return clientOn(srv, signedIn(t, cfg, s))
@@ -122,16 +129,16 @@ func TestFreshSignInMatrix(t *testing.T) {
 				masked(&nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("")}))
 			return refusedRPC(err)
 		}},
-		{"ServiceAccountService.UpdateServiceAccount limits", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).UpdateServiceAccount(t.Context(),
-				masked(&nokkuv1.UpdateServiceAccountRequest{Id: sa.GetServiceAccount().Id, ForceCommand: new("")}))
+		{"ServiceAccountService.SetServiceAccountLimits", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).SetServiceAccountLimits(t.Context(),
+				&nokkuv1.SetServiceAccountLimitsRequest{Id: sa.GetServiceAccount().Id, ForceCommand: new("")})
 			return refusedRPC(err)
 		}},
-		{"ServiceAccountService.UpdateServiceAccount role", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).UpdateServiceAccount(t.Context(),
-				masked(&nokkuv1.UpdateServiceAccountRequest{
+		{"ServiceAccountService.SetServiceAccountRole", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewServiceAccountServiceClient(rpc(s)).SetServiceAccountRole(t.Context(),
+				&nokkuv1.SetServiceAccountRoleRequest{
 					Id: sa.GetServiceAccount().Id, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER.Enum(),
-				}))
+				})
 			return refusedRPC(err)
 		}},
 		// No user has these ids, a call past the fresh check answers not_found.
@@ -142,9 +149,35 @@ func TestFreshSignInMatrix(t *testing.T) {
 				})
 			return refusedRPC(err)
 		}},
-		{"WorkspaceService.SetUserActive reactivate", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).SetUserActive(t.Context(),
-				&nokkuv1.SetUserActiveRequest{UserId: new(uuid.NewV7().String()), Active: new(true)})
+		{"WorkspaceService.ReactivateUser", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).ReactivateUser(t.Context(),
+				&nokkuv1.ReactivateUserRequest{UserId: new(uuid.NewV7().String())})
+			return refusedRPC(err)
+		}},
+		{"DaemonService.SetDaemonSafeguards", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewDaemonServiceClient(rpc(s)).SetDaemonSafeguards(t.Context(),
+				&nokkuv1.SetDaemonSafeguardsRequest{Id: new(uuid.NewV7().String()), RecordSessions: new(false)})
+			return refusedRPC(err)
+		}},
+		// An empty request changes nothing in the shared workspace.
+		{"WorkspaceService.SetDefaultSafeguards", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).SetDefaultSafeguards(t.Context(),
+				&nokkuv1.SetDefaultSafeguardsRequest{})
+			return refusedRPC(err)
+		}},
+		{"WorkspaceService.SetEnforceSSO off", owner, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).SetEnforceSSO(t.Context(),
+				&nokkuv1.SetEnforceSSORequest{EnforceSso: new(false)})
+			return refusedRPC(err)
+		}},
+		{"WorkspaceService.DeleteUser", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).DeleteUser(t.Context(),
+				&nokkuv1.DeleteUserRequest{UserId: new(uuid.NewV7().String())})
+			return refusedRPC(err)
+		}},
+		{"TeamService.OpenTeamToSCIM", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewTeamServiceClient(rpc(s)).OpenTeamToSCIM(t.Context(),
+				&nokkuv1.OpenTeamToSCIMRequest{Id: new(uuid.NewV7().String())})
 			return refusedRPC(err)
 		}},
 		{"JoinTokenService.CreateJoinToken", admin, func(s login) (string, bool) {
@@ -184,16 +217,14 @@ func TestFreshSignInMatrix(t *testing.T) {
 			return refusedRPC(err)
 		}},
 		// No server has this id, a call past the fresh check answers not_found.
-		{"TargetService.UpdateTarget address", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).UpdateTarget(t.Context(),
-				masked(
-					&nokkuv1.UpdateTargetRequest{Id: new(uuid.NewV7().String()), Endpoints: []string{"10.0.0.9:22"}},
-				))
+		{"TargetService.SetTargetEndpoints", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).SetTargetEndpoints(t.Context(),
+				&nokkuv1.SetTargetEndpointsRequest{Id: new(uuid.NewV7().String()), Endpoints: []string{"10.0.0.9:22"}})
 			return refusedRPC(err)
 		}},
-		{"TargetService.UpdateTarget name", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).UpdateTarget(t.Context(),
-				masked(&nokkuv1.UpdateTargetRequest{Id: new(uuid.NewV7().String()), Name: new(uniq("renamed"))}))
+		{"TargetService.RenameTarget", admin, func(s login) (string, bool) {
+			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).RenameTarget(t.Context(),
+				&nokkuv1.RenameTargetRequest{Id: new(uuid.NewV7().String()), Name: new(uniq("renamed"))})
 			return refusedRPC(err)
 		}},
 		{"DaemonService.DeleteDaemon", admin, func(s login) (string, bool) {
@@ -293,4 +324,19 @@ func TestSessionsSayHowLongTheyStayFresh(t *testing.T) {
 	nk := nokkuv1connect.NewAccountServiceClient(clientOn(srv, signedIn(t, cfg, deviceLogin(t, cfg, srv, owner))))
 	_, err := nk.ListAccountSessions(t.Context(), &nokkuv1.ListAccountSessionsRequest{})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "nk reached a call it never makes: %v", err)
+}
+
+// Deleting an account is for good, so an old browser session may not delete even its own.
+func TestAnOldSessionDeletesNoAccount(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	member := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	old := nokkuv1connect.NewAccountServiceClient(
+		clientOn(srv, signedIn(t, cfg, browserSession(t, cfg, member, oldSignIn))),
+	)
+	_, err := old.DeleteAccount(t.Context(), &nokkuv1.DeleteAccountRequest{})
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "an old session deleted its account: %v", err)
+
+	fresh := nokkuv1connect.NewAccountServiceClient(clientOn(srv, signedIn(t, cfg, browserSession(t, cfg, member, 0))))
+	_, err = fresh.DeleteAccount(t.Context(), &nokkuv1.DeleteAccountRequest{})
+	require.NoError(t, err, "a fresh session could not delete its own account")
 }

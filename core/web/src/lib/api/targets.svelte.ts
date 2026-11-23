@@ -96,6 +96,8 @@ export const target = {
 			onSuccess: () => toast.success('Server added')
 		}),
 	update: () => usePatch(TargetService.method.updateTarget),
+	rename: () => useMutation(TargetService.method.renameTarget),
+	setEndpoints: () => useMutation(TargetService.method.setTargetEndpoints),
 	forgetHostKey: () =>
 		useMutation(TargetService.method.forgetHostKey, {
 			onSuccess: () => toast.success('Host key forgotten')

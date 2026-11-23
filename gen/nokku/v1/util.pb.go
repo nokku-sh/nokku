@@ -1373,17 +1373,17 @@ const file_nokku_v1_util_proto_rawDesc = "" +
 	"\x19AUDIT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17AUDIT_OUTCOME_SUCCEEDED\x10\x01\x12\x18\n" +
 	"\x14AUDIT_OUTCOME_FAILED\x10\x02\x12\x18\n" +
-	"\x14AUDIT_OUTCOME_DENIED\x10\x032\xa6\x06\n" +
+	"\x14AUDIT_OUTCOME_DENIED\x10\x032\xb2\x06\n" +
 	"\vUtilService\x12R\n" +
 	"\n" +
 	"GetVersion\x12\x1b.nokku.v1.GetVersionRequest\x1a\x1c.nokku.v1.GetVersionResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12a\n" +
-	"\x0fGetInstanceInfo\x12 .nokku.v1.GetInstanceInfoRequest\x1a!.nokku.v1.GetInstanceInfoResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12O\n" +
-	"\tListRoles\x12\x1a.nokku.v1.ListRolesRequest\x1a\x1b.nokku.v1.ListRolesResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12[\n" +
-	"\rListAuditLogs\x12\x1e.nokku.v1.ListAuditLogsRequest\x1a\x1f.nokku.v1.ListAuditLogsResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12l\n" +
-	"\rPollAuditLogs\x12\x1e.nokku.v1.PollAuditLogsRequest\x1a\x1f.nokku.v1.PollAuditLogsResponse\"\x1a\xc2\xf3\x18\x13\x18\x02:\x0faudit_streaming\x90\x02\x01\x12l\n" +
-	"\x0fExportAuditLogs\x12 .nokku.v1.ExportAuditLogsRequest\x1a!.nokku.v1.ExportAuditLogsResponse\"\x14\xc2\xf3\x18\x10\x18\x02:\faudit_export\x12v\n" +
-	"\x12ExportAccessReport\x12#.nokku.v1.ExportAccessReportRequest\x1a$.nokku.v1.ExportAccessReportResponse\"\x15\xc2\xf3\x18\x11\x18\x02:\raccess_review\x12^\n" +
-	"\x0eListMyActivity\x12\x1f.nokku.v1.ListMyActivityRequest\x1a .nokku.v1.ListMyActivityResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01B\x8a\x01\n" +
+	"\x0fGetInstanceInfo\x12 .nokku.v1.GetInstanceInfoRequest\x1a!.nokku.v1.GetInstanceInfoResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12Q\n" +
+	"\tListRoles\x12\x1a.nokku.v1.ListRolesRequest\x1a\x1b.nokku.v1.ListRolesResponse\"\v\xc2\xf3\x18\x04\x10\x01h\x01\x90\x02\x01\x12]\n" +
+	"\rListAuditLogs\x12\x1e.nokku.v1.ListAuditLogsRequest\x1a\x1f.nokku.v1.ListAuditLogsResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12n\n" +
+	"\rPollAuditLogs\x12\x1e.nokku.v1.PollAuditLogsRequest\x1a\x1f.nokku.v1.PollAuditLogsResponse\"\x1c\xc2\xf3\x18\x15\x18\x02:\x0faudit_streamingh\x01\x90\x02\x01\x12n\n" +
+	"\x0fExportAuditLogs\x12 .nokku.v1.ExportAuditLogsRequest\x1a!.nokku.v1.ExportAuditLogsResponse\"\x16\xc2\xf3\x18\x12\x18\x02:\faudit_exporth\x01\x12x\n" +
+	"\x12ExportAccessReport\x12#.nokku.v1.ExportAccessReportRequest\x1a$.nokku.v1.ExportAccessReportResponse\"\x17\xc2\xf3\x18\x13\x18\x02:\raccess_reviewh\x01\x12`\n" +
+	"\x0eListMyActivity\x12\x1f.nokku.v1.ListMyActivityRequest\x1a .nokku.v1.ListMyActivityResponse\"\v\xc2\xf3\x18\x04\x10\x01h\x01\x90\x02\x01B\x8a\x01\n" +
 	"\fcom.nokku.v1B\tUtilProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

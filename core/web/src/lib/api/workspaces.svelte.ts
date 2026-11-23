@@ -42,7 +42,9 @@ export const workspace = {
 		),
 
 	update: () => usePatch(WorkspaceService.method.updateWorkspace),
+	setEnforceSSO: () => useMutation(WorkspaceService.method.setEnforceSSO),
 	updateDaemonDefaults: () => usePatch(WorkspaceService.method.updateDaemonDefaults),
+	setDefaultSafeguards: () => useMutation(WorkspaceService.method.setDefaultSafeguards),
 	delete: () =>
 		useMutation(WorkspaceService.method.deleteWorkspace, {
 			onSuccess: () => {
@@ -78,9 +80,13 @@ export const users = {
 		),
 
 	updateRole: () => useMutation(WorkspaceService.method.updateUserRole),
-	setActive: () =>
-		useMutation(WorkspaceService.method.setUserActive, {
-			onSuccess: (_, v) => toast.success(v.active ? 'Account reactivated' : 'Account deactivated')
+	deactivate: () =>
+		useMutation(WorkspaceService.method.deactivateUser, {
+			onSuccess: () => toast.success('Account deactivated')
+		}),
+	reactivate: () =>
+		useMutation(WorkspaceService.method.reactivateUser, {
+			onSuccess: () => toast.success('Account reactivated')
 		}),
 	delete: () =>
 		useMutation(WorkspaceService.method.deleteUser, {

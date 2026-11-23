@@ -581,11 +581,11 @@ const file_nokku_v1_join_token_proto_rawDesc = "" +
 	"\x06tokens\x18\x01 \x03(\v2\x13.nokku.v1.JoinTokenR\x06tokens\"2\n" +
 	"\x16DeleteJoinTokenRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x19\n" +
-	"\x17DeleteJoinTokenResponse2\xb4\x02\n" +
+	"\x17DeleteJoinTokenResponse2\xb8\x02\n" +
 	"\x10JoinTokenService\x12`\n" +
-	"\x0fCreateJoinToken\x12 .nokku.v1.CreateJoinTokenRequest\x1a!.nokku.v1.CreateJoinTokenResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12^\n" +
-	"\x0eListJoinTokens\x12\x1f.nokku.v1.ListJoinTokensRequest\x1a .nokku.v1.ListJoinTokensResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12^\n" +
-	"\x0fDeleteJoinToken\x12 .nokku.v1.DeleteJoinTokenRequest\x1a!.nokku.v1.DeleteJoinTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x04B\x8f\x01\n" +
+	"\x0fCreateJoinToken\x12 .nokku.v1.CreateJoinTokenRequest\x1a!.nokku.v1.CreateJoinTokenResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12`\n" +
+	"\x0eListJoinTokens\x12\x1f.nokku.v1.ListJoinTokensRequest\x1a .nokku.v1.ListJoinTokensResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12`\n" +
+	"\x0fDeleteJoinToken\x12 .nokku.v1.DeleteJoinTokenRequest\x1a!.nokku.v1.DeleteJoinTokenResponse\"\b\xc2\xf3\x18\x04\x18\x04h\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eJoinTokenProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

@@ -25,6 +25,7 @@ export const daemon = {
 			}
 		}),
 	update: () => usePatch(DaemonService.method.updateDaemon),
+	setSafeguards: () => useMutation(DaemonService.method.setDaemonSafeguards),
 	delete: () => useMutation(DaemonService.method.deleteDaemon),
 	approveMany: () =>
 		useBulkMutation(

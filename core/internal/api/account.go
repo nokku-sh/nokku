@@ -41,9 +41,6 @@ func (s *accountService) UpdateAccount(
 	ctx context.Context,
 	req *nokkuv1.UpdateAccountRequest,
 ) (*nokkuv1.UpdateAccountResponse, error) {
-	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
-		return nil, err
-	}
 	u, err := s.cfg.IAM.UpdateSelf(ctx, req.Name)
 	if err != nil {
 		return nil, err

@@ -388,12 +388,12 @@ const file_nokku_v1_scim_proto_rawDesc = "" +
 	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\"2\n" +
 	"\x16DeleteSCIMTokenRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x19\n" +
-	"\x17DeleteSCIMTokenResponse2\xb5\x02\n" +
+	"\x17DeleteSCIMTokenResponse2\xb9\x02\n" +
 	"\vSCIMService\x12f\n" +
 	"\x0fCreateSCIMToken\x12 .nokku.v1.CreateSCIMTokenRequest\x1a!.nokku.v1.CreateSCIMTokenResponse\"\x0e\xc2\xf3\x18\n" +
-	"\x18\x050\x01:\x04scim\x12^\n" +
-	"\x0eListSCIMTokens\x12\x1f.nokku.v1.ListSCIMTokensRequest\x1a .nokku.v1.ListSCIMTokensResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12^\n" +
-	"\x0fDeleteSCIMToken\x12 .nokku.v1.DeleteSCIMTokenRequest\x1a!.nokku.v1.DeleteSCIMTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x05B\x8a\x01\n" +
+	"\x18\x05:\x04scim`\x01\x12`\n" +
+	"\x0eListSCIMTokens\x12\x1f.nokku.v1.ListSCIMTokensRequest\x1a .nokku.v1.ListSCIMTokensResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12`\n" +
+	"\x0fDeleteSCIMToken\x12 .nokku.v1.DeleteSCIMTokenRequest\x1a!.nokku.v1.DeleteSCIMTokenResponse\"\b\xc2\xf3\x18\x04\x18\x05h\x01B\x8a\x01\n" +
 	"\fcom.nokku.v1B\tScimProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

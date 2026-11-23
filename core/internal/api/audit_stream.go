@@ -76,9 +76,6 @@ func (s *auditStreamService) UpdateAuditStream(
 	ctx context.Context,
 	req *nokkuv1.UpdateAuditStreamRequest,
 ) (*nokkuv1.UpdateAuditStreamResponse, error) {
-	if _, err := applyMask(req, req.GetUpdateMask()); err != nil {
-		return nil, err
-	}
 	var row *db.UpdateAuditStreamRow
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		prev, err := q.GetAuditStream(ctx, req.GetId())

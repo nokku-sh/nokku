@@ -15,12 +15,11 @@ import (
 )
 
 func TestApplyMaskKeepsOnlyNamedFields(t *testing.T) {
-	req := &nokkuv1.UpdateTargetRequest{
+	req := &nokkuv1.UpdateTeamRequest{
 		Id:          new("t1"),
 		Name:        new("renamed"),
 		Description: new("stale copy from the form"),
-		Tags:        []string{"stale"},
-		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"name", "endpoints"}},
+		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"name", "tags"}},
 	}
 	named, err := applyMask(req, req.GetUpdateMask())
 	require.NoError(t, err)
@@ -28,9 +27,8 @@ func TestApplyMaskKeepsOnlyNamedFields(t *testing.T) {
 	assert.Equal(t, "t1", req.GetId(), "the id is never masked away")
 	assert.Equal(t, "renamed", req.GetName())
 	assert.Nil(t, req.Description, "a field the mask does not name was kept")
-	assert.Nil(t, req.GetTags())
-	assert.True(t, named("endpoints"), "a named list counts even when empty")
-	assert.False(t, named("tags"))
+	assert.True(t, named("tags"), "a named list counts even when empty")
+	assert.False(t, named("description"))
 }
 
 func TestMaskedList(t *testing.T) {
@@ -47,18 +45,16 @@ func TestApplyMaskRefusesANamedFieldItDoesNotSend(t *testing.T) {
 }
 
 func TestApplyMaskPrunesNestedMessages(t *testing.T) {
-	req := &nokkuv1.UpdateWorkspaceRequest{
-		Settings: &nokkuv1.WorkspaceSettings{
-			EnforceSso:          new(true),
-			DefaultDaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(true), GatewayPorts: new(true)},
-		},
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"settings.default_daemon_config.gateway_ports"}},
+	req := &nokkuv1.UpdateDaemonDefaultsRequest{
+		SessionIdleTimeout:  durationpb.New(15 * time.Minute),
+		DefaultDaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(true), GatewayPorts: new(true)},
+		UpdateMask:          &fieldmaskpb.FieldMask{Paths: []string{"default_daemon_config.gateway_ports"}},
 	}
 	_, err := applyMask(req, req.GetUpdateMask())
 	require.NoError(t, err)
-	assert.Nil(t, req.GetSettings().EnforceSso)
-	assert.Nil(t, req.GetSettings().GetDefaultDaemonConfig().RecordSessions)
-	assert.True(t, req.GetSettings().GetDefaultDaemonConfig().GetGatewayPorts())
+	assert.Nil(t, req.GetSessionIdleTimeout())
+	assert.Nil(t, req.GetDefaultDaemonConfig().RecordSessions)
+	assert.True(t, req.GetDefaultDaemonConfig().GetGatewayPorts())
 }
 
 func TestMergeSetReplacesADurationWhole(t *testing.T) {
@@ -84,9 +80,9 @@ func TestApplyMaskRefusesAPathPastAField(t *testing.T) {
 	}{
 		{&nokkuv1.UpdateTeamRequest{Name: new("ops")}, "name.x"},
 		{&nokkuv1.UpdateTeamRequest{Tags: []string{"a"}}, "tags.x"},
-		{&nokkuv1.UpdateWorkspaceRequest{Settings: &nokkuv1.WorkspaceSettings{
+		{&nokkuv1.UpdateDaemonDefaultsRequest{
 			SessionIdleTimeout: &durationpb.Duration{Seconds: 2, Nanos: -2e9},
-		}}, "settings.session_idle_timeout.seconds"},
+		}, "session_idle_timeout.seconds"},
 	} {
 		_, err := applyMask(tt.req, &fieldmaskpb.FieldMask{Paths: []string{tt.mask}})
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), tt.mask)

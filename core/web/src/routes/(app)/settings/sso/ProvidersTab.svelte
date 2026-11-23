@@ -11,10 +11,8 @@
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
-	import { WorkspaceSettingsSchema } from '#lib/gen/nokku/v1/workspace_pb.js';
 	import { confirm, sheetLink, useCreate, useSheet } from '#lib/hooks/index.js';
 	import { usePlans } from '#lib/plans.js';
-	import { create as createMessage } from '@bufbuild/protobuf';
 	import { ArrowRight, ChevronRight, KeyRound, Plus } from '@lucide/svelte';
 	import AddProviderModal from './AddProviderModal.svelte';
 	import ProviderSheet from './ProviderSheet.svelte';
@@ -30,7 +28,7 @@
 
 	const providers = sso.list();
 	const ws = workspace.get();
-	const update = workspace.update();
+	const setEnforceSSO = workspace.setEnforceSSO();
 	const create = useCreate({ fresh: true });
 	const sheet = useSheet();
 
@@ -40,11 +38,9 @@
 	const plans = usePlans();
 	const upgrade = $derived(plans.upgradeLink('enforce_sso', hosted));
 
-	// Only the switch is sent. A downgraded workspace may turn it off, and nothing else rides along to be refused.
+	// A call of its own, so a downgraded workspace may turn it off and nothing else rides along to be refused.
 	function setEnforced(on: boolean) {
-		void whenFresh(() =>
-			update.mutate({ settings: createMessage(WorkspaceSettingsSchema, { enforceSso: on }) })
-		);
+		void whenFresh(() => setEnforceSSO.mutate({ enforceSso: on }));
 	}
 </script>
 
@@ -140,7 +136,7 @@
 					checked={enforced}
 					disabled={readonly ||
 						!ws.data ||
-						update.isPending ||
+						setEnforceSSO.isPending ||
 						enforceAvailable === undefined ||
 						locked ||
 						(!enforced && !anyEnabled)}

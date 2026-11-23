@@ -11,7 +11,10 @@ import "nokku/v1/util.proto";
 
 service DashboardService {
   rpc GetDashboard(GetDashboardRequest) returns (GetDashboardResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }

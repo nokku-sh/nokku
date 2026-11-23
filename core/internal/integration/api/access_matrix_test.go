@@ -145,9 +145,11 @@ func (f *matrixFixture) seedDaemonTarget(
 	ws := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, f.cfg, f.srv, ws, status != nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING)
 	if status == nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED {
-		_, err := nokkuv1connect.NewDaemonServiceClient(f.adminClient()).UpdateDaemon(t.Context(),
-			masked(&nokkuv1.UpdateDaemonRequest{Id: enrolled.Id, Status: &status}))
-		require.NoError(t, err)
+		// No call rejects without taking the server along, so the row is set by hand.
+		inWorkspace(t, f.cfg, ws, func(q *db.Queries) error {
+			_, err := q.UpdateDaemon(t.Context(), &db.UpdateDaemonParams{DaemonID: enrolled.GetId(), Status: status})
+			return err
+		})
 	}
 	f.labels[enrolled.GetId()] = label + "-daemon"
 	f.addTarget(t, matrixTarget{
@@ -266,8 +268,8 @@ func (f *matrixFixture) seedSubjects(t *testing.T) {
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(f.adminClient())
 	key := serviceAccountToken(t, accounts, ci, nil)
 	f.callers = append(f.callers, matrixCaller{"ci", key, key})
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(f.adminClient()).SetUserActive(t.Context(),
-		&nokkuv1.SetUserActiveRequest{UserId: &dave, Active: new(false)})
+	_, err := nokkuv1connect.NewWorkspaceServiceClient(f.adminClient()).DeactivateUser(t.Context(),
+		&nokkuv1.DeactivateUserRequest{UserId: &dave})
 	require.NoError(t, err)
 
 	f.subjects = []matrixSubject{

@@ -53,13 +53,41 @@ func (s *teamService) UpdateTeam(
 		Name:        req.Name,
 		Description: req.Description,
 		Tags:        maskedList(named("tags"), req.GetTags()),
-		ScimOpen:    req.ScimOpen,
 	})
 	if err != nil {
 		return nil, err
 	}
 	audit.Set(ctx, "name", team.Name)
 	return &nokkuv1.UpdateTeamResponse{Team: team.ToProto()}, nil
+}
+
+func (s *teamService) OpenTeamToSCIM(
+	ctx context.Context,
+	req *nokkuv1.OpenTeamToSCIMRequest,
+) (*nokkuv1.OpenTeamToSCIMResponse, error) {
+	if err := s.setSCIMOpen(ctx, req.GetId(), true); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.OpenTeamToSCIMResponse{}, nil
+}
+
+func (s *teamService) CloseTeamToSCIM(
+	ctx context.Context,
+	req *nokkuv1.CloseTeamToSCIMRequest,
+) (*nokkuv1.CloseTeamToSCIMResponse, error) {
+	if err := s.setSCIMOpen(ctx, req.GetId(), false); err != nil {
+		return nil, err
+	}
+	return &nokkuv1.CloseTeamToSCIMResponse{}, nil
+}
+
+func (s *teamService) setSCIMOpen(ctx context.Context, id string, open bool) error {
+	team, err := s.cfg.Conn.Tenant().UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, ScimOpen: &open})
+	if err != nil {
+		return err
+	}
+	audit.Set(ctx, "name", team.Name)
+	return nil
 }
 
 func (s *teamService) DeleteTeam(

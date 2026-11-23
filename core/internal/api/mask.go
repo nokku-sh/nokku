@@ -19,7 +19,9 @@ type maskedRequest interface {
 
 // applyMask clears every field the mask leaves out, so handlers can check
 // presence. A named field with presence must be set, or it would store a value
-// no rule checked. For lists, which have no presence, use named.
+// no rule checked. For lists, which have no presence, use named. The
+// interceptor runs it on every masked request before the plan gates and the
+// handler see it, a handler calls it again only to get named.
 func applyMask(req proto.Message, mask *fieldmaskpb.FieldMask) (named func(field string) bool, err error) {
 	tree := maskTree{}
 	for _, path := range mask.GetPaths() {

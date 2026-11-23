@@ -10,16 +10,22 @@ service SCIMService {
   rpc CreateSCIMToken(CreateSCIMTokenRequest) returns (CreateSCIMTokenResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      fresh: true
+      browser: BROWSER_FRESH
       feature: "scim"
     };
   }
   rpc ListSCIMTokens(ListSCIMTokensRequest) returns (ListSCIMTokensResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc DeleteSCIMToken(DeleteSCIMTokenRequest) returns (DeleteSCIMTokenResponse) {
-    option (access) = {role: WORKSPACE_ROLE_OWNER};
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      machine: true
+    };
   }
 }
 

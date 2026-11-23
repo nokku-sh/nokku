@@ -383,7 +383,6 @@ type UpdateWorkspaceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          *string                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,2,opt,name=description" json:"description,omitempty"`
-	Settings      *WorkspaceSettings     `protobuf:"bytes,3,opt,name=settings" json:"settings,omitempty"`
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,4,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -433,16 +432,97 @@ func (x *UpdateWorkspaceRequest) GetDescription() string {
 	return ""
 }
 
-func (x *UpdateWorkspaceRequest) GetSettings() *WorkspaceSettings {
+func (x *UpdateWorkspaceRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 	if x != nil {
-		return x.Settings
+		return x.UpdateMask
 	}
 	return nil
 }
 
-func (x *UpdateWorkspaceRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
+type SetEnforceSSORequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EnforceSso    *bool                  `protobuf:"varint,1,opt,name=enforce_sso,json=enforceSso" json:"enforce_sso,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetEnforceSSORequest) Reset() {
+	*x = SetEnforceSSORequest{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetEnforceSSORequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetEnforceSSORequest) ProtoMessage() {}
+
+func (x *SetEnforceSSORequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[6]
 	if x != nil {
-		return x.UpdateMask
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetEnforceSSORequest.ProtoReflect.Descriptor instead.
+func (*SetEnforceSSORequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SetEnforceSSORequest) GetEnforceSso() bool {
+	if x != nil && x.EnforceSso != nil {
+		return *x.EnforceSso
+	}
+	return false
+}
+
+type SetEnforceSSOResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Workspace     *Workspace             `protobuf:"bytes,1,opt,name=workspace" json:"workspace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetEnforceSSOResponse) Reset() {
+	*x = SetEnforceSSOResponse{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetEnforceSSOResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetEnforceSSOResponse) ProtoMessage() {}
+
+func (x *SetEnforceSSOResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetEnforceSSOResponse.ProtoReflect.Descriptor instead.
+func (*SetEnforceSSOResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SetEnforceSSOResponse) GetWorkspace() *Workspace {
+	if x != nil {
+		return x.Workspace
 	}
 	return nil
 }
@@ -456,7 +536,7 @@ type UpdateWorkspaceResponse struct {
 
 func (x *UpdateWorkspaceResponse) Reset() {
 	*x = UpdateWorkspaceResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[6]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -468,7 +548,7 @@ func (x *UpdateWorkspaceResponse) String() string {
 func (*UpdateWorkspaceResponse) ProtoMessage() {}
 
 func (x *UpdateWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[6]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -481,7 +561,7 @@ func (x *UpdateWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*UpdateWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{6}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateWorkspaceResponse) GetWorkspace() *Workspace {
@@ -502,7 +582,7 @@ type UpdateDaemonDefaultsRequest struct {
 
 func (x *UpdateDaemonDefaultsRequest) Reset() {
 	*x = UpdateDaemonDefaultsRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[7]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -514,7 +594,7 @@ func (x *UpdateDaemonDefaultsRequest) String() string {
 func (*UpdateDaemonDefaultsRequest) ProtoMessage() {}
 
 func (x *UpdateDaemonDefaultsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[7]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -527,7 +607,7 @@ func (x *UpdateDaemonDefaultsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDaemonDefaultsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDaemonDefaultsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{7}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateDaemonDefaultsRequest) GetDefaultDaemonConfig() *DaemonConfig {
@@ -560,7 +640,7 @@ type UpdateDaemonDefaultsResponse struct {
 
 func (x *UpdateDaemonDefaultsResponse) Reset() {
 	*x = UpdateDaemonDefaultsResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[8]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -572,7 +652,7 @@ func (x *UpdateDaemonDefaultsResponse) String() string {
 func (*UpdateDaemonDefaultsResponse) ProtoMessage() {}
 
 func (x *UpdateDaemonDefaultsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[8]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -585,10 +665,107 @@ func (x *UpdateDaemonDefaultsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDaemonDefaultsResponse.ProtoReflect.Descriptor instead.
 func (*UpdateDaemonDefaultsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{8}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateDaemonDefaultsResponse) GetWorkspace() *Workspace {
+	if x != nil {
+		return x.Workspace
+	}
+	return nil
+}
+
+// A rule left out stays as it is.
+type SetDefaultSafeguardsRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RecordSessions *bool                  `protobuf:"varint,1,opt,name=record_sessions,json=recordSessions" json:"record_sessions,omitempty"`
+	KillOnRevoke   *bool                  `protobuf:"varint,2,opt,name=kill_on_revoke,json=killOnRevoke" json:"kill_on_revoke,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SetDefaultSafeguardsRequest) Reset() {
+	*x = SetDefaultSafeguardsRequest{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDefaultSafeguardsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDefaultSafeguardsRequest) ProtoMessage() {}
+
+func (x *SetDefaultSafeguardsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDefaultSafeguardsRequest.ProtoReflect.Descriptor instead.
+func (*SetDefaultSafeguardsRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SetDefaultSafeguardsRequest) GetRecordSessions() bool {
+	if x != nil && x.RecordSessions != nil {
+		return *x.RecordSessions
+	}
+	return false
+}
+
+func (x *SetDefaultSafeguardsRequest) GetKillOnRevoke() bool {
+	if x != nil && x.KillOnRevoke != nil {
+		return *x.KillOnRevoke
+	}
+	return false
+}
+
+type SetDefaultSafeguardsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Workspace     *Workspace             `protobuf:"bytes,1,opt,name=workspace" json:"workspace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDefaultSafeguardsResponse) Reset() {
+	*x = SetDefaultSafeguardsResponse{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDefaultSafeguardsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDefaultSafeguardsResponse) ProtoMessage() {}
+
+func (x *SetDefaultSafeguardsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDefaultSafeguardsResponse.ProtoReflect.Descriptor instead.
+func (*SetDefaultSafeguardsResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SetDefaultSafeguardsResponse) GetWorkspace() *Workspace {
 	if x != nil {
 		return x.Workspace
 	}
@@ -603,7 +780,7 @@ type DeleteWorkspaceRequest struct {
 
 func (x *DeleteWorkspaceRequest) Reset() {
 	*x = DeleteWorkspaceRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[9]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +792,7 @@ func (x *DeleteWorkspaceRequest) String() string {
 func (*DeleteWorkspaceRequest) ProtoMessage() {}
 
 func (x *DeleteWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[9]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +805,7 @@ func (x *DeleteWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*DeleteWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{9}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{13}
 }
 
 type DeleteWorkspaceResponse struct {
@@ -639,7 +816,7 @@ type DeleteWorkspaceResponse struct {
 
 func (x *DeleteWorkspaceResponse) Reset() {
 	*x = DeleteWorkspaceResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[10]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -651,7 +828,7 @@ func (x *DeleteWorkspaceResponse) String() string {
 func (*DeleteWorkspaceResponse) ProtoMessage() {}
 
 func (x *DeleteWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[10]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -664,7 +841,7 @@ func (x *DeleteWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*DeleteWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{10}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{14}
 }
 
 type FindWorkspacesRequest struct {
@@ -676,7 +853,7 @@ type FindWorkspacesRequest struct {
 
 func (x *FindWorkspacesRequest) Reset() {
 	*x = FindWorkspacesRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[11]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -688,7 +865,7 @@ func (x *FindWorkspacesRequest) String() string {
 func (*FindWorkspacesRequest) ProtoMessage() {}
 
 func (x *FindWorkspacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[11]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -701,7 +878,7 @@ func (x *FindWorkspacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindWorkspacesRequest.ProtoReflect.Descriptor instead.
 func (*FindWorkspacesRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{11}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *FindWorkspacesRequest) GetEmail() string {
@@ -719,7 +896,7 @@ type FindWorkspacesResponse struct {
 
 func (x *FindWorkspacesResponse) Reset() {
 	*x = FindWorkspacesResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[12]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -731,7 +908,7 @@ func (x *FindWorkspacesResponse) String() string {
 func (*FindWorkspacesResponse) ProtoMessage() {}
 
 func (x *FindWorkspacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[12]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -744,7 +921,7 @@ func (x *FindWorkspacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindWorkspacesResponse.ProtoReflect.Descriptor instead.
 func (*FindWorkspacesResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{12}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{16}
 }
 
 type CreateWorkspaceRequest struct {
@@ -759,7 +936,7 @@ type CreateWorkspaceRequest struct {
 
 func (x *CreateWorkspaceRequest) Reset() {
 	*x = CreateWorkspaceRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[13]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -771,7 +948,7 @@ func (x *CreateWorkspaceRequest) String() string {
 func (*CreateWorkspaceRequest) ProtoMessage() {}
 
 func (x *CreateWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[13]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -784,7 +961,7 @@ func (x *CreateWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*CreateWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{13}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CreateWorkspaceRequest) GetSlug() string {
@@ -824,7 +1001,7 @@ type CreateWorkspaceResponse struct {
 
 func (x *CreateWorkspaceResponse) Reset() {
 	*x = CreateWorkspaceResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[14]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -836,7 +1013,7 @@ func (x *CreateWorkspaceResponse) String() string {
 func (*CreateWorkspaceResponse) ProtoMessage() {}
 
 func (x *CreateWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[14]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -849,7 +1026,7 @@ func (x *CreateWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*CreateWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{14}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CreateWorkspaceResponse) GetUrl() string {
@@ -872,7 +1049,7 @@ type ListUsersRequest struct {
 
 func (x *ListUsersRequest) Reset() {
 	*x = ListUsersRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[15]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +1061,7 @@ func (x *ListUsersRequest) String() string {
 func (*ListUsersRequest) ProtoMessage() {}
 
 func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[15]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +1074,7 @@ func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListUsersRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{15}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ListUsersRequest) GetLimit() int32 {
@@ -938,7 +1115,7 @@ type ListUsersResponse struct {
 
 func (x *ListUsersResponse) Reset() {
 	*x = ListUsersResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[16]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -950,7 +1127,7 @@ func (x *ListUsersResponse) String() string {
 func (*ListUsersResponse) ProtoMessage() {}
 
 func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[16]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -963,7 +1140,7 @@ func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListUsersResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{16}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListUsersResponse) GetUsers() []*User {
@@ -989,7 +1166,7 @@ type GetUserRequest struct {
 
 func (x *GetUserRequest) Reset() {
 	*x = GetUserRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[17]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1001,7 +1178,7 @@ func (x *GetUserRequest) String() string {
 func (*GetUserRequest) ProtoMessage() {}
 
 func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[17]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1014,7 +1191,7 @@ func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
 func (*GetUserRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{17}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetUserRequest) GetUserId() string {
@@ -1033,7 +1210,7 @@ type GetUserResponse struct {
 
 func (x *GetUserResponse) Reset() {
 	*x = GetUserResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[18]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1045,7 +1222,7 @@ func (x *GetUserResponse) String() string {
 func (*GetUserResponse) ProtoMessage() {}
 
 func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[18]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1058,7 +1235,7 @@ func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserResponse.ProtoReflect.Descriptor instead.
 func (*GetUserResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{18}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetUserResponse) GetUser() *User {
@@ -1078,7 +1255,7 @@ type UpdateUserRoleRequest struct {
 
 func (x *UpdateUserRoleRequest) Reset() {
 	*x = UpdateUserRoleRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[19]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1090,7 +1267,7 @@ func (x *UpdateUserRoleRequest) String() string {
 func (*UpdateUserRoleRequest) ProtoMessage() {}
 
 func (x *UpdateUserRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[19]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1103,7 +1280,7 @@ func (x *UpdateUserRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserRoleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserRoleRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{19}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UpdateUserRoleRequest) GetUserId() string {
@@ -1128,7 +1305,7 @@ type UpdateUserRoleResponse struct {
 
 func (x *UpdateUserRoleResponse) Reset() {
 	*x = UpdateUserRoleResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[20]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1140,7 +1317,7 @@ func (x *UpdateUserRoleResponse) String() string {
 func (*UpdateUserRoleResponse) ProtoMessage() {}
 
 func (x *UpdateUserRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[20]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1153,32 +1330,31 @@ func (x *UpdateUserRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserRoleResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserRoleResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{20}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{24}
 }
 
-type SetUserActiveRequest struct {
+type DeactivateUserRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        *string                `protobuf:"bytes,1,opt,name=user_id,json=userId" json:"user_id,omitempty"`
-	Active        *bool                  `protobuf:"varint,2,opt,name=active" json:"active,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SetUserActiveRequest) Reset() {
-	*x = SetUserActiveRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[21]
+func (x *DeactivateUserRequest) Reset() {
+	*x = DeactivateUserRequest{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SetUserActiveRequest) String() string {
+func (x *DeactivateUserRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SetUserActiveRequest) ProtoMessage() {}
+func (*DeactivateUserRequest) ProtoMessage() {}
 
-func (x *SetUserActiveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[21]
+func (x *DeactivateUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1189,46 +1365,39 @@ func (x *SetUserActiveRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SetUserActiveRequest.ProtoReflect.Descriptor instead.
-func (*SetUserActiveRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{21}
+// Deprecated: Use DeactivateUserRequest.ProtoReflect.Descriptor instead.
+func (*DeactivateUserRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{25}
 }
 
-func (x *SetUserActiveRequest) GetUserId() string {
+func (x *DeactivateUserRequest) GetUserId() string {
 	if x != nil && x.UserId != nil {
 		return *x.UserId
 	}
 	return ""
 }
 
-func (x *SetUserActiveRequest) GetActive() bool {
-	if x != nil && x.Active != nil {
-		return *x.Active
-	}
-	return false
-}
-
-type SetUserActiveResponse struct {
+type DeactivateUserResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SetUserActiveResponse) Reset() {
-	*x = SetUserActiveResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[22]
+func (x *DeactivateUserResponse) Reset() {
+	*x = DeactivateUserResponse{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SetUserActiveResponse) String() string {
+func (x *DeactivateUserResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SetUserActiveResponse) ProtoMessage() {}
+func (*DeactivateUserResponse) ProtoMessage() {}
 
-func (x *SetUserActiveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[22]
+func (x *DeactivateUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1239,9 +1408,89 @@ func (x *SetUserActiveResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SetUserActiveResponse.ProtoReflect.Descriptor instead.
-func (*SetUserActiveResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{22}
+// Deprecated: Use DeactivateUserResponse.ProtoReflect.Descriptor instead.
+func (*DeactivateUserResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{26}
+}
+
+type ReactivateUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        *string                `protobuf:"bytes,1,opt,name=user_id,json=userId" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReactivateUserRequest) Reset() {
+	*x = ReactivateUserRequest{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReactivateUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReactivateUserRequest) ProtoMessage() {}
+
+func (x *ReactivateUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReactivateUserRequest.ProtoReflect.Descriptor instead.
+func (*ReactivateUserRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ReactivateUserRequest) GetUserId() string {
+	if x != nil && x.UserId != nil {
+		return *x.UserId
+	}
+	return ""
+}
+
+type ReactivateUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReactivateUserResponse) Reset() {
+	*x = ReactivateUserResponse{}
+	mi := &file_nokku_v1_workspace_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReactivateUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReactivateUserResponse) ProtoMessage() {}
+
+func (x *ReactivateUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_workspace_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReactivateUserResponse.ProtoReflect.Descriptor instead.
+func (*ReactivateUserResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{28}
 }
 
 type DeleteUserRequest struct {
@@ -1253,7 +1502,7 @@ type DeleteUserRequest struct {
 
 func (x *DeleteUserRequest) Reset() {
 	*x = DeleteUserRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[23]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1265,7 +1514,7 @@ func (x *DeleteUserRequest) String() string {
 func (*DeleteUserRequest) ProtoMessage() {}
 
 func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[23]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1278,7 +1527,7 @@ func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{23}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *DeleteUserRequest) GetUserId() string {
@@ -1296,7 +1545,7 @@ type DeleteUserResponse struct {
 
 func (x *DeleteUserResponse) Reset() {
 	*x = DeleteUserResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[24]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1308,7 +1557,7 @@ func (x *DeleteUserResponse) String() string {
 func (*DeleteUserResponse) ProtoMessage() {}
 
 func (x *DeleteUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[24]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1321,7 +1570,7 @@ func (x *DeleteUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUserResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{24}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{30}
 }
 
 type ClearUserIdentitiesRequest struct {
@@ -1333,7 +1582,7 @@ type ClearUserIdentitiesRequest struct {
 
 func (x *ClearUserIdentitiesRequest) Reset() {
 	*x = ClearUserIdentitiesRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[25]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1345,7 +1594,7 @@ func (x *ClearUserIdentitiesRequest) String() string {
 func (*ClearUserIdentitiesRequest) ProtoMessage() {}
 
 func (x *ClearUserIdentitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[25]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1358,7 +1607,7 @@ func (x *ClearUserIdentitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearUserIdentitiesRequest.ProtoReflect.Descriptor instead.
 func (*ClearUserIdentitiesRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{25}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ClearUserIdentitiesRequest) GetUserId() string {
@@ -1376,7 +1625,7 @@ type ClearUserIdentitiesResponse struct {
 
 func (x *ClearUserIdentitiesResponse) Reset() {
 	*x = ClearUserIdentitiesResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[26]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1388,7 +1637,7 @@ func (x *ClearUserIdentitiesResponse) String() string {
 func (*ClearUserIdentitiesResponse) ProtoMessage() {}
 
 func (x *ClearUserIdentitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[26]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1401,7 +1650,7 @@ func (x *ClearUserIdentitiesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearUserIdentitiesResponse.ProtoReflect.Descriptor instead.
 func (*ClearUserIdentitiesResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{26}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{32}
 }
 
 type TransferOwnershipRequest struct {
@@ -1413,7 +1662,7 @@ type TransferOwnershipRequest struct {
 
 func (x *TransferOwnershipRequest) Reset() {
 	*x = TransferOwnershipRequest{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[27]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1425,7 +1674,7 @@ func (x *TransferOwnershipRequest) String() string {
 func (*TransferOwnershipRequest) ProtoMessage() {}
 
 func (x *TransferOwnershipRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[27]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1438,7 +1687,7 @@ func (x *TransferOwnershipRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferOwnershipRequest.ProtoReflect.Descriptor instead.
 func (*TransferOwnershipRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{27}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *TransferOwnershipRequest) GetNewOwnerId() string {
@@ -1456,7 +1705,7 @@ type TransferOwnershipResponse struct {
 
 func (x *TransferOwnershipResponse) Reset() {
 	*x = TransferOwnershipResponse{}
-	mi := &file_nokku_v1_workspace_proto_msgTypes[28]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1468,7 +1717,7 @@ func (x *TransferOwnershipResponse) String() string {
 func (*TransferOwnershipResponse) ProtoMessage() {}
 
 func (x *TransferOwnershipResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_workspace_proto_msgTypes[28]
+	mi := &file_nokku_v1_workspace_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1481,7 +1730,7 @@ func (x *TransferOwnershipResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferOwnershipResponse.ProtoReflect.Descriptor instead.
 func (*TransferOwnershipResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{28}
+	return file_nokku_v1_workspace_proto_rawDescGZIP(), []int{34}
 }
 
 var File_nokku_v1_workspace_proto protoreflect.FileDescriptor
@@ -1524,22 +1773,31 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\vPlanFeature\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
-	"\x04plan\x18\x03 \x01(\tR\x04plan\"\x8e\x02\n" +
+	"\x04plan\x18\x03 \x01(\tR\x04plan\"\xcf\x01\n" +
 	"\x16UpdateWorkspaceRequest\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x03\x18\x80\x02R\x04name\x12*\n" +
-	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x127\n" +
-	"\bsettings\x18\x03 \x01(\v2\x1b.nokku.v1.WorkspaceSettingsR\bsettings\x12o\n" +
-	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB2\xbaH/\xc8\x01\x01\xe2\x01)\x12\x04name\x12\vdescription\x12\x14settings.enforce_ssoR\n" +
-	"updateMask\"L\n" +
+	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12Y\n" +
+	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB\x1c\xbaH\x19\xc8\x01\x01\xe2\x01\x13\x12\x04name\x12\vdescriptionR\n" +
+	"updateMaskJ\x04\b\x03\x10\x04R\bsettings\"?\n" +
+	"\x14SetEnforceSSORequest\x12'\n" +
+	"\venforce_sso\x18\x01 \x01(\bB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"enforceSso\"J\n" +
+	"\x15SetEnforceSSOResponse\x121\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"L\n" +
 	"\x17UpdateWorkspaceResponse\x121\n" +
-	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\xf0\x03\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\xa3\x03\n" +
 	"\x1bUpdateDaemonDefaultsRequest\x12J\n" +
 	"\x15default_daemon_config\x18\x01 \x01(\v2\x16.nokku.v1.DaemonConfigR\x13defaultDaemonConfig\x12[\n" +
-	"\x14session_idle_timeout\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x0e\xbaH\v\xaa\x01\b\"\x04\b\x80\xa3\x052\x00R\x12sessionIdleTimeout\x12\xa7\x02\n" +
-	"\vupdate_mask\x18\x03 \x01(\v2\x1a.google.protobuf.FieldMaskB\xe9\x01\xbaH\xe5\x01\xc8\x01\x01\xe2\x01\xde\x01\x12%default_daemon_config.record_sessions\x12&default_daemon_config.allow_forwarding\x12,default_daemon_config.allow_agent_forwarding\x12#default_daemon_config.gateway_ports\x12$default_daemon_config.kill_on_revoke\x12\x14session_idle_timeoutR\n" +
+	"\x14session_idle_timeout\x18\x02 \x01(\v2\x19.google.protobuf.DurationB\x0e\xbaH\v\xaa\x01\b\"\x04\b\x80\xa3\x052\x00R\x12sessionIdleTimeout\x12\xda\x01\n" +
+	"\vupdate_mask\x18\x03 \x01(\v2\x1a.google.protobuf.FieldMaskB\x9c\x01\xbaH\x98\x01\xc8\x01\x01\xe2\x01\x91\x01\x12&default_daemon_config.allow_forwarding\x12,default_daemon_config.allow_agent_forwarding\x12#default_daemon_config.gateway_ports\x12\x14session_idle_timeoutR\n" +
 	"updateMask\"Q\n" +
 	"\x1cUpdateDaemonDefaultsResponse\x121\n" +
+	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"l\n" +
+	"\x1bSetDefaultSafeguardsRequest\x12'\n" +
+	"\x0frecord_sessions\x18\x01 \x01(\bR\x0erecordSessions\x12$\n" +
+	"\x0ekill_on_revoke\x18\x02 \x01(\bR\fkillOnRevoke\"Q\n" +
+	"\x1cSetDefaultSafeguardsResponse\x121\n" +
 	"\tworkspace\x18\x01 \x01(\v2\x13.nokku.v1.WorkspaceR\tworkspace\"\x18\n" +
 	"\x16DeleteWorkspaceRequest\"\x19\n" +
 	"\x17DeleteWorkspaceResponse\"6\n" +
@@ -1571,11 +1829,13 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x15UpdateUserRoleRequest\x12!\n" +
 	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\x12;\n" +
 	"\x04role\x18\x02 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleB\x0e\xbaH\v\x82\x01\b\x18\x01\x18\x02\x18\x03\x18\x04R\x04role\"\x18\n" +
-	"\x16UpdateUserRoleResponse\"Q\n" +
-	"\x14SetUserActiveRequest\x12!\n" +
-	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\x12\x16\n" +
-	"\x06active\x18\x02 \x01(\bR\x06active\"\x17\n" +
-	"\x15SetUserActiveResponse\"6\n" +
+	"\x16UpdateUserRoleResponse\":\n" +
+	"\x15DeactivateUserRequest\x12!\n" +
+	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x18\n" +
+	"\x16DeactivateUserResponse\":\n" +
+	"\x15ReactivateUserRequest\x12!\n" +
+	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x18\n" +
+	"\x16ReactivateUserResponse\"6\n" +
 	"\x11DeleteUserRequest\x12!\n" +
 	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x14\n" +
 	"\x12DeleteUserResponse\"?\n" +
@@ -1585,20 +1845,23 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\x18TransferOwnershipRequest\x12*\n" +
 	"\fnew_owner_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
 	"newOwnerId\"\x1b\n" +
-	"\x19TransferOwnershipResponse2\xd8\t\n" +
-	"\x10WorkspaceService\x12X\n" +
-	"\fGetWorkspace\x12\x1d.nokku.v1.GetWorkspaceRequest\x1a\x1e.nokku.v1.GetWorkspaceResponse\"\t\xc2\xf3\x18\x02\x10\x01\x90\x02\x01\x12^\n" +
-	"\x0fUpdateWorkspace\x12 .nokku.v1.UpdateWorkspaceRequest\x1a!.nokku.v1.UpdateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\x18\x05\x12m\n" +
-	"\x14UpdateDaemonDefaults\x12%.nokku.v1.UpdateDaemonDefaultsRequest\x1a&.nokku.v1.UpdateDaemonDefaultsResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12`\n" +
-	"\x0fDeleteWorkspace\x12 .nokku.v1.DeleteWorkspaceRequest\x1a!.nokku.v1.DeleteWorkspaceResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12Q\n" +
-	"\tListUsers\x12\x1a.nokku.v1.ListUsersRequest\x1a\x1b.nokku.v1.ListUsersResponse\"\v\xc2\xf3\x18\x04\x18\x02X\x01\x90\x02\x01\x12I\n" +
-	"\aGetUser\x12\x18.nokku.v1.GetUserRequest\x1a\x19.nokku.v1.GetUserResponse\"\t\xc2\xf3\x18\x02\x18\x02\x90\x02\x01\x12]\n" +
-	"\x0eUpdateUserRole\x12\x1f.nokku.v1.UpdateUserRoleRequest\x1a .nokku.v1.UpdateUserRoleResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12X\n" +
-	"\rSetUserActive\x12\x1e.nokku.v1.SetUserActiveRequest\x1a\x1f.nokku.v1.SetUserActiveResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12O\n" +
+	"\x19TransferOwnershipResponse2\x95\f\n" +
+	"\x10WorkspaceService\x12Z\n" +
+	"\fGetWorkspace\x12\x1d.nokku.v1.GetWorkspaceRequest\x1a\x1e.nokku.v1.GetWorkspaceResponse\"\v\xc2\xf3\x18\x04\x10\x01h\x01\x90\x02\x01\x12`\n" +
+	"\x0fUpdateWorkspace\x12 .nokku.v1.UpdateWorkspaceRequest\x1a!.nokku.v1.UpdateWorkspaceResponse\"\b\xc2\xf3\x18\x04\x18\x05h\x01\x12Z\n" +
+	"\rSetEnforceSSO\x12\x1e.nokku.v1.SetEnforceSSORequest\x1a\x1f.nokku.v1.SetEnforceSSOResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01\x12o\n" +
+	"\x14UpdateDaemonDefaults\x12%.nokku.v1.UpdateDaemonDefaultsRequest\x1a&.nokku.v1.UpdateDaemonDefaultsResponse\"\b\xc2\xf3\x18\x04\x18\x04h\x01\x12o\n" +
+	"\x14SetDefaultSafeguards\x12%.nokku.v1.SetDefaultSafeguardsRequest\x1a&.nokku.v1.SetDefaultSafeguardsResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12`\n" +
+	"\x0fDeleteWorkspace\x12 .nokku.v1.DeleteWorkspaceRequest\x1a!.nokku.v1.DeleteWorkspaceResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01\x12S\n" +
+	"\tListUsers\x12\x1a.nokku.v1.ListUsersRequest\x1a\x1b.nokku.v1.ListUsersResponse\"\r\xc2\xf3\x18\x06\x18\x02X\x01h\x01\x90\x02\x01\x12K\n" +
+	"\aGetUser\x12\x18.nokku.v1.GetUserRequest\x1a\x19.nokku.v1.GetUserResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12]\n" +
+	"\x0eUpdateUserRole\x12\x1f.nokku.v1.UpdateUserRoleRequest\x1a .nokku.v1.UpdateUserRoleResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12]\n" +
+	"\x0eDeactivateUser\x12\x1f.nokku.v1.DeactivateUserRequest\x1a .nokku.v1.DeactivateUserResponse\"\b\xc2\xf3\x18\x04\x18\x04h\x01\x12]\n" +
+	"\x0eReactivateUser\x12\x1f.nokku.v1.ReactivateUserRequest\x1a .nokku.v1.ReactivateUserResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12Q\n" +
 	"\n" +
-	"DeleteUser\x12\x1b.nokku.v1.DeleteUserRequest\x1a\x1c.nokku.v1.DeleteUserResponse\"\x06\xc2\xf3\x18\x02\x18\x04\x12l\n" +
-	"\x13ClearUserIdentities\x12$.nokku.v1.ClearUserIdentitiesRequest\x1a%.nokku.v1.ClearUserIdentitiesResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01\x12f\n" +
-	"\x11TransferOwnership\x12\".nokku.v1.TransferOwnershipRequest\x1a#.nokku.v1.TransferOwnershipResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01\x12^\n" +
+	"DeleteUser\x12\x1b.nokku.v1.DeleteUserRequest\x1a\x1c.nokku.v1.DeleteUserResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12l\n" +
+	"\x13ClearUserIdentities\x12$.nokku.v1.ClearUserIdentitiesRequest\x1a%.nokku.v1.ClearUserIdentitiesResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12f\n" +
+	"\x11TransferOwnership\x12\".nokku.v1.TransferOwnershipRequest\x1a#.nokku.v1.TransferOwnershipResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01\x12^\n" +
 	"\x0fCreateWorkspace\x12 .nokku.v1.CreateWorkspaceRequest\x1a!.nokku.v1.CreateWorkspaceResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12[\n" +
 	"\x0eFindWorkspaces\x12\x1f.nokku.v1.FindWorkspacesRequest\x1a .nokku.v1.FindWorkspacesResponse\"\x06\xc2\xf3\x18\x02\b\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eWorkspaceProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -1615,7 +1878,7 @@ func file_nokku_v1_workspace_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_workspace_proto_rawDescData
 }
 
-var file_nokku_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_nokku_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_nokku_v1_workspace_proto_goTypes = []any{
 	(*Workspace)(nil),                    // 0: nokku.v1.Workspace
 	(*WorkspaceSettings)(nil),            // 1: nokku.v1.WorkspaceSettings
@@ -1623,91 +1886,104 @@ var file_nokku_v1_workspace_proto_goTypes = []any{
 	(*GetWorkspaceResponse)(nil),         // 3: nokku.v1.GetWorkspaceResponse
 	(*PlanFeature)(nil),                  // 4: nokku.v1.PlanFeature
 	(*UpdateWorkspaceRequest)(nil),       // 5: nokku.v1.UpdateWorkspaceRequest
-	(*UpdateWorkspaceResponse)(nil),      // 6: nokku.v1.UpdateWorkspaceResponse
-	(*UpdateDaemonDefaultsRequest)(nil),  // 7: nokku.v1.UpdateDaemonDefaultsRequest
-	(*UpdateDaemonDefaultsResponse)(nil), // 8: nokku.v1.UpdateDaemonDefaultsResponse
-	(*DeleteWorkspaceRequest)(nil),       // 9: nokku.v1.DeleteWorkspaceRequest
-	(*DeleteWorkspaceResponse)(nil),      // 10: nokku.v1.DeleteWorkspaceResponse
-	(*FindWorkspacesRequest)(nil),        // 11: nokku.v1.FindWorkspacesRequest
-	(*FindWorkspacesResponse)(nil),       // 12: nokku.v1.FindWorkspacesResponse
-	(*CreateWorkspaceRequest)(nil),       // 13: nokku.v1.CreateWorkspaceRequest
-	(*CreateWorkspaceResponse)(nil),      // 14: nokku.v1.CreateWorkspaceResponse
-	(*ListUsersRequest)(nil),             // 15: nokku.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),            // 16: nokku.v1.ListUsersResponse
-	(*GetUserRequest)(nil),               // 17: nokku.v1.GetUserRequest
-	(*GetUserResponse)(nil),              // 18: nokku.v1.GetUserResponse
-	(*UpdateUserRoleRequest)(nil),        // 19: nokku.v1.UpdateUserRoleRequest
-	(*UpdateUserRoleResponse)(nil),       // 20: nokku.v1.UpdateUserRoleResponse
-	(*SetUserActiveRequest)(nil),         // 21: nokku.v1.SetUserActiveRequest
-	(*SetUserActiveResponse)(nil),        // 22: nokku.v1.SetUserActiveResponse
-	(*DeleteUserRequest)(nil),            // 23: nokku.v1.DeleteUserRequest
-	(*DeleteUserResponse)(nil),           // 24: nokku.v1.DeleteUserResponse
-	(*ClearUserIdentitiesRequest)(nil),   // 25: nokku.v1.ClearUserIdentitiesRequest
-	(*ClearUserIdentitiesResponse)(nil),  // 26: nokku.v1.ClearUserIdentitiesResponse
-	(*TransferOwnershipRequest)(nil),     // 27: nokku.v1.TransferOwnershipRequest
-	(*TransferOwnershipResponse)(nil),    // 28: nokku.v1.TransferOwnershipResponse
-	nil,                                  // 29: nokku.v1.GetWorkspaceResponse.FeaturesEntry
-	nil,                                  // 30: nokku.v1.GetWorkspaceResponse.PlanNamesEntry
-	(*timestamppb.Timestamp)(nil),        // 31: google.protobuf.Timestamp
-	(*DaemonConfig)(nil),                 // 32: nokku.v1.DaemonConfig
-	(*durationpb.Duration)(nil),          // 33: google.protobuf.Duration
-	(*fieldmaskpb.FieldMask)(nil),        // 34: google.protobuf.FieldMask
-	(WorkspaceRole)(0),                   // 35: nokku.v1.WorkspaceRole
-	(*User)(nil),                         // 36: nokku.v1.User
+	(*SetEnforceSSORequest)(nil),         // 6: nokku.v1.SetEnforceSSORequest
+	(*SetEnforceSSOResponse)(nil),        // 7: nokku.v1.SetEnforceSSOResponse
+	(*UpdateWorkspaceResponse)(nil),      // 8: nokku.v1.UpdateWorkspaceResponse
+	(*UpdateDaemonDefaultsRequest)(nil),  // 9: nokku.v1.UpdateDaemonDefaultsRequest
+	(*UpdateDaemonDefaultsResponse)(nil), // 10: nokku.v1.UpdateDaemonDefaultsResponse
+	(*SetDefaultSafeguardsRequest)(nil),  // 11: nokku.v1.SetDefaultSafeguardsRequest
+	(*SetDefaultSafeguardsResponse)(nil), // 12: nokku.v1.SetDefaultSafeguardsResponse
+	(*DeleteWorkspaceRequest)(nil),       // 13: nokku.v1.DeleteWorkspaceRequest
+	(*DeleteWorkspaceResponse)(nil),      // 14: nokku.v1.DeleteWorkspaceResponse
+	(*FindWorkspacesRequest)(nil),        // 15: nokku.v1.FindWorkspacesRequest
+	(*FindWorkspacesResponse)(nil),       // 16: nokku.v1.FindWorkspacesResponse
+	(*CreateWorkspaceRequest)(nil),       // 17: nokku.v1.CreateWorkspaceRequest
+	(*CreateWorkspaceResponse)(nil),      // 18: nokku.v1.CreateWorkspaceResponse
+	(*ListUsersRequest)(nil),             // 19: nokku.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),            // 20: nokku.v1.ListUsersResponse
+	(*GetUserRequest)(nil),               // 21: nokku.v1.GetUserRequest
+	(*GetUserResponse)(nil),              // 22: nokku.v1.GetUserResponse
+	(*UpdateUserRoleRequest)(nil),        // 23: nokku.v1.UpdateUserRoleRequest
+	(*UpdateUserRoleResponse)(nil),       // 24: nokku.v1.UpdateUserRoleResponse
+	(*DeactivateUserRequest)(nil),        // 25: nokku.v1.DeactivateUserRequest
+	(*DeactivateUserResponse)(nil),       // 26: nokku.v1.DeactivateUserResponse
+	(*ReactivateUserRequest)(nil),        // 27: nokku.v1.ReactivateUserRequest
+	(*ReactivateUserResponse)(nil),       // 28: nokku.v1.ReactivateUserResponse
+	(*DeleteUserRequest)(nil),            // 29: nokku.v1.DeleteUserRequest
+	(*DeleteUserResponse)(nil),           // 30: nokku.v1.DeleteUserResponse
+	(*ClearUserIdentitiesRequest)(nil),   // 31: nokku.v1.ClearUserIdentitiesRequest
+	(*ClearUserIdentitiesResponse)(nil),  // 32: nokku.v1.ClearUserIdentitiesResponse
+	(*TransferOwnershipRequest)(nil),     // 33: nokku.v1.TransferOwnershipRequest
+	(*TransferOwnershipResponse)(nil),    // 34: nokku.v1.TransferOwnershipResponse
+	nil,                                  // 35: nokku.v1.GetWorkspaceResponse.FeaturesEntry
+	nil,                                  // 36: nokku.v1.GetWorkspaceResponse.PlanNamesEntry
+	(*timestamppb.Timestamp)(nil),        // 37: google.protobuf.Timestamp
+	(*DaemonConfig)(nil),                 // 38: nokku.v1.DaemonConfig
+	(*durationpb.Duration)(nil),          // 39: google.protobuf.Duration
+	(*fieldmaskpb.FieldMask)(nil),        // 40: google.protobuf.FieldMask
+	(WorkspaceRole)(0),                   // 41: nokku.v1.WorkspaceRole
+	(*User)(nil),                         // 42: nokku.v1.User
 }
 var file_nokku_v1_workspace_proto_depIdxs = []int32{
 	1,  // 0: nokku.v1.Workspace.settings:type_name -> nokku.v1.WorkspaceSettings
-	31, // 1: nokku.v1.Workspace.created_at:type_name -> google.protobuf.Timestamp
-	31, // 2: nokku.v1.Workspace.updated_at:type_name -> google.protobuf.Timestamp
-	32, // 3: nokku.v1.WorkspaceSettings.default_daemon_config:type_name -> nokku.v1.DaemonConfig
-	33, // 4: nokku.v1.WorkspaceSettings.session_idle_timeout:type_name -> google.protobuf.Duration
+	37, // 1: nokku.v1.Workspace.created_at:type_name -> google.protobuf.Timestamp
+	37, // 2: nokku.v1.Workspace.updated_at:type_name -> google.protobuf.Timestamp
+	38, // 3: nokku.v1.WorkspaceSettings.default_daemon_config:type_name -> nokku.v1.DaemonConfig
+	39, // 4: nokku.v1.WorkspaceSettings.session_idle_timeout:type_name -> google.protobuf.Duration
 	0,  // 5: nokku.v1.GetWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	31, // 6: nokku.v1.GetWorkspaceResponse.delete_at:type_name -> google.protobuf.Timestamp
-	29, // 7: nokku.v1.GetWorkspaceResponse.features:type_name -> nokku.v1.GetWorkspaceResponse.FeaturesEntry
+	37, // 6: nokku.v1.GetWorkspaceResponse.delete_at:type_name -> google.protobuf.Timestamp
+	35, // 7: nokku.v1.GetWorkspaceResponse.features:type_name -> nokku.v1.GetWorkspaceResponse.FeaturesEntry
 	4,  // 8: nokku.v1.GetWorkspaceResponse.catalog:type_name -> nokku.v1.PlanFeature
-	30, // 9: nokku.v1.GetWorkspaceResponse.plan_names:type_name -> nokku.v1.GetWorkspaceResponse.PlanNamesEntry
-	1,  // 10: nokku.v1.UpdateWorkspaceRequest.settings:type_name -> nokku.v1.WorkspaceSettings
-	34, // 11: nokku.v1.UpdateWorkspaceRequest.update_mask:type_name -> google.protobuf.FieldMask
+	36, // 9: nokku.v1.GetWorkspaceResponse.plan_names:type_name -> nokku.v1.GetWorkspaceResponse.PlanNamesEntry
+	40, // 10: nokku.v1.UpdateWorkspaceRequest.update_mask:type_name -> google.protobuf.FieldMask
+	0,  // 11: nokku.v1.SetEnforceSSOResponse.workspace:type_name -> nokku.v1.Workspace
 	0,  // 12: nokku.v1.UpdateWorkspaceResponse.workspace:type_name -> nokku.v1.Workspace
-	32, // 13: nokku.v1.UpdateDaemonDefaultsRequest.default_daemon_config:type_name -> nokku.v1.DaemonConfig
-	33, // 14: nokku.v1.UpdateDaemonDefaultsRequest.session_idle_timeout:type_name -> google.protobuf.Duration
-	34, // 15: nokku.v1.UpdateDaemonDefaultsRequest.update_mask:type_name -> google.protobuf.FieldMask
+	38, // 13: nokku.v1.UpdateDaemonDefaultsRequest.default_daemon_config:type_name -> nokku.v1.DaemonConfig
+	39, // 14: nokku.v1.UpdateDaemonDefaultsRequest.session_idle_timeout:type_name -> google.protobuf.Duration
+	40, // 15: nokku.v1.UpdateDaemonDefaultsRequest.update_mask:type_name -> google.protobuf.FieldMask
 	0,  // 16: nokku.v1.UpdateDaemonDefaultsResponse.workspace:type_name -> nokku.v1.Workspace
-	35, // 17: nokku.v1.ListUsersRequest.role:type_name -> nokku.v1.WorkspaceRole
-	36, // 18: nokku.v1.ListUsersResponse.users:type_name -> nokku.v1.User
-	36, // 19: nokku.v1.GetUserResponse.user:type_name -> nokku.v1.User
-	35, // 20: nokku.v1.UpdateUserRoleRequest.role:type_name -> nokku.v1.WorkspaceRole
-	2,  // 21: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
-	5,  // 22: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
-	7,  // 23: nokku.v1.WorkspaceService.UpdateDaemonDefaults:input_type -> nokku.v1.UpdateDaemonDefaultsRequest
-	9,  // 24: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
-	15, // 25: nokku.v1.WorkspaceService.ListUsers:input_type -> nokku.v1.ListUsersRequest
-	17, // 26: nokku.v1.WorkspaceService.GetUser:input_type -> nokku.v1.GetUserRequest
-	19, // 27: nokku.v1.WorkspaceService.UpdateUserRole:input_type -> nokku.v1.UpdateUserRoleRequest
-	21, // 28: nokku.v1.WorkspaceService.SetUserActive:input_type -> nokku.v1.SetUserActiveRequest
-	23, // 29: nokku.v1.WorkspaceService.DeleteUser:input_type -> nokku.v1.DeleteUserRequest
-	25, // 30: nokku.v1.WorkspaceService.ClearUserIdentities:input_type -> nokku.v1.ClearUserIdentitiesRequest
-	27, // 31: nokku.v1.WorkspaceService.TransferOwnership:input_type -> nokku.v1.TransferOwnershipRequest
-	13, // 32: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
-	11, // 33: nokku.v1.WorkspaceService.FindWorkspaces:input_type -> nokku.v1.FindWorkspacesRequest
-	3,  // 34: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
-	6,  // 35: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
-	8,  // 36: nokku.v1.WorkspaceService.UpdateDaemonDefaults:output_type -> nokku.v1.UpdateDaemonDefaultsResponse
-	10, // 37: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
-	16, // 38: nokku.v1.WorkspaceService.ListUsers:output_type -> nokku.v1.ListUsersResponse
-	18, // 39: nokku.v1.WorkspaceService.GetUser:output_type -> nokku.v1.GetUserResponse
-	20, // 40: nokku.v1.WorkspaceService.UpdateUserRole:output_type -> nokku.v1.UpdateUserRoleResponse
-	22, // 41: nokku.v1.WorkspaceService.SetUserActive:output_type -> nokku.v1.SetUserActiveResponse
-	24, // 42: nokku.v1.WorkspaceService.DeleteUser:output_type -> nokku.v1.DeleteUserResponse
-	26, // 43: nokku.v1.WorkspaceService.ClearUserIdentities:output_type -> nokku.v1.ClearUserIdentitiesResponse
-	28, // 44: nokku.v1.WorkspaceService.TransferOwnership:output_type -> nokku.v1.TransferOwnershipResponse
-	14, // 45: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
-	12, // 46: nokku.v1.WorkspaceService.FindWorkspaces:output_type -> nokku.v1.FindWorkspacesResponse
-	34, // [34:47] is the sub-list for method output_type
-	21, // [21:34] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	0,  // 17: nokku.v1.SetDefaultSafeguardsResponse.workspace:type_name -> nokku.v1.Workspace
+	41, // 18: nokku.v1.ListUsersRequest.role:type_name -> nokku.v1.WorkspaceRole
+	42, // 19: nokku.v1.ListUsersResponse.users:type_name -> nokku.v1.User
+	42, // 20: nokku.v1.GetUserResponse.user:type_name -> nokku.v1.User
+	41, // 21: nokku.v1.UpdateUserRoleRequest.role:type_name -> nokku.v1.WorkspaceRole
+	2,  // 22: nokku.v1.WorkspaceService.GetWorkspace:input_type -> nokku.v1.GetWorkspaceRequest
+	5,  // 23: nokku.v1.WorkspaceService.UpdateWorkspace:input_type -> nokku.v1.UpdateWorkspaceRequest
+	6,  // 24: nokku.v1.WorkspaceService.SetEnforceSSO:input_type -> nokku.v1.SetEnforceSSORequest
+	9,  // 25: nokku.v1.WorkspaceService.UpdateDaemonDefaults:input_type -> nokku.v1.UpdateDaemonDefaultsRequest
+	11, // 26: nokku.v1.WorkspaceService.SetDefaultSafeguards:input_type -> nokku.v1.SetDefaultSafeguardsRequest
+	13, // 27: nokku.v1.WorkspaceService.DeleteWorkspace:input_type -> nokku.v1.DeleteWorkspaceRequest
+	19, // 28: nokku.v1.WorkspaceService.ListUsers:input_type -> nokku.v1.ListUsersRequest
+	21, // 29: nokku.v1.WorkspaceService.GetUser:input_type -> nokku.v1.GetUserRequest
+	23, // 30: nokku.v1.WorkspaceService.UpdateUserRole:input_type -> nokku.v1.UpdateUserRoleRequest
+	25, // 31: nokku.v1.WorkspaceService.DeactivateUser:input_type -> nokku.v1.DeactivateUserRequest
+	27, // 32: nokku.v1.WorkspaceService.ReactivateUser:input_type -> nokku.v1.ReactivateUserRequest
+	29, // 33: nokku.v1.WorkspaceService.DeleteUser:input_type -> nokku.v1.DeleteUserRequest
+	31, // 34: nokku.v1.WorkspaceService.ClearUserIdentities:input_type -> nokku.v1.ClearUserIdentitiesRequest
+	33, // 35: nokku.v1.WorkspaceService.TransferOwnership:input_type -> nokku.v1.TransferOwnershipRequest
+	17, // 36: nokku.v1.WorkspaceService.CreateWorkspace:input_type -> nokku.v1.CreateWorkspaceRequest
+	15, // 37: nokku.v1.WorkspaceService.FindWorkspaces:input_type -> nokku.v1.FindWorkspacesRequest
+	3,  // 38: nokku.v1.WorkspaceService.GetWorkspace:output_type -> nokku.v1.GetWorkspaceResponse
+	8,  // 39: nokku.v1.WorkspaceService.UpdateWorkspace:output_type -> nokku.v1.UpdateWorkspaceResponse
+	7,  // 40: nokku.v1.WorkspaceService.SetEnforceSSO:output_type -> nokku.v1.SetEnforceSSOResponse
+	10, // 41: nokku.v1.WorkspaceService.UpdateDaemonDefaults:output_type -> nokku.v1.UpdateDaemonDefaultsResponse
+	12, // 42: nokku.v1.WorkspaceService.SetDefaultSafeguards:output_type -> nokku.v1.SetDefaultSafeguardsResponse
+	14, // 43: nokku.v1.WorkspaceService.DeleteWorkspace:output_type -> nokku.v1.DeleteWorkspaceResponse
+	20, // 44: nokku.v1.WorkspaceService.ListUsers:output_type -> nokku.v1.ListUsersResponse
+	22, // 45: nokku.v1.WorkspaceService.GetUser:output_type -> nokku.v1.GetUserResponse
+	24, // 46: nokku.v1.WorkspaceService.UpdateUserRole:output_type -> nokku.v1.UpdateUserRoleResponse
+	26, // 47: nokku.v1.WorkspaceService.DeactivateUser:output_type -> nokku.v1.DeactivateUserResponse
+	28, // 48: nokku.v1.WorkspaceService.ReactivateUser:output_type -> nokku.v1.ReactivateUserResponse
+	30, // 49: nokku.v1.WorkspaceService.DeleteUser:output_type -> nokku.v1.DeleteUserResponse
+	32, // 50: nokku.v1.WorkspaceService.ClearUserIdentities:output_type -> nokku.v1.ClearUserIdentitiesResponse
+	34, // 51: nokku.v1.WorkspaceService.TransferOwnership:output_type -> nokku.v1.TransferOwnershipResponse
+	18, // 52: nokku.v1.WorkspaceService.CreateWorkspace:output_type -> nokku.v1.CreateWorkspaceResponse
+	16, // 53: nokku.v1.WorkspaceService.FindWorkspaces:output_type -> nokku.v1.FindWorkspacesResponse
+	38, // [38:54] is the sub-list for method output_type
+	22, // [22:38] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_workspace_proto_init() }
@@ -1724,7 +2000,7 @@ func file_nokku_v1_workspace_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_workspace_proto_rawDesc), len(file_nokku_v1_workspace_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

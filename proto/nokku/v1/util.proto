@@ -17,17 +17,24 @@ service UtilService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // PollAuditLogs is for a SIEM that fetches. It reads forward from a cursor, oldest first, and never skips an event.
   rpc PollAuditLogs(PollAuditLogsRequest) returns (PollAuditLogsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
+      machine: true
       feature: "audit_streaming"
     };
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -35,17 +42,22 @@ service UtilService {
   rpc ExportAuditLogs(ExportAuditLogsRequest) returns (ExportAuditLogsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
+      machine: true
       feature: "audit_export"
     };
   }
   rpc ExportAccessReport(ExportAccessReportRequest) returns (ExportAccessReportResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
+      machine: true
       feature: "access_review"
     };
   }
   rpc ListMyActivity(ListMyActivityRequest) returns (ListMyActivityResponse) {
-    option (access) = {self: true};
+    option (access) = {
+      self: true
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }

@@ -36,6 +36,12 @@ const (
 	// ServiceAccountServiceUpdateServiceAccountProcedure is the procedure name of the
 	// ServiceAccountService's UpdateServiceAccount RPC.
 	ServiceAccountServiceUpdateServiceAccountProcedure = "/nokku.v1.ServiceAccountService/UpdateServiceAccount"
+	// ServiceAccountServiceSetServiceAccountRoleProcedure is the procedure name of the
+	// ServiceAccountService's SetServiceAccountRole RPC.
+	ServiceAccountServiceSetServiceAccountRoleProcedure = "/nokku.v1.ServiceAccountService/SetServiceAccountRole"
+	// ServiceAccountServiceSetServiceAccountLimitsProcedure is the procedure name of the
+	// ServiceAccountService's SetServiceAccountLimits RPC.
+	ServiceAccountServiceSetServiceAccountLimitsProcedure = "/nokku.v1.ServiceAccountService/SetServiceAccountLimits"
 	// ServiceAccountServiceDeleteServiceAccountProcedure is the procedure name of the
 	// ServiceAccountService's DeleteServiceAccount RPC.
 	ServiceAccountServiceDeleteServiceAccountProcedure = "/nokku.v1.ServiceAccountService/DeleteServiceAccount"
@@ -88,6 +94,20 @@ var (
 			StreamType: connect.StreamTypeUnary,
 			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("UpdateServiceAccount"),
 			Procedure:  ServiceAccountServiceUpdateServiceAccountProcedure,
+		}
+	})
+	serviceAccountServiceSetServiceAccountRoleSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("SetServiceAccountRole"),
+			Procedure:  ServiceAccountServiceSetServiceAccountRoleProcedure,
+		}
+	})
+	serviceAccountServiceSetServiceAccountLimitsSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_service_account_proto.Services().ByName("ServiceAccountService").Methods().ByName("SetServiceAccountLimits"),
+			Procedure:  ServiceAccountServiceSetServiceAccountLimitsProcedure,
 		}
 	})
 	serviceAccountServiceDeleteServiceAccountSpec = sync.OnceValue(func() connect.Spec {
@@ -149,6 +169,11 @@ type ServiceAccountServiceClient interface {
 	ListServiceAccounts(context.Context, *v1.ListServiceAccountsRequest) (*v1.ListServiceAccountsResponse, error)
 	CreateServiceAccount(context.Context, *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error)
 	UpdateServiceAccount(context.Context, *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error)
+	// SetServiceAccountRole changes what the account may read and do through the API.
+	SetServiceAccountRole(context.Context, *v1.SetServiceAccountRoleRequest) (*v1.SetServiceAccountRoleResponse, error)
+	// SetServiceAccountLimits changes what goes on every certificate the account gets. Only a person does that, or
+	// an account would lift its own limits.
+	SetServiceAccountLimits(context.Context, *v1.SetServiceAccountLimitsRequest) (*v1.SetServiceAccountLimitsResponse, error)
 	DeleteServiceAccount(context.Context, *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error)
 	CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error)
 	ListServiceAccountTokens(context.Context, *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error)
@@ -170,6 +195,11 @@ type ServiceAccountServiceHandler interface {
 	ListServiceAccounts(context.Context, *v1.ListServiceAccountsRequest) (*v1.ListServiceAccountsResponse, error)
 	CreateServiceAccount(context.Context, *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error)
 	UpdateServiceAccount(context.Context, *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error)
+	// SetServiceAccountRole changes what the account may read and do through the API.
+	SetServiceAccountRole(context.Context, *v1.SetServiceAccountRoleRequest) (*v1.SetServiceAccountRoleResponse, error)
+	// SetServiceAccountLimits changes what goes on every certificate the account gets. Only a person does that, or
+	// an account would lift its own limits.
+	SetServiceAccountLimits(context.Context, *v1.SetServiceAccountLimitsRequest) (*v1.SetServiceAccountLimitsResponse, error)
 	DeleteServiceAccount(context.Context, *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error)
 	CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error)
 	ListServiceAccountTokens(context.Context, *v1.ListServiceAccountTokensRequest) (*v1.ListServiceAccountTokensResponse, error)
@@ -188,6 +218,8 @@ func RegisterServiceAccountServiceHandler(server *connect.Server, svc ServiceAcc
 		connect.Method{Spec: serviceAccountServiceListServiceAccountsSpec(), Handler: adapter.listServiceAccounts},
 		connect.Method{Spec: serviceAccountServiceCreateServiceAccountSpec(), Handler: adapter.createServiceAccount},
 		connect.Method{Spec: serviceAccountServiceUpdateServiceAccountSpec(), Handler: adapter.updateServiceAccount},
+		connect.Method{Spec: serviceAccountServiceSetServiceAccountRoleSpec(), Handler: adapter.setServiceAccountRole},
+		connect.Method{Spec: serviceAccountServiceSetServiceAccountLimitsSpec(), Handler: adapter.setServiceAccountLimits},
 		connect.Method{Spec: serviceAccountServiceDeleteServiceAccountSpec(), Handler: adapter.deleteServiceAccount},
 		connect.Method{Spec: serviceAccountServiceCreateServiceAccountTokenSpec(), Handler: adapter.createServiceAccountToken},
 		connect.Method{Spec: serviceAccountServiceListServiceAccountTokensSpec(), Handler: adapter.listServiceAccountTokens},
@@ -215,6 +247,14 @@ func (UnimplementedServiceAccountServiceHandler) CreateServiceAccount(context.Co
 
 func (UnimplementedServiceAccountServiceHandler) UpdateServiceAccount(context.Context, *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.UpdateServiceAccount is not implemented")
+}
+
+func (UnimplementedServiceAccountServiceHandler) SetServiceAccountRole(context.Context, *v1.SetServiceAccountRoleRequest) (*v1.SetServiceAccountRoleResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.SetServiceAccountRole is not implemented")
+}
+
+func (UnimplementedServiceAccountServiceHandler) SetServiceAccountLimits(context.Context, *v1.SetServiceAccountLimitsRequest) (*v1.SetServiceAccountLimitsResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.ServiceAccountService.SetServiceAccountLimits is not implemented")
 }
 
 func (UnimplementedServiceAccountServiceHandler) DeleteServiceAccount(context.Context, *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error) {
@@ -276,6 +316,22 @@ func (c *serviceAccountServiceClient) CreateServiceAccount(ctx context.Context, 
 func (c *serviceAccountServiceClient) UpdateServiceAccount(ctx context.Context, req *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error) {
 	var res v1.UpdateServiceAccountResponse
 	if err := c.client.CallUnary(ctx, serviceAccountServiceUpdateServiceAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) SetServiceAccountRole(ctx context.Context, req *v1.SetServiceAccountRoleRequest) (*v1.SetServiceAccountRoleResponse, error) {
+	var res v1.SetServiceAccountRoleResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceSetServiceAccountRoleSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *serviceAccountServiceClient) SetServiceAccountLimits(ctx context.Context, req *v1.SetServiceAccountLimitsRequest) (*v1.SetServiceAccountLimitsResponse, error) {
+	var res v1.SetServiceAccountLimitsResponse
+	if err := c.client.CallUnary(ctx, serviceAccountServiceSetServiceAccountLimitsSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -381,6 +437,30 @@ func (h serviceAccountServiceHandler) updateServiceAccount(ctx context.Context, 
 		return err
 	}
 	res, err := h.svc.UpdateServiceAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) setServiceAccountRole(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetServiceAccountRoleRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetServiceAccountRole(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h serviceAccountServiceHandler) setServiceAccountLimits(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.SetServiceAccountLimitsRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.SetServiceAccountLimits(ctx, &req)
 	if err != nil {
 		return err
 	}

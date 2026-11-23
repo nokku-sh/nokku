@@ -10,53 +10,62 @@ import "nokku/v1/account.proto";
 
 service TeamService {
   rpc GetTeam(GetTeamRequest) returns (GetTeamResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListTeams(ListTeamsRequest) returns (ListTeamsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      cli: true
+      nk: true
+      machine: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      people_only: true
       capped: true
     };
   }
   rpc UpdateTeam(UpdateTeamRequest) returns (UpdateTeamResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
+  // OpenTeamToSCIM lets a SCIM group of the same name take the team over. That hands its access to whoever runs
+  // the identity provider.
+  rpc OpenTeamToSCIM(OpenTeamToSCIMRequest) returns (OpenTeamToSCIMResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      people_only: true
+      browser: BROWSER_FRESH
     };
+  }
+  // CloseTeamToSCIM takes that back, and stays quick.
+  rpc CloseTeamToSCIM(CloseTeamToSCIMRequest) returns (CloseTeamToSCIMResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc DeleteTeam(DeleteTeamRequest) returns (DeleteTeamResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc AddTeamMember(AddTeamMemberRequest) returns (AddTeamMemberResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc RemoveTeamMember(RemoveTeamMemberRequest) returns (RemoveTeamMemberResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      people_only: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
   rpc ListTeamMembers(ListTeamMembersRequest) returns (ListTeamMembersResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListTeamsForUser(ListTeamsForUserRequest) returns (ListTeamsForUserResponse) {
-    option (access) = {role: WORKSPACE_ROLE_VIEWER};
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -96,6 +105,10 @@ message CreateTeamResponse {
 }
 
 message UpdateTeamRequest {
+  // scim_open went to OpenTeamToSCIM and CloseTeamToSCIM.
+  reserved 6;
+  reserved scim_open;
+
   string id = 1 [(buf.validate.field).string.uuid = true];
   string name = 2 [(buf.validate.field).string = {
     min_len: 1
@@ -103,16 +116,13 @@ message UpdateTeamRequest {
   }];
   string description = 3 [(buf.validate.field).string.max_len = 1000];
   repeated string tags = 4;
-  // Opening a team for SCIM takes a fresh sign-in, it hands its access to whoever runs the identity provider.
-  bool scim_open = 6;
   google.protobuf.FieldMask update_mask = 5 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
         "name",
         "description",
-        "tags",
-        "scim_open"
+        "tags"
       ]
     }
   ];
@@ -120,6 +130,16 @@ message UpdateTeamRequest {
 message UpdateTeamResponse {
   Team team = 1;
 }
+
+message OpenTeamToSCIMRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message OpenTeamToSCIMResponse {}
+
+message CloseTeamToSCIMRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message CloseTeamToSCIMResponse {}
 
 message DeleteTeamRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];

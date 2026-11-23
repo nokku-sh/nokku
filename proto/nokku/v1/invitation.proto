@@ -19,15 +19,21 @@ service InvitationService {
   rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      fresh: true
+      browser: BROWSER_FRESH
     };
   }
   rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      machine: true
+    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc DeleteInvitation(DeleteInvitationRequest) returns (DeleteInvitationResponse) {
-    option (access) = {role: WORKSPACE_ROLE_ADMIN};
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      machine: true
+    };
   }
 }
 

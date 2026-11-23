@@ -95,27 +95,28 @@
 
 	let newEndpoint = $state('');
 
-	// Where logins go takes a recent sign-in.
+	const rename = targetApi.rename();
+	const setEndpoints = targetApi.setEndpoints();
+
+	// Where logins go takes a recent sign-in, and a call of its own. The list follows the refetch, the draft never
+	// holds a change to it.
 	function addEndpoint() {
 		const value = newEndpoint.trim();
 		if (!model || !value || model.endpoints.includes(value)) return;
-		void whenFresh(() => {
-			if (!model) return;
-			model.endpoints = [...model.endpoints, value];
-			newEndpoint = '';
-			save();
-		});
+		const endpoints = [...model.endpoints, value];
+		void whenFresh(() =>
+			setEndpoints.mutate({ id: sheet.id, endpoints }, { onSuccess: () => (newEndpoint = '') })
+		);
 	}
 
 	function removeEndpoint(endpoint: string) {
-		void whenFresh(() => {
-			if (!model) return;
-			model.endpoints = model.endpoints.filter((e) => e !== endpoint);
-			save();
-		});
+		if (!model) return;
+		const endpoints = model.endpoints.filter((e) => e !== endpoint);
+		void whenFresh(() => setEndpoints.mutate({ id: sheet.id, endpoints }));
 	}
 
 	const updateDaemon = daemonApi.update();
+	const setSafeguards = daemonApi.setSafeguards();
 	const review = useDaemonReview();
 	const ws = workspace.get();
 	const defaults = $derived(ws.data?.settings?.defaultDaemonConfig ?? {});
@@ -128,8 +129,10 @@
 		if (!d) return;
 		let saved: Promise<unknown> | undefined;
 		const run = () => {
-			saved = autoSave.track(() =>
-				updateDaemon.mutateAsync({ id: d.id, config: ruleValue(rule.key, value) })
+			saved = autoSave.track<unknown>(() =>
+				rule.fresh
+					? setSafeguards.mutateAsync({ id: d.id, ...ruleValue(rule.key, value) })
+					: updateDaemon.mutateAsync({ id: d.id, config: ruleValue(rule.key, value) })
 			);
 		};
 		if (rule.fresh) await whenFresh(run);
@@ -214,12 +217,7 @@
 	missing={query.isError}
 	title={model?.name ?? ''}
 	onRename={can.edit
-		? (name) =>
-				void whenFresh(() => {
-					if (!model) return;
-					model.name = name;
-					save();
-				})
+		? (name) => void whenFresh(() => rename.mutate({ id: sheet.id, name }))
 		: undefined}
 	tabs={[
 		{ value: 'overview', label: 'Overview', icon: Info },
