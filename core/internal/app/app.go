@@ -128,7 +128,7 @@ func New(ctx context.Context, cmd *cli.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Keyset, store, cfg.Entitlements, cfg.Audit)
+	cfg.Record = recording.New(ctx, cfg.Conn, cfg.Keyset, store, cfg.Entitlements)
 	cfg.Pool = daemon.New(ctx, cfg.Conn, cfg.Audit.Record)
 	access.Start(ctx, cfg.Conn, cfg.Audit.Append)
 

@@ -216,7 +216,7 @@ func (s *daemonControlService) UploadRecording(
 	defer release()
 
 	// Before the row exists, so a refused upload leaves nothing behind.
-	if !s.cfg.Record.MakeRoom(ctx, actor.WorkspaceIDFromContext(ctx), meta.GetRecordingId()) {
+	if !s.cfg.Record.HasRoom(ctx, actor.WorkspaceIDFromContext(ctx)) {
 		return nil, errRecordingStorageFull
 	}
 	rec, err := s.resolveUpload(ctx, daemonID, meta)

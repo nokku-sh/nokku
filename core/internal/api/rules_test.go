@@ -31,7 +31,7 @@ var conditionalFeatures = []string{
 // uncappedCreates have their bound somewhere else, with the place named.
 var uncappedCreates = map[string]string{
 	"/nokku.v1.WorkspaceService/CreateWorkspace":                "pre-tenant, bounded by the auth rate limit",
-	"/nokku.v1.DaemonService/CreateSession":                     "no lasting row, recording storage evicts",
+	"/nokku.v1.DaemonService/CreateSession":                     "no lasting row, the recording storage cap refuses",
 	"/nokku.v1.AccessRequestService/CreateAccessRequest":        "handler: maxDailyRequests per person",
 	"/nokku.v1.AuditStreamService/CreateAuditStream":            "handler: maxAuditStreams per workspace",
 	"/nokku.v1.InvitationService/CreateInvitation":              "one row per address, gone in 7 days, the seat cap refuses it",

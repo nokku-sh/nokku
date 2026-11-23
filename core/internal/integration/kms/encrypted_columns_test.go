@@ -410,7 +410,7 @@ func seedRecording(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws strin
 	store, err := storage.New(t.Context())
 	require.NoError(t, err)
 	recorder := func(keys *kms.Keyset) *recording.Service {
-		return recording.New(t.Context(), conn, keys, store, recordingLimits{}, nil)
+		return recording.New(t.Context(), conn, keys, store, recordingLimits{})
 	}
 
 	key := recording.NewKey()

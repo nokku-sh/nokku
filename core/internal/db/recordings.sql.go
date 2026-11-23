@@ -467,52 +467,6 @@ func (q *Queries) NextRecordingDelete(ctx context.Context) (*NextRecordingDelete
 	return &i, err
 }
 
-const oldestRecordings = `-- name: OldestRecordings :many
-SELECT
-  id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, object_id, started_at, ended_at, size_bytes, complete
-FROM
-  recordings
-ORDER BY
-  started_at ASC
-LIMIT
-  $1
-`
-
-func (q *Queries) OldestRecordings(ctx context.Context, limit *int32) ([]*Recording, error) {
-	rows, err := q.db.Query(ctx, oldestRecordings, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Recording
-	for rows.Next() {
-		var i Recording
-		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.DaemonID,
-			&i.DaemonName,
-			&i.Username,
-			&i.SubjectID,
-			&i.SubjectName,
-			&i.Principal,
-			&i.Key,
-			&i.ObjectID,
-			&i.StartedAt,
-			&i.EndedAt,
-			&i.SizeBytes,
-			&i.Complete,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const queueLostRecordingObject = `-- name: QueueLostRecordingObject :exec
 SELECT
   queue_lost_recording_object ($1)

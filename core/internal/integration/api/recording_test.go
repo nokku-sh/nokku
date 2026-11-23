@@ -412,104 +412,36 @@ func capStorage(t *testing.T, cfg *app.Config) {
 		cfg.Keyset,
 		store,
 		cappedStorage{cfg.Entitlements},
-		cfg.Audit,
 	)
 	t.Cleanup(func() { cfg.Record = uncapped })
 }
 
-// backdate ages a recording. Only the owner role may rewrite a start time.
-func backdate(t *testing.T, id string, days int) {
-	t.Helper()
-	owner, err := pgx.Connect(t.Context(), "")
-	require.NoError(t, err)
-	defer func() { _ = owner.Close(t.Context()) }()
-	_, err = owner.Exec(t.Context(),
-		"UPDATE recordings SET started_at = NOW() - make_interval(days => $2) WHERE id = $1", id, days)
-	require.NoError(t, err)
-}
-
-// An upload over the cap evicts old recordings, never one from the last day.
+// Over the cap the workspace takes no new upload, and nothing is deleted to make room.
 func TestRecordingStorageCap(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	capStorage(t, cfg)
-	workspaceID := testWorkspace.ID
-	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
+	key, enrolled := enrollTestDaemon(t, cfg, srv, testWorkspace.ID, true)
 	upload := func(id string, mib int) error {
 		return uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, mib)
 	}
-	stored := func(id string) (*db.Recording, error) {
-		return cfg.Conn.Sys().GetRecording(t.Context(), id)
-	}
-	old, recent, next, last, refused := uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String(),
-		uuid.NewV7().String(), uuid.NewV7().String()
+	old, recent, refused := uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String()
 
 	require.NoError(t, upload(old, 6))
-	backdate(t, old, 2)
 	require.NoError(t, upload(recent, 6), "the cap is asked when an upload starts, this one started under it")
-	require.NoError(t, upload(next, 1), "an old recording is in the way, not a reason to refuse")
-	_, err := stored(old)
-	require.ErrorIs(t, err, pgx.ErrNoRows, "the old recording makes room")
-	var events []*db.ListAuditLogsRow
-	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
-		// Other tests evict in the same workspace, in any order.
-		events, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
-			Actions: []string{"RecordingEvicted"},
-			Target:  &old,
-			Limit:   10,
-		})
+	err := upload(refused, 1)
+	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "an upload into a full workspace, got %v", err)
+	_, err = cfg.Conn.Sys().GetRecording(t.Context(), refused)
+	require.ErrorIs(t, err, pgx.ErrNoRows, "a refused upload leaves no recording behind")
+	_, err = cfg.Conn.Sys().GetRecording(t.Context(), old)
+	require.NoError(t, err, "the oldest recording was deleted to make room")
+
+	// Once a recording is gone there is room again, and the daemon's next try gets through.
+	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
+		_, err := q.DeleteRecording(t.Context(), old)
 		return err
 	})
-	require.Len(t, events, 1, "every eviction is audited")
-	assert.Equal(t, old, events[0].Target)
-	assert.Contains(t, string(events[0].Details), next, "the event names the upload that needed the room")
-
-	// Over the cap with nothing to evict, the workspace takes no new upload.
-	require.NoError(t, upload(last, 6))
-	err = upload(refused, 1)
-	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err), "an upload into a full workspace, got %v", err)
-	_, err = stored(refused)
-	require.ErrorIs(t, err, pgx.ErrNoRows, "a refused upload leaves no recording behind")
-	_, err = stored(recent)
-	require.NoError(t, err, "a recording from today stays")
-
-	// A day later there is room again, and the daemon's next try gets through.
-	backdate(t, recent, 2)
 	require.NoError(t, upload(refused, 1))
-	rec, err := stored(refused)
-	require.NoError(t, err)
-	assert.EqualValues(t, 1<<20, rec.SizeBytes)
 	assert.EqualValues(t, 1<<20, storedBytes(t, cfg, refused))
-}
-
-// Eviction takes the oldest and stops once the workspace is under the cap.
-func TestRecordingEvictionTakesNoMoreThanNeeded(t *testing.T) {
-	cfg, srv := newTestAPI(t)
-	capStorage(t, cfg)
-	workspaceID := testWorkspace.ID
-	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
-	upload := func(mib int) string {
-		id := uuid.NewV7().String()
-		require.NoError(t, uploadMiB(t, cfg, srv, key, enrolled.GetAccessToken(), id, mib))
-		return id
-	}
-
-	oldest, older, old := upload(3), upload(3), upload(3)
-	backdate(t, oldest, 4)
-	backdate(t, older, 3)
-	backdate(t, old, 2)
-	evicted := objectOf(t, cfg, oldest)
-	upload(3)
-	upload(1)
-
-	_, err := cfg.Conn.Sys().GetRecording(t.Context(), oldest)
-	require.ErrorIs(t, err, pgx.ErrNoRows, "the oldest recording makes room")
-	for _, id := range []string{older, old} {
-		_, err = cfg.Conn.Sys().GetRecording(t.Context(), id)
-		require.NoError(t, err, "one recording was enough, a second one went too")
-	}
-	// capStorage's sweeper may have run already, only the end state is certain.
-	require.NoError(t, cfg.Record.DeleteQueued(t.Context()))
-	assert.False(t, objectExists(workspaceID, evicted), "the delete queue left the evicted object")
 }
 
 // objectPath is where the test server's storage keeps an object.

@@ -134,16 +134,6 @@ DELETE FROM recordings
 WHERE
   id = @id;
 
--- name: OldestRecordings :many
-SELECT
-  *
-FROM
-  recordings
-ORDER BY
-  started_at ASC
-LIMIT
-  sqlc.narg('limit');
-
 -- name: ListRecordingWorkspaceIDs :many
 -- Hops from one workspace to the next in the index. A DISTINCT reads every recording to name a few hundred ids.
 WITH RECURSIVE

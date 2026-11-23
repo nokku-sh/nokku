@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	// An eviction only frees disk once its objects are gone.
 	deleteEvery = 10 * time.Minute
 	// maxFailedDeletes in a row ends a pass, the next one asks again.
 	maxFailedDeletes = 3
