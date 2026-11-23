@@ -37,7 +37,8 @@ func requestCMD() *cli.Command {
 			if cmd.NArg() != 2 || cmd.String("reason") == "" {
 				return errors.New(`usage: nk request <server> <account> --reason "..." [--for 2h]`)
 			}
-			server, account := cmd.Args().Get(0), cmd.Args().Get(1)
+			// The name as ssh has it works too.
+			server, account := strings.TrimSuffix(cmd.Args().Get(0), ssh.HostSuffix), cmd.Args().Get(1)
 			c, err := connect(ctx, cmd)
 			if err != nil {
 				return err
@@ -79,7 +80,7 @@ func waitForAnswer(ctx context.Context, c *client.Client, id string) error {
 			if err = c.Sync(ctx, false); err != nil {
 				return err
 			}
-			host := cmp.Or(ssh.HostAliases(c.State)[req.GetTargetId()], ui.PlainLine(req.GetTargetName()))
+			host := cmp.Or(ssh.HostAliases(c.State)[req.GetTargetId()], ssh.HostName(ui.PlainLine(req.GetTargetName())))
 			fmt.Printf("%s Approved by %s until %s\n", ui.Green("✔"), ui.PlainLine(req.GetDeciderName()),
 				untilLabel(req.GetGrantedUntil().AsTime()))
 			fmt.Printf("  Connect with: ssh %s@%s\n", req.GetUsername(), host)

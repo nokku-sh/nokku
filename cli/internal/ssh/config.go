@@ -24,13 +24,17 @@ import (
 
 const header = "# Managed by Nokku. nk regenerates this file, do not edit it.\n\n"
 
+// HostSuffix ends ssh's name for every server, like web.nk. It keeps Nokku's names apart from the hosts a user
+// has, so no server takes the place of one, and ssh starts nk for nothing else.
+const HostSuffix = ".nk"
+
 // What the core allows. Anything wider could claim github.com or reach a shell.
 var targetName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
-//go:embed ssh_config.tmpl
-var sshConfigText string
+//go:embed ssh_hosts.tmpl
+var sshHostsText string
 
-var sshConfig = template.Must(template.New("ssh_config").Parse(sshConfigText))
+var sshHosts = template.Must(template.New("ssh_hosts").Parse(sshHostsText))
 
 // Every value is ready for ssh_config, quoted where it needs to be.
 type hostBlock struct {
@@ -39,8 +43,12 @@ type hostBlock struct {
 }
 
 func WriteConfigs(s *state.State) error {
-	config := renderSSHConfig(s, HostAliases(s), nkCommand())
-	if err := fsutil.WriteIfChanged(paths.SSHConfigFile(), config, 0o600); err != nil {
+	nk := nkCommand()
+	// The hosts first, the config that includes them never names a file that is not there yet.
+	if err := fsutil.WriteIfChanged(paths.SSHHostsFile(), renderSSHHosts(s, nk), 0o600); err != nil {
+		return err
+	}
+	if err := fsutil.WriteIfChanged(paths.SSHConfigFile(), renderSSHConfig(nk), 0o600); err != nil {
 		return err
 	}
 	if err := fsutil.WriteIfChanged(paths.KnownHostsFile(), renderKnownHosts(s), 0o600); err != nil {
@@ -49,39 +57,40 @@ func WriteConfigs(s *state.State) error {
 	return ensureInclude()
 }
 
-// HostAliases has no entry for a target that cannot go into ssh_config.
+// HostName is ssh's name for a server, like web.nk.
+func HostName(name string) string { return strings.ToLower(name) + HostSuffix }
+
+// HostAliases is ssh's name for each target, lowercased like ssh does it. A target that cannot go into
+// ssh_config has none.
 func HostAliases(s *state.State) map[string]string {
-	return hostAliases(s, readOwnHosts())
-}
-
-// nk's Include comes first, so a bare name could take over a user's own host.
-func hostAliases(s *state.State, own ownHosts) map[string]string {
-	// Case folded, ssh's Match can't tell Web from web. Neither can people.
-	names := make(map[string]int)
-	for _, t := range s.Targets {
-		if usable(t) {
-			names[strings.ToLower(t.Name)]++
-		}
-	}
-
 	aliases := make(map[string]string, len(s.Targets))
+	taken := map[string]bool{}
 	for _, t := range s.Targets {
-		if !usable(t) {
+		host := HostName(t.Name)
+		// The core keeps names apart without case. Should two meet anyway, the first keeps the name.
+		if !usable(t) || taken[host] {
 			continue
 		}
-		switch {
-		case names[strings.ToLower(t.Name)] > 1:
-			aliases[t.ID] = "nokku/" + t.ID
-		case own.claims(t.Name):
-			aliases[t.ID] = "nokku/" + t.Name
-		default:
-			aliases[t.ID] = t.Name
-		}
+		taken[host] = true
+		aliases[t.ID] = host
 	}
 	return aliases
 }
 
-func renderSSHConfig(s *state.State, aliases map[string]string, nk string) []byte {
+// renderSSHConfig is the file the user's ssh config includes: one block for every name under .nk. ssh runs nk
+// prepare, which brings the hosts file up to date, and reads that file after it. A name with no block there ends
+// in nk proxy, which says so. No line takes a token like %h, so a host name never reaches a shell.
+func renderSSHConfig(nk string) []byte {
+	var b bytes.Buffer
+	b.WriteString(header)
+	fmt.Fprintf(&b, "Match originalhost *%s exec %s\n", HostSuffix, configValue(nk+" prepare"))
+	fmt.Fprintf(&b, "    %s\n", includeLine(paths.SSHHostsFile()))
+	fmt.Fprintf(&b, "    ProxyCommand %s proxy\n", nk)
+	return b.Bytes()
+}
+
+func renderSSHHosts(s *state.State, nk string) []byte {
+	aliases := HostAliases(s)
 	identity, agent := configValue(paths.PubKeyFile()), configValue(paths.AgentSocket())
 	if s.SecurityKey {
 		// ssh talks to the key itself and asks for the touch, the handle is no secret.
@@ -97,8 +106,9 @@ func renderSSHConfig(s *state.State, aliases map[string]string, nk string) []byt
 			Host: host,
 			User: t.Usernames[0],
 			ID:   t.ID,
-			// ssh loads CertificateFile before ProxyCommand, so Match exec renews
-			// first. It lowercases %h, hence the id.
+			// ssh loads CertificateFile before ProxyCommand, so Match exec renews first. It gets the id and no
+			// token, a host name never reaches a shell. The options sit under the Match line, which takes Web.nk
+			// for web.nk where a Host line does not. The Host line above it is for shell completion.
 			Prepare:     configValue(nk + " prepare " + t.ID),
 			NK:          nk,
 			Certificate: configValue(paths.SSHCertificate(t.ID)),
@@ -111,7 +121,7 @@ func renderSSHConfig(s *state.State, aliases map[string]string, nk string) []byt
 	var b bytes.Buffer
 	b.WriteString(header)
 	// The template is fixed and the tests run it, so only a bug can fail here.
-	if err := sshConfig.Execute(&b, hosts); err != nil {
+	if err := sshHosts.Execute(&b, hosts); err != nil {
 		panic(err)
 	}
 	return b.Bytes()
@@ -194,16 +204,16 @@ func ensureInclude() error {
 	if HasInclude(data) {
 		return nil
 	}
-	out := append([]byte(includeLine()+"\n\n"), data...)
+	include := includeLine(paths.SSHConfigFile())
+	out := append([]byte(include+"\n\n"), data...)
 	if err = fsutil.WriteFile(path, out, 0o600); err != nil {
-		return fmt.Errorf("cannot update %s (%w), add this line at its top yourself:\n  %s", path, err, includeLine())
+		return fmt.Errorf("cannot update %s (%w), add this line at its top yourself:\n  %s", path, err, include)
 	}
 	return nil
 }
 
 // Bare where ssh reads it the same, shell completers don't unquote the path.
-func includeLine() string {
-	path := paths.SSHConfigFile()
+func includeLine(path string) string {
 	if strings.ContainsAny(path, " \t\"'\\#") {
 		return "Include " + configValue(path)
 	}
@@ -243,7 +253,7 @@ func HasInclude(data []byte) bool {
 
 func isInclude(line string) bool {
 	return strings.ReplaceAll(strings.TrimSpace(line), `"`, "") ==
-		strings.ReplaceAll(includeLine(), `"`, "")
+		strings.ReplaceAll(includeLine(paths.SSHConfigFile()), `"`, "")
 }
 
 // Resolves symlinks, so dotfile managers keep their link.

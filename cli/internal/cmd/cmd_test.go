@@ -189,7 +189,7 @@ func TestDropSecurityKey(t *testing.T) {
 	assert.False(t, state.Load().SecurityKey, "kept for later runs")
 	assert.NoFileExists(t, handle, "a later --security-key makes a new key")
 	assert.NoFileExists(t, handle+".pub")
-	config, err := os.ReadFile(paths.SSHConfigFile())
+	config, err := os.ReadFile(paths.SSHHostsFile())
 	require.NoError(t, err)
 	assert.NotContains(t, string(config), "security-key")
 	assert.NotContains(t, string(config), "IdentityAgent none", "ssh signs through the nk agent again")

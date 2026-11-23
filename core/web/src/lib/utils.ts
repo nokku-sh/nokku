@@ -135,6 +135,9 @@ export function nkLoginCommand(): string {
 	return `nk --api ${location.origin} login`;
 }
 
+/** ssh's name for a server, like web.nk. nk writes every server under .nk, in lowercase. */
+export const sshHost = (name: string) => `${name.toLowerCase()}.nk`;
+
 /** "a, b and c", or "a, b, c and 4 more" past max. A total above the list counts names it left out. */
 export function listNames(list: string[], max = 3, total = list.length): string {
 	const shown = list.slice(0, max);

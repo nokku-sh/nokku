@@ -26,7 +26,7 @@
 	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
-	import { formatTs } from '#lib/utils.js';
+	import { formatTs, sshHost } from '#lib/utils.js';
 	import {
 		Ban,
 		Bot,
@@ -202,7 +202,9 @@
 				{#each accounts as account (account.id)}
 					<DropdownMenu.Item onclick={() => entity && connect.copy(entity, account.username)}>
 						<Copy />
-						<span class="truncate font-mono">ssh {account.username}@{entity?.name}</span>
+						<span class="truncate font-mono"
+							>ssh {account.username}@{sshHost(entity?.name ?? '')}</span
+						>
 					</DropdownMenu.Item>
 				{/each}
 			</DropdownMenu.Group>

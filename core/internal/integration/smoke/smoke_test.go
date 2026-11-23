@@ -54,7 +54,8 @@ const (
 	// The container enrolls under its hostname, dev is its one account.
 	serverName = "smoke-box"
 	account    = "dev"
-	login      = account + "@" + serverName
+	// ssh has every server under .nk.
+	login = account + "@" + serverName + ".nk"
 
 	// What the web terminal types. It prints smoke-web, its own echo does not.
 	webCommand = "echo smoke-''web"
@@ -345,9 +346,9 @@ func (s *smoke) loginNK(t *testing.T) {
 
 	require.NoError(t, nk.Wait(), "nk login: %s", &out)
 	assert.Contains(t, out.String(), "Signed in as "+ownerEmail+", 1 servers available")
-	config, err := os.ReadFile(filepath.Join(s.home.dir, ".config", "nk", "ssh_config"))
+	hosts, err := os.ReadFile(filepath.Join(s.home.dir, ".config", "nk", "ssh_hosts"))
 	require.NoError(t, err)
-	assert.Contains(t, string(config), "Host "+serverName+"\n", "nk wrote no ssh config for the server")
+	assert.Contains(t, string(hosts), "Host "+serverName+".nk\n", "nk wrote no ssh config for the server")
 }
 
 func (s *smoke) sshDirect(t *testing.T) {

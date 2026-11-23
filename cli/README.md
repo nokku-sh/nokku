@@ -22,7 +22,7 @@ irm https://get.nokku.sh/nk.ps1 | iex        # Windows, in PowerShell
 
 nk --api https://nokku.example.com login   # opens your browser, then sets up your SSH config
 nk ls                                      # lists the servers you can reach
-ssh user@target                            # plain OpenSSH
+ssh user@server.nk                         # plain OpenSSH, every server is <name>.nk
 ```
 
 `--api` is the address you open Nokku at. `nk` remembers it, so later it is just `nk login`. The web app shows the command with your address filled in.
@@ -33,7 +33,7 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 
 - Signs you in through your browser, the way you sign in to the web app. On a machine without one, `nk login --headless` gives you a code to type on another device. A sign-in lasts 30 days, or one day where your workspace requires single sign-on. After that `ssh` tells you to run `nk login` again.
 - Gets a short-lived certificate per server right before `ssh` needs it, and renews it on its own.
-- Writes an SSH config for your servers and adds one `Include` line to your `~/.ssh/config`. Your own settings stay untouched.
+- Writes an SSH config for your servers and adds one `Include` line to your `~/.ssh/config`. Every server is `<name>.nk` there, so none of them can take the place of a host of your own, and `ssh` starts `nk` for no other name. Your own settings stay untouched.
 - Connects directly when it can, and through the Nokku relay when it can't.
 - Sets up servers without the daemon, with [`nk sync`](#servers-without-the-daemon).
 
@@ -116,7 +116,7 @@ jobs:
     steps:
       - run: curl -fsSL https://get.nokku.sh/nk | sh
       - run: nk login --ci deploy
-      - run: ssh deploy@web-1 ./release.sh
+      - run: ssh deploy@web-1.nk ./release.sh
 ```
 
 <details>
@@ -135,7 +135,7 @@ deploy:
   script:
     - curl -fsSL https://get.nokku.sh/nk | sh
     - nk login --ci deploy
-    - ssh deploy@web-1 ./release.sh
+    - ssh deploy@web-1.nk ./release.sh
 ```
 
 Any other platform with signed tokens works the same way: put the job's token in `NK_ID_TOKEN`, with the address of the core as its audience.
@@ -158,7 +158,7 @@ For Ansible and scripts that run somewhere without a signed token, use a service
 export NK_API_URL=https://nokku.example.com
 export NK_TOKEN=nk_sa_<SECRET>
 nk login
-ssh user@target
+ssh user@server.nk
 ```
 
 `nk` only takes a key that starts with `nk_sa_`. A key ends within a year at most, so it needs rolling over.
@@ -197,7 +197,7 @@ nk sync 10.0.0.5 --grant root=me --grant deploy=team:ops,alice@example.com --tag
 <details>
 <summary><b>Host keys, scripts and <code>nk rm</code></b></summary>
 
-- **Finding a server.** `nk sync` and `nk rm` take its name, the name `nk ls` shows, or its address. Pass `--port` when several servers share one address.
+- **Finding a server.** `nk sync` and `nk rm` take its name, with or without the `.nk` that `nk ls` shows, or its address. Pass `--port` when several servers share one address.
 - **The first sync** trusts the server the way your own `ssh` does. When `ssh` asks about the host key, answer as you would for any server. Without a terminal, as in CI, connect once with `ssh root@host` first.
 - **Later syncs** pin the host key the first one saw, and `ssh` accepts no other. A server that shows another key is refused before you are asked for a password, and nothing is written. If you reinstalled the server, run it again with `--accept-host-key`. That drops the pin and your own `ssh` checks the host, as on the first sync, so a key it remembers from before shows its usual warning until you remove it with `ssh-keygen -R`. Only whoever added the server can do this, see [when a host key changes](#when-a-host-key-changes).
 - **Your ssh config applies, but not its forwards.** The root `ssh` runs without an agent, X11 or port forwarding, whatever `ForwardAgent` or `LocalForward` your config sets.
@@ -263,7 +263,7 @@ Local state lives under `~/.config/nk/` on every OS. On Windows the agent listen
 <details>
 <summary><b>How access stays current</b></summary>
 
-- Every `nk ls` refreshes what you can reach. An SSH connection refreshes it too, when the last sync is a little old.
+- Every `nk ls` refreshes what you can reach. An SSH connection to a name under `.nk` refreshes it too, when the last sync is over ten seconds old, and before `ssh` looks the name up. So a server you were just given works on the first `ssh`. Within those seconds the first try says it knows no such server and reads your access again, and the second one connects.
 - A revoke applies at once on servers with the daemon, because the server enforces it. On a server set up with `nk sync` it lands within an hour.
 - When the core is unreachable, `nk` fails fast and works from cached data and the certificates you still hold.
 - Direct addresses are tried in parallel, and the Nokku relay joins a moment later, so an unreachable private address barely slows a connection down.

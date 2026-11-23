@@ -18,10 +18,10 @@ func TestListJSON(t *testing.T) {
 		{ID: "t-2", Name: "bare"},
 	}
 
-	b, err := json.Marshal(listJSON(s, map[string]string{"t-1": "nokku/web"}))
+	b, err := json.Marshal(listJSON(s, map[string]string{"t-1": "web.nk"}))
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"targets":[
-		{"name":"web","host":"nokku/web","users":["root"],"manual":false},
+		{"name":"web","host":"web.nk","users":["root"],"manual":false},
 		{"name":"bare","users":[],"manual":true}
 	]}`, string(b), "scripts get the ssh host and a list, never null")
 }

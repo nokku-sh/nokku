@@ -68,7 +68,7 @@ The image at `ghcr.io/nokku-sh/nokkud` is for devboxes, CI runners and sandboxes
 
 ```bash
 docker run -d --hostname alice -e NOKKUD_ENROLL_TOKEN=... ghcr.io/nokku-sh/nokkud
-ssh dev@alice
+ssh dev@alice.nk
 ```
 
 - **Accounts.** Besides root, the image ships one login account, `dev`. Build on it with `FROM ghcr.io/nokku-sh/nokkud` to add your tools and users. The container has to run as root, which is the default.

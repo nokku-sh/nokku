@@ -153,9 +153,9 @@ func TestSyncCommitsAccessSnapshot(t *testing.T) {
 	// The snapshot is committed to disk for offline use.
 	assert.NotNil(t, state.Load().User)
 
-	content, err := os.ReadFile(paths.SSHConfigFile())
+	content, err := os.ReadFile(paths.SSHHostsFile())
 	require.NoError(t, err)
-	assert.Contains(t, string(content), "Host prod\n")
+	assert.Contains(t, string(content), "Host prod.nk\n")
 }
 
 func TestSyncDropsCertificatesOfAnotherSubject(t *testing.T) {

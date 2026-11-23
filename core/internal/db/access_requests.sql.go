@@ -215,7 +215,8 @@ WHERE
   )
   AND (
     t.id::TEXT = $1::TEXT
-    OR t.name = $1::TEXT
+    -- Names differ by more than case, and people type what ssh shows, in lowercase.
+    OR lower(t.name) = lower($1::TEXT)
   )
   AND p.username = $2
 `

@@ -458,7 +458,7 @@ func applyPlan(
 	fmt.Fprintf(
 		progress,
 		"%s %s is synced. Users connect with: ssh <user>@%s\n",
-		ui.Green("✔"), target.Name, target.Name,
+		ui.Green("✔"), target.Name, ssh.HostName(target.Name),
 	)
 	return nil
 }
@@ -603,7 +603,7 @@ func findRemoteTarget(
 	return target, dest, err
 }
 
-// A name or nk ls alias wins over an address, and uses its first endpoint.
+// A name, also as ssh has it, wins over an address, and uses its first endpoint.
 func findTarget(targets []state.Target, aliases map[string]string, dest remote) (*state.Target, remote, error) {
 	type match struct {
 		t  *state.Target
@@ -612,7 +612,7 @@ func findTarget(targets []state.Target, aliases map[string]string, dest remote) 
 	var named, reached []match
 	for i := range targets {
 		t := &targets[i]
-		if t.Name == dest.host || aliases[t.ID] == dest.host {
+		if t.Name == dest.host || (aliases[t.ID] != "" && strings.EqualFold(aliases[t.ID], dest.host)) {
 			at := dest
 			if len(t.Endpoints) > 0 {
 				at = endpointRemote(t.Endpoints[0], dest.port)

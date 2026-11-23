@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sshHost } from '#lib/utils.js';
 	import { useConnect } from '#lib/api/connect.svelte.js';
 	import { getSessions, removeSession } from '#lib/api/terminal.svelte.js';
 	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
@@ -32,7 +33,9 @@
 	const run = (username: string) =>
 		shell ? connect.shell(target, username) : connect.copy(target, username);
 	const label = (username: string) =>
-		shell ? `Open a shell on ${target.name} as ${username}` : `Copy ssh ${username}@${target.name}`;
+		shell
+			? `Open a shell on ${target.name} as ${username}`
+			: `Copy ssh ${username}@${sshHost(target.name)}`;
 </script>
 
 {#snippet actionIcon()}

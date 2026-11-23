@@ -1,7 +1,6 @@
 {{range . -}}
-Match originalhost {{.Host}} exec {{.Prepare}}
-
 Host {{.Host}}
+Match originalhost {{.Host}} exec {{.Prepare}}
     User {{.User}}
     ProxyCommand {{.NK}} proxy {{.ID}} %p
     HostKeyAlias {{.ID}}

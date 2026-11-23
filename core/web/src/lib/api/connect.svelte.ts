@@ -2,7 +2,7 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 import { recentTargets } from '#lib/store.svelte.js';
-import { nkLoginCommand } from '#lib/utils.js';
+import { nkLoginCommand, sshHost } from '#lib/utils.js';
 import { toast } from 'svelte-sonner';
 import { whenFresh } from './auth.svelte';
 import { daemon } from './daemons.svelte';
@@ -40,7 +40,7 @@ export function useConnect() {
 			),
 		async copy(t: Pick<Target, 'id' | 'name'>, username: string) {
 			remember(t.id);
-			await navigator.clipboard.writeText(`ssh ${username}@${t.name}`);
+			await navigator.clipboard.writeText(`ssh ${username}@${sshHost(t.name)}`);
 			toast.success('SSH command copied', {
 				description: 'On a new machine, sign in once with nk login first.',
 				action: {

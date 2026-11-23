@@ -307,6 +307,38 @@ func TestAServerIsNotSwappedByDeletingIt(t *testing.T) {
 	require.NoError(t, remove(bobNK, byName), "nk could not delete a server its person added in the web app")
 }
 
+// ssh takes Web.nk for web.nk, so a workspace has one of the two.
+func TestServerNamesDifferByMoreThanCase(t *testing.T) {
+	cfg, srv := newTestAPI(t)
+	editor := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	targets := nokkuv1connect.NewTargetServiceClient(clientOn(srv, header(
+		"Authorization", "Bearer "+sessionFor(t, cfg, editor),
+	)))
+	name := uniq("Cased")
+	first, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: &name})
+	require.NoError(t, err)
+	_, err = targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(strings.ToLower(name))})
+	assert.Equal(
+		t,
+		connect.CodeAlreadyExists,
+		connect.CodeOf(err),
+		"a second server took the name in lowercase: %v",
+		err,
+	)
+
+	other, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("other"))})
+	require.NoError(t, err)
+	_, err = targets.RenameTarget(t.Context(), &nokkuv1.RenameTargetRequest{
+		Id: other.GetTarget().Id, Name: new(strings.ToUpper(name)),
+	})
+	assert.Equal(t, connect.CodeAlreadyExists, connect.CodeOf(err), "a rename took the name in uppercase: %v", err)
+
+	_, err = targets.RenameTarget(t.Context(), &nokkuv1.RenameTargetRequest{
+		Id: first.GetTarget().Id, Name: new(strings.ToUpper(name)),
+	})
+	require.NoError(t, err, "a server could not change the case of its own name")
+}
+
 // Sessions and recordings show the daemon's name, so a rename has to reach it.
 func TestRenameReachesTheDaemon(t *testing.T) {
 	cfg, srv := newTestAPI(t)

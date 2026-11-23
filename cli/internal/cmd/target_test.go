@@ -88,7 +88,7 @@ func TestFindTarget(t *testing.T) {
 		{ID: "t-5", Name: "nat-a", Endpoints: []string{"1.2.3.4:2201"}},
 		{ID: "t-6", Name: "nat-b", Endpoints: []string{"1.2.3.4:2202"}},
 	}
-	aliases := map[string]string{"t-1": "nokku/web"}
+	aliases := map[string]string{"t-1": "web.nk"}
 
 	tests := []struct {
 		name   string
@@ -98,7 +98,7 @@ func TestFindTarget(t *testing.T) {
 		errMsg string
 	}{
 		{"by name, at its endpoint", remote{host: "web"}, "t-1", remote{host: "10.0.0.5", port: "2222"}, ""},
-		{"by nk ls alias", remote{host: "nokku/web"}, "t-1", remote{host: "10.0.0.5", port: "2222"}, ""},
+		{"by the name ssh has", remote{host: "Web.nk"}, "t-1", remote{host: "10.0.0.5", port: "2222"}, ""},
 		{
 			"--port beats the endpoint port",
 			remote{host: "web", port: "22"},
@@ -123,6 +123,8 @@ func TestFindTarget(t *testing.T) {
 			"",
 		},
 		{"unknown host is a new target", remote{host: "10.0.0.9"}, "", remote{host: "10.0.0.9"}, ""},
+		// A target ssh has no name for must not match an empty one.
+		{"an empty host names nothing", remote{}, "", remote{}, ""},
 		{"the name settles a shared endpoint", remote{host: "dup"}, "t-3", remote{host: "10.0.0.7"}, ""},
 		{
 			"the port settles a shared IP",

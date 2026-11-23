@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sshHost } from '#lib/utils.js';
 	import { serverMatches, useConnect, useServers } from '#lib/api/connect.svelte.js';
 	import StatusDot from '#lib/components/blocks/StatusDot.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -101,7 +102,9 @@
 										{/snippet}
 									</Tooltip.Trigger>
 									<Tooltip.Content>
-										{shell ? 'Open a shell in the browser' : `Copy ssh ${username}@${t.name}`}
+										{shell
+											? 'Open a shell in the browser'
+											: `Copy ssh ${username}@${sshHost(t.name)}`}
 									</Tooltip.Content>
 								</Tooltip.Root>
 							{/each}

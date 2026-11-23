@@ -42,7 +42,8 @@ WHERE
   )
   AND (
     t.id::TEXT = @target::TEXT
-    OR t.name = @target::TEXT
+    -- Names differ by more than case, and people type what ssh shows, in lowercase.
+    OR lower(t.name) = lower(@target::TEXT)
   )
   AND p.username = @username;
 

@@ -389,10 +389,12 @@ CREATE TABLE targets (
   created_by UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (workspace_id, name),
   UNIQUE (workspace_id, id),
   FOREIGN KEY (workspace_id, daemon_id) REFERENCES daemons (workspace_id, id) ON DELETE CASCADE
 );
+
+-- ssh has every server as <name>.nk and takes Web.nk for web.nk, so two names never differ by case alone.
+CREATE UNIQUE INDEX idx_targets_name ON targets (workspace_id, lower(name));
 
 -- A daemon serves one target, a manual target has none. The daemon goes by its target's name.
 CREATE UNIQUE INDEX idx_targets_daemon_id ON targets (daemon_id);

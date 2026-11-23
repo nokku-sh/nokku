@@ -4,6 +4,7 @@ package api_test
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,6 +128,9 @@ func TestAccessRequestFlow(t *testing.T) {
 
 	_, err = ask(asMember, target.Name)
 	assert.Equal(t, connect.CodeAlreadyExists, connect.CodeOf(err), "one open request per account, got %v", err)
+	// People type the name as ssh has it, in lowercase, the server may be called otherwise.
+	_, err = ask(asMember, strings.ToUpper(target.Name))
+	assert.Equal(t, connect.CodeAlreadyExists, connect.CodeOf(err), "the name in another case found no server: %v", err)
 
 	_, err = asMember.ApproveAccessRequest(ctx, &nokkuv1.ApproveAccessRequestRequest{Id: new(req.GetId())})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "a member must not approve, got %v", err)

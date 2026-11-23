@@ -70,7 +70,7 @@ func loginCMD() *cli.Command {
 				who += " " + s.ServiceAccount.Name
 			}
 			fmt.Printf("%s Signed in as %s, %d servers available\n", ui.Green("✔"), who, len(s.Targets))
-			fmt.Println("  List them with nk ls, connect with ssh <server>")
+			fmt.Println("  List them with nk ls, connect with ssh <server>.nk")
 			return nil
 		},
 	}

@@ -12,7 +12,7 @@
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { AccessRequestStatus } from '#lib/gen/nokku/v1/access_request_pb.js';
 	import { statusTone } from '#lib/tone.js';
-	import { formatTs } from '#lib/utils.js';
+	import { formatTs, sshHost } from '#lib/utils.js';
 	import { CircleCheck, Hand, SquareTerminal } from '@lucide/svelte';
 	import NkLogin from './NkLogin.svelte';
 	import YourServers from './YourServers.svelte';
@@ -34,7 +34,7 @@
 
 	const first = $derived(servers.list[0]);
 	const sshLine = $derived(
-		first?.usernames[0] ? `ssh ${first.usernames[0]}@${first.name}` : 'ssh user@server'
+		first?.usernames[0] ? `ssh ${first.usernames[0]}@${sshHost(first.name)}` : 'ssh user@server.nk'
 	);
 	const requestLine = $derived(
 		first?.usernames[0]

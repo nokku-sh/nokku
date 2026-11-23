@@ -1,8 +1,8 @@
 package ssh
 
 import (
-	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -15,13 +15,13 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
 
-func TestRenderSSHConfig(t *testing.T) {
+func TestRenderSSHHosts(t *testing.T) {
 	setupSSHDir(t)
 	st := &state.State{
 		Targets: []state.Target{
 			{ID: "t-1", Name: "web", Usernames: []string{"alice", "bob"}},
-			{ID: "t-2", Name: "db", Usernames: []string{"alice"}},
-			{ID: "t-3", Name: "DB", Usernames: []string{"alice"}},
+			{ID: "t-2", Name: "DB", Usernames: []string{"alice"}},
+			{ID: "t-3", Name: "db", Usernames: []string{"alice"}},
 			{ID: "t-4", Name: "no-users"},
 			{ID: "t-5", Name: "prod\n    ProxyCommand curl evil", Usernames: []string{"a"}},
 			{ID: "t-6", Name: "ok", Usernames: []string{"a\n    ProxyCommand curl evil"}},
@@ -31,26 +31,95 @@ func TestRenderSSHConfig(t *testing.T) {
 			{ID: "t-10", Name: "wild", Usernames: []string{"*"}},
 		},
 	}
-	out := string(renderSSHConfig(st, hostAliases(st, nil), "nk"))
+	out := string(renderSSHHosts(st, "nk"))
 
 	for _, want := range []string{
-		"Match originalhost web exec \"nk prepare t-1\"\n\nHost web\n    User alice\n    ProxyCommand nk proxy t-1 %p\n    HostKeyAlias t-1\n",
+		"Host web.nk\nMatch originalhost web.nk exec \"nk prepare t-1\"\n    User alice\n" +
+			"    ProxyCommand nk proxy t-1 %p\n    HostKeyAlias t-1\n",
 		"    CertificateFile " + configValue(paths.SSHCertificate("t-1")) + "\n",
 		"    IdentityAgent " + configValue(paths.AgentSocket()) + "\n",
 		// A Host * of the user never forwards to a target.
 		"    ForwardAgent no\n    ForwardX11 no\n",
-		// Names that differ only by case fall back to the id.
-		"Host nokku/t-2\n",
-		"Host nokku/t-3\n",
+		// One lowercase name a server, whatever its case in the core.
+		"Host db.nk\nMatch originalhost db.nk exec \"nk prepare t-2\"\n    User alice\n",
 	} {
 		assert.Contains(t, out, want)
 	}
 	// A server names its own targets only. It never claims a real host.
 	for _, forbidden := range []string{
-		"no-users", "curl evil", "a/b", "\nHost db\n", "github.com", "10.0.0.5", "wild",
+		"no-users", "curl evil", "a/b", "github.com", "10.0.0.5", "wild", "t-3",
 	} {
 		assert.NotContains(t, out, forbidden)
 	}
+	assert.Equal(t, map[string]string{"t-1": "web.nk", "t-2": "db.nk"}, HostAliases(st),
+		"nk ls shows the names ssh knows, and a second name that differs by case gets none")
+}
+
+// One block for every name under .nk, and no token in it: a host name never reaches a shell.
+func TestRenderSSHConfig(t *testing.T) {
+	setupSSHDir(t)
+	out := string(renderSSHConfig("/usr/bin/nk"))
+
+	assert.Equal(t, header+
+		"Match originalhost *.nk exec \"/usr/bin/nk prepare\"\n"+
+		"    "+includeLine(paths.SSHHostsFile())+"\n"+
+		"    ProxyCommand /usr/bin/nk proxy\n", out)
+	assert.NotContains(t, out, "%", "a token would hand what the user typed to a shell")
+}
+
+// What nk writes is for the real ssh to read. A name under .nk runs nk prepare before the hosts file is read, so
+// a sync in it counts on the first try. Any other name starts nothing.
+func TestSSHReadsTheConfigAsMeant(t *testing.T) {
+	sshBin, err := exec.LookPath("ssh")
+	if err != nil || runtime.GOOS == "windows" {
+		t.Skip("needs an OpenSSH client and a shell")
+	}
+	setupSSHDir(t)
+	dir := t.TempDir()
+	calls, synced, fake := filepath.Join(dir, "calls"), filepath.Join(dir, "synced"), filepath.Join(dir, "nk")
+	st := &state.State{Targets: []state.Target{{ID: "t-1", Name: "Web", Usernames: []string{"alice"}}}}
+	// The stand-in for nk. A prepare without an id puts the hosts file there, like a sync does.
+	require.NoError(t, os.WriteFile(synced, renderSSHHosts(st, fake), 0o600))
+	require.NoError(t, os.WriteFile(fake, []byte("#!/bin/sh\necho \"$*\" >> "+calls+"\n"+
+		"[ \"$*\" = prepare ] && cp "+synced+" "+paths.SSHHostsFile()+"\nexit 0\n"), 0o700))
+	require.NoError(t, os.WriteFile(paths.SSHConfigFile(), renderSSHConfig(fake), 0o600))
+	resolve := func(host string) string {
+		t.Helper()
+		out, sshErr := exec.CommandContext(t.Context(), sshBin, "-F", paths.SSHConfigFile(), "-G", host).
+			CombinedOutput()
+		require.NoError(t, sshErr, string(out))
+		return string(out)
+	}
+	called := func() string {
+		data, readErr := os.ReadFile(calls)
+		if readErr != nil {
+			return ""
+		}
+		return string(data)
+	}
+
+	own := resolve("example.com")
+	assert.Empty(t, called(), "a host of the user's own started nk")
+	assert.NotContains(t, own, fake)
+
+	// The server is Web in the core, and people type what they read there.
+	known := resolve("Web.nk")
+	assert.Equal(t, "prepare\nprepare t-1\n", called(), "first the hosts, then the certificate of the one")
+	assert.Contains(t, known, "user alice\n")
+	assert.Contains(t, known, "hostkeyalias t-1\n")
+	assert.Contains(
+		t,
+		known,
+		"proxycommand "+fake+" proxy t-1 %p\n",
+		"the hosts file was read after nk prepare wrote it",
+	)
+
+	assert.Contains(
+		t,
+		resolve("typo.nk"),
+		"proxycommand "+fake+" proxy\n",
+		"an unknown name ends in nk proxy, which says so",
+	)
 }
 
 // ssh signs through the key itself, the nk agent holds nothing for it.
@@ -60,7 +129,7 @@ func TestRenderSSHConfigSecurityKey(t *testing.T) {
 		SecurityKey: true,
 		Targets:     []state.Target{{ID: "t-1", Name: "web", Usernames: []string{"alice"}}},
 	}
-	out := string(renderSSHConfig(st, hostAliases(st, nil), "nk"))
+	out := string(renderSSHHosts(st, "nk"))
 
 	assert.Contains(t, out, "    IdentityFile "+configValue(paths.SecurityKeyFile())+"\n")
 	assert.Contains(t, out, "    IdentityAgent none\n")
@@ -117,7 +186,7 @@ func TestInclude(t *testing.T) {
 	require.NoError(t, ensureInclude())
 	data, err = os.ReadFile(cfg)
 	require.NoError(t, err)
-	assert.Equal(t, includeLine()+"\n\n"+original, string(data), "include goes on top, once")
+	assert.Equal(t, includeLine(paths.SSHConfigFile())+"\n\n"+original, string(data), "include goes on top, once")
 
 	require.NoError(t, RemoveInclude())
 	data, err = os.ReadFile(cfg)
@@ -130,11 +199,13 @@ func TestIncludeLineQuotesOnlyWhenNeeded(t *testing.T) {
 		t.Skip("windows paths have backslashes and stay quoted")
 	}
 	t.Setenv("HOME", "/home/jane")
-	assert.Equal(t, "Include /home/jane/.config/nk/ssh_config", includeLine(),
+	assert.Equal(t, "Include /home/jane/.config/nk/ssh_config", includeLine(paths.SSHConfigFile()),
 		"zsh and bash completion read the path as written")
+	assert.Equal(t, "Include /home/jane/.config/nk/ssh_hosts", includeLine(paths.SSHHostsFile()),
+		"and follow it to the hosts, which is where the names to complete are")
 
 	t.Setenv("HOME", "/Users/Jane Doe")
-	assert.Equal(t, `Include "/Users/Jane Doe/.config/nk/ssh_config"`, includeLine())
+	assert.Equal(t, `Include "/Users/Jane Doe/.config/nk/ssh_config"`, includeLine(paths.SSHConfigFile()))
 }
 
 func TestIncludeKeepsSymlink(t *testing.T) {
@@ -161,116 +232,40 @@ func TestNKCommandIsAbsolute(t *testing.T) {
 	assert.Equal(t, self, nkCommand(), "ProxyCommand must name this binary")
 }
 
-func writtenConfig(t *testing.T, st *state.State) string {
-	t.Helper()
-	require.NoError(t, WriteConfigs(st))
-	out, err := os.ReadFile(paths.SSHConfigFile())
-	require.NoError(t, err)
-	return string(out)
-}
-
-// nk's Include sits on top, so a name the user routes stays theirs.
-func TestOwnSSHConfigKeepsItsNames(t *testing.T) {
+// Whatever the user's own config holds, nk writes names under .nk only and leaves the rest alone.
+func TestHostsAreAllUnderNK(t *testing.T) {
 	setupSSHDir(t)
-	sshDir := filepath.Dir(paths.SSHUserConfig())
-	require.NoError(t, os.MkdirAll(filepath.Join(sshDir, "conf.d", "a-directory"), 0o700))
-	require.NoError(t, os.WriteFile(paths.SSHUserConfig(), []byte(`# mine
-Include conf.d/* ~/.ssh/extra missing
-
-Host *
-    ProxyCommand none
-    ForwardAgent no
-
-Host bastion jump   # two names
-    HostName 203.0.113.7
-    ForwardAgent yes
-
-Host web
-    LocalForward 8080 localhost:80
-`), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(sshDir, "conf.d", "work"), []byte(`
-host=prod-* !prod-open
-  proxyjump jump
-
-Match originalhost gitbox,mirror user git
-  Hostname git.example.com
-`), 0o600))
-	// It includes itself, ssh gives up on that at some depth.
-	require.NoError(t, os.WriteFile(filepath.Join(sshDir, "extra"), []byte(
-		"Host \"nas\"\n  ProxyCommand nc 192.0.2.9 22\nInclude extra\n",
-	), 0o600))
-
-	st := &state.State{}
-	for i, name := range []string{"bastion", "JUMP", "prod-db", "mirror", "nas", "web", "prod-open", "other"} {
-		st.Targets = append(st.Targets, state.Target{
-			ID: fmt.Sprintf("t-%d", i+1), Name: name, Usernames: []string{"root"},
-		})
-	}
-	// Twice, the second run sees the file the first one wrote.
-	writtenConfig(t, st)
-	out := writtenConfig(t, st)
-
-	// JUMP differs from jump only by case, ssh's Match can't tell them apart.
-	for _, taken := range []string{"bastion", "JUMP", "prod-db", "mirror", "nas"} {
-		assert.NotContains(t, out, "\nHost "+taken+"\n", "%s is the user's own name", taken)
-		assert.Contains(t, out, "\nHost nokku/"+taken+"\n", "%s stays reachable under the prefix", taken)
-	}
-	for name, why := range map[string]string{
-		"web":       "a block that sends the name nowhere only adds options",
-		"prod-open": "the user's pattern leaves it out",
-		"other":     "Host * holds defaults",
-	} {
-		assert.Contains(t, out, "\nHost "+name+"\n", why)
-	}
-	assert.Equal(t, map[string]string{
-		"t-1": "nokku/bastion", "t-2": "nokku/JUMP", "t-3": "nokku/prod-db", "t-4": "nokku/mirror", "t-5": "nokku/nas",
-		"t-6": "web", "t-7": "prod-open", "t-8": "other",
-	}, HostAliases(st), "nk ls shows the names ssh knows")
-}
-
-func TestIncludeEndsItsBlocks(t *testing.T) {
-	setupSSHDir(t)
-	sshDir := filepath.Dir(paths.SSHUserConfig())
-	require.NoError(t, os.MkdirAll(sshDir, 0o700))
-	require.NoError(t, os.WriteFile(paths.SSHUserConfig(), []byte(`Host web
-Include extra
-    HostName 203.0.113.7
-`), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(sshDir, "extra"), []byte("Host db\n    User admin\n"), 0o600))
-
-	st := &state.State{Targets: []state.Target{
-		{ID: "t-1", Name: "web", Usernames: []string{"root"}},
-		{ID: "t-2", Name: "db", Usernames: []string{"root"}},
-	}}
-	assert.Equal(t, map[string]string{"t-1": "nokku/web", "t-2": "db"}, HostAliases(st),
-		"the HostName after the Include belongs to web, like ssh reads it")
-}
-
-// Two servers never share a Host line, names differing by case count as one.
-func TestHostLinesAreNeverShared(t *testing.T) {
-	setupSSHDir(t)
+	require.NoError(t, os.MkdirAll(filepath.Dir(paths.SSHUserConfig()), 0o700))
+	own := "Host web bastion\n    HostName 203.0.113.7\n"
+	require.NoError(t, os.WriteFile(paths.SSHUserConfig(), []byte(own), 0o600))
 	st := &state.State{
 		Targets: []state.Target{
-			{ID: "t-1", Name: "db", Usernames: []string{"root"}},
+			{ID: "t-1", Name: "web", Usernames: []string{"root"}},
 			{ID: "t-2", Name: "DB", Usernames: []string{"root"}},
 			{ID: "t-3", Name: "Db", Usernames: []string{"root"}},
-			{ID: "t-4", Name: "cache", Usernames: []string{"root"}},
+			{ID: "t-4", Name: "bastion", Usernames: []string{"root"}},
 		},
 	}
-	out := writtenConfig(t, st)
+	// Twice, the second run sees the files the first one wrote.
+	require.NoError(t, WriteConfigs(st))
+	require.NoError(t, WriteConfigs(st))
+	hosts, err := os.ReadFile(paths.SSHHostsFile())
+	require.NoError(t, err)
 
-	for _, host := range []string{"nokku/t-1", "nokku/t-2", "nokku/t-3", "cache"} {
-		assert.Contains(t, out, "\nHost "+host+"\n")
-	}
-	seen := map[string]bool{}
-	for line := range strings.SplitSeq(out, "\n") {
-		host, ok := strings.CutPrefix(line, "Host ")
-		if !ok {
-			continue
+	var seen []string
+	for line := range strings.SplitSeq(string(hosts), "\n") {
+		if host, ok := strings.CutPrefix(line, "Host "); ok {
+			seen = append(seen, host)
 		}
-		host = strings.ToLower(host)
-		assert.False(t, seen[host], "%s is written twice", host)
-		seen[host] = true
 	}
-	assert.Len(t, seen, 4)
+	assert.Equal(t, []string{"web.nk", "db.nk", "bastion.nk"}, seen, "one lowercase line a server, all under .nk")
+
+	mine, err := os.ReadFile(paths.SSHUserConfig())
+	require.NoError(t, err)
+	assert.Equal(
+		t,
+		includeLine(paths.SSHConfigFile())+"\n\n"+own,
+		string(mine),
+		"the user's own hosts stay as they wrote them",
+	)
 }

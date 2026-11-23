@@ -26,7 +26,6 @@ func listCMD() *cli.Command {
 				return err
 			}
 			s := c.State
-			// ssh's name for a server has a prefix when the bare one is taken.
 			aliases := ssh.HostAliases(s)
 			if cmd.Bool(jsonFlag.Name) {
 				return printJSON(listJSON(s, aliases))
@@ -48,7 +47,7 @@ func listCMD() *cli.Command {
 				name := cmp.Or(aliases[t.ID], t.Name)
 				fmt.Printf("  %-24s %s %s\n", name, users, ui.Dim(note))
 			}
-			fmt.Println("\nConnect with: ssh <server> or ssh <user>@<server>")
+			fmt.Println("\nConnect with: ssh <server>.nk or ssh <user>@<server>.nk")
 			return nil
 		},
 	}

@@ -37,6 +37,7 @@ func SSHUserConfig() string {
 func ConfigFile() string      { return filepath.Join(ConfigDir(), "config.json") }
 func CacheFile() string       { return filepath.Join(ConfigDir(), "cache.json") }
 func SSHConfigFile() string   { return filepath.Join(ConfigDir(), "ssh_config") }
+func SSHHostsFile() string    { return filepath.Join(ConfigDir(), "ssh_hosts") }
 func KnownHostsFile() string  { return filepath.Join(ConfigDir(), "known_hosts") }
 func PubKeyFile() string      { return filepath.Join(ConfigDir(), "nokku.pub") }
 func SSHCertDir() string      { return filepath.Join(ConfigDir(), "certs") }
