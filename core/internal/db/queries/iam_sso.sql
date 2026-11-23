@@ -32,3 +32,17 @@ ORDER BY
 DELETE FROM sso_providers
 WHERE
   provider_id = @provider_id;
+
+-- name: HasSSOSignIn :one
+SELECT
+  EXISTS (
+    SELECT
+      1
+    FROM
+      credentials c
+      JOIN sso_providers p ON p.workspace_id = c.workspace_id
+      AND p.provider_id = c.provider
+    WHERE
+      c.type = 'oidc'
+      AND p.enabled
+  );

@@ -151,21 +151,6 @@ func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) erro
 	})
 }
 
-// HasSSOProvider guards enforced SSO, without one only the owner gets in.
-func HasSSOProvider(ctx context.Context, q *db.Queries) (bool, error) {
-	return hasSSOProviderBesides(ctx, q, "")
-}
-
-func hasSSOProviderBesides(ctx context.Context, q *db.Queries, providerID string) (bool, error) {
-	rows, err := q.ListSSOProviders(ctx)
-	if err != nil {
-		return false, err
-	}
-	return slices.ContainsFunc(rows, func(r *db.SsoProvider) bool {
-		return r.Enabled && r.ProviderID != providerID
-	}), nil
-}
-
 // keepSSOProvider refuses to drop the last provider of enforced SSO. The lock
 // keeps a save that turns enforcement on from slipping past.
 func keepSSOProvider(ctx context.Context, q *db.Queries, providerID string) error {
@@ -173,11 +158,14 @@ func keepSSOProvider(ctx context.Context, q *db.Queries, providerID string) erro
 	if err != nil || !ws.Settings.GetEnforceSso() {
 		return err
 	}
-	has, err := hasSSOProviderBesides(ctx, q, providerID)
-	if err == nil && !has {
+	rows, err := q.ListSSOProviders(ctx)
+	if err != nil {
+		return err
+	}
+	if !slices.ContainsFunc(rows, func(r *db.SsoProvider) bool { return r.Enabled && r.ProviderID != providerID }) {
 		return ErrLastSSOProvider
 	}
-	return err
+	return nil
 }
 
 func (s *Service) ssoProviderFromRow(row *db.SsoProvider) (*SSOProvider, error) {

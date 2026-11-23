@@ -239,7 +239,7 @@ func TestPlanGateReadsOnlyMaskedFields(t *testing.T) {
 		"a field outside the mask was stored")
 }
 
-// seedProvider is an enabled provider. Call it before saving what the test
+// seedProvider is an enabled provider someone signed in through. Call it before saving what the test
 // restores, so enforcement is off by the time it goes.
 func seedProvider(t *testing.T, cfg *app.Config) {
 	t.Helper()
@@ -249,10 +249,23 @@ func seedProvider(t *testing.T, cfg *app.Config) {
 		OIDC: iam.OIDCProvider{IssuerURL: "https://idp.test", ClientID: "nokku", ClientSecret: "s3cret"},
 	})
 	require.NoError(t, err)
+	linkIdentity(t, cfg, id)
 	// The workspace is shared, the login page of later tests must not offer it.
 	t.Cleanup(func() {
 		ctx := actor.WithWorkspace(context.WithoutCancel(t.Context()), testWorkspace)
 		require.NoError(t, cfg.IAM.DeleteSSOProvider(ctx, id))
+	})
+}
+
+func linkIdentity(t *testing.T, cfg *app.Config, provider string) {
+	t.Helper()
+	u := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
+		_, err := q.UpsertCredential(t.Context(), &db.UpsertCredentialParams{
+			ID: "oidc-" + u.ID, UserID: u.ID, Type: string(iam.MethodOIDC), Provider: provider, Subject: u.ID,
+			Data: []byte{},
+		})
+		return err
 	})
 }
 
@@ -299,6 +312,8 @@ func TestEnforcedSSOKeepsAProvider(t *testing.T) {
 	require.NoError(t, put(first, false))
 	refused(enforce(true), "a disabled provider signs nobody in")
 	require.NoError(t, put(first, true))
+	refused(enforce(true), "nobody signed in through the provider yet")
+	linkIdentity(t, cfg, first)
 	require.NoError(t, enforce(true))
 
 	refused(put(first, false), "disabling the last provider")

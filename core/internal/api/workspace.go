@@ -91,14 +91,15 @@ func (s *workspaceService) SetEnforceSSO(
 		}
 		turnedOn := req.GetEnforceSso() && !base.Settings.GetEnforceSso()
 		if turnedOn {
-			has, err := iam.HasSSOProvider(ctx, q)
+			// A provider nobody got through yet may be set up wrong, and only the owner would get back in.
+			has, err := q.HasSSOSignIn(ctx)
 			if err != nil {
 				return err
 			}
 			if !has {
 				return connect.NewError(
 					connect.CodeFailedPrecondition,
-					"add and enable a provider before requiring single sign-on",
+					"sign in through a provider once before requiring single sign-on",
 				)
 			}
 		}

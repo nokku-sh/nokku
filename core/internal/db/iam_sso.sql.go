@@ -49,6 +49,28 @@ func (q *Queries) GetSSOProvider(ctx context.Context, providerID string) (*SsoPr
 	return &i, err
 }
 
+const hasSSOSignIn = `-- name: HasSSOSignIn :one
+SELECT
+  EXISTS (
+    SELECT
+      1
+    FROM
+      credentials c
+      JOIN sso_providers p ON p.workspace_id = c.workspace_id
+      AND p.provider_id = c.provider
+    WHERE
+      c.type = 'oidc'
+      AND p.enabled
+  )
+`
+
+func (q *Queries) HasSSOSignIn(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, hasSSOSignIn)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listSSOProviders = `-- name: ListSSOProviders :many
 SELECT
   workspace_id, provider_id, name, enabled, config, created_at, updated_at
