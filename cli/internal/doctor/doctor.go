@@ -119,7 +119,7 @@ func checkAccount(ctx context.Context, r *Report, s *state.State) {
 	case errors.Is(err, dpopclient.ErrAPIURLMismatch):
 		r.add(sec, "Nokku", statusFail, err.Error())
 	default:
-		r.add(sec, "Nokku", statusWarn, "cannot reach "+s.APIURL+", ssh keeps working with cached access")
+		r.add(sec, "Nokku", statusWarn, "cannot reach "+s.APIURL+", ssh keeps working with cached access: "+err.Error())
 	}
 }
 

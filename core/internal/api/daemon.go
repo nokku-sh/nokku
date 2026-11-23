@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
 	"uuid"
 
@@ -294,6 +295,7 @@ func (s *daemonService) Relay(
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
 			return connect.NewError(connect.CodeResourceExhausted, "too many concurrent relays")
 		}
+		slog.Warn("relay not opened", "daemon_id", d.ID, "error", err)
 		return connect.NewError(connect.CodeUnavailable, "daemon did not accept relay")
 	}
 	defer s.cfg.Pool.UnregisterRelay(relayID)

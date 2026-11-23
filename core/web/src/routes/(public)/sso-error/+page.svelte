@@ -51,7 +51,7 @@
 		'email not verified': {
 			title: 'Email not verified',
 			description:
-				'Your identity provider has not verified your email address. Verify it there, then try again.'
+				'Your identity provider did not confirm your email address. Verify it there, or ask the workspace owner to trust the addresses of this provider.'
 		},
 		'owner link required': {
 			title: 'Link this sign-in first',

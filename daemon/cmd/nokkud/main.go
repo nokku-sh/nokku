@@ -283,7 +283,8 @@ func enroll(ctx context.Context, cmd *cli.Command) error {
 	if _, err = enrollHost(ctx, cmd, token, st); err != nil {
 		return err
 	}
-	fmt.Println("Enrolled. Start the daemon with: sudo systemctl restart nokkud")
+	fmt.Println("Enrolled. A server the web app shows as pending takes no logins until it is approved there.")
+	fmt.Println("Start the daemon with: sudo systemctl restart nokkud")
 	return nil
 }
 

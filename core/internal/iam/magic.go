@@ -60,7 +60,6 @@ func (s *Service) mailLoginLink(ctx context.Context, email string) error {
 		return err
 	}
 	if u == nil {
-		s.record(ctx, event{Action: actionLoginDenied, Method: MethodMagicLink, Email: email, Detail: "unknown email"})
 		return nil
 	}
 	if link == "" {

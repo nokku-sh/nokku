@@ -75,7 +75,7 @@ func EnsureAgent(ctx context.Context, s *state.State) error {
 			return nil
 		}
 	}
-	return errors.New("the nk agent did not start, run nk doctor")
+	return errors.New("the nk agent did not start, run nk agent to see why")
 }
 
 // Drops NK_TOKEN, the agent never calls the core and outlives its command.

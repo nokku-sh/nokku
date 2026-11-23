@@ -423,7 +423,8 @@ func applyPlan(
 	// A config without the Include line takes the files and ignores them, nobody could log in.
 	if !res.Verified {
 		return undo("the files are on "+dest.host+", but its sshd does not read the Nokku drop-in", errors.New(
-			"make sure /etc/ssh/sshd_config has\n  Include /etc/ssh/sshd_config.d/*.conf\nnear the top, then run nk sync again",
+			"sshd older than OpenSSH 8.2 cannot read it and needs the Nokku daemon. On a newer one make sure "+
+				"/etc/ssh/sshd_config has\n  Include /etc/ssh/sshd_config.d/*.conf\nnear the top, then run nk sync again",
 		))
 	}
 	err = c.ReportTarget(ctx, target, h.Accounts, h.HostKey, ca.UserPublicKey)
