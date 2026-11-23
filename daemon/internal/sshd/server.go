@@ -16,6 +16,7 @@ import (
 	"uuid"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/time/rate"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/internal/login"
@@ -43,6 +44,10 @@ const (
 	maxLocalStartups = 10
 	// One remote address cannot hold every pre-auth slot.
 	maxSourceStartups = 3
+	// Refused logins logged a second, after a burst. Past that one line says how many went unlogged, so a flood
+	// from someone without a key cannot fill the journal.
+	refusedPerSecond = 10
+	refusedBurst     = 100
 	// Per connection, sessions and forwards alike.
 	maxChannels = 50
 	// Covers the account lookup, which may wait on a slow directory.
@@ -113,6 +118,11 @@ type Server struct {
 
 	hostKey ssh.Signer
 
+	// refused caps the audit lines of refused logins, which anyone who reaches the port can cause. dropped counts
+	// what the cap held back, the next line that goes out says how many.
+	refused *rate.Limiter
+	dropped atomic.Int64
+
 	mu  sync.RWMutex
 	cfg *ssh.ServerConfig
 }
@@ -137,6 +147,7 @@ func New(uploads *recording.Uploads, reports *report.Spool, groups *cgroup.Tree)
 		live:           map[*ssh.ServerConn]struct{}{},
 		maxChannels:    maxChannels,
 		aliveInterval:  aliveInterval,
+		refused:        rate.NewLimiter(refusedPerSecond, refusedBurst),
 	}
 	s.SetAccess(&state.Access{})
 	var err error

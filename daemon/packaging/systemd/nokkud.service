@@ -1,18 +1,21 @@
 [Unit]
 Description=Nokku Daemon
 Documentation=https://github.com/nokku-sh/nokku/tree/main/daemon
-After=network-online.target
+# Enrolling signs a proof with the time in it, the core refuses one from a clock that is far off.
+After=network-online.target time-sync.target
 Wants=network-online.target
 
 [Service]
 Type=simple
+# Settings and the enroll token, one NAME=value a line. Not in a drop-in, systemctl show prints those.
+EnvironmentFile=-/etc/nokkud/env
 ExecStart=/usr/bin/nokkud
 # A reload says a new binary is in place. nokkud exits 75 once its sessions end.
 ExecReload=/bin/kill -USR1 $MAINPID
 Restart=on-failure
 SuccessExitStatus=75
 RestartForceExitStatus=75
-# 78 means not enrolled, restarting cannot fix that.
+# 78 means not enrolled or set up wrong, like a token that ran out. Restarting cannot fix that.
 RestartPreventExitStatus=78
 RestartSec=5s
 # A restart only signals the daemon. Live connections still end with it.
@@ -20,6 +23,9 @@ KillMode=process
 # nokkud keeps each person's sessions in a cgroup of their own below this one, so a revoke can end what they left.
 # Naming one controller hands over the subtree without turning on the others for every service.
 Delegate=pids
+# The log carries the audit events. journald drops what a unit logs past its burst, so one person looping logins
+# would cost everyone's lines.
+LogRateLimitIntervalSec=0
 # One OOM kill in a session must not stop the unit.
 OOMPolicy=continue
 LimitNOFILE=65536

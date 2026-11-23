@@ -13,15 +13,12 @@ import (
 	"net/netip"
 	"os"
 	"os/exec"
-	"os/signal"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/pkg/sftp"
 	"github.com/stretchr/testify/assert"
@@ -137,12 +134,6 @@ func TestSessionsRunAsTheUser(t *testing.T) {
 		assert.Equal(t, strings.Repeat(want+":"+want+"\n", 2), string(out), "socket, then its directory")
 	})
 
-	t.Run("signal", func(t *testing.T) {
-		// Sent as the user, a signal reaches only the user's own processes.
-		assert.True(t, signalReaches(t, client, os.Args[0]), "a signal to the user's own process got lost")
-		assert.False(t, signalReaches(t, client, setuidCopy(t)), "a signal reached a process that became root")
-	})
-
 	// Last, it ends the connection.
 	t.Run("revoke", func(t *testing.T) {
 		require.NotNil(t, srv.groups, "this needs a writable cgroup tree, task daemon:test:root has one")
@@ -155,24 +146,6 @@ func TestSessionsRunAsTheUser(t *testing.T) {
 
 		checkRevokeKills(t, srv, client, granted)
 	})
-}
-
-// Not a test: the signal's target. It turns fully root first when setuid.
-func TestSignalTarget(t *testing.T) {
-	if !slices.Contains(os.Args, "signal-target") {
-		t.Skip("only runs as the target of the signal check")
-	}
-	if os.Geteuid() == 0 {
-		require.NoError(t, syscall.Setuid(0))
-	}
-	got := make(chan os.Signal, 1)
-	signal.Notify(got, syscall.SIGUSR1)
-	_, _ = os.Stdout.WriteString("ready\n")
-	select {
-	case <-got:
-		_, _ = os.Stdout.WriteString("signaled\n")
-	case <-time.After(30 * time.Second):
-	}
 }
 
 func addUser(t *testing.T) {
@@ -254,55 +227,4 @@ func procAddr(t *testing.T, field string) netip.AddrPort {
 	p, err := strconv.ParseUint(port, 16, 16)
 	require.NoError(t, err)
 	return netip.AddrPortFrom(netip.AddrFrom4(b), uint16(p))
-}
-
-// signalReaches runs bin in a session and says if a SIGUSR1 sent there arrives.
-func signalReaches(t *testing.T, client *ssh.Client, bin string) bool {
-	t.Helper()
-	sess, err := client.NewSession()
-	require.NoError(t, err)
-	defer sess.Close()
-	stdout, err := sess.StdoutPipe()
-	require.NoError(t, err)
-	var stderr strings.Builder
-	sess.Stderr = &stderr
-	require.NoError(t, sess.Start("exec '"+bin+"' '-test.run=^TestSignalTarget$' -- signal-target"))
-
-	lines := make(chan string, 2)
-	go func() {
-		s := bufio.NewScanner(stdout)
-		for s.Scan() {
-			lines <- s.Text()
-		}
-		close(lines)
-	}()
-	select {
-	case line := <-lines:
-		require.Equal(t, "ready", line, "stderr: %s", &stderr)
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "the signal target never started", "stderr: %s", &stderr)
-	}
-	require.NoError(t, sess.Signal(ssh.SIGUSR1))
-	select {
-	case line := <-lines:
-		return line == "signaled"
-	case <-time.After(3 * time.Second):
-		return false
-	}
-}
-
-// setuidCopy is the setuid root test binary, in a directory the user reaches.
-func setuidCopy(t *testing.T) string {
-	t.Helper()
-	//nolint:usetesting // the parent of t.TempDir() is root-only, the user could not reach the binary
-	dir, err := os.MkdirTemp("", "nokku-signal-target-")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	require.NoError(t, os.Chmod(dir, 0o755))
-	bin := filepath.Join(dir, "signal-target")
-	data, err := os.ReadFile(os.Args[0])
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(bin, data, 0o755))
-	require.NoError(t, os.Chmod(bin, 0o755|os.ModeSetuid))
-	return bin
 }

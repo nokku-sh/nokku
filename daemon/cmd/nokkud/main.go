@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect/v2"
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/logx"
 	"github.com/mizuchilabs/kata/sigx"
@@ -28,10 +30,14 @@ import (
 	"github.com/nokku-sh/nokku/daemon/internal/sshd"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
 	"github.com/nokku-sh/nokku/daemon/internal/sysutil"
+	"github.com/nokku-sh/nokku/internal/login"
 	"github.com/nokku-sh/nokku/internal/nktoken"
 	"github.com/nokku-sh/nokku/internal/tpm"
 	"github.com/nokku-sh/nokku/internal/trust"
 )
+
+// exConfig is the one exit code the unit file does not restart.
+const exConfig = 78
 
 const (
 	// Docker kills a container 10 s after stop, so shutdown must fit in stopGrace.
@@ -45,10 +51,14 @@ const (
 
 var (
 	// errNotEnrolled exits with EX_CONFIG, which the unit file does not restart.
-	errNotEnrolled = cli.Exit("nokkud: this host is not enrolled, run: sudo nokkud enroll", 78)
+	errNotEnrolled = cli.Exit("nokkud: this host is not enrolled, run: sudo nokkud enroll", exConfig)
 	// errRestart exits with EX_TEMPFAIL, which the unit file restarts.
 	errRestart = cli.Exit("nokkud: restarting for the new binary", 75)
 )
+
+// setupError is an error a restart cannot fix. It exits with EX_CONFIG, or the unit would start nokkud again
+// every five seconds, and with a token that ran out each start would ask the core again.
+type setupError struct{ error }
 
 func main() {
 	cmd := &cli.Command{
@@ -75,12 +85,6 @@ SSH certificates. The host sshd on port 22 is never touched.`,
 			{
 				Name:   "forward",
 				Usage:  "Open the socket of a port forward as the session user (spawned by the embedded SSH server)",
-				Hidden: true,
-				Action: helper,
-			},
-			{
-				Name:   "signal",
-				Usage:  "Signal a session's process as the session user (spawned by the embedded SSH server)",
 				Hidden: true,
 				Action: helper,
 			},
@@ -137,6 +141,17 @@ enrolled yet, which is how a container joins. Once enrolled, the variable is ign
 		fmt.Fprintf(os.Stderr, "%s: %v\n", cmd.Name, err)
 		os.Exit(1)
 	}
+}
+
+func (e setupError) Error() string { return "nokkud: " + e.error.Error() }
+func (e setupError) Unwrap() error { return e.error }
+func (setupError) ExitCode() int   { return exConfig }
+
+// cannotRetry is true for an enroll token the core turned down, and for a software key where a TPM is required.
+// Everything else may pass with the next start: a DPoP proof refused while the clock is not synced yet, or a 401
+// from a proxy in front of the core.
+func cannotRetry(err error) bool {
+	return errors.Is(err, tpm.ErrSoftwareKey) || connect.CodeOf(err) == connect.CodeFailedPrecondition
 }
 
 func helper(ctx context.Context, cmd *cli.Command) error {
@@ -280,17 +295,17 @@ func enroll(ctx context.Context, cmd *cli.Command) error {
 func enrollHost(ctx context.Context, cmd *cli.Command, token string, st *state.State) (*client.Client, error) {
 	if token != "" {
 		if err := checkEnrollToken(token); err != nil {
-			return nil, err
+			return nil, setupError{err}
 		}
 	}
 	cl, err := newDaemonClient(ctx, cmd, token, st)
 	if trust.Untrusted(err) {
-		return nil, fmt.Errorf(
+		return nil, setupError{fmt.Errorf(
 			"this machine does not trust the certificate of %s. If it comes from a private CA, "+
 				"point NOKKUD_CA_FILE at that CA: %w",
 			st.APIURL,
 			err,
-		)
+		)}
 	}
 	if err == nil && token != "" {
 		warnHomeKeys(ctx)
@@ -300,8 +315,12 @@ func enrollHost(ctx context.Context, cmd *cli.Command, token string, st *state.S
 
 // Port 22 is the way back in, so it is never changed, only flagged.
 func warnHomeKeys(ctx context.Context) {
-	files := sysutil.SSHDHomeKeyFiles(ctx)
-	if len(files) == 0 {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	// No answer when sshd is missing or its config does not load.
+	out, err := exec.CommandContext(ctx, "sshd", "-T").Output()
+	files := login.HomeKeyFiles(string(out))
+	if err != nil || len(files) == 0 {
 		return
 	}
 	slog.Warn("sshd reads keys from home directories, so a user granted an account here "+
@@ -336,7 +355,7 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	}
 	st, err := state.Load()
 	if err != nil {
-		return nil, err
+		return nil, setupError{err}
 	}
 	if api := strings.TrimRight(cmd.String("api"), "/"); cmd.IsSet("api") && api != st.APIURL {
 		// The CA of one Nokku is never trusted for another.
@@ -344,20 +363,20 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	}
 	// Every workspace has an address of its own, so there is none to fall back to.
 	if st.APIURL == "" {
-		return nil, errors.New("nokkud does not know its Nokku yet. Pass the address with --api or " +
-			"NOKKUD_API_URL, the web app shows the full command")
+		return nil, setupError{errors.New("this host does not know its Nokku yet. Pass the address with --api or " +
+			"NOKKUD_API_URL, the web app shows the full command")}
 	}
 	if err = checkAPIURL(st.APIURL); err != nil {
-		return nil, err
+		return nil, setupError{err}
 	}
 	if path := cmd.String("ca-file"); path != "" {
 		// #nosec G304 -- the operator names the file
 		ca, readErr := os.ReadFile(path)
 		if readErr != nil {
-			return nil, fmt.Errorf("CA file: %w", readErr)
+			return nil, setupError{fmt.Errorf("CA file: %w", readErr)}
 		}
 		if err = trust.CheckBundle(ca); err != nil {
-			return nil, fmt.Errorf("CA file %s: %w", path, err)
+			return nil, setupError{fmt.Errorf("CA file %s: %w", path, err)}
 		}
 		st.APICA = string(ca)
 	}
@@ -408,10 +427,13 @@ func enrollToken() (string, error) {
 func newDaemonClient(ctx context.Context, cmd *cli.Command, token string, st *state.State) (*client.Client, error) {
 	cl, err := client.New(ctx, st, cmd.Bool("require-tpm"), token)
 	if errors.Is(err, tpm.ErrIdentityChanged) {
-		return nil, fmt.Errorf(
+		return nil, setupError{fmt.Errorf(
 			"the daemon signing key no longer matches this machine, re-enroll with `sudo nokkud enroll`: %w",
 			err,
-		)
+		)}
+	}
+	if cannotRetry(err) {
+		return nil, setupError{fmt.Errorf("initialize daemon client: %w", err)}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("initialize daemon client: %w", err)

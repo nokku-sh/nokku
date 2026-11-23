@@ -117,17 +117,18 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 
 ### What a session may do
 
-- **Sessions run as the target OS user.** The daemon runs as root only so it can drop privileges, and refuses to serve SSH without root. A test running as root in a container checks that the shell, exec, file transfer, both kinds of port forward, the agent socket and signals all reach the OS as the user.
+- **Sessions run as the target OS user.** The daemon runs as root only so it can drop privileges, and refuses to serve SSH without root. A test running as root in a container checks that the shell, exec, file transfer, both kinds of port forward and the agent socket all reach the OS as the user.
 - **The client environment is an allowlist.** Only locale and terminal variables are accepted, like `TERM`, `LANG`, `LC_*` and `TZ`. Never `PATH`, `LD_*`, `BASH_ENV`, `ENV` or `SSH_*`.
 - **Only modern algorithms are offered.** The modern set Go's SSH library supports. SHA-1 key exchange, `hmac-sha1-96`, `ssh-rsa` signatures and DSA keys are refused.
 - **Remote forwards are loopback-only by default**, like OpenSSH's `GatewayPorts=no`. Direct forwards are written to the audit log with their destination.
 
 <details>
-<summary><b>Forced commands, forwards, signals and limits</b></summary>
+<summary><b>Forced commands, forwards and limits</b></summary>
 
 - **A forced command**, which only a service account's certificate can carry, refuses all client-supplied environment. The command the client asked for is passed along as `SSH_ORIGINAL_COMMAND`, like sshd does, so wrappers such as `git-shell` work.
 - **Forwards are opened as the session user.** A helper that runs as the user dials direct forwards and binds remote ones, then hands the socket to the daemon. Firewall rules that match on the user, like nftables `meta skuid` or the iptables `owner` match, see the session's user. Connections that arrive on a remote forward are accepted by the daemon, so those still count as root's.
-- **Signals from the client are sent as the session user.** A process that became privileged, like a `sudo` the user started, can't be signaled this way. A forced command and SFTP take no signals from the client, like in sshd.
+- **Signals from the client are refused.** OpenSSH's `ssh` sends none. A command ends when its channel or its connection ends.
+- **Groups are read at the login.** A user added to a group gets it with the next connection, as with sshd.
 - **Connections are capped at 100, and only logins count.** A peer that has not logged in holds none of them. One person or service account holds 25 at most, over all its accounts on the server and the browser terminals too, so nobody fills the server alone. A CI job that opens more than 25 connections to one server at once has to queue them. A login past either cap is refused with a line that says so.
 - **Unauthenticated connections are dropped early, at random.** One address gets three at a time, an IPv6 /64 counts as one. From ten on, a new one is refused more often the more there are, and always at sixty, like sshd's `MaxStartups 10:30:60`. A few addresses that hold the first slots lower your odds of getting in, they can't end them. Enough addresses still can, so keep the port off the open internet where you can.
 - **A panic ends one goroutine.** Every goroutine that serves a connection, a session or a recording recovers its own panic, and a test fails on one that would not.
@@ -139,6 +140,7 @@ The daemon authenticates to the core with DPoP, so its session token is bound to
 
 ### Audit and recording
 
+- **The idle timeout ends sessions with a terminal only.** It counts what is typed into a shell. A remote command, `ssh -T`, sftp and a forward without a shell have no typing to count and stay open as long as the connection does.
 - **Audit events go to the daemon's log** as `audit` lines with a `type`: logins, sessions, commands, subsystems, forwards and idle timeouts. Under systemd that is journald, under OpenRC `/var/log/nokkud.log`.
 - **Every connection is reported to the core's audit log**, once when it opens and once when it is gone: who, as which account, from where, with which certificate. Commands, forwards and refused logins stay in the daemon's log only.
 - **The report is the daemon's word.** Root on a server can make its daemon report anything, or nothing. So the core's audit log names the daemon as the one who said it and the person as who it is about, and keeps its own time next to the daemon's. A certificate the core signed is in the log either way, as something the core saw itself.

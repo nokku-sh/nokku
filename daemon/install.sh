@@ -151,7 +151,7 @@ main() {
 		install_tarball
 	fi
 
-	echo "nokkud is installed. Enroll this host with: nokkud enroll"
+	echo "nokkud is installed. Enroll this host with: sudo nokkud --api https://nokku.example.com enroll"
 }
 
 main "$@"

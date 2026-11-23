@@ -39,6 +39,9 @@ func TestHelperProcess(t *testing.T) {
 	if i < 0 || i+1 >= len(os.Args) {
 		return
 	}
+	if name := os.Args[i+1]; name == testHelperTwoFDs || name == testHelperKeeper {
+		runTestHelper(name)
+	}
 	if err := RunHelper(t.Context(), os.Args[i+1], os.Args[i+2:]); err != nil {
 		fmt.Fprintln(os.Stderr, "helper:", err)
 		os.Exit(1)

@@ -99,7 +99,7 @@ func (s *Server) serveDirectTCPIP(ctx context.Context, st *connState, newCh ssh.
 		return
 	}
 	go safe.Func("forward requests", func() { ssh.DiscardRequests(reqs) })()
-	proxy(ch, dconn)
+	proxy(ctx, ch, dconn)
 }
 
 func (s *Server) forwardingAllowed(conn *ssh.ServerConn) bool {
@@ -149,7 +149,7 @@ func (s *Server) tcpipForward(ctx context.Context, st *connState, payload []byte
 	ev := connEvent(st.conn, eventRemoteForward)
 	ev.Target = ln.Addr().String()
 	s.emit(ev)
-	go safe.Func("remote forward", func() { s.acceptForwarded(st, ln, f.BindAddr) })()
+	go safe.Func("remote forward", func() { s.acceptForwarded(ctx, st, ln, f.BindAddr) })()
 	return true, ssh.Marshal(struct{ Port uint32 }{f.BindPort})
 }
 
@@ -186,7 +186,7 @@ func forwardAddr(f tcpipForwardData, gateway bool) string {
 }
 
 // bindAddr is echoed so the client matches its -R forward.
-func (s *Server) acceptForwarded(st *connState, ln net.Listener, bindAddr string) {
+func (s *Server) acceptForwarded(ctx context.Context, st *connState, ln net.Listener, bindAddr string) {
 	defer st.releaseChannel()
 	// A listener nobody accepts on would hold the port until the connection ends.
 	defer ln.Close()
@@ -214,24 +214,31 @@ func (s *Server) acceptForwarded(st *connState, ln net.Listener, bindAddr string
 				return
 			}
 			go safe.Func("forward requests", func() { ssh.DiscardRequests(reqs) })()
-			proxy(ch, c)
+			proxy(ctx, ch, c)
 		})()
 	}
 }
 
-func proxy(ch ssh.Channel, c net.Conn) {
+// proxy carries a half-close through, so a client that is done sending still gets its answer. Both ends close
+// with ctx, or a copy would wait on a peer that stays silent after the connection is gone.
+func proxy(ctx context.Context, ch ssh.Channel, c net.Conn) {
 	closeBoth := sync.OnceFunc(func() {
 		_ = ch.Close()
 		_ = c.Close()
 	})
+	defer closeBoth()
+	stop := context.AfterFunc(ctx, safe.Func("forward end", closeBoth))
+	defer stop()
 	var wg sync.WaitGroup
 	wg.Go(safe.Func("forward in", func() {
 		_, _ = io.Copy(ch, c)
-		closeBoth()
+		_ = ch.CloseWrite()
 	}))
 	wg.Go(safe.Func("forward out", func() {
 		_, _ = io.Copy(c, ch)
-		closeBoth()
+		if tc, ok := c.(*net.TCPConn); ok {
+			_ = tc.CloseWrite()
+		}
 	}))
 	wg.Wait()
 }

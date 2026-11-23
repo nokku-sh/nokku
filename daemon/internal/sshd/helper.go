@@ -5,23 +5,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/nokku-sh/nokku/daemon/internal/safe"
 )
 
 // Hidden nokkud commands the daemon runs itself as, with the user's privileges.
 const (
 	helperSFTP    = "sftp-server"
 	helperForward = "forward"
-	helperSignal  = "signal"
 )
 
 const (
@@ -30,7 +28,6 @@ const (
 	// Covers the helper's start and its dial.
 	forwardTimeout = 10 * time.Second
 	dialTimeout    = 5 * time.Second
-	signalTimeout  = 5 * time.Second
 	// The helper reads more than this, so a long address is refused, never cut.
 	maxForwardAddr = 512
 )
@@ -47,13 +44,15 @@ var helperArgv = func(name string, args ...string) ([]string, error) {
 }
 
 func RunHelper(ctx context.Context, name string, args []string) error {
+	// The user could ptrace a dumpable helper and take its socket to the daemon.
+	if err := unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0); err != nil {
+		return err
+	}
 	switch {
 	case name == helperSFTP && len(args) == 0:
 		return serveSFTP()
 	case name == helperForward && len(args) == 0:
 		return serveForwardSocket(ctx)
-	case name == helperSignal && len(args) == 2:
-		return sendSignal(args[0], args[1])
 	}
 	return fmt.Errorf("bad arguments for %s", name)
 }
@@ -133,7 +132,7 @@ func (s *Server) openSocketAs(ctx context.Context, st *connState, mode, addr str
 	if err != nil {
 		return nil, err
 	}
-	// A helper dying or killed at the timeout closes its end, ending the read.
+	// The helper is killed with ctx at the latest.
 	defer func() { _ = cmd.Wait() }()
 
 	uc, ok := conn.(*net.UnixConn)
@@ -143,6 +142,9 @@ func (s *Server) openSocketAs(ctx context.Context, st *connState, mode, addr str
 	if _, err = uc.Write([]byte(mode + " " + addr)); err != nil {
 		return nil, err
 	}
+	// Another process of the user can hold the helper's end open, so the read ends with ctx.
+	stop := context.AfterFunc(ctx, safe.Func("forward deadline", func() { _ = uc.SetReadDeadline(time.Unix(1, 0)) }))
+	defer stop()
 	buf, oob := make([]byte, 1024), make([]byte, unix.CmsgSpace(4))
 	n, oobn, _, _, err := uc.ReadMsgUnix(buf, oob)
 	if err != nil {
@@ -152,12 +154,17 @@ func (s *Server) openSocketAs(ctx context.Context, st *connState, mode, addr str
 		// No socket came back, so the packet is the helper's error.
 		return nil, errors.New(cmp.Or(string(buf[:n]), "forward helper sent no answer"))
 	}
+	// Every descriptor that arrived is open here, also one nobody asked for.
+	var fds []int
 	msgs, err := unix.ParseSocketControlMessage(oob[:oobn])
-	if err != nil || len(msgs) != 1 {
-		return nil, errors.New("forward helper sent a bad control message")
+	for i := range msgs {
+		rights, _ := unix.ParseUnixRights(&msgs[i])
+		fds = append(fds, rights...)
 	}
-	fds, err := unix.ParseUnixRights(&msgs[0])
 	if err != nil || len(fds) != 1 {
+		for _, fd := range fds {
+			_ = unix.Close(fd)
+		}
 		return nil, errors.New("forward helper sent no socket")
 	}
 	return os.NewFile(uintptr(fds[0]), "forward-socket"), nil
@@ -174,9 +181,7 @@ func helperCmd(ctx context.Context, a *account, name string, args ...string) (*e
 	// Never the daemon's own environment, the user could read it from /proc.
 	cmd.Env = []string{"HOME=" + a.Home}
 	cmd.Dir = "/"
-	if cmd.SysProcAttr, err = sysProcAttr(a); err != nil {
-		return nil, err
-	}
+	cmd.SysProcAttr = sysProcAttr(a)
 	return cmd, nil
 }
 
@@ -236,33 +241,4 @@ func openSocket(ctx context.Context, mode, addr string) (*os.File, error) {
 		}
 	}
 	return nil, fmt.Errorf("bad forward request %q", mode)
-}
-
-// Like sshd, runs as the user. Root would also reach a sudo the user started.
-func (sess *session) signalProc(pid int, name string) {
-	ctx, cancel := context.WithTimeout(sess.ctx, signalTimeout)
-	defer cancel()
-	cmd, err := helperCmd(ctx, sess.sysUser, helperSignal, strconv.Itoa(pid), name)
-	if err == nil {
-		err = sess.server.start(sess.principal, cmd)
-	}
-	if err == nil {
-		err = cmd.Wait()
-	}
-	if err != nil {
-		slog.Debug("signal session process failed", "signal", name, "error", err)
-	}
-}
-
-func sendSignal(pid, name string) error {
-	p, err := strconv.Atoi(pid)
-	if err != nil || p <= 0 {
-		return fmt.Errorf("bad pid %q", pid)
-	}
-	sig, _ := signalByName(name)
-	s, ok := sig.(syscall.Signal)
-	if !ok {
-		return fmt.Errorf("unknown signal %q", name)
-	}
-	return syscall.Kill(p, s)
 }

@@ -22,10 +22,8 @@ func TestSysProcAttrNoCredentialWhenNonRoot(t *testing.T) {
 	}
 
 	is := assert.New(t)
-	must := require.New(t)
 
-	attr, err := sysProcAttr(&account{Name: "testuser"})
-	must.NoError(err)
+	attr := sysProcAttr(&account{Name: "testuser"})
 	is.Nil(attr.Credential)
 	is.True(attr.Setsid)
 
@@ -43,19 +41,19 @@ func TestSysProcAttrCredentialWhenRoot(t *testing.T) {
 	}
 
 	is := assert.New(t)
-	must := require.New(t)
 
-	attr, err := sysProcAttr(&account{Name: "root"})
-	must.NoError(err)
+	attr := sysProcAttr(&account{Name: "root"})
 	is.NotNil(attr.Credential)
 }
 
-// A fake getent first on PATH stands in for NSS and LDAP.
+// A fake getent first on PATH stands in for NSS and LDAP. As root the lookup also asks id -G, which has to know
+// the made-up accounts too.
 func withFakeGetent(t *testing.T, script string) {
 	t.Helper()
 	dir := t.TempDir()
 	must := require.New(t)
 	must.NoError(os.WriteFile(filepath.Join(dir, "getent"), []byte(script), 0o755))
+	must.NoError(os.WriteFile(filepath.Join(dir, "id"), []byte("#!/bin/sh\necho 1002 27\n"), 0o755))
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
@@ -76,7 +74,12 @@ func TestLookupAccount(t *testing.T) {
 
 	a, err := lookupAccount("nokkud-test-alice")
 	must.NoError(err)
-	is.Equal(account{Name: "nokkud-test-alice", UID: 1001, GID: 1002, Home: "/home/alice", Shell: "/bin/bash"}, *a)
+	want := account{Name: "nokkud-test-alice", UID: 1001, GID: 1002, Home: "/home/alice", Shell: "/bin/bash"}
+	// Only root sets groups, so only root reads them.
+	if os.Geteuid() == 0 {
+		want.Groups = []uint32{1002, 27}
+	}
+	is.Equal(want, *a)
 }
 
 func TestLookupAccountShell(t *testing.T) {

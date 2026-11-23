@@ -5,7 +5,7 @@ import (
 	"syscall"
 )
 
-// RFC 4254 signal names.
+// RFC 4254 signal names, for the exit-signal a killed command ends with.
 var sshSignals = map[string]os.Signal{
 	"ABRT": syscall.SIGABRT,
 	"ALRM": syscall.SIGALRM,
@@ -20,11 +20,6 @@ var sshSignals = map[string]os.Signal{
 	"TERM": syscall.SIGTERM,
 	"USR1": syscall.SIGUSR1,
 	"USR2": syscall.SIGUSR2,
-}
-
-func signalByName(name string) (os.Signal, bool) {
-	sig, ok := sshSignals[name]
-	return sig, ok
 }
 
 // code is the shell's 128+n. ok is false on a normal exit.

@@ -27,8 +27,6 @@ import (
 
 const (
 	maxClientEnv = 64
-	// Each queued signal costs a helper process once the command starts.
-	maxPendingSignals = 8
 	// How long an interactive shell gets after the hangup before it is killed.
 	hangupGrace = 5 * time.Second
 	// A tenth of a shell's cap, so nightly dumps can't fill a workspace.
@@ -69,12 +67,6 @@ type session struct {
 
 	exitMu sync.Mutex
 	exited bool
-
-	procMu sync.Mutex
-	proc   *os.Process
-
-	// Sent before the command started, flushed by setProc. Guarded by procMu.
-	pendingSignals []string
 }
 
 // A failing recording never disturbs the stream, Recorder swallows its errors.
@@ -148,8 +140,6 @@ func (sess *session) handleRequests() {
 			}
 		case "window-change":
 			sess.windowChange(req)
-		case "signal":
-			sess.signal(req)
 		default:
 			_ = req.Reply(false, nil)
 		}
@@ -304,29 +294,6 @@ func (sess *session) windowChange(req *ssh.Request) {
 	_ = req.Reply(true, nil)
 }
 
-func (sess *session) signal(req *ssh.Request) {
-	var sg struct{ Signal string }
-	// Like sshd, a forced command or subsystem takes no client signals.
-	if sess.forceCommand() != "" || sess.subsystem || ssh.Unmarshal(req.Payload, &sg) != nil {
-		_ = req.Reply(false, nil)
-		return
-	}
-	if _, ok := signalByName(sg.Signal); !ok {
-		_ = req.Reply(false, nil)
-		return
-	}
-	sess.procMu.Lock()
-	p := sess.proc
-	if p == nil && len(sess.pendingSignals) < maxPendingSignals {
-		sess.pendingSignals = append(sess.pendingSignals, sg.Signal)
-	}
-	sess.procMu.Unlock()
-	if p != nil {
-		sess.signalProc(p.Pid, sg.Signal)
-	}
-	_ = req.Reply(true, nil)
-}
-
 // RFC 4254 section 6.10.
 func (sess *session) exitSignal(name string, code int) {
 	sess.finish(code, func() {
@@ -380,11 +347,9 @@ func (sess *session) runPTY() {
 		return sess.server.start(sess.principal, cmd)
 	})
 	if err != nil {
-		slog.Debug("start pty command failed", "error", err)
-		sess.exit(1)
+		sess.startFailed("shell", err)
 		return
 	}
-	sess.setProc(cmd.Process)
 	// Drop our slave end, so the master reports EOF once the child exits.
 	_ = sess.tty.Close()
 	// A background process can hold the slave. Closing the master hangs it up.
@@ -480,32 +445,12 @@ func (sess *session) shellCmd() (*exec.Cmd, error) {
 	}
 	cmd.Dir = sess.sysUser.Home
 	cmd.Env = sess.buildEnv()
-	attr, err := sysProcAttr(sess.sysUser)
-	if err != nil {
-		return nil, err
-	}
-	cmd.SysProcAttr = attr
+	cmd.SysProcAttr = sysProcAttr(sess.sysUser)
 	return cmd, nil
-}
-
-func (sess *session) setProc(p *os.Process) {
-	sess.procMu.Lock()
-	sess.proc = p
-	pending := sess.pendingSignals
-	sess.pendingSignals = nil
-	sess.procMu.Unlock()
-	for _, name := range pending {
-		sess.signalProc(p.Pid, name)
-	}
 }
 
 // Like OpenSSH, exit-signal when killed, so clients surface 128+signal.
 func (sess *session) exitProcess(st *os.ProcessState) {
-	// The pid is reaped and may be reused, so no later signal goes to it.
-	sess.procMu.Lock()
-	sess.proc = nil
-	sess.procMu.Unlock()
-
 	name, code, signaled := processSignal(st)
 	if !signaled {
 		status := 1
@@ -536,8 +481,7 @@ func (sess *session) runPlain() {
 		return err
 	})
 	if err != nil {
-		slog.Debug("start command failed", "error", err)
-		sess.exit(1)
+		sess.startFailed("command", err)
 		return
 	}
 	if notice != "" {
@@ -614,6 +558,14 @@ func (sess *session) recordingFull() {
 	sess.exit(1)
 }
 
+// startFailed is a session that never ran, like a shell that is not there or a cgroup that cannot be made. That
+// locks people out, so the log says why and the client reads more than a bare exit 1.
+func (sess *session) startFailed(what string, err error) {
+	slog.Warn("session could not start", "what", what, "user", sess.sysUser.Name, "error", err)
+	_, _ = io.WriteString(sess.Stderr(), "nokkud: could not start your session, the server's log says why\n")
+	sess.exit(1)
+}
+
 func (sess *session) idleOut() {
 	sess.server.emit(sess.event(eventSessionIdle))
 	_, _ = io.WriteString(sess, "\r\nnokkud: no input for too long, closing this session\r\n")
@@ -652,7 +604,6 @@ func (sess *session) startPiped(cmd *exec.Cmd) (stdin io.WriteCloser, stdout io.
 }
 
 func (sess *session) relay(cmd *exec.Cmd, stdin io.WriteCloser, stdout io.ReadCloser) {
-	sess.setProc(cmd.Process)
 	stop := context.AfterFunc(sess.ctx, safe.Func("close stdout", func() { _ = stdout.Close() }))
 	defer stop()
 

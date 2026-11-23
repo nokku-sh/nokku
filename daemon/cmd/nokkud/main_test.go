@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -10,11 +13,67 @@ import (
 	"testing/synctest"
 	"time"
 
+	"connectrpc.com/connect/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 
 	"github.com/nokku-sh/nokku/internal/nktoken"
+	"github.com/nokku-sh/nokku/internal/tpm"
 )
+
+// The unit file restarts every exit but 78. A setup error that exits 1 comes back every five seconds, and with a
+// token that ran out each start asks the core again.
+func TestSetupErrorsExitWithoutARestart(t *testing.T) {
+	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
+	load := func(args ...string) error {
+		var got error
+		cmd := &cli.Command{
+			Flags: []cli.Flag{&cli.StringFlag{Name: "api"}, &cli.StringFlag{Name: "ca-file"}},
+			Action: func(_ context.Context, cmd *cli.Command) error {
+				_, got = loadState(cmd)
+				return nil
+			},
+		}
+		require.NoError(t, cmd.Run(t.Context(), append([]string{"nokkud"}, args...)))
+		return got
+	}
+	missing := filepath.Join(t.TempDir(), "ca.pem")
+	for name, err := range map[string]error{
+		"no address yet":              load(),
+		"a plain http address":        load("--api", "http://nokku.example.com"),
+		"a CA file that is not there": load("--api", "https://nokku.example.com", "--ca-file", missing),
+		"a token of the wrong kind":   func() error { _, err := enrollHost(t.Context(), nil, nktoken.New("invite"), nil); return err }(),
+	} {
+		coder, ok := errors.AsType[cli.ExitCoder](err)
+		if assert.True(t, ok, "%s: %v", name, err) {
+			assert.Equal(t, 78, coder.ExitCode(), name)
+		}
+	}
+}
+
+func TestOnlyAnAnswerThatComesAgainIsASetupError(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		code connect.Code
+		want bool
+	}{
+		// The core's answer for a token that ran out or was used.
+		{connect.CodeFailedPrecondition, true},
+		// A DPoP proof from a clock that is not synced yet, and a proxy's 401 or 403.
+		{connect.CodeInvalidArgument, false},
+		{connect.CodeUnauthenticated, false},
+		{connect.CodePermissionDenied, false},
+		{connect.CodeUnavailable, false},
+		{connect.CodeResourceExhausted, false},
+		{connect.CodeDeadlineExceeded, false},
+	} {
+		err := fmt.Errorf("enroll: %w", connect.NewError(tt.code, "the core's answer"))
+		assert.Equal(t, tt.want, cannotRetry(err), tt.code.String())
+	}
+	assert.True(t, cannotRetry(fmt.Errorf("open the key: %w", tpm.ErrSoftwareKey)))
+	assert.False(t, cannotRetry(errors.New("dial tcp: connection refused")))
+}
 
 func TestCheckAPIURL(t *testing.T) {
 	t.Parallel()

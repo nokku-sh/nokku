@@ -2,7 +2,6 @@ package sshd
 
 import (
 	"io"
-	"log/slog"
 	"os"
 	"os/exec"
 
@@ -26,8 +25,7 @@ func serveSFTP() error {
 func (sess *session) runSFTP() {
 	argv, err := helperArgv(helperSFTP)
 	if err != nil {
-		slog.Debug("start sftp failed", "error", err)
-		sess.exit(1)
+		sess.startFailed("sftp", err)
 		return
 	}
 	// Like sshd, the login shell runs it, so a lock shell can refuse it.
@@ -40,8 +38,7 @@ func (sess *session) runSFTP() {
 		return err
 	})
 	if err != nil {
-		slog.Debug("start sftp failed", "error", err)
-		sess.exit(1)
+		sess.startFailed("sftp", err)
 		return
 	}
 	if notice != "" {

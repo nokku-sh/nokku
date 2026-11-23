@@ -77,7 +77,9 @@ func TestServerDisconnectHangsUpTheShell(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond, "the shell got no SIGHUP")
 }
 
-func TestServerSignalForwards(t *testing.T) {
+// No client nokkud knows sends one, and taking them meant a helper process per signal. The command still ends
+// with the connection or the channel.
+func TestClientSignalsAreRefused(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)
 	addr, closeFn := startTestServer(t, ca)
@@ -86,26 +88,14 @@ func TestServerSignalForwards(t *testing.T) {
 	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
 	must.NoError(err, "dial")
 	defer client.Close()
-
 	sess, err := client.NewSession()
 	must.NoError(err, "new session")
 	defer sess.Close()
-
-	must.NoError(sess.RequestPty("xterm", 80, 24, ssh.TerminalModes{}), "request pty")
 	must.NoError(sess.Start("sleep 30"), "start")
 
-	must.NoError(sess.Signal(ssh.SIGTERM), "signal")
-
-	done := make(chan error, 1)
-	go func() {
-		done <- sess.Wait()
-	}()
-	select {
-	case err = <-done:
-		must.Error(err, "expected non-zero exit after signal")
-	case <-time.After(5 * time.Second):
-		t.Fatal("process did not terminate after signal")
-	}
+	ok, err := sess.SendRequest("signal", true, ssh.Marshal(struct{ Signal string }{"TERM"}))
+	must.NoError(err)
+	must.False(ok, "the daemon took a signal from the client")
 }
 
 func TestServerWindowChange(t *testing.T) {

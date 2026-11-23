@@ -23,6 +23,8 @@ type account struct {
 	GID   uint32
 	Home  string
 	Shell string
+	// Groups are read once at the login, like the rest. Only root can set them, so only root reads them.
+	Groups []uint32
 	// Zero means the account never expires.
 	Expires time.Time
 }
@@ -64,11 +66,18 @@ func lookupAccount(name string) (*account, error) {
 	if uidErr != nil || gidErr != nil {
 		return nil, fmt.Errorf("user %q has a bad passwd entry", name)
 	}
+	var groups []uint32
+	if os.Geteuid() == 0 {
+		if groups, err = groupIDs(ctx, name); err != nil {
+			return nil, err
+		}
+	}
 	return &account{
-		Name: name,
-		UID:  uint32(uid),
-		GID:  uint32(gid),
-		Home: parts[5],
+		Name:   name,
+		UID:    uint32(uid),
+		GID:    uint32(gid),
+		Groups: groups,
+		Home:   parts[5],
 		// A lock shell fails the session. Only an empty field means /bin/sh.
 		Shell:   cmp.Or(parts[6], "/bin/sh"),
 		Expires: shadowExpiry(ctx, name),
@@ -102,7 +111,7 @@ func cmdEnv(a *account) []string {
 		"PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin",
 	}
 	// Only harmless locale vars pass, so the admin's agent socket cannot leak.
-	for _, key := range []string{"LANG", "LC_ALL", "LC_CTYPE", "TZ", "MAIL"} {
+	for _, key := range []string{"LANG", "LC_ALL", "LC_CTYPE", "TZ"} {
 		if val, exists := os.LookupEnv(key); exists {
 			env = append(env, key+"="+val)
 		}
@@ -110,34 +119,26 @@ func cmdEnv(a *account) []string {
 	return env
 }
 
-func sysProcAttr(a *account) (*syscall.SysProcAttr, error) {
+func sysProcAttr(a *account) *syscall.SysProcAttr {
 	attr := &syscall.SysProcAttr{Setsid: true}
-
 	// setgroups(2) gives non-root EPERM, so Credential would fail every exec.
-	if os.Geteuid() != 0 {
-		return attr, nil
+	if os.Geteuid() == 0 {
+		attr.Credential = &syscall.Credential{Uid: a.UID, Gid: a.GID, Groups: a.Groups}
 	}
-	groups, err := groupIDs(a)
-	if err != nil {
-		return nil, err
-	}
-	attr.Credential = &syscall.Credential{Uid: a.UID, Gid: a.GID, Groups: groups}
-	return attr, nil
+	return attr
 }
 
-func groupIDs(a *account) ([]uint32, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func groupIDs(ctx context.Context, name string) ([]uint32, error) {
 	// #nosec G204
-	out, err := exec.CommandContext(ctx, "id", "-G", a.Name).Output()
+	out, err := exec.CommandContext(ctx, "id", "-G", name).Output()
 	if err != nil {
-		return nil, fmt.Errorf("lookup groups for %s: %w", a.Name, err)
+		return nil, fmt.Errorf("lookup groups for %s: %w", name, err)
 	}
 	var ids []uint32
 	for g := range strings.FieldsSeq(string(out)) {
 		id, parseErr := strconv.ParseUint(g, 10, 32)
 		if parseErr != nil {
-			return nil, fmt.Errorf("lookup groups for %s: %w", a.Name, parseErr)
+			return nil, fmt.Errorf("lookup groups for %s: %w", name, parseErr)
 		}
 		ids = append(ids, uint32(id))
 	}

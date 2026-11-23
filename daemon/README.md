@@ -88,6 +88,8 @@ ssh dev@alice
 | `--require-tpm` | `NOKKUD_REQUIRE_TPM` | Require a TPM 2.0 and refuse the software key |
 | `--debug`       | `NOKKUD_DEBUG`       | Debug logging                                 |
 
+Under systemd the service reads these from `/etc/nokkud/env`, one `NAME=value` a line. Make it mode 0600 and owned by root when it holds `NOKKUD_ENROLL_TOKEN`. A drop-in with `Environment=` works too, but `systemctl show` prints it to every local user.
+
 Session rules like recording and port forwarding are set per daemon in the web app. A new daemon starts with the workspace defaults, a later change of the defaults leaves enrolled daemons alone. The idle timeout is the exception, it is one setting for every daemon.
 
 When recording is on, every session with a terminal starts with `nokkud: this session is recorded`, and the web terminal shows a REC badge. Sessions without a terminal, like scp, rsync and git, get no line, since text in their stream would break them.

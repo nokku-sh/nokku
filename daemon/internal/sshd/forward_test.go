@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,12 +13,20 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sys/unix"
+)
+
+// Helpers that misbehave, the binary re-enters as one through TestHelperProcess.
+const (
+	testHelperTwoFDs = "test-two-fds"
+	testHelperKeeper = "test-keeper"
 )
 
 func testEchoServer(t *testing.T) net.Listener {
@@ -465,6 +474,121 @@ func TestDialAsStopsWithItsContext(t *testing.T) {
 	assert.Less(t, time.Since(start), forwardTimeout/2, "the dial waited for its timeout")
 }
 
+// A client that is done sending half-closes and waits for the answer, like nc -N or ssh -W with a piped stdin.
+func TestForwardKeepsTheAnswerAfterAHalfClose(t *testing.T) {
+	ca := newTestCA(t)
+	addr, closeFn := startTestServerOpts(t, ca, withPolicy(policy{AllowForwarding: true}))
+	defer closeFn()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	go func() {
+		c, acceptErr := ln.Accept()
+		if acceptErr != nil {
+			return
+		}
+		defer c.Close()
+		// Answers only once the client said it is done.
+		asked, _ := io.ReadAll(c)
+		_, _ = c.Write(append([]byte("answer to "), asked...))
+	}()
+
+	client, err := dial(t, addr, currentUser(t), userCert(t, ca, testPrincipal))
+	require.NoError(t, err)
+	defer client.Close()
+	conn, err := client.Dial("tcp", ln.Addr().String())
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = conn.Write([]byte("ping"))
+	require.NoError(t, err)
+	half, ok := conn.(interface{ CloseWrite() error })
+	require.True(t, ok)
+	require.NoError(t, half.CloseWrite())
+
+	answer := make(chan string, 1)
+	go func() {
+		got, _ := io.ReadAll(conn)
+		answer <- string(got)
+	}()
+	select {
+	case got := <-answer:
+		assert.Equal(t, "answer to ping", got, "the answer was lost with the half-close")
+	case <-time.After(5 * time.Second):
+		t.Fatal("no answer and no close after a half-close")
+	}
+}
+
+// The helper runs as the user, who can make it answer with more than the one socket.
+func TestAHelperAnswerWithTwoSocketsLeavesNoneOpen(t *testing.T) {
+	sysUser, err := lookupAccount(currentUser(t))
+	require.NoError(t, err)
+	sysUser.Home = t.TempDir()
+	helperAs(t, testHelperTwoFDs)
+
+	_, err = (&Server{}).dialAs(t.Context(), &connState{user: sysUser}, "127.0.0.1:1")
+	require.Error(t, err)
+	seen, err := os.ReadFile(filepath.Join(sysUser.Home, "seen"))
+	require.NoError(t, err)
+	assert.Equal(t, "closed", string(seen), "the daemon kept a descriptor the helper sent")
+}
+
+// Another process of the user can hold the helper's socket open, the read must not wait for it.
+func TestDialAsDoesNotWaitForAHeldSocket(t *testing.T) {
+	sysUser, err := lookupAccount(currentUser(t))
+	require.NoError(t, err)
+	sysUser.Home = t.TempDir()
+	helperAs(t, testHelperKeeper)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var canceled time.Time
+	go func() {
+		// The connection ends once the other process holds the socket.
+		for ctx.Err() == nil {
+			if _, statErr := os.Stat(filepath.Join(sysUser.Home, "held")); statErr == nil {
+				canceled = time.Now()
+				cancel()
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	_, err = (&Server{}).dialAs(ctx, &connState{user: sysUser}, "127.0.0.1:1")
+	require.Error(t, err)
+	require.False(t, canceled.IsZero(), "the helper never handed its socket on: %v", err)
+	assert.Less(t, time.Since(canceled), 2*time.Second, "the read waited for a socket the user held open")
+}
+
+// A helper the user could ptrace would hand them its socket to the daemon.
+func TestHelpersCannotBeTraced(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root owns every /proc entry")
+	}
+	pair, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_SEQPACKET|unix.SOCK_CLOEXEC, 0)
+	require.NoError(t, err)
+	ours, theirs := os.NewFile(uintptr(pair[0]), "daemon"), os.NewFile(uintptr(pair[1]), "helper")
+	argv := testHelperArgv(os.Args[0], helperForward)
+	cmd := exec.CommandContext(t.Context(), argv[0], argv[1:]...)
+	cmd.ExtraFiles = []*os.File{theirs}
+	require.NoError(t, cmd.Start())
+	require.NoError(t, theirs.Close())
+	// The helper waits for a request that never comes, the close ends it.
+	defer func() {
+		_ = ours.Close()
+		_ = cmd.Wait()
+	}()
+
+	// /proc entries of a process that is not dumpable belong to root.
+	require.Eventually(t, func() bool {
+		fi, statErr := os.Stat("/proc/" + strconv.Itoa(cmd.Process.Pid) + "/stat")
+		if statErr != nil {
+			return false
+		}
+		st, ok := fi.Sys().(*syscall.Stat_t)
+		return ok && st.Uid == 0
+	}, 5*time.Second, 20*time.Millisecond, "the helper stayed dumpable")
+}
+
 // To the kernel a forward is the user's socket, not the daemon's.
 func TestForwardSocketsBelongToTheUser(t *testing.T) {
 	if os.Geteuid() != 0 {
@@ -504,6 +628,52 @@ func helperForEveryone(t *testing.T) {
 	helperArgv = func(name string, args ...string) ([]string, error) {
 		return append(testHelperArgv(bin, name), args...), nil
 	}
+}
+
+func helperAs(t *testing.T, name string) {
+	t.Helper()
+	inPlace := helperArgv
+	t.Cleanup(func() { helperArgv = inPlace })
+	helperArgv = func(string, ...string) ([]string, error) {
+		return testHelperArgv(os.Args[0], name), nil
+	}
+}
+
+func runTestHelper(name string) {
+	daemon := os.NewFile(3, "daemon")
+	conn, err := net.FileConn(daemon)
+	if err != nil {
+		os.Exit(1)
+	}
+	uc, _ := conn.(*net.UnixConn)
+	buf := make([]byte, 1024)
+	switch name {
+	case testHelperTwoFDs:
+		// Both ends it sends are write ends of one pipe, so EOF on the read end says the daemon closed them.
+		_, _ = uc.Read(buf)
+		r, w, pipeErr := os.Pipe()
+		second, dupErr := unix.Dup(int(w.Fd()))
+		if pipeErr != nil || dupErr != nil {
+			os.Exit(1)
+		}
+		_, _, _ = uc.WriteMsgUnix([]byte{0}, unix.UnixRights(int(w.Fd()), second), nil)
+		_ = w.Close()
+		_ = unix.Close(second)
+		seen := "open"
+		_ = r.SetReadDeadline(time.Now().Add(3 * time.Second))
+		if _, readErr := r.Read(buf); errors.Is(readErr, io.EOF) {
+			seen = "closed"
+		}
+		_ = os.WriteFile(filepath.Join(os.Getenv("HOME"), "seen"), []byte(seen), 0o600)
+	case testHelperKeeper:
+		// The sleep outlives this helper and keeps its socket to the daemon open.
+		keeper := exec.Command("/bin/sleep", "6")
+		keeper.ExtraFiles = []*os.File{daemon}
+		if keeper.Start() == nil {
+			_ = os.WriteFile(filepath.Join(os.Getenv("HOME"), "held"), nil, 0o600)
+		}
+	}
+	os.Exit(0)
 }
 
 // The uid column of /proc/net/tcp is the owner a firewall matches on.

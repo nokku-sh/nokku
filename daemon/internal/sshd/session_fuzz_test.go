@@ -1,32 +1,11 @@
 package sshd
 
 import (
-	"maps"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
-
-func FuzzSignalByName(f *testing.F) {
-	for name := range sshSignals {
-		f.Add(name)
-	}
-	f.Add("")
-	f.Add("SIGTERM")
-	f.Add("term")
-
-	f.Fuzz(func(t *testing.T, name string) {
-		sig, ok := signalByName(name)
-		if !ok {
-			return
-		}
-		require.NotNil(t, sig, "signalByName(%q) returned nil with ok=true", name)
-		require.Contains(t, slices.Collect(maps.Values(sshSignals)), sig,
-			"signalByName(%q) maps to no RFC 4254 name", name)
-	})
-}
 
 func FuzzExitCodeToU32(f *testing.F) {
 	f.Add(0)

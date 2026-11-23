@@ -178,6 +178,13 @@ func certExt(conn *ssh.ServerConn, name string) bool {
 }
 
 func (s *Server) deny(conn ssh.ConnMetadata, err error) error {
+	if !s.refused.Allow() {
+		s.dropped.Add(1)
+		return err
+	}
+	if n := s.dropped.Swap(0); n > 0 {
+		s.log.Info("audit", "type", string(eventAuthFailuresUnlogged), "count", n)
+	}
 	ev := connEvent(conn, eventAuthFailure)
 	ev.Error = err.Error()
 	s.emit(ev)

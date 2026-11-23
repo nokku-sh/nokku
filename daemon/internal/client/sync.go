@@ -4,9 +4,12 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"os/exec"
 	"strconv"
+	"time"
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/internal/login"
 
 	"github.com/nokku-sh/nokku/daemon/internal/hostcerts"
 	"github.com/nokku-sh/nokku/daemon/internal/state"
@@ -19,9 +22,19 @@ func (c *Client) syncDaemon(ctx context.Context) error {
 	defer c.syncing.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, syncTimeout)
 	defer cancel()
+	// getent also lists the accounts of LDAP or SSSD. A slow one still leaves the call 5 of its 15 s.
+	usersCtx, stop := context.WithTimeout(ctx, 10*time.Second)
+	passwd, err := exec.CommandContext(usersCtx, "getent", "passwd").Output()
+	stop()
+	if err != nil {
+		// Output keeps what came before a timeout, and its last line may be cut, like a nologin shell that reads
+		// as a usable one. No list means the core keeps the accounts it has.
+		slog.Warn("list system users", "error", err)
+		passwd = nil
+	}
 	res, err := c.ctl.SyncDaemon(ctx, &nokkuv1.SyncDaemonRequest{
 		PrivateIps: c.sshEndpoints(),
-		Users:      sysutil.SystemUsers(),
+		Users:      login.Accounts(string(passwd)),
 		Metadata:   sysutil.Metadata(),
 	})
 	if err != nil {
