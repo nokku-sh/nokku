@@ -693,7 +693,7 @@ const file_nokku_v1_audit_stream_proto_rawDesc = "" +
 	"\x18AUDIT_STREAM_KIND_SPLUNK\x10\x02\x12\x1d\n" +
 	"\x19AUDIT_STREAM_KIND_DATADOG\x10\x032\xb8\x04\n" +
 	"\x12AuditStreamService\x12f\n" +
-	"\x10ListAuditStreams\x12!.nokku.v1.ListAuditStreamsRequest\x1a\".nokku.v1.ListAuditStreamsResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12w\n" +
+	"\x10ListAuditStreams\x12!.nokku.v1.ListAuditStreamsRequest\x1a\".nokku.v1.ListAuditStreamsResponse\"\v\xc2\xf3\x18\x04\x18\x05h\x01\x90\x02\x01\x12w\n" +
 	"\x11CreateAuditStream\x12\".nokku.v1.CreateAuditStreamRequest\x1a#.nokku.v1.CreateAuditStreamResponse\"\x19\xc2\xf3\x18\x15\x18\x05:\x0faudit_streaming`\x01\x12f\n" +
 	"\x11UpdateAuditStream\x12\".nokku.v1.UpdateAuditStreamRequest\x1a#.nokku.v1.UpdateAuditStreamResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01\x12f\n" +
 	"\x11DeleteAuditStream\x12\".nokku.v1.DeleteAuditStreamRequest\x1a#.nokku.v1.DeleteAuditStreamResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01\x12q\n" +

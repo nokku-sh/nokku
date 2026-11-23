@@ -10,7 +10,7 @@ import "nokku/v1/access.proto";
 service AuditStreamService {
   rpc ListAuditStreams(ListAuditStreamsRequest) returns (ListAuditStreamsResponse) {
     option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
+      role: WORKSPACE_ROLE_OWNER
       machine: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;

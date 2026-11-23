@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { auditStreams } from '#lib/api/audit-streams.svelte.js';
 	import { whenFresh } from '#lib/api/auth.svelte.js';
-	import { user } from '#lib/api/user.svelte.js';
 	import { useFeatures } from '#lib/api/workspaces.svelte.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -24,7 +23,6 @@
 
 	let open = $state(false);
 
-	const can = user.can();
 	const has = useFeatures();
 	const available = $derived(has('audit_streaming'));
 	const streams = auditStreams.list();
@@ -118,7 +116,7 @@
 		</Sheet.Header>
 
 		<div class="flex flex-1 flex-col gap-6 overflow-y-auto px-4 pb-4">
-			{#if can.own && available && (streams.data?.length ?? 0) < maxStreams}
+			{#if available && (streams.data?.length ?? 0) < maxStreams}
 				<form class="rounded-xl border p-4" onsubmit={add}>
 					<Field.Group>
 						<Field.Field>
@@ -165,34 +163,32 @@
 									{status(s)}
 								</Item.Description>
 							</Item.Content>
-							{#if can.own}
-								<Item.Actions>
-									<Switch
-										checked={s.enabled}
-										aria-label="Send events"
-										disabled={update.isPending || (!s.enabled && !available)}
-										onCheckedChange={(on) =>
-											whenFresh(() => update.mutate({ id: s.id, enabled: on }))}
-									/>
-									<Button
-										variant="ghost"
-										size="icon-sm"
-										aria-label="Send a test event"
-										disabled={!available || test.isPending}
-										onclick={() => test.mutate({ id: s.id })}
-									>
-										<Send />
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon-sm"
-										aria-label="Remove stream"
-										onclick={() => askRemove(s)}
-									>
-										<Trash />
-									</Button>
-								</Item.Actions>
-							{/if}
+							<Item.Actions>
+								<Switch
+									checked={s.enabled}
+									aria-label="Send events"
+									disabled={update.isPending || (!s.enabled && !available)}
+									onCheckedChange={(on) =>
+										whenFresh(() => update.mutate({ id: s.id, enabled: on }))}
+								/>
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									aria-label="Send a test event"
+									disabled={!available || test.isPending}
+									onclick={() => test.mutate({ id: s.id })}
+								>
+									<Send />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									aria-label="Remove stream"
+									onclick={() => askRemove(s)}
+								>
+									<Trash />
+								</Button>
+							</Item.Actions>
 						</Item.Root>
 					{/each}
 				</Item.Group>
@@ -201,9 +197,7 @@
 					<Empty.Header>
 						<Empty.Media variant="icon"><Radio /></Empty.Media>
 						<Empty.Title>No streams</Empty.Title>
-						<Empty.Description>
-							{can.own ? 'Add your SIEM above, or export the log by hand.' : 'The owner adds them.'}
-						</Empty.Description>
+						<Empty.Description>Add your SIEM above, or export the log by hand.</Empty.Description>
 					</Empty.Header>
 				</Empty.Root>
 			{/if}

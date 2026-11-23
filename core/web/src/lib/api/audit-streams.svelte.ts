@@ -2,10 +2,16 @@ import { toast } from 'svelte-sonner';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { AuditStreamService } from '#lib/gen/nokku/v1/audit_stream_pb.js';
 import { usePatch } from './mask';
+import { user } from './user.svelte';
 
 export const auditStreams = {
-	list: () =>
-		useQuery(AuditStreamService.method.listAuditStreams, {}, { select: (res) => res.streams }),
+	list: () => {
+		const can = user.can();
+		return useQuery(AuditStreamService.method.listAuditStreams, {}, () => ({
+			enabled: can.own,
+			select: (res) => res.streams
+		}));
+	},
 
 	create: () =>
 		useMutation(AuditStreamService.method.createAuditStream, {

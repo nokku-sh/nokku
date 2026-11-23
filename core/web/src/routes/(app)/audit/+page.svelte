@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { auditStreams } from '#lib/api/audit-streams.svelte.js';
+	import { user } from '#lib/api/user.svelte.js';
 	import { plural } from '#lib/api/bulk.js';
 	import ExportMenu from '#lib/components/blocks/ExportMenu.svelte';
 	import AuditStreams from '#lib/components/audit/AuditStreams.svelte';
@@ -58,6 +59,7 @@
 	});
 
 	const logs = util.getLogs(() => ({ ...pager.args, filter }));
+	const can = user.can();
 	const streams = auditStreams.list();
 	const live = $derived((streams.data ?? []).filter((s) => s.enabled));
 	const failing = $derived(live.some((s) => s.failingSince));
@@ -116,7 +118,7 @@
 	title="Audit log"
 	description="Every change and sign-in in this workspace, who did it and from where"
 >
-	<AuditStreams />
+	{#if can.own}<AuditStreams />{/if}
 	<ExportMenu
 		hint="Exactly what is on screen, up to 90 days"
 		feature="audit_export"
