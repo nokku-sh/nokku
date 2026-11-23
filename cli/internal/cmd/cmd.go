@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/mizuchilabs/kata/buildinfo"
 	"github.com/mizuchilabs/kata/logx"
@@ -19,6 +20,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 	"github.com/nokku-sh/nokku/internal/nktoken"
+	"github.com/nokku-sh/nokku/internal/tpm"
 	"github.com/nokku-sh/nokku/internal/trust"
 )
 
@@ -118,9 +120,14 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 	// A cut, mistyped or old key gets a clear answer before any call.
 	if s.Token != "" && !nktoken.Valid(s.Token, nktoken.KindServiceAccount) {
 		return nil, errors.New("NK_TOKEN is not a whole service account key, those start with nk_" +
-			nktoken.KindServiceAccount + "_. A key of the older format no longer works, create a new one")
+			nktoken.KindServiceAccount + "_")
 	}
-	if api := cmd.String("api"); s.APIURL != api && (s.APIURL == "" || cmd.IsSet("api")) {
+	api := cmd.String("api")
+	// People type the address as the browser shows it, without the scheme.
+	if api != "" && !strings.Contains(api, "://") {
+		api = "https://" + api
+	}
+	if s.APIURL != api && (s.APIURL == "" || cmd.IsSet("api")) {
 		// Another server never gets this session or shows its targets. The key belongs to the machine.
 		s.Config = state.Config{APIURL: api, SecurityKey: s.SecurityKey, RequireTPM: s.RequireTPM}
 		s.Cache = state.Cache{}
@@ -149,13 +156,23 @@ func newClient(s *state.State) (*client.Client, error) {
 			"like nk --api https://nokku.example.com login. The web app shows the full command")
 	}
 	if err := ssh.SetupKey(s); err != nil {
-		return nil, err
+		return nil, moveKeyHint(err)
 	}
-	return client.New(s)
+	c, err := client.New(s)
+	return c, moveKeyHint(err)
 }
 
+// A software key from an earlier sign-in stays until a logout removes it.
+func moveKeyHint(err error) error {
+	if errors.Is(err, tpm.ErrSoftwareKey) {
+		return fmt.Errorf("%w. Run nk logout, then nk login, to make a new key in the TPM", err)
+	}
+	return err
+}
+
+// A warning can carry what a server or the core sent, so it goes through ui.Plain.
 func warnf(format string, args ...any) {
-	fmt.Fprintln(os.Stderr, ui.Yellow("warning: "+fmt.Sprintf(format, args...)))
+	fmt.Fprintln(os.Stderr, ui.Yellow("warning: "+ui.Plain(fmt.Sprintf(format, args...))))
 }
 
 func printJSON(v any) error {

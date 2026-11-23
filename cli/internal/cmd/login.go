@@ -16,9 +16,8 @@ import (
 
 func loginCMD() *cli.Command {
 	return &cli.Command{
-		Name:    "login",
-		Usage:   "Sign in and set up ssh for your servers",
-		Aliases: []string{"refresh"},
+		Name:  "login",
+		Usage: "Sign in and set up ssh for your servers",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "ci",
@@ -113,6 +112,9 @@ func logoutCMD() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			s, loadErr := loadState(cmd)
 			if loadErr == nil {
+				// The hint for a software key under --require-tpm sends people here. Revoking the session takes the
+				// key that signs it, which is removed right after.
+				s.RequireTPM = false
 				c, err := client.New(s)
 				if err == nil {
 					err = c.Logout(ctx)

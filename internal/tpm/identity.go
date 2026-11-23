@@ -29,6 +29,9 @@ const (
 // ErrIdentityChanged means the caller must register a new public key.
 var ErrIdentityChanged = errors.New("tpm: machine identity changed since the key was created")
 
+// ErrSoftwareKey means RequireTPM is set and the stored key is a software key. Only a new key moves it.
+var ErrSoftwareKey = errors.New("tpm: require-tpm is set but this machine's key is a software key")
+
 // Signer signs SHA-256 digests only.
 type Signer interface {
 	crypto.Signer
@@ -84,9 +87,7 @@ func NewSigner(opts SignerOptions) (Signer, error) {
 			return openTPMIdentity(opts, st)
 		case MethodSoft:
 			if opts.RequireTPM {
-				return nil, errors.New(
-					"tpm: require-tpm is set but the machine is enrolled with a software key",
-				)
+				return nil, ErrSoftwareKey
 			}
 			return openSoft(opts, st)
 		default:

@@ -229,6 +229,7 @@ func TestSyncOrCacheNeverFallsBackToAnotherServer(t *testing.T) {
 	assert.Empty(t, st.Targets)
 }
 
+// A first run has only the address to go on. One nothing answers at once read as a raw dial error.
 func TestSyncOrCacheWithoutCacheFails(t *testing.T) {
 	setTestDirs(t)
 
@@ -241,7 +242,8 @@ func TestSyncOrCacheWithoutCacheFails(t *testing.T) {
 		connect.NewClient(connecthttp.NewTransport(&http.Client{}, st.APIURL)),
 	)
 	err := c.SyncOrCache(t.Context(), false)
-	assert.ErrorContains(t, err, "nothing is cached yet")
+	require.ErrorContains(t, err, "cannot reach Nokku at http://127.0.0.1:1")
+	require.ErrorContains(t, err, "--api")
 }
 
 func TestEnsureCertFreshIsNoOp(t *testing.T) {

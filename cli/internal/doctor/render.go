@@ -58,10 +58,8 @@ func color(status Status) func(string) string {
 	case statusFail:
 		return ui.Red
 	case statusInfo:
-		return ui.Dim
-	default:
-		return ui.Dim
 	}
+	return ui.Dim
 }
 
 func summarize(r Report) string {

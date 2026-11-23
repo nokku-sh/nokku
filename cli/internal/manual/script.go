@@ -26,7 +26,6 @@ var shared = scriptData{
 	CA:             caPath,
 	DropInDir:      dropInDir,
 	DropIn:         dropInPath,
-	OldPrincipals:  oldPrincipalsDir,
 	PasswdSection:  sectionPasswd,
 	HostKeySection: sectionHostKey,
 	ReloadMarker:   reloadMarker,
@@ -38,10 +37,10 @@ var shared = scriptData{
 var RemoveScript = render("remove.sh.tmpl", shared)
 
 type scriptData struct {
-	CA, DropInDir, DropIn, OldPrincipals string
-	PasswdSection, HostKeySection        string
-	ReloadMarker, VerifyMarker           string
-	KeysMarker                           string
+	CA, DropInDir, DropIn         string
+	PasswdSection, HostKeySection string
+	ReloadMarker, VerifyMarker    string
+	KeysMarker                    string
 
 	// Only the sync script reads these.
 	Files          []File

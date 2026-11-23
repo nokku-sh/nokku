@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
@@ -135,6 +136,11 @@ func (c *Client) SyncOrCache(ctx context.Context, interactive bool) error {
 		return err
 	}
 	if loadErr := c.State.LoadCache(); loadErr != nil || !c.State.HasCachedData() {
+		// A first run has only the address to go on, so say when no server is there.
+		if _, ok := errors.AsType[*net.OpError](err); ok {
+			return fmt.Errorf("cannot reach Nokku at %s. Check the address you gave with --api, "+
+				"and that this machine gets there: %w", c.State.APIURL, err)
+		}
 		return fmt.Errorf("sync with Nokku failed and nothing is cached yet: %w", err)
 	}
 	slog.Warn("sync with Nokku failed, using cached access", "err", err)

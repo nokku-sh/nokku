@@ -104,6 +104,10 @@ func checkAccount(ctx context.Context, r *Report, s *state.State) {
 	default:
 		r.add(sec, "signed in", statusWarn, "not signed in, run nk login")
 	}
+	// The key a sign-in is bound to, it is never on a security key.
+	if method := tpm.IdentityMethod(paths.SignerStateFile()); method != "" {
+		machineKey(r, sec, "sign-in key", method)
+	}
 	r.add(sec, "servers", statusInfo, strconv.Itoa(len(s.Targets)))
 
 	if s.APIURL == "" {
@@ -146,19 +150,15 @@ func checkSSH(r *Report, s *state.State) {
 	switch method := tpm.IdentityMethod(paths.SSHSignerFile()); {
 	case s.SecurityKey:
 		checkSecurityKey(r)
-	case method == tpm.MethodTPM:
-		r.add(sec, "identity", statusOK, "TPM key, never leaves the chip")
-	case method == tpm.MethodSoft && tpm.Available() == nil:
-		// A software key is never moved to hardware on its own.
-		r.add(sec, "identity", statusWarn,
-			"software key although this machine can keep it in hardware, run nk logout and nk login to move it")
-	case method == tpm.MethodSoft:
-		r.add(sec, "identity", statusOK, "machine-wrapped key, tied to this machine's ID")
-		// Malware on this machine can copy a software key, it can't copy a security key.
-		r.add(sec, "security key", statusInfo,
-			"a security key keeps your key in hardware, see nk login --security-key")
-	default:
+	case method == "":
 		r.add(sec, "identity", statusWarn, "none yet, run nk login")
+	default:
+		machineKey(r, sec, "identity", method)
+		if method == tpm.MethodSoft && tpm.Available() != nil {
+			// Malware on this machine can copy a software key, it can't copy a security key.
+			r.add(sec, "security key", statusInfo,
+				"a security key keeps your key in hardware, see nk login --security-key")
+		}
 	}
 
 	if runtime.GOOS != "windows" {
@@ -191,6 +191,19 @@ func checkSSH(r *Report, s *state.State) {
 	}
 	if certs == 0 {
 		r.add(sec, "certificates", statusInfo, "none yet, fetched on the first ssh to a server")
+	}
+}
+
+func machineKey(r *Report, sec, name, method string) {
+	switch {
+	case method == tpm.MethodTPM:
+		r.add(sec, name, statusOK, "TPM key, never leaves the chip")
+	case tpm.Available() == nil:
+		// A software key is never moved to hardware on its own.
+		r.add(sec, name, statusWarn,
+			"software key although this machine can keep it in hardware, run nk logout and nk login to move it")
+	default:
+		r.add(sec, name, statusOK, "machine-wrapped key, tied to this machine's ID")
 	}
 }
 

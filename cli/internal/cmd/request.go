@@ -49,7 +49,7 @@ func requestCMD() *cli.Command {
 			fmt.Printf("%s Asked for %s on %s for %s\n",
 				ui.Green("✔"), account, ui.PlainLine(req.GetTargetName()), ui.HumanizeDuration(cmd.Duration("for")))
 			if cmd.Bool("no-wait") {
-				fmt.Println("  You get an email with the answer. Then run nk login and ssh as usual.")
+				fmt.Println("  You get an email with the answer. Then ssh as usual.")
 				return nil
 			}
 			fmt.Println("  Waiting for an admin. Ctrl-C stops waiting, the request stays open.")
@@ -62,7 +62,7 @@ func waitForAnswer(ctx context.Context, c *client.Client, id string) error {
 	for wait := requestPollFirst; ; wait = min(wait*2, requestPollLast) {
 		select {
 		case <-ctx.Done():
-			fmt.Println("\n  Stopped waiting. Run nk login once it is approved.")
+			fmt.Println("\n  Stopped waiting. Once it is approved, ssh as usual.")
 			return nil
 		case <-time.After(wait):
 		}

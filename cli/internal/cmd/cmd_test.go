@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/internal/nktoken"
+	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
 func setHome(t *testing.T) {
@@ -225,4 +228,41 @@ func TestLoadStateRefusesANewerConfig(t *testing.T) {
 	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte(newer), 0o600))
 	_, err = runFlags(t)
 	require.ErrorContains(t, err, "newer nk")
+}
+
+// The refusal once named no fix, and nk logout did not help.
+func TestASoftwareKeyUnderRequireTPMNamesTheFix(t *testing.T) {
+	err := moveKeyHint(fmt.Errorf("open the key: %w", tpm.ErrSoftwareKey))
+	require.ErrorIs(t, err, tpm.ErrSoftwareKey)
+	require.ErrorContains(t, err, "nk logout")
+	require.NoError(t, moveKeyHint(nil))
+}
+
+// What a server printed can end up in a warning, like the key files sshd reads.
+func TestWarningsCarryNoEscapeSequences(t *testing.T) {
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	stderr := os.Stderr
+	os.Stderr = w                            //nolint:reassign // warnf writes to os.Stderr itself
+	t.Cleanup(func() { os.Stderr = stderr }) //nolint:reassign // and gets it back
+
+	warnf("sshd reads keys from home directories (%s)", ".ssh/authorized_keys\x1b[2J\x1b]0;owned\x07")
+	require.NoError(t, w.Close())
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	assert.Contains(t, string(out), ".ssh/authorized_keys")
+	assert.NotContains(t, string(out), "\x1b[2J")
+	assert.NotContains(t, string(out), "\x07")
+}
+
+// People type the address as the browser shows it. It once ended as: unsupported protocol scheme "".
+func TestAnAddressWithoutASchemeIsHTTPS(t *testing.T) {
+	setHome(t)
+	s, err := runFlags(t, "--api", "nokku.example.com")
+	require.NoError(t, err)
+	assert.Equal(t, "https://nokku.example.com", s.APIURL)
+
+	s, err = runFlags(t, "--api", "https://nokku.example.com")
+	require.NoError(t, err)
+	assert.Equal(t, "https://nokku.example.com", s.APIURL, "a whole address changed")
 }

@@ -12,8 +12,6 @@ const (
 	caPath     = "/etc/ssh/nokku_ca.pub"
 	dropInDir  = "/etc/ssh/sshd_config.d"
 	dropInPath = dropInDir + "/60-nokku.conf"
-	// Held a file per account before the drop-in named a command.
-	oldPrincipalsDir = "/etc/ssh/nokku_principals"
 )
 
 const (
@@ -48,7 +46,7 @@ func ParseProbe(out string) (Host, error) {
 		h.HostKey = strings.TrimSpace(keys[0])
 	}
 	if h.HostKey == "" {
-		return h, errors.New("found no ssh host key in /etc/ssh")
+		return h, errors.New("found no ssh host key that sshd serves, check that sshd -T runs as root")
 	}
 	return h, nil
 }

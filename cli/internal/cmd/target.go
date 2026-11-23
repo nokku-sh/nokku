@@ -23,11 +23,16 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/ssh"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 	"github.com/nokku-sh/nokku/cli/internal/ui"
+	"github.com/nokku-sh/nokku/internal/login"
 )
 
 const rootAccount = "root"
 
-var portFlag = &cli.StringFlag{Name: "port", Usage: "SSH port of the server, defaults to your ssh config or 22"}
+var (
+	portFlag = &cli.StringFlag{Name: "port", Usage: "SSH port of the server, defaults to your ssh config or 22"}
+	// errNoConnection is ssh's exit 255, before any command on the server ran.
+	errNoConnection = errors.New("could not connect")
+)
 
 type syncResult struct {
 	Target string        `json:"target"`
@@ -39,6 +44,8 @@ type syncResult struct {
 
 // Uses the system ssh as root, so the operator's keys and config apply.
 type remote struct {
+	// user is empty for root. Anyone else runs the scripts through sudo.
+	user string
 	host string
 	port string
 	// dir holds this run's pinned known_hosts and control socket.
@@ -88,7 +95,7 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Bool("stale") {
 		return syncStale(ctx, cmd)
 	}
-	host, err := rootHost(cmd)
+	at, err := remoteArg(cmd)
 	if err != nil {
 		return err
 	}
@@ -96,7 +103,15 @@ func targetSync(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	return syncHost(ctx, cmd, c, host)
+	targets, err := c.ListAllTargets(ctx)
+	if err != nil {
+		return fmt.Errorf("listing targets: %w", err)
+	}
+	ca, err := c.WorkspaceCA(ctx)
+	if err != nil {
+		return fmt.Errorf("reading the certificate authority: %w", err)
+	}
+	return syncHost(ctx, cmd, c, targets, ca, at)
 }
 
 // One server that fails does not keep the rest on the old key.
@@ -119,18 +134,24 @@ func syncStale(ctx context.Context, cmd *cli.Command) error {
 	if ca == nil {
 		return errors.New("the core sent no certificate authority")
 	}
+	var behind []string
+	for _, t := range targets {
+		if t.Behind(*ca) {
+			behind = append(behind, t.Name)
+		}
+	}
 	var failed []string
 	synced := 0
-	for _, t := range targets {
-		if !t.Behind(*ca) {
-			continue
-		}
-		if err = syncHost(ctx, cmd, c, t.Name); err != nil {
+	for i, name := range behind {
+		// On stderr, stdout may carry JSON.
+		fmt.Fprintf(os.Stderr, "%s\n", ui.Bold(fmt.Sprintf("%s, %d of %d", name, i+1, len(behind))))
+		// The list and the CA are read once, a rollover locks people out of every server still to come.
+		if err = syncHost(ctx, cmd, c, targets, ca, remote{host: name}); err != nil {
 			if ctx.Err() != nil {
 				return err
 			}
-			warnf("%s: %v", t.Name, err)
-			failed = append(failed, t.Name)
+			warnf("%s: %v", name, err)
+			failed = append(failed, name)
 			continue
 		}
 		synced++
@@ -145,7 +166,14 @@ func syncStale(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func syncHost(ctx context.Context, cmd *cli.Command, c *client.Client, host string) error {
+func syncHost(
+	ctx context.Context,
+	cmd *cli.Command,
+	c *client.Client,
+	targets []state.Target,
+	ca *state.CA,
+	at remote,
+) error {
 	dryRun := cmd.Bool("dry-run")
 	asJSON := cmd.Bool(jsonFlag.Name)
 	var progress io.Writer = os.Stdout
@@ -153,14 +181,12 @@ func syncHost(ctx context.Context, cmd *cli.Command, c *client.Client, host stri
 		progress = os.Stderr
 	}
 
-	target, dest, err := findRemoteTarget(ctx, c, remote{host: host, port: cmd.String("port")})
+	target, dest, err := findRemoteTarget(ctx, targets, c.State, at)
 	if err != nil {
 		return err
 	}
-	ca, err := c.WorkspaceCA(ctx)
-	if err != nil {
-		return fmt.Errorf("reading the certificate authority: %w", err)
-	}
+	// A target found by its name connects to its stored address, as whoever the operator named.
+	dest.user = at.user
 	if ca == nil || strings.TrimSpace(ca.UserPublicKey) == "" {
 		return errors.New("the core sent no certificate authority key, nothing was written")
 	}
@@ -220,6 +246,15 @@ func probe(
 	seeds []client.Grant,
 	acceptKey bool,
 ) (manual.Host, error) {
+	// Asked first and without a prompt, or sudo would wait for a password nobody can type.
+	if dest.user != "" {
+		if _, err := dest.run(ctx, "true", ""); errors.Is(err, errNoConnection) {
+			return manual.Host{}, err
+		} else if err != nil {
+			return manual.Host{}, fmt.Errorf("%s cannot become root on %s without a password. "+
+				"Give it sudo without a password there, or connect as root: %w", dest.user, dest.host, err)
+		}
+	}
 	out, err := dest.run(ctx, "sh -s", manual.ProbeCommand)
 	if err != nil {
 		return manual.Host{}, err
@@ -289,7 +324,12 @@ func someoneElses(s *state.State, target *state.Target) bool {
 
 // checkHostKey stops a sync that would hand a changed host key to every user.
 func checkHostKey(pinned, seen, host string, accept bool) error {
-	if pinned == "" || pinned == seen {
+	// Type and key, a comment is no part of what ssh checks.
+	key := func(line string) string {
+		f := strings.Fields(line)
+		return strings.Join(f[:min(2, len(f))], " ")
+	}
+	if pinned == "" || key(pinned) == key(seen) {
 		return nil
 	}
 	if !accept {
@@ -367,18 +407,28 @@ func applyPlan(
 	plan manual.Plan,
 	progress io.Writer,
 ) error {
+	// A sync that stops before the report takes a new target back, even after Ctrl-C. An old one is left as it was.
+	undo := func(what string, err error) error {
+		if !created {
+			return fmt.Errorf("%s, nothing was reported to Nokku: %w", what, err)
+		}
+		if delErr := c.DeleteTarget(context.WithoutCancel(ctx), target); delErr != nil {
+			return fmt.Errorf("%s and the new target %s is still in Nokku, remove it with nk rm %s --keep-host: %w",
+				what, target.Name, target.Name, errors.Join(err, delErr))
+		}
+		return fmt.Errorf("%s, the new target %s was removed again: %w", what, target.Name, err)
+	}
 	out, err := dest.run(ctx, "sh -s", plan.Script())
 	fmt.Fprint(progress, ui.Dim(ui.Plain(manual.Output(out))))
 	if err != nil {
-		if !created {
-			return fmt.Errorf("writing to %s failed, nothing was reported to Nokku: %w", dest.host, err)
-		}
-		// A failed write takes the new target back, even after Ctrl-C.
-		if delErr := c.DeleteTarget(context.WithoutCancel(ctx), target); delErr != nil {
-			return fmt.Errorf("writing to %s failed and the new target %s is still in Nokku, "+
-				"remove it with nk rm %s --keep-host: %w", dest.host, target.Name, target.Name, errors.Join(err, delErr))
-		}
-		return fmt.Errorf("writing to %s failed, the new target %s was removed again: %w", dest.host, target.Name, err)
+		return undo("writing to "+dest.host+" failed", err)
+	}
+	res := manual.ParseResult(out)
+	// A config without the Include line takes the files and ignores them, nobody could log in.
+	if !res.Verified {
+		return undo("the files are on "+dest.host+", but its sshd does not read the Nokku drop-in", errors.New(
+			"make sure /etc/ssh/sshd_config has\n  Include /etc/ssh/sshd_config.d/*.conf\nnear the top, then run nk sync again",
+		))
 	}
 	err = c.ReportTarget(ctx, target, h.Accounts, h.HostKey, ca.UserPublicKey)
 	if connectrpc.CodeOf(err) == connectrpc.CodeFailedPrecondition {
@@ -391,13 +441,8 @@ func applyPlan(
 		return fmt.Errorf("the host is up to date, but reporting to Nokku failed, run nk sync again: %w", err)
 	}
 
-	res := manual.ParseResult(out)
 	if !res.Reloaded {
 		warnf("could not reload sshd, restart it on the host to apply the changes")
-	}
-	if !res.Verified {
-		warnf("sshd is not using the Nokku drop-in. Make sure /etc/ssh/sshd_config has\n" +
-			"  Include /etc/ssh/sshd_config.d/*.conf\nnear the top, then run nk sync again")
 	}
 	if len(res.HomeKeys) > 0 {
 		warnf("sshd reads keys from home directories (%s), so a user granted an account here can add one "+
@@ -408,7 +453,7 @@ func applyPlan(
 
 	// Refresh locally so nk ls, ssh_config, and the host key pin match at once.
 	if err = c.SyncOrCache(ctx, false); err != nil {
-		warnf("local refresh failed, run nk login to update your ssh config")
+		warnf("local refresh failed, run nk ls to update your ssh config")
 	}
 	fmt.Fprintf(
 		progress,
@@ -440,7 +485,7 @@ func rmCMD() *cli.Command {
 
 // Host first, so a target never leaves Nokku while its server trusts the CA.
 func targetDelete(ctx context.Context, cmd *cli.Command) error {
-	host, err := rootHost(cmd)
+	at, err := remoteArg(cmd)
 	if err != nil {
 		return err
 	}
@@ -449,13 +494,18 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	target, dest, err := findRemoteTarget(ctx, c, remote{host: host, port: cmd.String("port")})
+	targets, err := c.ListAllTargets(ctx)
+	if err != nil {
+		return fmt.Errorf("listing targets: %w", err)
+	}
+	target, dest, err := findRemoteTarget(ctx, targets, c.State, at)
 	if err != nil {
 		return err
 	}
 	if target == nil {
-		return fmt.Errorf("no target matches %s, check the name in the Nokku web app", host)
+		return fmt.Errorf("no target matches %s, check the name in the Nokku web app", at.host)
 	}
+	dest.user = at.user
 	if err = machineOwns(c.State, target); err != nil {
 		return err
 	}
@@ -501,34 +551,49 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("deleting %s in Nokku failed, run it again with --keep-host: %w", target.Name, err)
 	}
 	if err = c.SyncOrCache(ctx, false); err != nil {
-		warnf("local refresh failed, run nk login to update your ssh config")
+		warnf("local refresh failed, run nk ls to update your ssh config")
 	}
 	fmt.Printf("%s %s is deleted\n", ui.Green("✔"), target.Name)
 	return nil
 }
 
-func rootHost(cmd *cli.Command) (string, error) {
+// remoteArg reads [user@]host. Root is the default, any other user has to reach root through sudo.
+func remoteArg(cmd *cli.Command) (remote, error) {
 	arg := cmd.Args().First()
 	if arg == "" {
-		return "", fmt.Errorf("which server? For example: %s 10.0.0.5", cmd.FullName())
+		return remote{}, fmt.Errorf("which server? For example: %s 10.0.0.5", cmd.FullName())
 	}
-	user, host, found := strings.Cut(arg, "@")
-	if found && user != rootAccount {
-		return "", fmt.Errorf("%s connects as root, use root@%s", cmd.FullName(), host)
+	at := remote{host: arg, port: cmd.String("port")}
+	if user, host, found := strings.Cut(arg, "@"); found {
+		// The name goes on the ssh command line.
+		if !login.ValidUsername(user) {
+			return remote{}, fmt.Errorf("%q is no account name", user)
+		}
+		// Like an unset variable in root@$HOST. An empty name would match a server nobody named.
+		if host == "" {
+			return remote{}, fmt.Errorf(
+				"which server after %s@? For example: %s %s@10.0.0.5",
+				user,
+				cmd.FullName(),
+				user,
+			)
+		}
+		at.host = host
+		if user != rootAccount {
+			at.user = user
+		}
 	}
-	if !found {
-		host = arg
-	}
-	return host, nil
+	return at, nil
 }
 
 // Lists all targets, the snapshot misses those the operator can't log in to.
-func findRemoteTarget(ctx context.Context, c *client.Client, dest remote) (*state.Target, remote, error) {
-	targets, err := c.ListAllTargets(ctx)
-	if err != nil {
-		return nil, dest, fmt.Errorf("listing targets: %w", err)
-	}
-	aliases := ssh.HostAliases(c.State)
+func findRemoteTarget(
+	ctx context.Context,
+	targets []state.Target,
+	s *state.State,
+	dest remote,
+) (*state.Target, remote, error) {
+	aliases := ssh.HostAliases(s)
 	target, at, err := findTarget(targets, aliases, dest)
 	if target != nil || err != nil {
 		return target, at, err
@@ -618,10 +683,11 @@ func endpointRemote(ep, port string) remote {
 }
 
 func (r remote) String() string {
+	to := cmp.Or(r.user, rootAccount) + "@" + r.host
 	if r.port == "" || r.port == "22" {
-		return "ssh root@" + r.host
+		return "ssh " + to
 	}
-	return "ssh -p " + r.port + " root@" + r.host
+	return "ssh -p " + r.port + " " + to
 }
 
 // Asks ssh where an operator's alias points, without connecting.
@@ -690,7 +756,11 @@ func (r remote) controlPath() string {
 }
 
 func (r remote) run(ctx context.Context, command, stdin string) (string, error) {
-	args := append(r.portArgs(), "-l", rootAccount)
+	args := append(r.portArgs(), "-l", cmp.Or(r.user, rootAccount))
+	if r.user != "" {
+		// Never with a prompt, the script comes in on stdin.
+		command = "sudo -n " + command
+	}
 	// Whatever the operator's config says, root on a server being set up gets no agent and no forwards.
 	args = append(args, "-T", "-o", "ForwardAgent=no", "-o", "ForwardX11=no",
 		"-o", "ClearAllForwardings=yes", "-o", "PermitLocalCommand=no")
@@ -710,10 +780,11 @@ func (r remote) run(ctx context.Context, command, stdin string) (string, error) 
 	err := cmd.Run()
 	if ee, ok := errors.AsType[*exec.ExitError](err); ok && ee.ExitCode() == 255 {
 		if r.pinned {
-			return out.String(), fmt.Errorf("could not connect as root, check that this works: %s. "+
-				"If ssh refused the host key because the server was reinstalled, run again with --accept-host-key", r)
+			return out.String(), fmt.Errorf("%w, check that this works: %s. "+
+				"If ssh refused the host key because the server was reinstalled, run again with --accept-host-key",
+				errNoConnection, r)
 		}
-		return out.String(), fmt.Errorf("could not connect as root, check that this works: %s", r)
+		return out.String(), fmt.Errorf("%w, check that this works: %s", errNoConnection, r)
 	}
 	return out.String(), err
 }

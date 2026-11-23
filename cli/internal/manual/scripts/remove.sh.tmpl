@@ -18,8 +18,4 @@ if [ -f {{.CA}} ]; then
   rm -f {{.CA}}
   echo "removed   {{.CA}}"
 fi
-if [ -d {{.OldPrincipals}} ]; then
-  rm -rf {{.OldPrincipals}}
-  echo "removed   {{.OldPrincipals}}"
-fi
 {{template "reloadSSHD" .}}

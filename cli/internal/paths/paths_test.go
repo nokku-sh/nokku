@@ -30,7 +30,8 @@ func TestEnsurePathsWithoutHome(t *testing.T) {
 	assert.Error(t, EnsureDirs(), "startup must stop when no home resolves")
 }
 
-func TestClearConfigDirKeepsOnlyTheSignerKey(t *testing.T) {
+// A kept key would stay a software key for good, also after the machine got a TPM.
+func TestClearConfigDirLeavesNothing(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -43,7 +44,6 @@ func TestClearConfigDirKeepsOnlyTheSignerKey(t *testing.T) {
 
 	left, err := os.ReadDir(ConfigDir())
 	require.NoError(t, err)
-	require.Len(t, left, 1, "a logout left more than the signer key")
-	assert.Equal(t, "signer.json", left[0].Name())
+	assert.Empty(t, left, "a logout left a file behind")
 	require.NoError(t, ClearConfigDir(), "a second logout")
 }

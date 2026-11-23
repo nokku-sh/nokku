@@ -3,17 +3,80 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 
+	connectrpc "connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
+
+	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
+	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
 	"github.com/nokku-sh/nokku/cli/internal/client"
 	"github.com/nokku-sh/nokku/cli/internal/manual"
 	"github.com/nokku-sh/nokku/cli/internal/state"
 )
+
+type reportCounter struct {
+	nokkuv1connect.UnimplementedTargetServiceHandler
+
+	reports atomic.Int32
+}
+
+func (s *reportCounter) SyncTargetUsers(
+	context.Context,
+	*nokkuv1.SyncTargetUsersRequest,
+) (*nokkuv1.SyncTargetUsersResponse, error) {
+	s.reports.Add(1)
+	return &nokkuv1.SyncTargetUsersResponse{}, nil
+}
+
+// A config without the Include line takes the files and ignores them. That sync once counted as done.
+func TestASyncThatSSHDIgnoresReportsNothing(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stand-in for ssh is a shell script")
+	}
+	setHome(t)
+	// What the sync script prints on a host whose sshd_config has no Include: written, reloaded, not verified.
+	bin := t.TempDir()
+	fakeSSH := "#!/bin/sh\ncat >/dev/null\necho 'written   /etc/ssh/nokku_ca.pub'\necho '#nk reloaded'\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "ssh"), []byte(fakeSSH), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	core := &reportCounter{}
+	mux := http.NewServeMux()
+	srv := connectrpc.NewServer()
+	nokkuv1connect.RegisterTargetServiceHandler(srv, core)
+	connecthttp.Mount(mux, srv)
+	// nk speaks HTTP/2 without TLS to a core on this machine.
+	server := httptest.NewUnstartedServer(mux)
+	server.Config.Protocols = new(http.Protocols)
+	server.Config.Protocols.SetUnencryptedHTTP2(true)
+	server.Start()
+	t.Cleanup(server.Close)
+	token := "nk_sa_" + strings.Repeat("a", 40)
+	c, err := client.New(&state.State{APIURL: server.URL, Token: token})
+	require.NoError(t, err)
+
+	const id = "01a20340-f269-71ed-894b-5c75e8b6c893"
+	const caKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFnqlkEEgnnAYIr5pXed65L5FfJ5iwFb/dx4g0LI+YJe ca"
+	plan, err := manual.NewPlan(caKey, id)
+	require.NoError(t, err)
+	err = applyPlan(t.Context(), c, &state.CA{UserPublicKey: caKey}, &state.Target{ID: id, Name: "web"}, false,
+		remote{host: "192.0.2.1"}, manual.Host{HostKey: "ssh-ed25519 AAAA host"}, plan, io.Discard)
+	require.ErrorContains(t, err, "does not read the Nokku drop-in")
+	assert.Zero(t, core.reports.Load(), "a sync sshd ignores was reported as done")
+}
 
 func TestFindTarget(t *testing.T) {
 	t.Parallel()
@@ -206,6 +269,8 @@ func TestSyncKeepsTheSubjectsOfAGrantTogether(t *testing.T) {
 func TestCheckHostKey(t *testing.T) {
 	assert.NoError(t, checkHostKey("", "ssh-ed25519 new", "web", false), "first sync pins the key")
 	assert.NoError(t, checkHostKey("ssh-ed25519 old", "ssh-ed25519 old", "web", false))
+	assert.NoError(t, checkHostKey("ssh-ed25519 old root@web", "ssh-ed25519 old", "web", false),
+		"a pin from a .pub file carries a comment, the key is the same")
 
 	err := checkHostKey("ssh-ed25519 old", "ssh-ed25519 new", "web", false)
 	require.Error(t, err, "a changed key stops the sync")
@@ -274,4 +339,61 @@ func TestSyncStaleTakesNoServer(t *testing.T) {
 		err := Root().Run(t.Context(), append([]string{"nk", "sync", "--stale"}, args...))
 		assert.ErrorContains(t, err, "--stale picks the servers itself", "args %v", args)
 	}
+}
+
+// A stock cloud image lets nobody in as root. Its user reaches root through sudo, never at a prompt.
+func TestAnotherUserRunsTheScriptsThroughSudo(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stand-in for ssh is a shell script")
+	}
+	bin := t.TempDir()
+	argv := filepath.Join(bin, "argv")
+	fakeSSH := "#!/bin/sh\ncat >/dev/null\necho \"$@\" > " + argv + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "ssh"), []byte(fakeSSH), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	ran := func(r remote) string {
+		_, err := r.run(t.Context(), "sh -s", "")
+		require.NoError(t, err)
+		got, err := os.ReadFile(argv)
+		require.NoError(t, err)
+		return strings.TrimSpace(string(got))
+	}
+
+	root := ran(remote{host: "10.0.0.5"})
+	assert.Contains(t, root, "-l root ")
+	assert.True(t, strings.HasSuffix(root, "-- 10.0.0.5 sh -s"), root)
+
+	sudo := ran(remote{host: "10.0.0.5", user: "ubuntu"})
+	assert.Contains(t, sudo, "-l ubuntu ")
+	assert.True(t, strings.HasSuffix(sudo, "-- 10.0.0.5 sudo -n sh -s"), sudo)
+	assert.Equal(t, "ssh ubuntu@10.0.0.5", remote{host: "10.0.0.5", user: "ubuntu"}.String())
+}
+
+func TestRemoteArg(t *testing.T) {
+	parse := func(arg string) (remote, error) {
+		var got remote
+		var err error
+		sync := syncCMD()
+		sync.Action = func(_ context.Context, cmd *cli.Command) error {
+			got, err = remoteArg(cmd)
+			return nil
+		}
+		require.NoError(t, sync.Run(t.Context(), []string{"sync", arg}))
+		return got, err
+	}
+	for arg, want := range map[string]remote{
+		"10.0.0.5":        {host: "10.0.0.5"},
+		"root@10.0.0.5":   {host: "10.0.0.5"},
+		"ubuntu@10.0.0.5": {host: "10.0.0.5", user: "ubuntu"},
+	} {
+		got, err := parse(arg)
+		require.NoError(t, err, arg)
+		assert.Equal(t, want, got, arg)
+	}
+	// The name becomes an argument of ssh.
+	_, err := parse("a;id@10.0.0.5")
+	require.ErrorContains(t, err, "no account name")
+	// Like root@$HOST with $HOST unset. It must not match a server nobody named.
+	_, err = parse("root@")
+	require.ErrorContains(t, err, "which server")
 }

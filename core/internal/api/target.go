@@ -230,10 +230,20 @@ func addedBy(target *db.Target, caller actor.Principal) bool {
 	return target.CreatedBy != nil && *target.CreatedBy == caller.ID
 }
 
+// sameHostKey compares type and key, a comment is no part of what ssh checks. nk sends the key without one, a pin
+// from before may still have it.
+func sameHostKey(a, b string) bool {
+	key := func(line string) string {
+		f := strings.Fields(line)
+		return strings.Join(f[:min(2, len(f))], " ")
+	}
+	return key(a) == key(b)
+}
+
 // repinTarget lets only whoever added a server replace its pinned host key, the first pin stays open.
 func repinTarget(caller actor.Principal, target *db.Target, req *nokkuv1.SyncTargetUsersRequest) error {
 	key, pinned := strings.TrimSpace(req.GetHostPublicKey()), target.HostPublicKey
-	if key == "" || pinned == nil || key == *pinned || addedBy(target, caller) {
+	if key == "" || pinned == nil || sameHostKey(key, *pinned) || addedBy(target, caller) {
 		return nil
 	}
 	return connect.NewError(

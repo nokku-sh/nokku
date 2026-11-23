@@ -2,7 +2,11 @@
 echo '{{.PasswdSection}}'
 getent passwd 2>/dev/null || cat /etc/passwd
 echo '{{.HostKeySection}}'
-for t in ed25519 ecdsa rsa; do
-  f=/etc/ssh/ssh_host_${t}_key.pub
-  if [ -r "$f" ]; then cat "$f"; break; fi
+# Only a key sshd serves counts, read from the private key. A .pub file in /etc/ssh can be stale or unused.
+nk_served=$(sshd -T 2>/dev/null | sed -n 's/^hostkey //p')
+for t in ssh-ed25519 ecdsa-sha2 ssh-rsa; do
+  for f in $nk_served; do
+    k=$(ssh-keygen -y -f "$f" 2>/dev/null | cut -d' ' -f1,2)
+    case "$k" in "$t"*) echo "$k"; break 2 ;; esac
+  done
 done

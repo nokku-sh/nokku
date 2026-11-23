@@ -41,13 +41,13 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 
 | Command                      | Purpose                                                                       |
 | ---------------------------- | ----------------------------------------------------------------------------- |
-| `nk login` (alias `refresh`) | Sign in and sync local state                                                  |
+| `nk login`                   | Sign in and sync local state                                                  |
 | `nk ls` / `nk list`          | List the servers you can reach, and until when for access that ends           |
 | `nk request <host> <user>`   | Ask an admin for an account on a server for a while, then wait for the answer |
 | `nk doctor`                  | Check the core, the TPM and your local SSH setup                              |
 | `nk sync <host>`             | Add a server without the daemon, or refresh one you added                     |
 | `nk rm <host>`               | Clean up a server you added with `nk sync` and delete its target              |
-| `nk logout`                  | Sign out, stop the agent and remove local credentials and state. The machine's key stays, so signing in again sends no new sign-in mail |
+| `nk logout`                  | Sign out, stop the agent and remove local credentials, state and both machine keys. The next sign-in counts as a new device |
 
 <details>
 <summary><b>Flags per command</b></summary>
@@ -174,6 +174,7 @@ nk rm web                   # undo it and delete the target
 ```
 
 - It connects as root with your own `ssh`, so your keys and SSH config apply. On Linux and macOS a password is asked at most once.
+- Where root can't log in, name a user that has `sudo` without a password, like `nk sync ubuntu@10.0.0.5`. `nk` runs its scripts through `sudo -n` and never waits at a password prompt.
 - It writes the workspace's CA key to `/etc/ssh/nokku_ca.pub`, and an sshd drop-in, `/etc/ssh/sshd_config.d/60-nokku.conf`, with one fixed rule: let in a certificate Nokku signed for this server and the account asked for.
 - It checks the result with `sshd -t` and rolls every file back if sshd rejects it, or if the run breaks off halfway.
 

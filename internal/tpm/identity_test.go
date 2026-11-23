@@ -136,7 +136,7 @@ func TestSignerWithoutATPM(t *testing.T) {
 
 	opts.RequireTPM = true
 	_, err = NewSigner(opts)
-	assert.ErrorContains(t, err, "require-tpm is set")
+	assert.ErrorIs(t, err, ErrSoftwareKey)
 }
 
 func (k wrongKey) Public() crypto.PublicKey { return k.shows }

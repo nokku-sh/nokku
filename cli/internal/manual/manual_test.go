@@ -43,11 +43,17 @@ func TestProbeCommand(t *testing.T) {
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "ssh"), 0o755))
 	require.NoError(t, os.Mkdir(bin, 0o755))
 	for name, body := range map[string]string{
-		"bin/id":                     "#!/bin/sh\necho 0\n",
-		"bin/getent":                 "#!/bin/sh\nexit 2\n",
-		"passwd":                     "root:x:0:0:root:/root:/bin/sh\nalice:x:1000:1000::/home/alice:/bin/sh\n",
-		"ssh/ssh_host_ecdsa_key.pub": "ecdsa-sha2-nistp256 AAAAecdsa root@web\n",
-		"ssh/ssh_host_rsa_key.pub":   "ssh-rsa AAAArsa root@web\n",
+		"bin/id":     "#!/bin/sh\necho 0\n",
+		"bin/getent": "#!/bin/sh\nexit 2\n",
+		// What sshd -T prints for a config with two HostKey lines.
+		"bin/sshd": "#!/bin/sh\necho 'port 22'\necho 'hostkey " + dir + "/ssh/ssh_host_rsa_key'\n" +
+			"echo 'hostkey " + dir + "/ssh/ssh_host_ecdsa_key'\n",
+		// ssh-keygen -y -f <key> prints the public half.
+		"bin/ssh-keygen":               "#!/bin/sh\ncat \"$3.pub\"\n",
+		"passwd":                       "root:x:0:0:root:/root:/bin/sh\nalice:x:1000:1000::/home/alice:/bin/sh\n",
+		"ssh/ssh_host_ecdsa_key.pub":   "ecdsa-sha2-nistp256 AAAAecdsa root@web\n",
+		"ssh/ssh_host_rsa_key.pub":     "ssh-rsa AAAArsa root@web\n",
+		"ssh/ssh_host_ed25519_key.pub": "ssh-ed25519 AAAAstale root@old\n",
 	} {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o755))
 	}
@@ -61,7 +67,8 @@ func TestProbeCommand(t *testing.T) {
 	h, err := ParseProbe(string(out))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"alice", "root"}, h.Accounts, "read from /etc/passwd when getent fails")
-	assert.Equal(t, "ecdsa-sha2-nistp256 AAAAecdsa root@web", h.HostKey, "without ed25519 the probe takes ecdsa")
+	assert.Equal(t, "ecdsa-sha2-nistp256 AAAAecdsa", h.HostKey,
+		"the pin is the best key sshd serves, not a file that only lies in /etc/ssh")
 }
 
 func TestNewPlan(t *testing.T) {
@@ -183,40 +190,19 @@ func TestScriptWrites(t *testing.T) {
 	assert.True(t, ParseResult(out).Reloaded)
 }
 
-// A server set up with a file per account gets the drop-in, and the files go.
-func TestScriptReplacesTheOldSetup(t *testing.T) {
+// A host where no reload works still gets its files, and nk hears that nothing reloaded.
+func TestScriptSaysWhenNothingReloaded(t *testing.T) {
 	t.Parallel()
-	p := testPlan(t)
-	dir, out, err := runPlan(t, p, map[string]string{
-		"nokku_ca.pub": "new-ca\n",
-		"sshd_config.d/60-nokku.conf": "TrustedUserCAKeys /etc/ssh/nokku_ca.pub\n" +
-			"AuthorizedPrincipalsFile /etc/ssh/nokku_principals/%u\n",
-		"nokku_principals/root":  "0199a0a0-0000-7000-8000-000000000001@" + testTargetID + ":root\n",
-		"nokku_principals/alice": "",
-	}, false, true)
-	require.NoError(t, err, out)
-
-	assert.Equal(t, strings.ReplaceAll(p.Files[1].Content, "/etc/ssh", dir),
-		readFile(t, filepath.Join(dir, "sshd_config.d/60-nokku.conf")))
-	assert.NoDirExists(t, filepath.Join(dir, "nokku_principals"))
-	assert.Contains(t, out, "removed   "+dir+"/nokku_principals")
-}
-
-// The running sshd reads the old files until it reloads, so they stay.
-func TestScriptKeepsTheOldFilesWithoutAReload(t *testing.T) {
-	t.Parallel()
-	dir, out, err := runPlan(t, testPlan(t), map[string]string{"nokku_principals/root": "p\n"}, false, false)
+	_, out, err := runPlan(t, testPlan(t), nil, false, false)
 	require.NoError(t, err, out)
 
 	assert.False(t, ParseResult(out).Reloaded)
-	assert.FileExists(t, filepath.Join(dir, "nokku_principals/root"))
 }
 
 func TestScriptRollsBackWhenSSHDRejects(t *testing.T) {
 	t.Parallel()
 	dir, out, err := runPlan(t, testPlan(t), map[string]string{
-		"nokku_ca.pub":          "old-ca\n",
-		"nokku_principals/root": "p\n",
+		"nokku_ca.pub": "old-ca\n",
 	}, true, true)
 	require.Error(t, err)
 
@@ -224,7 +210,6 @@ func TestScriptRollsBackWhenSSHDRejects(t *testing.T) {
 	assert.Equal(t, "old-ca\n", readFile(t, filepath.Join(dir, "nokku_ca.pub")))
 	assert.NoFileExists(t, filepath.Join(dir, "sshd_config.d/60-nokku.conf"), "a new file is removed again")
 	assert.NoFileExists(t, filepath.Join(dir, "nokku_ca.pub.nokku-bak"))
-	assert.FileExists(t, filepath.Join(dir, "nokku_principals/root"), "the old setup stays as it was")
 	assert.False(t, ParseResult(out).Reloaded)
 }
 
@@ -264,12 +249,10 @@ func runRemoveScript(t *testing.T, sshdExit int) (dir, out string, err error) {
 	dir = t.TempDir()
 	bin := filepath.Join(dir, "bin")
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "sshd_config.d"), 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "nokku_principals"), 0o755))
 	require.NoError(t, os.Mkdir(bin, 0o755))
 	for name, body := range map[string]string{
 		"sshd_config.d/60-nokku.conf": "TrustedUserCAKeys x\n",
 		"nokku_ca.pub":                "ca\n",
-		"nokku_principals/root":       "id\n",
 		"bin/id":                      "#!/bin/sh\necho 0\n",
 		"bin/sshd":                    fmt.Sprintf("#!/bin/sh\nexit %d\n", sshdExit),
 		"bin/systemctl":               "#!/bin/sh\nexit 0\n",
@@ -292,7 +275,6 @@ func TestRemoveScript(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(dir, "sshd_config.d/60-nokku.conf"))
 	assert.NoFileExists(t, filepath.Join(dir, "sshd_config.d/60-nokku.conf.nokku-bak"))
 	assert.NoFileExists(t, filepath.Join(dir, "nokku_ca.pub"))
-	assert.NoDirExists(t, filepath.Join(dir, "nokku_principals"), "a server set up the old way is cleaned too")
 	assert.DirExists(t, filepath.Join(dir, "sshd_config.d"), "the drop-in dir belongs to the host")
 	assert.True(t, ParseResult(out).Reloaded)
 }
@@ -305,7 +287,6 @@ func TestRemoveScriptRollsBack(t *testing.T) {
 	assert.Contains(t, out, "nothing was removed")
 	assert.FileExists(t, filepath.Join(dir, "sshd_config.d/60-nokku.conf"))
 	assert.FileExists(t, filepath.Join(dir, "nokku_ca.pub"))
-	assert.FileExists(t, filepath.Join(dir, "nokku_principals/root"))
 	assert.False(t, ParseResult(out).Reloaded, "a rejected config is never reloaded")
 }
 

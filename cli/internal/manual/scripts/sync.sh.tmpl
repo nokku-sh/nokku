@@ -36,11 +36,6 @@ fi
 trap - EXIT HUP INT TERM PIPE
 for f in {{.Paths}}; do rm -f "$f.nokku-bak"; done
 {{template "reloadSSHD" .}}
-# A running sshd may still read the old files until it reloads.
-if [ -n "$nk_reloaded" ] && [ -d {{q .OldPrincipals}} ]; then
-  rm -rf {{q .OldPrincipals}}
-  echo "removed   {{.OldPrincipals}}"
-fi
 # A config without the Include line reloads fine and ignores the drop-in.
 nk_cfg=$(sshd -T 2>/dev/null || true)
 # A key a user adds at home outlives a revoke, nk warns about it.

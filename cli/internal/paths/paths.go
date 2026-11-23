@@ -64,8 +64,8 @@ func SSHCertificates() ([]string, error) {
 	return filepath.Glob(filepath.Join(SSHCertDir(), "*-cert.pub"))
 }
 
-// ClearConfigDir keeps the signer's key. The core knows this machine by it, so signing in again is no new
-// device and sends no mail. The key opens nothing without a session.
+// ClearConfigDir takes both machine keys too, so the next sign-in makes new ones where they are safest by then.
+// To the core that sign-in is a new device.
 func ClearConfigDir() error {
 	entries, err := os.ReadDir(ConfigDir())
 	if errors.Is(err, fs.ErrNotExist) {
@@ -74,11 +74,7 @@ func ClearConfigDir() error {
 	if err != nil {
 		return fmt.Errorf("read config dir: %w", err)
 	}
-	keep := filepath.Base(SignerStateFile())
 	for _, e := range entries {
-		if e.Name() == keep {
-			continue
-		}
 		if err = os.RemoveAll(filepath.Join(ConfigDir(), e.Name())); err != nil {
 			return fmt.Errorf("clear config dir: %w", err)
 		}

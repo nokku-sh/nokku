@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,6 +45,21 @@ func TestCheckSecurityKey(t *testing.T) {
 	got := identity()
 	assert.Equal(t, statusOK, got.Status, got.Detail)
 	assert.Contains(t, got.Detail, "sk-ssh-ed25519@openssh.com")
+}
+
+// The key a sign-in is bound to once stayed a software key unseen.
+func TestTheSignInKeyIsReported(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	require.NoError(t, paths.EnsureDirs())
+	require.NoError(t, os.WriteFile(paths.SignerStateFile(), []byte(`{"method":"soft"}`), 0o600))
+
+	var r Report
+	checkAccount(t.Context(), &r, &state.State{})
+	i := slices.IndexFunc(r.Checks, func(c Check) bool { return c.Name == "sign-in key" })
+	require.GreaterOrEqual(t, i, 0, "doctor does not show the sign-in key")
+	assert.Contains(t, r.Checks[i].Detail, "key")
 }
 
 // A missing cache leaves no CA, which must not make every certificate stale.
