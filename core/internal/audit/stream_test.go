@@ -159,8 +159,7 @@ func testStream(t *testing.T, s *Service, kind nokkuv1.AuditStreamKind, url, sec
 	return st
 }
 
-// The answer is cut at 200 bytes, which can be inside a rune, and it is stored as the stream's last error. Postgres
-// refuses such text, and a failure that is not stored never retries later or alerts.
+// The cut can fall inside a rune, which Postgres refuses to store.
 func TestAFailedSendCanBeStored(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)

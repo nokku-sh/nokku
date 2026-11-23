@@ -23,9 +23,6 @@ KillMode=process
 # nokkud keeps each person's sessions in a cgroup of their own below this one, so a revoke can end what they left.
 # Naming one controller hands over the subtree without turning on the others for every service.
 Delegate=pids
-# The log carries the audit events. journald drops what a unit logs past its burst, so one person looping logins
-# would cost everyone's lines.
-LogRateLimitIntervalSec=0
 # One OOM kill in a session must not stop the unit.
 OOMPolicy=continue
 LimitNOFILE=65536

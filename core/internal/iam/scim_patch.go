@@ -26,7 +26,7 @@ var scimNames = map[string]string{
 	"value":       "value",
 }
 
-// eachScimOp fans a path-less op out to one call per attribute, with every name in the case the handlers read.
+// eachScimOp fans a path-less op out to one call per attribute.
 func eachScimOp(
 	ops []scim.PatchOperation,
 	apply func(opName, attr string, expr filter.Expression, value any) error,
@@ -61,7 +61,6 @@ func scimName(name string) string {
 	return cmp.Or(scimNames[strings.ToLower(name)], name)
 }
 
-// scimNamed renames the keys of a value, however deep they sit.
 func scimNamed(v any) any {
 	switch v := v.(type) {
 	case map[string]any:

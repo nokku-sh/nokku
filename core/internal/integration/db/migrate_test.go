@@ -39,8 +39,7 @@ func TestNewConnectionChangesNothing(t *testing.T) {
 	assert.False(t, migrated, "opening a connection migrated the database")
 }
 
-// A role that cannot log in has no password to set at a start, to read in a Postgres log or to share with a second
-// database of the cluster.
+// The runtime roles cannot log in, so they have no password.
 func TestRuntimeRolesCannotLogIn(t *testing.T) {
 	c := testConnection(t)
 	rows, err := c.sysPool.Query(t.Context(), `

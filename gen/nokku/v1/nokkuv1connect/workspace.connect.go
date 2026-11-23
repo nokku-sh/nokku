@@ -194,24 +194,16 @@ var (
 type WorkspaceServiceClient interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
-	// SetEnforceSSO turns required single sign-on on or off. It decides who may sign in, so it takes a fresh
-	// sign-in. On ends every session that did not come through a provider.
 	SetEnforceSSO(context.Context, *v1.SetEnforceSSORequest) (*v1.SetEnforceSSOResponse, error)
 	// UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
 	UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error)
-	// SetDefaultSafeguards is SetDaemonSafeguards for the rules a new daemon starts with.
 	SetDefaultSafeguards(context.Context, *v1.SetDefaultSafeguardsRequest) (*v1.SetDefaultSafeguardsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
-	// DeactivateUser ends the user's sessions and keeps their grants for a return. It asks for no fresh sign-in, it is
-	// the emergency brake.
 	DeactivateUser(context.Context, *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error)
-	// ReactivateUser lets someone back in with the access they had.
 	ReactivateUser(context.Context, *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error)
-	// DeleteUser takes grants and team seats for good, so in a browser it takes a fresh sign-in. Deactivating is
-	// the quick one.
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
 	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
 	// them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
@@ -232,24 +224,16 @@ func NewWorkspaceServiceClient(client *connect.Client) WorkspaceServiceClient {
 type WorkspaceServiceHandler interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
-	// SetEnforceSSO turns required single sign-on on or off. It decides who may sign in, so it takes a fresh
-	// sign-in. On ends every session that did not come through a provider.
 	SetEnforceSSO(context.Context, *v1.SetEnforceSSORequest) (*v1.SetEnforceSSOResponse, error)
 	// UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
 	UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error)
-	// SetDefaultSafeguards is SetDaemonSafeguards for the rules a new daemon starts with.
 	SetDefaultSafeguards(context.Context, *v1.SetDefaultSafeguardsRequest) (*v1.SetDefaultSafeguardsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
 	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
 	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
 	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
-	// DeactivateUser ends the user's sessions and keeps their grants for a return. It asks for no fresh sign-in, it is
-	// the emergency brake.
 	DeactivateUser(context.Context, *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error)
-	// ReactivateUser lets someone back in with the access they had.
 	ReactivateUser(context.Context, *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error)
-	// DeleteUser takes grants and team seats for good, so in a browser it takes a fresh sign-in. Deactivating is
-	// the quick one.
 	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
 	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
 	// them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.

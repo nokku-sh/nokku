@@ -191,6 +191,7 @@ func TestSyncOrCacheFallsBackToCache(t *testing.T) {
 	setTestDirs(t)
 
 	st := &state.State{APIURL: "http://127.0.0.1:1", SessionToken: "sess-token"}
+	st.Server = st.APIURL
 	st.Targets = []state.Target{{ID: "t-1", Name: "prod"}}
 	st.User = &state.User{ID: "user-1"}
 	require.NoError(t, st.Save())

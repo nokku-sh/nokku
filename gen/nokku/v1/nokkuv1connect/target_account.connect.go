@@ -84,11 +84,9 @@ type TargetAccountServiceClient interface {
 	ListTargetAccounts(context.Context, *v1.ListTargetAccountsRequest) (*v1.ListTargetAccountsResponse, error)
 	AddTargetAccount(context.Context, *v1.AddTargetAccountRequest) (*v1.AddTargetAccountResponse, error)
 	RemoveTargetAccount(context.Context, *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error)
-	// Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
-	// access change, however many servers. A dry run says what it would do and changes nothing.
+	// Grant gives subjects one account on many servers, in one transaction and one access change.
 	Grant(context.Context, *v1.GrantRequest) (*v1.GrantResponse, error)
-	// Revoke takes one subject's own grants off many servers: the servers by id, by tag, or all of them. Like Grant it
-	// is one transaction and one access change, and a dry run changes nothing.
+	// Revoke takes one subject's own grants off many servers, in one transaction and one access change.
 	Revoke(context.Context, *v1.RevokeRequest) (*v1.RevokeResponse, error)
 }
 
@@ -103,11 +101,9 @@ type TargetAccountServiceHandler interface {
 	ListTargetAccounts(context.Context, *v1.ListTargetAccountsRequest) (*v1.ListTargetAccountsResponse, error)
 	AddTargetAccount(context.Context, *v1.AddTargetAccountRequest) (*v1.AddTargetAccountResponse, error)
 	RemoveTargetAccount(context.Context, *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error)
-	// Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
-	// access change, however many servers. A dry run says what it would do and changes nothing.
+	// Grant gives subjects one account on many servers, in one transaction and one access change.
 	Grant(context.Context, *v1.GrantRequest) (*v1.GrantResponse, error)
-	// Revoke takes one subject's own grants off many servers: the servers by id, by tag, or all of them. Like Grant it
-	// is one transaction and one access change, and a dry run changes nothing.
+	// Revoke takes one subject's own grants off many servers, in one transaction and one access change.
 	Revoke(context.Context, *v1.RevokeRequest) (*v1.RevokeResponse, error)
 }
 

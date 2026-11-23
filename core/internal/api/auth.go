@@ -85,7 +85,6 @@ func (s *authService) ConsumeMagicLink(
 	case errors.Is(err, iam.ErrInvalidToken), errors.Is(err, pgx.ErrNoRows):
 		return nil, errLinkInvalid
 	case err != nil:
-		// Not the link's fault. It is logged and reads as a failure of ours, the link is spent by then.
 		return nil, err
 	}
 	setCookie(ci, cookie)

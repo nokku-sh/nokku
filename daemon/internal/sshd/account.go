@@ -18,12 +18,11 @@ import (
 const nologinPath = "/etc/nologin"
 
 type account struct {
-	Name  string
-	UID   uint32
-	GID   uint32
-	Home  string
-	Shell string
-	// Groups are read once at the login, like the rest. Only root can set them, so only root reads them.
+	Name   string
+	UID    uint32
+	GID    uint32
+	Home   string
+	Shell  string
 	Groups []uint32
 	// Zero means the account never expires.
 	Expires time.Time

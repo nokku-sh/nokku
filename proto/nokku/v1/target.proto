@@ -40,15 +40,13 @@ service TargetService {
   rpc UpdateTarget(UpdateTargetRequest) returns (UpdateTargetResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // RenameTarget changes the name people type to get there. A freed name fits another host, so it takes a fresh
-  // sign-in.
   rpc RenameTarget(RenameTargetRequest) returns (RenameTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
       browser: BROWSER_FRESH
     };
   }
-  // SetTargetEndpoints replaces where logins to the server go, an empty list clears it.
+  // An empty list clears the endpoints.
   rpc SetTargetEndpoints(SetTargetEndpointsRequest) returns (SetTargetEndpointsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
@@ -198,15 +196,11 @@ message CreateTargetResponse {
 }
 
 message UpdateTargetRequest {
-  // name and endpoints went to RenameTarget and SetTargetEndpoints.
-  reserved 2, 4;
-  reserved name, endpoints;
-
   string id = 1 [(buf.validate.field).string.uuid = true];
   string description = 3 [(buf.validate.field).string.max_len = 1000];
   repeated string tags = 5;
   // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-  // The name and the endpoints have calls of their own. The pinned host key is set by nk sync on the server only.
+  // The pinned host key is set by nk sync on the server only.
   google.protobuf.FieldMask update_mask = 6 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {

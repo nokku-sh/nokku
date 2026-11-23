@@ -347,8 +347,7 @@ func TestRevokeOnATag(t *testing.T) {
 	assert.Zero(t, held(team, outside))
 }
 
-// A dry run changes nothing, so it leaves no audit row, not even when it is refused. A preview left open past
-// its end and a member who tries are both refused.
+// A dry run leaves no audit row, not even when it is refused.
 func TestADryRunLeavesNoAuditRow(t *testing.T) {
 	cfg, srv := enterprise(t)
 	ws := testWorkspace.ID

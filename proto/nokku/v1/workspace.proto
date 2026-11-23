@@ -24,8 +24,6 @@ service WorkspaceService {
       machine: true
     };
   }
-  // SetEnforceSSO turns required single sign-on on or off. It decides who may sign in, so it takes a fresh
-  // sign-in. On ends every session that did not come through a provider.
   rpc SetEnforceSSO(SetEnforceSSORequest) returns (SetEnforceSSOResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
@@ -39,7 +37,6 @@ service WorkspaceService {
       machine: true
     };
   }
-  // SetDefaultSafeguards is SetDaemonSafeguards for the rules a new daemon starts with.
   rpc SetDefaultSafeguards(SetDefaultSafeguardsRequest) returns (SetDefaultSafeguardsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
@@ -73,23 +70,18 @@ service WorkspaceService {
       browser: BROWSER_FRESH
     };
   }
-  // DeactivateUser ends the user's sessions and keeps their grants for a return. It asks for no fresh sign-in, it is
-  // the emergency brake.
   rpc DeactivateUser(DeactivateUserRequest) returns (DeactivateUserResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
       machine: true
     };
   }
-  // ReactivateUser lets someone back in with the access they had.
   rpc ReactivateUser(ReactivateUserRequest) returns (ReactivateUserResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
       browser: BROWSER_FRESH
     };
   }
-  // DeleteUser takes grants and team seats for good, so in a browser it takes a fresh sign-in. Deactivating is
-  // the quick one.
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
@@ -163,10 +155,6 @@ message PlanFeature {
 }
 
 message UpdateWorkspaceRequest {
-  // settings went to SetEnforceSSO and UpdateDaemonDefaults.
-  reserved 3;
-  reserved settings;
-
   string name = 1 [(buf.validate.field).string = {
     min_len: 3
     max_len: 256

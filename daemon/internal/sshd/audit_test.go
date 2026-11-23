@@ -5,34 +5,22 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"maps"
-	"net"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/pkg/sftp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/time/rate"
 
 	"github.com/nokku-sh/nokku/daemon/internal/report"
 )
-
-// fakeMeta is a connection before its key proof, the only parts a refused login reads.
-type fakeMeta struct {
-	ssh.ConnMetadata
-
-	user string
-}
 
 type lockedWriter struct {
 	mu *sync.Mutex
@@ -219,34 +207,4 @@ func TestClientVersionKeepsOnlyWhatPrints(t *testing.T) {
 	} {
 		assert.Equal(t, want, clientVersion(versionLine{line: in}), "%q", in)
 	}
-}
-
-func (f fakeMeta) User() string         { return f.user }
-func (f fakeMeta) RemoteAddr() net.Addr { return &net.TCPAddr{IP: net.IPv4(192, 0, 2, 1), Port: 4022} }
-
-// Anyone who reaches the port can cause a refused login, so their lines are capped and the next one says how many
-// went unlogged.
-func TestRefusedLoginsAreCapped(t *testing.T) {
-	log, events := auditLog()
-	s := &Server{log: log, refused: rate.NewLimiter(rate.Every(time.Hour), 3)}
-	conn := versionLine{ConnMetadata: fakeMeta{user: strings.Repeat("x", 4096)}, line: "SSH-2.0-flood"}
-	for range 10 {
-		_ = s.deny(conn, errors.New("refused"))
-	}
-	assert.Len(t, events(), 3, "the burst passes, the rest is held back")
-
-	s.refused = rate.NewLimiter(rate.Inf, 1)
-	_ = s.deny(conn, errors.New("refused"))
-	assert.Equal(t, []eventType{
-		eventAuthFailure, eventAuthFailure, eventAuthFailure, eventAuthFailuresUnlogged, eventAuthFailure,
-	}, events())
-}
-
-func TestPrintableCutsALongClientField(t *testing.T) {
-	t.Parallel()
-	assert.Equal(t, "root", printable("root"))
-	long := printable(strings.Repeat("é", 200))
-	assert.LessOrEqual(t, len(long), maxClientField+len("…"))
-	assert.True(t, utf8.ValidString(long), "a cut in the middle of a rune")
-	assert.Equal(t, "ab", printable("a\x1b\nb"), "control characters reach the log")
 }

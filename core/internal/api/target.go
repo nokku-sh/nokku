@@ -226,8 +226,7 @@ func addedBy(target *db.Target, caller actor.Principal) bool {
 	return target.CreatedBy != nil && *target.CreatedBy == caller.ID
 }
 
-// sameHostKey compares type and key, a comment is no part of what ssh checks. nk sends the key without one, a pin
-// from before may still have it.
+// A comment is no part of what ssh checks.
 func sameHostKey(a, b string) bool {
 	key := func(line string) string {
 		f := strings.Fields(line)
@@ -291,9 +290,8 @@ func (s *targetService) SetTargetEndpoints(
 	ctx context.Context,
 	req *nokkuv1.SetTargetEndpointsRequest,
 ) (*nokkuv1.SetTargetEndpointsResponse, error) {
-	// The query keeps the stored list for nil, so an empty one is never nil.
 	result, err := s.cfg.Conn.Tenant().UpdateTarget(ctx, &db.UpdateTargetParams{
-		TargetID: req.GetId(), Endpoints: append([]string{}, req.GetEndpoints()...),
+		TargetID: req.GetId(), Endpoints: maskedList(true, req.GetEndpoints()),
 	})
 	if err != nil {
 		return nil, err

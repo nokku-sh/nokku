@@ -656,10 +656,9 @@ func (x *GrantPlan) GetOutcomes() []*GrantOutcome {
 }
 
 type GrantRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Grant *GrantSpec             `protobuf:"bytes,1,opt,name=grant" json:"grant,omitempty"`
-	// Only say what it would do.
-	DryRun        *bool `protobuf:"varint,2,opt,name=dry_run,json=dryRun" json:"dry_run,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Grant         *GrantSpec             `protobuf:"bytes,1,opt,name=grant" json:"grant,omitempty"`
+	DryRun        *bool                  `protobuf:"varint,2,opt,name=dry_run,json=dryRun" json:"dry_run,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -709,9 +708,8 @@ func (x *GrantRequest) GetDryRun() bool {
 }
 
 type GrantResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it did, or would do.
-	Plan          *GrantPlan `protobuf:"bytes,1,opt,name=plan" json:"plan,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Plan          *GrantPlan             `protobuf:"bytes,1,opt,name=plan" json:"plan,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -753,17 +751,15 @@ func (x *GrantResponse) GetPlan() *GrantPlan {
 	return nil
 }
 
-// Whose grants go where. A server counts when its id is named, it has one of the tags, or everywhere is set. Only the
-// subject's own grants go, what a team gives its members stays.
+// Only the subject's own grants go, what a team gives its members stays.
 type RevokeSpec struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Subject   *GrantSubject          `protobuf:"bytes,1,opt,name=subject" json:"subject,omitempty"`
 	TargetIds []string               `protobuf:"bytes,2,rep,name=target_ids,json=targetIds" json:"target_ids,omitempty"`
 	Tags      []string               `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty"`
-	// Only the grants on this account. Empty is every account.
-	Username *string `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
-	// Every server of the workspace, the ids and tags are not read.
-	Everywhere    *bool `protobuf:"varint,5,opt,name=everywhere" json:"everywhere,omitempty"`
+	// Empty is every account.
+	Username      *string `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
+	Everywhere    *bool   `protobuf:"varint,5,opt,name=everywhere" json:"everywhere,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -977,10 +973,9 @@ func (x *RevokePlan) GetOtherTagNames() []string {
 }
 
 type RevokeRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Revoke *RevokeSpec            `protobuf:"bytes,1,opt,name=revoke" json:"revoke,omitempty"`
-	// Only say what it would do.
-	DryRun        *bool `protobuf:"varint,2,opt,name=dry_run,json=dryRun" json:"dry_run,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revoke        *RevokeSpec            `protobuf:"bytes,1,opt,name=revoke" json:"revoke,omitempty"`
+	DryRun        *bool                  `protobuf:"varint,2,opt,name=dry_run,json=dryRun" json:"dry_run,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1030,9 +1025,8 @@ func (x *RevokeRequest) GetDryRun() bool {
 }
 
 type RevokeResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// What it did, or would do.
-	Plan          *RevokePlan `protobuf:"bytes,1,opt,name=plan" json:"plan,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Plan          *RevokePlan            `protobuf:"bytes,1,opt,name=plan" json:"plan,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

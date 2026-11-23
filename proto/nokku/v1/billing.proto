@@ -40,7 +40,6 @@ message GetBillingResponse {
   Quotas quotas = 4;
   int64 user_count = 5;
   int64 resource_count = 6;
-  reserved 7;
   Quotas held_quotas = 8;
   google.protobuf.Timestamp held_until = 9;
   // The end of a hosted trial, set until the first key is activated.

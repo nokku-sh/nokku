@@ -181,7 +181,7 @@ export type UpdateDaemonRequest = Message<"nokku.v1.UpdateDaemonRequest"> & {
   id: string;
 
   /**
-   * status only approves. Rejecting takes the server along, which DeleteDaemon does with a fresh sign-in.
+   * status only approves, rejecting is DeleteDaemon.
    *
    * @generated from field: nokku.v1.DaemonStatus status = 2;
    */
@@ -909,8 +909,6 @@ export type RelayRequest = Message<"nokku.v1.RelayRequest"> & {
     case: "start";
   } | {
     /**
-     * The core holds a few frames per relay in memory, so a frame is small. nk sends 32 KiB at most.
-     *
      * @generated from field: bytes data = 2;
      */
     value: Uint8Array;
@@ -1138,10 +1136,6 @@ export const DaemonService: GenService<{
     output: typeof UpdateDaemonResponseSchema;
   },
   /**
-   * SetDaemonSafeguards changes the two rules that work against whoever is logged in: recording their sessions,
-   * and ending what they left running once their access is gone. Off helps someone cover their tracks or stay,
-   * so either takes a fresh sign-in.
-   *
    * @generated from rpc nokku.v1.DaemonService.SetDaemonSafeguards
    */
   setDaemonSafeguards: {

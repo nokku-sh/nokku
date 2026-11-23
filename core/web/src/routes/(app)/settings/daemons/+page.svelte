@@ -55,8 +55,7 @@
 		idleChoices.find((c) => c.minutes === idleMinutes)?.label ?? `After ${idleMinutes} minutes`
 	);
 
-	// Only the flipped rule goes out, so one the plan no longer allows never blocks the others. A fresh rule
-	// steps up first, and a step-up that is turned down starts no save.
+	// Only the flipped rule goes out, so one the plan no longer allows never blocks the others.
 	async function setRule(rule: (typeof daemonRules)[number], value: boolean) {
 		if (!rule.fresh) {
 			return saving.track(() =>

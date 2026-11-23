@@ -77,8 +77,7 @@ func TestServerDisconnectHangsUpTheShell(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond, "the shell got no SIGHUP")
 }
 
-// No client nokkud knows sends one, and taking them meant a helper process per signal. The command still ends
-// with the connection or the channel.
+// Client signals are refused, the command still ends with the connection or the channel.
 func TestClientSignalsAreRefused(t *testing.T) {
 	must := require.New(t)
 	ca := newTestCA(t)

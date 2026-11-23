@@ -30,7 +30,7 @@ const rootAccount = "root"
 
 var (
 	portFlag = &cli.StringFlag{Name: "port", Usage: "SSH port of the server, defaults to your ssh config or 22"}
-	// errNoConnection is ssh's exit 255, before any command on the server ran.
+	// errNoConnection is ssh's exit 255.
 	errNoConnection = errors.New("could not connect")
 )
 
@@ -44,7 +44,6 @@ type syncResult struct {
 
 // Uses the system ssh as root, so the operator's keys and config apply.
 type remote struct {
-	// user is empty for root. Anyone else runs the scripts through sudo.
 	user string
 	host string
 	port string
@@ -145,7 +144,6 @@ func syncStale(ctx context.Context, cmd *cli.Command) error {
 	for i, name := range behind {
 		// On stderr, stdout may carry JSON.
 		fmt.Fprintf(os.Stderr, "%s\n", ui.Bold(fmt.Sprintf("%s, %d of %d", name, i+1, len(behind))))
-		// The list and the CA are read once, a rollover locks people out of every server still to come.
 		if err = syncHost(ctx, cmd, c, targets, ca, remote{host: name}); err != nil {
 			if ctx.Err() != nil {
 				return err
@@ -185,7 +183,6 @@ func syncHost(
 	if err != nil {
 		return err
 	}
-	// A target found by its name connects to its stored address, as whoever the operator named.
 	dest.user = at.user
 	if ca == nil || strings.TrimSpace(ca.UserPublicKey) == "" {
 		return errors.New("the core sent no certificate authority key, nothing was written")
@@ -407,7 +404,6 @@ func applyPlan(
 	plan manual.Plan,
 	progress io.Writer,
 ) error {
-	// A sync that stops before the report takes a new target back, even after Ctrl-C. An old one is left as it was.
 	undo := func(what string, err error) error {
 		if !created {
 			return fmt.Errorf("%s, nothing was reported to Nokku: %w", what, err)
@@ -557,7 +553,6 @@ func targetDelete(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-// remoteArg reads [user@]host. Root is the default, any other user has to reach root through sudo.
 func remoteArg(cmd *cli.Command) (remote, error) {
 	arg := cmd.Args().First()
 	if arg == "" {
@@ -569,7 +564,6 @@ func remoteArg(cmd *cli.Command) (remote, error) {
 		if !login.ValidUsername(user) {
 			return remote{}, fmt.Errorf("%q is no account name", user)
 		}
-		// Like an unset variable in root@$HOST. An empty name would match a server nobody named.
 		if host == "" {
 			return remote{}, fmt.Errorf(
 				"which server after %s@? For example: %s %s@10.0.0.5",
@@ -603,7 +597,6 @@ func findRemoteTarget(
 	return target, dest, err
 }
 
-// A name, also as ssh has it, wins over an address, and uses its first endpoint.
 func findTarget(targets []state.Target, aliases map[string]string, dest remote) (*state.Target, remote, error) {
 	type match struct {
 		t  *state.Target

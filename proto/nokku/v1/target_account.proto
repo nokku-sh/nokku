@@ -20,13 +20,11 @@ service TargetAccountService {
   rpc RemoveTargetAccount(RemoveTargetAccountRequest) returns (RemoveTargetAccountResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
-  // access change, however many servers. A dry run says what it would do and changes nothing.
+  // Grant gives subjects one account on many servers, in one transaction and one access change.
   rpc Grant(GrantRequest) returns (GrantResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // Revoke takes one subject's own grants off many servers: the servers by id, by tag, or all of them. Like Grant it
-  // is one transaction and one access change, and a dry run changes nothing.
+  // Revoke takes one subject's own grants off many servers, in one transaction and one access change.
   rpc Revoke(RevokeRequest) returns (RevokeResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
@@ -133,16 +131,13 @@ message GrantPlan {
 
 message GrantRequest {
   GrantSpec grant = 1 [(buf.validate.field).required = true];
-  // Only say what it would do.
   bool dry_run = 2;
 }
 message GrantResponse {
-  // What it did, or would do.
   GrantPlan plan = 1;
 }
 
-// Whose grants go where. A server counts when its id is named, it has one of the tags, or everywhere is set. Only the
-// subject's own grants go, what a team gives its members stays.
+// Only the subject's own grants go, what a team gives its members stays.
 message RevokeSpec {
   GrantSubject subject = 1 [(buf.validate.field).required = true];
   repeated string target_ids = 2 [(buf.validate.field).repeated = {
@@ -160,9 +155,8 @@ message RevokeSpec {
       }
     }
   }];
-  // Only the grants on this account. Empty is every account.
+  // Empty is every account.
   string username = 4 [(buf.validate.field).string.max_len = 32];
-  // Every server of the workspace, the ids and tags are not read.
   bool everywhere = 5;
 }
 
@@ -189,11 +183,9 @@ message RevokePlan {
 
 message RevokeRequest {
   RevokeSpec revoke = 1 [(buf.validate.field).required = true];
-  // Only say what it would do.
   bool dry_run = 2;
 }
 message RevokeResponse {
-  // What it did, or would do.
   RevokePlan plan = 1;
 }
 

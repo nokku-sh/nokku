@@ -181,7 +181,6 @@ func (s *Service) send(ctx context.Context, st *db.AuditStream, events []*Event)
 	defer res.Body.Close()
 	if res.StatusCode/100 != 2 {
 		detail, _ := io.ReadAll(io.LimitReader(res.Body, 200))
-		// The cut can fall inside a rune, and this text is stored as the stream's last error.
 		return errors.New(text(fmt.Sprintf("the destination answered %s: %s", res.Status, bytes.TrimSpace(detail))))
 	}
 	return nil

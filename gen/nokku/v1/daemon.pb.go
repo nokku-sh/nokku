@@ -382,7 +382,7 @@ func (x *GetDaemonResponse) GetDaemon() *Daemon {
 type UpdateDaemonRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	// status only approves. Rejecting takes the server along, which DeleteDaemon does with a fresh sign-in.
+	// status only approves, rejecting is DeleteDaemon.
 	Status *DaemonStatus `protobuf:"varint,2,opt,name=status,enum=nokku.v1.DaemonStatus" json:"status,omitempty"`
 	Config *DaemonConfig `protobuf:"bytes,3,opt,name=config" json:"config,omitempty"`
 	// update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
@@ -2085,7 +2085,6 @@ type RelayRequest_Start struct {
 }
 
 type RelayRequest_Data struct {
-	// The core holds a few frames per relay in memory, so a frame is small. nk sends 32 KiB at most.
 	Data []byte `protobuf:"bytes,2,opt,name=data,oneof"`
 }
 

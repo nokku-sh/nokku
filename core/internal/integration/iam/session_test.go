@@ -251,8 +251,7 @@ func TestEmailChange(t *testing.T) {
 	require.ErrorIs(t, e.svc.CancelEmailChange(ctx, cancel), iam.ErrInvalidToken, "second revert")
 }
 
-// "This wasn't me" on a change nobody confirmed. Whoever asked for it held a fresh session, so that ends, with
-// the passkey they added since.
+// "This wasn't me" on a change nobody confirmed ends the sessions and the passkeys added since.
 func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)

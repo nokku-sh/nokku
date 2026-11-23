@@ -107,8 +107,7 @@ func (s *accessRequestService) CreateAccessRequest(
 	return &nokkuv1.CreateAccessRequestResponse{Request: row.ToProto()}, nil
 }
 
-// answersRequests is a person who may grant, the ones who see every request. A service account may grant as an
-// editor but answers none, so it sees none.
+// A service account may grant but answers no request.
 func answersRequests(ctx context.Context) bool {
 	return callerRole(ctx) >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR && actor.UserIDFromContext(ctx) != ""
 }

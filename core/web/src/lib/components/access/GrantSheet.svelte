@@ -56,8 +56,7 @@
 			: accounts
 	);
 
-	// Worked out again every few minutes. The core takes no end in the past, and the preview of a sheet left open
-	// would send one.
+	// The core takes no end in the past.
 	const clock = useInterval(5 * 60_000);
 	const end = $derived.by(() => {
 		void clock.counter;

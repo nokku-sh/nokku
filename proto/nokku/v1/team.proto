@@ -33,15 +33,12 @@ service TeamService {
   rpc UpdateTeam(UpdateTeamRequest) returns (UpdateTeamResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // OpenTeamToSCIM lets a SCIM group of the same name take the team over. That hands its access to whoever runs
-  // the identity provider.
   rpc OpenTeamToSCIM(OpenTeamToSCIMRequest) returns (OpenTeamToSCIMResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
       browser: BROWSER_FRESH
     };
   }
-  // CloseTeamToSCIM takes that back, and stays quick.
   rpc CloseTeamToSCIM(CloseTeamToSCIMRequest) returns (CloseTeamToSCIMResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
@@ -105,10 +102,6 @@ message CreateTeamResponse {
 }
 
 message UpdateTeamRequest {
-  // scim_open went to OpenTeamToSCIM and CloseTeamToSCIM.
-  reserved 6;
-  reserved scim_open;
-
   string id = 1 [(buf.validate.field).string.uuid = true];
   string name = 2 [(buf.validate.field).string = {
     min_len: 1

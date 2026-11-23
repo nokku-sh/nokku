@@ -79,7 +79,7 @@ func (t *targetStream) Receive(msg any) error {
 	if err := t.ServerStream.Receive(msg); err != nil {
 		return err
 	}
-	// It changes nothing, refused or not. Authorization and validation answer after this, so it is decided here.
+	// Authorization and validation refuse after this, so a refused dry run is skipped too.
 	if d, ok := msg.(interface{ GetDryRun() bool }); ok && d.GetDryRun() {
 		t.e.written = true
 	}

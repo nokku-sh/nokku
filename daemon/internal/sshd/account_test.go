@@ -46,8 +46,7 @@ func TestSysProcAttrCredentialWhenRoot(t *testing.T) {
 	is.NotNil(attr.Credential)
 }
 
-// A fake getent first on PATH stands in for NSS and LDAP. As root the lookup also asks id -G, which has to know
-// the made-up accounts too.
+// A fake getent and id first on PATH stand in for NSS and LDAP.
 func withFakeGetent(t *testing.T, script string) {
 	t.Helper()
 	dir := t.TempDir()

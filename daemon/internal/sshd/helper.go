@@ -132,7 +132,6 @@ func (s *Server) openSocketAs(ctx context.Context, st *connState, mode, addr str
 	if err != nil {
 		return nil, err
 	}
-	// The helper is killed with ctx at the latest.
 	defer func() { _ = cmd.Wait() }()
 
 	uc, ok := conn.(*net.UnixConn)

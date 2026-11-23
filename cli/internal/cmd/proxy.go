@@ -20,9 +20,7 @@ import (
 
 const (
 	// Long enough that a fan-out of ssh runs syncs once.
-	proxyFreshFor = time.Minute
-	// nk prepare runs before ssh looks a name up, so a short wait here is what makes a new grant work on the first
-	// try. One sync is one call.
+	proxyFreshFor   = time.Minute
 	prepareFreshFor = 10 * time.Second
 	// Backoff after a failed sync, or every ssh would wait for the timeout.
 	syncRetryAfter = 30 * time.Second
@@ -103,8 +101,7 @@ func proxyCMD() *cli.Command {
 	}
 }
 
-// unknownHost is where ssh ends up with a name under .nk that has no block in the hosts file. ssh has read that
-// file already, so a sync here only helps the next try.
+// ssh read the hosts file already, so the sync only helps the next try.
 func unknownHost(ctx context.Context, s *state.State) error {
 	if !s.SyncFailedWithin(syncRetryAfter) {
 		if c, err := newClient(s); err == nil {
@@ -122,13 +119,11 @@ func prepareCMD() *cli.Command {
 		ArgsUsage: "[server-id]",
 		Hidden:    true,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			// With an id it renews that server's certificate. Without one it runs for any name under .nk, before
-			// ssh reads the hosts file.
 			run := renewCert
 			if cmd.Args().First() == "" {
 				run = refreshHosts
 			}
-			// Always 0, ssh skips the hosts file otherwise. nk proxy runs right after and reports what went wrong.
+			// A non-zero exit makes ssh skip the hosts file.
 			if err := run(ctx, cmd); err != nil {
 				slog.Debug("prepare for ssh", "err", err)
 			}
@@ -137,8 +132,6 @@ func prepareCMD() *cli.Command {
 	}
 }
 
-// refreshHosts syncs a stale snapshot, which rewrites the hosts file. So a server granted since the last sync is
-// there on the first ssh.
 func refreshHosts(ctx context.Context, cmd *cli.Command) error {
 	s, err := loadState(cmd)
 	if err != nil {

@@ -57,7 +57,6 @@ type terminalHandler struct {
 }
 
 // handleWebSocket runs one shell. A reload or a dropped connection ends it.
-// appOrigin is the app's own address. Hosted that is the workspace's, the bare domain is the public site.
 func (t *terminalHandler) appOrigin(r *http.Request) string {
 	if ws, ok := actor.WorkspaceFromContext(r.Context()); ok && t.cfg.SaaS {
 		return ws.BaseURL

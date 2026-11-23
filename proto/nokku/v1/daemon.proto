@@ -21,9 +21,6 @@ service DaemonService {
   rpc UpdateDaemon(UpdateDaemonRequest) returns (UpdateDaemonResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // SetDaemonSafeguards changes the two rules that work against whoever is logged in: recording their sessions,
-  // and ending what they left running once their access is gone. Off helps someone cover their tracks or stay,
-  // so either takes a fresh sign-in.
   rpc SetDaemonSafeguards(SetDaemonSafeguardsRequest) returns (SetDaemonSafeguardsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
@@ -140,7 +137,7 @@ message GetDaemonResponse {
 
 message UpdateDaemonRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
-  // status only approves. Rejecting takes the server along, which DeleteDaemon does with a fresh sign-in.
+  // status only approves, rejecting is DeleteDaemon.
   DaemonStatus status = 2 [(buf.validate.field).enum = {
     in: [2]
   }];
@@ -365,7 +362,6 @@ message RelayStart {
 message RelayRequest {
   oneof msg {
     RelayStart start = 1;
-    // The core holds a few frames per relay in memory, so a frame is small. nk sends 32 KiB at most.
     bytes data = 2 [(buf.validate.field).bytes.max_len = 65536];
   }
 }

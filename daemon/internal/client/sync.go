@@ -22,13 +22,12 @@ func (c *Client) syncDaemon(ctx context.Context) error {
 	defer c.syncing.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, syncTimeout)
 	defer cancel()
-	// getent also lists the accounts of LDAP or SSSD. A slow one still leaves the call 5 of its 15 s.
+	// LDAP or SSSD can be slow, the sync still gets 5 of its 15 s.
 	usersCtx, stop := context.WithTimeout(ctx, 10*time.Second)
 	passwd, err := exec.CommandContext(usersCtx, "getent", "passwd").Output()
 	stop()
 	if err != nil {
-		// Output keeps what came before a timeout, and its last line may be cut, like a nologin shell that reads
-		// as a usable one. No list means the core keeps the accounts it has.
+		// Output keeps a cut last line from before a timeout.
 		slog.Warn("list system users", "error", err)
 		passwd = nil
 	}

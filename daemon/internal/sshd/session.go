@@ -558,8 +558,6 @@ func (sess *session) recordingFull() {
 	sess.exit(1)
 }
 
-// startFailed is a session that never ran, like a shell that is not there or a cgroup that cannot be made. That
-// locks people out, so the log says why and the client reads more than a bare exit 1.
 func (sess *session) startFailed(what string, err error) {
 	slog.Warn("session could not start", "what", what, "user", sess.sysUser.Name, "error", err)
 	_, _ = io.WriteString(sess.Stderr(), "nokkud: could not start your session, the server's log says why\n")

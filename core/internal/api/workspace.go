@@ -60,7 +60,7 @@ func (s *workspaceService) UpdateWorkspace(
 ) (*nokkuv1.UpdateWorkspaceResponse, error) {
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		// Locked, the settings are written back whole and a save in another tab must not get lost.
+		// Locked, so two tabs saving different settings at once keep both.
 		base, err := q.GetWorkspaceForUpdate(ctx)
 		if err != nil {
 			return err
@@ -153,7 +153,6 @@ func (s *workspaceService) SetDefaultSafeguards(
 ) (*nokkuv1.SetDefaultSafeguardsResponse, error) {
 	var workspace *db.Workspace
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		// Locked like UpdateWorkspace, both write the same settings.
 		base, err := q.GetWorkspaceForUpdate(ctx)
 		if err != nil {
 			return err

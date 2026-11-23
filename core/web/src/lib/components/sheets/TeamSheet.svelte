@@ -72,8 +72,6 @@
 	const openToSCIM = teamApi.openToSCIM();
 	const closeToSCIM = teamApi.closeToSCIM();
 
-	// Opening hands the team's access to whoever runs the identity provider, so that takes a recent sign-in. The
-	// switch follows the refetch, the draft never holds it.
 	function setScimOpen(open: boolean) {
 		const id = sheet.id;
 		if (open) void whenFresh(() => openToSCIM.mutate({ id }));

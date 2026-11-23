@@ -513,12 +513,11 @@ func (x *CreateServiceAccountResponse) GetServiceAccount() *ServiceAccount {
 }
 
 type UpdateServiceAccountRequest struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Tags        []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
-	// The role and the login limits have calls of their own.
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,6,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -729,7 +728,7 @@ func (x *SetServiceAccountRoleResponse) GetServiceAccount() *ServiceAccount {
 	return nil
 }
 
-// A limit left out keeps what the account has, an empty one takes the limit away.
+// A limit left out stays, an empty one takes it away.
 type SetServiceAccountLimitsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
@@ -1661,14 +1660,14 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\rforce_command\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\fforceCommand\x12/\n" +
 	"\x0esource_address\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\rsourceAddress\"a\n" +
 	"\x1cCreateServiceAccountResponse\x12A\n" +
-	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\xcc\x02\n" +
+	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"\x95\x02\n" +
 	"\x1bUpdateServiceAccountRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12;\n" +
 	"\x04name\x18\x02 \x01(\tB'\xbaH$r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\x12*\n" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\x12_\n" +
 	"\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskB\"\xbaH\x1f\xc8\x01\x01\xe2\x01\x19\x12\x04name\x12\vdescription\x12\x04tagsR\n" +
-	"updateMaskJ\x04\b\x04\x10\x05J\x04\b\a\x10\bJ\x04\b\b\x10\tR\x04roleR\rforce_commandR\x0esource_address\"a\n" +
+	"updateMask\"a\n" +
 	"\x1cUpdateServiceAccountResponse\x12A\n" +
 	"\x0fservice_account\x18\x01 \x01(\v2\x18.nokku.v1.ServiceAccountR\x0eserviceAccount\"v\n" +
 	"\x1cSetServiceAccountRoleRequest\x12\x18\n" +

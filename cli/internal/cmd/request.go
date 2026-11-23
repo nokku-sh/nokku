@@ -17,7 +17,6 @@ import (
 	"github.com/nokku-sh/nokku/cli/internal/ui"
 )
 
-// A request may wait a week, so the poll slows down.
 const (
 	requestPollFirst = 3 * time.Second
 	requestPollLast  = 30 * time.Second
@@ -37,7 +36,6 @@ func requestCMD() *cli.Command {
 			if cmd.NArg() != 2 || cmd.String("reason") == "" {
 				return errors.New(`usage: nk request <server> <account> --reason "..." [--for 2h]`)
 			}
-			// The name as ssh has it works too.
 			server, account := strings.TrimSuffix(cmd.Args().Get(0), ssh.HostSuffix), cmd.Args().Get(1)
 			c, err := connect(ctx, cmd)
 			if err != nil {

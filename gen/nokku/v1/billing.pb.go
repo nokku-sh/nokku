@@ -453,7 +453,7 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
 	"\x16nokku/v1/billing.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"-\n" +
 	"\x11GetBillingRequest\x12\x18\n" +
-	"\arefresh\x18\x01 \x01(\bR\arefresh\"\xda\x04\n" +
+	"\arefresh\x18\x01 \x01(\bR\arefresh\"\xd4\x04\n" +
 	"\x12GetBillingResponse\x12\x12\n" +
 	"\x04plan\x18\x01 \x01(\tR\x04plan\x12\x16\n" +
 	"\x06hosted\x18\x02 \x01(\bR\x06hosted\x12F\n" +
@@ -472,7 +472,7 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\alicense\x18\f \x01(\v2\x1c.nokku.v1.GetLicenseResponseR\alicense\x1a;\n" +
 	"\rFeaturesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x01J\x04\b\a\x10\b\"\xe5\x01\n" +
+	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x01\"\xe5\x01\n" +
 	"\x06Quotas\x12\x14\n" +
 	"\x05seats\x18\x01 \x01(\x03R\x05seats\x120\n" +
 	"\x14audit_retention_days\x18\x02 \x01(\x03R\x12auditRetentionDays\x126\n" +

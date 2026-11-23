@@ -123,7 +123,6 @@ func loadState(cmd *cli.Command) (*state.State, error) {
 			nktoken.KindServiceAccount + "_")
 	}
 	api := cmd.String("api")
-	// People type the address as the browser shows it, without the scheme.
 	if api != "" && !strings.Contains(api, "://") {
 		api = "https://" + api
 	}
@@ -162,7 +161,6 @@ func newClient(s *state.State) (*client.Client, error) {
 	return c, moveKeyHint(err)
 }
 
-// A software key from an earlier sign-in stays until a logout removes it.
 func moveKeyHint(err error) error {
 	if errors.Is(err, tpm.ErrSoftwareKey) {
 		return fmt.Errorf("%w. Run nk logout, then nk login, to make a new key in the TPM", err)
@@ -170,7 +168,6 @@ func moveKeyHint(err error) error {
 	return err
 }
 
-// A warning can carry what a server or the core sent, so it goes through ui.Plain.
 func warnf(format string, args ...any) {
 	fmt.Fprintln(os.Stderr, ui.Yellow("warning: "+ui.Plain(fmt.Sprintf(format, args...))))
 }

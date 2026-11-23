@@ -96,8 +96,6 @@ export type AccessRequest = Message<"nokku.v1.AccessRequest"> & {
   grantedUntil?: Timestamp | undefined;
 
   /**
-   * decision_reason is what whoever answered wrote for the requester.
-   *
    * @generated from field: string decision_reason = 16;
    */
   decisionReason: string;
@@ -345,8 +343,6 @@ export type DenyAccessRequestRequest = Message<"nokku.v1.DenyAccessRequestReques
   id: string;
 
   /**
-   * reason goes to the requester, in the mail and on the request.
-   *
    * @generated from field: string reason = 2;
    */
   reason: string;
@@ -514,8 +510,6 @@ export const AccessRequestService: GenService<{
     output: typeof ListAccessRequestsResponseSchema;
   },
   /**
-   * Requests are an inbox, not a second pair of eyes: whoever may grant may answer one, only not their own.
-   *
    * @generated from rpc nokku.v1.AccessRequestService.ApproveAccessRequest
    */
   approveAccessRequest: {

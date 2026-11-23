@@ -31,8 +31,7 @@ func (s *auditStreamService) ListAuditStreams(
 	if err != nil {
 		return nil, err
 	}
-	// The error holds part of what the destination answered, and an address can hold a token. Both are for the
-	// owner who set it up, everyone else learns where events go and whether that works.
+	// The error and the address can carry what only the owner should read.
 	owner := callerRole(ctx) >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER
 	streams := make([]*nokkuv1.AuditStream, len(rows))
 	for i, r := range rows {
@@ -45,7 +44,6 @@ func (s *auditStreamService) ListAuditStreams(
 	return &nokkuv1.ListAuditStreamsResponse{Streams: streams}, nil
 }
 
-// streamPlace is the address without what could be a credential: a user and password, a query, a fragment.
 func streamPlace(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {

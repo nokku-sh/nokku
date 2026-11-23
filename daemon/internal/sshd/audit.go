@@ -9,23 +9,18 @@ import (
 )
 
 const (
-	eventAuthSuccess eventType = "auth_success"
-	eventAuthFailure eventType = "auth_failure"
-	// Refused logins past the limit, with how many.
-	eventAuthFailuresUnlogged eventType = "auth_failures_unlogged"
-	eventSessionStart         eventType = "session_start"
-	eventSessionEnd           eventType = "session_end"
-	eventCommand              eventType = "command"
-	eventSubsystem            eventType = "subsystem"
-	eventForward              eventType = "forward"
-	eventRemoteForward        eventType = "remote_forward"
-	eventRecordingDegraded    eventType = "recording_degraded"
-	eventSessionIdle          eventType = "session_idle"
-	eventRevokeKill           eventType = "revoke_kill"
+	eventAuthSuccess       eventType = "auth_success"
+	eventAuthFailure       eventType = "auth_failure"
+	eventSessionStart      eventType = "session_start"
+	eventSessionEnd        eventType = "session_end"
+	eventCommand           eventType = "command"
+	eventSubsystem         eventType = "subsystem"
+	eventForward           eventType = "forward"
+	eventRemoteForward     eventType = "remote_forward"
+	eventRecordingDegraded eventType = "recording_degraded"
+	eventSessionIdle       eventType = "session_idle"
+	eventRevokeKill        eventType = "revoke_kill"
 )
-
-// The client picks its user name and version line, so they are cut to a length a log line can take.
-const maxClientField = 128
 
 // Operators filter the "audit" log lines on the type, keep the names stable.
 type eventType string
@@ -48,30 +43,18 @@ type auditEvent struct {
 // clientVersion is the client's version line without what a log or a report cannot carry. The client picks
 // every byte of it.
 func clientVersion(conn ssh.ConnMetadata) string {
-	return printable(string(conn.ClientVersion()))
-}
-
-func printable(s string) string {
-	s = strings.Map(func(r rune) rune {
+	return strings.Map(func(r rune) rune {
 		if r == utf8.RuneError || !unicode.IsPrint(r) {
 			return -1
 		}
 		return r
-	}, s)
-	if len(s) <= maxClientField {
-		return s
-	}
-	cut := maxClientField
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + "…"
+	}, string(conn.ClientVersion()))
 }
 
 func connEvent(conn ssh.ConnMetadata, typ eventType) auditEvent {
 	return auditEvent{
 		Type:   typ,
-		User:   printable(conn.User()),
+		User:   conn.User(),
 		Remote: conn.RemoteAddr().String(),
 		Client: clientVersion(conn),
 	}

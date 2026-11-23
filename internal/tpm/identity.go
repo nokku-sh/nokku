@@ -29,7 +29,6 @@ const (
 // ErrIdentityChanged means the caller must register a new public key.
 var ErrIdentityChanged = errors.New("tpm: machine identity changed since the key was created")
 
-// ErrSoftwareKey means RequireTPM is set and the stored key is a software key. Only a new key moves it.
 var ErrSoftwareKey = errors.New("tpm: require-tpm is set but this machine's key is a software key")
 
 // Signer signs SHA-256 digests only.

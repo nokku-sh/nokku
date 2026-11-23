@@ -206,7 +206,6 @@ func (h scimGroupHandler) Delete(r *http.Request, id string) error {
 
 func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.PatchOperation) (scim.Resource, error) {
 	ctx := r.Context()
-	// Like Replace: off the plan only a removal goes through.
 	planErr := h.svc.requirePlan(ctx)
 	skipped := false
 	var res scim.Resource
@@ -225,7 +224,6 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 			switch attr {
 			case "displayName":
 				name := scimAttrString(value)
-				// The same name changes nothing, so it is no change to refuse off the plan.
 				if name == "" || name == team.Name {
 					return nil
 				}
@@ -240,9 +238,6 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 				events = append(events, groupEvent(actionUpdateTeam, id, map[string]any{"name": team.Name}))
 				return nil
 			case "externalId":
-				if equalTo(team.ScimExternalID, scimAttrString(value)) {
-					return nil
-				}
 				if planErr != nil {
 					skipped = true
 					return nil
@@ -259,7 +254,6 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 					skipped = skipped || left
 					return err
 				case opName != "remove" && planErr != nil:
-					// Only someone who is not in yet would get in.
 					skipped = skipped ||
 						slices.ContainsFunc(ids, func(id string) bool { _, in := before[id]; return !in })
 					return nil
@@ -313,7 +307,6 @@ func linkTeamSCIM(ctx context.Context, q *db.Queries, team *db.Team, externalID 
 	return team, err
 }
 
-// setTeamMembers only takes members out without add, and says whether that left someone to add.
 func setTeamMembers(
 	ctx context.Context,
 	q *db.Queries,
@@ -342,9 +335,6 @@ func setTeamMembers(
 }
 
 // teamMembers maps member ids to the names the audit log shows for them.
-// equalTo is true when p is set to v.
-func equalTo(p *string, v string) bool { return p != nil && *p == v }
-
 func teamMembers(ctx context.Context, q *db.Queries, teamID string) (map[string]string, error) {
 	rows, err := q.ListTeamMembers(ctx, teamID)
 	if err != nil {

@@ -151,9 +151,7 @@ func (c *Connection) poolConfig(connString string) (*pgxpool.Config, error) {
 	return config, nil
 }
 
-// Both pools log in as the owner and switch to a runtime role that cannot log in, so no role has a password to
-// set or to leak. A session could switch back with RESET ROLE. Only injected SQL would, and every query is a
-// parameterized one from sqlc.
+// Runtime roles cannot log in, both pools switch to them. Only injected SQL could RESET ROLE.
 func (c *Connection) createPools(ctx context.Context, appConfig *pgxpool.Config) error {
 	appConfig.AfterConnect = setRole("nokku_app")
 	appConfig.PrepareConn = pinWorkspace

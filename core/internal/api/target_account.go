@@ -64,13 +64,10 @@ func (s *targetAccountService) ListTargetAccounts(
 	}, nil
 }
 
-// Grant works out what a grant does, and does it unless it is a dry run. Both read the same rows the same way, so
-// what the sheet showed is what happens, give or take a change in between.
 func (s *targetAccountService) Grant(
 	ctx context.Context,
 	req *nokkuv1.GrantRequest,
 ) (*nokkuv1.GrantResponse, error) {
-	// The audit log leaves out a dry run.
 	spec, write := req.GetGrant(), !req.GetDryRun()
 	if subjects := spec.GetSubjects(); write && len(subjects) == 1 {
 		// An event is about one thing. A grant to several subjects names them in its details only.
@@ -201,7 +198,6 @@ func sameEnd(a, b *time.Time) bool {
 	return a.Unix() == b.Unix()
 }
 
-// Revoke works out which of a subject's own grants go, and takes them unless it is a dry run.
 func (s *targetAccountService) Revoke(
 	ctx context.Context,
 	req *nokkuv1.RevokeRequest,
@@ -344,7 +340,6 @@ func auditAccount(ctx context.Context, q *db.Queries, accountID string) error {
 	return nil
 }
 
-// subjectKind is the kind as the database spells it. Validation lets no other kind reach a handler.
 func subjectKind(k nokkuv1.SubjectKind) string {
 	for name, kind := range subjectKinds {
 		if kind == k {

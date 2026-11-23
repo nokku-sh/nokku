@@ -307,8 +307,6 @@ func (s *Service) SendEmailMovedNotice(ctx context.Context, userID, email, newEm
 	})
 }
 
-// profileURL is where a person looks at their sign-ins. Hosted, every workspace has an address of its own and
-// the bare domain serves none.
 func (s *Service) profileURL(ctx context.Context) string {
 	base := s.appURL
 	if ws, ok := actor.WorkspaceFromContext(ctx); ok && ws.BaseURL != "" {

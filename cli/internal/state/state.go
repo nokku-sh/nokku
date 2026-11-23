@@ -67,7 +67,6 @@ type Config struct {
 
 // Cache is the last access snapshot, kept in cache.json for offline use.
 type Cache struct {
-	// Server is empty in a snapshot older than this field.
 	Server   string    `json:"server,omitempty"`
 	SyncedAt time.Time `json:"synced_at,omitzero"`
 	// FailedAt is when a sync or a renewal last failed. A sync clears it.
@@ -112,7 +111,7 @@ func (s *State) LoadCache() error {
 	if err := fsutil.LoadJSON(paths.CacheFile(), &s.Cache); err != nil {
 		return err
 	}
-	if s.Server != "" && s.Server != s.APIURL {
+	if s.Server != s.APIURL {
 		s.Cache = Cache{}
 	}
 	return nil

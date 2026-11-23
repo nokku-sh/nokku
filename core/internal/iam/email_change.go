@@ -130,9 +130,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 	return nil
 }
 
-// CancelEmailChange says the change was not the account's own, so whoever asked for it held a session. A change
-// still pending ends every session and takes what was added since the request. A finished one is undone, and
-// every way in ends.
+// CancelEmailChange means someone else asked for the change, so every way in ends.
 func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
 	reverted := false

@@ -65,8 +65,6 @@ func SSHCertificates() ([]string, error) {
 	return filepath.Glob(filepath.Join(SSHCertDir(), "*-cert.pub"))
 }
 
-// ClearConfigDir takes both machine keys too, so the next sign-in makes new ones where they are safest by then.
-// To the core that sign-in is a new device.
 func ClearConfigDir() error {
 	entries, err := os.ReadDir(ConfigDir())
 	if errors.Is(err, fs.ErrNotExist) {

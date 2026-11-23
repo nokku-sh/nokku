@@ -61,7 +61,6 @@
 	const setRole = saApi.setRole();
 	const setLimits = saApi.setLimits();
 
-	// The role and the login limits have calls of their own, each takes a recent sign-in. The rest is one update.
 	const autoSave = useAutoSave(() =>
 		draft.save(async ({ role, forceCommand, sourceAddress, ...rest }) => {
 			const id = sheet.id;

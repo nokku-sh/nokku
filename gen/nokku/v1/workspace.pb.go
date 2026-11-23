@@ -1773,13 +1773,13 @@ const file_nokku_v1_workspace_proto_rawDesc = "" +
 	"\vPlanFeature\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
-	"\x04plan\x18\x03 \x01(\tR\x04plan\"\xcf\x01\n" +
+	"\x04plan\x18\x03 \x01(\tR\x04plan\"\xbf\x01\n" +
 	"\x16UpdateWorkspaceRequest\x12\x1e\n" +
 	"\x04name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x03\x18\x80\x02R\x04name\x12*\n" +
 	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12Y\n" +
 	"\vupdate_mask\x18\x04 \x01(\v2\x1a.google.protobuf.FieldMaskB\x1c\xbaH\x19\xc8\x01\x01\xe2\x01\x13\x12\x04name\x12\vdescriptionR\n" +
-	"updateMaskJ\x04\b\x03\x10\x04R\bsettings\"?\n" +
+	"updateMask\"?\n" +
 	"\x14SetEnforceSSORequest\x12'\n" +
 	"\venforce_sso\x18\x01 \x01(\bB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"enforceSso\"J\n" +

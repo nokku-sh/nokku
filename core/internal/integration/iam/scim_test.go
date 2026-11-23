@@ -162,8 +162,7 @@ func TestSCIMOffThePlanOnlyOffboards(t *testing.T) {
 		"offboarding waited on the plan")
 }
 
-// Off the plan a group still loses members and can go. What would add is skipped,
-// and the provider hears that.
+// Off the plan a group may only lose members, the rest is refused.
 func TestSCIMOffThePlanGroupsOnlyShrink(t *testing.T) {
 	onPlan := true
 	e := newTestEnvWith(t, iam.Deps{

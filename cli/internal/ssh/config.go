@@ -24,8 +24,6 @@ import (
 
 const header = "# Managed by Nokku. nk regenerates this file, do not edit it.\n\n"
 
-// HostSuffix ends ssh's name for every server, like web.nk. It keeps Nokku's names apart from the hosts a user
-// has, so no server takes the place of one, and ssh starts nk for nothing else.
 const HostSuffix = ".nk"
 
 // What the core allows. Anything wider could claim github.com or reach a shell.
@@ -57,29 +55,19 @@ func WriteConfigs(s *state.State) error {
 	return ensureInclude()
 }
 
-// HostName is ssh's name for a server, like web.nk.
 func HostName(name string) string { return strings.ToLower(name) + HostSuffix }
 
-// HostAliases is ssh's name for each target, lowercased like ssh does it. A target that cannot go into
-// ssh_config has none.
 func HostAliases(s *state.State) map[string]string {
 	aliases := make(map[string]string, len(s.Targets))
-	taken := map[string]bool{}
 	for _, t := range s.Targets {
-		host := HostName(t.Name)
-		// The core keeps names apart without case. Should two meet anyway, the first keeps the name.
-		if !usable(t) || taken[host] {
-			continue
+		if usable(t) {
+			aliases[t.ID] = HostName(t.Name)
 		}
-		taken[host] = true
-		aliases[t.ID] = host
 	}
 	return aliases
 }
 
-// renderSSHConfig is the file the user's ssh config includes: one block for every name under .nk. ssh runs nk
-// prepare, which brings the hosts file up to date, and reads that file after it. A name with no block there ends
-// in nk proxy, which says so. No line takes a token like %h, so a host name never reaches a shell.
+// No line takes a token like %h, which would hand a host name to a shell.
 func renderSSHConfig(nk string) []byte {
 	var b bytes.Buffer
 	b.WriteString(header)
@@ -106,9 +94,7 @@ func renderSSHHosts(s *state.State, nk string) []byte {
 			Host: host,
 			User: t.Usernames[0],
 			ID:   t.ID,
-			// ssh loads CertificateFile before ProxyCommand, so Match exec renews first. It gets the id and no
-			// token, a host name never reaches a shell. The options sit under the Match line, which takes Web.nk
-			// for web.nk where a Host line does not. The Host line above it is for shell completion.
+			// ssh loads CertificateFile before ProxyCommand, so the Match exec renews first.
 			Prepare:     configValue(nk + " prepare " + t.ID),
 			NK:          nk,
 			Certificate: configValue(paths.SSHCertificate(t.ID)),

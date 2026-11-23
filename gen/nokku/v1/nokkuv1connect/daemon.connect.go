@@ -124,9 +124,6 @@ type DaemonServiceClient interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
 	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
-	// SetDaemonSafeguards changes the two rules that work against whoever is logged in: recording their sessions,
-	// and ending what they left running once their access is gone. Off helps someone cover their tracks or stay,
-	// so either takes a fresh sign-in.
 	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
 	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
@@ -183,9 +180,6 @@ type DaemonServiceHandler interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
 	// Turning recording on or off takes a fresh sign-in, so a stolen session can't hide what it does next.
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
-	// SetDaemonSafeguards changes the two rules that work against whoever is logged in: recording their sessions,
-	// and ending what they left running once their access is gone. Off helps someone cover their tracks or stay,
-	// so either takes a fresh sign-in.
 	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
 	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)

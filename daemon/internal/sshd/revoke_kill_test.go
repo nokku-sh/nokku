@@ -67,7 +67,7 @@ func checkRevokeKills(t *testing.T, srv *Server, client *ssh.Client, granted *st
 	srv.DropRevoked()
 	still("a sync that revoked nothing killed a process")
 
-	// An older core and a deleted server send no rule, which reads as off.
+	// A deleted server sends no rule, which reads as off.
 	ruleUnset := *granted
 	ruleUnset.Principals = nil
 	ruleUnset.DaemonConfig = nil

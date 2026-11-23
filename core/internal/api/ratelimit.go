@@ -21,8 +21,7 @@ const (
 	// Spraying and enumeration surface, sign-in mails also have a cooldown.
 	authPerMinute = 300
 
-	// Anyone can start a device login. This caps the grants one IP can park. With SSO required nk signs in
-	// again every day, so it has to fit an office behind one address in the morning.
+	// Anyone can start a device login. This caps the grants one IP can park.
 	deviceStartsPerWindow = 300
 	deviceStartWindow     = 15 * time.Minute
 

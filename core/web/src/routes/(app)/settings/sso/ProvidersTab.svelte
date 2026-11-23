@@ -38,7 +38,6 @@
 	const plans = usePlans();
 	const upgrade = $derived(plans.upgradeLink('enforce_sso', hosted));
 
-	// A call of its own, so a downgraded workspace may turn it off and nothing else rides along to be refused.
 	function setEnforced(on: boolean) {
 		void whenFresh(() => setEnforceSSO.mutate({ enforceSso: on }));
 	}

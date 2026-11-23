@@ -208,8 +208,7 @@ func TestAnUnreadableStreamSecretStopsNoOtherStream(t *testing.T) {
 	}, 10*time.Second, 100*time.Millisecond, "the broken stream is not marked as failing")
 }
 
-// A failing stream's error holds part of what the destination answered. The owner set it up and reads it, everyone
-// else only learns that it fails.
+// Only the owner reads what a failing stream's destination answered.
 func TestOnlyTheOwnerReadsAStreamsError(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	ws := testWorkspace.ID

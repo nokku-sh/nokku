@@ -1186,7 +1186,7 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x03 \x03(\tR\x04tags\"8\n" +
 	"\x12CreateTeamResponse\x12\"\n" +
-	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\xff\x01\n" +
+	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"\xee\x01\n" +
 	"\x11UpdateTeamRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
@@ -1194,7 +1194,7 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x04 \x03(\tR\x04tags\x12_\n" +
 	"\vupdate_mask\x18\x05 \x01(\v2\x1a.google.protobuf.FieldMaskB\"\xbaH\x1f\xc8\x01\x01\xe2\x01\x19\x12\x04name\x12\vdescription\x12\x04tagsR\n" +
-	"updateMaskJ\x04\b\x06\x10\aR\tscim_open\"8\n" +
+	"updateMask\"8\n" +
 	"\x12UpdateTeamResponse\x12\"\n" +
 	"\x04team\x18\x01 \x01(\v2\x0e.nokku.v1.TeamR\x04team\"1\n" +
 	"\x15OpenTeamToSCIMRequest\x12\x18\n" +

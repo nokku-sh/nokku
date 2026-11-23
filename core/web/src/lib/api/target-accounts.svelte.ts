@@ -34,7 +34,6 @@ export const targetAccount = {
 
 	addAccount: () => useMutation(TargetAccountService.method.addTargetAccount),
 	removeAccount: () => useMutation(TargetAccountService.method.removeTargetAccount),
-	// What a grant on many servers would do, asked again whenever the form changes. It is the grant as a dry run.
 	planGrant: (spec: () => MessageInitShape<typeof GrantSpecSchema>, when: () => boolean) =>
 		useQuery(
 			TargetAccountService.method.grant,
@@ -48,9 +47,7 @@ export const targetAccount = {
 			() => ({ revoke: spec(), dryRun: true }),
 			() => ({ enabled: when(), placeholderData: keepPreviousData })
 		),
-	// One account on one server, a tag, or everywhere, by what the spec names.
 	revoke: () => useMutation(TargetAccountService.method.revoke),
-	// Every grant of the subject's own, on every server.
 	revokeEverywhere: () =>
 		useMutation(TargetAccountService.method.revoke, {
 			transform: (input) => ({ ...input, revoke: { ...input.revoke, everywhere: true } }),

@@ -142,10 +142,7 @@ type TeamServiceClient interface {
 	ListTeams(context.Context, *v1.ListTeamsRequest) (*v1.ListTeamsResponse, error)
 	CreateTeam(context.Context, *v1.CreateTeamRequest) (*v1.CreateTeamResponse, error)
 	UpdateTeam(context.Context, *v1.UpdateTeamRequest) (*v1.UpdateTeamResponse, error)
-	// OpenTeamToSCIM lets a SCIM group of the same name take the team over. That hands its access to whoever runs
-	// the identity provider.
 	OpenTeamToSCIM(context.Context, *v1.OpenTeamToSCIMRequest) (*v1.OpenTeamToSCIMResponse, error)
-	// CloseTeamToSCIM takes that back, and stays quick.
 	CloseTeamToSCIM(context.Context, *v1.CloseTeamToSCIMRequest) (*v1.CloseTeamToSCIMResponse, error)
 	DeleteTeam(context.Context, *v1.DeleteTeamRequest) (*v1.DeleteTeamResponse, error)
 	AddTeamMember(context.Context, *v1.AddTeamMemberRequest) (*v1.AddTeamMemberResponse, error)
@@ -166,10 +163,7 @@ type TeamServiceHandler interface {
 	ListTeams(context.Context, *v1.ListTeamsRequest) (*v1.ListTeamsResponse, error)
 	CreateTeam(context.Context, *v1.CreateTeamRequest) (*v1.CreateTeamResponse, error)
 	UpdateTeam(context.Context, *v1.UpdateTeamRequest) (*v1.UpdateTeamResponse, error)
-	// OpenTeamToSCIM lets a SCIM group of the same name take the team over. That hands its access to whoever runs
-	// the identity provider.
 	OpenTeamToSCIM(context.Context, *v1.OpenTeamToSCIMRequest) (*v1.OpenTeamToSCIMResponse, error)
-	// CloseTeamToSCIM takes that back, and stays quick.
 	CloseTeamToSCIM(context.Context, *v1.CloseTeamToSCIMRequest) (*v1.CloseTeamToSCIMResponse, error)
 	DeleteTeam(context.Context, *v1.DeleteTeamRequest) (*v1.DeleteTeamResponse, error)
 	AddTeamMember(context.Context, *v1.AddTeamMemberRequest) (*v1.AddTeamMemberResponse, error)

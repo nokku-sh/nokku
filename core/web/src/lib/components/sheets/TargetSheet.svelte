@@ -98,8 +98,6 @@
 	const rename = targetApi.rename();
 	const setEndpoints = targetApi.setEndpoints();
 
-	// Where logins go takes a recent sign-in, and a call of its own. The list follows the refetch, the draft never
-	// holds a change to it.
 	function addEndpoint() {
 		const value = newEndpoint.trim();
 		if (!model || !value || model.endpoints.includes(value)) return;

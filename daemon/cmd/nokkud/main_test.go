@@ -22,8 +22,7 @@ import (
 	"github.com/nokku-sh/nokku/internal/tpm"
 )
 
-// The unit file restarts every exit but 78. A setup error that exits 1 comes back every five seconds, and with a
-// token that ran out each start asks the core again.
+// The unit restarts every exit but 78.
 func TestSetupErrorsExitWithoutARestart(t *testing.T) {
 	t.Setenv("NOKKUD_DATA_DIR", t.TempDir())
 	load := func(args ...string) error {

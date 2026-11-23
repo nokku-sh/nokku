@@ -56,7 +56,6 @@ func loadProcedureAccess() map[string]*nokkuv1.Access {
 	return out
 }
 
-// loadUnaryProcedures lists the calls that take one message and answer with one.
 func loadUnaryProcedures() map[string]bool {
 	out := make(map[string]bool)
 	protoregistry.GlobalFiles.RangeFilesByPackage("nokku.v1", func(fd protoreflect.FileDescriptor) bool {
@@ -124,7 +123,6 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	if !access.GetSelf() && (required == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || caller.Role < required) {
 		return db.ErrPermissionDenied
 	}
-	// A leaked key reaches only what names machines.
 	if caller.Kind == actor.KindServiceAccount && !access.GetMachine() {
 		return connect.NewError(connect.CodePermissionDenied, "only people can do this, not a service account")
 	}
@@ -132,7 +130,6 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	if caller.Kind == actor.KindUser && browser == nokkuv1.Browser_BROWSER_REFUSED {
 		return connect.NewError(connect.CodePermissionDenied, "do this with nk")
 	}
-	// nk and a service account are in by the two checks above. The handler holds them to what they added.
 	machineOrNk := caller.Kind == actor.KindCLI || caller.Kind == actor.KindServiceAccount
 	if browser == nokkuv1.Browser_BROWSER_FRESH && !machineOrNk {
 		if err := a.fresh(ctx, caller); err != nil {

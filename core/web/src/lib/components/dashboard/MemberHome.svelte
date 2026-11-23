@@ -43,7 +43,6 @@
 	);
 
 	const canAsk = $derived(has('access_requests') === true);
-	// Only the newest few, and no poll, they change when someone answers.
 	const requests = accessRequests.list({ limit: RECENT }, { when: () => canAsk, live: false });
 	const mine = $derived(requests.data?.requests ?? []);
 </script>

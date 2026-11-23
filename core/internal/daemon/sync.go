@@ -84,8 +84,6 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*nokkuv1.SyncDaem
 	return res, nil
 }
 
-// Hashes is the pass over a workspace: the hash of what each of its daemons would be told right now, by id, and
-// which of them are accepted. One transaction, and every answer built the way Sync builds it.
 func Hashes(ctx context.Context, conn connection) (hashes map[string][]byte, accepted map[string]bool, err error) {
 	hashes, accepted = map[string][]byte{}, map[string]bool{}
 	err = conn.TenantTx(ctx, func(q *db.Queries) error {

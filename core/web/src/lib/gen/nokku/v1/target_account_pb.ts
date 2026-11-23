@@ -321,8 +321,6 @@ export type GrantRequest = Message<"nokku.v1.GrantRequest"> & {
   grant?: GrantSpec | undefined;
 
   /**
-   * Only say what it would do.
-   *
    * @generated from field: bool dry_run = 2;
    */
   dryRun: boolean;
@@ -340,8 +338,6 @@ export const GrantRequestSchema: GenMessage<GrantRequest> = /*@__PURE__*/
  */
 export type GrantResponse = Message<"nokku.v1.GrantResponse"> & {
   /**
-   * What it did, or would do.
-   *
    * @generated from field: nokku.v1.GrantPlan plan = 1;
    */
   plan?: GrantPlan | undefined;
@@ -355,8 +351,7 @@ export const GrantResponseSchema: GenMessage<GrantResponse> = /*@__PURE__*/
   messageDesc(file_nokku_v1_target_account, 9);
 
 /**
- * Whose grants go where. A server counts when its id is named, it has one of the tags, or everywhere is set. Only the
- * subject's own grants go, what a team gives its members stays.
+ * Only the subject's own grants go, what a team gives its members stays.
  *
  * @generated from message nokku.v1.RevokeSpec
  */
@@ -377,15 +372,13 @@ export type RevokeSpec = Message<"nokku.v1.RevokeSpec"> & {
   tags: string[];
 
   /**
-   * Only the grants on this account. Empty is every account.
+   * Empty is every account.
    *
    * @generated from field: string username = 4;
    */
   username: string;
 
   /**
-   * Every server of the workspace, the ids and tags are not read.
-   *
    * @generated from field: bool everywhere = 5;
    */
   everywhere: boolean;
@@ -486,8 +479,6 @@ export type RevokeRequest = Message<"nokku.v1.RevokeRequest"> & {
   revoke?: RevokeSpec | undefined;
 
   /**
-   * Only say what it would do.
-   *
    * @generated from field: bool dry_run = 2;
    */
   dryRun: boolean;
@@ -505,8 +496,6 @@ export const RevokeRequestSchema: GenMessage<RevokeRequest> = /*@__PURE__*/
  */
 export type RevokeResponse = Message<"nokku.v1.RevokeResponse"> & {
   /**
-   * What it did, or would do.
-   *
    * @generated from field: nokku.v1.RevokePlan plan = 1;
    */
   plan?: RevokePlan | undefined;
@@ -648,8 +637,7 @@ export const TargetAccountService: GenService<{
     output: typeof RemoveTargetAccountResponseSchema;
   },
   /**
-   * Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
-   * access change, however many servers. A dry run says what it would do and changes nothing.
+   * Grant gives subjects one account on many servers, in one transaction and one access change.
    *
    * @generated from rpc nokku.v1.TargetAccountService.Grant
    */
@@ -659,8 +647,7 @@ export const TargetAccountService: GenService<{
     output: typeof GrantResponseSchema;
   },
   /**
-   * Revoke takes one subject's own grants off many servers: the servers by id, by tag, or all of them. Like Grant it
-   * is one transaction and one access change, and a dry run changes nothing.
+   * Revoke takes one subject's own grants off many servers, in one transaction and one access change.
    *
    * @generated from rpc nokku.v1.TargetAccountService.Revoke
    */

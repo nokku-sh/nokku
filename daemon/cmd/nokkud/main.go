@@ -36,7 +36,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/trust"
 )
 
-// exConfig is the one exit code the unit file does not restart.
 const exConfig = 78
 
 const (
@@ -56,8 +55,7 @@ var (
 	errRestart = cli.Exit("nokkud: restarting for the new binary", 75)
 )
 
-// setupError is an error a restart cannot fix. It exits with EX_CONFIG, or the unit would start nokkud again
-// every five seconds, and with a token that ran out each start would ask the core again.
+// setupError exits 78, which the unit does not restart.
 type setupError struct{ error }
 
 func main() {
@@ -147,9 +145,7 @@ func (e setupError) Error() string { return "nokkud: " + e.error.Error() }
 func (e setupError) Unwrap() error { return e.error }
 func (setupError) ExitCode() int   { return exConfig }
 
-// cannotRetry is true for an enroll token the core turned down, and for a software key where a TPM is required.
-// Everything else may pass with the next start: a DPoP proof refused while the clock is not synced yet, or a 401
-// from a proxy in front of the core.
+// A DPoP proof from an unsynced clock or a proxy's 401 may pass on the next start.
 func cannotRetry(err error) bool {
 	return errors.Is(err, tpm.ErrSoftwareKey) || connect.CodeOf(err) == connect.CodeFailedPrecondition
 }
@@ -317,7 +313,6 @@ func enrollHost(ctx context.Context, cmd *cli.Command, token string, st *state.S
 func warnHomeKeys(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	// No answer when sshd is missing or its config does not load.
 	out, err := exec.CommandContext(ctx, "sshd", "-T").Output()
 	files := login.HomeKeyFiles(string(out))
 	if err != nil || len(files) == 0 {

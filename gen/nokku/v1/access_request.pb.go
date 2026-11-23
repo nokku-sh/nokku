@@ -99,8 +99,7 @@ type AccessRequest struct {
 	DecidedAt      *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=decided_at,json=decidedAt" json:"decided_at,omitempty"`
 	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	GrantedUntil   *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=granted_until,json=grantedUntil" json:"granted_until,omitempty"`
-	// decision_reason is what whoever answered wrote for the requester.
-	DecisionReason *string `protobuf:"bytes,16,opt,name=decision_reason,json=decisionReason" json:"decision_reason,omitempty"`
+	DecisionReason *string                `protobuf:"bytes,16,opt,name=decision_reason,json=decisionReason" json:"decision_reason,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -789,10 +788,9 @@ func (x *ApproveAccessRequestResponse) GetRequest() *AccessRequest {
 }
 
 type DenyAccessRequestRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	// reason goes to the requester, in the mail and on the request.
-	Reason        *string `protobuf:"bytes,2,opt,name=reason" json:"reason,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Reason        *string                `protobuf:"bytes,2,opt,name=reason" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

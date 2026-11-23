@@ -86,7 +86,6 @@
 
 	function status(s: AuditStream) {
 		if (!s.enabled) return 'Paused';
-		// Only the owner gets the error itself.
 		if (s.failingSince) {
 			return `Failing since ${formatTs(s.failingSince, 'relative')}${s.lastError ? `: ${s.lastError}` : ''}`;
 		}

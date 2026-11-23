@@ -115,7 +115,6 @@ func (s *daemonService) SetDaemonSafeguards(
 	return &nokkuv1.SetDaemonSafeguardsResponse{}, nil
 }
 
-// setSafeguards writes the rules a request names into config, and into the audit event. A rule it leaves out stays.
 func setSafeguards(ctx context.Context, config *nokkuv1.DaemonConfig, req *nokkuv1.SetDaemonSafeguardsRequest) {
 	if req.RecordSessions != nil {
 		config.RecordSessions = req.RecordSessions

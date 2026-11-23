@@ -26,8 +26,7 @@ type Browser int32
 
 const (
 	Browser_BROWSER_UNSPECIFIED Browser = 0
-	// A sign-in from the last 10 minutes, so a stolen session cannot add a way in. With neither nk nor machine set,
-	// only a person who just signed in makes the call.
+	// A sign-in from the last 10 minutes.
 	Browser_BROWSER_FRESH Browser = 1
 	// The browser is kept out, the call is for nk and service accounts.
 	Browser_BROWSER_REFUSED Browser = 2
@@ -132,8 +131,7 @@ func (WorkspaceRole) EnumDescriptor() ([]byte, []int) {
 	return file_nokku_v1_access_proto_rawDescGZIP(), []int{1}
 }
 
-// Access says who may make a call. public, self, role and daemon pick the class. Next to the role there are three
-// questions, one per kind of caller that has one: browser, nk and machine.
+// Access says who may make a call.
 type Access struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Public *bool                  `protobuf:"varint,1,opt,name=public" json:"public,omitempty"`
@@ -148,13 +146,11 @@ type Access struct {
 	Signs *bool `protobuf:"varint,9,opt,name=signs" json:"signs,omitempty"`
 	// quiet changes something, but the handler records what matters, so the audit log skips the call.
 	Quiet *bool `protobuf:"varint,10,opt,name=quiet" json:"quiet,omitempty"`
-	// nk lets a person's nk session make the call. nk signs certificates, lists what it reaches and runs nk sync,
-	// nothing else, so a phished or infected nk session can't change who may do what.
+	// nk lets a person's nk session make the call.
 	Nk *bool `protobuf:"varint,11,opt,name=nk" json:"nk,omitempty"`
-	// browser is a person in the web app. Any session may make the call unless this says otherwise.
+	// browser is a person in the web app, any session unless this says otherwise.
 	Browser *Browser `protobuf:"varint,12,opt,name=browser,enum=nokku.v1.Browser" json:"browser,omitempty"`
-	// machine lets a service account make the call. Without it a leaked key reads and changes nothing here, so it
-	// cannot mint more credentials for itself.
+	// machine lets a service account make the call.
 	Machine       *bool `protobuf:"varint,13,opt,name=machine" json:"machine,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -288,7 +284,7 @@ var File_nokku_v1_access_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_access_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\xce\x02\n" +
+	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\xae\x02\n" +
 	"\x06Access\x12\x16\n" +
 	"\x06public\x18\x01 \x01(\bR\x06public\x12\x12\n" +
 	"\x04self\x18\x02 \x01(\bR\x04self\x12+\n" +
@@ -301,7 +297,7 @@ const file_nokku_v1_access_proto_rawDesc = "" +
 	" \x01(\bR\x05quiet\x12\x0e\n" +
 	"\x02nk\x18\v \x01(\bR\x02nk\x12+\n" +
 	"\abrowser\x18\f \x01(\x0e2\x11.nokku.v1.BrowserR\abrowser\x12\x18\n" +
-	"\amachine\x18\r \x01(\bR\amachineJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aR\vpeople_onlyR\x05fresh*J\n" +
+	"\amachine\x18\r \x01(\bR\amachine*J\n" +
 	"\aBrowser\x12\x17\n" +
 	"\x13BROWSER_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rBROWSER_FRESH\x10\x01\x12\x13\n" +

@@ -112,8 +112,7 @@ func logoutCMD() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			s, loadErr := loadState(cmd)
 			if loadErr == nil {
-				// The hint for a software key under --require-tpm sends people here. Revoking the session takes the
-				// key that signs it, which is removed right after.
+				// Revoking signs with the stored key, even a software one.
 				s.RequireTPM = false
 				c, err := client.New(s)
 				if err == nil {

@@ -458,8 +458,7 @@ func TestHeartbeatFindsADaemonThatFellBehind(t *testing.T) {
 	require.NotNil(t, c.behindSince.Load(), "the console still sees it as behind")
 }
 
-// A daemon heartbeats every 30 s, so what the core last heard is stale right after a sync. A revoke that brings
-// the answer back to what it was before a grant must still wake the daemon.
+// The heartbeat is up to 30 s old, so a revoke right after a grant must still wake the daemon.
 func TestARevokeRightAfterAGrantWakesTheDaemon(t *testing.T) {
 	c := &daemonConn{state: make(chan struct{}, 1)}
 	before, granted := []byte("before the grant"), []byte("with the grant")
@@ -485,8 +484,7 @@ func TestARevokeRightAfterAGrantWakesTheDaemon(t *testing.T) {
 	assert.True(t, woken(), "the revoke waits for the next heartbeat")
 }
 
-// A daemon that was deleted or rejected hears it, then loses its stream. One that ignored the update once stayed
-// online and went on reporting logins.
+// A deleted or rejected daemon that ignores the update still loses its stream.
 func TestADaemonThatIsGoneLosesItsStream(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		p := newTestPool(t)

@@ -169,10 +169,7 @@ type ServiceAccountServiceClient interface {
 	ListServiceAccounts(context.Context, *v1.ListServiceAccountsRequest) (*v1.ListServiceAccountsResponse, error)
 	CreateServiceAccount(context.Context, *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error)
 	UpdateServiceAccount(context.Context, *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error)
-	// SetServiceAccountRole changes what the account may read and do through the API.
 	SetServiceAccountRole(context.Context, *v1.SetServiceAccountRoleRequest) (*v1.SetServiceAccountRoleResponse, error)
-	// SetServiceAccountLimits changes what goes on every certificate the account gets. Only a person does that, or
-	// an account would lift its own limits.
 	SetServiceAccountLimits(context.Context, *v1.SetServiceAccountLimitsRequest) (*v1.SetServiceAccountLimitsResponse, error)
 	DeleteServiceAccount(context.Context, *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error)
 	CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error)
@@ -195,10 +192,7 @@ type ServiceAccountServiceHandler interface {
 	ListServiceAccounts(context.Context, *v1.ListServiceAccountsRequest) (*v1.ListServiceAccountsResponse, error)
 	CreateServiceAccount(context.Context, *v1.CreateServiceAccountRequest) (*v1.CreateServiceAccountResponse, error)
 	UpdateServiceAccount(context.Context, *v1.UpdateServiceAccountRequest) (*v1.UpdateServiceAccountResponse, error)
-	// SetServiceAccountRole changes what the account may read and do through the API.
 	SetServiceAccountRole(context.Context, *v1.SetServiceAccountRoleRequest) (*v1.SetServiceAccountRoleResponse, error)
-	// SetServiceAccountLimits changes what goes on every certificate the account gets. Only a person does that, or
-	// an account would lift its own limits.
 	SetServiceAccountLimits(context.Context, *v1.SetServiceAccountLimitsRequest) (*v1.SetServiceAccountLimitsResponse, error)
 	DeleteServiceAccount(context.Context, *v1.DeleteServiceAccountRequest) (*v1.DeleteServiceAccountResponse, error)
 	CreateServiceAccountToken(context.Context, *v1.CreateServiceAccountTokenRequest) (*v1.CreateServiceAccountTokenResponse, error)

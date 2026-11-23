@@ -76,8 +76,7 @@ func TestDuplexProceduresAreAllListed(t *testing.T) {
 	}
 }
 
-// Hosted, the base address is the bare domain of the public site. A script there must not post to a workspace
-// with the visitor's session cookie, like to approve an nk login.
+// Hosted, the base address is the public site, which must not post into a workspace.
 func TestThePublicSiteIsNoTrustedOrigin(t *testing.T) {
 	post := func(saas bool, host, origin, site string) int {
 		cfg := &app.Config{}

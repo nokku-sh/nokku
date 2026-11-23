@@ -21,31 +21,15 @@ import (
 	"gocloud.dev/gcerrors"
 )
 
-// roomCheckEvery is how much one recording writes between two looks at the disk.
-const roomCheckEvery = 1 << 20
-
 // A bucket that hangs must not hold up the start. Tests shorten it.
 var probeTimeout = 5 * time.Second
 
-// minFreeDisk is what a folder leaves free. It often shares its disk with PostgreSQL, which stops when that is
-// full. Tests raise it.
+// minFreeDisk is left free for PostgreSQL, which often shares the disk and stops when it is full.
 var minFreeDisk uint64 = 1 << 30
-
-// ErrFull means the folder's disk is nearly full. The daemon keeps its recording and sends it later.
-var ErrFull = errors.New("storage: the disk of the recordings folder is nearly full")
 
 type Storage struct {
 	bucket *blob.Bucket
-	// dir is the folder of a file:// URL. A bucket has no disk of ours to fill.
-	dir string
-}
-
-// roomWriter stops a recording that is being written once the disk is nearly full.
-type roomWriter struct {
-	io.WriteCloser
-
-	store   *Storage
-	written int
+	dir    string
 }
 
 type config struct {
@@ -90,7 +74,6 @@ func New(ctx context.Context) (*Storage, error) {
 	return s, nil
 }
 
-// HasRoom is false for a folder whose disk is nearly full. A disk that cannot be read counts as having room.
 func (s *Storage) HasRoom() bool {
 	if s.dir == "" {
 		return true
@@ -101,15 +84,6 @@ func (s *Storage) HasRoom() bool {
 		return true
 	}
 	return st.Bavail*uint64(st.Bsize) >= minFreeDisk
-}
-
-func (w *roomWriter) Write(p []byte) (int, error) {
-	before := w.written / roomCheckEvery
-	w.written += len(p)
-	if w.written/roomCheckEvery != before && !w.store.HasRoom() {
-		return 0, ErrFull
-	}
-	return w.WriteCloser.Write(p)
 }
 
 // refused is storage saying no, so a wrong setting fails at boot.
@@ -175,9 +149,6 @@ func (s *Storage) CreateWriter(ctx context.Context, name string) (io.WriteCloser
 	if name == "" {
 		return nil, errors.New("filename is empty")
 	}
-	if !s.HasRoom() {
-		return nil, ErrFull
-	}
 	// The smallest part S3 takes, one at a time. The SDK's defaults hold 48 MiB
 	// per upload, and a live session keeps its upload open for hours.
 	w, err := s.bucket.NewWriter(ctx, name, &blob.WriterOptions{
@@ -188,5 +159,5 @@ func (s *Storage) CreateWriter(ctx context.Context, name string) (io.WriteCloser
 	if err != nil {
 		return nil, fmt.Errorf("open writer for %q: %w", name, err)
 	}
-	return &roomWriter{WriteCloser: w, store: s}, nil
+	return w, nil
 }

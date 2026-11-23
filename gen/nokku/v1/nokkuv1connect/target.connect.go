@@ -176,10 +176,8 @@ type TargetServiceClient interface {
 	ListTargets(context.Context, *v1.ListTargetsRequest) (*v1.ListTargetsResponse, error)
 	CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error)
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
-	// RenameTarget changes the name people type to get there. A freed name fits another host, so it takes a fresh
-	// sign-in.
 	RenameTarget(context.Context, *v1.RenameTargetRequest) (*v1.RenameTargetResponse, error)
-	// SetTargetEndpoints replaces where logins to the server go, an empty list clears it.
+	// An empty list clears the endpoints.
 	SetTargetEndpoints(context.Context, *v1.SetTargetEndpointsRequest) (*v1.SetTargetEndpointsResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
@@ -206,10 +204,8 @@ type TargetServiceHandler interface {
 	ListTargets(context.Context, *v1.ListTargetsRequest) (*v1.ListTargetsResponse, error)
 	CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error)
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
-	// RenameTarget changes the name people type to get there. A freed name fits another host, so it takes a fresh
-	// sign-in.
 	RenameTarget(context.Context, *v1.RenameTargetRequest) (*v1.RenameTargetResponse, error)
-	// SetTargetEndpoints replaces where logins to the server go, an empty list clears it.
+	// An empty list clears the endpoints.
 	SetTargetEndpoints(context.Context, *v1.SetTargetEndpointsRequest) (*v1.SetTargetEndpointsResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)

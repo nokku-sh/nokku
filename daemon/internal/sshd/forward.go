@@ -219,8 +219,7 @@ func (s *Server) acceptForwarded(ctx context.Context, st *connState, ln net.List
 	}
 }
 
-// proxy carries a half-close through, so a client that is done sending still gets its answer. Both ends close
-// with ctx, or a copy would wait on a peer that stays silent after the connection is gone.
+// proxy carries a half-close through, both ends close with ctx.
 func proxy(ctx context.Context, ch ssh.Channel, c net.Conn) {
 	closeBoth := sync.OnceFunc(func() {
 		_ = ch.Close()

@@ -24,7 +24,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	expires := time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC)
 	s := &State{
 		APIURL: "https://a.example", SessionToken: "sess", SessionExpiresAt: expires,
-		Targets: []Target{{ID: "t", Name: "web"}}, User: &User{ID: "u"},
+		Server: "https://a.example", Targets: []Target{{ID: "t", Name: "web"}}, User: &User{ID: "u"},
 		Token: "nk_sa_secret",
 	}
 	require.NoError(t, s.Save())
@@ -42,17 +42,6 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	fi, err := os.Stat(paths.ConfigFile())
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
-}
-
-// nk once kept a --ttl here. A file from then still loads.
-func TestLoadTakesAConfigWithAFieldThatIsGone(t *testing.T) {
-	setHome(t)
-	old := `{"api_url":"https://a.example","session_token":"sess","ttl":3600000000000}`
-	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte(old), 0o600))
-
-	loaded := Load()
-	assert.Equal(t, "https://a.example", loaded.APIURL)
-	assert.Equal(t, "sess", loaded.SessionToken)
 }
 
 func TestSessionValid(t *testing.T) {
@@ -76,12 +65,6 @@ func TestLoadCacheLeavesOutAnotherServer(t *testing.T) {
 	other := &State{APIURL: "https://b.example"}
 	require.NoError(t, other.LoadCache())
 	assert.Empty(t, other.Targets, "server a's targets showed up under server b")
-
-	snapshot.Server = ""
-	require.NoError(t, (&State{APIURL: "https://a.example", Cache: snapshot}).Save())
-	old := &State{APIURL: "https://a.example"}
-	require.NoError(t, old.LoadCache())
-	assert.True(t, old.HasCachedData(), "a snapshot from before the field existed keeps ssh working offline")
 }
 
 // Only an nk login --ci session counts, not what NK_TOKEN left behind.

@@ -21,7 +21,6 @@ func TestRenderSSHHosts(t *testing.T) {
 		Targets: []state.Target{
 			{ID: "t-1", Name: "web", Usernames: []string{"alice", "bob"}},
 			{ID: "t-2", Name: "DB", Usernames: []string{"alice"}},
-			{ID: "t-3", Name: "db", Usernames: []string{"alice"}},
 			{ID: "t-4", Name: "no-users"},
 			{ID: "t-5", Name: "prod\n    ProxyCommand curl evil", Usernames: []string{"a"}},
 			{ID: "t-6", Name: "ok", Usernames: []string{"a\n    ProxyCommand curl evil"}},
@@ -47,12 +46,16 @@ func TestRenderSSHHosts(t *testing.T) {
 	}
 	// A server names its own targets only. It never claims a real host.
 	for _, forbidden := range []string{
-		"no-users", "curl evil", "a/b", "github.com", "10.0.0.5", "wild", "t-3",
+		"no-users", "curl evil", "a/b", "github.com", "10.0.0.5", "wild",
 	} {
 		assert.NotContains(t, out, forbidden)
 	}
-	assert.Equal(t, map[string]string{"t-1": "web.nk", "t-2": "db.nk"}, HostAliases(st),
-		"nk ls shows the names ssh knows, and a second name that differs by case gets none")
+	assert.Equal(
+		t,
+		map[string]string{"t-1": "web.nk", "t-2": "db.nk"},
+		HostAliases(st),
+		"nk ls shows the names ssh knows",
+	)
 }
 
 // One block for every name under .nk, and no token in it: a host name never reaches a shell.
@@ -67,8 +70,7 @@ func TestRenderSSHConfig(t *testing.T) {
 	assert.NotContains(t, out, "%", "a token would hand what the user typed to a shell")
 }
 
-// What nk writes is for the real ssh to read. A name under .nk runs nk prepare before the hosts file is read, so
-// a sync in it counts on the first try. Any other name starts nothing.
+// The real ssh reads what nk writes: only a name under .nk runs nk prepare, before the hosts file.
 func TestSSHReadsTheConfigAsMeant(t *testing.T) {
 	sshBin, err := exec.LookPath("ssh")
 	if err != nil || runtime.GOOS == "windows" {
@@ -242,12 +244,9 @@ func TestHostsAreAllUnderNK(t *testing.T) {
 		Targets: []state.Target{
 			{ID: "t-1", Name: "web", Usernames: []string{"root"}},
 			{ID: "t-2", Name: "DB", Usernames: []string{"root"}},
-			{ID: "t-3", Name: "Db", Usernames: []string{"root"}},
-			{ID: "t-4", Name: "bastion", Usernames: []string{"root"}},
+			{ID: "t-3", Name: "bastion", Usernames: []string{"root"}},
 		},
 	}
-	// Twice, the second run sees the files the first one wrote.
-	require.NoError(t, WriteConfigs(st))
 	require.NoError(t, WriteConfigs(st))
 	hosts, err := os.ReadFile(paths.SSHHostsFile())
 	require.NoError(t, err)

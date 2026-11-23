@@ -136,7 +136,6 @@ func (c *Client) SyncOrCache(ctx context.Context, interactive bool) error {
 		return err
 	}
 	if loadErr := c.State.LoadCache(); loadErr != nil || !c.State.HasCachedData() {
-		// A first run has only the address to go on, so say when no server is there.
 		if _, ok := errors.AsType[*net.OpError](err); ok {
 			return fmt.Errorf("cannot reach Nokku at %s. Check the address you gave with --api, "+
 				"and that this machine gets there: %w", c.State.APIURL, err)

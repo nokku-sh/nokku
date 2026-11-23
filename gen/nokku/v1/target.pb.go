@@ -719,7 +719,7 @@ type UpdateTargetRequest struct {
 	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
 	Tags        []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
 	// update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-	// The name and the endpoints have calls of their own. The pinned host key is set by nk sync on the server only.
+	// The pinned host key is set by nk sync on the server only.
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,6,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2572,13 +2572,13 @@ const file_nokku_v1_target_proto_rawDesc = "" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\x12:\n" +
 	"\x06grants\x18\x06 \x03(\v2\x18.nokku.v1.JoinTokenGrantB\b\xbaH\x05\x92\x01\x02\x10 R\x06grants\"@\n" +
 	"\x14CreateTargetResponse\x12(\n" +
-	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xe7\x01\n" +
+	"\x06target\x18\x01 \x01(\v2\x10.nokku.v1.TargetR\x06target\"\xca\x01\n" +
 	"\x13UpdateTargetRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12*\n" +
 	"\vdescription\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\vdescription\x12\x12\n" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\x12Y\n" +
 	"\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskB\x1c\xbaH\x19\xc8\x01\x01\xe2\x01\x13\x12\vdescription\x12\x04tagsR\n" +
-	"updateMaskJ\x04\b\x02\x10\x03J\x04\b\x04\x10\x05R\x04nameR\tendpoints\"o\n" +
+	"updateMask\"o\n" +
 	"\x13RenameTargetRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12>\n" +
 	"\x04name\x18\x02 \x01(\tB*\xbaH'\xc8\x01\x01r\"\x10\x01\x18\x80\x022\x1b^[a-zA-Z0-9][a-zA-Z0-9-_]*$R\x04name\"@\n" +

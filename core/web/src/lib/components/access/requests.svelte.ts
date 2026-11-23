@@ -45,7 +45,6 @@ export function useRequestAnswers() {
 	};
 }
 
-// useWaitingRequests is what is still to answer, for whoever may grant, on a plan that has requests.
 export function useWaitingRequests(live = false) {
 	const can = user.can();
 	const has = useFeatures();

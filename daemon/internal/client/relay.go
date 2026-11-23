@@ -13,9 +13,6 @@ import (
 	"github.com/nokku-sh/nokku/internal/login"
 )
 
-// ssh packets stay under this, so one write is one frame in practice.
-const relayFrame = 32 << 10
-
 var relayClosed = &nokkuv1.DaemonRelayRequest{
 	Msg: &nokkuv1.DaemonRelayRequest_Closed{Closed: &nokkuv1.DaemonRelayClosed{}},
 }
@@ -106,16 +103,11 @@ func (c *relayConn) Write(p []byte) (int, error) {
 	if c.closed {
 		return 0, net.ErrClosed
 	}
-	// The core takes no frame over 64 KiB, so a large write goes out in pieces.
-	for sent := 0; sent < len(p); {
-		n := min(len(p)-sent, relayFrame)
-		// Send marshals before it returns, so the stream does not keep p.
-		if err := c.stream.Send(&nokkuv1.DaemonRelayRequest{
-			Msg: &nokkuv1.DaemonRelayRequest_Data{Data: p[sent : sent+n]},
-		}); err != nil {
-			return sent, err
-		}
-		sent += n
+	// Send marshals before it returns, so the stream does not keep p.
+	if err := c.stream.Send(&nokkuv1.DaemonRelayRequest{
+		Msg: &nokkuv1.DaemonRelayRequest_Data{Data: p},
+	}); err != nil {
+		return 0, err
 	}
 	return len(p), nil
 }
