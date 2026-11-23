@@ -410,6 +410,30 @@ func TestOIDCFlowMissingEmailVerifiedLinksOnlyWhenTrusted(t *testing.T) {
 	})
 }
 
+// The provider owns the address of a member, unless another account holds it.
+func TestOIDCFlowTakesANewAddressFromTheProvider(t *testing.T) {
+	h := newOIDCIdP(t)
+	e, svc := h.setup(t, true)
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	first := h.email
+	u := e.userByEmail(t, h.org.ws, first)
+	require.NotNil(t, u, "JIT provisioned user missing")
+
+	h.email = "bob@" + testDomain()
+	e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	kept := e.userByEmail(t, h.org.ws, first)
+	require.NotNil(t, kept, "the account took an address another one holds")
+	assert.Equal(t, u.ID, kept.ID)
+
+	h.email = "alice.moved@" + testDomain()
+	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
+	moved := e.userByEmail(t, h.org.ws, h.email)
+	require.NotNil(t, moved, "the new address did not reach the account")
+	assert.Equal(t, u.ID, moved.ID)
+	assert.Nil(t, e.userByEmail(t, h.org.ws, first), "the old address still finds the account")
+}
+
 // A provider may give a leaver's address to someone new, with a new subject.
 // That person must not land on the account.
 func TestOIDCFlowRefusesASecondSubjectOnAnAccount(t *testing.T) {

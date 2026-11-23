@@ -264,12 +264,24 @@ func identityFrom(cfg *SSOProvider, idToken *oidc.IDToken, claims map[string]any
 func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool, error) {
 	var u *db.User
 	var created, linked bool
+	var before string
 	err := h.svc.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		u, created, linked, err = h.resolveIn(ctx, q, id)
+		if err != nil || linked {
+			return err
+		}
+		before = u.Email
+		u, err = follow(ctx, q, u, id)
 		return err
 	})
 	if err != nil {
 		return nil, false, mapNotFound(err)
+	}
+	if !linked && before != u.Email {
+		h.svc.record(ctx, event{
+			Action: actionEmailChanged, Kind: actor.KindUser, Method: MethodOIDC, UserID: u.ID, Email: u.Email,
+		})
+		h.svc.emailMoved(ctx, u.ID, before, u.Email)
 	}
 	if created {
 		h.svc.record(ctx, event{
@@ -277,6 +289,30 @@ func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool
 		})
 	}
 	return u, linked && !created, nil
+}
+
+// follow takes the name and the address the provider has now. An admin's address is a way back in and stays, as
+// with SCIM.
+func follow(ctx context.Context, q *db.Queries, u *db.User, id oidcIdentity) (*db.User, error) {
+	if id.Name != "" && id.Name != u.Name {
+		var err error
+		if u, err = q.UpdateUser(ctx, &db.UpdateUserParams{ID: u.ID, Name: &id.Name}); err != nil {
+			return nil, err
+		}
+	}
+	email := NormalizeEmail(id.Email)
+	if email == "" || email == u.Email || u.Role >= nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN ||
+		(!id.EmailVerified && !id.TrustUnverifiedEmail) {
+		return u, nil
+	}
+	if _, err := q.GetUserByEmail(ctx, email); !errors.Is(err, pgx.ErrNoRows) {
+		return u, err
+	}
+	// A link mailed to the old address must not outlive it.
+	if err := q.DeleteAllUserTokens(ctx, &u.ID); err != nil {
+		return nil, err
+	}
+	return q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: u.ID, Email: email})
 }
 
 // resolveIn returns the user, whether it created it, and whether it linked it.
