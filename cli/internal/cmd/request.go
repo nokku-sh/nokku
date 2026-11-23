@@ -26,17 +26,18 @@ func requestCMD() *cli.Command {
 	return &cli.Command{
 		Name:      "request",
 		Usage:     "Ask for an account on a server, for a while",
-		ArgsUsage: "<server> <account>",
+		ArgsUsage: "<account>@<server>",
 		Flags: []cli.Flag{
 			&cli.DurationFlag{Name: "for", Value: time.Hour, Usage: "How long you need it, from 15m to 168h"},
 			&cli.StringFlag{Name: "reason", Aliases: []string{"r"}, Usage: "Why you need it, whoever answers reads it"},
 			&cli.BoolFlag{Name: "no-wait", Usage: "Return once the request is sent"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.NArg() != 2 || cmd.String("reason") == "" {
-				return errors.New(`usage: nk request <server> <account> --reason "..." [--for 2h]`)
+			account, server, ok := strings.Cut(cmd.Args().First(), "@")
+			if !ok || cmd.NArg() != 1 || cmd.String("reason") == "" {
+				return errors.New(`usage: nk request <account>@<server> --reason "..." [--for 2h]`)
 			}
-			server, account := strings.TrimSuffix(cmd.Args().Get(0), ssh.HostSuffix), cmd.Args().Get(1)
+			server = strings.TrimSuffix(server, ssh.HostSuffix)
 			c, err := connect(ctx, cmd)
 			if err != nil {
 				return err

@@ -25,6 +25,8 @@ nk ls                                      # lists the servers you can reach
 ssh user@server.nk                         # plain OpenSSH, every server is <name>.nk
 ```
 
+The Windows build is untested so far.
+
 `--api` is the address you open Nokku at. `nk` remembers it, so later it is just `nk login`. The web app shows the command with your address filled in.
 
 Something not working? Run `nk doctor`. It checks the core, your key and your SSH setup, and `nk doctor --fix` repairs what it can.
@@ -43,7 +45,7 @@ Something not working? Run `nk doctor`. It checks the core, your key and your SS
 | ---------------------------- | ----------------------------------------------------------------------------- |
 | `nk login`                   | Sign in and sync local state                                                  |
 | `nk ls` / `nk list`          | List the servers you can reach, and until when for access that ends           |
-| `nk request <host> <user>`   | Ask for an account on a server for a while, then wait for the answer          |
+| `nk request <user>@<host>`   | Ask for an account on a server for a while, then wait for the answer          |
 | `nk doctor`                  | Check the core, the TPM and your local SSH setup                              |
 | `nk sync <host>`             | Add a server without the daemon, or refresh one you added                     |
 | `nk rm <host>`               | Clean up a server you added with `nk sync` and delete its target              |

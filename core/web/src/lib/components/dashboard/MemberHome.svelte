@@ -38,8 +38,8 @@
 	);
 	const requestLine = $derived(
 		first?.usernames[0]
-			? `nk request ${first.name} ${first.usernames[0]} --for 1h --reason "..."`
-			: 'nk request <server> <account> --for 1h --reason "..."'
+			? `nk request ${first.usernames[0]}@${first.name} --for 1h --reason "..."`
+			: 'nk request <account>@<server> --for 1h --reason "..."'
 	);
 
 	const canAsk = $derived(has('access_requests') === true);
