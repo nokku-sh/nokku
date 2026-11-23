@@ -56,13 +56,8 @@ func TestSignSSHCertificate(t *testing.T) {
 		Username: new("root"),
 	})
 	require.NoError(t, err)
-	grant := &nokkuv1.AddSubjectsRequest{
-		Id:         new(root.GetAccount().GetId()),
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-		SubjectIds: []string{member.ID},
-	}
-	_, err = targetAccounts.AddSubjects(t.Context(), grant)
-	require.NoError(t, err)
+	require.Equal(t, targetID, root.GetAccount().GetTargetId())
+	grantAccount(t, targetAccounts, targetID, "root", nokkuv1.SubjectKind_SUBJECT_KIND_USER, member.ID)
 
 	sign := func(target string) ([]string, error) {
 		res, err := nokkuv1connect.NewCertificateServiceClient(clientOn(srv, header("Authorization", "Bearer "+nkToken))).
@@ -110,19 +105,13 @@ func TestSignSSHCertificate(t *testing.T) {
 	assert.Equal(t, []string{wantPrincipal}, synced.GetPrincipals()[0].GetCertPrincipals(),
 		"the daemon must be told the principal the certificate carries")
 
-	_, err = targetAccounts.RemoveSubjects(t.Context(), &nokkuv1.RemoveSubjectsRequest{
-		Id:         grant.Id,
-		Kind:       grant.Kind,
-		SubjectIds: grant.GetSubjectIds(),
-	})
-	require.NoError(t, err)
+	revokeAccount(t, targetAccounts, targetID, "root", nokkuv1.SubjectKind_SUBJECT_KIND_USER, member.ID)
 	_, err = sign(targetID)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err),
 		"a revoked grant still got a certificate signed, %v", err)
 
 	// A certificate goes out only once the log has it, and gets one row.
-	_, err = targetAccounts.AddSubjects(t.Context(), grant)
-	require.NoError(t, err)
+	grantAccount(t, targetAccounts, targetID, "root", nokkuv1.SubjectKind_SUBJECT_KIND_USER, member.ID)
 	issued := func() int {
 		var rows []*db.ListAuditLogsRow
 		require.NoError(t, cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
@@ -183,12 +172,14 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 		Username: new("root"),
 	})
 	require.NoError(t, err)
-	_, err = targetAccounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
-		Id:         new(root.GetAccount().GetId()),
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum(),
-		SubjectIds: []string{id},
-	})
-	require.NoError(t, err)
+	grantAccount(
+		t,
+		targetAccounts,
+		root.GetAccount().GetTargetId(),
+		"root",
+		nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT,
+		id,
+	)
 
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
@@ -269,12 +260,16 @@ func TestCertificateLimitsPerSubjectKind(t *testing.T) {
 	plainToken := serviceAccountToken(t, accounts, plainID, nil)
 	grantBoth := func(accountID string) {
 		n.grant(t, accountID, personID)
-		_, err := n.accounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
-			Id:         &accountID,
-			Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum(),
-			SubjectIds: []string{serviceID, plainID},
-		})
-		require.NoError(t, err)
+		targetID, username := n.account(t, accountID)
+		grantAccount(
+			t,
+			n.accounts,
+			targetID,
+			username,
+			nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT,
+			serviceID,
+			plainID,
+		)
 	}
 
 	_, enrolled := enrollTestDaemon(t, n.cfg, n.srv, workspaceID, true)

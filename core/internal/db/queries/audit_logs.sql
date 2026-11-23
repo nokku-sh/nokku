@@ -99,6 +99,7 @@ WITH
           ' ',
           details ->> 'name',
           details ->> 'target',
+          details ->> 'targets',
           details ->> 'username',
           details ->> 'member',
           details ->> 'subject',

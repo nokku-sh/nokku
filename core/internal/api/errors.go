@@ -38,10 +38,6 @@ var (
 		connect.CodeFailedPrecondition,
 		"invalid or expired invitation",
 	)
-	errInvalidInput = connect.NewError(
-		connect.CodeInvalidArgument,
-		"please check your input and try again",
-	)
 	errInvalidValue = connect.NewError(
 		connect.CodeInvalidArgument,
 		"a value is missing, too long or not valid",

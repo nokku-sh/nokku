@@ -79,24 +79,25 @@ func (n *nkSync) target(t *testing.T, username string) (targetID, accountID stri
 	return targetID, res.GetAccount().GetId()
 }
 
+// account says which server and username an account id stands for, a grant names those.
+func (n *nkSync) account(t *testing.T, accountID string) (targetID, username string) {
+	t.Helper()
+	require.NoError(t, n.cfg.Conn.Pool.QueryRow(wsCtx(t),
+		"SELECT target_id::TEXT, username FROM target_accounts WHERE id = $1", accountID).
+		Scan(&targetID, &username), "read the account")
+	return targetID, username
+}
+
 func (n *nkSync) grant(t *testing.T, accountID, userID string) {
 	t.Helper()
-	_, err := n.accounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
-		Id:         &accountID,
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-		SubjectIds: []string{userID},
-	})
-	require.NoError(t, err)
+	targetID, username := n.account(t, accountID)
+	grantAccount(t, n.accounts, targetID, username, nokkuv1.SubjectKind_SUBJECT_KIND_USER, userID)
 }
 
 func (n *nkSync) revoke(t *testing.T, accountID, userID string) {
 	t.Helper()
-	_, err := n.accounts.RemoveSubjects(t.Context(), &nokkuv1.RemoveSubjectsRequest{
-		Id:         &accountID,
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-		SubjectIds: []string{userID},
-	})
-	require.NoError(t, err)
+	targetID, username := n.account(t, accountID)
+	revokeAccount(t, n.accounts, targetID, username, nokkuv1.SubjectKind_SUBJECT_KIND_USER, userID)
 }
 
 // person is a member and the nk session that signs for them.

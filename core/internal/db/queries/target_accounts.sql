@@ -282,15 +282,9 @@ FROM
   LEFT JOIN teams m ON m.id = gone.subject_id
   LEFT JOIN service_accounts s ON s.id = gone.subject_id;
 
--- name: RemoveGrant :exec
-DELETE FROM grants
-WHERE
-  account_id = @account_id
-  AND subject_kind = @subject_kind::TEXT
-  AND subject_id = @subject_id::UUID;
-
 -- name: RevokeWhere :many
--- One subject's own grants on the servers a batch revoke names, by id or by tag.
+-- One subject's own grants on the servers a revoke names: by id, by tag, or all of them. A username keeps it to one
+-- account.
 SELECT
   g.account_id,
   a.username,
@@ -305,25 +299,24 @@ WHERE
   g.subject_kind = @subject_kind::TEXT
   AND g.subject_id = @subject_id::UUID
   AND (
-    t.id = ANY (@target_ids::UUID[])
+    @everywhere::BOOLEAN
+    OR t.id = ANY (@target_ids::UUID[])
     OR t.tags && @tags::TEXT[]
+  )
+  AND (
+    @username::TEXT = ''
+    OR a.username = @username::TEXT
   )
 ORDER BY
   t.name,
   a.username;
 
 -- name: RemoveGrants :exec
--- RemoveGrant for many accounts in one statement.
+-- Grant removal is the whole lockout. The next sync drops the subject, so an issued cert matches no account.
 DELETE FROM grants
 WHERE
   account_id = ANY (@account_ids::UUID[])
   AND subject_kind = @subject_kind::TEXT
-  AND subject_id = @subject_id::UUID;
-
--- name: RevokeSubjectAccessInWorkspace :exec
-DELETE FROM grants
-WHERE
-  subject_kind = @subject_kind::TEXT
   AND subject_id = @subject_id::UUID;
 
 -- name: GetTargetAccountsByTargetIDs :many

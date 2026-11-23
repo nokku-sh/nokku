@@ -43,24 +43,15 @@ func TestRequestedFeatures(t *testing.T) {
 			msg:  &nokkuv1.UpdateDaemonDefaultsRequest{SessionIdleTimeout: durationpb.New(0)},
 		},
 		{
-			name: "a grant that ends is gated",
-			msg:  &nokkuv1.AddSubjectsRequest{ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))},
-			want: []string{FeatureExpiringAccess},
-		},
-		{
 			name: "a grant for good is never gated",
-			msg:  &nokkuv1.AddSubjectsRequest{},
+			msg:  &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{}},
 		},
 		{
-			name: "a batch grant that ends is gated",
+			name: "a grant that ends is gated",
 			msg: &nokkuv1.GrantRequest{
 				Grant: &nokkuv1.GrantSpec{ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))},
 			},
 			want: []string{FeatureExpiringAccess},
-		},
-		{
-			name: "a batch grant for good is never gated",
-			msg:  &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{}},
 		},
 		{
 			name: "opening targets to requests is gated",

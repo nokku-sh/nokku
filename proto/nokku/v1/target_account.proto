@@ -20,32 +20,13 @@ service TargetAccountService {
   rpc RemoveTargetAccount(RemoveTargetAccountRequest) returns (RemoveTargetAccountResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  rpc AddSubjects(AddSubjectsRequest) returns (AddSubjectsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
-  }
-  rpc RemoveSubjects(RemoveSubjectsRequest) returns (RemoveSubjectsResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
-  }
-  rpc RevokeAllAccess(RevokeAllAccessRequest) returns (RevokeAllAccessResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
-  }
-  // PlanGrant says what Grant would do with the same request, and changes nothing.
-  rpc PlanGrant(PlanGrantRequest) returns (PlanGrantResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
   // Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
-  // access change, however many servers.
+  // access change, however many servers. A dry run says what it would do and changes nothing.
   rpc Grant(GrantRequest) returns (GrantResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // PlanRevoke says what Revoke would do with the same request, and changes nothing.
-  rpc PlanRevoke(PlanRevokeRequest) returns (PlanRevokeResponse) {
-    option (access) = {role: WORKSPACE_ROLE_EDITOR};
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  // Revoke takes one subject's own grants off many servers, the servers by id or by tag. Like Grant it is one
-  // transaction and one access change.
+  // Revoke takes one subject's own grants off many servers: the servers by id, by tag, or all of them. Like Grant it
+  // is one transaction and one access change, and a dry run changes nothing.
   rpc Revoke(RevokeRequest) returns (RevokeResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
@@ -84,42 +65,6 @@ message ListTargetAccountsResponse {
   int32 total = 2;
 }
 
-message AddSubjectsRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
-  repeated string subject_ids = 2 [(buf.validate.field).repeated = {
-    min_items: 1
-    max_items: 50
-    items: {
-      string: {uuid: true}
-    }
-  }];
-  SubjectKind kind = 3 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-  google.protobuf.Timestamp expires_at = 4 [(buf.validate.field).timestamp = {
-    gt_now: true
-    within: {seconds: 31622400}
-  }];
-}
-message AddSubjectsResponse {}
-
-message RemoveSubjectsRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
-  repeated string subject_ids = 2 [(buf.validate.field).repeated = {
-    min_items: 1
-    max_items: 50
-    items: {
-      string: {uuid: true}
-    }
-  }];
-  SubjectKind kind = 3 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-}
-message RemoveSubjectsResponse {}
-
 message GrantSubject {
   string id = 1 [(buf.validate.field).string.uuid = true];
   SubjectKind kind = 2 [(buf.validate.field).enum = {
@@ -149,7 +94,10 @@ message GrantSpec {
   // Empty asks only which servers these are and what accounts they have.
   string username = 4 [(buf.validate.field).string.max_len = 32];
   // Unset is for good.
-  google.protobuf.Timestamp expires_at = 5;
+  google.protobuf.Timestamp expires_at = 5 [(buf.validate.field).timestamp = {
+    gt_now: true
+    within: {seconds: 31622400}
+  }];
   // A grant that stands with another end keeps it, unless this is set.
   bool change_ends = 6;
 }
@@ -183,23 +131,18 @@ message GrantPlan {
   repeated GrantOutcome outcomes = 6;
 }
 
-message PlanGrantRequest {
-  GrantSpec grant = 1 [(buf.validate.field).required = true];
-}
-message PlanGrantResponse {
-  GrantPlan plan = 1;
-}
-
 message GrantRequest {
   GrantSpec grant = 1 [(buf.validate.field).required = true];
+  // Only say what it would do.
+  bool dry_run = 2;
 }
 message GrantResponse {
-  // What it did.
+  // What it did, or would do.
   GrantPlan plan = 1;
 }
 
-// Whose grants go where. A server counts when its id is named or it has one of the tags. Only the subject's own
-// grants go, what a team gives its members stays.
+// Whose grants go where. A server counts when its id is named, it has one of the tags, or everywhere is set. Only the
+// subject's own grants go, what a team gives its members stays.
 message RevokeSpec {
   GrantSubject subject = 1 [(buf.validate.field).required = true];
   repeated string target_ids = 2 [(buf.validate.field).repeated = {
@@ -217,6 +160,10 @@ message RevokeSpec {
       }
     }
   }];
+  // Only the grants on this account. Empty is every account.
+  string username = 4 [(buf.validate.field).string.max_len = 32];
+  // Every server of the workspace, the ids and tags are not read.
+  bool everywhere = 5;
 }
 
 message RevokeAccount {
@@ -240,29 +187,15 @@ message RevokePlan {
   repeated string other_tag_names = 5;
 }
 
-message PlanRevokeRequest {
-  RevokeSpec revoke = 1 [(buf.validate.field).required = true];
-}
-message PlanRevokeResponse {
-  RevokePlan plan = 1;
-}
-
 message RevokeRequest {
   RevokeSpec revoke = 1 [(buf.validate.field).required = true];
+  // Only say what it would do.
+  bool dry_run = 2;
 }
 message RevokeResponse {
-  // What it did.
+  // What it did, or would do.
   RevokePlan plan = 1;
 }
-
-message RevokeAllAccessRequest {
-  string subject_id = 1 [(buf.validate.field).string.uuid = true];
-  SubjectKind kind = 2 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-}
-message RevokeAllAccessResponse {}
 
 message AddTargetAccountRequest {
   string target_id = 1 [(buf.validate.field).string.uuid = true];

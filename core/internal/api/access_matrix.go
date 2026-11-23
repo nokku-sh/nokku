@@ -25,11 +25,7 @@ func (s *targetService) GetAccessMatrix(
 ) (*nokkuv1.GetAccessMatrixResponse, error) {
 	var kind *string
 	if req.GetKind() != nokkuv1.SubjectKind_SUBJECT_KIND_UNSPECIFIED {
-		name, ok := subjectKind(req.GetKind())
-		if !ok {
-			return nil, errInvalidInput
-		}
-		kind = &name
+		kind = new(subjectKind(req.GetKind()))
 	}
 
 	res := &nokkuv1.GetAccessMatrixResponse{}

@@ -53,7 +53,7 @@
 
 	const update = saApi.update();
 	const remove = saApi.delete();
-	const revokeAll = accountApi.revokeSubject();
+	const revokeAll = accountApi.revokeEverywhere();
 	const tokens = saApi.tokens.list(() => sheet.id);
 	const tokenList = $derived(tokens.data ?? []);
 	const revokeToken = saApi.tokens.revoke();
@@ -120,7 +120,9 @@
 			description: 'It is removed from every login account on every server.',
 			confirmText: 'Revoke all',
 			onConfirm: () =>
-				revokeAll.mutateAsync({ subjectId: entity.id, kind: SubjectKind.SERVICE_ACCOUNT })
+				revokeAll.mutateAsync({
+					revoke: { subject: { id: entity.id, kind: SubjectKind.SERVICE_ACCOUNT } }
+				})
 		});
 	}
 </script>

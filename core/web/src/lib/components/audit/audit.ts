@@ -37,11 +37,8 @@ export const areas: Area[] = [
 		label: 'Access',
 		icon: ShieldCheck,
 		actions: [
-			'AddSubjects',
-			'RemoveSubjects',
 			'Grant',
 			'Revoke',
-			'RevokeAllAccess',
 			'AddTargetAccount',
 			'RemoveTargetAccount',
 			'GrantExpired',
@@ -217,11 +214,8 @@ const labels: Record<string, string> = {
 	ConnectionClose: 'Left a server',
 	ConnectionReportsDropped: 'Login reports lost',
 	GetRecording: 'Played a recording',
-	AddSubjects: 'Granted access',
-	RemoveSubjects: 'Revoked access',
 	Grant: 'Granted access',
 	Revoke: 'Revoked access',
-	RevokeAllAccess: 'Revoked all access',
 	AddTargetAccount: 'Added login account',
 	RemoveTargetAccount: 'Removed login account',
 	GrantExpired: 'Access expired',
@@ -270,13 +264,6 @@ const strings = (log: EventLog, key: string) => {
 
 const subjectPrefix: Record<string, string> = { team: 'team:', service_account: 'sa:' };
 
-// How a grant event joins the account and the subjects, like "deploy on web-1 to Mia".
-const grantWords: Record<string, string> = {
-	AddSubjects: 'to',
-	RemoveSubjects: 'from',
-	GrantExpired: 'for'
-};
-
 /** What an event touched, in words, from the names it stored. Older events only hold ids and get undefined. */
 export function eventWhat(log: EventLog): string | undefined {
 	const name = detail(log, 'name');
@@ -288,8 +275,9 @@ export function eventWhat(log: EventLog): string | undefined {
 		.join(', ');
 	const on = account && server ? `${account} on ${server}` : undefined;
 
-	if (grantWords[log.action]) return on && (who ? `${on} ${grantWords[log.action]} ${who}` : on);
 	switch (log.action) {
+		case 'GrantExpired':
+			return on && (who ? `${on} for ${who}` : on);
 		case 'ConnectionOpen':
 		case 'ConnectionClose': {
 			const person = detail(log, 'subject');
@@ -304,13 +292,13 @@ export function eventWhat(log: EventLog): string | undefined {
 			// One event for many servers. It names the tags and the servers picked by name, and counts the rest.
 			const count = log.details?.['servers'];
 			if (typeof count !== 'number') return undefined;
-			const accounts = account ?? strings(log, 'usernames').join(', ');
-			const where = [...strings(log, 'tags'), ...strings(log, 'targets')];
+			const accounts = (account ?? strings(log, 'usernames').join(', ')) || 'No grant';
+			const where = log.details?.['everywhere']
+				? ['everywhere']
+				: [...strings(log, 'tags'), ...strings(log, 'targets')];
 			const servers = `${plural(count, 'server')}${where.length ? ` (${listNames(where)})` : ''}`;
 			return `${accounts} on ${servers} ${log.action === 'Grant' ? 'to' : 'from'} ${who}`;
 		}
-		case 'RevokeAllAccess':
-			return name && prefix + name;
 		case 'AddTeamMember':
 		case 'RemoveTeamMember': {
 			const member = detail(log, 'member');

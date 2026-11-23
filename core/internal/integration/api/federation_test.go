@@ -230,12 +230,14 @@ func TestExchangeSignsAJobIn(t *testing.T) {
 		TargetId: &targetID, Username: new("root"),
 	})
 	require.NoError(t, err)
-	_, err = grants.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
-		Id:         root.GetAccount().Id,
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum(),
-		SubjectIds: []string{f.account.GetId()},
-	})
-	require.NoError(t, err)
+	grantAccount(
+		t,
+		grants,
+		targetID,
+		root.GetAccount().GetUsername(),
+		nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT,
+		f.account.GetId(),
+	)
 
 	res, session := f.signIn(t)
 	assert.True(t, strings.HasPrefix(res.GetAccessToken(), "nk_sa_"), "the token is %q", res.GetAccessToken())

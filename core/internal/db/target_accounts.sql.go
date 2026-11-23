@@ -823,25 +823,6 @@ func (q *Queries) PutGrants(ctx context.Context, arg *PutGrantsParams) error {
 	return err
 }
 
-const removeGrant = `-- name: RemoveGrant :exec
-DELETE FROM grants
-WHERE
-  account_id = $1
-  AND subject_kind = $2::TEXT
-  AND subject_id = $3::UUID
-`
-
-type RemoveGrantParams struct {
-	AccountID   string `json:"accountId"`
-	SubjectKind string `json:"subjectKind"`
-	SubjectID   string `json:"subjectId"`
-}
-
-func (q *Queries) RemoveGrant(ctx context.Context, arg *RemoveGrantParams) error {
-	_, err := q.db.Exec(ctx, removeGrant, arg.AccountID, arg.SubjectKind, arg.SubjectID)
-	return err
-}
-
 const removeGrants = `-- name: RemoveGrants :exec
 DELETE FROM grants
 WHERE
@@ -856,26 +837,9 @@ type RemoveGrantsParams struct {
 	SubjectID   string   `json:"subjectId"`
 }
 
-// RemoveGrant for many accounts in one statement.
+// Grant removal is the whole lockout. The next sync drops the subject, so an issued cert matches no account.
 func (q *Queries) RemoveGrants(ctx context.Context, arg *RemoveGrantsParams) error {
 	_, err := q.db.Exec(ctx, removeGrants, arg.AccountIds, arg.SubjectKind, arg.SubjectID)
-	return err
-}
-
-const revokeSubjectAccessInWorkspace = `-- name: RevokeSubjectAccessInWorkspace :exec
-DELETE FROM grants
-WHERE
-  subject_kind = $1::TEXT
-  AND subject_id = $2::UUID
-`
-
-type RevokeSubjectAccessInWorkspaceParams struct {
-	SubjectKind string `json:"subjectKind"`
-	SubjectID   string `json:"subjectId"`
-}
-
-func (q *Queries) RevokeSubjectAccessInWorkspace(ctx context.Context, arg *RevokeSubjectAccessInWorkspaceParams) error {
-	_, err := q.db.Exec(ctx, revokeSubjectAccessInWorkspace, arg.SubjectKind, arg.SubjectID)
 	return err
 }
 
@@ -894,8 +858,13 @@ WHERE
   g.subject_kind = $1::TEXT
   AND g.subject_id = $2::UUID
   AND (
-    t.id = ANY ($3::UUID[])
-    OR t.tags && $4::TEXT[]
+    $3::BOOLEAN
+    OR t.id = ANY ($4::UUID[])
+    OR t.tags && $5::TEXT[]
+  )
+  AND (
+    $6::TEXT = ''
+    OR a.username = $6::TEXT
   )
 ORDER BY
   t.name,
@@ -905,8 +874,10 @@ ORDER BY
 type RevokeWhereParams struct {
 	SubjectKind string   `json:"subjectKind"`
 	SubjectID   string   `json:"subjectId"`
+	Everywhere  bool     `json:"everywhere"`
 	TargetIds   []string `json:"targetIds"`
 	Tags        []string `json:"tags"`
+	Username    string   `json:"username"`
 }
 
 type RevokeWhereRow struct {
@@ -917,13 +888,16 @@ type RevokeWhereRow struct {
 	OtherTags bool   `json:"otherTags"`
 }
 
-// One subject's own grants on the servers a batch revoke names, by id or by tag.
+// One subject's own grants on the servers a revoke names: by id, by tag, or all of them. A username keeps it to one
+// account.
 func (q *Queries) RevokeWhere(ctx context.Context, arg *RevokeWhereParams) ([]*RevokeWhereRow, error) {
 	rows, err := q.db.Query(ctx, revokeWhere,
 		arg.SubjectKind,
 		arg.SubjectID,
+		arg.Everywhere,
 		arg.TargetIds,
 		arg.Tags,
+		arg.Username,
 	)
 	if err != nil {
 		return nil, err

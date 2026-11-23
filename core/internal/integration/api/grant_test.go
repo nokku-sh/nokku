@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,7 +83,7 @@ func TestGrantOnATag(t *testing.T) {
 	}
 	plan := func(s *nokkuv1.GrantSpec) *nokkuv1.GrantPlan {
 		t.Helper()
-		res, err := api.PlanGrant(t.Context(), &nokkuv1.PlanGrantRequest{Grant: s})
+		res, err := api.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: s, DryRun: new(true)})
 		require.NoError(t, err)
 		return res.GetPlan()
 	}
@@ -172,8 +173,9 @@ func TestGrantOnATag(t *testing.T) {
 func TestRevokeOnATag(t *testing.T) {
 	cfg, srv := enterprise(t)
 	ws := testWorkspace.ID
+	editor := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
 	api := nokkuv1connect.NewTargetAccountServiceClient(clientOn(srv, header("Authorization",
-		"Bearer "+seedMember(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR))))
+		"Bearer "+sessionFor(t, cfg, editor))))
 	tag, second := uniq("fleet"), uniq("second")
 	person := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 
@@ -249,7 +251,20 @@ func TestRevokeOnATag(t *testing.T) {
 		Tags:    []string{tag},
 	}
 
-	planned, err := api.PlanRevoke(t.Context(), &nokkuv1.PlanRevokeRequest{Revoke: spec})
+	// One account of the tag's servers goes alone when it is named.
+	onlyRoot, err := api.Revoke(t.Context(), &nokkuv1.RevokeRequest{DryRun: new(true), Revoke: &nokkuv1.RevokeSpec{
+		Subject: spec.GetSubject(), Tags: spec.GetTags(), Username: new("root"),
+	}})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, onlyRoot.GetPlan().GetGrants())
+	// Nor does a revoke with no server named take anything.
+	nowhere, err := api.Revoke(t.Context(), &nokkuv1.RevokeRequest{DryRun: new(true), Revoke: &nokkuv1.RevokeSpec{
+		Subject: spec.GetSubject(),
+	}})
+	require.NoError(t, err)
+	assert.Zero(t, nowhere.GetPlan().GetGrants(), "no server named must mean none, not all")
+
+	planned, err := api.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: spec, DryRun: new(true)})
 	require.NoError(t, err)
 	plan := planned.GetPlan()
 	assert.EqualValues(t, 4, plan.GetGrants())
@@ -289,7 +304,7 @@ func TestRevokeOnATag(t *testing.T) {
 	assert.Equal(t, 1, held(person.ID, onTag[0]), "someone else's grant went along")
 	assert.Equal(t, 1, held(team, outside), "a grant on a server without the tag went along")
 
-	again, err := api.PlanRevoke(t.Context(), &nokkuv1.PlanRevokeRequest{Revoke: spec})
+	again, err := api.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: spec, DryRun: new(true)})
 	require.NoError(t, err)
 	assert.Zero(t, again.GetPlan().GetGrants())
 
@@ -303,6 +318,14 @@ func TestRevokeOnATag(t *testing.T) {
 		return len(events) == 1
 	}, 5*time.Second, 20*time.Millisecond, "the revoke must leave one audit event")
 	assert.Equal(t, "Revoke", events[0].Action)
+	// The dry runs before and after it changed nothing, so they left no event.
+	inWorkspace(t, cfg, ws, func(q *db.Queries) (err error) {
+		events, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+			ActorIds: []string{editor.ID}, Actions: []string{"Grant", "Revoke"}, Limit: 5,
+		})
+		return err
+	})
+	assert.Len(t, events, 1, "a dry run was written to the audit log")
 	var details struct {
 		Removed   int      `json:"removed"`
 		Servers   int      `json:"servers"`
@@ -322,6 +345,69 @@ func TestRevokeOnATag(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	assert.Zero(t, held(team, outside))
+}
+
+// A dry run changes nothing, so it leaves no audit row, not even when it is refused. A preview left open past
+// its end and a member who tries are both refused.
+func TestADryRunLeavesNoAuditRow(t *testing.T) {
+	cfg, srv := enterprise(t)
+	ws := testWorkspace.ID
+	editor := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
+	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	as := func(u *db.User) nokkuv1connect.TargetAccountServiceClient {
+		return nokkuv1connect.NewTargetAccountServiceClient(clientOn(srv, header("Authorization",
+			"Bearer "+sessionFor(t, cfg, u))))
+	}
+	spec := &nokkuv1.GrantSpec{
+		Subjects:  []*nokkuv1.GrantSubject{{Id: &member.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
+		Tags:      []string{uniq("none")},
+		Username:  new("deploy"),
+		ExpiresAt: timestamppb.New(time.Now().Add(-time.Minute)),
+	}
+	_, err := as(editor).Grant(t.Context(), &nokkuv1.GrantRequest{Grant: spec, DryRun: new(true)})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an end in the past: %v", err)
+	_, err = as(member).Revoke(t.Context(), &nokkuv1.RevokeRequest{DryRun: new(true), Revoke: &nokkuv1.RevokeSpec{
+		Subject: spec.GetSubjects()[0], Everywhere: new(true),
+	}})
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "a member's revoke: %v", err)
+
+	var rows []*db.ListAuditLogsRow
+	inWorkspace(t, cfg, ws, func(q *db.Queries) (err error) {
+		rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
+			ActorIds: []string{editor.ID, member.ID}, Actions: []string{"Grant", "Revoke"}, Limit: 5,
+		})
+		return err
+	})
+	assert.Empty(t, rows, "a dry run was written to the audit log")
+}
+
+// grantAccount gives subjects one account of one server, for good.
+func grantAccount(
+	t *testing.T, c nokkuv1connect.TargetAccountServiceClient, targetID, username string,
+	kind nokkuv1.SubjectKind, subjects ...string,
+) {
+	t.Helper()
+	spec := &nokkuv1.GrantSpec{TargetIds: []string{targetID}, Username: &username}
+	for _, id := range subjects {
+		spec.Subjects = append(spec.Subjects, &nokkuv1.GrantSubject{Id: &id, Kind: kind.Enum()})
+	}
+	res, err := c.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: spec})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, res.GetPlan().GetWithAccount(), "the server has no %s account", username)
+}
+
+// revokeAccount takes a subject's own grant on one account of one server.
+func revokeAccount(
+	t *testing.T, c nokkuv1connect.TargetAccountServiceClient, targetID, username string,
+	kind nokkuv1.SubjectKind, subject string,
+) {
+	t.Helper()
+	_, err := c.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: &nokkuv1.RevokeSpec{
+		Subject:   &nokkuv1.GrantSubject{Id: &subject, Kind: kind.Enum()},
+		TargetIds: []string{targetID},
+		Username:  &username,
+	}})
+	require.NoError(t, err)
 }
 
 // grantedBy reads who a grant on a server names, no query returns it yet.
@@ -345,7 +431,7 @@ func TestGrantsNameWhoMadeThem(t *testing.T) {
 	two := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	tag := uniq("named")
 
-	var target, account string
+	var target string
 	inWorkspace(t, cfg, ws, func(q *db.Queries) error {
 		created, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{
 			Name: uniq("named"), Tags: []string{tag}, Endpoints: []string{},
@@ -354,23 +440,16 @@ func TestGrantsNameWhoMadeThem(t *testing.T) {
 			return err
 		}
 		target = created.ID
-		made, err := q.CreateTargetAccount(t.Context(), &db.CreateTargetAccountParams{
+		_, err = q.CreateTargetAccount(t.Context(), &db.CreateTargetAccountParams{
 			TargetID: target, Username: "deploy",
 		})
-		if err != nil {
-			return err
-		}
-		account = made.ID
-		return nil
+		return err
 	})
 
-	_, err := accounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
-		Id: &account, SubjectIds: []string{one.ID}, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, editor.ID, grantedBy(t, cfg, target, one.ID), "AddSubjects left the grant unnamed")
+	grantAccount(t, accounts, target, "deploy", nokkuv1.SubjectKind_SUBJECT_KIND_USER, one.ID)
+	assert.Equal(t, editor.ID, grantedBy(t, cfg, target, one.ID), "a grant on one server left the grant unnamed")
 
-	_, err = accounts.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{
+	_, err := accounts.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{
 		Subjects: []*nokkuv1.GrantSubject{{Id: &two.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
 		Tags:     []string{tag},
 		Username: new("deploy"),

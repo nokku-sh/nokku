@@ -162,10 +162,11 @@ func TestAuditStoresNames(t *testing.T) {
 	server := uniq("names")
 	teamName := uniq("crew")
 
-	var accountID, personID string
+	var serverID, personID string
 	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
 		seed := graphSeed{t: t, q: q, targets: map[string]string{}}
-		accountID = seed.account(server, nil, "deploy")
+		seed.account(server, nil, "deploy")
+		serverID = seed.targets[server]
 		personID = seed.member("Ada Names")
 		return nil
 	})
@@ -176,12 +177,8 @@ func TestAuditStoresNames(t *testing.T) {
 	teamID := team.GetTeam().GetId()
 	_, err = teams.AddTeamMember(t.Context(), &nokkuv1.AddTeamMemberRequest{TeamId: &teamID, UserId: &personID})
 	require.NoError(t, err)
-	_, err = nokkuv1connect.NewTargetAccountServiceClient(editor).AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
-		Id:         &accountID,
-		SubjectIds: []string{teamID},
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_TEAM.Enum(),
-	})
-	require.NoError(t, err)
+	grantAccount(t, nokkuv1connect.NewTargetAccountServiceClient(editor), serverID, "deploy",
+		nokkuv1.SubjectKind_SUBJECT_KIND_TEAM, teamID)
 	_, err = teams.DeleteTeam(t.Context(), &nokkuv1.DeleteTeamRequest{Id: &teamID})
 	require.NoError(t, err)
 
@@ -200,10 +197,9 @@ func TestAuditStoresNames(t *testing.T) {
 		return out
 	}
 
-	grant := details("AddSubjects", &db.ListAuditLogsParams{Search: &server})
-	assert.Equal(t, server, grant["target"], "a search for the server finds its grant")
+	grant := details("Grant", &db.ListAuditLogsParams{Search: &server})
+	assert.Equal(t, []any{server}, grant["targets"], "a search for the server finds its grant")
 	assert.Equal(t, "deploy", grant["username"])
-	assert.Equal(t, "team", grant["subject_kind"])
 	assert.Equal(t, []any{teamName}, grant["subjects"])
 
 	member := details("AddTeamMember", &db.ListAuditLogsParams{Target: &teamID})

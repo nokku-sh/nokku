@@ -42,7 +42,7 @@
 	const access = targetApi.access(() => subjectId);
 	const userTeams = teamApi.listForUser(() => (kind === SubjectKind.USER ? subjectId : undefined));
 	const teamNames = $derived(new Map((userTeams.data ?? []).map((t) => [t.id, t.name])));
-	const removeSubjects = accountApi.removeSubjects();
+	const revokeGrant = accountApi.revoke();
 	const revoking = new SvelteSet<string>();
 
 	type Grant = { account: TargetAccount; direct: boolean; via: string[] };
@@ -73,7 +73,9 @@
 	async function revoke(p: TargetAccount) {
 		revoking.add(p.id);
 		try {
-			await removeSubjects.mutateAsync({ id: p.id, subjectIds: [subjectId], kind });
+			await revokeGrant.mutateAsync({
+				revoke: { subject: { id: subjectId, kind }, targetIds: [p.targetId], username: p.username }
+			});
 		} finally {
 			revoking.delete(p.id);
 		}

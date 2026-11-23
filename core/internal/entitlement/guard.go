@@ -59,10 +59,6 @@ func RequestedFeatures(msg any) []string {
 		if req.GetEnabled() {
 			features = append(features, FeatureAuditStreaming)
 		}
-	case *nokkuv1.AddSubjectsRequest:
-		if req.GetExpiresAt() != nil {
-			features = append(features, FeatureExpiringAccess)
-		}
 	case *nokkuv1.GrantRequest:
 		if req.GetGrant().GetExpiresAt() != nil {
 			features = append(features, FeatureExpiringAccess)

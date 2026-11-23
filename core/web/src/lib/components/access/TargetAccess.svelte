@@ -37,7 +37,7 @@
 
 	const can = user.can();
 	const accounts = accountApi.list(() => ({ targetId, limit: MAX_PAGE_SIZE }));
-	const removeSubjects = accountApi.removeSubjects();
+	const revokeGrant = accountApi.revoke();
 	const addAccount = accountApi.addAccount();
 	const removeAccount = accountApi.removeAccount();
 
@@ -52,7 +52,13 @@
 		const k = key(p, grant.id);
 		revoking.add(k);
 		try {
-			await removeSubjects.mutateAsync({ id: p.id, subjectIds: [grant.id], kind: grant.kind });
+			await revokeGrant.mutateAsync({
+				revoke: {
+					subject: { id: grant.id, kind: grant.kind },
+					targetIds: [targetId],
+					username: p.username
+				}
+			});
 		} finally {
 			revoking.delete(k);
 		}

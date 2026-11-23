@@ -260,13 +260,14 @@ func TestLoadFanOut(t *testing.T) {
 		TargetId: &first.target, Username: new("deploy"),
 	})
 	require.NoError(t, err)
-	grant := &nokkuv1.AddSubjectsRequest{
-		Id:         new(account.GetAccount().GetId()),
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-		SubjectIds: []string{person.ID},
-	}
-	_, err = accounts.AddSubjects(ctx, grant)
-	require.NoError(t, err)
+	grantAccount(
+		t,
+		accounts,
+		first.target,
+		account.GetAccount().GetUsername(),
+		nokkuv1.SubjectKind_SUBJECT_KIND_USER,
+		person.ID,
+	)
 	principal := nklogin.Principal(person.ID, first.target, "deploy")
 	require.Eventually(t, func() bool { return first.lets(principal) }, time.Minute, 10*time.Millisecond,
 		"the grant never reached its server")
@@ -280,10 +281,7 @@ func TestLoadFanOut(t *testing.T) {
 	fleet.syncs.Store(0)
 	before = commits()
 	revoked := time.Now()
-	_, err = accounts.RemoveSubjects(ctx, &nokkuv1.RemoveSubjectsRequest{
-		Id: grant.Id, Kind: grant.Kind, SubjectIds: grant.GetSubjectIds(),
-	})
-	require.NoError(t, err)
+	revokeAccount(t, accounts, first.target, "deploy", nokkuv1.SubjectKind_SUBJECT_KIND_USER, person.ID)
 	require.Eventually(t, func() bool { return !first.lets(principal) }, 5*time.Minute, time.Millisecond,
 		"the revoke never reached its server")
 	landed := time.Since(revoked)

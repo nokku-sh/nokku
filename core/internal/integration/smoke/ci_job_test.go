@@ -123,11 +123,11 @@ func (s *smoke) ciJob(t *testing.T) {
 		Claims:           map[string]string{"sub": jobSubject},
 	})
 	require.NoError(t, err)
-	_, err = s.targetAccounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
-		Id:         new(s.devAccount.GetId()),
-		SubjectIds: []string{id},
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum(),
-	})
+	_, err = s.targetAccounts.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{
+		Subjects:  []*nokkuv1.GrantSubject{{Id: &id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum()}},
+		TargetIds: []string{s.devAccount.GetTargetId()},
+		Username:  s.devAccount.Username,
+	}})
 	require.NoError(t, err)
 
 	job := newNKHome(t, filepath.Dir(s.home.nkBinary), s.home.sshBinary)

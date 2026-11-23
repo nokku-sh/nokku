@@ -79,6 +79,10 @@ func (t *targetStream) Receive(msg any) error {
 	if err := t.ServerStream.Receive(msg); err != nil {
 		return err
 	}
+	// It changes nothing, refused or not. Authorization and validation answer after this, so it is decided here.
+	if d, ok := msg.(interface{ GetDryRun() bool }); ok && d.GetDryRun() {
+		t.e.written = true
+	}
 	if m, ok := msg.(proto.Message); ok {
 		t.e.Target = cut(requestTarget(m.ProtoReflect()), maxTarget)
 	}

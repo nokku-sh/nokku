@@ -83,8 +83,9 @@ func TestEnrollSeedsTokenGrantsOnce(t *testing.T) {
 	assert.Nil(t, seeded.accounts[0].TargetAccount.SeenAt, "the host has not reported dev yet")
 
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
-		return q.RemoveGrant(f.ctx, &db.RemoveGrantParams{
-			AccountID: seeded.accounts[0].TargetAccount.ID, SubjectKind: db.SubjectKindTeam, SubjectID: teamID,
+		return q.RemoveGrants(f.ctx, &db.RemoveGrantsParams{
+			AccountIds:  []string{seeded.accounts[0].TargetAccount.ID},
+			SubjectKind: db.SubjectKindTeam, SubjectID: teamID,
 		})
 	}))
 	reenrolled, err := enroll(t, f, in)
@@ -209,8 +210,19 @@ func TestContainerChurnWakesNobody(t *testing.T) {
 	assert.False(t, woken(), "a container replacing its offline self woke the fleet")
 
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
-		return q.RevokeSubjectAccessInWorkspace(f.ctx, &db.RevokeSubjectAccessInWorkspaceParams{
-			SubjectKind: db.SubjectKindTeam, SubjectID: teamID,
+		held, err := q.RevokeWhere(f.ctx, &db.RevokeWhereParams{
+			SubjectKind: db.SubjectKindTeam, SubjectID: teamID, Everywhere: true,
+		})
+		if err != nil {
+			return err
+		}
+		require.NotEmpty(t, held, "the team holds no grant to take")
+		var accounts []string
+		for _, g := range held {
+			accounts = append(accounts, g.AccountID)
+		}
+		return q.RemoveGrants(f.ctx, &db.RemoveGrantsParams{
+			AccountIds: accounts, SubjectKind: db.SubjectKindTeam, SubjectID: teamID,
 		})
 	}))
 	assert.True(t, woken(), "a revoke must wake the fleet at once")

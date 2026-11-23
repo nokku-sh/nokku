@@ -42,7 +42,7 @@ func TestProcedureRoles(t *testing.T) {
 		},
 
 		{nokkuv1connect.TargetServiceDeleteTargetProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR},
-		{nokkuv1connect.TargetAccountServiceRevokeAllAccessProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR},
+		{nokkuv1connect.TargetAccountServiceRevokeProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR},
 		{
 			nokkuv1connect.ServiceAccountServiceCreateServiceAccountProcedure,
 			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR,

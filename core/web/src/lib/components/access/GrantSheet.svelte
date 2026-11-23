@@ -20,7 +20,7 @@
 	import { confirm, IsMobile } from '#lib/hooks/index.js';
 	import { formatHours, formatTs, listNames } from '#lib/utils.js';
 	import { Check, Plus, Server, Tag } from '@lucide/svelte';
-	import { Debounced } from 'runed';
+	import { Debounced, useInterval } from 'runed';
 	import { toast } from 'svelte-sonner';
 	import { grantSheet, subjectLabel } from './grant.svelte';
 	import SubjectAvatar from './SubjectAvatar.svelte';
@@ -56,7 +56,13 @@
 			: accounts
 	);
 
-	const end = $derived(grantEnd(grantSheet.hours));
+	// Worked out again every few minutes. The core takes no end in the past, and the preview of a sheet left open
+	// would send one.
+	const clock = useInterval(5 * 60_000);
+	const end = $derived.by(() => {
+		void clock.counter;
+		return grantEnd(grantSheet.hours);
+	});
 	const spec = $derived({
 		...whereSpec(),
 		subjects: grantSheet.subjects.map(({ id, kind }) => ({ id, kind })),

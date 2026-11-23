@@ -34,26 +34,28 @@ export const targetAccount = {
 
 	addAccount: () => useMutation(TargetAccountService.method.addTargetAccount),
 	removeAccount: () => useMutation(TargetAccountService.method.removeTargetAccount),
-	// What a grant on many servers would do, asked again whenever the form changes.
+	// What a grant on many servers would do, asked again whenever the form changes. It is the grant as a dry run.
 	planGrant: (spec: () => MessageInitShape<typeof GrantSpecSchema>, when: () => boolean) =>
 		useQuery(
-			TargetAccountService.method.planGrant,
-			() => ({ grant: spec() }),
+			TargetAccountService.method.grant,
+			() => ({ grant: spec(), dryRun: true }),
 			() => ({ enabled: when(), placeholderData: keepPreviousData })
 		),
 	grant: () => useMutation(TargetAccountService.method.grant),
 	planRevoke: (spec: () => MessageInitShape<typeof RevokeSpecSchema>, when: () => boolean) =>
 		useQuery(
-			TargetAccountService.method.planRevoke,
-			() => ({ revoke: spec() }),
+			TargetAccountService.method.revoke,
+			() => ({ revoke: spec(), dryRun: true }),
 			() => ({ enabled: when(), placeholderData: keepPreviousData })
 		),
+	// One account on one server, a tag, or everywhere, by what the spec names.
 	revoke: () => useMutation(TargetAccountService.method.revoke),
-	removeSubjects: () => useMutation(TargetAccountService.method.removeSubjects),
-	revokeSubject: () =>
-		useMutation(TargetAccountService.method.revokeAllAccess, {
+	// Every grant of the subject's own, on every server.
+	revokeEverywhere: () =>
+		useMutation(TargetAccountService.method.revoke, {
+			transform: (input) => ({ ...input, revoke: { ...input.revoke, everywhere: true } }),
 			onSuccess: (_, variables) => {
-				switch (variables.kind) {
+				switch (variables.revoke?.subject?.kind) {
 					case SubjectKind.USER:
 						toast.success('User access revoked');
 						break;

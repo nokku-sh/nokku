@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/target_account.proto.
  */
 export const file_nokku_v1_target_account: GenFile = /*@__PURE__*/
-  fileDesc("Ch1ub2trdS92MS90YXJnZXRfYWNjb3VudC5wcm90bxIIbm9ra3UudjEi6AIKDVRhcmdldEFjY291bnQSCgoCaWQYASABKAkSEQoJdGFyZ2V0X2lkGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEhAKCHVzZXJfaWRzGAQgAygJEhAKCHRlYW1faWRzGAUgAygJEhsKE3NlcnZpY2VfYWNjb3VudF9pZHMYBiADKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASKwoHc2Vlbl9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOgoKZXhwaXJlc19hdBgJIAMoCzImLm5va2t1LnYxLlRhcmdldEFjY291bnQuRXhwaXJlc0F0RW50cnkaTAoORXhwaXJlc0F0RW50cnkSCwoDa2V5GAEgASgJEikKBXZhbHVlGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcDoCOAEiegoZTGlzdFRhcmdldEFjY291bnRzUmVxdWVzdBIbCgl0YXJnZXRfaWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEg0KBXF1ZXJ5GAQgASgJIlYKGkxpc3RUYXJnZXRBY2NvdW50c1Jlc3BvbnNlEikKCGFjY291bnRzGAEgAygLMhcubm9ra3UudjEuVGFyZ2V0QWNjb3VudBINCgV0b3RhbBgCIAEoBSLEAQoSQWRkU3ViamVjdHNSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARImCgtzdWJqZWN0X2lkcxgCIAMoCUIRukgOkgELCAEQMiIFcgOwAQESLwoEa2luZBgDIAEoDjIVLm5va2t1LnYxLlN1YmplY3RLaW5kQgq6SAeCAQQQASAAEj8KCmV4cGlyZXNfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQg+6SAyyAQlKBQiAiooPQAEiFQoTQWRkU3ViamVjdHNSZXNwb25zZSKGAQoVUmVtb3ZlU3ViamVjdHNSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARImCgtzdWJqZWN0X2lkcxgCIAMoCUIRukgOkgELCAEQMiIFcgOwAQESLwoEa2luZBgDIAEoDjIVLm5va2t1LnYxLlN1YmplY3RLaW5kQgq6SAeCAQQQASAAIhgKFlJlbW92ZVN1YmplY3RzUmVzcG9uc2UiVQoMR3JhbnRTdWJqZWN0EhQKAmlkGAEgASgJQgi6SAVyA7ABARIvCgRraW5kGAIgASgOMhUubm9ra3UudjEuU3ViamVjdEtpbmRCCrpIB4IBBBABIAAi5QEKCUdyYW50U3BlYxIyCghzdWJqZWN0cxgBIAMoCzIWLm5va2t1LnYxLkdyYW50U3ViamVjdEIIukgFkgECEDISJAoKdGFyZ2V0X2lkcxgCIAMoCUIQukgNkgEKEPQDIgVyA7ABARIeCgR0YWdzGAMgAygJQhC6SA2SAQoQICIGcgQQARhAEhkKCHVzZXJuYW1lGAQgASgJQge6SARyAhggEi4KCmV4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhMKC2NoYW5nZV9lbmRzGAYgASgIIjEKDEdyYW50QWNjb3VudBIQCgh1c2VybmFtZRgBIAEoCRIPCgdzZXJ2ZXJzGAIgASgFIlIKDEdyYW50T3V0Y29tZRISCgpzdWJqZWN0X2lkGAEgASgJEg0KBWFkZGVkGAIgASgFEgwKBHNhbWUYAyABKAUSEQoJb3RoZXJfZW5kGAQgASgFIq0BCglHcmFudFBsYW4SDwoHc2VydmVycxgBIAEoBRIUCgxzZXJ2ZXJfbmFtZXMYAiADKAkSKAoIYWNjb3VudHMYAyADKAsyFi5ub2trdS52MS5HcmFudEFjY291bnQSFAoMd2l0aF9hY2NvdW50GAQgASgFEg8KB3NraXBwZWQYBSADKAkSKAoIb3V0Y29tZXMYBiADKAsyFi5ub2trdS52MS5HcmFudE91dGNvbWUiPgoQUGxhbkdyYW50UmVxdWVzdBIqCgVncmFudBgBIAEoCzITLm5va2t1LnYxLkdyYW50U3BlY0IGukgDyAEBIjYKEVBsYW5HcmFudFJlc3BvbnNlEiEKBHBsYW4YASABKAsyEy5ub2trdS52MS5HcmFudFBsYW4iOgoMR3JhbnRSZXF1ZXN0EioKBWdyYW50GAEgASgLMhMubm9ra3UudjEuR3JhbnRTcGVjQga6SAPIAQEiMgoNR3JhbnRSZXNwb25zZRIhCgRwbGFuGAEgASgLMhMubm9ra3UudjEuR3JhbnRQbGFuIoMBCgpSZXZva2VTcGVjEi8KB3N1YmplY3QYASABKAsyFi5ub2trdS52MS5HcmFudFN1YmplY3RCBrpIA8gBARIkCgp0YXJnZXRfaWRzGAIgAygJQhC6SA2SAQoQ9AMiBXIDsAEBEh4KBHRhZ3MYAyADKAlCELpIDZIBChAgIgZyBBABGEAiSAoNUmV2b2tlQWNjb3VudBIQCgh1c2VybmFtZRgBIAEoCRIPCgdzZXJ2ZXJzGAIgASgFEhQKDHNlcnZlcl9uYW1lcxgDIAMoCSKFAQoKUmV2b2tlUGxhbhIOCgZncmFudHMYASABKAUSDwoHc2VydmVycxgCIAEoBRIpCghhY2NvdW50cxgDIAMoCzIXLm5va2t1LnYxLlJldm9rZUFjY291bnQSEgoKb3RoZXJfdGFncxgEIAEoBRIXCg9vdGhlcl90YWdfbmFtZXMYBSADKAkiQQoRUGxhblJldm9rZVJlcXVlc3QSLAoGcmV2b2tlGAEgASgLMhQubm9ra3UudjEuUmV2b2tlU3BlY0IGukgDyAEBIjgKElBsYW5SZXZva2VSZXNwb25zZRIiCgRwbGFuGAEgASgLMhQubm9ra3UudjEuUmV2b2tlUGxhbiI9Cg1SZXZva2VSZXF1ZXN0EiwKBnJldm9rZRgBIAEoCzIULm5va2t1LnYxLlJldm9rZVNwZWNCBrpIA8gBASI0Cg5SZXZva2VSZXNwb25zZRIiCgRwbGFuGAEgASgLMhQubm9ra3UudjEuUmV2b2tlUGxhbiJnChZSZXZva2VBbGxBY2Nlc3NSZXF1ZXN0EhwKCnN1YmplY3RfaWQYASABKAlCCLpIBXIDsAEBEi8KBGtpbmQYAiABKA4yFS5ub2trdS52MS5TdWJqZWN0S2luZEIKukgHggEEEAEgACIZChdSZXZva2VBbGxBY2Nlc3NSZXNwb25zZSJyChdBZGRUYXJnZXRBY2NvdW50UmVxdWVzdBIbCgl0YXJnZXRfaWQYASABKAlCCLpIBXIDsAEBEjoKCHVzZXJuYW1lGAIgASgJQii6SCVyIxABGCAyHV5bQS1aYS16X11bQS1aYS16MC05Ll8tXSpcJD8kIkQKGEFkZFRhcmdldEFjY291bnRSZXNwb25zZRIoCgdhY2NvdW50GAEgASgLMhcubm9ra3UudjEuVGFyZ2V0QWNjb3VudCIyChpSZW1vdmVUYXJnZXRBY2NvdW50UmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiHQobUmVtb3ZlVGFyZ2V0QWNjb3VudFJlc3BvbnNlKnsKC1N1YmplY3RLaW5kEhwKGFNVQkpFQ1RfS0lORF9VTlNQRUNJRklFRBAAEhUKEVNVQkpFQ1RfS0lORF9VU0VSEAESFQoRU1VCSkVDVF9LSU5EX1RFQU0QAhIgChxTVUJKRUNUX0tJTkRfU0VSVklDRV9BQ0NPVU5UEAMykAcKFFRhcmdldEFjY291bnRTZXJ2aWNlEmwKEkxpc3RUYXJnZXRBY2NvdW50cxIjLm5va2t1LnYxLkxpc3RUYXJnZXRBY2NvdW50c1JlcXVlc3QaJC5ub2trdS52MS5MaXN0VGFyZ2V0QWNjb3VudHNSZXNwb25zZSILkAIBwvMYBBgCaAESYQoQQWRkVGFyZ2V0QWNjb3VudBIhLm5va2t1LnYxLkFkZFRhcmdldEFjY291bnRSZXF1ZXN0GiIubm9ra3UudjEuQWRkVGFyZ2V0QWNjb3VudFJlc3BvbnNlIgbC8xgCGAMSagoTUmVtb3ZlVGFyZ2V0QWNjb3VudBIkLm5va2t1LnYxLlJlbW92ZVRhcmdldEFjY291bnRSZXF1ZXN0GiUubm9ra3UudjEuUmVtb3ZlVGFyZ2V0QWNjb3VudFJlc3BvbnNlIgbC8xgCGAMSUgoLQWRkU3ViamVjdHMSHC5ub2trdS52MS5BZGRTdWJqZWN0c1JlcXVlc3QaHS5ub2trdS52MS5BZGRTdWJqZWN0c1Jlc3BvbnNlIgbC8xgCGAMSWwoOUmVtb3ZlU3ViamVjdHMSHy5ub2trdS52MS5SZW1vdmVTdWJqZWN0c1JlcXVlc3QaIC5ub2trdS52MS5SZW1vdmVTdWJqZWN0c1Jlc3BvbnNlIgbC8xgCGAMSXgoPUmV2b2tlQWxsQWNjZXNzEiAubm9ra3UudjEuUmV2b2tlQWxsQWNjZXNzUmVxdWVzdBohLm5va2t1LnYxLlJldm9rZUFsbEFjY2Vzc1Jlc3BvbnNlIgbC8xgCGAMSTwoJUGxhbkdyYW50Ehoubm9ra3UudjEuUGxhbkdyYW50UmVxdWVzdBobLm5va2t1LnYxLlBsYW5HcmFudFJlc3BvbnNlIgmQAgHC8xgCGAMSQAoFR3JhbnQSFi5ub2trdS52MS5HcmFudFJlcXVlc3QaFy5ub2trdS52MS5HcmFudFJlc3BvbnNlIgbC8xgCGAMSUgoKUGxhblJldm9rZRIbLm5va2t1LnYxLlBsYW5SZXZva2VSZXF1ZXN0Ghwubm9ra3UudjEuUGxhblJldm9rZVJlc3BvbnNlIgmQAgHC8xgCGAMSQwoGUmV2b2tlEhcubm9ra3UudjEuUmV2b2tlUmVxdWVzdBoYLm5va2t1LnYxLlJldm9rZVJlc3BvbnNlIgbC8xgCGANCkwEKDGNvbS5ub2trdS52MUISVGFyZ2V0QWNjb3VudFByb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Ch1ub2trdS92MS90YXJnZXRfYWNjb3VudC5wcm90bxIIbm9ra3UudjEi6AIKDVRhcmdldEFjY291bnQSCgoCaWQYASABKAkSEQoJdGFyZ2V0X2lkGAIgASgJEhAKCHVzZXJuYW1lGAMgASgJEhAKCHVzZXJfaWRzGAQgAygJEhAKCHRlYW1faWRzGAUgAygJEhsKE3NlcnZpY2VfYWNjb3VudF9pZHMYBiADKAkSLgoKY3JlYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASKwoHc2Vlbl9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOgoKZXhwaXJlc19hdBgJIAMoCzImLm5va2t1LnYxLlRhcmdldEFjY291bnQuRXhwaXJlc0F0RW50cnkaTAoORXhwaXJlc0F0RW50cnkSCwoDa2V5GAEgASgJEikKBXZhbHVlGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcDoCOAEiegoZTGlzdFRhcmdldEFjY291bnRzUmVxdWVzdBIbCgl0YXJnZXRfaWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEg0KBXF1ZXJ5GAQgASgJIlYKGkxpc3RUYXJnZXRBY2NvdW50c1Jlc3BvbnNlEikKCGFjY291bnRzGAEgAygLMhcubm9ra3UudjEuVGFyZ2V0QWNjb3VudBINCgV0b3RhbBgCIAEoBSJVCgxHcmFudFN1YmplY3QSFAoCaWQYASABKAlCCLpIBXIDsAEBEi8KBGtpbmQYAiABKA4yFS5ub2trdS52MS5TdWJqZWN0S2luZEIKukgHggEEEAEgACL2AQoJR3JhbnRTcGVjEjIKCHN1YmplY3RzGAEgAygLMhYubm9ra3UudjEuR3JhbnRTdWJqZWN0Qgi6SAWSAQIQMhIkCgp0YXJnZXRfaWRzGAIgAygJQhC6SA2SAQoQ9AMiBXIDsAEBEh4KBHRhZ3MYAyADKAlCELpIDZIBChAgIgZyBBABGEASGQoIdXNlcm5hbWUYBCABKAlCB7pIBHICGCASPwoKZXhwaXJlc19hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCD7pIDLIBCUoFCICKig9AARITCgtjaGFuZ2VfZW5kcxgGIAEoCCIxCgxHcmFudEFjY291bnQSEAoIdXNlcm5hbWUYASABKAkSDwoHc2VydmVycxgCIAEoBSJSCgxHcmFudE91dGNvbWUSEgoKc3ViamVjdF9pZBgBIAEoCRINCgVhZGRlZBgCIAEoBRIMCgRzYW1lGAMgASgFEhEKCW90aGVyX2VuZBgEIAEoBSKtAQoJR3JhbnRQbGFuEg8KB3NlcnZlcnMYASABKAUSFAoMc2VydmVyX25hbWVzGAIgAygJEigKCGFjY291bnRzGAMgAygLMhYubm9ra3UudjEuR3JhbnRBY2NvdW50EhQKDHdpdGhfYWNjb3VudBgEIAEoBRIPCgdza2lwcGVkGAUgAygJEigKCG91dGNvbWVzGAYgAygLMhYubm9ra3UudjEuR3JhbnRPdXRjb21lIksKDEdyYW50UmVxdWVzdBIqCgVncmFudBgBIAEoCzITLm5va2t1LnYxLkdyYW50U3BlY0IGukgDyAEBEg8KB2RyeV9ydW4YAiABKAgiMgoNR3JhbnRSZXNwb25zZRIhCgRwbGFuGAEgASgLMhMubm9ra3UudjEuR3JhbnRQbGFuIrIBCgpSZXZva2VTcGVjEi8KB3N1YmplY3QYASABKAsyFi5ub2trdS52MS5HcmFudFN1YmplY3RCBrpIA8gBARIkCgp0YXJnZXRfaWRzGAIgAygJQhC6SA2SAQoQ9AMiBXIDsAEBEh4KBHRhZ3MYAyADKAlCELpIDZIBChAgIgZyBBABGEASGQoIdXNlcm5hbWUYBCABKAlCB7pIBHICGCASEgoKZXZlcnl3aGVyZRgFIAEoCCJICg1SZXZva2VBY2NvdW50EhAKCHVzZXJuYW1lGAEgASgJEg8KB3NlcnZlcnMYAiABKAUSFAoMc2VydmVyX25hbWVzGAMgAygJIoUBCgpSZXZva2VQbGFuEg4KBmdyYW50cxgBIAEoBRIPCgdzZXJ2ZXJzGAIgASgFEikKCGFjY291bnRzGAMgAygLMhcubm9ra3UudjEuUmV2b2tlQWNjb3VudBISCgpvdGhlcl90YWdzGAQgASgFEhcKD290aGVyX3RhZ19uYW1lcxgFIAMoCSJOCg1SZXZva2VSZXF1ZXN0EiwKBnJldm9rZRgBIAEoCzIULm5va2t1LnYxLlJldm9rZVNwZWNCBrpIA8gBARIPCgdkcnlfcnVuGAIgASgIIjQKDlJldm9rZVJlc3BvbnNlEiIKBHBsYW4YASABKAsyFC5ub2trdS52MS5SZXZva2VQbGFuInIKF0FkZFRhcmdldEFjY291bnRSZXF1ZXN0EhsKCXRhcmdldF9pZBgBIAEoCUIIukgFcgOwAQESOgoIdXNlcm5hbWUYAiABKAlCKLpIJXIjEAEYIDIdXltBLVphLXpfXVtBLVphLXowLTkuXy1dKlwkPyQiRAoYQWRkVGFyZ2V0QWNjb3VudFJlc3BvbnNlEigKB2FjY291bnQYASABKAsyFy5ub2trdS52MS5UYXJnZXRBY2NvdW50IjIKGlJlbW92ZVRhcmdldEFjY291bnRSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIdChtSZW1vdmVUYXJnZXRBY2NvdW50UmVzcG9uc2UqewoLU3ViamVjdEtpbmQSHAoYU1VCSkVDVF9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRU1VCSkVDVF9LSU5EX1VTRVIQARIVChFTVUJKRUNUX0tJTkRfVEVBTRACEiAKHFNVQkpFQ1RfS0lORF9TRVJWSUNFX0FDQ09VTlQQAzLaAwoUVGFyZ2V0QWNjb3VudFNlcnZpY2USbAoSTGlzdFRhcmdldEFjY291bnRzEiMubm9ra3UudjEuTGlzdFRhcmdldEFjY291bnRzUmVxdWVzdBokLm5va2t1LnYxLkxpc3RUYXJnZXRBY2NvdW50c1Jlc3BvbnNlIguQAgHC8xgEGAJoARJhChBBZGRUYXJnZXRBY2NvdW50EiEubm9ra3UudjEuQWRkVGFyZ2V0QWNjb3VudFJlcXVlc3QaIi5ub2trdS52MS5BZGRUYXJnZXRBY2NvdW50UmVzcG9uc2UiBsLzGAIYAxJqChNSZW1vdmVUYXJnZXRBY2NvdW50EiQubm9ra3UudjEuUmVtb3ZlVGFyZ2V0QWNjb3VudFJlcXVlc3QaJS5ub2trdS52MS5SZW1vdmVUYXJnZXRBY2NvdW50UmVzcG9uc2UiBsLzGAIYAxJACgVHcmFudBIWLm5va2t1LnYxLkdyYW50UmVxdWVzdBoXLm5va2t1LnYxLkdyYW50UmVzcG9uc2UiBsLzGAIYAxJDCgZSZXZva2USFy5ub2trdS52MS5SZXZva2VSZXF1ZXN0Ghgubm9ra3UudjEuUmV2b2tlUmVzcG9uc2UiBsLzGAIYA0KTAQoMY29tLm5va2t1LnYxQhJUYXJnZXRBY2NvdW50UHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.TargetAccount
@@ -128,91 +128,6 @@ export const ListTargetAccountsResponseSchema: GenMessage<ListTargetAccountsResp
   messageDesc(file_nokku_v1_target_account, 2);
 
 /**
- * @generated from message nokku.v1.AddSubjectsRequest
- */
-export type AddSubjectsRequest = Message<"nokku.v1.AddSubjectsRequest"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
-
-  /**
-   * @generated from field: repeated string subject_ids = 2;
-   */
-  subjectIds: string[];
-
-  /**
-   * @generated from field: nokku.v1.SubjectKind kind = 3;
-   */
-  kind: SubjectKind;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 4;
-   */
-  expiresAt?: Timestamp | undefined;
-};
-
-/**
- * Describes the message nokku.v1.AddSubjectsRequest.
- * Use `create(AddSubjectsRequestSchema)` to create a new message.
- */
-export const AddSubjectsRequestSchema: GenMessage<AddSubjectsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 3);
-
-/**
- * @generated from message nokku.v1.AddSubjectsResponse
- */
-export type AddSubjectsResponse = Message<"nokku.v1.AddSubjectsResponse"> & {
-};
-
-/**
- * Describes the message nokku.v1.AddSubjectsResponse.
- * Use `create(AddSubjectsResponseSchema)` to create a new message.
- */
-export const AddSubjectsResponseSchema: GenMessage<AddSubjectsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 4);
-
-/**
- * @generated from message nokku.v1.RemoveSubjectsRequest
- */
-export type RemoveSubjectsRequest = Message<"nokku.v1.RemoveSubjectsRequest"> & {
-  /**
-   * @generated from field: string id = 1;
-   */
-  id: string;
-
-  /**
-   * @generated from field: repeated string subject_ids = 2;
-   */
-  subjectIds: string[];
-
-  /**
-   * @generated from field: nokku.v1.SubjectKind kind = 3;
-   */
-  kind: SubjectKind;
-};
-
-/**
- * Describes the message nokku.v1.RemoveSubjectsRequest.
- * Use `create(RemoveSubjectsRequestSchema)` to create a new message.
- */
-export const RemoveSubjectsRequestSchema: GenMessage<RemoveSubjectsRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 5);
-
-/**
- * @generated from message nokku.v1.RemoveSubjectsResponse
- */
-export type RemoveSubjectsResponse = Message<"nokku.v1.RemoveSubjectsResponse"> & {
-};
-
-/**
- * Describes the message nokku.v1.RemoveSubjectsResponse.
- * Use `create(RemoveSubjectsResponseSchema)` to create a new message.
- */
-export const RemoveSubjectsResponseSchema: GenMessage<RemoveSubjectsResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 6);
-
-/**
  * @generated from message nokku.v1.GrantSubject
  */
 export type GrantSubject = Message<"nokku.v1.GrantSubject"> & {
@@ -232,7 +147,7 @@ export type GrantSubject = Message<"nokku.v1.GrantSubject"> & {
  * Use `create(GrantSubjectSchema)` to create a new message.
  */
 export const GrantSubjectSchema: GenMessage<GrantSubject> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 7);
+  messageDesc(file_nokku_v1_target_account, 3);
 
 /**
  * Who gets which account where. A server counts when its id is named or it has one of the tags.
@@ -282,7 +197,7 @@ export type GrantSpec = Message<"nokku.v1.GrantSpec"> & {
  * Use `create(GrantSpecSchema)` to create a new message.
  */
 export const GrantSpecSchema: GenMessage<GrantSpec> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 8);
+  messageDesc(file_nokku_v1_target_account, 4);
 
 /**
  * @generated from message nokku.v1.GrantAccount
@@ -304,7 +219,7 @@ export type GrantAccount = Message<"nokku.v1.GrantAccount"> & {
  * Use `create(GrantAccountSchema)` to create a new message.
  */
 export const GrantAccountSchema: GenMessage<GrantAccount> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 9);
+  messageDesc(file_nokku_v1_target_account, 5);
 
 /**
  * @generated from message nokku.v1.GrantOutcome
@@ -342,7 +257,7 @@ export type GrantOutcome = Message<"nokku.v1.GrantOutcome"> & {
  * Use `create(GrantOutcomeSchema)` to create a new message.
  */
 export const GrantOutcomeSchema: GenMessage<GrantOutcome> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 10);
+  messageDesc(file_nokku_v1_target_account, 6);
 
 /**
  * @generated from message nokku.v1.GrantPlan
@@ -394,41 +309,7 @@ export type GrantPlan = Message<"nokku.v1.GrantPlan"> & {
  * Use `create(GrantPlanSchema)` to create a new message.
  */
 export const GrantPlanSchema: GenMessage<GrantPlan> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 11);
-
-/**
- * @generated from message nokku.v1.PlanGrantRequest
- */
-export type PlanGrantRequest = Message<"nokku.v1.PlanGrantRequest"> & {
-  /**
-   * @generated from field: nokku.v1.GrantSpec grant = 1;
-   */
-  grant?: GrantSpec | undefined;
-};
-
-/**
- * Describes the message nokku.v1.PlanGrantRequest.
- * Use `create(PlanGrantRequestSchema)` to create a new message.
- */
-export const PlanGrantRequestSchema: GenMessage<PlanGrantRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 12);
-
-/**
- * @generated from message nokku.v1.PlanGrantResponse
- */
-export type PlanGrantResponse = Message<"nokku.v1.PlanGrantResponse"> & {
-  /**
-   * @generated from field: nokku.v1.GrantPlan plan = 1;
-   */
-  plan?: GrantPlan | undefined;
-};
-
-/**
- * Describes the message nokku.v1.PlanGrantResponse.
- * Use `create(PlanGrantResponseSchema)` to create a new message.
- */
-export const PlanGrantResponseSchema: GenMessage<PlanGrantResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 13);
+  messageDesc(file_nokku_v1_target_account, 7);
 
 /**
  * @generated from message nokku.v1.GrantRequest
@@ -438,6 +319,13 @@ export type GrantRequest = Message<"nokku.v1.GrantRequest"> & {
    * @generated from field: nokku.v1.GrantSpec grant = 1;
    */
   grant?: GrantSpec | undefined;
+
+  /**
+   * Only say what it would do.
+   *
+   * @generated from field: bool dry_run = 2;
+   */
+  dryRun: boolean;
 };
 
 /**
@@ -445,14 +333,14 @@ export type GrantRequest = Message<"nokku.v1.GrantRequest"> & {
  * Use `create(GrantRequestSchema)` to create a new message.
  */
 export const GrantRequestSchema: GenMessage<GrantRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 14);
+  messageDesc(file_nokku_v1_target_account, 8);
 
 /**
  * @generated from message nokku.v1.GrantResponse
  */
 export type GrantResponse = Message<"nokku.v1.GrantResponse"> & {
   /**
-   * What it did.
+   * What it did, or would do.
    *
    * @generated from field: nokku.v1.GrantPlan plan = 1;
    */
@@ -464,11 +352,11 @@ export type GrantResponse = Message<"nokku.v1.GrantResponse"> & {
  * Use `create(GrantResponseSchema)` to create a new message.
  */
 export const GrantResponseSchema: GenMessage<GrantResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 15);
+  messageDesc(file_nokku_v1_target_account, 9);
 
 /**
- * Whose grants go where. A server counts when its id is named or it has one of the tags. Only the subject's own
- * grants go, what a team gives its members stays.
+ * Whose grants go where. A server counts when its id is named, it has one of the tags, or everywhere is set. Only the
+ * subject's own grants go, what a team gives its members stays.
  *
  * @generated from message nokku.v1.RevokeSpec
  */
@@ -487,6 +375,20 @@ export type RevokeSpec = Message<"nokku.v1.RevokeSpec"> & {
    * @generated from field: repeated string tags = 3;
    */
   tags: string[];
+
+  /**
+   * Only the grants on this account. Empty is every account.
+   *
+   * @generated from field: string username = 4;
+   */
+  username: string;
+
+  /**
+   * Every server of the workspace, the ids and tags are not read.
+   *
+   * @generated from field: bool everywhere = 5;
+   */
+  everywhere: boolean;
 };
 
 /**
@@ -494,7 +396,7 @@ export type RevokeSpec = Message<"nokku.v1.RevokeSpec"> & {
  * Use `create(RevokeSpecSchema)` to create a new message.
  */
 export const RevokeSpecSchema: GenMessage<RevokeSpec> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 16);
+  messageDesc(file_nokku_v1_target_account, 10);
 
 /**
  * @generated from message nokku.v1.RevokeAccount
@@ -525,7 +427,7 @@ export type RevokeAccount = Message<"nokku.v1.RevokeAccount"> & {
  * Use `create(RevokeAccountSchema)` to create a new message.
  */
 export const RevokeAccountSchema: GenMessage<RevokeAccount> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 17);
+  messageDesc(file_nokku_v1_target_account, 11);
 
 /**
  * @generated from message nokku.v1.RevokePlan
@@ -572,41 +474,7 @@ export type RevokePlan = Message<"nokku.v1.RevokePlan"> & {
  * Use `create(RevokePlanSchema)` to create a new message.
  */
 export const RevokePlanSchema: GenMessage<RevokePlan> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 18);
-
-/**
- * @generated from message nokku.v1.PlanRevokeRequest
- */
-export type PlanRevokeRequest = Message<"nokku.v1.PlanRevokeRequest"> & {
-  /**
-   * @generated from field: nokku.v1.RevokeSpec revoke = 1;
-   */
-  revoke?: RevokeSpec | undefined;
-};
-
-/**
- * Describes the message nokku.v1.PlanRevokeRequest.
- * Use `create(PlanRevokeRequestSchema)` to create a new message.
- */
-export const PlanRevokeRequestSchema: GenMessage<PlanRevokeRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 19);
-
-/**
- * @generated from message nokku.v1.PlanRevokeResponse
- */
-export type PlanRevokeResponse = Message<"nokku.v1.PlanRevokeResponse"> & {
-  /**
-   * @generated from field: nokku.v1.RevokePlan plan = 1;
-   */
-  plan?: RevokePlan | undefined;
-};
-
-/**
- * Describes the message nokku.v1.PlanRevokeResponse.
- * Use `create(PlanRevokeResponseSchema)` to create a new message.
- */
-export const PlanRevokeResponseSchema: GenMessage<PlanRevokeResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 20);
+  messageDesc(file_nokku_v1_target_account, 12);
 
 /**
  * @generated from message nokku.v1.RevokeRequest
@@ -616,6 +484,13 @@ export type RevokeRequest = Message<"nokku.v1.RevokeRequest"> & {
    * @generated from field: nokku.v1.RevokeSpec revoke = 1;
    */
   revoke?: RevokeSpec | undefined;
+
+  /**
+   * Only say what it would do.
+   *
+   * @generated from field: bool dry_run = 2;
+   */
+  dryRun: boolean;
 };
 
 /**
@@ -623,14 +498,14 @@ export type RevokeRequest = Message<"nokku.v1.RevokeRequest"> & {
  * Use `create(RevokeRequestSchema)` to create a new message.
  */
 export const RevokeRequestSchema: GenMessage<RevokeRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 21);
+  messageDesc(file_nokku_v1_target_account, 13);
 
 /**
  * @generated from message nokku.v1.RevokeResponse
  */
 export type RevokeResponse = Message<"nokku.v1.RevokeResponse"> & {
   /**
-   * What it did.
+   * What it did, or would do.
    *
    * @generated from field: nokku.v1.RevokePlan plan = 1;
    */
@@ -642,42 +517,7 @@ export type RevokeResponse = Message<"nokku.v1.RevokeResponse"> & {
  * Use `create(RevokeResponseSchema)` to create a new message.
  */
 export const RevokeResponseSchema: GenMessage<RevokeResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 22);
-
-/**
- * @generated from message nokku.v1.RevokeAllAccessRequest
- */
-export type RevokeAllAccessRequest = Message<"nokku.v1.RevokeAllAccessRequest"> & {
-  /**
-   * @generated from field: string subject_id = 1;
-   */
-  subjectId: string;
-
-  /**
-   * @generated from field: nokku.v1.SubjectKind kind = 2;
-   */
-  kind: SubjectKind;
-};
-
-/**
- * Describes the message nokku.v1.RevokeAllAccessRequest.
- * Use `create(RevokeAllAccessRequestSchema)` to create a new message.
- */
-export const RevokeAllAccessRequestSchema: GenMessage<RevokeAllAccessRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 23);
-
-/**
- * @generated from message nokku.v1.RevokeAllAccessResponse
- */
-export type RevokeAllAccessResponse = Message<"nokku.v1.RevokeAllAccessResponse"> & {
-};
-
-/**
- * Describes the message nokku.v1.RevokeAllAccessResponse.
- * Use `create(RevokeAllAccessResponseSchema)` to create a new message.
- */
-export const RevokeAllAccessResponseSchema: GenMessage<RevokeAllAccessResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 24);
+  messageDesc(file_nokku_v1_target_account, 14);
 
 /**
  * @generated from message nokku.v1.AddTargetAccountRequest
@@ -699,7 +539,7 @@ export type AddTargetAccountRequest = Message<"nokku.v1.AddTargetAccountRequest"
  * Use `create(AddTargetAccountRequestSchema)` to create a new message.
  */
 export const AddTargetAccountRequestSchema: GenMessage<AddTargetAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 25);
+  messageDesc(file_nokku_v1_target_account, 15);
 
 /**
  * @generated from message nokku.v1.AddTargetAccountResponse
@@ -716,7 +556,7 @@ export type AddTargetAccountResponse = Message<"nokku.v1.AddTargetAccountRespons
  * Use `create(AddTargetAccountResponseSchema)` to create a new message.
  */
 export const AddTargetAccountResponseSchema: GenMessage<AddTargetAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 26);
+  messageDesc(file_nokku_v1_target_account, 16);
 
 /**
  * @generated from message nokku.v1.RemoveTargetAccountRequest
@@ -733,7 +573,7 @@ export type RemoveTargetAccountRequest = Message<"nokku.v1.RemoveTargetAccountRe
  * Use `create(RemoveTargetAccountRequestSchema)` to create a new message.
  */
 export const RemoveTargetAccountRequestSchema: GenMessage<RemoveTargetAccountRequest> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 27);
+  messageDesc(file_nokku_v1_target_account, 17);
 
 /**
  * @generated from message nokku.v1.RemoveTargetAccountResponse
@@ -746,7 +586,7 @@ export type RemoveTargetAccountResponse = Message<"nokku.v1.RemoveTargetAccountR
  * Use `create(RemoveTargetAccountResponseSchema)` to create a new message.
  */
 export const RemoveTargetAccountResponseSchema: GenMessage<RemoveTargetAccountResponse> = /*@__PURE__*/
-  messageDesc(file_nokku_v1_target_account, 28);
+  messageDesc(file_nokku_v1_target_account, 18);
 
 /**
  * @generated from enum nokku.v1.SubjectKind
@@ -808,42 +648,8 @@ export const TargetAccountService: GenService<{
     output: typeof RemoveTargetAccountResponseSchema;
   },
   /**
-   * @generated from rpc nokku.v1.TargetAccountService.AddSubjects
-   */
-  addSubjects: {
-    methodKind: "unary";
-    input: typeof AddSubjectsRequestSchema;
-    output: typeof AddSubjectsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.TargetAccountService.RemoveSubjects
-   */
-  removeSubjects: {
-    methodKind: "unary";
-    input: typeof RemoveSubjectsRequestSchema;
-    output: typeof RemoveSubjectsResponseSchema;
-  },
-  /**
-   * @generated from rpc nokku.v1.TargetAccountService.RevokeAllAccess
-   */
-  revokeAllAccess: {
-    methodKind: "unary";
-    input: typeof RevokeAllAccessRequestSchema;
-    output: typeof RevokeAllAccessResponseSchema;
-  },
-  /**
-   * PlanGrant says what Grant would do with the same request, and changes nothing.
-   *
-   * @generated from rpc nokku.v1.TargetAccountService.PlanGrant
-   */
-  planGrant: {
-    methodKind: "unary";
-    input: typeof PlanGrantRequestSchema;
-    output: typeof PlanGrantResponseSchema;
-  },
-  /**
    * Grant gives subjects one account on many servers, the servers by id or by tag. It is one transaction and one
-   * access change, however many servers.
+   * access change, however many servers. A dry run says what it would do and changes nothing.
    *
    * @generated from rpc nokku.v1.TargetAccountService.Grant
    */
@@ -853,18 +659,8 @@ export const TargetAccountService: GenService<{
     output: typeof GrantResponseSchema;
   },
   /**
-   * PlanRevoke says what Revoke would do with the same request, and changes nothing.
-   *
-   * @generated from rpc nokku.v1.TargetAccountService.PlanRevoke
-   */
-  planRevoke: {
-    methodKind: "unary";
-    input: typeof PlanRevokeRequestSchema;
-    output: typeof PlanRevokeResponseSchema;
-  },
-  /**
-   * Revoke takes one subject's own grants off many servers, the servers by id or by tag. Like Grant it is one
-   * transaction and one access change.
+   * Revoke takes one subject's own grants off many servers: the servers by id, by tag, or all of them. Like Grant it
+   * is one transaction and one access change, and a dry run changes nothing.
    *
    * @generated from rpc nokku.v1.TargetAccountService.Revoke
    */

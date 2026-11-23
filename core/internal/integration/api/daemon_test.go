@@ -735,7 +735,7 @@ func woken(t *testing.T, updates <-chan struct{}) bool {
 // One transaction revokes on every server and notifies once. That one
 // notification must reach every daemon, not only the owner of the first deleted
 // grant.
-func TestRevokeAllAccessReachesEveryServer(t *testing.T) {
+func TestRevokeEverywhereReachesEveryServer(t *testing.T) {
 	n := newNKSync(t)
 	cfg, srv := n.cfg, n.srv
 	workspaceID := testWorkspace.ID
@@ -778,11 +778,12 @@ func TestRevokeAllAccessReachesEveryServer(t *testing.T) {
 		s.updates = holdControlStream(t, cfg, srv, s.key, s.enrolled.GetAccessToken())
 	}
 
-	_, err := n.accounts.RevokeAllAccess(t.Context(), &nokkuv1.RevokeAllAccessRequest{
-		SubjectId: &revoked.ID,
-		Kind:      nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-	})
+	gone, err := n.accounts.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: &nokkuv1.RevokeSpec{
+		Subject:    &nokkuv1.GrantSubject{Id: &revoked.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
+		Everywhere: new(true),
+	}})
 	require.NoError(t, err)
+	assert.EqualValues(t, len(servers), gone.GetPlan().GetGrants(), "a grant was left somewhere")
 
 	for i, s := range servers {
 		assert.True(t, woken(t, s.updates), "daemon %d was not told about the revoke", i)

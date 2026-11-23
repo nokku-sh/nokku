@@ -62,7 +62,7 @@
 	const remove = teamApi.delete();
 	const addMember = teamApi.addMember();
 	const removeMember = teamApi.removeMember();
-	const revokeAll = accountApi.revokeSubject();
+	const revokeAll = accountApi.revokeEverywhere();
 
 	const autoSave = useAutoSave(() =>
 		draft.save((changes) => update.mutateAsync({ ...changes, id: model?.id }))
@@ -107,7 +107,8 @@
 			title: `Revoke all access for ${entity.name}?`,
 			description: 'The team is removed from every login account on every server.',
 			confirmText: 'Revoke all',
-			onConfirm: () => revokeAll.mutateAsync({ subjectId: entity.id, kind: SubjectKind.TEAM })
+			onConfirm: () =>
+				revokeAll.mutateAsync({ revoke: { subject: { id: entity.id, kind: SubjectKind.TEAM } } })
 		});
 	}
 </script>

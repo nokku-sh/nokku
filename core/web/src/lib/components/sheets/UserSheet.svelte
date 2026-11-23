@@ -81,7 +81,7 @@
 	const transfer = users.transferOwnership();
 	const addToTeam = teamApi.addMember();
 	const removeFromTeam = teamApi.removeMember();
-	const revokeAll = accountApi.revokeSubject();
+	const revokeAll = accountApi.revokeEverywhere();
 
 	const isOwner = $derived(person?.role === WorkspaceRole.OWNER);
 	const isMe = $derived(me.data?.id === person?.id);
@@ -111,7 +111,10 @@
 						title: `Revoke all access for ${name}?`,
 						description: 'Direct grants on every server are removed. Access through teams stays.',
 						confirmText: 'Revoke all',
-						onConfirm: () => revokeAll.mutateAsync({ subjectId: person.id, kind: SubjectKind.USER })
+						onConfirm: () =>
+							revokeAll.mutateAsync({
+								revoke: { subject: { id: person.id, kind: SubjectKind.USER } }
+							})
 					})
 			});
 		}

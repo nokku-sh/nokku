@@ -294,12 +294,13 @@ func (s *smoke) grantAccount(t *testing.T) {
 		return s.devAccount != nil
 	}, "the daemon never reported its %s account", account)
 
-	_, err := s.targetAccounts.AddSubjects(t.Context(), &nokkuv1.AddSubjectsRequest{
-		Id:         new(s.devAccount.GetId()),
-		SubjectIds: []string{s.owner.GetId()},
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-	})
+	granted, err := s.targetAccounts.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{
+		Subjects:  []*nokkuv1.GrantSubject{{Id: s.owner.Id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
+		TargetIds: []string{s.devAccount.GetTargetId()},
+		Username:  s.devAccount.Username,
+	}})
 	require.NoError(t, err)
+	require.EqualValues(t, 1, granted.GetPlan().GetOutcomes()[0].GetAdded(), "the grant added nothing")
 
 	// ssh checks the host certificate, the daemon gets it after its first sync.
 	waitFor(t, time.Minute, func() bool { return len(s.auditLogs(t, "SignHostCertificate")) > 0 },
@@ -534,11 +535,11 @@ func (s *smoke) revokeGrant(t *testing.T) {
 	require.Never(t, func() bool { return len(ended) > 0 }, time.Second, 100*time.Millisecond,
 		"the session ended before the revoke: %s", &out)
 
-	_, err := s.targetAccounts.RemoveSubjects(t.Context(), &nokkuv1.RemoveSubjectsRequest{
-		Id:         new(s.devAccount.GetId()),
-		SubjectIds: []string{s.owner.GetId()},
-		Kind:       nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum(),
-	})
+	_, err := s.targetAccounts.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: &nokkuv1.RevokeSpec{
+		Subject:   &nokkuv1.GrantSubject{Id: s.owner.Id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
+		TargetIds: []string{s.devAccount.GetTargetId()},
+		Username:  s.devAccount.Username,
+	}})
 	require.NoError(t, err)
 	// A revoke is a matter of seconds. A sync change that makes it slower has to show up here.
 	revoked := time.Now()
