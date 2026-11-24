@@ -42,7 +42,7 @@ type syncResult struct {
 	Grants map[string][]string `json:"grants,omitempty"`
 }
 
-// Uses the system ssh as root, so the operator's keys and config apply.
+// Uses the system ssh, so the operator's keys and config apply.
 type remote struct {
 	user string
 	host string

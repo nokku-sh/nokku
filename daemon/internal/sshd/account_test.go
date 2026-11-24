@@ -1,6 +1,7 @@
 package sshd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -178,6 +179,15 @@ func TestLookupAccountExpiry(t *testing.T) {
 			assert.True(t, tt.want.Equal(a.Expires), "expires %s, want %s", a.Expires, tt.want)
 		})
 	}
+}
+
+// No answer in time is not "never expires", an expired account would get in.
+func TestShadowExpiryRefusesATimeout(t *testing.T) {
+	withFakeGetent(t, fakeGetentDatabases("", "nokkud-test-alice:!:19000:0:99999:7::1:"))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err := shadowExpiry(ctx, "nokkud-test-alice")
+	require.Error(t, err)
 }
 
 func TestLoginAllowed(t *testing.T) {

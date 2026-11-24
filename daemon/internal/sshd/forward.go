@@ -98,8 +98,7 @@ func (s *Server) serveDirectTCPIP(ctx context.Context, st *connState, newCh ssh.
 		_ = dconn.Close()
 		return
 	}
-	go safe.Func("forward requests", func() { ssh.DiscardRequests(reqs) })()
-	proxy(ctx, ch, dconn)
+	proxy(ctx, ch, reqs, dconn)
 }
 
 func (s *Server) forwardingAllowed(conn *ssh.ServerConn) bool {
@@ -213,14 +212,13 @@ func (s *Server) acceptForwarded(ctx context.Context, st *connState, ln net.List
 				_ = c.Close()
 				return
 			}
-			go safe.Func("forward requests", func() { ssh.DiscardRequests(reqs) })()
-			proxy(ctx, ch, c)
+			proxy(ctx, ch, reqs, c)
 		})()
 	}
 }
 
 // proxy carries a half-close through, both ends close with ctx.
-func proxy(ctx context.Context, ch ssh.Channel, c net.Conn) {
+func proxy(ctx context.Context, ch ssh.Channel, reqs <-chan *ssh.Request, c net.Conn) {
 	closeBoth := sync.OnceFunc(func() {
 		_ = ch.Close()
 		_ = c.Close()
@@ -228,6 +226,13 @@ func proxy(ctx context.Context, ch ssh.Channel, c net.Conn) {
 	defer closeBoth()
 	stop := context.AfterFunc(ctx, safe.Func("forward end", closeBoth))
 	defer stop()
+	sent := make(chan struct{})
+	// A closed channel reads no answer, so the forward ends once its data is out.
+	go safe.Func("forward requests", func() {
+		ssh.DiscardRequests(reqs)
+		<-sent
+		closeBoth()
+	})()
 	var wg sync.WaitGroup
 	wg.Go(safe.Func("forward in", func() {
 		_, _ = io.Copy(ch, c)
@@ -238,6 +243,7 @@ func proxy(ctx context.Context, ch ssh.Channel, c net.Conn) {
 		if tc, ok := c.(*net.TCPConn); ok {
 			_ = tc.CloseWrite()
 		}
+		close(sent)
 	}))
 	wg.Wait()
 }

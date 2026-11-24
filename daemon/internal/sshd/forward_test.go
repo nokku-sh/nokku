@@ -29,6 +29,14 @@ const (
 	testHelperKeeper = "test-keeper"
 )
 
+// closedChannel is a channel its peer closed: reads end and nobody takes an answer.
+type closedChannel struct{ ssh.Channel }
+
+func (closedChannel) Read([]byte) (int, error)    { return 0, io.EOF }
+func (closedChannel) Write(p []byte) (int, error) { return len(p), nil }
+func (closedChannel) Close() error                { return nil }
+func (closedChannel) CloseWrite() error           { return nil }
+
 func testEchoServer(t *testing.T) net.Listener {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -701,4 +709,29 @@ func procNetAddr(a net.Addr) string {
 	}
 	ap := addrPort(a)
 	return fmt.Sprintf("%08X:%04X", binary.LittleEndian.Uint32(ap.Addr().AsSlice()), ap.Port())
+}
+
+// A far side that ignores the FIN must not hold the forward once the client closed its channel.
+func TestProxyEndsWhenTheChannelIsClosed(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	far, err := net.Dial("tcp", ln.Addr().String())
+	require.NoError(t, err)
+	defer far.Close()
+	near, err := ln.Accept()
+	require.NoError(t, err)
+
+	reqs := make(chan *ssh.Request)
+	close(reqs)
+	done := make(chan struct{})
+	go func() {
+		proxy(t.Context(), closedChannel{}, reqs, near)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the forward stayed open after the channel closed")
+	}
 }

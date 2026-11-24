@@ -238,12 +238,16 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 				events = append(events, groupEvent(actionUpdateTeam, id, map[string]any{"name": team.Name}))
 				return nil
 			case "externalId":
+				externalID := scimAttrString(value)
+				if linked(team, externalID) {
+					return nil
+				}
 				if planErr != nil {
 					skipped = true
 					return nil
 				}
 				changed = true
-				team, err = linkTeamSCIM(ctx, q, team, scimAttrString(value))
+				team, err = linkTeamSCIM(ctx, q, team, externalID)
 				return err
 			case "members":
 				changed = true
@@ -296,8 +300,12 @@ func (h scimGroupHandler) Patch(r *http.Request, id string, operations []scim.Pa
 	return res, err
 }
 
+func linked(team *db.Team, externalID string) bool {
+	return externalID == "" || externalID == deref(team.ScimExternalID)
+}
+
 func linkTeamSCIM(ctx context.Context, q *db.Queries, team *db.Team, externalID string) (*db.Team, error) {
-	if externalID == "" || (team.ScimExternalID != nil && *team.ScimExternalID == externalID) {
+	if linked(team, externalID) {
 		return team, nil
 	}
 	team, err := q.SetTeamSCIMExternalID(ctx, &db.SetTeamSCIMExternalIDParams{ID: team.ID, ExternalID: &externalID})

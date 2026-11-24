@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	// Long enough that a fan-out of ssh runs syncs once.
+	// nk prepare syncs first, nk proxy only when that one did not.
 	proxyFreshFor   = time.Minute
 	prepareFreshFor = 10 * time.Second
 	// Backoff after a failed sync, or every ssh would wait for the timeout.

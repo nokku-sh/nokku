@@ -33,7 +33,7 @@
 	const deleteAccount = user.deleteAccount();
 	const requestEmailChange = user.requestEmailChange();
 	const creds = credentials.all();
-	// An identity provider owns the address of the accounts it signs in or provisions.
+	// An identity provider owns the name and address of the accounts it signs in or provisions.
 	const managed = $derived(
 		!!me.data?.scimManaged || (creds.data ?? []).some((c) => c.type === CredentialType.OIDC)
 	);
@@ -88,9 +88,14 @@
 						id="profile-name"
 						bind:value={model.name}
 						placeholder="Ada Lovelace"
+						readonly={managed}
 						oninput={() => autoSave.save()}
 					/>
-					<Field.Description>Shown to your teammates and in the audit log.</Field.Description>
+					<Field.Description>
+						{managed
+							? 'Your identity provider owns this name. Change it there.'
+							: 'Shown to your teammates and in the audit log.'}
+					</Field.Description>
 				</Field.Field>
 				<Field.Field>
 					<Field.Label for="profile-email">Email</Field.Label>

@@ -65,6 +65,10 @@ func lookupAccount(name string) (*account, error) {
 	if uidErr != nil || gidErr != nil {
 		return nil, fmt.Errorf("user %q has a bad passwd entry", name)
 	}
+	expires, err := shadowExpiry(ctx, name)
+	if err != nil {
+		return nil, err
+	}
 	var groups []uint32
 	if os.Geteuid() == 0 {
 		if groups, err = groupIDs(ctx, name); err != nil {
@@ -79,26 +83,30 @@ func lookupAccount(name string) (*account, error) {
 		Home:   parts[5],
 		// A lock shell fails the session. Only an empty field means /bin/sh.
 		Shell:   cmp.Or(parts[6], "/bin/sh"),
-		Expires: shadowExpiry(ctx, name),
+		Expires: expires,
 	}, nil
 }
 
 // chage -E expiry, which OpenSSH denies through pam_unix. No entry means none.
-func shadowExpiry(ctx context.Context, name string) time.Time {
+func shadowExpiry(ctx context.Context, name string) (time.Time, error) {
 	// #nosec G204
 	out, err := exec.CommandContext(ctx, "getent", "shadow", name).Output()
+	// No answer in time is not "never expires", an expired account would get in.
+	if ctx.Err() != nil {
+		return time.Time{}, fmt.Errorf("lookup expiry for %s: %w", name, ctx.Err())
+	}
 	if err != nil {
-		return time.Time{}
+		return time.Time{}, nil
 	}
 	parts := strings.Split(strings.TrimSpace(string(out)), ":")
 	if len(parts) != 9 || parts[0] != name {
-		return time.Time{}
+		return time.Time{}, nil
 	}
 	days, err := strconv.ParseInt(parts[7], 10, 64)
 	if err != nil || days < 0 {
-		return time.Time{}
+		return time.Time{}, nil
 	}
-	return time.Unix(days*24*60*60, 0)
+	return time.Unix(days*24*60*60, 0), nil
 }
 
 func cmdEnv(a *account) []string {

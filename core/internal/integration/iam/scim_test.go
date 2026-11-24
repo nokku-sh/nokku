@@ -195,7 +195,16 @@ func TestSCIMOffThePlanGroupsOnlyShrink(t *testing.T) {
 		return got.DisplayName, ids
 	}
 
+	link := patchOp("replace", "externalId", "pid-1")
+	require.Equal(t, http.StatusOK, c.do(http.MethodPatch, path, link, nil))
+
 	onPlan = false
+	assert.Equal(
+		t,
+		http.StatusNoContent,
+		c.do(http.MethodPatch, path, link, nil),
+		"an unchanged externalId was refused",
+	)
 	remove := func(u scimResource) map[string]any {
 		return map[string]any{"op": "remove", "path": `members[value eq "` + u.ID + `"]`}
 	}
