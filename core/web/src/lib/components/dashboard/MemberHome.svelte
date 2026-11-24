@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SessionKind } from '#lib/gen/nokku/v1/account_pb.js';
 	import { describeAgent } from '#lib/agent.js';
 	import { accessRequests } from '#lib/api/access-requests.svelte.js';
 	import { useServers } from '#lib/api/connect.svelte.js';
@@ -27,18 +28,19 @@
 	// What nk login leaves behind, the newest first.
 	const terminals = $derived(
 		(sessions.data ?? [])
-			.filter((s) => s.kind === 'cli')
+			.filter((s) => s.kind === SessionKind.CLI)
 			.toSorted((a, b) => Number(b.lastSeenAt?.seconds ?? 0) - Number(a.lastSeenAt?.seconds ?? 0))
 	);
 	const terminal = $derived(terminals[0]);
 
 	const first = $derived(servers.list[0]);
+	const login = $derived(first?.logins[0]?.username);
 	const sshLine = $derived(
-		first?.usernames[0] ? `ssh ${first.usernames[0]}@${sshHost(first.name)}` : 'ssh user@server.nk'
+		first && login ? `ssh ${login}@${sshHost(first.target.name)}` : 'ssh user@server.nk'
 	);
 	const requestLine = $derived(
-		first?.usernames[0]
-			? `nk request ${first.usernames[0]}@${first.name} --for 1h --reason "..."`
+		first && login
+			? `nk request ${login}@${first.target.name} --for 1h --reason "..."`
 			: 'nk request <account>@<server> --for 1h --reason "..."'
 	);
 

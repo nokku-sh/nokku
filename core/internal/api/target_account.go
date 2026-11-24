@@ -20,12 +20,6 @@ import (
 // A plan names this many servers, the counts say how many there are.
 const grantNamesShown = 5
 
-var subjectKinds = map[string]nokkuv1.SubjectKind{
-	db.SubjectKindUser:           nokkuv1.SubjectKind_SUBJECT_KIND_USER,
-	db.SubjectKindTeam:           nokkuv1.SubjectKind_SUBJECT_KIND_TEAM,
-	db.SubjectKindServiceAccount: nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT,
-}
-
 type targetAccountService struct {
 	cfg *app.Config
 }
@@ -64,6 +58,37 @@ func (s *targetAccountService) ListTargetAccounts(
 	}, nil
 }
 
+func (s *targetAccountService) GetGrantScope(
+	ctx context.Context,
+	req *nokkuv1.GetGrantScopeRequest,
+) (*nokkuv1.GetGrantScopeResponse, error) {
+	res := &nokkuv1.GetGrantScopeResponse{}
+	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		targets, err := q.GrantWhere(ctx, &db.GrantWhereParams{TargetIds: req.GetTargetIds(), Tags: req.GetTags()})
+		if err != nil {
+			return err
+		}
+		res.TargetCount = new(int32(len(targets))) //nolint:gosec // rows of one workspace
+		for _, t := range targets[:min(len(targets), grantNamesShown)] {
+			res.TargetNames = append(res.TargetNames, t.Name)
+		}
+		accounts, err := q.GrantWhereAccounts(ctx, &db.GrantWhereAccountsParams{
+			TargetIds: req.GetTargetIds(), Tags: req.GetTags(),
+		})
+		if err != nil {
+			return err
+		}
+		for _, a := range accounts {
+			res.Accounts = append(res.Accounts, &nokkuv1.GrantAccount{Username: &a.Username, TargetCount: &a.Servers})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 func (s *targetAccountService) Grant(
 	ctx context.Context,
 	req *nokkuv1.GrantRequest,
@@ -85,32 +110,20 @@ func (s *targetAccountService) Grant(
 		if err != nil {
 			return err
 		}
-		accounts, err := q.GrantWhereAccounts(ctx, &db.GrantWhereAccountsParams{
-			TargetIds: spec.GetTargetIds(), Tags: spec.GetTags(),
-		})
-		if err != nil {
-			return err
-		}
-		for _, a := range accounts {
-			plan.Accounts = append(plan.Accounts, &nokkuv1.GrantAccount{Username: &a.Username, Servers: &a.Servers})
-		}
 		var accountIDs, named []string
 		for _, server := range servers {
-			if len(plan.GetServerNames()) < grantNamesShown {
-				plan.ServerNames = append(plan.ServerNames, server.Name)
-			}
 			switch {
 			case server.AccountID != nil:
 				accountIDs = append(accountIDs, *server.AccountID)
 				if slices.Contains(spec.GetTargetIds(), server.ID) {
 					named = append(named, server.Name)
 				}
-			case spec.GetUsername() != "" && len(plan.GetSkipped()) < grantNamesShown:
-				plan.Skipped = append(plan.Skipped, server.Name)
+			case len(plan.GetSkippedTargetNames()) < grantNamesShown:
+				plan.SkippedTargetNames = append(plan.SkippedTargetNames, server.Name)
 			}
 		}
-		plan.Servers = new(int32(len(servers)))        //nolint:gosec // rows of one workspace
-		plan.WithAccount = new(int32(len(accountIDs))) //nolint:gosec // rows of one workspace
+		plan.TargetCount = new(int32(len(servers)))           //nolint:gosec // rows of one workspace
+		plan.MatchedTargetCount = new(int32(len(accountIDs))) //nolint:gosec // rows of one workspace
 
 		var subjects []string
 		var added, changed int32
@@ -137,18 +150,18 @@ func (s *targetAccountService) Grant(
 					continue
 				default:
 					otherEnd++
-					if !spec.GetChangeEnds() {
+					if !spec.GetOverwriteExpiry() {
 						continue
 					}
 				}
 				put = append(put, accountID)
 			}
 			plan.Outcomes = append(plan.Outcomes, &nokkuv1.GrantOutcome{
-				SubjectId: subject.Id, Added: &fresh, Same: &same, OtherEnd: &otherEnd,
+				SubjectId: subject.Id, AddedCount: &fresh, UnchangedCount: &same, OtherExpiryCount: &otherEnd,
 			})
 			subjects = append(subjects, subject.GetId())
 			added += fresh
-			if spec.GetChangeEnds() {
+			if spec.GetOverwriteExpiry() {
 				changed += otherEnd
 			}
 			if !write || len(put) == 0 {
@@ -176,7 +189,7 @@ func (s *targetAccountService) Grant(
 		if len(named) > 0 {
 			audit.Set(ctx, "targets", named)
 		}
-		audit.Set(ctx, "servers", plan.GetWithAccount())
+		audit.Set(ctx, "servers", plan.GetMatchedTargetCount())
 		audit.Set(ctx, "added", added)
 		audit.Set(ctx, "changed", changed)
 		if expiresAt != nil {
@@ -209,7 +222,7 @@ func (s *targetAccountService) Revoke(
 	err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		held, err := q.RevokeWhere(ctx, &db.RevokeWhereParams{
 			SubjectKind: kind, SubjectID: spec.GetSubject().GetId(),
-			Everywhere: spec.GetEverywhere(), TargetIds: spec.GetTargetIds(), Tags: spec.GetTags(),
+			Everywhere: spec.GetAllTargets(), TargetIds: spec.GetTargetIds(), Tags: spec.GetTags(),
 			Username: spec.GetUsername(),
 		})
 		if err != nil {
@@ -245,8 +258,8 @@ func (s *targetAccountService) Revoke(
 				continue
 			}
 			otherTags++
-			if len(plan.GetOtherTagNames()) < grantNamesShown {
-				plan.OtherTagNames = append(plan.OtherTagNames, g.Name)
+			if len(plan.GetMultiTagTargetNames()) < grantNamesShown {
+				plan.MultiTagTargetNames = append(plan.MultiTagTargetNames, g.Name)
 			}
 		}
 		usernames := slices.SortedFunc(maps.Keys(accounts), func(a, b string) int {
@@ -254,12 +267,12 @@ func (s *targetAccountService) Revoke(
 		})
 		for _, username := range usernames {
 			plan.Accounts = append(plan.Accounts, &nokkuv1.RevokeAccount{
-				Username: &username, Servers: &accounts[username].servers, ServerNames: accounts[username].names,
+				Username: &username, TargetCount: &accounts[username].servers, TargetNames: accounts[username].names,
 			})
 		}
-		plan.Grants = new(int32(len(held)))     //nolint:gosec // rows of one workspace
-		plan.Servers = new(int32(len(servers))) //nolint:gosec // rows of one workspace
-		plan.OtherTags = &otherTags
+		plan.GrantCount = new(int32(len(held)))     //nolint:gosec // rows of one workspace
+		plan.TargetCount = new(int32(len(servers))) //nolint:gosec // rows of one workspace
+		plan.MultiTagTargetCount = &otherTags
 		if !write {
 			return nil
 		}
@@ -279,11 +292,11 @@ func (s *targetAccountService) Revoke(
 		if len(named) > 0 {
 			audit.Set(ctx, "targets", named)
 		}
-		if spec.GetEverywhere() {
+		if spec.GetAllTargets() {
 			audit.Set(ctx, "everywhere", true)
 		}
-		audit.Set(ctx, "servers", plan.GetServers())
-		audit.Set(ctx, "removed", plan.GetGrants())
+		audit.Set(ctx, "servers", plan.GetTargetCount())
+		audit.Set(ctx, "removed", plan.GetGrantCount())
 		return nil
 	})
 	if err != nil {
@@ -341,7 +354,7 @@ func auditAccount(ctx context.Context, q *db.Queries, accountID string) error {
 }
 
 func subjectKind(k nokkuv1.SubjectKind) string {
-	for name, kind := range subjectKinds {
+	for name, kind := range db.SubjectKinds {
 		if kind == k {
 			return name
 		}

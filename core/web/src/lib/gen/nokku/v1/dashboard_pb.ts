@@ -7,21 +7,21 @@ import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import { file_nokku_v1_access } from "./access_pb";
+import type { AuditEvent } from "./audit_log_pb";
+import { file_nokku_v1_audit_log } from "./audit_log_pb";
 import type { Daemon } from "./daemon_pb";
 import { file_nokku_v1_daemon } from "./daemon_pb";
+import type { Subject } from "./subject_pb";
+import { file_nokku_v1_subject } from "./subject_pb";
 import type { Target } from "./target_pb";
 import { file_nokku_v1_target } from "./target_pb";
-import type { SubjectKind } from "./target_account_pb";
-import { file_nokku_v1_target_account } from "./target_account_pb";
-import type { EventLog } from "./util_pb";
-import { file_nokku_v1_util } from "./util_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/dashboard.proto.
  */
 export const file_nokku_v1_dashboard: GenFile = /*@__PURE__*/
-  fileDesc("Chhub2trdS92MS9kYXNoYm9hcmQucHJvdG8SCG5va2t1LnYxIrQBCgtMaXZlU2Vzc2lvbhIKCgJpZBgBIAEoCRIRCglkYWVtb25faWQYAiABKAkSEwoLZGFlbW9uX25hbWUYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSDwoHdXNlcl9pZBgFIAEoCRIRCglyZWNvcmRpbmcYBiABKAgSCwoDd2ViGAcgASgIEi4KCnN0YXJ0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIo8CCgtFbmRpbmdHcmFudBIrCgxzdWJqZWN0X2tpbmQYASABKA4yFS5ub2trdS52MS5TdWJqZWN0S2luZBISCgpzdWJqZWN0X2lkGAIgASgJEhQKDHN1YmplY3RfbmFtZRgDIAEoCRIQCgh1c2VybmFtZRgEIAEoCRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCgd0YXJnZXRzGAYgAygLMhwubm9ra3UudjEuRW5kaW5nR3JhbnQuVGFyZ2V0EhQKDHRhcmdldF9jb3VudBgHIAEoBRoiCgZUYXJnZXQSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCSIVChNHZXREYXNoYm9hcmRSZXF1ZXN0Iv4DChRHZXREYXNoYm9hcmRSZXNwb25zZRIPCgd0YXJnZXRzGAEgASgFEhYKDnRhcmdldHNfb25saW5lGAIgASgFEhYKDnRhcmdldHNfbWFudWFsGAMgASgFEg8KB2RhZW1vbnMYBCABKAUSFgoOZGFlbW9uc19vbmxpbmUYBSABKAUSKQoPcGVuZGluZ19kYWVtb25zGAYgAygLMhAubm9ra3UudjEuRGFlbW9uEikKD29mZmxpbmVfc2VydmVycxgHIAMoCzIQLm5va2t1LnYxLlRhcmdldBINCgV1c2VycxgIIAEoBRIXCg9yZWNvcmRpbmdfYnl0ZXMYCSABKAMSHQoVcmVjb3JkaW5nX3F1b3RhX2J5dGVzGAogASgDEiwKDWxpdmVfc2Vzc2lvbnMYCyADKAsyFS5ub2trdS52MS5MaXZlU2Vzc2lvbhIQCghhY3Rpdml0eRgMIAMoBRIQCghmYWlsdXJlcxgNIAMoBRIqCg5yZWNlbnRfY2hhbmdlcxgOIAMoCzISLm5va2t1LnYxLkV2ZW50TG9nEhYKDmRhZW1vbnNfYmVoaW5kGA8gASgFEiwKDWVuZGluZ19ncmFudHMYECADKAsyFS5ub2trdS52MS5FbmRpbmdHcmFudBIbChNlbmRpbmdfZ3JhbnRzX3RvdGFsGBEgASgFMm4KEERhc2hib2FyZFNlcnZpY2USWgoMR2V0RGFzaGJvYXJkEh0ubm9ra3UudjEuR2V0RGFzaGJvYXJkUmVxdWVzdBoeLm5va2t1LnYxLkdldERhc2hib2FyZFJlc3BvbnNlIguQAgHC8xgEGAJoAUKPAQoMY29tLm5va2t1LnYxQg5EYXNoYm9hcmRQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_daemon, file_nokku_v1_target, file_nokku_v1_target_account, file_nokku_v1_util]);
+  fileDesc("Chhub2trdS92MS9kYXNoYm9hcmQucHJvdG8SCG5va2t1LnYxIrQBCgtMaXZlU2Vzc2lvbhIKCgJpZBgBIAEoCRIRCglkYWVtb25faWQYAiABKAkSEwoLZGFlbW9uX25hbWUYAyABKAkSEAoIdXNlcm5hbWUYBCABKAkSDwoHdXNlcl9pZBgFIAEoCRIRCglyZWNvcmRpbmcYBiABKAgSCwoDd2ViGAcgASgIEi4KCnN0YXJ0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIvIBCgtFbmRpbmdHcmFudBIiCgdzdWJqZWN0GAEgASgLMhEubm9ra3UudjEuU3ViamVjdBIUCgxzdWJqZWN0X25hbWUYAiABKAkSEAoIdXNlcm5hbWUYAyABKAkSLgoKZXhwaXJlc19hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLQoHdGFyZ2V0cxgFIAMoCzIcLm5va2t1LnYxLkVuZGluZ0dyYW50LlRhcmdldBIUCgx0YXJnZXRfY291bnQYBiABKAUaIgoGVGFyZ2V0EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiFQoTR2V0RGFzaGJvYXJkUmVxdWVzdCKwBAoUR2V0RGFzaGJvYXJkUmVzcG9uc2USFAoMdGFyZ2V0X2NvdW50GAEgASgFEhsKE29ubGluZV90YXJnZXRfY291bnQYAiABKAUSGwoTbWFudWFsX3RhcmdldF9jb3VudBgDIAEoBRIpCg9vZmZsaW5lX3RhcmdldHMYBCADKAsyEC5ub2trdS52MS5UYXJnZXQSFAoMZGFlbW9uX2NvdW50GAUgASgFEhsKE29ubGluZV9kYWVtb25fY291bnQYBiABKAUSGwoTYmVoaW5kX2RhZW1vbl9jb3VudBgHIAEoBRIpCg9wZW5kaW5nX2RhZW1vbnMYCCADKAsyEC5ub2trdS52MS5EYWVtb24SEgoKdXNlcl9jb3VudBgJIAEoBRIXCg9yZWNvcmRpbmdfYnl0ZXMYCiABKAMSHQoVcmVjb3JkaW5nX3F1b3RhX2J5dGVzGAsgASgDEiwKDWxpdmVfc2Vzc2lvbnMYDCADKAsyFS5ub2trdS52MS5MaXZlU2Vzc2lvbhIWCg5ldmVudHNfYnlfaG91chgNIAMoBRIYChBmYWlsdXJlc19ieV9ob3VyGA4gAygFEiwKDnJlY2VudF9jaGFuZ2VzGA8gAygLMhQubm9ra3UudjEuQXVkaXRFdmVudBIsCg1lbmRpbmdfZ3JhbnRzGBAgAygLMhUubm9ra3UudjEuRW5kaW5nR3JhbnQSGgoSZW5kaW5nX2dyYW50X2NvdW50GBEgASgFMm4KEERhc2hib2FyZFNlcnZpY2USWgoMR2V0RGFzaGJvYXJkEh0ubm9ra3UudjEuR2V0RGFzaGJvYXJkUmVxdWVzdBoeLm5va2t1LnYxLkdldERhc2hib2FyZFJlc3BvbnNlIguQAgHC8xgEGAIwAUKPAQoMY29tLm5va2t1LnYxQg5EYXNoYm9hcmRQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_audit_log, file_nokku_v1_daemon, file_nokku_v1_subject, file_nokku_v1_target]);
 
 /**
  * @generated from message nokku.v1.LiveSession
@@ -82,39 +82,34 @@ export const LiveSessionSchema: GenMessage<LiveSession> = /*@__PURE__*/
  */
 export type EndingGrant = Message<"nokku.v1.EndingGrant"> & {
   /**
-   * @generated from field: nokku.v1.SubjectKind subject_kind = 1;
+   * @generated from field: nokku.v1.Subject subject = 1;
    */
-  subjectKind: SubjectKind;
+  subject?: Subject | undefined;
 
   /**
-   * @generated from field: string subject_id = 2;
-   */
-  subjectId: string;
-
-  /**
-   * @generated from field: string subject_name = 3;
+   * @generated from field: string subject_name = 2;
    */
   subjectName: string;
 
   /**
-   * @generated from field: string username = 4;
+   * @generated from field: string username = 3;
    */
   username: string;
 
   /**
-   * @generated from field: google.protobuf.Timestamp expires_at = 5;
+   * @generated from field: google.protobuf.Timestamp expires_at = 4;
    */
   expiresAt?: Timestamp | undefined;
 
   /**
-   * the first 20 by name, target_count has them all
+   * The first 20 by name.
    *
-   * @generated from field: repeated nokku.v1.EndingGrant.Target targets = 6;
+   * @generated from field: repeated nokku.v1.EndingGrant.Target targets = 5;
    */
   targets: EndingGrant_Target[];
 
   /**
-   * @generated from field: int32 target_count = 7;
+   * @generated from field: int32 target_count = 6;
    */
   targetCount: number;
 };
@@ -166,93 +161,93 @@ export const GetDashboardRequestSchema: GenMessage<GetDashboardRequest> = /*@__P
  */
 export type GetDashboardResponse = Message<"nokku.v1.GetDashboardResponse"> & {
   /**
-   * @generated from field: int32 targets = 1;
+   * @generated from field: int32 target_count = 1;
    */
-  targets: number;
+  targetCount: number;
 
   /**
-   * @generated from field: int32 targets_online = 2;
+   * @generated from field: int32 online_target_count = 2;
    */
-  targetsOnline: number;
+  onlineTargetCount: number;
 
   /**
-   * @generated from field: int32 targets_manual = 3;
+   * @generated from field: int32 manual_target_count = 3;
    */
-  targetsManual: number;
+  manualTargetCount: number;
 
   /**
-   * @generated from field: int32 daemons = 4;
+   * @generated from field: repeated nokku.v1.Target offline_targets = 4;
    */
-  daemons: number;
+  offlineTargets: Target[];
 
   /**
-   * @generated from field: int32 daemons_online = 5;
+   * @generated from field: int32 daemon_count = 5;
    */
-  daemonsOnline: number;
+  daemonCount: number;
 
   /**
-   * @generated from field: repeated nokku.v1.Daemon pending_daemons = 6;
+   * @generated from field: int32 online_daemon_count = 6;
+   */
+  onlineDaemonCount: number;
+
+  /**
+   * @generated from field: int32 behind_daemon_count = 7;
+   */
+  behindDaemonCount: number;
+
+  /**
+   * @generated from field: repeated nokku.v1.Daemon pending_daemons = 8;
    */
   pendingDaemons: Daemon[];
 
   /**
-   * with their daemons, approved but not connected
-   *
-   * @generated from field: repeated nokku.v1.Target offline_servers = 7;
+   * @generated from field: int32 user_count = 9;
    */
-  offlineServers: Target[];
+  userCount: number;
 
   /**
-   * @generated from field: int32 users = 8;
-   */
-  users: number;
-
-  /**
-   * @generated from field: int64 recording_bytes = 9;
+   * @generated from field: int64 recording_bytes = 10;
    */
   recordingBytes: bigint;
 
   /**
-   * @generated from field: int64 recording_quota_bytes = 10;
+   * @generated from field: int64 recording_quota_bytes = 11;
    */
   recordingQuotaBytes: bigint;
 
   /**
-   * @generated from field: repeated nokku.v1.LiveSession live_sessions = 11;
+   * @generated from field: repeated nokku.v1.LiveSession live_sessions = 12;
    */
   liveSessions: LiveSession[];
 
   /**
-   * @generated from field: repeated int32 activity = 12;
+   * The last 24 hours, oldest first.
+   *
+   * @generated from field: repeated int32 events_by_hour = 13;
    */
-  activity: number[];
+  eventsByHour: number[];
 
   /**
-   * @generated from field: repeated int32 failures = 13;
+   * @generated from field: repeated int32 failures_by_hour = 14;
    */
-  failures: number[];
+  failuresByHour: number[];
 
   /**
-   * @generated from field: repeated nokku.v1.EventLog recent_changes = 14;
+   * @generated from field: repeated nokku.v1.AuditEvent recent_changes = 15;
    */
-  recentChanges: EventLog[];
+  recentChanges: AuditEvent[];
 
   /**
-   * @generated from field: int32 daemons_behind = 15;
-   */
-  daemonsBehind: number;
-
-  /**
-   * the next five to end within a day
+   * The next five to end within a day.
    *
    * @generated from field: repeated nokku.v1.EndingGrant ending_grants = 16;
    */
   endingGrants: EndingGrant[];
 
   /**
-   * @generated from field: int32 ending_grants_total = 17;
+   * @generated from field: int32 ending_grant_count = 17;
    */
-  endingGrantsTotal: number;
+  endingGrantCount: number;
 };
 
 /**

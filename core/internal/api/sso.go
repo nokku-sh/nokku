@@ -44,7 +44,7 @@ func (s *ssoService) PutSSOProvider(
 		}
 	}
 	// Only a new issuer is fetched, so a down provider can still be edited.
-	prev, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetProviderId())
+	prev, err := s.cfg.IAM.GetSSOProvider(ctx, req.GetId())
 	if err != nil || prev.OIDC.IssuerURL != req.GetIssuerUrl() {
 		if err := s.cfg.IAM.CheckIssuer(ctx, req.GetIssuerUrl()); err != nil {
 			return nil, connect.NewError(
@@ -54,7 +54,7 @@ func (s *ssoService) PutSSOProvider(
 		}
 	}
 	stored, err := s.cfg.IAM.PutSSOProvider(ctx, iam.SSOProvider{
-		ProviderID: req.GetProviderId(),
+		ProviderID: req.GetId(),
 		Name:       req.GetName(),
 		Enabled:    req.GetEnabled(),
 		OIDC: iam.OIDCProvider{
@@ -82,7 +82,7 @@ func (s *ssoService) DeleteSSOProvider(
 	ctx context.Context,
 	req *nokkuv1.DeleteSSOProviderRequest,
 ) (*nokkuv1.DeleteSSOProviderResponse, error) {
-	err := s.cfg.IAM.DeleteSSOProvider(ctx, req.GetProviderId())
+	err := s.cfg.IAM.DeleteSSOProvider(ctx, req.GetId())
 	if errors.Is(err, iam.ErrNotFound) {
 		return nil, errNotFound
 	}
@@ -94,7 +94,7 @@ func (s *ssoService) DeleteSSOProvider(
 
 func providerToProto(p *iam.SSOProvider) *nokkuv1.SSOProvider {
 	return &nokkuv1.SSOProvider{
-		ProviderId:           &p.ProviderID,
+		Id:                   &p.ProviderID,
 		Name:                 &p.Name,
 		Enabled:              &p.Enabled,
 		IssuerUrl:            &p.OIDC.IssuerURL,

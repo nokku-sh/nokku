@@ -21,11 +21,11 @@ func TestTransferOwnership(t *testing.T) {
 	owner := seedOwner(t, cfg)
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)
 	stranger := seedUser(t, cfg, seedOtherWorkspace(t, cfg), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)
-	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
+	users := nokkuv1connect.NewUserServiceClient(
 		clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, owner))),
 	)
 	transfer := func(to string) error {
-		_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &to})
+		_, err := users.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &to})
 		return err
 	}
 	role := func(u *db.User) nokkuv1.WorkspaceRole {
@@ -58,10 +58,10 @@ func TestTransferOwnershipAfterTheOwnerRowMoved(t *testing.T) {
 		return err
 	})
 
-	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
+	users := nokkuv1connect.NewUserServiceClient(
 		clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, owner))),
 	)
-	_, err := workspaces.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &member.ID})
+	_, err := users.TransferOwnership(t.Context(), &nokkuv1.TransferOwnershipRequest{NewOwnerId: &member.ID})
 	require.NoError(t, err)
 	assert.Equal(t, member.ID, seedOwner(t, cfg).ID)
 }
@@ -73,40 +73,40 @@ func TestManageUsers(t *testing.T) {
 	owner := seedOwner(t, cfg)
 	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	viewer := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
-	workspaces := nokkuv1connect.NewWorkspaceServiceClient(
+	users := nokkuv1connect.NewUserServiceClient(
 		clientOn(srv, header("Authorization", "Bearer "+sessionFor(t, cfg, admin))),
 	)
 
-	_, err := workspaces.UpdateUserRole(t.Context(), &nokkuv1.UpdateUserRoleRequest{
-		UserId: &viewer.ID, Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
+	_, err := users.SetUserRole(t.Context(), &nokkuv1.SetUserRoleRequest{
+		Id: &viewer.ID, Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR),
 	})
 	require.NoError(t, err)
-	got, err := workspaces.GetUser(t.Context(), &nokkuv1.GetUserRequest{UserId: &viewer.ID})
+	got, err := users.GetUser(t.Context(), &nokkuv1.GetUserRequest{Id: &viewer.ID})
 	require.NoError(t, err)
 	assert.Equal(t, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR, got.GetUser().GetRole())
 
-	_, err = workspaces.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{UserId: &owner.ID})
+	_, err = users.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{Id: &owner.ID})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "an admin switched the owner off: %v", err)
-	_, err = workspaces.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{UserId: &admin.ID})
+	_, err = users.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{Id: &admin.ID})
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "an admin switched themselves off: %v", err)
 
 	viewerToken := sessionFor(t, cfg, viewer)
-	_, err = workspaces.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{UserId: &viewer.ID})
+	_, err = users.DeactivateUser(t.Context(), &nokkuv1.DeactivateUserRequest{Id: &viewer.ID})
 	require.NoError(t, err)
 	_, _, err = cfg.IAM.AuthenticateToken(wsCtx(t), viewerToken, accessTokens...)
 	require.Error(t, err, "a deactivated user kept their session")
 
-	users, err := workspaces.ListUsers(
+	owners, err := users.ListUsers(
 		t.Context(),
 		&nokkuv1.ListUsersRequest{Limit: new(int32(100)), Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER)},
 	)
 	require.NoError(t, err)
-	require.Len(t, users.GetUsers(), 1, "one owner")
-	assert.Equal(t, owner.ID, users.GetUsers()[0].GetId())
+	require.Len(t, owners.GetUsers(), 1, "one owner")
+	assert.Equal(t, owner.ID, owners.GetUsers()[0].GetId())
 
-	_, err = workspaces.DeleteUser(t.Context(), &nokkuv1.DeleteUserRequest{UserId: &viewer.ID})
+	_, err = users.DeleteUser(t.Context(), &nokkuv1.DeleteUserRequest{Id: &viewer.ID})
 	require.NoError(t, err)
-	_, err = workspaces.GetUser(t.Context(), &nokkuv1.GetUserRequest{UserId: &viewer.ID})
+	_, err = users.GetUser(t.Context(), &nokkuv1.GetUserRequest{Id: &viewer.ID})
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err))
 }
 

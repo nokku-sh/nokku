@@ -25,7 +25,24 @@ func FromAccess(res *nokkuv1.GetSubjectAccessResponse) Cache {
 	}
 
 	c.CA = MapCA(res.GetCertificateAuthority())
-	c.Targets = Targets(res.GetTargets())
+	for _, access := range res.GetTargets() {
+		if !validTarget(access.GetTarget()) {
+			continue
+		}
+		target := MapTarget(access.GetTarget())
+		for _, l := range access.GetLogins() {
+			username := ui.PlainLine(l.GetUsername())
+			target.Usernames = append(target.Usernames, username)
+			if l.GetExpiresAt() == nil {
+				continue
+			}
+			if target.Until == nil {
+				target.Until = make(map[string]time.Time)
+			}
+			target.Until[username] = l.GetExpiresAt().AsTime()
+		}
+		c.Targets = append(c.Targets, target)
+	}
 	return c
 }
 
@@ -33,12 +50,15 @@ func FromAccess(res *nokkuv1.GetSubjectAccessResponse) Cache {
 func Targets(targets []*nokkuv1.Target) []Target {
 	var out []Target
 	for _, t := range targets {
-		if !validIDs(t.GetId()) || t.GetDaemonId() != "" && !validIDs(t.GetDaemonId()) {
-			continue
+		if validTarget(t) {
+			out = append(out, MapTarget(t))
 		}
-		out = append(out, MapTarget(t))
 	}
 	return out
+}
+
+func validTarget(t *nokkuv1.Target) bool {
+	return validIDs(t.GetId()) && (t.GetDaemonId() == "" || validIDs(t.GetDaemonId()))
 }
 
 // MapCA is nil without a CA, a subject with no targets gets none.
@@ -59,8 +79,6 @@ func MapTarget(t *nokkuv1.Target) Target {
 		DaemonID:      t.GetDaemonId(),
 		Name:          ui.PlainLine(t.GetName()),
 		Endpoints:     plainAll(t.GetEndpoints()),
-		Usernames:     plainAll(t.GetUsernames()),
-		Until:         untilAll(t.GetUsernameExpiresAt()),
 		HostPublicKey: t.GetHostPublicKey(),
 		LastSyncAt:    timeOf(t.GetLastSyncAt()),
 		CreatedBy:     t.GetCreatedBy(),
@@ -73,17 +91,6 @@ func timeOf(ts *timestamppb.Timestamp) time.Time {
 		return time.Time{}
 	}
 	return ts.AsTime()
-}
-
-func untilAll(ends map[string]*timestamppb.Timestamp) map[string]time.Time {
-	if len(ends) == 0 {
-		return nil
-	}
-	out := make(map[string]time.Time, len(ends))
-	for username, end := range ends {
-		out[ui.PlainLine(username)] = end.AsTime()
-	}
-	return out
 }
 
 func plainAll(values []string) []string {

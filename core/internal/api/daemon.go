@@ -72,24 +72,32 @@ func (s *daemonService) UpdateDaemon(
 			config = cmp.Or(stored, &nokkuv1.DaemonConfig{})
 			mergeSet(config.ProtoReflect(), req.GetConfig().ProtoReflect())
 		}
-		name, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{
-			DaemonID: req.GetId(),
-			Status:   req.GetStatus(),
-			Config:   config,
-		})
+		name, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{DaemonID: req.GetId(), Config: config})
 		if err != nil {
 			return err
 		}
 		audit.Set(ctx, "name", name)
-		if req.GetStatus() == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
-			audit.SetAction(ctx, "ApproveDaemon")
-		}
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
 	return &nokkuv1.UpdateDaemonResponse{}, nil
+}
+
+func (s *daemonService) ApproveDaemon(
+	ctx context.Context,
+	req *nokkuv1.ApproveDaemonRequest,
+) (*nokkuv1.ApproveDaemonResponse, error) {
+	name, err := s.cfg.Conn.Tenant().UpdateDaemon(ctx, &db.UpdateDaemonParams{
+		DaemonID: req.GetId(),
+		Status:   nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED,
+	})
+	if err != nil {
+		return nil, err
+	}
+	audit.Set(ctx, "name", name)
+	return &nokkuv1.ApproveDaemonResponse{}, nil
 }
 
 func (s *daemonService) SetDaemonSafeguards(
@@ -182,6 +190,9 @@ func (s *daemonService) CreateSession(
 	ctx context.Context,
 	req *nokkuv1.CreateSessionRequest,
 ) (*nokkuv1.CreateSessionResponse, error) {
+	if err := s.cfg.Entitlements.CheckSigning(ctx); err != nil {
+		return nil, err
+	}
 	// People only, so there is a person's id for the cert principal.
 	userID := actor.UserIDFromContext(ctx)
 
@@ -217,9 +228,9 @@ func (s *daemonService) CreateSession(
 	})
 	return &nokkuv1.CreateSessionResponse{
 		Session: &nokkuv1.DaemonSession{
-			SessionId: &sessionID,
-			UserId:    &userID,
-			Username:  &username,
+			Id:       &sessionID,
+			UserId:   &userID,
+			Username: &username,
 		},
 		DaemonName: &daemon.Name,
 	}, nil

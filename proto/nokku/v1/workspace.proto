@@ -7,105 +7,49 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
-import "nokku/v1/account.proto";
 import "nokku/v1/daemon.proto";
 
 service WorkspaceService {
   rpc GetWorkspace(GetWorkspaceRequest) returns (GetWorkspaceResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateWorkspace(UpdateWorkspaceRequest) returns (UpdateWorkspaceResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      machine: true
+      service_account: true
     };
   }
   rpc SetEnforceSSO(SetEnforceSSORequest) returns (SetEnforceSSOResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
-  // UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
   rpc UpdateDaemonDefaults(UpdateDaemonDefaultsRequest) returns (UpdateDaemonDefaultsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      machine: true
+      service_account: true
     };
   }
   rpc SetDefaultSafeguards(SetDefaultSafeguardsRequest) returns (SetDefaultSafeguardsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc DeleteWorkspace(DeleteWorkspaceRequest) returns (DeleteWorkspaceResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      browser: BROWSER_FRESH
-    };
-  }
-  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      nk: true
-      machine: true
-    };
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      machine: true
-    };
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
-    };
-  }
-  rpc DeactivateUser(DeactivateUserRequest) returns (DeactivateUserResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_ADMIN
-      machine: true
-    };
-  }
-  rpc ReactivateUser(ReactivateUserRequest) returns (ReactivateUserResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
-    };
-  }
-  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
-    };
-  }
-  // ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
-  // them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
-  rpc ClearUserIdentities(ClearUserIdentitiesRequest) returns (ClearUserIdentitiesResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
-    };
-  }
-  rpc TransferOwnership(TransferOwnershipRequest) returns (TransferOwnershipResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_OWNER
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (CreateWorkspaceResponse) {
     option (access) = {public: true};
   }
-  // Mails an address the workspaces it can sign in to. Always answers OK.
   rpc FindWorkspaces(FindWorkspacesRequest) returns (FindWorkspacesResponse) {
     option (access) = {public: true};
   }
@@ -135,16 +79,10 @@ message GetWorkspaceRequest {}
 message GetWorkspaceResponse {
   Workspace workspace = 1;
   string base_url = 2;
-  // inactive is a hosted workspace with no trial or plan. It signs no user certificates until the owner activates a
-  // license key.
   bool inactive = 3;
-  // delete_at is when an inactive workspace is deleted, unless the owner activates a license key before.
   google.protobuf.Timestamp delete_at = 4;
-  // features is what every member may see, so any page can show a lock. GetBilling has the rest.
   map<string, bool> features = 5;
-  // catalog names every feature and the smallest plan that has it. It is the same for every workspace.
   repeated PlanFeature catalog = 6;
-  // plan_names are the names people see, by plan code.
   map<string, string> plan_names = 7;
 }
 
@@ -160,7 +98,7 @@ message UpdateWorkspaceRequest {
     max_len: 256
   }];
   string description = 2 [(buf.validate.field).string.max_len = 1000];
-  google.protobuf.FieldMask update_mask = 4 [
+  google.protobuf.FieldMask update_mask = 3 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
@@ -203,7 +141,6 @@ message UpdateDaemonDefaultsResponse {
   Workspace workspace = 1;
 }
 
-// A rule left out stays as it is.
 message SetDefaultSafeguardsRequest {
   bool record_sessions = 1;
   bool kill_on_revoke = 2;
@@ -236,63 +173,3 @@ message CreateWorkspaceRequest {
 message CreateWorkspaceResponse {
   string url = 1;
 }
-
-// Users ----------------------------------------------------------------------
-message ListUsersRequest {
-  int32 limit = 1 [(buf.validate.field).int32 = {
-    gte: 1
-    lte: 100
-  }];
-  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
-  string query = 3;
-  WorkspaceRole role = 4 [(buf.validate.field).enum.defined_only = true];
-}
-message ListUsersResponse {
-  repeated User users = 1;
-  int32 total = 2;
-}
-
-message GetUserRequest {
-  string user_id = 1 [(buf.validate.field).string.uuid = true];
-}
-message GetUserResponse {
-  User user = 1;
-}
-
-message UpdateUserRoleRequest {
-  string user_id = 1 [(buf.validate.field).string.uuid = true];
-  WorkspaceRole role = 2 [(buf.validate.field).enum = {
-    in: [
-      1,
-      2,
-      3,
-      4
-    ]
-  }];
-}
-message UpdateUserRoleResponse {}
-
-message DeactivateUserRequest {
-  string user_id = 1 [(buf.validate.field).string.uuid = true];
-}
-message DeactivateUserResponse {}
-
-message ReactivateUserRequest {
-  string user_id = 1 [(buf.validate.field).string.uuid = true];
-}
-message ReactivateUserResponse {}
-
-message DeleteUserRequest {
-  string user_id = 1 [(buf.validate.field).string.uuid = true];
-}
-message DeleteUserResponse {}
-
-message ClearUserIdentitiesRequest {
-  string user_id = 1 [(buf.validate.field).string.uuid = true];
-}
-message ClearUserIdentitiesResponse {}
-
-message TransferOwnershipRequest {
-  string new_owner_id = 1 [(buf.validate.field).string.uuid = true];
-}
-message TransferOwnershipResponse {}

@@ -14,17 +14,17 @@
 
 	interface Props {
 		target: Target;
+		usernames: string[];
 		/** Why a web shell does not work, unset when it does. The row then copies the ssh command. */
 		why: string | undefined;
 		/** Its daemon records sessions. */
 		records?: boolean;
 	}
 
-	let { target, why, records = false }: Props = $props();
+	let { target, usernames, why, records = false }: Props = $props();
 
 	const shell = $derived(!why);
 
-	const usernames = $derived(target.usernames);
 	const mine = $derived(
 		[...getSessions().entries()].filter(([, s]) => !!s.daemonID && s.daemonID === target.daemonId)
 	);

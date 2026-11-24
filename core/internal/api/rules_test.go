@@ -1,7 +1,6 @@
 package api
 
 import (
-	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,21 +49,16 @@ func TestRulesGolden(t *testing.T) {
 		md, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		require.NoError(t, err, procedure)
 		lines = append(lines, fmt.Sprintf(
-			"%s public=%t self=%t role=%s daemon=%t browser=%s nk=%t machine=%t feature=%s capped=%t signs=%t audited=%t",
+			"%s public=%t daemon=%t role=%s fresh=%t cli=%t service_account=%t feature=%s capped=%t audited=%t",
 			procedure,
 			a.GetPublic(),
-			a.GetSelf(),
-			strings.TrimPrefix(a.GetRole().String(), "WORKSPACE_ROLE_"),
 			a.GetDaemon(),
-			cmp.Or(
-				strings.TrimPrefix(strings.TrimPrefix(a.GetBrowser().String(), "BROWSER_"), "UNSPECIFIED"),
-				"SESSION",
-			),
-			a.GetNk(),
-			a.GetMachine(),
+			strings.TrimPrefix(a.GetRole().String(), "WORKSPACE_ROLE_"),
+			a.GetFresh(),
+			a.GetCli(),
+			a.GetServiceAccount(),
 			a.GetFeature(),
 			a.GetCapped(),
-			a.GetSigns(),
 			audit.Records(md),
 		))
 	}
@@ -102,7 +96,7 @@ func TestEveryFeatureIsGated(t *testing.T) {
 
 // onlyAFreshPerson is the strictest answer to the three questions: a person who just signed in, no nk, no machine.
 func onlyAFreshPerson(a *nokkuv1.Access) bool {
-	return a.GetBrowser() == nokkuv1.Browser_BROWSER_FRESH && !a.GetNk() && !a.GetMachine()
+	return a.GetFresh() && !a.GetCli() && !a.GetServiceAccount()
 }
 
 // Handing out a credential takes a recent sign-in, or a stolen cookie lasts.
@@ -128,9 +122,9 @@ func TestSignInAndAuditChangesAreFresh(t *testing.T) {
 		nokkuv1connect.AuditStreamServiceCreateAuditStreamProcedure,
 		nokkuv1connect.AuditStreamServiceUpdateAuditStreamProcedure,
 		nokkuv1connect.AuditStreamServiceDeleteAuditStreamProcedure,
-		nokkuv1connect.WorkspaceServiceTransferOwnershipProcedure,
+		nokkuv1connect.UserServiceTransferOwnershipProcedure,
 		nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure,
-		nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure,
+		nokkuv1connect.UserServiceSetUserRoleProcedure,
 		nokkuv1connect.RecordingServiceDeleteRecordingProcedure,
 	} {
 		assert.True(t, onlyAFreshPerson(procedureAccess[procedure]), "%s needs a recent sign-in", procedure)
@@ -167,7 +161,6 @@ func TestNoStreamCarriesAPlanGate(t *testing.T) {
 				streams++
 				a := procedureAccess["/"+string(svc.FullName())+"/"+string(m.Name())]
 				assert.Empty(t, a.GetFeature(), "%s: a stream's feature is never checked", m.FullName())
-				assert.False(t, a.GetSigns(), "%s: a stream's signs is never checked", m.FullName())
 				assert.False(t, a.GetCapped(), "%s: a stream's capped is never checked", m.FullName())
 			}
 		}

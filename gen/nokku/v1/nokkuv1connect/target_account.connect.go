@@ -33,6 +33,9 @@ const (
 	// TargetAccountServiceRemoveTargetAccountProcedure is the procedure name of the
 	// TargetAccountService's RemoveTargetAccount RPC.
 	TargetAccountServiceRemoveTargetAccountProcedure = "/nokku.v1.TargetAccountService/RemoveTargetAccount"
+	// TargetAccountServiceGetGrantScopeProcedure is the procedure name of the TargetAccountService's
+	// GetGrantScope RPC.
+	TargetAccountServiceGetGrantScopeProcedure = "/nokku.v1.TargetAccountService/GetGrantScope"
 	// TargetAccountServiceGrantProcedure is the procedure name of the TargetAccountService's Grant RPC.
 	TargetAccountServiceGrantProcedure = "/nokku.v1.TargetAccountService/Grant"
 	// TargetAccountServiceRevokeProcedure is the procedure name of the TargetAccountService's Revoke
@@ -63,6 +66,14 @@ var (
 			Procedure:  TargetAccountServiceRemoveTargetAccountProcedure,
 		}
 	})
+	targetAccountServiceGetGrantScopeSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType:       connect.StreamTypeUnary,
+			Schema:           v1.File_nokku_v1_target_account_proto.Services().ByName("TargetAccountService").Methods().ByName("GetGrantScope"),
+			Procedure:        TargetAccountServiceGetGrantScopeProcedure,
+			IdempotencyLevel: connect.IdempotencyNoSideEffects,
+		}
+	})
 	targetAccountServiceGrantSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -84,9 +95,8 @@ type TargetAccountServiceClient interface {
 	ListTargetAccounts(context.Context, *v1.ListTargetAccountsRequest) (*v1.ListTargetAccountsResponse, error)
 	AddTargetAccount(context.Context, *v1.AddTargetAccountRequest) (*v1.AddTargetAccountResponse, error)
 	RemoveTargetAccount(context.Context, *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error)
-	// Grant gives subjects one account on many servers, in one transaction and one access change.
+	GetGrantScope(context.Context, *v1.GetGrantScopeRequest) (*v1.GetGrantScopeResponse, error)
 	Grant(context.Context, *v1.GrantRequest) (*v1.GrantResponse, error)
-	// Revoke takes one subject's own grants off many servers, in one transaction and one access change.
 	Revoke(context.Context, *v1.RevokeRequest) (*v1.RevokeResponse, error)
 }
 
@@ -101,9 +111,8 @@ type TargetAccountServiceHandler interface {
 	ListTargetAccounts(context.Context, *v1.ListTargetAccountsRequest) (*v1.ListTargetAccountsResponse, error)
 	AddTargetAccount(context.Context, *v1.AddTargetAccountRequest) (*v1.AddTargetAccountResponse, error)
 	RemoveTargetAccount(context.Context, *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error)
-	// Grant gives subjects one account on many servers, in one transaction and one access change.
+	GetGrantScope(context.Context, *v1.GetGrantScopeRequest) (*v1.GetGrantScopeResponse, error)
 	Grant(context.Context, *v1.GrantRequest) (*v1.GrantResponse, error)
-	// Revoke takes one subject's own grants off many servers, in one transaction and one access change.
 	Revoke(context.Context, *v1.RevokeRequest) (*v1.RevokeResponse, error)
 }
 
@@ -115,6 +124,7 @@ func RegisterTargetAccountServiceHandler(server *connect.Server, svc TargetAccou
 		connect.Method{Spec: targetAccountServiceListTargetAccountsSpec(), Handler: adapter.listTargetAccounts},
 		connect.Method{Spec: targetAccountServiceAddTargetAccountSpec(), Handler: adapter.addTargetAccount},
 		connect.Method{Spec: targetAccountServiceRemoveTargetAccountSpec(), Handler: adapter.removeTargetAccount},
+		connect.Method{Spec: targetAccountServiceGetGrantScopeSpec(), Handler: adapter.getGrantScope},
 		connect.Method{Spec: targetAccountServiceGrantSpec(), Handler: adapter.grant},
 		connect.Method{Spec: targetAccountServiceRevokeSpec(), Handler: adapter.revoke},
 	)
@@ -133,6 +143,10 @@ func (UnimplementedTargetAccountServiceHandler) AddTargetAccount(context.Context
 
 func (UnimplementedTargetAccountServiceHandler) RemoveTargetAccount(context.Context, *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.RemoveTargetAccount is not implemented")
+}
+
+func (UnimplementedTargetAccountServiceHandler) GetGrantScope(context.Context, *v1.GetGrantScopeRequest) (*v1.GetGrantScopeResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetAccountService.GetGrantScope is not implemented")
 }
 
 func (UnimplementedTargetAccountServiceHandler) Grant(context.Context, *v1.GrantRequest) (*v1.GrantResponse, error) {
@@ -166,6 +180,14 @@ func (c *targetAccountServiceClient) AddTargetAccount(ctx context.Context, req *
 func (c *targetAccountServiceClient) RemoveTargetAccount(ctx context.Context, req *v1.RemoveTargetAccountRequest) (*v1.RemoveTargetAccountResponse, error) {
 	var res v1.RemoveTargetAccountResponse
 	if err := c.client.CallUnary(ctx, targetAccountServiceRemoveTargetAccountSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *targetAccountServiceClient) GetGrantScope(ctx context.Context, req *v1.GetGrantScopeRequest) (*v1.GetGrantScopeResponse, error) {
+	var res v1.GetGrantScopeResponse
+	if err := c.client.CallUnary(ctx, targetAccountServiceGetGrantScopeSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -219,6 +241,18 @@ func (h targetAccountServiceHandler) removeTargetAccount(ctx context.Context, _ 
 		return err
 	}
 	res, err := h.svc.RemoveTargetAccount(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h targetAccountServiceHandler) getGrantScope(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.GetGrantScopeRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.GetGrantScope(ctx, &req)
 	if err != nil {
 		return err
 	}

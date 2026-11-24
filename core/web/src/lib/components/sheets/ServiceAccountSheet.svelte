@@ -21,7 +21,7 @@
 	import { TagsInput } from '#lib/components/ui/tags-input/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import {
 		ServiceAccountSchema,
 		type ServiceAccountToken

@@ -79,7 +79,7 @@ func (s *recordingService) GetRecording(
 	req *nokkuv1.GetRecordingRequest,
 	stream nokkuv1connect.RecordingServiceGetRecordingServerStream,
 ) error {
-	rec, err := s.cfg.Conn.Tenant().GetRecording(ctx, req.GetRecordingId())
+	rec, err := s.cfg.Conn.Tenant().GetRecording(ctx, req.GetId())
 	if err != nil {
 		return err
 	}
@@ -94,9 +94,9 @@ func (s *recordingService) GetRecording(
 	if err := stream.Send(&nokkuv1.GetRecordingResponse{
 		Msg: &nokkuv1.GetRecordingResponse_Meta{
 			Meta: &nokkuv1.RecordingMeta{
-				RecordingId: &rec.ID,
-				Username:    &rec.Username,
-				Principal:   &rec.Principal,
+				Id:        &rec.ID,
+				Username:  &rec.Username,
+				Principal: &rec.Principal,
 			},
 		},
 	}); err != nil {
@@ -140,7 +140,7 @@ func (s *recordingService) DeleteRecording(
 	req *nokkuv1.DeleteRecordingRequest,
 ) (*nokkuv1.DeleteRecordingResponse, error) {
 	// The delete queue takes the object, unreadable without the row's key.
-	if _, err := s.cfg.Conn.Tenant().DeleteRecording(ctx, req.GetRecordingId()); err != nil {
+	if _, err := s.cfg.Conn.Tenant().DeleteRecording(ctx, req.GetId()); err != nil {
 		return nil, err
 	}
 	return &nokkuv1.DeleteRecordingResponse{}, nil

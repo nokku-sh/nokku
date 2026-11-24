@@ -24,7 +24,6 @@
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
 	import Term from '#lib/components/blocks/Term.svelte';
 	import type { JoinToken } from '#lib/gen/nokku/v1/join_token_pb.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import { formatTs, listNames, toDate } from '#lib/utils.js';
 	import {
@@ -144,9 +143,6 @@
 			: g.subjects.filter((s) => s.id !== subject.id);
 	}
 
-	const ids = (subjects: Subject[], kind: SubjectKind) =>
-		subjects.filter((s) => s.kind === kind).map((s) => s.id);
-
 	const maxUses = $derived(
 		uses === 'unlimited'
 			? undefined
@@ -207,9 +203,7 @@
 			tags,
 			grants: grants.map((g) => ({
 				username: g.username,
-				userIds: ids(g.subjects, SubjectKind.USER),
-				teamIds: ids(g.subjects, SubjectKind.TEAM),
-				serviceAccountIds: ids(g.subjects, SubjectKind.SERVICE_ACCOUNT)
+				subjects: g.subjects.map(({ id, kind }) => ({ id, kind }))
 			})),
 			ephemeral,
 			retireAfter: ephemeral ? { seconds: BigInt(retireAfter) } : undefined
@@ -584,13 +578,13 @@
 					</div>
 					<div class="flex items-center gap-3 text-xs">
 						{#if t.maxUses}
-							<Progress value={(t.uses / t.maxUses) * 100} class="h-1.5 flex-1" />
+							<Progress value={(t.useCount / t.maxUses) * 100} class="h-1.5 flex-1" />
 							<span class="shrink-0 text-muted-foreground tabular-nums">
-								{t.uses} / {t.maxUses} used
+								{t.useCount} / {t.maxUses} used
 							</span>
 						{:else}
 							<span class="flex-1 text-muted-foreground tabular-nums">
-								{t.uses} used · no limit
+								{t.useCount} used · no limit
 							</span>
 						{/if}
 						<Badge variant={expiresSoon(t) ? 'warning' : 'outline'} class="shrink-0">

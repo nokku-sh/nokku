@@ -1,8 +1,14 @@
 <script lang="ts">
-	import { eventLabel, eventWhat, outcomeLabel, outcomeOf } from '#lib/components/audit/audit.js';
+	import {
+		eventLabel,
+		eventWhat,
+		kindName,
+		outcomeLabel,
+		outcomeOf
+	} from '#lib/components/audit/audit.js';
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { Badge } from '#lib/components/ui/badge/index.js';
-	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { ActorKind, type AuditEvent } from '#lib/gen/nokku/v1/audit_log_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import { CircleCheckBig, CircleX, Globe, UserRound, Zap } from '@lucide/svelte';
 	import DetailList from './DetailList.svelte';
@@ -10,7 +16,7 @@
 	import Section from './Section.svelte';
 
 	interface Props {
-		log?: EventLog;
+		log?: AuditEvent;
 		onClose: () => void;
 	}
 
@@ -18,8 +24,9 @@
 
 	const actorHref = $derived.by(() => {
 		if (!log?.actorId) return undefined;
-		if (log.actorKind === 'user') return `/access/people?id=${log.actorId}`;
-		if (log.actorKind === 'service_account') return `/access/service-accounts?id=${log.actorId}`;
+		if (log.actorKind === ActorKind.USER) return `/access/people?id=${log.actorId}`;
+		if (log.actorKind === ActorKind.SERVICE_ACCOUNT)
+			return `/access/service-accounts?id=${log.actorId}`;
 		return undefined;
 	});
 
@@ -60,7 +67,7 @@
 				<DetailList
 					items={[
 						{ label: 'Name', value: log.actorName || 'unknown', href: actorHref },
-						{ label: 'Kind', value: log.actorKind.replace(/_/g, ' ') || 'unknown' },
+						{ label: 'Kind', value: kindName(log.actorKind) },
 						{ label: 'Actor ID', value: log.actorId, mono: true, copy: true, wide: true }
 					]}
 				/>

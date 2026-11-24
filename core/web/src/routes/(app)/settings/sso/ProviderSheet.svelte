@@ -27,11 +27,11 @@
 	const sheet = useSheet();
 	const can = user.can();
 	const providers = sso.list();
-	const entity = $derived(providers.data?.find((p) => p.providerId === sheet.id));
+	const entity = $derived(providers.data?.find((p) => p.id === sheet.id));
 	const draft = useDraft(
 		SSOProviderSchema,
 		() => entity,
-		(p) => p.providerId
+		(p) => p.id
 	);
 	const model = $derived(draft.current);
 
@@ -51,7 +51,7 @@
 	}) {
 		if (!model) return;
 		await put.mutateAsync({
-			providerId: model.providerId,
+			id: model.id,
 			name: model.name,
 			enabled: model.enabled,
 			issuerUrl: model.issuerUrl,
@@ -143,7 +143,7 @@
 					'Nobody can sign in through it anymore. Accounts it created stay, and keep their other sign-in methods.',
 				confirmText: 'Remove',
 				onConfirm: async () => {
-					await remove.mutateAsync({ providerId: p.providerId });
+					await remove.mutateAsync({ id: p.id });
 					sheet.close();
 				}
 			})
@@ -219,7 +219,7 @@
 	onRetry={autoSave.retry}
 	saveHint={sheet.tab === 'settings'}
 	readonly={!can.own}
-	meta={{ id: entity?.providerId, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
+	meta={{ id: entity?.id, createdAt: entity?.createdAt, updatedAt: entity?.updatedAt }}
 >
 	{#snippet media()}
 		<div class="grid size-10 place-items-center rounded-lg bg-muted">

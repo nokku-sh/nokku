@@ -89,7 +89,7 @@ func (t *targetStream) Receive(msg any) error {
 	return nil
 }
 
-// Records is false for calls the proto marks read-only or quiet.
+// Records is false for calls the proto marks read-only or unaudited.
 func Records(schema any) bool {
 	md, ok := schema.(protoreflect.MethodDescriptor)
 	if !ok {
@@ -99,7 +99,7 @@ func Records(schema any) bool {
 		return false
 	}
 	access, _ := proto.GetExtension(md.Options(), nokkuv1.E_Access).(*nokkuv1.Access)
-	return !access.GetQuiet()
+	return !access.GetUnaudited()
 }
 
 // Log is for work the interceptor cannot see, like a relay opening.

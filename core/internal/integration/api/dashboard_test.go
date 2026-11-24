@@ -42,12 +42,12 @@ func TestDashboardDaemons(t *testing.T) {
 	res, err := viewer.GetDashboard(t.Context(), &nokkuv1.GetDashboardRequest{})
 	require.NoError(t, err)
 
-	assert.EqualValues(t, len(all), res.GetDaemons(), "every daemon counts")
+	assert.EqualValues(t, len(all), res.GetDaemonCount(), "every daemon counts")
 	require.NotEmpty(t, res.GetPendingDaemons())
 	assert.Equal(t, pending.GetId(), res.GetPendingDaemons()[0].GetId(), "the newest pending daemon comes first")
 	assert.LessOrEqual(t, len(res.GetPendingDaemons()), 5)
-	assert.LessOrEqual(t, len(res.GetOfflineServers()), 5)
-	for _, server := range res.GetOfflineServers() {
+	assert.LessOrEqual(t, len(res.GetOfflineTargets()), 5)
+	for _, server := range res.GetOfflineTargets() {
 		d := server.GetDaemon()
 		require.NotNil(t, d, "an offline server comes with its daemon")
 		assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, d.GetStatus(), "only accepted daemons are missed")
@@ -73,14 +73,14 @@ func TestDashboardRecentChangesSkipRoutine(t *testing.T) {
 	dashboard := nokkuv1connect.NewDashboardServiceClient(
 		clientOn(srv, editorAuth),
 	)
-	var changes []*nokkuv1.EventLog
+	var changes []*nokkuv1.AuditEvent
 	require.Eventually(t, func() bool {
 		res, err := dashboard.GetDashboard(t.Context(), &nokkuv1.GetDashboardRequest{})
 		if err != nil {
 			return false
 		}
 		changes = res.GetRecentChanges()
-		return slices.ContainsFunc(changes, func(e *nokkuv1.EventLog) bool { return e.GetTarget() == name })
+		return slices.ContainsFunc(changes, func(e *nokkuv1.AuditEvent) bool { return e.GetTarget() == name })
 	}, 5*time.Second, 50*time.Millisecond, "the new team is no recent change")
 
 	assert.LessOrEqual(t, len(changes), 8)
@@ -128,11 +128,11 @@ func TestDashboardEndingGrants(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, res.GetEndingGrants(), 1, "only the grants that end within a day, as one row")
-	assert.EqualValues(t, 1, res.GetEndingGrantsTotal())
+	assert.EqualValues(t, 1, res.GetEndingGrantCount())
 	g := res.GetEndingGrants()[0]
-	assert.Equal(t, mia, g.GetSubjectId())
+	assert.Equal(t, mia, g.GetSubject().GetId())
 	assert.Equal(t, "Mia", g.GetSubjectName())
-	assert.Equal(t, nokkuv1.SubjectKind_SUBJECT_KIND_USER, g.GetSubjectKind())
+	assert.Equal(t, nokkuv1.SubjectKind_SUBJECT_KIND_USER, g.GetSubject().GetKind())
 	assert.Equal(t, "deploy", g.GetUsername())
 	assert.WithinDuration(t, soon, g.GetExpiresAt().AsTime(), time.Second)
 	assert.EqualValues(t, 2, g.GetTargetCount())

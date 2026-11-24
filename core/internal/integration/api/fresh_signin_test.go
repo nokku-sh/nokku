@@ -58,7 +58,7 @@ func TestFreshSignInMatrix(t *testing.T) {
 	providerID := uniq("link")
 	issuer := fakeIssuer(t).URL + "/" + providerID
 	provider := &nokkuv1.PutSSOProviderRequest{
-		ProviderId: &providerID, Name: new("Link"), Enabled: new(true), IssuerUrl: &issuer,
+		Id: &providerID, Name: new("Link"), Enabled: new(true), IssuerUrl: &issuer,
 		ClientId: new("nokku"), ClientSecret: new("s3cret"),
 	}
 	_, err := nokkuv1connect.NewSSOServiceClient(rpc(browserSession(t, cfg, owner, 0))).
@@ -143,15 +143,15 @@ func TestFreshSignInMatrix(t *testing.T) {
 		}},
 		// No user has these ids, a call past the fresh check answers not_found.
 		{"WorkspaceService.UpdateUserRole", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).UpdateUserRole(t.Context(),
-				&nokkuv1.UpdateUserRoleRequest{
-					UserId: new(uuid.NewV7().String()), Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN.Enum(),
+			_, err := nokkuv1connect.NewUserServiceClient(rpc(s)).SetUserRole(t.Context(),
+				&nokkuv1.SetUserRoleRequest{
+					Id: new(uuid.NewV7().String()), Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN.Enum(),
 				})
 			return refusedRPC(err)
 		}},
 		{"WorkspaceService.ReactivateUser", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).ReactivateUser(t.Context(),
-				&nokkuv1.ReactivateUserRequest{UserId: new(uuid.NewV7().String())})
+			_, err := nokkuv1connect.NewUserServiceClient(rpc(s)).ReactivateUser(t.Context(),
+				&nokkuv1.ReactivateUserRequest{Id: new(uuid.NewV7().String())})
 			return refusedRPC(err)
 		}},
 		{"DaemonService.SetDaemonSafeguards", admin, func(s login) (string, bool) {
@@ -171,8 +171,8 @@ func TestFreshSignInMatrix(t *testing.T) {
 			return refusedRPC(err)
 		}},
 		{"WorkspaceService.DeleteUser", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).DeleteUser(t.Context(),
-				&nokkuv1.DeleteUserRequest{UserId: new(uuid.NewV7().String())})
+			_, err := nokkuv1connect.NewUserServiceClient(rpc(s)).DeleteUser(t.Context(),
+				&nokkuv1.DeleteUserRequest{Id: new(uuid.NewV7().String())})
 			return refusedRPC(err)
 		}},
 		{"TeamService.OpenTeamToSCIM", admin, func(s login) (string, bool) {
@@ -240,7 +240,7 @@ func TestFreshSignInMatrix(t *testing.T) {
 		}},
 		{"TargetService.ForgetHostKey", admin, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).ForgetHostKey(t.Context(),
-				&nokkuv1.ForgetHostKeyRequest{Id: new(uuid.NewV7().String())})
+				&nokkuv1.ForgetHostKeyRequest{TargetId: new(uuid.NewV7().String())})
 			return refusedRPC(err)
 		}},
 		{"SSOService.PutSSOProvider", owner, func(s login) (string, bool) {
@@ -249,7 +249,7 @@ func TestFreshSignInMatrix(t *testing.T) {
 		}},
 		// The shared owner stays, an unknown new owner answers not_found.
 		{"WorkspaceService.TransferOwnership", owner, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewWorkspaceServiceClient(rpc(s)).TransferOwnership(t.Context(),
+			_, err := nokkuv1connect.NewUserServiceClient(rpc(s)).TransferOwnership(t.Context(),
 				&nokkuv1.TransferOwnershipRequest{NewOwnerId: new(uuid.NewV7().String())})
 			return refusedRPC(err)
 		}},

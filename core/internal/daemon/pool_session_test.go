@@ -306,7 +306,7 @@ func TestPool_ListSessionsShowsOnlyShells(t *testing.T) {
 	s := startTestSession(t, p, srv, "web-1")
 	sessions := p.ListSessions("d1")
 	require.Len(t, sessions, 1)
-	assert.Equal(t, "web-1", sessions[0].GetSessionId())
+	assert.Equal(t, "web-1", sessions[0].GetId())
 	assert.Equal(t, "user", sessions[0].GetUsername())
 	assert.Equal(t, "u1", sessions[0].GetUserId())
 	assert.Equal(t, []string{"d1"}, p.SessionDaemons())

@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { CredentialType } from '#lib/gen/nokku/v1/account_pb.js';
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
+	import { UserSchema } from '#lib/gen/nokku/v1/user_pb.js';
 	import { credentials } from '#lib/api/credential.svelte.js';
 	import { whenFresh } from '#lib/api/auth.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -16,7 +18,6 @@
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
-	import { UserSchema } from '#lib/gen/nokku/v1/account_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
 	import { roleIcon, roleLabel } from '#lib/roles.js';
 	import { formatTs } from '#lib/utils.js';
@@ -34,7 +35,7 @@
 	const creds = credentials.all();
 	// An identity provider owns the address of the accounts it signs in or provisions.
 	const managed = $derived(
-		!!me.data?.scimManaged || (creds.data ?? []).some((c) => c.type === 'oidc')
+		!!me.data?.scimManaged || (creds.data ?? []).some((c) => c.type === CredentialType.OIDC)
 	);
 	const isOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
 

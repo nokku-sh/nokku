@@ -25,19 +25,17 @@ const (
 )
 
 type ServiceAccount struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Name        *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
-	Description *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
-	Role        *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	Tags        []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
-	LastUsedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
-	CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt   *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	// force_command replaces what a login asks to run. source_address lists the addresses a login may come from.
-	// Both go on the account's certificates, and the CA's own settings don't.
-	ForceCommand  *string `protobuf:"bytes,9,opt,name=force_command,json=forceCommand" json:"force_command,omitempty"`
-	SourceAddress *string `protobuf:"bytes,10,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	Description   *string                `protobuf:"bytes,3,opt,name=description" json:"description,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,4,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags" json:"tags,omitempty"`
+	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_used_at,json=lastUsedAt" json:"last_used_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	ForceCommand  *string                `protobuf:"bytes,9,opt,name=force_command,json=forceCommand" json:"force_command,omitempty"`
+	SourceAddress *string                `protobuf:"bytes,10,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -218,8 +216,6 @@ func (x *ServiceAccountToken) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-// A rule says which jobs of a CI platform may sign in as the account: the issuer of their token and the claims it must
-// hold, each exactly.
 type ServiceAccountFederation struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
@@ -728,7 +724,6 @@ func (x *SetServiceAccountRoleResponse) GetServiceAccount() *ServiceAccount {
 	return nil
 }
 
-// A limit left out stays, an empty one takes it away.
 type SetServiceAccountLimitsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
@@ -1729,19 +1724,19 @@ const file_nokku_v1_service_account_proto_rawDesc = "" +
 	"\x02id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"(\n" +
 	"&RemoveServiceAccountFederationResponse2\xd7\f\n" +
 	"\x15ServiceAccountService\x12i\n" +
-	"\x11GetServiceAccount\x12\".nokku.v1.GetServiceAccountRequest\x1a#.nokku.v1.GetServiceAccountResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12q\n" +
-	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\r\xc2\xf3\x18\x06\x18\x02X\x01h\x01\x90\x02\x01\x12o\n" +
+	"\x11GetServiceAccount\x12\".nokku.v1.GetServiceAccountRequest\x1a#.nokku.v1.GetServiceAccountResponse\"\v\xc2\xf3\x18\x04\x18\x020\x01\x90\x02\x01\x12q\n" +
+	"\x13ListServiceAccounts\x12$.nokku.v1.ListServiceAccountsRequest\x1a%.nokku.v1.ListServiceAccountsResponse\"\r\xc2\xf3\x18\x06\x18\x02(\x010\x01\x90\x02\x01\x12o\n" +
 	"\x14CreateServiceAccount\x12%.nokku.v1.CreateServiceAccountRequest\x1a&.nokku.v1.CreateServiceAccountResponse\"\b\xc2\xf3\x18\x04\x18\x03@\x01\x12m\n" +
 	"\x14UpdateServiceAccount\x12%.nokku.v1.UpdateServiceAccountRequest\x1a&.nokku.v1.UpdateServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12r\n" +
-	"\x15SetServiceAccountRole\x12&.nokku.v1.SetServiceAccountRoleRequest\x1a'.nokku.v1.SetServiceAccountRoleResponse\"\b\xc2\xf3\x18\x04\x18\x03`\x01\x12x\n" +
-	"\x17SetServiceAccountLimits\x12(.nokku.v1.SetServiceAccountLimitsRequest\x1a).nokku.v1.SetServiceAccountLimitsResponse\"\b\xc2\xf3\x18\x04\x18\x03`\x01\x12m\n" +
+	"\x15SetServiceAccountRole\x12&.nokku.v1.SetServiceAccountRoleRequest\x1a'.nokku.v1.SetServiceAccountRoleResponse\"\b\xc2\xf3\x18\x04\x18\x03 \x01\x12x\n" +
+	"\x17SetServiceAccountLimits\x12(.nokku.v1.SetServiceAccountLimitsRequest\x1a).nokku.v1.SetServiceAccountLimitsResponse\"\b\xc2\xf3\x18\x04\x18\x03 \x01\x12m\n" +
 	"\x14DeleteServiceAccount\x12%.nokku.v1.DeleteServiceAccountRequest\x1a&.nokku.v1.DeleteServiceAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12~\n" +
-	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\b\xc2\xf3\x18\x04\x18\x03`\x01\x12~\n" +
-	"\x18ListServiceAccountTokens\x12).nokku.v1.ListServiceAccountTokensRequest\x1a*.nokku.v1.ListServiceAccountTokensResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12|\n" +
+	"\x19CreateServiceAccountToken\x12*.nokku.v1.CreateServiceAccountTokenRequest\x1a+.nokku.v1.CreateServiceAccountTokenResponse\"\b\xc2\xf3\x18\x04\x18\x03 \x01\x12~\n" +
+	"\x18ListServiceAccountTokens\x12).nokku.v1.ListServiceAccountTokensRequest\x1a*.nokku.v1.ListServiceAccountTokensResponse\"\v\xc2\xf3\x18\x04\x18\x020\x01\x90\x02\x01\x12|\n" +
 	"\x19RevokeServiceAccountToken\x12*.nokku.v1.RevokeServiceAccountTokenRequest\x1a+.nokku.v1.RevokeServiceAccountTokenResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12\x84\x01\n" +
-	"\x1bAddServiceAccountFederation\x12,.nokku.v1.AddServiceAccountFederationRequest\x1a-.nokku.v1.AddServiceAccountFederationResponse\"\b\xc2\xf3\x18\x04\x18\x03`\x01\x12\x8d\x01\n" +
-	"\x1dListServiceAccountFederations\x12..nokku.v1.ListServiceAccountFederationsRequest\x1a/.nokku.v1.ListServiceAccountFederationsResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12\x8d\x01\n" +
-	"\x1eRemoveServiceAccountFederation\x12/.nokku.v1.RemoveServiceAccountFederationRequest\x1a0.nokku.v1.RemoveServiceAccountFederationResponse\"\b\xc2\xf3\x18\x04\x18\x03`\x01B\x94\x01\n" +
+	"\x1bAddServiceAccountFederation\x12,.nokku.v1.AddServiceAccountFederationRequest\x1a-.nokku.v1.AddServiceAccountFederationResponse\"\b\xc2\xf3\x18\x04\x18\x03 \x01\x12\x8d\x01\n" +
+	"\x1dListServiceAccountFederations\x12..nokku.v1.ListServiceAccountFederationsRequest\x1a/.nokku.v1.ListServiceAccountFederationsResponse\"\v\xc2\xf3\x18\x04\x18\x020\x01\x90\x02\x01\x12\x8d\x01\n" +
+	"\x1eRemoveServiceAccountFederation\x12/.nokku.v1.RemoveServiceAccountFederationRequest\x1a0.nokku.v1.RemoveServiceAccountFederationResponse\"\b\xc2\xf3\x18\x04\x18\x03 \x01B\x94\x01\n" +
 	"\fcom.nokku.v1B\x13ServiceAccountProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

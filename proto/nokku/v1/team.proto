@@ -6,21 +6,21 @@ import "buf/validate/validate.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
-import "nokku/v1/account.proto";
+import "nokku/v1/user.proto";
 
 service TeamService {
   rpc GetTeam(GetTeamRequest) returns (GetTeamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListTeams(ListTeamsRequest) returns (ListTeamsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      nk: true
-      machine: true
+      cli: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -36,7 +36,7 @@ service TeamService {
   rpc OpenTeamToSCIM(OpenTeamToSCIMRequest) returns (OpenTeamToSCIMResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc CloseTeamToSCIM(CloseTeamToSCIMRequest) returns (CloseTeamToSCIMResponse) {
@@ -54,14 +54,14 @@ service TeamService {
   rpc ListTeamMembers(ListTeamMembersRequest) returns (ListTeamMembersResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListTeamsForUser(ListTeamsForUserRequest) returns (ListTeamsForUserResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -75,10 +75,7 @@ message Team {
   int32 member_count = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
-  // The identity provider sets the members over SCIM.
   bool scim_managed = 8;
-  // An admin lets a SCIM group of the same name take this team over, with the access it has. Until then such a group
-  // is refused. The takeover uses it up.
   bool scim_open = 9;
 }
 

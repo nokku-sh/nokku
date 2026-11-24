@@ -18,6 +18,19 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
 
+var sessionKinds = map[string]nokkuv1.SessionKind{
+	string(actor.KindUser): nokkuv1.SessionKind_SESSION_KIND_BROWSER,
+	string(actor.KindCLI):  nokkuv1.SessionKind_SESSION_KIND_CLI,
+}
+
+//nolint:exhaustive // only how people sign in
+var signInMethods = map[iam.Method]nokkuv1.SignInMethod{
+	iam.MethodPasskey:   nokkuv1.SignInMethod_SIGN_IN_METHOD_PASSKEY,
+	iam.MethodMagicLink: nokkuv1.SignInMethod_SIGN_IN_METHOD_MAGIC_LINK,
+	iam.MethodOIDC:      nokkuv1.SignInMethod_SIGN_IN_METHOD_OIDC,
+	iam.MethodDevice:    nokkuv1.SignInMethod_SIGN_IN_METHOD_DEVICE,
+}
+
 type accountService struct {
 	cfg *app.Config
 }
@@ -168,8 +181,8 @@ func (s *accountService) ListAccountSessions(
 	for _, sess := range sessions {
 		out = append(out, &nokkuv1.AccountSession{
 			Id:         new(sess.ID),
-			Kind:       new(sess.Kind),
-			Method:     new(sess.Method),
+			Kind:       sessionKinds[sess.Kind].Enum(),
+			Method:     signInMethods[iam.Method(sess.Method)].Enum(),
 			Binding:    new(sess.Binding),
 			Current:    new(sess.ID == current.ID),
 			ExpiresAt:  db.SafeTimestamp(sess.ExpiresAt),
@@ -187,8 +200,8 @@ func (s *accountService) ListAccountSessions(
 	for _, d := range devices {
 		out = append(out, &nokkuv1.AccountSession{
 			Id:         new(d.ID),
-			Kind:       new("device"),
-			Method:     new(string(iam.MethodDevice)),
+			Kind:       nokkuv1.SessionKind_SESSION_KIND_DEVICE.Enum(),
+			Method:     nokkuv1.SignInMethod_SIGN_IN_METHOD_DEVICE.Enum(),
 			Binding:    new(""),
 			Current:    new(false),
 			ExpiresAt:  timestamppb.New(d.ExpiresAt),

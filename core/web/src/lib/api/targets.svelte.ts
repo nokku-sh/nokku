@@ -1,10 +1,15 @@
 import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { authTransport, LIVE } from './client';
 import {
-	TargetService,
 	type AccessGraphFilterSchema,
-	type GetAccessMatrixRequestSchema,
-	type ListTargetsRequestSchema
+	AccessViewService,
+	type GetAccessMatrixRequestSchema
+} from '#lib/gen/nokku/v1/access_view_pb.js';
+import {
+	type ListTargetsRequestSchema,
+	type Target,
+	type TargetAccess,
+	TargetService
 } from '#lib/gen/nokku/v1/target_pb.js';
 import { createClient } from '@connectrpc/connect';
 import { keepPreviousData } from '@tanstack/svelte-query';
@@ -16,6 +21,11 @@ import { plural, useBulkMutation } from './bulk';
 import { usePatch } from './mask';
 
 export type AccessGraphFilter = MessageInitShape<typeof AccessGraphFilterSchema>;
+
+/** A TargetAccess whose target is there, the core never sends one without. */
+export type SubjectTarget = TargetAccess & { target: Target };
+const subjectTarget = (a: TargetAccess): SubjectTarget[] =>
+	a.target ? [{ ...a, target: a.target }] : [];
 
 // What a delete takes with it, for the dialogs that ask first.
 export function deleteWarning(t: { name: string; daemonId: string }) {
@@ -59,21 +69,24 @@ export const target = {
 		useQuery(
 			TargetService.method.getSubjectAccess,
 			() => ({ subjectId: extract(subjectId) }),
-			() => ({ enabled: !!extract(subjectId) })
+			() => ({
+				enabled: !!extract(subjectId),
+				select: (res) => ({ ...res, targets: res.targets.flatMap(subjectTarget) })
+			})
 		),
 	filters: (when?: () => boolean) =>
 		useQuery(TargetService.method.getTargetFilters, {}, () => ({ enabled: when?.() ?? true })),
 	// Without a filter this is the whole workspace.
 	accessGraph: (filter?: () => AccessGraphFilter | undefined, when?: () => boolean) =>
 		useQuery(
-			TargetService.method.getAccessGraph,
+			AccessViewService.method.getAccessGraph,
 			() => ({ filter: filter?.() }),
 			() => ({ enabled: when?.() ?? true })
 		),
 	// Nothing loads until a tag is set. The empty tag is the untagged targets.
 	accessGraphTargets: (opts: () => { tag?: string; filter?: AccessGraphFilter; limit: number }) =>
 		useQuery(
-			TargetService.method.listAccessGraphTargets,
+			AccessViewService.method.listAccessGraphTargets,
 			() => ({ ...opts() }),
 			() => ({
 				enabled: opts().tag !== undefined,
@@ -87,7 +100,7 @@ export const target = {
 
 	// A page of the access matrix. The last page stays on screen while the next one loads.
 	accessMatrix: (input: () => MessageInitShape<typeof GetAccessMatrixRequestSchema>) =>
-		useQuery(TargetService.method.getAccessMatrix, input, () => ({
+		useQuery(AccessViewService.method.getAccessMatrix, input, () => ({
 			placeholderData: keepPreviousData
 		})),
 

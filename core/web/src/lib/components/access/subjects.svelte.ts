@@ -1,10 +1,11 @@
 import { serviceAccount } from '#lib/api/service_account.svelte.js';
 import { team } from '#lib/api/team.svelte.js';
 import { users } from '#lib/api/workspaces.svelte.js';
-import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 import type { ServiceAccount } from '#lib/gen/nokku/v1/service_account_pb.js';
+import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
+import { type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 import type { Team } from '#lib/gen/nokku/v1/team_pb.js';
-import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+import { type User } from '#lib/gen/nokku/v1/user_pb.js';
 import { timestampFromMs, type Timestamp } from '@bufbuild/protobuf/wkt';
 
 export type Subject = {
@@ -70,25 +71,13 @@ export function subjectHref(kind: SubjectKind, id: string) {
 }
 
 export function subjectIds(p: TargetAccount, kind: SubjectKind): string[] {
-	switch (kind) {
-		case SubjectKind.USER:
-			return p.userIds;
-		case SubjectKind.TEAM:
-			return p.teamIds;
-		case SubjectKind.SERVICE_ACCOUNT:
-			return p.serviceAccountIds;
-		default:
-			return [];
-	}
+	return p.grants.flatMap((g) => (g.subject?.kind === kind ? [g.subject.id] : []));
 }
 
 export function grantsOf(p: TargetAccount): SubjectRef[] {
-	const ref = (kind: SubjectKind) => (id: string) => ({ id, kind, expiresAt: p.expiresAt[id] });
-	return [
-		...p.userIds.map(ref(SubjectKind.USER)),
-		...p.teamIds.map(ref(SubjectKind.TEAM)),
-		...p.serviceAccountIds.map(ref(SubjectKind.SERVICE_ACCOUNT))
-	];
+	return p.grants.flatMap((g) =>
+		g.subject ? [{ id: g.subject.id, kind: g.subject.kind, expiresAt: g.expiresAt }] : []
+	);
 }
 
 const SEARCH_LIMIT = 20;

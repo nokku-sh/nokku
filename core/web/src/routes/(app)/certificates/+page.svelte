@@ -20,9 +20,9 @@
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { AuditOutcome } from '#lib/gen/nokku/v1/audit_log_pb.js';
 	import { CertificateAuthoritySchema } from '#lib/gen/nokku/v1/certificates_pb.js';
 	import { TargetStatus } from '#lib/gen/nokku/v1/target_pb.js';
-	import { AuditOutcome } from '#lib/gen/nokku/v1/util_pb.js';
 	import { confirm, useAutoSave, useDraft } from '#lib/hooks/index.js';
 	import { UseClipboard } from '#lib/hooks/use-clipboard.svelte.js';
 	import type { Tone } from '#lib/tone.js';
@@ -145,7 +145,7 @@
 				}
 			];
 		}
-		const actor = rollovers.data?.logs[0]?.actorName;
+		const actor = rollovers.data?.events[0]?.actorName;
 		const by = actor ? `, by ${actor}` : '';
 		return [
 			{ title: 'Current keys', detail: `Since ${formatTs(entity.rotatedAt, 'short')}${by}` },

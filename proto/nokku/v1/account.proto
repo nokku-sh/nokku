@@ -7,83 +7,92 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
+import "nokku/v1/user.proto";
 
 service AccountService {
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
   }
   rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse) {
     option (access) = {
-      self: true
-      browser: BROWSER_FRESH
+      role: WORKSPACE_ROLE_MEMBER
+      fresh: true
     };
   }
   rpc ListCredentials(ListCredentialsRequest) returns (ListCredentialsResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc RenameCredential(RenameCredentialRequest) returns (RenameCredentialResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
   }
   rpc RemoveCredential(RemoveCredentialRequest) returns (RemoveCredentialResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
   }
   rpc ListAccountSessions(ListAccountSessionsRequest) returns (ListAccountSessionsResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc RemoveSession(RemoveSessionRequest) returns (RemoveSessionResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
   }
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {
     option (access) = {
-      self: true
-      browser: BROWSER_FRESH
+      role: WORKSPACE_ROLE_MEMBER
+      fresh: true
     };
   }
 }
 
-message User {
-  string id = 1;
-  string name = 2;
-  string email = 3;
-  string picture = 4;
-  WorkspaceRole role = 5;
-  bool active = 6;
-  string pending_email = 7;
-  google.protobuf.Timestamp created_at = 8;
-  google.protobuf.Timestamp updated_at = 9;
-  bool scim_managed = 10;
+enum CredentialType {
+  CREDENTIAL_TYPE_UNSPECIFIED = 0;
+  CREDENTIAL_TYPE_PASSKEY = 1;
+  CREDENTIAL_TYPE_OIDC = 2;
+}
+
+enum SessionKind {
+  SESSION_KIND_UNSPECIFIED = 0;
+  SESSION_KIND_BROWSER = 1;
+  SESSION_KIND_CLI = 2;
+  SESSION_KIND_DEVICE = 3;
+}
+
+enum SignInMethod {
+  SIGN_IN_METHOD_UNSPECIFIED = 0;
+  SIGN_IN_METHOD_PASSKEY = 1;
+  SIGN_IN_METHOD_MAGIC_LINK = 2;
+  SIGN_IN_METHOD_OIDC = 3;
+  SIGN_IN_METHOD_DEVICE = 4;
 }
 
 message AccountCredential {
   string id = 1;
-  string type = 2;
+  CredentialType type = 2;
   string provider = 3;
   string subject = 4;
   string label = 5;
@@ -93,15 +102,14 @@ message AccountCredential {
 
 message AccountSession {
   string id = 1;
-  string kind = 2;
-  string method = 3;
+  SessionKind kind = 2;
+  SignInMethod method = 3;
   string binding = 4;
   string user_agent = 5;
   string ip = 6;
   bool current = 7;
   google.protobuf.Timestamp expires_at = 8;
   google.protobuf.Timestamp last_seen_at = 9;
-  // How long this session can still make calls marked fresh, zero once it can't.
   google.protobuf.Duration fresh_for = 10;
 }
 

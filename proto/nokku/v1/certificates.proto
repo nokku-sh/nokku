@@ -8,34 +8,32 @@ import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
-// A workspace has one CA, made with it. A server has no tie to it, so every call here is about that one.
 service CertificateService {
   rpc GetCertificateAuthority(GetCertificateAuthorityRequest) returns (GetCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      nk: true
-      machine: true
+      cli: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateCertificateAuthority(UpdateCertificateAuthorityRequest) returns (UpdateCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc RolloverCertificateAuthority(RolloverCertificateAuthorityRequest) returns (RolloverCertificateAuthorityResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc SignSSHCertificate(SignSSHCertificateRequest) returns (SignSSHCertificateResponse) {
     option (access) = {
-      self: true
-      nk: true
-      machine: true
-      signs: true
+      role: WORKSPACE_ROLE_MEMBER
+      cli: true
+      service_account: true
     };
   }
 }
@@ -44,17 +42,13 @@ message CertificateAuthority {
   string id = 1;
   string user_public_key = 2;
   string host_public_key = 3;
-  // Unset until the first rollover.
-  google.protobuf.Timestamp rotated_at = 4;
-  // What a person's certificate lasts. A machine and a server set up with nk sync get an hour at most.
-  google.protobuf.Duration user_ttl = 5;
-  google.protobuf.Timestamp created_at = 8;
-  google.protobuf.Timestamp updated_at = 9;
-  // source_address lists where people log in from. A service account has a list of its own.
-  string source_address = 10;
-  // What ssh-keygen -lf prints for each key.
-  string user_public_key_fingerprint = 11;
-  string host_public_key_fingerprint = 12;
+  string source_address = 4;
+  string user_public_key_fingerprint = 5;
+  string host_public_key_fingerprint = 6;
+  google.protobuf.Duration user_ttl = 7;
+  google.protobuf.Timestamp rotated_at = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
 }
 
 message GetCertificateAuthorityRequest {}
@@ -63,13 +57,12 @@ message GetCertificateAuthorityResponse {
 }
 
 message UpdateCertificateAuthorityRequest {
-  // 15 minutes to 7 days. The ceiling is login.MaxCertTTL, a test holds the two together.
   google.protobuf.Duration user_ttl = 1 [(buf.validate.field).duration = {
     gte: {seconds: 900}
     lte: {seconds: 604800}
   }];
-  string source_address = 4 [(buf.validate.field).string.max_len = 1024];
-  google.protobuf.FieldMask update_mask = 5 [
+  string source_address = 2 [(buf.validate.field).string.max_len = 1024];
+  google.protobuf.FieldMask update_mask = 3 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
@@ -83,21 +76,17 @@ message UpdateCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;
 }
 
-// New keys replace both, and nothing trusts the old ones any more.
 message RolloverCertificateAuthorityRequest {}
 message RolloverCertificateAuthorityResponse {
   CertificateAuthority certificate_authority = 1;
 }
 
-// Certificate messages -------------------------------------------------------
-
-// The core picks the lifetime, a caller never asks for one.
 message SignSSHCertificateRequest {
   string public_key = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 10000
   }];
-  string target_id = 3 [
+  string target_id = 2 [
     (buf.validate.field).string.uuid = true,
     (buf.validate.field).required = true
   ];

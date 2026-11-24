@@ -69,7 +69,7 @@ func TestGrantOnATag(t *testing.T) {
 	person := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	spec := func(change func(*nokkuv1.GrantSpec)) *nokkuv1.GrantSpec {
 		s := &nokkuv1.GrantSpec{
-			Subjects: []*nokkuv1.GrantSubject{
+			Subjects: []*nokkuv1.Subject{
 				{Id: &team, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_TEAM.Enum()},
 				{Id: &person.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
 			},
@@ -107,20 +107,21 @@ func TestGrantOnATag(t *testing.T) {
 		t.Helper()
 		require.Len(t, p.GetOutcomes(), 2)
 		o := p.GetOutcomes()[i]
-		return [3]int32{o.GetAdded(), o.GetSame(), o.GetOtherEnd()}
+		return [3]int32{o.GetAddedCount(), o.GetUnchangedCount(), o.GetOtherExpiryCount()}
 	}
 
-	// With no account asked for, the plan only says which servers these are and what accounts they have.
-	asked := plan(spec(func(s *nokkuv1.GrantSpec) { s.Username = nil }))
-	assert.EqualValues(t, servers, asked.GetServers())
-	assert.Len(t, asked.GetServerNames(), 5, "a few names stand for the rest")
+	// The scope says which servers these are and what accounts they have.
+	asked, err := api.GetGrantScope(t.Context(), &nokkuv1.GetGrantScopeRequest{Tags: []string{tag}})
+	require.NoError(t, err)
+	assert.EqualValues(t, servers, asked.GetTargetCount())
+	assert.Len(t, asked.GetTargetNames(), 5, "a few names stand for the rest")
 	require.Len(t, asked.GetAccounts(), 1)
 	assert.Equal(t, "deploy", asked.GetAccounts()[0].GetUsername())
-	assert.EqualValues(t, servers-without, asked.GetAccounts()[0].GetServers())
+	assert.EqualValues(t, servers-without, asked.GetAccounts()[0].GetTargetCount())
 
 	before := plan(spec(nil))
-	assert.EqualValues(t, servers-without, before.GetWithAccount())
-	assert.Len(t, before.GetSkipped(), without, "the servers without the account are named")
+	assert.EqualValues(t, servers-without, before.GetMatchedTargetCount())
+	assert.Len(t, before.GetSkippedTargetNames(), without, "the servers without the account are named")
 	assert.Equal(t, [3]int32{servers - without, 0, 0}, outcome(before, 0))
 	assert.Zero(t, grants(), "the plan wrote something")
 
@@ -162,7 +163,7 @@ func TestGrantOnATag(t *testing.T) {
 		"a standing grant got an end unasked",
 	)
 	_, err = api.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: spec(func(s *nokkuv1.GrantSpec) {
-		s.ExpiresAt, s.ChangeEnds = end, new(true)
+		s.ExpiresAt, s.OverwriteExpiry = end, new(true)
 	})})
 	require.NoError(t, err)
 	assert.Equal(t, [3]int32{0, servers - without, 0}, outcome(plan(spec(timed)), 1), "the ends did not move")
@@ -247,7 +248,7 @@ func TestRevokeOnATag(t *testing.T) {
 		return count
 	}
 	spec := &nokkuv1.RevokeSpec{
-		Subject: &nokkuv1.GrantSubject{Id: &team, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_TEAM.Enum()},
+		Subject: &nokkuv1.Subject{Id: &team, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_TEAM.Enum()},
 		Tags:    []string{tag},
 	}
 
@@ -256,26 +257,26 @@ func TestRevokeOnATag(t *testing.T) {
 		Subject: spec.GetSubject(), Tags: spec.GetTags(), Username: new("root"),
 	}})
 	require.NoError(t, err)
-	assert.EqualValues(t, 1, onlyRoot.GetPlan().GetGrants())
+	assert.EqualValues(t, 1, onlyRoot.GetPlan().GetGrantCount())
 	// Nor does a revoke with no server named take anything.
 	nowhere, err := api.Revoke(t.Context(), &nokkuv1.RevokeRequest{DryRun: new(true), Revoke: &nokkuv1.RevokeSpec{
 		Subject: spec.GetSubject(),
 	}})
 	require.NoError(t, err)
-	assert.Zero(t, nowhere.GetPlan().GetGrants(), "no server named must mean none, not all")
+	assert.Zero(t, nowhere.GetPlan().GetGrantCount(), "no server named must mean none, not all")
 
 	planned, err := api.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: spec, DryRun: new(true)})
 	require.NoError(t, err)
 	plan := planned.GetPlan()
-	assert.EqualValues(t, 4, plan.GetGrants())
-	assert.EqualValues(t, 3, plan.GetServers())
+	assert.EqualValues(t, 4, plan.GetGrantCount())
+	assert.EqualValues(t, 3, plan.GetTargetCount())
 	require.Len(t, plan.GetAccounts(), 2)
 	assert.Equal(t, "deploy", plan.GetAccounts()[0].GetUsername(), "the account on the most servers comes first")
-	assert.EqualValues(t, 3, plan.GetAccounts()[0].GetServers())
-	assert.Len(t, plan.GetAccounts()[0].GetServerNames(), 3)
+	assert.EqualValues(t, 3, plan.GetAccounts()[0].GetTargetCount())
+	assert.Len(t, plan.GetAccounts()[0].GetTargetNames(), 3)
 	assert.Equal(t, "root", plan.GetAccounts()[1].GetUsername())
-	assert.EqualValues(t, 1, plan.GetOtherTags())
-	assert.Equal(t, []string{tag + "-0"}, plan.GetOtherTagNames())
+	assert.EqualValues(t, 1, plan.GetMultiTagTargetCount())
+	assert.Equal(t, []string{tag + "-0"}, plan.GetMultiTagTargetNames())
 	assert.Equal(t, 4, held(team, onTag...), "the plan took something")
 
 	listener, err := pgx.Connect(t.Context(), "")
@@ -286,7 +287,7 @@ func TestRevokeOnATag(t *testing.T) {
 
 	done, err := api.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: spec})
 	require.NoError(t, err)
-	assert.EqualValues(t, 4, done.GetPlan().GetGrants(), "the revoke did something else than its plan")
+	assert.EqualValues(t, 4, done.GetPlan().GetGrantCount(), "the revoke did something else than its plan")
 	told := 0
 	for {
 		ctx, cancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
@@ -306,7 +307,7 @@ func TestRevokeOnATag(t *testing.T) {
 
 	again, err := api.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: spec, DryRun: new(true)})
 	require.NoError(t, err)
-	assert.Zero(t, again.GetPlan().GetGrants())
+	assert.Zero(t, again.GetPlan().GetGrantCount())
 
 	// The whole revoke is one audit event about the team. It says how much went and from where.
 	var events []*db.ListAuditLogsRow
@@ -358,7 +359,7 @@ func TestADryRunLeavesNoAuditRow(t *testing.T) {
 			"Bearer "+sessionFor(t, cfg, u))))
 	}
 	spec := &nokkuv1.GrantSpec{
-		Subjects:  []*nokkuv1.GrantSubject{{Id: &member.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
+		Subjects:  []*nokkuv1.Subject{{Id: &member.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
 		Tags:      []string{uniq("none")},
 		Username:  new("deploy"),
 		ExpiresAt: timestamppb.New(time.Now().Add(-time.Minute)),
@@ -366,7 +367,7 @@ func TestADryRunLeavesNoAuditRow(t *testing.T) {
 	_, err := as(editor).Grant(t.Context(), &nokkuv1.GrantRequest{Grant: spec, DryRun: new(true)})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an end in the past: %v", err)
 	_, err = as(member).Revoke(t.Context(), &nokkuv1.RevokeRequest{DryRun: new(true), Revoke: &nokkuv1.RevokeSpec{
-		Subject: spec.GetSubjects()[0], Everywhere: new(true),
+		Subject: spec.GetSubjects()[0], AllTargets: new(true),
 	}})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "a member's revoke: %v", err)
 
@@ -388,11 +389,11 @@ func grantAccount(
 	t.Helper()
 	spec := &nokkuv1.GrantSpec{TargetIds: []string{targetID}, Username: &username}
 	for _, id := range subjects {
-		spec.Subjects = append(spec.Subjects, &nokkuv1.GrantSubject{Id: &id, Kind: kind.Enum()})
+		spec.Subjects = append(spec.Subjects, &nokkuv1.Subject{Id: &id, Kind: kind.Enum()})
 	}
 	res, err := c.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: spec})
 	require.NoError(t, err)
-	require.EqualValues(t, 1, res.GetPlan().GetWithAccount(), "the server has no %s account", username)
+	require.EqualValues(t, 1, res.GetPlan().GetMatchedTargetCount(), "the server has no %s account", username)
 }
 
 // revokeAccount takes a subject's own grant on one account of one server.
@@ -402,7 +403,7 @@ func revokeAccount(
 ) {
 	t.Helper()
 	_, err := c.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: &nokkuv1.RevokeSpec{
-		Subject:   &nokkuv1.GrantSubject{Id: &subject, Kind: kind.Enum()},
+		Subject:   &nokkuv1.Subject{Id: &subject, Kind: kind.Enum()},
 		TargetIds: []string{targetID},
 		Username:  &username,
 	}})
@@ -449,7 +450,7 @@ func TestGrantsNameWhoMadeThem(t *testing.T) {
 	assert.Equal(t, editor.ID, grantedBy(t, cfg, target, one.ID), "a grant on one server left the grant unnamed")
 
 	_, err := accounts.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{
-		Subjects: []*nokkuv1.GrantSubject{{Id: &two.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
+		Subjects: []*nokkuv1.Subject{{Id: &two.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
 		Tags:     []string{tag},
 		Username: new("deploy"),
 	}})
@@ -457,8 +458,10 @@ func TestGrantsNameWhoMadeThem(t *testing.T) {
 	assert.Equal(t, editor.ID, grantedBy(t, cfg, target, two.ID), "Grant left the grant unnamed")
 
 	seeded, err := nokkuv1connect.NewTargetServiceClient(client).CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
-		Name:   new(uniq("named")),
-		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("root"), UserIds: []string{one.ID}}},
+		Name: new(uniq("named")),
+		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("root"), Subjects: []*nokkuv1.Subject{
+			{Id: &one.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
+		}}},
 	})
 	require.NoError(t, err)
 	assert.Equal(

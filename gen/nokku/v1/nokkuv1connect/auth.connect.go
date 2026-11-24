@@ -107,8 +107,6 @@ type AuthServiceClient interface {
 	GetLoginOptions(context.Context, *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error)
 	ConfirmEmailChange(context.Context, *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error)
 	CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error)
-	// ExchangeWorkloadToken trades the signed token of a CI job for a short session of a service account. The workspace
-	// comes from the host. The call carries a DPoP proof and the session is bound to its key.
 	ExchangeWorkloadToken(context.Context, *v1.ExchangeWorkloadTokenRequest) (*v1.ExchangeWorkloadTokenResponse, error)
 }
 
@@ -126,8 +124,6 @@ type AuthServiceHandler interface {
 	GetLoginOptions(context.Context, *v1.GetLoginOptionsRequest) (*v1.GetLoginOptionsResponse, error)
 	ConfirmEmailChange(context.Context, *v1.ConfirmEmailChangeRequest) (*v1.ConfirmEmailChangeResponse, error)
 	CancelEmailChange(context.Context, *v1.CancelEmailChangeRequest) (*v1.CancelEmailChangeResponse, error)
-	// ExchangeWorkloadToken trades the signed token of a CI job for a short session of a service account. The workspace
-	// comes from the host. The call carries a DPoP proof and the session is bound to its key.
 	ExchangeWorkloadToken(context.Context, *v1.ExchangeWorkloadTokenRequest) (*v1.ExchangeWorkloadTokenResponse, error)
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SessionKind } from '#lib/gen/nokku/v1/account_pb.js';
 	import { auth, whenFresh } from '#lib/api/auth.svelte.js';
 	import { session } from '#lib/api/session.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
@@ -29,7 +30,7 @@
 	const options = auth.options();
 	// A CLI session is what nk login leaves behind.
 	const sessions = session.list();
-	const signedIn = $derived((sessions.data ?? []).some((s) => s.kind === 'cli'));
+	const signedIn = $derived((sessions.data ?? []).some((s) => s.kind === SessionKind.CLI));
 	const canInvite = $derived(can.admin && !!options.data?.passkey);
 
 	const steps = $derived([

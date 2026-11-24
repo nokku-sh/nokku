@@ -9,6 +9,7 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
 	import type { EndingGrant } from '#lib/gen/nokku/v1/dashboard_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import { formatTs } from '#lib/utils.js';
 
 	let { grants, total, canEdit }: { grants: EndingGrant[]; total: number; canEdit: boolean } =
@@ -23,8 +24,8 @@
 	const canExtend = $derived(canEdit && has('expiring_access') === true);
 
 	const subjectOf = (g: EndingGrant): Subject => ({
-		id: g.subjectId,
-		kind: g.subjectKind,
+		id: g.subject?.id ?? '',
+		kind: g.subject?.kind ?? SubjectKind.UNSPECIFIED,
 		name: g.subjectName,
 		detail: ''
 	});
@@ -37,7 +38,7 @@
 			servers: g.targets,
 			account: g.username,
 			hours: EXTEND_HOURS,
-			changeEnds: true
+			overwriteExpiry: true
 		});
 	}
 </script>
@@ -52,13 +53,13 @@
 	</Card.Header>
 	<Card.Content class="flex flex-col gap-2">
 		<Item.Group class="divide-y rounded-lg border">
-			{#each grants as g (`${g.subjectId}:${g.username}:${g.expiresAt?.seconds}.${g.expiresAt?.nanos}`)}
+			{#each grants as g (`${g.subject?.id}:${g.username}:${g.expiresAt?.seconds}.${g.expiresAt?.nanos}`)}
 				{@const subject = subjectOf(g)}
 				<Item.Root size="xs" class="rounded-none">
 					<Item.Media><SubjectAvatar {subject} class="size-6" /></Item.Media>
 					<Item.Content class="min-w-0">
 						<Item.Title class="w-full">
-							<a href={subjectHref(g.subjectKind, g.subjectId)} class="truncate hover:underline">
+							<a href={subjectHref(subject.kind, subject.id)} class="truncate hover:underline">
 								{subjectLabel(subject)}
 							</a>
 						</Item.Title>
@@ -76,7 +77,7 @@
 								<Button
 									size="sm"
 									variant="outline"
-									href={`${subjectHref(g.subjectKind, g.subjectId)}&tab=access`}
+									href={`${subjectHref(subject.kind, subject.id)}&tab=access`}
 									aria-label={`See all ${g.targetCount} servers of ${subjectLabel(subject)}`}
 								>
 									See all {g.targetCount}

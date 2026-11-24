@@ -13,48 +13,47 @@ service DaemonService {
   rpc GetDaemon(GetDaemonRequest) returns (GetDaemonResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateDaemon(UpdateDaemonRequest) returns (UpdateDaemonResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // Takes a fresh sign-in, so a stolen session can't hide what it does next.
+  rpc ApproveDaemon(ApproveDaemonRequest) returns (ApproveDaemonResponse) {
+    option (access) = {role: WORKSPACE_ROLE_EDITOR};
+  }
   rpc SetDaemonSafeguards(SetDaemonSafeguardsRequest) returns (SetDaemonSafeguardsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
-  // DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
   rpc DeleteDaemon(DeleteDaemonRequest) returns (DeleteDaemonResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc ListDaemons(ListDaemonsRequest) returns (ListDaemonsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  // A browser shell is a way onto a server, so a cookie alone does not open one.
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      browser: BROWSER_FRESH
-      signs: true
+      fresh: true
     };
   }
   rpc Relay(stream RelayRequest) returns (stream RelayResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      nk: true
-      machine: true
-      quiet: true
+      cli: true
+      service_account: true
+      unaudited: true
     };
   }
 }
@@ -66,19 +65,19 @@ service DaemonControlService {
   rpc SyncDaemon(SyncDaemonRequest) returns (SyncDaemonResponse) {
     option (access) = {
       daemon: true
-      quiet: true
+      unaudited: true
     };
   }
   rpc Connect(stream ConnectRequest) returns (stream ConnectResponse) {
     option (access) = {
       daemon: true
-      quiet: true
+      unaudited: true
     };
   }
   rpc DaemonRelay(stream DaemonRelayRequest) returns (stream DaemonRelayResponse) {
     option (access) = {
       daemon: true
-      quiet: true
+      unaudited: true
     };
   }
   rpc SignHostCertificate(SignHostCertificateRequest) returns (SignHostCertificateResponse) {
@@ -105,12 +104,10 @@ message Daemon {
   bool online = 3;
   DaemonStatus status = 4;
   DaemonConfig config = 5;
-  google.protobuf.Timestamp updated_at = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp last_seen_at = 8;
-  // version is nokkud's, as its last enroll or sync reported it.
-  string version = 9;
-  // behind_since is when a connected daemon stopped keeping up with access changes. Unset while it keeps up.
+  string version = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp last_seen_at = 9;
   google.protobuf.Timestamp behind_since = 10;
 }
 
@@ -120,12 +117,7 @@ message DaemonConfig {
   bool allow_agent_forwarding = 3;
   bool gateway_ports = 4;
   bool ephemeral = 5;
-  // idle_timeout closes an interactive session nobody typed into for that long. It is the workspace's
-  // session_idle_timeout, filled in by the core on sync and ignored when sent.
-  google.protobuf.Duration idle_timeout = 6;
-  // kill_on_revoke ends every process a person left on the server once their access to the account is gone. Only
-  // a daemon that can keep sessions in cgroups does it, the others close the connections as before.
-  bool kill_on_revoke = 7;
+  bool kill_on_revoke = 6;
 }
 
 message GetDaemonRequest {
@@ -137,17 +129,11 @@ message GetDaemonResponse {
 
 message UpdateDaemonRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
-  // status only approves, rejecting is DeleteDaemon.
-  DaemonStatus status = 2 [(buf.validate.field).enum = {
-    in: [2]
-  }];
-  DaemonConfig config = 3;
-  // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-  google.protobuf.FieldMask update_mask = 4 [
+  DaemonConfig config = 2;
+  google.protobuf.FieldMask update_mask = 3 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
-        "status",
         "config.allow_forwarding",
         "config.allow_agent_forwarding",
         "config.gateway_ports"
@@ -155,10 +141,13 @@ message UpdateDaemonRequest {
     }
   ];
 }
-
 message UpdateDaemonResponse {}
 
-// A rule left out stays as it is.
+message ApproveDaemonRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ApproveDaemonResponse {}
+
 message SetDaemonSafeguardsRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
   bool record_sessions = 2;
@@ -234,7 +223,6 @@ message SyncDaemonRequest {
       string: {max_len: 256}
     }
   }];
-  // Where the daemon's sshd listens, as ip:port.
   repeated string private_ips = 2 [(buf.validate.field).repeated = {
     max_items: 8
     items: {
@@ -256,11 +244,10 @@ message SyncDaemonResponse {
   DaemonStatus status = 1;
   DaemonConfig config = 2;
   repeated AccountPrincipals principals = 3;
-  // The user CA key logins are checked against.
-  string user_ca_public_key = 5;
-  // The host CA key the daemon's host certificate has to come from.
-  string host_ca_public_key = 6;
-  // A hash of this answer, the daemon sends it back with every heartbeat. A daemon never works it out itself.
+  string user_ca_public_key = 4;
+  string host_ca_public_key = 5;
+  google.protobuf.Duration idle_timeout = 6;
+  // The daemon hands it back in every heartbeat and never computes it.
   bytes state_hash = 7;
 }
 
@@ -294,51 +281,38 @@ message ConnectResponse {
   }
 }
 
-// ConnectionReport tells the core who logged in on the daemon's server and when they left. The daemon sends one
-// report at a time and keeps its events until the ack. A report may so come twice, the core stores each event once.
+// A report may arrive twice, the core stores each event once.
 message ConnectionReport {
   repeated ConnectionEvent events = 1 [(buf.validate.field).repeated = {
     min_items: 1
     max_items: 100
   }];
-  // Events the daemon threw away since its last report, because it could keep no more.
-  uint32 dropped = 2;
+  uint32 dropped_count = 2;
 }
 
-// The core cuts a field that is too long, it does not refuse the event. A refused report would come again forever.
 message ConnectionEvent {
-  // The same for the open and the close of one connection.
   string connection_id = 1 [(buf.validate.field).string.uuid = true];
-  // False when the connection opened, true when it closed.
   bool closed = 2;
-  // By the daemon's clock.
-  google.protobuf.Timestamp time = 3;
-  // The certificate principal the login matched. It names the subject and the account.
-  string principal = 4;
-  // The key id the CA signed into the certificate.
-  string key_id = 5;
-  // Where the client came from, as the daemon saw it.
-  string remote_addr = 6;
-  string client_version = 7;
-  // It came through the core's relay, like a browser shell.
-  bool relayed = 8;
+  string principal = 3;
+  string key_id = 4;
+  string remote_addr = 5;
+  string client_version = 6;
+  bool relayed = 7;
+  google.protobuf.Timestamp time = 8;
 }
 
-// The core stored the report it got last.
 message ConnectionReportAck {}
 
 message Heartbeat {
-  // The state_hash of the last sync the daemon saved, empty before the first.
-  bytes state_hash = 2 [(buf.validate.field).bytes.max_len = 64];
+  bytes state_hash = 1 [(buf.validate.field).bytes.max_len = 64];
 }
 
-// StateUpdate tells a daemon what it should hold. It syncs when its own hash differs, or when this one is empty.
 message StateUpdate {
   bytes state_hash = 1;
 }
 
 message DaemonSession {
-  string session_id = 1;
+  string id = 1;
   string username = 2;
   string user_id = 3;
 }
@@ -347,8 +321,6 @@ message DaemonSession {
 
 message RelayOpen {
   string relay_id = 1;
-  // The user's address as the core saw it. The daemon's sshd reports it as
-  // the remote address of the relayed connection.
   string client_addr = 2;
 }
 

@@ -112,32 +112,32 @@ func TestRememberedDeviceShowsInTheSessionsList(t *testing.T) {
 			clientOn(srv, header("Authorization", "Bearer "+bearer)),
 		)
 	}
-	kinds := func() map[string]string {
+	kinds := func() map[nokkuv1.SessionKind]string {
 		t.Helper()
 		res, err := account(
 			cookies[sessionCookie],
 		).ListAccountSessions(t.Context(), &nokkuv1.ListAccountSessionsRequest{})
 		require.NoError(t, err)
-		out := map[string]string{}
+		out := make(map[nokkuv1.SessionKind]string)
 		for _, s := range res.GetSessions() {
 			out[s.GetKind()] = s.GetId()
 		}
 		return out
 	}
 	listed := kinds()
-	require.Contains(t, listed, "user")
-	require.Contains(t, listed, "device")
+	require.Contains(t, listed, nokkuv1.SessionKind_SESSION_KIND_BROWSER)
+	require.Contains(t, listed, nokkuv1.SessionKind_SESSION_KIND_DEVICE)
 
 	_, err = account(deviceCookie).ListAccountSessions(t.Context(), &nokkuv1.ListAccountSessionsRequest{})
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the device cookie signed in: %v", err)
 
 	_, err = account(
 		cookies[sessionCookie],
-	).RemoveSession(t.Context(), &nokkuv1.RemoveSessionRequest{Id: new(listed["device"])})
+	).RemoveSession(t.Context(), &nokkuv1.RemoveSessionRequest{Id: new(listed[nokkuv1.SessionKind_SESSION_KIND_DEVICE])})
 	require.NoError(t, err)
 	listed = kinds()
-	assert.Contains(t, listed, "user", "forgetting a device ended the session")
-	assert.NotContains(t, listed, "device")
+	assert.Contains(t, listed, nokkuv1.SessionKind_SESSION_KIND_BROWSER, "forgetting a device ended the session")
+	assert.NotContains(t, listed, nokkuv1.SessionKind_SESSION_KIND_DEVICE)
 }
 
 // The audit log tells a deactivated account from an address nobody has.

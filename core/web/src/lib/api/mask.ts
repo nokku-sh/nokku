@@ -11,7 +11,7 @@ type Input<I extends DescMessage> = Omit<MessageInitShape<I>, '$typeName'>;
 
 // withMask names every field an update sets in its update_mask, so the server changes exactly those and keeps the
 // rest. A plain empty list counts, it clears. Our own messages are named field by field, a Duration as a whole.
-export function withMask<I extends DescMessage>(schema: I) {
+function withMask<I extends DescMessage>(schema: I) {
 	return (input: Input<I>): Input<I> =>
 		({ ...input, updateMask: { paths: maskPaths(schema, input, '') } }) as Input<I>;
 }

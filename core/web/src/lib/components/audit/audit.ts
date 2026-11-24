@@ -1,6 +1,8 @@
 import { page } from '$app/state';
 import { plural } from '#lib/api/bulk.js';
-import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+import { sessionMethodLabel } from '#lib/api/session.svelte.js';
+import { SignInMethod } from '#lib/gen/nokku/v1/account_pb.js';
+import { ActorKind, type AuditEvent, AuditOutcome } from '#lib/gen/nokku/v1/audit_log_pb.js';
 import { setFilters } from '#lib/hooks/index.js';
 import { listNames } from '#lib/utils.js';
 import { timestampDate, timestampFromDate, type Timestamp } from '@bufbuild/protobuf/wkt';
@@ -56,7 +58,7 @@ export const areas: Area[] = [
 		label: 'People & roles',
 		icon: Users,
 		actions: [
-			'UpdateUserRole',
+			'SetUserRole',
 			'DeactivateUser',
 			'ReactivateUser',
 			'DeleteUser',
@@ -172,15 +174,29 @@ export const outcomes = [
 	{ value: 'succeeded', label: 'Succeeded', icon: CircleCheck, enum: AuditOutcome.SUCCEEDED }
 ];
 
-/** `label` names the group in filters, `one` names a single actor in a row. */
-export const actorKinds: { value: string; label: string; one: string; icon: LucideIcon }[] = [
-	{ value: 'user', label: 'People', one: 'Person', icon: CircleUser },
-	{ value: 'cli', label: 'CLI', one: 'CLI', icon: Terminal },
-	{ value: 'service_account', label: 'Service accounts', one: 'Service account', icon: Bot },
-	{ value: 'daemon', label: 'Daemons', one: 'Daemon', icon: Server },
-	{ value: 'scim', label: 'SCIM', one: 'SCIM', icon: RefreshCw }
+/** `value` is the URL param, `label` names the group in filters, `one` names a single actor in a row. */
+export const actorKinds: {
+	value: string;
+	kind: ActorKind;
+	label: string;
+	one: string;
+	icon: LucideIcon;
+}[] = [
+	{ value: 'user', kind: ActorKind.USER, label: 'People', one: 'Person', icon: CircleUser },
+	{ value: 'cli', kind: ActorKind.CLI, label: 'CLI', one: 'CLI', icon: Terminal },
+	{
+		value: 'service_account',
+		kind: ActorKind.SERVICE_ACCOUNT,
+		label: 'Service accounts',
+		one: 'Service account',
+		icon: Bot
+	},
+	{ value: 'daemon', kind: ActorKind.DAEMON, label: 'Daemons', one: 'Daemon', icon: Server },
+	{ value: 'scim', kind: ActorKind.SCIM, label: 'SCIM', one: 'SCIM', icon: RefreshCw }
 ];
-export const kindOf = (kind: string) => actorKinds.find((k) => k.value === kind);
+const kindOf = (kind: ActorKind) => actorKinds.find((k) => k.kind === kind);
+export const kindName = (kind: ActorKind) =>
+	kindOf(kind)?.one ?? (kind === ActorKind.SYSTEM ? 'System' : 'Unknown');
 
 /** Params owned by the quick views, clicking one replaces all of them. */
 const filterParams = ['q', 'area', 'outcome', 'kind', 'actor', 'target'];
@@ -246,18 +262,25 @@ const labels: Record<string, string> = {
 	DeleteTeam: 'Deleted a team',
 	AddTeamMember: 'Added to a team',
 	RemoveTeamMember: 'Removed from a team',
-	UpdateUserRole: 'Changed a role',
+	SetUserRole: 'Changed a role',
 	UpdateDaemonDefaults: 'Changed daemon defaults',
 	SetEnforceSSO: 'Changed required single sign-on',
 	DeleteUser: 'Removed a person'
 };
 
-const detail = (log: EventLog, key: string) => {
+const detail = (log: AuditEvent, key: string) => {
 	const v = log.details?.[key];
 	return typeof v === 'string' && v ? v : undefined;
 };
 
-const strings = (log: EventLog, key: string) => {
+/** How an event signed in. The details name it like "magic_link". */
+export function eventMethod(log: AuditEvent) {
+	const name = detail(log, 'method');
+	const method = name && SignInMethod[name.toUpperCase() as keyof typeof SignInMethod];
+	return method ? sessionMethodLabel(method) : name;
+}
+
+const strings = (log: AuditEvent, key: string) => {
 	const v = log.details?.[key];
 	return (Array.isArray(v) ? v : []).filter((s): s is string => typeof s === 'string' && s !== '');
 };
@@ -265,7 +288,7 @@ const strings = (log: EventLog, key: string) => {
 const subjectPrefix: Record<string, string> = { team: 'team:', service_account: 'sa:' };
 
 /** What an event touched, in words, from the names it stored. Older events only hold ids and get undefined. */
-export function eventWhat(log: EventLog): string | undefined {
+export function eventWhat(log: AuditEvent): string | undefined {
 	const name = detail(log, 'name');
 	const server = detail(log, 'target');
 	const account = detail(log, 'username');
@@ -305,7 +328,7 @@ export function eventWhat(log: EventLog): string | undefined {
 			const to = log.action === 'AddTeamMember' ? 'to' : 'from';
 			return member && name ? `${member} ${to} ${name}` : name;
 		}
-		case 'UpdateUserRole': {
+		case 'SetUserRole': {
 			const role = detail(log, 'role');
 			return name && role ? `${name} to ${role}` : name;
 		}
@@ -314,7 +337,7 @@ export function eventWhat(log: EventLog): string | undefined {
 }
 
 /** Where an event came from. For a login that is the client the daemon saw, not the daemon that reported it. */
-export function eventSource(log: EventLog): string {
+export function eventSource(log: AuditEvent): string {
 	const remote = detail(log, 'remote');
 	if (!remote || !log.action.startsWith('Connection')) return log.ip;
 	// Without the port, "[::1]:22" and "10.0.0.1:22" alike.
@@ -322,7 +345,7 @@ export function eventSource(log: EventLog): string {
 }
 
 /** When a reported login happened by the daemon's clock, if the core only heard of it over a minute later. */
-export function eventHappened(log: EventLog): Timestamp | undefined {
+export function eventHappened(log: AuditEvent): Timestamp | undefined {
 	const at = Date.parse(detail(log, 'at') ?? '');
 	if (!log.timestamp || Number.isNaN(at)) return undefined;
 	const late = timestampDate(log.timestamp).getTime() - at > 60_000;
@@ -338,7 +361,7 @@ export function eventLabel(action: string) {
 
 export type Outcome = 'succeeded' | 'failed' | 'denied';
 
-export function outcomeOf(log: EventLog): Outcome {
+export function outcomeOf(log: AuditEvent): Outcome {
 	if (log.ok) return 'succeeded';
 	const code = log.details?.['code'];
 	if (log.action === 'LoginDenied' || code === 'permission_denied' || code === 'unauthenticated') {
@@ -356,7 +379,7 @@ export function setParams(params: Record<string, string | undefined>, replaceFil
 	setFilters({ ...cleared, ...params });
 }
 
-export const kindIcon = (kind: string): LucideIcon => kindOf(kind)?.icon ?? KeyRound;
+export const kindIcon = (kind: ActorKind): LucideIcon => kindOf(kind)?.icon ?? KeyRound;
 
 /** Failures and denials read as destructive, successes stay quiet. */
 export const outcomeLabel: Record<Outcome, string> = {

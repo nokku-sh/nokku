@@ -37,6 +37,7 @@ type Config struct {
 type Access struct {
 	Principals   map[string][]string   `json:"principals,omitempty"`
 	DaemonConfig *nokkuv1.DaemonConfig `json:"daemon_config,omitempty"`
+	IdleTimeout  time.Duration         `json:"idle_timeout,omitzero"`
 	UserCA       string                `json:"user_ca,omitempty"`
 	// HostCA signs the host cert. Logins only ever check UserCA.
 	HostCA string `json:"host_ca,omitempty"`
@@ -91,6 +92,7 @@ func AccessFrom(res *nokkuv1.SyncDaemonResponse, targetID string) *Access {
 	return &Access{
 		Principals:   validAccounts(principals),
 		DaemonConfig: res.GetConfig(),
+		IdleTimeout:  res.GetIdleTimeout().AsDuration(),
 		UserCA:       res.GetUserCaPublicKey(),
 		HostCA:       res.GetHostCaPublicKey(),
 		StateHash:    res.GetStateHash(),

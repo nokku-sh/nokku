@@ -12,10 +12,10 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/access.proto.
  */
 export const file_nokku_v1_access: GenFile = /*@__PURE__*/
-  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIt0BCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEgwKBHNlbGYYAiABKAgSJQoEcm9sZRgDIAEoDjIXLm5va2t1LnYxLldvcmtzcGFjZVJvbGUSDgoGZGFlbW9uGAQgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEg0KBXNpZ25zGAkgASgIEg0KBXF1aWV0GAogASgIEgoKAm5rGAsgASgIEiIKB2Jyb3dzZXIYDCABKA4yES5ub2trdS52MS5Ccm93c2VyEg8KB21hY2hpbmUYDSABKAgqSgoHQnJvd3NlchIXChNCUk9XU0VSX1VOU1BFQ0lGSUVEEAASEQoNQlJPV1NFUl9GUkVTSBABEhMKD0JST1dTRVJfUkVGVVNFRBACKrQBCg1Xb3Jrc3BhY2VSb2xlEh4KGldPUktTUEFDRV9ST0xFX1VOU1BFQ0lGSUVEEAASGQoVV09SS1NQQUNFX1JPTEVfTUVNQkVSEAESGQoVV09SS1NQQUNFX1JPTEVfVklFV0VSEAISGQoVV09SS1NQQUNFX1JPTEVfRURJVE9SEAMSGAoUV09SS1NQQUNFX1JPTEVfQURNSU4QBBIYChRXT1JLU1BBQ0VfUk9MRV9PV05FUhAFOkoKBmFjY2VzcxIeLmdvb2dsZS5wcm90b2J1Zi5NZXRob2RPcHRpb25zGLiOAyABKAsyEC5ub2trdS52MS5BY2Nlc3NSBmFjY2Vzc0KMAQoMY29tLm5va2t1LnYxQgtBY2Nlc3NQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_google_protobuf_descriptor]);
+  fileDesc("ChVub2trdS92MS9hY2Nlc3MucHJvdG8SCG5va2t1LnYxIrgBCgZBY2Nlc3MSDgoGcHVibGljGAEgASgIEg4KBmRhZW1vbhgCIAEoCBIlCgRyb2xlGAMgASgOMhcubm9ra3UudjEuV29ya3NwYWNlUm9sZRINCgVmcmVzaBgEIAEoCBILCgNjbGkYBSABKAgSFwoPc2VydmljZV9hY2NvdW50GAYgASgIEg8KB2ZlYXR1cmUYByABKAkSDgoGY2FwcGVkGAggASgIEhEKCXVuYXVkaXRlZBgJIAEoCCq0AQoNV29ya3NwYWNlUm9sZRIeChpXT1JLU1BBQ0VfUk9MRV9VTlNQRUNJRklFRBAAEhkKFVdPUktTUEFDRV9ST0xFX01FTUJFUhABEhkKFVdPUktTUEFDRV9ST0xFX1ZJRVdFUhACEhkKFVdPUktTUEFDRV9ST0xFX0VESVRPUhADEhgKFFdPUktTUEFDRV9ST0xFX0FETUlOEAQSGAoUV09SS1NQQUNFX1JPTEVfT1dORVIQBTpKCgZhY2Nlc3MSHi5nb29nbGUucHJvdG9idWYuTWV0aG9kT3B0aW9ucxi4jgMgASgLMhAubm9ra3UudjEuQWNjZXNzUgZhY2Nlc3NCjAEKDGNvbS5ub2trdS52MUILQWNjZXNzUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_google_protobuf_descriptor]);
 
 /**
- * Access says who may make a call.
+ * Access is the rule of one call. A call without it is denied.
  *
  * @generated from message nokku.v1.Access
  */
@@ -26,9 +26,9 @@ export type Access = Message<"nokku.v1.Access"> & {
   public: boolean;
 
   /**
-   * @generated from field: bool self = 2;
+   * @generated from field: bool daemon = 2;
    */
-  self: boolean;
+  daemon: boolean;
 
   /**
    * @generated from field: nokku.v1.WorkspaceRole role = 3;
@@ -36,58 +36,44 @@ export type Access = Message<"nokku.v1.Access"> & {
   role: WorkspaceRole;
 
   /**
-   * @generated from field: bool daemon = 4;
+   * A browser session must be from the last 10 minutes.
+   *
+   * @generated from field: bool fresh = 4;
    */
-  daemon: boolean;
+  fresh: boolean;
 
   /**
-   * feature is the plan feature the call needs.
+   * Lets an nk session call, a browser session needs no such field.
+   *
+   * @generated from field: bool cli = 5;
+   */
+  cli: boolean;
+
+  /**
+   * @generated from field: bool service_account = 6;
+   */
+  serviceAccount: boolean;
+
+  /**
+   * The plan feature the call needs.
    *
    * @generated from field: string feature = 7;
    */
   feature: string;
 
   /**
-   * capped counts the create against the plan's resource cap.
+   * A create that counts against the plan's resource cap.
    *
    * @generated from field: bool capped = 8;
    */
   capped: boolean;
 
   /**
-   * signs issues a user certificate, an inactive workspace gets none.
+   * The handler writes its own audit events.
    *
-   * @generated from field: bool signs = 9;
+   * @generated from field: bool unaudited = 9;
    */
-  signs: boolean;
-
-  /**
-   * quiet changes something, but the handler records what matters, so the audit log skips the call.
-   *
-   * @generated from field: bool quiet = 10;
-   */
-  quiet: boolean;
-
-  /**
-   * nk lets a person's nk session make the call.
-   *
-   * @generated from field: bool nk = 11;
-   */
-  nk: boolean;
-
-  /**
-   * browser is a person in the web app, any session unless this says otherwise.
-   *
-   * @generated from field: nokku.v1.Browser browser = 12;
-   */
-  browser: Browser;
-
-  /**
-   * machine lets a service account make the call.
-   *
-   * @generated from field: bool machine = 13;
-   */
-  machine: boolean;
+  unaudited: boolean;
 };
 
 /**
@@ -96,36 +82,6 @@ export type Access = Message<"nokku.v1.Access"> & {
  */
 export const AccessSchema: GenMessage<Access> = /*@__PURE__*/
   messageDesc(file_nokku_v1_access, 0);
-
-/**
- * @generated from enum nokku.v1.Browser
- */
-export enum Browser {
-  /**
-   * @generated from enum value: BROWSER_UNSPECIFIED = 0;
-   */
-  UNSPECIFIED = 0,
-
-  /**
-   * A sign-in from the last 10 minutes.
-   *
-   * @generated from enum value: BROWSER_FRESH = 1;
-   */
-  FRESH = 1,
-
-  /**
-   * The browser is kept out, the call is for nk and service accounts.
-   *
-   * @generated from enum value: BROWSER_REFUSED = 2;
-   */
-  REFUSED = 2,
-}
-
-/**
- * Describes the enum nokku.v1.Browser.
- */
-export const BrowserSchema: GenEnum<Browser> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_access, 0);
 
 /**
  * @generated from enum nokku.v1.WorkspaceRole
@@ -166,7 +122,7 @@ export enum WorkspaceRole {
  * Describes the enum nokku.v1.WorkspaceRole.
  */
 export const WorkspaceRoleSchema: GenEnum<WorkspaceRole> = /*@__PURE__*/
-  enumDesc(file_nokku_v1_access, 1);
+  enumDesc(file_nokku_v1_access, 0);
 
 /**
  * @generated from extension: nokku.v1.Access access = 51000;

@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/certificates.proto.
  */
 export const file_nokku_v1_certificates: GenFile = /*@__PURE__*/
-  fileDesc("Chtub2trdS92MS9jZXJ0aWZpY2F0ZXMucHJvdG8SCG5va2t1LnYxIvMCChRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIKCgJpZBgBIAEoCRIXCg91c2VyX3B1YmxpY19rZXkYAiABKAkSFwoPaG9zdF9wdWJsaWNfa2V5GAMgASgJEi4KCnJvdGF0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEisKCHVzZXJfdHRsGAUgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi4KCmNyZWF0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhYKDnNvdXJjZV9hZGRyZXNzGAogASgJEiMKG3VzZXJfcHVibGljX2tleV9maW5nZXJwcmludBgLIAEoCRIjChtob3N0X3B1YmxpY19rZXlfZmluZ2VycHJpbnQYDCABKAkiIAoeR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0ImAKH0dldENlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHki2wEKIVVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBI+Cgh1c2VyX3R0bBgBIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgQIgPUkMgMIhAcSIAoOc291cmNlX2FkZHJlc3MYBCABKAlCCLpIBXIDGIAIElQKC3VwZGF0ZV9tYXNrGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0IjukggyAEB4gEaEgh1c2VyX3R0bBIOc291cmNlX2FkZHJlc3MiYwoiVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZRI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYASABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSIlCiNSb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdCJlCiRSb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiWwoZU2lnblNTSENlcnRpZmljYXRlUmVxdWVzdBIeCgpwdWJsaWNfa2V5GAEgASgJQgq6SAdyBRABGJBOEh4KCXRhcmdldF9pZBgDIAEoCUILukgIyAEBcgOwAQEiaAoaU2lnblNTSENlcnRpZmljYXRlUmVzcG9uc2USGgoSc2lnbmVkX2NlcnRpZmljYXRlGAEgASgJEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMpAEChJDZXJ0aWZpY2F0ZVNlcnZpY2USfQoXR2V0Q2VydGlmaWNhdGVBdXRob3JpdHkSKC5ub2trdS52MS5HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaKS5ub2trdS52MS5HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIg2QAgHC8xgGGAFYAWgBEoEBChpVcGRhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiCMLzGAQYBGABEocBChxSb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5Ei0ubm9ra3UudjEuUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLi5ub2trdS52MS5Sb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiCMLzGAQYBGABEm0KElNpZ25TU0hDZXJ0aWZpY2F0ZRIjLm5va2t1LnYxLlNpZ25TU0hDZXJ0aWZpY2F0ZVJlcXVlc3QaJC5ub2trdS52MS5TaWduU1NIQ2VydGlmaWNhdGVSZXNwb25zZSIMwvMYCBABSAFYAWgBQpIBCgxjb20ubm9ra3UudjFCEUNlcnRpZmljYXRlc1Byb3RvUAFaLmdpdGh1Yi5jb20vbm9ra3Utc2gvbm9ra3UvZ2VuL25va2t1L3YxO25va2t1djGiAgNOWFiqAghOb2trdS5WMcoCCE5va2t1XFYx4gIUTm9ra3VcVjFcR1BCTWV0YWRhdGHqAglOb2trdTo6VjFiCGVkaXRpb25zcOgH", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chtub2trdS92MS9jZXJ0aWZpY2F0ZXMucHJvdG8SCG5va2t1LnYxIvMCChRDZXJ0aWZpY2F0ZUF1dGhvcml0eRIKCgJpZBgBIAEoCRIXCg91c2VyX3B1YmxpY19rZXkYAiABKAkSFwoPaG9zdF9wdWJsaWNfa2V5GAMgASgJEhYKDnNvdXJjZV9hZGRyZXNzGAQgASgJEiMKG3VzZXJfcHVibGljX2tleV9maW5nZXJwcmludBgFIAEoCRIjChtob3N0X3B1YmxpY19rZXlfZmluZ2VycHJpbnQYBiABKAkSKwoIdXNlcl90dGwYByABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb24SLgoKcm90YXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKY3JlYXRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiIAoeR2V0Q2VydGlmaWNhdGVBdXRob3JpdHlSZXF1ZXN0ImAKH0dldENlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHki2wEKIVVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBI+Cgh1c2VyX3R0bBgBIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIRukgOqgELIgQIgPUkMgMIhAcSIAoOc291cmNlX2FkZHJlc3MYAiABKAlCCLpIBXIDGIAIElQKC3VwZGF0ZV9tYXNrGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0IjukggyAEB4gEaEgh1c2VyX3R0bBIOc291cmNlX2FkZHJlc3MiYwoiVXBkYXRlQ2VydGlmaWNhdGVBdXRob3JpdHlSZXNwb25zZRI9ChVjZXJ0aWZpY2F0ZV9hdXRob3JpdHkYASABKAsyHi5ub2trdS52MS5DZXJ0aWZpY2F0ZUF1dGhvcml0eSIlCiNSb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdCJlCiRSb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2USPQoVY2VydGlmaWNhdGVfYXV0aG9yaXR5GAEgASgLMh4ubm9ra3UudjEuQ2VydGlmaWNhdGVBdXRob3JpdHkiWwoZU2lnblNTSENlcnRpZmljYXRlUmVxdWVzdBIeCgpwdWJsaWNfa2V5GAEgASgJQgq6SAdyBRABGJBOEh4KCXRhcmdldF9pZBgCIAEoCUILukgIyAEBcgOwAQEiaAoaU2lnblNTSENlcnRpZmljYXRlUmVzcG9uc2USGgoSc2lnbmVkX2NlcnRpZmljYXRlGAEgASgJEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMo4EChJDZXJ0aWZpY2F0ZVNlcnZpY2USfQoXR2V0Q2VydGlmaWNhdGVBdXRob3JpdHkSKC5ub2trdS52MS5HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaKS5ub2trdS52MS5HZXRDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlc3BvbnNlIg2QAgHC8xgGGAEoATABEoEBChpVcGRhdGVDZXJ0aWZpY2F0ZUF1dGhvcml0eRIrLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVxdWVzdBosLm5va2t1LnYxLlVwZGF0ZUNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiCMLzGAQYBCABEocBChxSb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5Ei0ubm9ra3UudjEuUm9sbG92ZXJDZXJ0aWZpY2F0ZUF1dGhvcml0eVJlcXVlc3QaLi5ub2trdS52MS5Sb2xsb3ZlckNlcnRpZmljYXRlQXV0aG9yaXR5UmVzcG9uc2UiCMLzGAQYBCABEmsKElNpZ25TU0hDZXJ0aWZpY2F0ZRIjLm5va2t1LnYxLlNpZ25TU0hDZXJ0aWZpY2F0ZVJlcXVlc3QaJC5ub2trdS52MS5TaWduU1NIQ2VydGlmaWNhdGVSZXNwb25zZSIKwvMYBhgBKAEwAUKSAQoMY29tLm5va2t1LnYxQhFDZXJ0aWZpY2F0ZXNQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.CertificateAuthority
@@ -36,47 +36,39 @@ export type CertificateAuthority = Message<"nokku.v1.CertificateAuthority"> & {
   hostPublicKey: string;
 
   /**
-   * Unset until the first rollover.
-   *
-   * @generated from field: google.protobuf.Timestamp rotated_at = 4;
-   */
-  rotatedAt?: Timestamp | undefined;
-
-  /**
-   * What a person's certificate lasts. A machine and a server set up with nk sync get an hour at most.
-   *
-   * @generated from field: google.protobuf.Duration user_ttl = 5;
-   */
-  userTtl?: Duration | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp created_at = 8;
-   */
-  createdAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 9;
-   */
-  updatedAt?: Timestamp | undefined;
-
-  /**
-   * source_address lists where people log in from. A service account has a list of its own.
-   *
-   * @generated from field: string source_address = 10;
+   * @generated from field: string source_address = 4;
    */
   sourceAddress: string;
 
   /**
-   * What ssh-keygen -lf prints for each key.
-   *
-   * @generated from field: string user_public_key_fingerprint = 11;
+   * @generated from field: string user_public_key_fingerprint = 5;
    */
   userPublicKeyFingerprint: string;
 
   /**
-   * @generated from field: string host_public_key_fingerprint = 12;
+   * @generated from field: string host_public_key_fingerprint = 6;
    */
   hostPublicKeyFingerprint: string;
+
+  /**
+   * @generated from field: google.protobuf.Duration user_ttl = 7;
+   */
+  userTtl?: Duration | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp rotated_at = 8;
+   */
+  rotatedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 9;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 10;
+   */
+  updatedAt?: Timestamp | undefined;
 };
 
 /**
@@ -121,19 +113,17 @@ export const GetCertificateAuthorityResponseSchema: GenMessage<GetCertificateAut
  */
 export type UpdateCertificateAuthorityRequest = Message<"nokku.v1.UpdateCertificateAuthorityRequest"> & {
   /**
-   * 15 minutes to 7 days. The ceiling is login.MaxCertTTL, a test holds the two together.
-   *
    * @generated from field: google.protobuf.Duration user_ttl = 1;
    */
   userTtl?: Duration | undefined;
 
   /**
-   * @generated from field: string source_address = 4;
+   * @generated from field: string source_address = 2;
    */
   sourceAddress: string;
 
   /**
-   * @generated from field: google.protobuf.FieldMask update_mask = 5;
+   * @generated from field: google.protobuf.FieldMask update_mask = 3;
    */
   updateMask?: FieldMask | undefined;
 };
@@ -163,8 +153,6 @@ export const UpdateCertificateAuthorityResponseSchema: GenMessage<UpdateCertific
   messageDesc(file_nokku_v1_certificates, 4);
 
 /**
- * New keys replace both, and nothing trusts the old ones any more.
- *
  * @generated from message nokku.v1.RolloverCertificateAuthorityRequest
  */
 export type RolloverCertificateAuthorityRequest = Message<"nokku.v1.RolloverCertificateAuthorityRequest"> & {
@@ -195,8 +183,6 @@ export const RolloverCertificateAuthorityResponseSchema: GenMessage<RolloverCert
   messageDesc(file_nokku_v1_certificates, 6);
 
 /**
- * The core picks the lifetime, a caller never asks for one.
- *
  * @generated from message nokku.v1.SignSSHCertificateRequest
  */
 export type SignSSHCertificateRequest = Message<"nokku.v1.SignSSHCertificateRequest"> & {
@@ -206,7 +192,7 @@ export type SignSSHCertificateRequest = Message<"nokku.v1.SignSSHCertificateRequ
   publicKey: string;
 
   /**
-   * @generated from field: string target_id = 3;
+   * @generated from field: string target_id = 2;
    */
   targetId: string;
 };
@@ -241,8 +227,6 @@ export const SignSSHCertificateResponseSchema: GenMessage<SignSSHCertificateResp
   messageDesc(file_nokku_v1_certificates, 8);
 
 /**
- * A workspace has one CA, made with it. A server has no tie to it, so every call here is about that one.
- *
  * @generated from service nokku.v1.CertificateService
  */
 export const CertificateService: GenService<{

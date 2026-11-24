@@ -37,15 +37,14 @@ async function settle<T, R>(
 // useBulkMutation runs one RPC per item as a single mutation, so a bulk action gives one toast and one invalidation.
 export function useBulkMutation<I extends DescMessage, O extends DescMessage>(
 	method: DescMethodUnary<I, O>,
-	successMessage: (count: number) => string,
-	transform: (input: Input<I>) => Input<I> = (input) => input
+	successMessage: (count: number) => string
 ) {
 	const transport = useTransport();
 
 	return createMutation(() => ({
 		mutationFn: async (inputs: Input<I>[]) => {
 			const results = await settle(inputs, (input) =>
-				callUnaryMethod(transport, method, transform(input) as MessageInitShape<I>)
+				callUnaryMethod(transport, method, input as MessageInitShape<I>)
 			);
 			const failures = results.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
 			if (failures.length === inputs.length) throw failures[0];

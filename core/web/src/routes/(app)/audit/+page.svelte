@@ -13,10 +13,10 @@
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import {
+		type AuditEvent,
 		AuditOutcome,
-		ExportAuditLogsRequest_Format,
-		type EventLog
-	} from '#lib/gen/nokku/v1/util_pb.js';
+		ExportAuditLogsRequest_Format
+	} from '#lib/gen/nokku/v1/audit_log_pb.js';
 	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import { usePagination } from '#lib/hooks/index.js';
 	import { auditUTC } from '#lib/store.svelte.js';
@@ -38,7 +38,7 @@
 	import EventCell from './EventCell.svelte';
 	import RangePicker, { currentRange } from '#lib/components/audit/RangePicker.svelte';
 
-	let selected = $state<EventLog>();
+	let selected = $state<AuditEvent>();
 
 	const pager = usePagination();
 	const search = new Debounced(() => page.url.searchParams.get('q') ?? '', 300);
@@ -48,7 +48,7 @@
 	const filter = $derived({
 		search: search.current,
 		actorIds: csv('actor'),
-		actorKinds: csv('kind'),
+		actorKinds: actorKinds.filter((k) => csv('kind').includes(k.value)).map((k) => k.kind),
 		actions: areas.filter((a) => csv('area').includes(a.value)).flatMap((a) => a.actions),
 		target: page.url.searchParams.get('target') ?? '',
 		outcome:
@@ -87,7 +87,7 @@
 		})?.label;
 	});
 
-	const columnHelper = createAppColumnHelper<EventLog>();
+	const columnHelper = createAppColumnHelper<AuditEvent>();
 	const columns = columnHelper.columns([
 		columnHelper.accessor('timestamp', {
 			header: 'Time',
@@ -188,7 +188,7 @@
 <ActivitySheet log={selected} onClose={() => (selected = undefined)} />
 
 <DataTable
-	data={logs.data?.logs ?? []}
+	data={logs.data?.events ?? []}
 	{columns}
 	rowCount={logs.data?.total ?? 0}
 	isLoading={logs.isLoading}

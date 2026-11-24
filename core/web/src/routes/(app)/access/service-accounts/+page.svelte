@@ -24,8 +24,8 @@
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { PlusIcon, ShieldCheck, Waypoints } from '@lucide/svelte';
 	import { Debounced } from 'runed';
-	import { roles } from '#lib/api/roles.svelte.js';
 	import {
+		assignableRoles,
 		parseRole,
 		roleIcon,
 		roleLabel,
@@ -57,16 +57,13 @@
 		})
 	];
 
-	const rolesQuery = roles.list();
-	const roleOptions = $derived(
-		(rolesQuery.data ?? [])
-			.filter((r) => r.role <= SERVICE_ACCOUNT_MAX_ROLE)
-			.map((r) => ({
-				label: roleLabel(r.role),
-				value: roleSlug(r.role),
-				icon: roleIcon(r.role)
-			}))
-	);
+	const roleOptions = assignableRoles
+		.filter((r) => r.role <= SERVICE_ACCOUNT_MAX_ROLE)
+		.map((r) => ({
+			label: roleLabel(r.role),
+			value: roleSlug(r.role),
+			icon: roleIcon(r.role)
+		}));
 
 	const columnHelper = createAppColumnHelper<ServiceAccount>();
 	const columns = columnHelper.columns([

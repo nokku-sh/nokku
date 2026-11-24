@@ -83,10 +83,7 @@ func TestSignSSHCertificate(t *testing.T) {
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err),
 		"a daemon nobody approved got a certificate signed, %v", err)
 	_, err = nokkuv1connect.NewDaemonServiceClient(clientOn(srv, adminAuth)).
-		UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
-			Id:     new(enrolled.GetId()),
-			Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
-		}))
+		ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(enrolled.GetId())})
 	require.NoError(t, err)
 
 	signed, err := sign(targetID)

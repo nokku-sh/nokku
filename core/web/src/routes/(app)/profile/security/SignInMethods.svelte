@@ -13,7 +13,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
-	import type { AccountCredential } from '#lib/gen/nokku/v1/account_pb.js';
+	import { type AccountCredential, CredentialType } from '#lib/gen/nokku/v1/account_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import type { Timestamp } from '@bufbuild/protobuf/wkt';
 	import { KeyRound, Link, Mail, Plus, Trash, Unlink } from '@lucide/svelte';
@@ -26,8 +26,8 @@
 	const options = auth.options();
 	const me = user.self();
 
-	const passkeys = $derived((all.data ?? []).filter((c) => c.type === 'passkey'));
-	const linked = $derived((all.data ?? []).filter((c) => c.type === 'oidc'));
+	const passkeys = $derived((all.data ?? []).filter((c) => c.type === CredentialType.PASSKEY));
+	const linked = $derived((all.data ?? []).filter((c) => c.type === CredentialType.OIDC));
 	const scim = $derived(!!me.data?.scimManaged);
 
 	// With email links on, a lost passkey is not a lockout. Otherwise the last method stays.
@@ -38,11 +38,11 @@
 		`Added ${formatTs(added, 'relative', 'a while ago')} · ${used ? `last used ${formatTs(used, 'relative')}` : 'not used yet'}`;
 
 	const providerName = (c: AccountCredential) =>
-		options.data?.providers.find((p) => p.providerId === c.provider)?.name || c.provider;
+		options.data?.providers.find((p) => p.id === c.provider)?.name || c.provider;
 
 	// Providers of this workspace the account has not signed in through yet.
 	const linkable = $derived(
-		(options.data?.providers ?? []).filter((p) => !linked.some((c) => c.provider === p.providerId))
+		(options.data?.providers ?? []).filter((p) => !linked.some((c) => c.provider === p.id))
 	);
 
 	let adding = $state(false);
@@ -164,15 +164,15 @@
 		{#if linked.length || linkable.length || scim}
 			<Section title="Single sign-on" icon={Link} count={linked.length}>
 				{#snippet action()}
-					{#each linkable as p (p.providerId)}
+					{#each linkable as p (p.id)}
 						<Button
 							size="sm"
 							variant="ghost"
-							href={`/oidc/link?provider=${encodeURIComponent(p.providerId)}&return_to=/profile/security`}
+							href={`/oidc/link?provider=${encodeURIComponent(p.id)}&return_to=/profile/security`}
 							data-sveltekit-reload
 						>
 							<OIDCIcon data-icon="inline-start" />
-							Link {p.name || p.providerId}
+							Link {p.name || p.id}
 						</Button>
 					{/each}
 				{/snippet}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { CredentialType } from '#lib/gen/nokku/v1/account_pb.js';
 	import { credentials } from '#lib/api/credential.svelte.js';
 	import { session } from '#lib/api/session.svelte.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
@@ -9,8 +10,12 @@
 	const creds = credentials.all();
 	const sessions = session.list();
 
-	const passkeyCount = $derived((creds.data ?? []).filter((c) => c.type === 'passkey').length);
-	const linkCount = $derived((creds.data ?? []).filter((c) => c.type === 'oidc').length);
+	const passkeyCount = $derived(
+		(creds.data ?? []).filter((c) => c.type === CredentialType.PASSKEY).length
+	);
+	const linkCount = $derived(
+		(creds.data ?? []).filter((c) => c.type === CredentialType.OIDC).length
+	);
 	const strangers = $derived((sessions.data ?? []).filter((s) => !s.current).length);
 
 	const checks = $derived([

@@ -124,7 +124,7 @@ func (s *smoke) ciJob(t *testing.T) {
 	})
 	require.NoError(t, err)
 	_, err = s.targetAccounts.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{
-		Subjects:  []*nokkuv1.GrantSubject{{Id: &id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum()}},
+		Subjects:  []*nokkuv1.Subject{{Id: &id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT.Enum()}},
 		TargetIds: []string{s.devAccount.GetTargetId()},
 		Username:  s.devAccount.Username,
 	}})

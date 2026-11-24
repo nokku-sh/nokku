@@ -1,17 +1,17 @@
 import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
+import {
+	type AuditLogFilterSchema,
+	AuditLogService,
+	type ListMyActivityResponse
+} from '#lib/gen/nokku/v1/audit_log_pb.js';
+import { type User } from '#lib/gen/nokku/v1/user_pb.js';
 import { createInfiniteQuery, createMutation, createQuery } from '@tanstack/svelte-query';
 import { callUnaryMethod } from '@connectrpc/connect-query-core';
 import { toast } from 'svelte-sonner';
 import { leave, queryClient } from './client';
 import { account } from './account';
 import { useQuery, useTransport } from '#lib/query/index.js';
-import {
-	UtilService,
-	type AuditLogFilterSchema,
-	type ListMyActivityResponse
-} from '#lib/gen/nokku/v1/util_pb.js';
 import type { MessageInitShape } from '@bufbuild/protobuf';
-import type { User } from '#lib/gen/nokku/v1/account_pb.js';
 import { atLeast } from '#lib/roles.js';
 
 const invalidateAccount = () => queryClient.invalidateQueries({ queryKey: ['account'] });
@@ -56,14 +56,14 @@ export const user = {
 		return createInfiniteQuery(() => ({
 			queryKey: ['account', 'activity', filter() ?? {}],
 			queryFn: ({ pageParam }: { pageParam: number }) =>
-				callUnaryMethod(transport, UtilService.method.listMyActivity, {
+				callUnaryMethod(transport, AuditLogService.method.listMyActivity, {
 					limit: FEED_PAGE,
 					offset: pageParam,
 					filter: filter()
 				}),
 			initialPageParam: 0,
 			getNextPageParam: (last: ListMyActivityResponse, pages: ListMyActivityResponse[]) => {
-				const loaded = pages.reduce((n, p) => n + p.logs.length, 0);
+				const loaded = pages.reduce((n, p) => n + p.events.length, 0);
 				return loaded < last.total ? loaded : undefined;
 			},
 			// A poll would fetch every loaded page again.
@@ -75,7 +75,7 @@ export const user = {
 	// The newest of the caller's events that match, with how many there are.
 	activity: (filter: () => ActivityFilter, enabled: () => boolean, limit = 1) =>
 		useQuery(
-			UtilService.method.listMyActivity,
+			AuditLogService.method.listMyActivity,
 			() => ({ limit, filter: filter() }),
 			() => ({
 				enabled: enabled()

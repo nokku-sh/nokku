@@ -41,18 +41,18 @@
 		tags: grantSheet.tags
 	});
 	// The core says which servers these are and what the grant does there. The sheet only shows it.
-	const where = targetAccount.planGrant(whereSpec, () => grantSheet.open && can.edit && picked);
-	const servers = $derived(picked ? (where.data?.plan?.servers ?? 0) : 0);
+	const where = targetAccount.grantScope(whereSpec, () => grantSheet.open && can.edit && picked);
+	const servers = $derived(picked ? (where.data?.targetCount ?? 0) : 0);
 	const finding = $derived(picked && where.isFetching);
 
-	const accounts = $derived(picked ? (where.data?.plan?.accounts ?? []) : []);
+	const accounts = $derived(picked ? (where.data?.accounts ?? []) : []);
 	// The only account there is picks itself.
 	const account = $derived(
 		grantSheet.account || (accounts.length === 1 ? accounts[0].username : '')
 	);
 	const accountChoices = $derived(
 		account && !accounts.some((a) => a.username === account)
-			? [...accounts, { username: account, servers: 0 }]
+			? [...accounts, { username: account, targetCount: 0 }]
 			: accounts
 	);
 
@@ -67,7 +67,7 @@
 		subjects: grantSheet.subjects.map(({ id, kind }) => ({ id, kind })),
 		username: account,
 		expiresAt: end,
-		changeEnds: grantSheet.changeEnds
+		overwriteExpiry: grantSheet.overwriteExpiry
 	});
 	const planned = targetAccount.planGrant(
 		() => spec,
@@ -80,10 +80,10 @@
 			return outcome ? [{ subject, ...outcome }] : [];
 		})
 	);
-	const added = $derived(rows.reduce((n, r) => n + r.added, 0));
-	const otherEnd = $derived(rows.reduce((n, r) => n + r.otherEnd, 0));
-	const changes = $derived(added + (grantSheet.changeEnds ? otherEnd : 0));
-	const skipped = $derived(plan ? plan.servers - plan.withAccount : 0);
+	const added = $derived(rows.reduce((n, r) => n + r.addedCount, 0));
+	const otherEnd = $derived(rows.reduce((n, r) => n + r.otherExpiryCount, 0));
+	const changes = $derived(added + (grantSheet.overwriteExpiry ? otherEnd : 0));
+	const skipped = $derived(plan ? plan.targetCount - plan.matchedTargetCount : 0);
 	const ready = $derived(
 		can.edit &&
 			grantSheet.subjects.length > 0 &&
@@ -102,24 +102,24 @@
 		if (!picked) return 'Pick servers by name, or a tag for all its servers.';
 		if (finding && !servers) return '';
 		if (!servers) return 'No server has these tags yet.';
-		return `${plural(servers, 'server')}: ${listNames(where.data?.plan?.serverNames ?? [], 3, servers)}`;
+		return `${plural(servers, 'server')}: ${listNames(where.data?.targetNames ?? [], 3, servers)}`;
 	});
 	const previewTitle = $derived.by(() => {
 		if (!plan) return '';
-		if (!plan.withAccount) return `No server here has a ${account} account.`;
+		if (!plan.matchedTargetCount) return `No server here has a ${account} account.`;
 		if (!changes) return 'Nothing to change, they have it already.';
-		const moved = grantSheet.changeEnds ? otherEnd : 0;
+		const moved = grantSheet.overwriteExpiry ? otherEnd : 0;
 		return [added && `${plural(added, 'new grant')}`, moved && `${plural(moved, 'new end')}`]
 			.filter(Boolean)
 			.join(' and ')
-			.concat(` on ${plural(plan.withAccount, 'server')}`);
+			.concat(` on ${plural(plan.matchedTargetCount, 'server')}`);
 	});
 
 	const grant = targetAccount.grant();
 
 	async function submit() {
 		if (!ready || !plan) return;
-		const on = plural(plan.withAccount, 'server');
+		const on = plural(plan.matchedTargetCount, 'server');
 		const done = added ? `Granted ${account} on ${on}` : `New end for ${account} on ${on}`;
 		// One call and one transaction, so it lands whole or not at all. The end counts from now.
 		const run = async () => {
@@ -127,7 +127,7 @@
 			toast.success(done);
 			grantSheet.open = false;
 		};
-		if (account === 'root' || plan.withAccount > CAREFUL) {
+		if (account === 'root' || plan.matchedTargetCount > CAREFUL) {
 			const who = listNames(grantSheet.subjects.map(subjectLabel));
 			await confirm({
 				title: `Grant ${account} on ${on}?`,
@@ -300,7 +300,7 @@
 								<ToggleGroup.Item value={a.username} class="gap-2">
 									<span class="font-mono">{a.username}</span>
 									<span class="text-xs text-muted-foreground tabular-nums">
-										{a.servers}/{servers}
+										{a.targetCount}/{servers}
 									</span>
 								</ToggleGroup.Item>
 							{/each}
@@ -342,9 +342,9 @@
 						{/each}
 					</ToggleGroup.Root>
 					<Field.Description>{endText}</Field.Description>
-					{#if otherEnd || grantSheet.changeEnds}
+					{#if otherEnd || grantSheet.overwriteExpiry}
 						<Field.Field orientation="horizontal">
-							<Checkbox id="grant-change-ends" bind:checked={grantSheet.changeEnds} />
+							<Checkbox id="grant-change-ends" bind:checked={grantSheet.overwriteExpiry} />
 							<Field.Content>
 								<Field.Label for="grant-change-ends">
 									Give the {plural(otherEnd, 'grant')} they hold already this end too
@@ -366,12 +366,13 @@
 								<li class="flex flex-wrap items-center gap-2 text-sm">
 									<SubjectAvatar subject={row.subject} class="size-6" />
 									<span class="min-w-0 flex-1 truncate">{subjectLabel(row.subject)}</span>
-									{#if row.added}<Badge variant="success">{row.added} new</Badge>{/if}
-									{#if row.same}<Badge variant="muted">{row.same} already</Badge>{/if}
-									{#if row.otherEnd}
+									{#if row.addedCount}<Badge variant="success">{row.addedCount} new</Badge>{/if}
+									{#if row.unchangedCount}<Badge variant="muted">{row.unchangedCount} already</Badge
+										>{/if}
+									{#if row.otherExpiryCount}
 										<Badge variant="warning">
-											{row.otherEnd}
-											{grantSheet.changeEnds ? 'get this end' : 'keep their end'}
+											{row.otherExpiryCount}
+											{grantSheet.overwriteExpiry ? 'get this end' : 'keep their end'}
 										</Badge>
 									{/if}
 								</li>
@@ -379,7 +380,7 @@
 						</ul>
 						{#if skipped}
 							<p class="text-xs text-muted-foreground">
-								{listNames(plan.skipped, 3, skipped)}
+								{listNames(plan.skippedTargetNames, 3, skipped)}
 								{skipped === 1 ? 'has' : 'have'} no {account} account, so
 								{skipped === 1 ? 'it is' : 'they are'} skipped.
 							</p>

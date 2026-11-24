@@ -1,7 +1,7 @@
 import { MAX_PAGE_SIZE } from '#lib/config.js';
+import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 import {
 	TargetAccountService,
-	SubjectKind,
 	type GrantSpecSchema,
 	type RevokeSpecSchema
 } from '#lib/gen/nokku/v1/target_account_pb.js';
@@ -34,6 +34,12 @@ export const targetAccount = {
 
 	addAccount: () => useMutation(TargetAccountService.method.addTargetAccount),
 	removeAccount: () => useMutation(TargetAccountService.method.removeTargetAccount),
+	// Which servers the ids and tags name, and the accounts they have.
+	grantScope: (where: () => { targetIds: string[]; tags: string[] }, when: () => boolean) =>
+		useQuery(TargetAccountService.method.getGrantScope, where, () => ({
+			enabled: when(),
+			placeholderData: keepPreviousData
+		})),
 	planGrant: (spec: () => MessageInitShape<typeof GrantSpecSchema>, when: () => boolean) =>
 		useQuery(
 			TargetAccountService.method.grant,
@@ -50,7 +56,7 @@ export const targetAccount = {
 	revoke: () => useMutation(TargetAccountService.method.revoke),
 	revokeEverywhere: () =>
 		useMutation(TargetAccountService.method.revoke, {
-			transform: (input) => ({ ...input, revoke: { ...input.revoke, everywhere: true } }),
+			transform: (input) => ({ ...input, revoke: { ...input.revoke, allTargets: true } }),
 			onSuccess: (_, variables) => {
 				switch (variables.revoke?.subject?.kind) {
 					case SubjectKind.USER:

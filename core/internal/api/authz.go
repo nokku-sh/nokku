@@ -23,7 +23,7 @@ import (
 var procedureAccess, streamProcedures = loadProcedures()
 
 // authorizationInterceptor applies the (access) option in this order: daemon,
-// nk, role or self, people only, browser, fresh sign-in, plan feature, signing, cap.
+// nk, role, people only, fresh sign-in, plan feature, cap.
 type authorizationInterceptor struct {
 	cfg *app.Config
 }
@@ -100,23 +100,19 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 		return a.daemonAccepted(ctx, caller.ID, procedure)
 	}
 	// nk gets what nk needs, so a phished or infected nk session can't run the workspace.
-	if caller.Kind == actor.KindCLI && !access.GetNk() {
+	if caller.Kind == actor.KindCLI && !access.GetCli() {
 		return connect.NewError(connect.CodePermissionDenied, "do this in the web app")
 	}
 	// An RPC that names no role stays denied.
 	required := access.GetRole()
-	if !access.GetSelf() && (required == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || caller.Role < required) {
+	if required == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED || caller.Role < required {
 		return db.ErrPermissionDenied
 	}
-	if caller.Kind == actor.KindServiceAccount && !access.GetMachine() {
+	if caller.Kind == actor.KindServiceAccount && !access.GetServiceAccount() {
 		return connect.NewError(connect.CodePermissionDenied, "only people can do this, not a service account")
 	}
-	browser := access.GetBrowser()
-	if caller.Kind == actor.KindUser && browser == nokkuv1.Browser_BROWSER_REFUSED {
-		return connect.NewError(connect.CodePermissionDenied, "do this with nk")
-	}
 	machineOrNk := caller.Kind == actor.KindCLI || caller.Kind == actor.KindServiceAccount
-	if browser == nokkuv1.Browser_BROWSER_FRESH && !machineOrNk {
+	if access.GetFresh() && !machineOrNk {
 		if err := a.fresh(ctx, caller); err != nil {
 			return err
 		}
@@ -138,11 +134,6 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 	if err := ent.CheckFeatures(ctx, features); err != nil {
 		return err
 	}
-	if access.GetSigns() {
-		if err := ent.CheckSigning(ctx); err != nil {
-			return err
-		}
-	}
 	if ws := actor.WorkspaceIDFromContext(ctx); access.GetCapped() && ws != "" {
 		return ent.CheckResources(ctx, ws)
 	}
@@ -151,20 +142,16 @@ func (a *authorizationInterceptor) authorize(ctx context.Context, procedure stri
 
 // fresh lets only a person's browser session from the last 10 minutes through.
 func (a *authorizationInterceptor) fresh(ctx context.Context, caller actor.Principal) error {
-	switch caller.Kind {
-	case actor.KindUser:
-		if err := a.cfg.IAM.RequireRecentSignIn(ctx); err != nil {
-			if ci, ok := connect.CallInfoForServerContext(ctx); ok {
-				setCookie(ci, a.cfg.IAM.ClearSessionCookie())
-			}
-			return connect.NewError(connect.CodeUnauthenticated, "sign in again to continue")
-		}
-		return nil
-	case actor.KindServiceAccount:
-		return connect.NewError(connect.CodePermissionDenied, "only people can do this, not a service account")
-	case actor.KindCLI, actor.KindDaemon, actor.KindSCIM:
+	if caller.Kind != actor.KindUser {
+		return connect.NewError(connect.CodePermissionDenied, "do this in the web app")
 	}
-	return connect.NewError(connect.CodePermissionDenied, "do this in the web app")
+	if err := a.cfg.IAM.RequireRecentSignIn(ctx); err != nil {
+		if ci, ok := connect.CallInfoForServerContext(ctx); ok {
+			setCookie(ci, a.cfg.IAM.ClearSessionCookie())
+		}
+		return connect.NewError(connect.CodeUnauthenticated, "sign in again to continue")
+	}
+	return nil
 }
 
 // A daemon that is not accepted gets only its status and removing itself.

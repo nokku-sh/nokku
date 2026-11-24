@@ -1,17 +1,16 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { describeAgent } from '#lib/agent.js';
-	import { sessionMethodLabel } from '#lib/api/session.svelte.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
-	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { type AuditEvent } from '#lib/gen/nokku/v1/audit_log_pb.js';
 	import { cn } from '#lib/utils.js';
 	import { ChevronDown } from '@lucide/svelte';
 	import EventIcon from './EventIcon.svelte';
-	import { eventLabel, outcomeLabel, outcomeOf } from './audit';
+	import { eventLabel, eventMethod, outcomeLabel, outcomeOf } from './audit';
 
 	interface Props {
-		log: EventLog;
+		log: AuditEvent;
 		/** Makes the row a button, usually to open the ActivitySheet. */
 		onclick?: () => void;
 		title?: string;
@@ -28,10 +27,7 @@
 	let { log, onclick, title, meta, subtitle, badges, expanded }: Props = $props();
 
 	const outcome = $derived(outcomeOf(log));
-	const method = $derived.by(() => {
-		const m = log.details?.['method'];
-		return typeof m === 'string' && m ? sessionMethodLabel(m) : undefined;
-	});
+	const method = $derived(eventMethod(log));
 </script>
 
 <Item.Root size="sm" class="rounded-none">

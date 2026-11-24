@@ -164,7 +164,7 @@ func TestSyncAnswer(t *testing.T) {
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, res.GetStatus())
 	assert.Equal(t, "pub", res.GetUserCaPublicKey())
 	assert.Equal(t, "host-pub", res.GetHostCaPublicKey())
-	assert.Equal(t, 10*time.Minute, res.GetConfig().GetIdleTimeout().AsDuration(), "the workspace's idle timeout")
+	assert.Equal(t, 10*time.Minute, res.GetIdleTimeout().AsDuration(), "the workspace's idle timeout")
 	got := map[string][]string{}
 	for _, p := range res.GetPrincipals() {
 		got[p.GetUsername()] = slices.Sorted(slices.Values(p.GetCertPrincipals()))

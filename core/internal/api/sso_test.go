@@ -15,7 +15,7 @@ import (
 func TestHostedSSOProviderNeedsTLS(t *testing.T) {
 	svc := &ssoService{cfg: &app.Config{SaaS: true}}
 	_, err := svc.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{
-		ProviderId: new("lab"), Name: new("Lab"), IssuerUrl: new("http://idp.example/realms/lab"),
+		Id: new("lab"), Name: new("Lab"), IssuerUrl: new("http://idp.example/realms/lab"),
 		ClientId: new("nokku"), ClientSecret: new("s3cret"),
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "got %v", err)

@@ -147,7 +147,7 @@
 				description:
 					'Do this after the server was reinstalled and shows a new key. Nobody can log in until someone runs nk sync on it again. That sync pins the key the server shows then, so check you reach the right host.',
 				confirmText: 'Forget host key',
-				onConfirm: () => forgetHostKey.mutateAsync({ id: entity.id })
+				onConfirm: () => forgetHostKey.mutateAsync({ targetId: entity.id })
 			})
 		);
 	}

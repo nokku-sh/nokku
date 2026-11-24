@@ -2,9 +2,9 @@
 	import EventRow from '#lib/components/audit/EventRow.svelte';
 	import StatTile from '#lib/components/blocks/StatTile.svelte';
 	import { page } from '$app/state';
-	import { sessionMethodLabel, session } from '#lib/api/session.svelte.js';
+	import { session } from '#lib/api/session.svelte.js';
 	import { user, type ActivityFilter } from '#lib/api/user.svelte.js';
-	import { areas, eventWhat, setParams } from '#lib/components/audit/audit.js';
+	import { areas, eventMethod, eventWhat, setParams } from '#lib/components/audit/audit.js';
 	import ActivitySheet from '#lib/components/sheets/ActivitySheet.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -15,7 +15,7 @@
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
 	import { describeAgent } from '#lib/agent.js';
-	import { AuditOutcome, type EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { type AuditEvent, AuditOutcome } from '#lib/gen/nokku/v1/audit_log_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import { timestampDate, timestampFromMs } from '@bufbuild/protobuf/wkt';
 	import { Activity, LogIn, MonitorSmartphone, ShieldAlert, TriangleAlert } from '@lucide/svelte';
@@ -47,7 +47,7 @@
 		}
 	});
 	const feed = user.activityFeed(() => filter, signedIn);
-	const events = $derived(feed.data?.pages.flatMap((p) => p.logs) ?? []);
+	const events = $derived(feed.data?.pages.flatMap((p) => p.events) ?? []);
 	const total = $derived(feed.data?.pages[0]?.total ?? 0);
 
 	// The tiles look at all your events, whatever the view shows.
@@ -61,7 +61,7 @@
 		signedIn
 	);
 	const sessions = session.list();
-	const last = $derived(lastLogin.data?.logs[0]);
+	const last = $derived(lastLogin.data?.events[0]);
 	const failed = $derived(failedSignIns.data?.total ?? 0);
 
 	function dayLabel(date: Date) {
@@ -72,7 +72,7 @@
 	}
 
 	const days = $derived.by(() => {
-		const groups: { label: string; events: EventLog[] }[] = [];
+		const groups: { label: string; events: AuditEvent[] }[] = [];
 		for (const e of events) {
 			const label = e.timestamp ? dayLabel(timestampDate(e.timestamp)) : 'Unknown';
 			const current = groups.at(-1);
@@ -82,12 +82,7 @@
 		return groups;
 	});
 
-	const method = (e: EventLog) => {
-		const m = e.details?.['method'];
-		return typeof m === 'string' && m ? sessionMethodLabel(m) : undefined;
-	};
-
-	let selected = $state<EventLog>();
+	let selected = $state<AuditEvent>();
 </script>
 
 <PageHeader title="Your activity" description="Your sign-ins and the changes you made" />
@@ -104,7 +99,7 @@
 		{#if last}
 			<span class="flex items-center gap-2 text-sm font-medium">
 				{formatTs(last.timestamp, 'relative')}
-				{#if method(last)}<Badge variant="secondary">{method(last)}</Badge>{/if}
+				{#if eventMethod(last)}<Badge variant="secondary">{eventMethod(last)}</Badge>{/if}
 			</span>
 		{:else}
 			<span class="text-sm text-muted-foreground">None recorded yet</span>

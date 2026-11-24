@@ -145,14 +145,14 @@
 					Passkey
 				</Button>
 			{/if}
-			{#each providers as p (p.providerId)}
+			{#each providers as p (p.id)}
 				<Button
 					variant={providersOnly ? 'default' : 'secondary'}
-					href={`/oidc/login?provider=${encodeURIComponent(p.providerId)}`}
+					href={`/oidc/login?provider=${encodeURIComponent(p.id)}`}
 					data-sveltekit-reload
 				>
 					<OIDCIcon data-icon="inline-start" />
-					{p.name || p.providerId}
+					{p.name || p.id}
 				</Button>
 			{/each}
 			{#if ownerRecovery && !options.data?.emailConfigured}

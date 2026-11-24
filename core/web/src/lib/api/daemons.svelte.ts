@@ -1,11 +1,11 @@
 import { MAX_PAGE_SIZE } from '#lib/config.js';
-import { DaemonService, DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
+import { type Daemon, DaemonService } from '#lib/gen/nokku/v1/daemon_pb.js';
 import { confirm } from '#lib/hooks/index.js';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { whenFresh } from './auth.svelte';
 import { plural, useBulkMutation } from './bulk';
 import { addSession, TerminalSession } from './terminal.svelte';
-import { usePatch, withMask } from './mask';
+import { usePatch } from './mask';
 
 export const daemon = {
 	// Every daemon by name, for filters that pick one.
@@ -16,7 +16,7 @@ export const daemon = {
 				if (!data.session || !vars.daemonId) return;
 				addSession(
 					new TerminalSession(
-						data.session.sessionId,
+						data.session.id,
 						vars.daemonId,
 						data.daemonName,
 						data.session.username
@@ -27,25 +27,21 @@ export const daemon = {
 	update: () => usePatch(DaemonService.method.updateDaemon),
 	setSafeguards: () => useMutation(DaemonService.method.setDaemonSafeguards),
 	delete: () => useMutation(DaemonService.method.deleteDaemon),
+	approve: () => useMutation(DaemonService.method.approveDaemon),
 	approveMany: () =>
-		useBulkMutation(
-			DaemonService.method.updateDaemon,
-			(n) => `${plural(n, 'server')} approved`,
-			withMask(DaemonService.method.updateDaemon.input)
-		)
+		useBulkMutation(DaemonService.method.approveDaemon, (n) => `${plural(n, 'server')} approved`)
 };
 
 // useDaemonReview approves or rejects an enrolled daemon the same way everywhere. Reject takes its server along.
 export function useDaemonReview() {
-	const update = daemon.update();
+	const approve = daemon.approve();
 	const remove = daemon.delete();
 	return {
 		get pending() {
-			return update.isPending || remove.isPending;
+			return approve.isPending || remove.isPending;
 		},
-		approving: (id: string) => update.isPending && update.variables?.id === id,
-		approve: (d: Pick<Daemon, 'id'>) =>
-			update.mutateAsync({ id: d.id, status: DaemonStatus.ACCEPTED }),
+		approving: (id: string) => approve.isPending && approve.variables?.id === id,
+		approve: (d: Pick<Daemon, 'id'>) => approve.mutateAsync({ id: d.id }),
 		reject(d: Pick<Daemon, 'id' | 'name'>, done?: () => void) {
 			void whenFresh(() =>
 				confirm({

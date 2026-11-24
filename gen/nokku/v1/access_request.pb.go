@@ -96,10 +96,10 @@ type AccessRequest struct {
 	Status         *AccessRequestStatus   `protobuf:"varint,10,opt,name=status,enum=nokku.v1.AccessRequestStatus" json:"status,omitempty"`
 	DecidedBy      *string                `protobuf:"bytes,11,opt,name=decided_by,json=decidedBy" json:"decided_by,omitempty"`
 	DeciderName    *string                `protobuf:"bytes,12,opt,name=decider_name,json=deciderName" json:"decider_name,omitempty"`
-	DecidedAt      *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=decided_at,json=decidedAt" json:"decided_at,omitempty"`
-	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	GrantedUntil   *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=granted_until,json=grantedUntil" json:"granted_until,omitempty"`
-	DecisionReason *string                `protobuf:"bytes,16,opt,name=decision_reason,json=decisionReason" json:"decision_reason,omitempty"`
+	DecisionReason *string                `protobuf:"bytes,13,opt,name=decision_reason,json=decisionReason" json:"decision_reason,omitempty"`
+	DecidedAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=decided_at,json=decidedAt" json:"decided_at,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	GrantedUntil   *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=granted_until,json=grantedUntil" json:"granted_until,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -218,6 +218,13 @@ func (x *AccessRequest) GetDeciderName() string {
 	return ""
 }
 
+func (x *AccessRequest) GetDecisionReason() string {
+	if x != nil && x.DecisionReason != nil {
+		return *x.DecisionReason
+	}
+	return ""
+}
+
 func (x *AccessRequest) GetDecidedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.DecidedAt
@@ -237,13 +244,6 @@ func (x *AccessRequest) GetGrantedUntil() *timestamppb.Timestamp {
 		return x.GrantedUntil
 	}
 	return nil
-}
-
-func (x *AccessRequest) GetDecisionReason() string {
-	if x != nil && x.DecisionReason != nil {
-		return *x.DecisionReason
-	}
-	return ""
 }
 
 type RequestableTarget struct {
@@ -1063,13 +1063,13 @@ const file_nokku_v1_access_request_proto_rawDesc = "" +
 	" \x01(\x0e2\x1d.nokku.v1.AccessRequestStatusR\x06status\x12\x1d\n" +
 	"\n" +
 	"decided_by\x18\v \x01(\tR\tdecidedBy\x12!\n" +
-	"\fdecider_name\x18\f \x01(\tR\vdeciderName\x129\n" +
+	"\fdecider_name\x18\f \x01(\tR\vdeciderName\x12'\n" +
+	"\x0fdecision_reason\x18\r \x01(\tR\x0edecisionReason\x129\n" +
 	"\n" +
-	"decided_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tdecidedAt\x129\n" +
+	"decided_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tdecidedAt\x129\n" +
 	"\n" +
-	"created_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12?\n" +
-	"\rgranted_until\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\fgrantedUntil\x12'\n" +
-	"\x0fdecision_reason\x18\x10 \x01(\tR\x0edecisionReason\"U\n" +
+	"created_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12?\n" +
+	"\rgranted_until\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\fgrantedUntil\"U\n" +
 	"\x11RequestableTarget\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
@@ -1120,14 +1120,14 @@ const file_nokku_v1_access_request_proto_rawDesc = "" +
 	"\x1fACCESS_REQUEST_STATUS_CANCELLED\x10\x04\x12!\n" +
 	"\x1dACCESS_REQUEST_STATUS_EXPIRED\x10\x052\xb9\a\n" +
 	"\x14AccessRequestService\x12\x8c\x01\n" +
-	"\x17ListRequestableAccounts\x12(.nokku.v1.ListRequestableAccountsRequest\x1a).nokku.v1.ListRequestableAccountsResponse\"\x1c\xc2\xf3\x18\x15\x18\x01:\x0faccess_requestsh\x01\x90\x02\x01\x12}\n" +
-	"\x13CreateAccessRequest\x12$.nokku.v1.CreateAccessRequestRequest\x1a%.nokku.v1.CreateAccessRequestResponse\"\x19\xc2\xf3\x18\x15\x18\x01:\x0faccess_requestsX\x01\x12h\n" +
-	"\x10GetAccessRequest\x12!.nokku.v1.GetAccessRequestRequest\x1a\".nokku.v1.GetAccessRequestResponse\"\r\xc2\xf3\x18\x06\x18\x01X\x01h\x01\x90\x02\x01\x12l\n" +
-	"\x12ListAccessRequests\x12#.nokku.v1.ListAccessRequestsRequest\x1a$.nokku.v1.ListAccessRequestsResponse\"\v\xc2\xf3\x18\x04\x18\x01h\x01\x90\x02\x01\x12~\n" +
+	"\x17ListRequestableAccounts\x12(.nokku.v1.ListRequestableAccountsRequest\x1a).nokku.v1.ListRequestableAccountsResponse\"\x1c\xc2\xf3\x18\x15\x18\x010\x01:\x0faccess_requests\x90\x02\x01\x12}\n" +
+	"\x13CreateAccessRequest\x12$.nokku.v1.CreateAccessRequestRequest\x1a%.nokku.v1.CreateAccessRequestResponse\"\x19\xc2\xf3\x18\x15\x18\x01(\x01:\x0faccess_requests\x12h\n" +
+	"\x10GetAccessRequest\x12!.nokku.v1.GetAccessRequestRequest\x1a\".nokku.v1.GetAccessRequestResponse\"\r\xc2\xf3\x18\x06\x18\x01(\x010\x01\x90\x02\x01\x12l\n" +
+	"\x12ListAccessRequests\x12#.nokku.v1.ListAccessRequestsRequest\x1a$.nokku.v1.ListAccessRequestsResponse\"\v\xc2\xf3\x18\x04\x18\x010\x01\x90\x02\x01\x12~\n" +
 	"\x14ApproveAccessRequest\x12%.nokku.v1.ApproveAccessRequestRequest\x1a&.nokku.v1.ApproveAccessRequestResponse\"\x17\xc2\xf3\x18\x13\x18\x03:\x0faccess_requests\x12d\n" +
 	"\x11DenyAccessRequest\x12\".nokku.v1.DenyAccessRequestRequest\x1a#.nokku.v1.DenyAccessRequestResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12j\n" +
 	"\x13CancelAccessRequest\x12$.nokku.v1.CancelAccessRequestRequest\x1a%.nokku.v1.CancelAccessRequestResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12i\n" +
-	"\x12SetRequestableTags\x12#.nokku.v1.SetRequestableTagsRequest\x1a$.nokku.v1.SetRequestableTagsResponse\"\b\xc2\xf3\x18\x04\x18\x04h\x01B\x93\x01\n" +
+	"\x12SetRequestableTags\x12#.nokku.v1.SetRequestableTagsRequest\x1a$.nokku.v1.SetRequestableTagsResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01B\x93\x01\n" +
 	"\fcom.nokku.v1B\x12AccessRequestProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

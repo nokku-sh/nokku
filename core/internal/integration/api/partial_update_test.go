@@ -308,9 +308,10 @@ func partialDaemon(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *c
 			return partialFields(res.GetDaemon(), "id")
 		},
 		cases: []partialCase{
-			{"status", update(&nokkuv1.UpdateDaemonRequest{
-				Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
-			})},
+			{"status", func(id string) error {
+				_, err := daemons.ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: &id})
+				return err
+			}},
 			{"config.allow_forwarding", update(&nokkuv1.UpdateDaemonRequest{
 				Config: &nokkuv1.DaemonConfig{AllowForwarding: new(true)},
 			})},

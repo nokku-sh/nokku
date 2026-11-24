@@ -30,6 +30,9 @@ const (
 	DaemonServiceGetDaemonProcedure = "/nokku.v1.DaemonService/GetDaemon"
 	// DaemonServiceUpdateDaemonProcedure is the procedure name of the DaemonService's UpdateDaemon RPC.
 	DaemonServiceUpdateDaemonProcedure = "/nokku.v1.DaemonService/UpdateDaemon"
+	// DaemonServiceApproveDaemonProcedure is the procedure name of the DaemonService's ApproveDaemon
+	// RPC.
+	DaemonServiceApproveDaemonProcedure = "/nokku.v1.DaemonService/ApproveDaemon"
 	// DaemonServiceSetDaemonSafeguardsProcedure is the procedure name of the DaemonService's
 	// SetDaemonSafeguards RPC.
 	DaemonServiceSetDaemonSafeguardsProcedure = "/nokku.v1.DaemonService/SetDaemonSafeguards"
@@ -81,6 +84,13 @@ var (
 			Procedure:  DaemonServiceUpdateDaemonProcedure,
 		}
 	})
+	daemonServiceApproveDaemonSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Schema:     v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonService").Methods().ByName("ApproveDaemon"),
+			Procedure:  DaemonServiceApproveDaemonProcedure,
+		}
+	})
 	daemonServiceSetDaemonSafeguardsSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -123,12 +133,10 @@ var (
 type DaemonServiceClient interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
-	// Takes a fresh sign-in, so a stolen session can't hide what it does next.
+	ApproveDaemon(context.Context, *v1.ApproveDaemonRequest) (*v1.ApproveDaemonResponse, error)
 	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
-	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
-	// A browser shell is a way onto a server, so a cookie alone does not open one.
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	Relay(context.Context) (DaemonServiceRelayClientStream, error)
 }
@@ -179,12 +187,10 @@ func (s DaemonServiceRelayClientStream) Close() error {
 type DaemonServiceHandler interface {
 	GetDaemon(context.Context, *v1.GetDaemonRequest) (*v1.GetDaemonResponse, error)
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
-	// Takes a fresh sign-in, so a stolen session can't hide what it does next.
+	ApproveDaemon(context.Context, *v1.ApproveDaemonRequest) (*v1.ApproveDaemonResponse, error)
 	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
-	// DeleteDaemon takes the daemon's server along, so it is as fresh as deleting a server.
 	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
-	// A browser shell is a way onto a server, so a cookie alone does not open one.
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	Relay(context.Context, DaemonServiceRelayServerStream) error
 }
@@ -196,6 +202,7 @@ func RegisterDaemonServiceHandler(server *connect.Server, svc DaemonServiceHandl
 	server.Register(
 		connect.Method{Spec: daemonServiceGetDaemonSpec(), Handler: adapter.getDaemon},
 		connect.Method{Spec: daemonServiceUpdateDaemonSpec(), Handler: adapter.updateDaemon},
+		connect.Method{Spec: daemonServiceApproveDaemonSpec(), Handler: adapter.approveDaemon},
 		connect.Method{Spec: daemonServiceSetDaemonSafeguardsSpec(), Handler: adapter.setDaemonSafeguards},
 		connect.Method{Spec: daemonServiceDeleteDaemonSpec(), Handler: adapter.deleteDaemon},
 		connect.Method{Spec: daemonServiceListDaemonsSpec(), Handler: adapter.listDaemons},
@@ -239,6 +246,10 @@ func (UnimplementedDaemonServiceHandler) UpdateDaemon(context.Context, *v1.Updat
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.UpdateDaemon is not implemented")
 }
 
+func (UnimplementedDaemonServiceHandler) ApproveDaemon(context.Context, *v1.ApproveDaemonRequest) (*v1.ApproveDaemonResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.ApproveDaemon is not implemented")
+}
+
 func (UnimplementedDaemonServiceHandler) SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.SetDaemonSafeguards is not implemented")
 }
@@ -274,6 +285,14 @@ func (c *daemonServiceClient) GetDaemon(ctx context.Context, req *v1.GetDaemonRe
 func (c *daemonServiceClient) UpdateDaemon(ctx context.Context, req *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error) {
 	var res v1.UpdateDaemonResponse
 	if err := c.client.CallUnary(ctx, daemonServiceUpdateDaemonSpec(), req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
+func (c *daemonServiceClient) ApproveDaemon(ctx context.Context, req *v1.ApproveDaemonRequest) (*v1.ApproveDaemonResponse, error) {
+	var res v1.ApproveDaemonResponse
+	if err := c.client.CallUnary(ctx, daemonServiceApproveDaemonSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -339,6 +358,18 @@ func (h daemonServiceHandler) updateDaemon(ctx context.Context, _ connect.Spec, 
 		return err
 	}
 	res, err := h.svc.UpdateDaemon(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return stream.Send(res)
+}
+
+func (h daemonServiceHandler) approveDaemon(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	var req v1.ApproveDaemonRequest
+	if err := stream.Receive(&req); err != nil {
+		return err
+	}
+	res, err := h.svc.ApproveDaemon(ctx, &req)
 	if err != nil {
 		return err
 	}

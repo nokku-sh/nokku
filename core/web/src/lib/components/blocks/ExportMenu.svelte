@@ -3,7 +3,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { ExportAuditLogsRequest_Format as Format } from '#lib/gen/nokku/v1/util_pb.js';
+	import { ExportAuditLogsRequest_Format as Format } from '#lib/gen/nokku/v1/audit_log_pb.js';
 	import { Download, type LucideIcon } from '@lucide/svelte';
 	import PlanBadge from './PlanBadge.svelte';
 

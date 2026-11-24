@@ -1,135 +1,136 @@
-/nokku.v1.AccessRequestService/ApproveAccessRequest public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature=access_requests capped=false signs=false audited=true
-/nokku.v1.AccessRequestService/CancelAccessRequest public=false self=false role=MEMBER daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AccessRequestService/CreateAccessRequest public=false self=false role=MEMBER daemon=false browser=SESSION nk=true machine=false feature=access_requests capped=false signs=false audited=true
-/nokku.v1.AccessRequestService/DenyAccessRequest public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AccessRequestService/GetAccessRequest public=false self=false role=MEMBER daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
-/nokku.v1.AccessRequestService/ListAccessRequests public=false self=false role=MEMBER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.AccessRequestService/ListRequestableAccounts public=false self=false role=MEMBER daemon=false browser=SESSION nk=false machine=true feature=access_requests capped=false signs=false audited=false
-/nokku.v1.AccessRequestService/SetRequestableTags public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.AccountService/DeleteAccount public=false self=true role=UNSPECIFIED daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AccountService/GetAccount public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.AccountService/ListAccountSessions public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.AccountService/ListCredentials public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.AccountService/RemoveCredential public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.AccountService/RemoveSession public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.AccountService/RenameCredential public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.AccountService/RequestEmailChange public=false self=true role=UNSPECIFIED daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AccountService/UpdateAccount public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.AuditStreamService/CreateAuditStream public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature=audit_streaming capped=false signs=false audited=true
-/nokku.v1.AuditStreamService/DeleteAuditStream public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AuditStreamService/ListAuditStreams public=false self=false role=OWNER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.AuditStreamService/TestAuditStream public=false self=false role=OWNER daemon=false browser=SESSION nk=false machine=true feature=audit_streaming capped=false signs=false audited=true
-/nokku.v1.AuditStreamService/UpdateAuditStream public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AuthService/CancelEmailChange public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AuthService/ConfirmEmailChange public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AuthService/ConsumeMagicLink public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AuthService/ExchangeWorkloadToken public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AuthService/GetLoginOptions public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=false
-/nokku.v1.AuthService/Logout public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.AuthService/RequestMagicLink public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.BillingService/ActivateLicense public=false self=false role=OWNER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.BillingService/GetBilling public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.BillingService/GetLicense public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.CertificateService/GetCertificateAuthority public=false self=false role=MEMBER daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
-/nokku.v1.CertificateService/RolloverCertificateAuthority public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.CertificateService/SignSSHCertificate public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=true audited=true
-/nokku.v1.CertificateService/UpdateCertificateAuthority public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.DaemonControlService/Connect public=false self=false role=UNSPECIFIED daemon=true browser=SESSION nk=false machine=false feature= capped=false signs=false audited=false
-/nokku.v1.DaemonControlService/DaemonRelay public=false self=false role=UNSPECIFIED daemon=true browser=SESSION nk=false machine=false feature= capped=false signs=false audited=false
-/nokku.v1.DaemonControlService/EnrollDaemon public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.DaemonControlService/SignHostCertificate public=false self=false role=UNSPECIFIED daemon=true browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.DaemonControlService/SyncDaemon public=false self=false role=UNSPECIFIED daemon=true browser=SESSION nk=false machine=false feature= capped=false signs=false audited=false
-/nokku.v1.DaemonControlService/UnenrollDaemon public=false self=false role=UNSPECIFIED daemon=true browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.DaemonControlService/UploadRecording public=false self=false role=UNSPECIFIED daemon=true browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.DaemonService/CreateSession public=false self=false role=MEMBER daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=true audited=true
-/nokku.v1.DaemonService/DeleteDaemon public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.DaemonService/GetDaemon public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.DaemonService/ListDaemons public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.DaemonService/Relay public=false self=false role=MEMBER daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
-/nokku.v1.DaemonService/SetDaemonSafeguards public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.DaemonService/UpdateDaemon public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.DashboardService/GetDashboard public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.InvitationService/AcceptInvitation public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.InvitationService/CreateInvitation public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.InvitationService/DeleteInvitation public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.InvitationService/GetInvitation public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=false
-/nokku.v1.InvitationService/ListInvitations public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.JoinTokenService/CreateJoinToken public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.JoinTokenService/DeleteJoinToken public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.JoinTokenService/ListJoinTokens public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.RecordingService/DeleteRecording public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.RecordingService/GetRecording public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.RecordingService/ListRecordings public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.SCIMService/CreateSCIMToken public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature=scim capped=false signs=false audited=true
-/nokku.v1.SCIMService/DeleteSCIMToken public=false self=false role=OWNER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.SCIMService/ListSCIMTokens public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.SSOService/DeleteSSOProvider public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.SSOService/ListSSOProviders public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.SSOService/PutSSOProvider public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.ServiceAccountService/AddServiceAccountFederation public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.ServiceAccountService/CreateServiceAccount public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=true signs=false audited=true
-/nokku.v1.ServiceAccountService/CreateServiceAccountToken public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.ServiceAccountService/DeleteServiceAccount public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.ServiceAccountService/GetServiceAccount public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.ServiceAccountService/ListServiceAccountFederations public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.ServiceAccountService/ListServiceAccountTokens public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.ServiceAccountService/ListServiceAccounts public=false self=false role=VIEWER daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
-/nokku.v1.ServiceAccountService/RemoveServiceAccountFederation public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.ServiceAccountService/RevokeServiceAccountToken public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.ServiceAccountService/SetServiceAccountLimits public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.ServiceAccountService/SetServiceAccountRole public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.ServiceAccountService/UpdateServiceAccount public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TargetAccountService/AddTargetAccount public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TargetAccountService/Grant public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TargetAccountService/ListTargetAccounts public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TargetAccountService/RemoveTargetAccount public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TargetAccountService/Revoke public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TargetService/CreateTarget public=false self=false role=EDITOR daemon=false browser=SESSION nk=true machine=true feature= capped=true signs=false audited=true
-/nokku.v1.TargetService/DeleteTarget public=false self=false role=EDITOR daemon=false browser=FRESH nk=true machine=true feature= capped=false signs=false audited=true
-/nokku.v1.TargetService/ForgetHostKey public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TargetService/GetAccessGraph public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TargetService/GetAccessMatrix public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TargetService/GetSubjectAccess public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TargetService/GetTarget public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TargetService/GetTargetFilters public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TargetService/ListAccessGraphTargets public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TargetService/ListTargets public=false self=false role=VIEWER daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TargetService/RenameTarget public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TargetService/SetTargetEndpoints public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TargetService/SyncTargetUsers public=false self=false role=EDITOR daemon=false browser=REFUSED nk=true machine=true feature= capped=false signs=false audited=true
-/nokku.v1.TargetService/UpdateTarget public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TeamService/AddTeamMember public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TeamService/CloseTeamToSCIM public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TeamService/CreateTeam public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=true signs=false audited=true
-/nokku.v1.TeamService/DeleteTeam public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TeamService/GetTeam public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TeamService/ListTeamMembers public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TeamService/ListTeams public=false self=false role=VIEWER daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TeamService/ListTeamsForUser public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.TeamService/OpenTeamToSCIM public=false self=false role=EDITOR daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TeamService/RemoveTeamMember public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.TeamService/UpdateTeam public=false self=false role=EDITOR daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.UtilService/ExportAccessReport public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature=access_review capped=false signs=false audited=true
-/nokku.v1.UtilService/ExportAuditLogs public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature=audit_export capped=false signs=false audited=true
-/nokku.v1.UtilService/GetInstanceInfo public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=false
-/nokku.v1.UtilService/GetVersion public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=false
-/nokku.v1.UtilService/ListAuditLogs public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.UtilService/ListMyActivity public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.UtilService/ListRoles public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.UtilService/PollAuditLogs public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature=audit_streaming capped=false signs=false audited=false
-/nokku.v1.WorkspaceService/ClearUserIdentities public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/CreateWorkspace public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/DeactivateUser public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/DeleteUser public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/DeleteWorkspace public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/FindWorkspaces public=true self=false role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/GetUser public=false self=false role=VIEWER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.WorkspaceService/GetWorkspace public=false self=true role=UNSPECIFIED daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=false
-/nokku.v1.WorkspaceService/ListUsers public=false self=false role=VIEWER daemon=false browser=SESSION nk=true machine=true feature= capped=false signs=false audited=false
-/nokku.v1.WorkspaceService/ReactivateUser public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/SetDefaultSafeguards public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/SetEnforceSSO public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/TransferOwnership public=false self=false role=OWNER daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/UpdateDaemonDefaults public=false self=false role=ADMIN daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/UpdateUserRole public=false self=false role=ADMIN daemon=false browser=FRESH nk=false machine=false feature= capped=false signs=false audited=true
-/nokku.v1.WorkspaceService/UpdateWorkspace public=false self=false role=OWNER daemon=false browser=SESSION nk=false machine=true feature= capped=false signs=false audited=true
+/nokku.v1.AccessRequestService/ApproveAccessRequest public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature=access_requests capped=false audited=true
+/nokku.v1.AccessRequestService/CancelAccessRequest public=false daemon=false role=MEMBER fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AccessRequestService/CreateAccessRequest public=false daemon=false role=MEMBER fresh=false cli=true service_account=false feature=access_requests capped=false audited=true
+/nokku.v1.AccessRequestService/DenyAccessRequest public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AccessRequestService/GetAccessRequest public=false daemon=false role=MEMBER fresh=false cli=true service_account=true feature= capped=false audited=false
+/nokku.v1.AccessRequestService/ListAccessRequests public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AccessRequestService/ListRequestableAccounts public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature=access_requests capped=false audited=false
+/nokku.v1.AccessRequestService/SetRequestableTags public=false daemon=false role=ADMIN fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.AccessViewService/ExportAccessReport public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature=access_review capped=false audited=true
+/nokku.v1.AccessViewService/GetAccessGraph public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AccessViewService/GetAccessMatrix public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AccessViewService/ListAccessGraphTargets public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AccountService/DeleteAccount public=false daemon=false role=MEMBER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AccountService/GetAccount public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AccountService/ListAccountSessions public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AccountService/ListCredentials public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AccountService/RemoveCredential public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.AccountService/RemoveSession public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.AccountService/RenameCredential public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.AccountService/RequestEmailChange public=false daemon=false role=MEMBER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AccountService/UpdateAccount public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.AuditLogService/ExportAuditLogs public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature=audit_export capped=false audited=true
+/nokku.v1.AuditLogService/ListAuditLogs public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AuditLogService/ListMyActivity public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AuditLogService/PollAuditLogs public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature=audit_streaming capped=false audited=false
+/nokku.v1.AuditStreamService/CreateAuditStream public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature=audit_streaming capped=false audited=true
+/nokku.v1.AuditStreamService/DeleteAuditStream public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AuditStreamService/ListAuditStreams public=false daemon=false role=OWNER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.AuditStreamService/TestAuditStream public=false daemon=false role=OWNER fresh=false cli=false service_account=true feature=audit_streaming capped=false audited=true
+/nokku.v1.AuditStreamService/UpdateAuditStream public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AuthService/CancelEmailChange public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AuthService/ConfirmEmailChange public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AuthService/ConsumeMagicLink public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AuthService/ExchangeWorkloadToken public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AuthService/GetLoginOptions public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=false
+/nokku.v1.AuthService/Logout public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.AuthService/RequestMagicLink public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.BillingService/ActivateLicense public=false daemon=false role=OWNER fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.BillingService/GetBilling public=false daemon=false role=ADMIN fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.BillingService/GetLicense public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.CertificateService/GetCertificateAuthority public=false daemon=false role=MEMBER fresh=false cli=true service_account=true feature= capped=false audited=false
+/nokku.v1.CertificateService/RolloverCertificateAuthority public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.CertificateService/SignSSHCertificate public=false daemon=false role=MEMBER fresh=false cli=true service_account=true feature= capped=false audited=true
+/nokku.v1.CertificateService/UpdateCertificateAuthority public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonControlService/Connect public=false daemon=true role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=false
+/nokku.v1.DaemonControlService/DaemonRelay public=false daemon=true role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=false
+/nokku.v1.DaemonControlService/EnrollDaemon public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonControlService/SignHostCertificate public=false daemon=true role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonControlService/SyncDaemon public=false daemon=true role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=false
+/nokku.v1.DaemonControlService/UnenrollDaemon public=false daemon=true role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonControlService/UploadRecording public=false daemon=true role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonService/ApproveDaemon public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonService/CreateSession public=false daemon=false role=MEMBER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonService/DeleteDaemon public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonService/GetDaemon public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.DaemonService/ListDaemons public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.DaemonService/Relay public=false daemon=false role=MEMBER fresh=false cli=true service_account=true feature= capped=false audited=false
+/nokku.v1.DaemonService/SetDaemonSafeguards public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DaemonService/UpdateDaemon public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.DashboardService/GetDashboard public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.InvitationService/AcceptInvitation public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.InvitationService/CreateInvitation public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.InvitationService/DeleteInvitation public=false daemon=false role=ADMIN fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.InvitationService/GetInvitation public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=false
+/nokku.v1.InvitationService/ListInvitations public=false daemon=false role=ADMIN fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.JoinTokenService/CreateJoinToken public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.JoinTokenService/DeleteJoinToken public=false daemon=false role=ADMIN fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.JoinTokenService/ListJoinTokens public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.RecordingService/DeleteRecording public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.RecordingService/GetRecording public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.RecordingService/ListRecordings public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.SCIMService/CreateSCIMToken public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature=scim capped=false audited=true
+/nokku.v1.SCIMService/DeleteSCIMToken public=false daemon=false role=OWNER fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.SCIMService/ListSCIMTokens public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.SSOService/DeleteSSOProvider public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.SSOService/ListSSOProviders public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.SSOService/PutSSOProvider public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.ServiceAccountService/AddServiceAccountFederation public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.ServiceAccountService/CreateServiceAccount public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=true audited=true
+/nokku.v1.ServiceAccountService/CreateServiceAccountToken public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.ServiceAccountService/DeleteServiceAccount public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.ServiceAccountService/GetServiceAccount public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.ServiceAccountService/ListServiceAccountFederations public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.ServiceAccountService/ListServiceAccountTokens public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.ServiceAccountService/ListServiceAccounts public=false daemon=false role=VIEWER fresh=false cli=true service_account=true feature= capped=false audited=false
+/nokku.v1.ServiceAccountService/RemoveServiceAccountFederation public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.ServiceAccountService/RevokeServiceAccountToken public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.ServiceAccountService/SetServiceAccountLimits public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.ServiceAccountService/SetServiceAccountRole public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.ServiceAccountService/UpdateServiceAccount public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TargetAccountService/AddTargetAccount public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TargetAccountService/GetGrantScope public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.TargetAccountService/Grant public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TargetAccountService/ListTargetAccounts public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.TargetAccountService/RemoveTargetAccount public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TargetAccountService/Revoke public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TargetService/CreateTarget public=false daemon=false role=EDITOR fresh=false cli=true service_account=true feature= capped=true audited=true
+/nokku.v1.TargetService/DeleteTarget public=false daemon=false role=EDITOR fresh=true cli=true service_account=true feature= capped=false audited=true
+/nokku.v1.TargetService/ForgetHostKey public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TargetService/GetSubjectAccess public=false daemon=false role=MEMBER fresh=false cli=true service_account=true feature= capped=false audited=false
+/nokku.v1.TargetService/GetTarget public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.TargetService/GetTargetFilters public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.TargetService/ListTargets public=false daemon=false role=VIEWER fresh=false cli=true service_account=true feature= capped=false audited=false
+/nokku.v1.TargetService/RenameTarget public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TargetService/SetTargetEndpoints public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TargetService/SyncTargetUsers public=false daemon=false role=EDITOR fresh=false cli=true service_account=true feature= capped=false audited=true
+/nokku.v1.TargetService/UpdateTarget public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TeamService/AddTeamMember public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TeamService/CloseTeamToSCIM public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TeamService/CreateTeam public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=true audited=true
+/nokku.v1.TeamService/DeleteTeam public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TeamService/GetTeam public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.TeamService/ListTeamMembers public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.TeamService/ListTeams public=false daemon=false role=VIEWER fresh=false cli=true service_account=true feature= capped=false audited=false
+/nokku.v1.TeamService/ListTeamsForUser public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.TeamService/OpenTeamToSCIM public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TeamService/RemoveTeamMember public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.TeamService/UpdateTeam public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.UserService/ClearUserIdentities public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.UserService/DeactivateUser public=false daemon=false role=ADMIN fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.UserService/DeleteUser public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.UserService/GetUser public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.UserService/ListUsers public=false daemon=false role=VIEWER fresh=false cli=true service_account=true feature= capped=false audited=false
+/nokku.v1.UserService/ReactivateUser public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.UserService/SetUserRole public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.UserService/TransferOwnership public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.UtilService/GetInstanceInfo public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=false
+/nokku.v1.UtilService/GetVersion public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=false
+/nokku.v1.WorkspaceService/CreateWorkspace public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.WorkspaceService/DeleteWorkspace public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.WorkspaceService/FindWorkspaces public=true daemon=false role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.WorkspaceService/GetWorkspace public=false daemon=false role=MEMBER fresh=false cli=false service_account=true feature= capped=false audited=false
+/nokku.v1.WorkspaceService/SetDefaultSafeguards public=false daemon=false role=ADMIN fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.WorkspaceService/SetEnforceSSO public=false daemon=false role=OWNER fresh=true cli=false service_account=false feature= capped=false audited=true
+/nokku.v1.WorkspaceService/UpdateDaemonDefaults public=false daemon=false role=ADMIN fresh=false cli=false service_account=true feature= capped=false audited=true
+/nokku.v1.WorkspaceService/UpdateWorkspace public=false daemon=false role=OWNER fresh=false cli=false service_account=true feature= capped=false audited=true

@@ -293,7 +293,7 @@ func answer(stream nokkuv1connect.DaemonControlServiceUploadRecordingClientStrea
 }
 
 func (h header) meta() *nokkuv1.RecordingMeta {
-	meta := &nokkuv1.RecordingMeta{RecordingId: &h.SessionID, Username: &h.User, Principal: &h.Principal}
+	meta := &nokkuv1.RecordingMeta{Id: &h.SessionID, Username: &h.User, Principal: &h.Principal}
 	if h.Timestamp > 0 {
 		meta.StartedAt = timestamppb.New(time.Unix(h.Timestamp, 0))
 	}

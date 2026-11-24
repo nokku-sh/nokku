@@ -11,33 +11,33 @@ service AuditStreamService {
   rpc ListAuditStreams(ListAuditStreamsRequest) returns (ListAuditStreamsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateAuditStream(CreateAuditStreamRequest) returns (CreateAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      browser: BROWSER_FRESH
+      fresh: true
       feature: "audit_streaming"
     };
   }
   rpc UpdateAuditStream(UpdateAuditStreamRequest) returns (UpdateAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc DeleteAuditStream(DeleteAuditStreamRequest) returns (DeleteAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc TestAuditStream(TestAuditStreamRequest) returns (TestAuditStreamResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      machine: true
+      service_account: true
       feature: "audit_streaming"
     };
   }
@@ -45,11 +45,8 @@ service AuditStreamService {
 
 enum AuditStreamKind {
   AUDIT_STREAM_KIND_UNSPECIFIED = 0;
-  // WEBHOOK posts a JSON array, signed with an HMAC of the secret in X-Nokku-Signature.
   AUDIT_STREAM_KIND_WEBHOOK = 1;
-  // SPLUNK posts to an HTTP Event Collector, the secret is the HEC token.
   AUDIT_STREAM_KIND_SPLUNK = 2;
-  // DATADOG posts to the logs intake, the secret is the API key.
   AUDIT_STREAM_KIND_DATADOG = 3;
 }
 
@@ -58,8 +55,8 @@ message AuditStream {
   AuditStreamKind kind = 2;
   string url = 3;
   bool enabled = 4;
-  google.protobuf.Timestamp last_sent_at = 5;
-  string last_error = 6;
+  string last_error = 5;
+  google.protobuf.Timestamp last_sent_at = 6;
   google.protobuf.Timestamp failing_since = 7;
   google.protobuf.Timestamp created_at = 8;
 }
@@ -79,6 +76,7 @@ message CreateAuditStreamRequest {
     prefix: "https://"
     max_len: 2048
   }];
+  // The webhook HMAC key, the Splunk HEC token or the Datadog API key.
   string secret = 3 [(buf.validate.field).string = {
     min_len: 8
     max_len: 1024

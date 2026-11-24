@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
-	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
+	import { type AuditEvent } from '#lib/gen/nokku/v1/audit_log_pb.js';
 	import {
 		eventHappened,
 		eventLabel,
@@ -13,7 +13,7 @@
 	import EventIcon from '#lib/components/audit/EventIcon.svelte';
 	import { formatTs } from '#lib/utils.js';
 
-	let { log }: { log: EventLog } = $props();
+	let { log }: { log: AuditEvent } = $props();
 
 	const outcome = $derived(outcomeOf(log));
 	const code = $derived(log.details?.['code'] as string | undefined);

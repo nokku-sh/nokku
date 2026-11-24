@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import { targetAccount as accountApi } from '#lib/api/target-accounts.svelte.js';
 	import { team as teamApi } from '#lib/api/team.svelte.js';
 	import { whenFresh } from '#lib/api/auth.svelte.js';
@@ -15,7 +16,6 @@
 	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm, useAutoSave, useSheet } from '#lib/hooks/index.js';
 	import {
 		Check,
@@ -43,8 +43,8 @@
 	let pickerKey = $state(0);
 	function changeRole(role: WorkspaceRole) {
 		if (!person) return;
-		const userId = person.id;
-		const apply = () => autoSave.track(() => updateRole.mutateAsync({ userId, role }));
+		const id = person.id;
+		const apply = () => autoSave.track(() => updateRole.mutateAsync({ id, role }));
 		if (role < WorkspaceRole.ADMIN || role <= person.role) {
 			void apply().catch(() => {});
 			return;
@@ -149,9 +149,9 @@
 								title: `Deactivate ${name}?`,
 								description: 'Every session ends right away. You can reactivate them later.',
 								confirmText: 'Deactivate',
-								onConfirm: () => deactivate.mutateAsync({ userId: person.id })
+								onConfirm: () => deactivate.mutateAsync({ id: person.id })
 							})
-						: whenFresh(() => reactivate.mutate({ userId: person.id }))
+						: whenFresh(() => reactivate.mutate({ id: person.id }))
 			});
 			actions.push({
 				title: 'Unlink sign-in providers',
@@ -165,7 +165,7 @@
 							description:
 								'Whoever holds this address at the provider gets this account at the next sign-in. If they left, delete the account instead.',
 							confirmText: 'Unlink',
-							onConfirm: () => clearIdentities.mutateAsync({ userId: person.id })
+							onConfirm: () => clearIdentities.mutateAsync({ id: person.id })
 						})
 					)
 			});
@@ -182,7 +182,7 @@
 								description: await userDeleteWarning(person.id),
 								confirmText: 'Delete',
 								onConfirm: async () => {
-									await remove.mutateAsync({ userId: person.id });
+									await remove.mutateAsync({ id: person.id });
 									sheet.close();
 								}
 							})

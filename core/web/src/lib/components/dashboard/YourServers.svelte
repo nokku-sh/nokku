@@ -20,7 +20,7 @@
 
 	let query = $state('');
 
-	const servers = $derived(all.list.filter((t) => serverMatches(t, query)));
+	const servers = $derived(all.list.filter((s) => serverMatches(s, query)));
 	const visible = $derived(query ? servers : servers.slice(0, LIMIT));
 </script>
 
@@ -65,7 +65,7 @@
 			</Empty.Root>
 		{:else}
 			<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-				{#each visible as t (t.id)}
+				{#each visible as { target: t, logins } (t.id)}
 					{@const shell = all.canShell(t)}
 					<div
 						class="flex min-w-0 flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/40"
@@ -79,7 +79,7 @@
 							{t.metadata?.hostname || t.endpoints[0] || 'no address yet'}
 						</span>
 						<div class="flex flex-wrap gap-1">
-							{#each t.usernames as username (username)}
+							{#each logins as { username } (username)}
 								<Tooltip.Root>
 									<Tooltip.Trigger>
 										{#snippet child({ props })}

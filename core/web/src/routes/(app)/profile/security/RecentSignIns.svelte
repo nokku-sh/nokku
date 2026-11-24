@@ -14,7 +14,7 @@
 		() => !!me.data?.id,
 		5
 	);
-	const signIns = $derived(feed.data?.logs ?? []);
+	const signIns = $derived(feed.data?.events ?? []);
 </script>
 
 <Card.Root>

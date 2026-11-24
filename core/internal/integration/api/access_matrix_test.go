@@ -268,8 +268,8 @@ func (f *matrixFixture) seedSubjects(t *testing.T) {
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(f.adminClient())
 	key := serviceAccountToken(t, accounts, ci, nil)
 	f.callers = append(f.callers, matrixCaller{"ci", key, key})
-	_, err := nokkuv1connect.NewWorkspaceServiceClient(f.adminClient()).DeactivateUser(t.Context(),
-		&nokkuv1.DeactivateUserRequest{UserId: &dave})
+	_, err := nokkuv1connect.NewUserServiceClient(f.adminClient()).DeactivateUser(t.Context(),
+		&nokkuv1.DeactivateUserRequest{Id: &dave})
 	require.NoError(t, err)
 
 	f.subjects = []matrixSubject{
@@ -466,15 +466,21 @@ func caIDs(res *nokkuv1.GetSubjectAccessResponse) []string {
 	return []string{}
 }
 
-func (f *matrixFixture) targetAccessLines(prefix string, targets []*nokkuv1.Target) []string {
+func (f *matrixFixture) targetAccessLines(prefix string, targets []*nokkuv1.TargetAccess) []string {
 	if len(targets) == 0 {
 		return []string{prefix + ": no targets"}
 	}
 	lines := make([]string, 0, len(targets))
 	for _, tg := range targets {
-		expiring := slices.Collect(maps.Keys(tg.GetUsernameExpiresAt()))
+		var usernames, expiring []string
+		for _, l := range tg.GetLogins() {
+			usernames = append(usernames, l.GetUsername())
+			if l.GetExpiresAt() != nil {
+				expiring = append(expiring, l.GetUsername())
+			}
+		}
 		line := fmt.Sprintf("%s %s: accounts %s, expiring %s",
-			prefix, tg.GetId(), f.list(tg.GetUsernames()), f.list(expiring))
+			prefix, tg.GetTarget().GetId(), f.list(usernames), f.list(expiring))
 		if tg.Blocked != nil {
 			line += ", blocked " + strings.ToLower(strings.TrimPrefix(tg.GetBlocked().String(), "ACCESS_BLOCK_"))
 		}
@@ -489,14 +495,15 @@ func (f *matrixFixture) reportLines(t *testing.T) []string {
 	req := &nokkuv1.ExportAccessReportRequest{Format: nokkuv1.ExportAuditLogsRequest_FORMAT_JSON.Enum()}
 	var lines []string
 	restore := withoutAPlan(t, f.cfg)
-	if _, err := nokkuv1connect.NewUtilServiceClient(f.adminClient()).ExportAccessReport(t.Context(), req); err != nil {
+	if _, err := nokkuv1connect.NewAccessViewServiceClient(f.adminClient()).
+		ExportAccessReport(t.Context(), req); err != nil {
 		// Hosted has no free plan, its refusal names the plan that ran out.
 		refused := strings.ReplaceAll(errText(err), "inactive", "Community")
 		lines = append(lines, "ExportAccessReport on community: "+refused)
 	}
 	restore()
 	_, srv := enterprise(t)
-	res, err := nokkuv1connect.NewUtilServiceClient(
+	res, err := nokkuv1connect.NewAccessViewServiceClient(
 		clientOn(srv, f.admin),
 	).ExportAccessReport(t.Context(), req)
 	if err != nil {

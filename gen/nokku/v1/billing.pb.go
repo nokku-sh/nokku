@@ -24,9 +24,8 @@ const (
 )
 
 type GetBillingRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Asks the license server for the current key first, so new seats show up. That can take a moment.
-	Refresh       *bool `protobuf:"varint,1,opt,name=refresh" json:"refresh,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Refresh       *bool                  `protobuf:"varint,1,opt,name=refresh" json:"refresh,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -76,14 +75,11 @@ type GetBillingResponse struct {
 	Quotas        *Quotas                `protobuf:"bytes,4,opt,name=quotas" json:"quotas,omitempty"`
 	UserCount     *int64                 `protobuf:"varint,5,opt,name=user_count,json=userCount" json:"user_count,omitempty"`
 	ResourceCount *int64                 `protobuf:"varint,6,opt,name=resource_count,json=resourceCount" json:"resource_count,omitempty"`
-	HeldQuotas    *Quotas                `protobuf:"bytes,8,opt,name=held_quotas,json=heldQuotas" json:"held_quotas,omitempty"`
+	HeldQuotas    *Quotas                `protobuf:"bytes,7,opt,name=held_quotas,json=heldQuotas" json:"held_quotas,omitempty"`
+	License       *GetLicenseResponse    `protobuf:"bytes,8,opt,name=license" json:"license,omitempty"`
 	HeldUntil     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=held_until,json=heldUntil" json:"held_until,omitempty"`
-	// The end of a hosted trial, set until the first key is activated.
-	TrialEndsAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=trial_ends_at,json=trialEndsAt" json:"trial_ends_at,omitempty"`
-	// When a hosted workspace whose plan ended is deleted.
-	DeleteAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=delete_at,json=deleteAt" json:"delete_at,omitempty"`
-	// The key this response was resolved from, after the refresh.
-	License       *GetLicenseResponse `protobuf:"bytes,12,opt,name=license" json:"license,omitempty"`
+	TrialEndsAt   *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=trial_ends_at,json=trialEndsAt" json:"trial_ends_at,omitempty"`
+	DeleteAt      *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=delete_at,json=deleteAt" json:"delete_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -167,6 +163,13 @@ func (x *GetBillingResponse) GetHeldQuotas() *Quotas {
 	return nil
 }
 
+func (x *GetBillingResponse) GetLicense() *GetLicenseResponse {
+	if x != nil {
+		return x.License
+	}
+	return nil
+}
+
 func (x *GetBillingResponse) GetHeldUntil() *timestamppb.Timestamp {
 	if x != nil {
 		return x.HeldUntil
@@ -184,13 +187,6 @@ func (x *GetBillingResponse) GetTrialEndsAt() *timestamppb.Timestamp {
 func (x *GetBillingResponse) GetDeleteAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.DeleteAt
-	}
-	return nil
-}
-
-func (x *GetBillingResponse) GetLicense() *GetLicenseResponse {
-	if x != nil {
-		return x.License
 	}
 	return nil
 }
@@ -462,14 +458,14 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\n" +
 	"user_count\x18\x05 \x01(\x03R\tuserCount\x12%\n" +
 	"\x0eresource_count\x18\x06 \x01(\x03R\rresourceCount\x121\n" +
-	"\vheld_quotas\x18\b \x01(\v2\x10.nokku.v1.QuotasR\n" +
-	"heldQuotas\x129\n" +
+	"\vheld_quotas\x18\a \x01(\v2\x10.nokku.v1.QuotasR\n" +
+	"heldQuotas\x126\n" +
+	"\alicense\x18\b \x01(\v2\x1c.nokku.v1.GetLicenseResponseR\alicense\x129\n" +
 	"\n" +
 	"held_until\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\theldUntil\x12>\n" +
 	"\rtrial_ends_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\vtrialEndsAt\x127\n" +
-	"\tdelete_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\bdeleteAt\x126\n" +
-	"\alicense\x18\f \x01(\v2\x1c.nokku.v1.GetLicenseResponseR\alicense\x1a;\n" +
+	"\tdelete_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\bdeleteAt\x1a;\n" +
 	"\rFeaturesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\bR\x05value:\x028\x01\"\xe5\x01\n" +
@@ -491,10 +487,10 @@ const file_nokku_v1_billing_proto_rawDesc = "" +
 	"\x17ActivateLicenseResponse2\x9e\x02\n" +
 	"\x0eBillingService\x12T\n" +
 	"\n" +
-	"GetBilling\x12\x1b.nokku.v1.GetBillingRequest\x1a\x1c.nokku.v1.GetBillingResponse\"\v\xc2\xf3\x18\x04\x18\x04h\x01\x90\x02\x01\x12T\n" +
+	"GetBilling\x12\x1b.nokku.v1.GetBillingRequest\x1a\x1c.nokku.v1.GetBillingResponse\"\v\xc2\xf3\x18\x04\x18\x040\x01\x90\x02\x01\x12T\n" +
 	"\n" +
-	"GetLicense\x12\x1b.nokku.v1.GetLicenseRequest\x1a\x1c.nokku.v1.GetLicenseResponse\"\v\xc2\xf3\x18\x04\x10\x01h\x01\x90\x02\x01\x12`\n" +
-	"\x0fActivateLicense\x12 .nokku.v1.ActivateLicenseRequest\x1a!.nokku.v1.ActivateLicenseResponse\"\b\xc2\xf3\x18\x04\x18\x05h\x01B\x8d\x01\n" +
+	"GetLicense\x12\x1b.nokku.v1.GetLicenseRequest\x1a\x1c.nokku.v1.GetLicenseResponse\"\v\xc2\xf3\x18\x04\x18\x010\x01\x90\x02\x01\x12`\n" +
+	"\x0fActivateLicense\x12 .nokku.v1.ActivateLicenseRequest\x1a!.nokku.v1.ActivateLicenseResponse\"\b\xc2\xf3\x18\x04\x18\x050\x01B\x8d\x01\n" +
 	"\fcom.nokku.v1B\fBillingProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -525,10 +521,10 @@ var file_nokku_v1_billing_proto_depIdxs = []int32{
 	7,  // 0: nokku.v1.GetBillingResponse.features:type_name -> nokku.v1.GetBillingResponse.FeaturesEntry
 	2,  // 1: nokku.v1.GetBillingResponse.quotas:type_name -> nokku.v1.Quotas
 	2,  // 2: nokku.v1.GetBillingResponse.held_quotas:type_name -> nokku.v1.Quotas
-	8,  // 3: nokku.v1.GetBillingResponse.held_until:type_name -> google.protobuf.Timestamp
-	8,  // 4: nokku.v1.GetBillingResponse.trial_ends_at:type_name -> google.protobuf.Timestamp
-	8,  // 5: nokku.v1.GetBillingResponse.delete_at:type_name -> google.protobuf.Timestamp
-	4,  // 6: nokku.v1.GetBillingResponse.license:type_name -> nokku.v1.GetLicenseResponse
+	4,  // 3: nokku.v1.GetBillingResponse.license:type_name -> nokku.v1.GetLicenseResponse
+	8,  // 4: nokku.v1.GetBillingResponse.held_until:type_name -> google.protobuf.Timestamp
+	8,  // 5: nokku.v1.GetBillingResponse.trial_ends_at:type_name -> google.protobuf.Timestamp
+	8,  // 6: nokku.v1.GetBillingResponse.delete_at:type_name -> google.protobuf.Timestamp
 	8,  // 7: nokku.v1.GetLicenseResponse.expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 8: nokku.v1.BillingService.GetBilling:input_type -> nokku.v1.GetBillingRequest
 	3,  // 9: nokku.v1.BillingService.GetLicense:input_type -> nokku.v1.GetLicenseRequest

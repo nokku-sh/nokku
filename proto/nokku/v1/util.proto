@@ -2,9 +2,6 @@ edition = "2023";
 
 package nokku.v1;
 
-import "buf/validate/validate.proto";
-import "google/protobuf/struct.proto";
-import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
 
 service UtilService {
@@ -14,50 +11,6 @@ service UtilService {
   }
   rpc GetInstanceInfo(GetInstanceInfoRequest) returns (GetInstanceInfoResponse) {
     option (access) = {public: true};
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
-    option (access) = {
-      self: true
-      machine: true
-    };
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      machine: true
-    };
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  // PollAuditLogs is for a SIEM that fetches. It reads forward from a cursor, oldest first, and never skips an event.
-  rpc PollAuditLogs(PollAuditLogsRequest) returns (PollAuditLogsResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      machine: true
-      feature: "audit_streaming"
-    };
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc ExportAuditLogs(ExportAuditLogsRequest) returns (ExportAuditLogsResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      machine: true
-      feature: "audit_export"
-    };
-  }
-  rpc ExportAccessReport(ExportAccessReportRequest) returns (ExportAccessReportResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      machine: true
-      feature: "access_review"
-    };
-  }
-  rpc ListMyActivity(ListMyActivityRequest) returns (ListMyActivityResponse) {
-    option (access) = {
-      self: true
-      machine: true
-    };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -78,119 +31,5 @@ message GetInstanceInfoResponse {
   string imprint_url = 6;
   bool hosted = 7;
   bool signup = 8;
-  // Set where signup is: a workspace lives at <slug>.<workspace_domain>.
   string workspace_domain = 9;
-}
-
-message Role {
-  WorkspaceRole role = 1;
-  string description = 2;
-}
-message ListRolesRequest {}
-message ListRolesResponse {
-  repeated Role roles = 1;
-}
-
-message EventLog {
-  string id = 1;
-  string actor_id = 2;
-  string actor_kind = 3;
-  string actor_name = 4;
-  string action = 5;
-  string target = 6;
-  bool ok = 7;
-  string ip = 8;
-  string user_agent = 9;
-  google.protobuf.Struct details = 10;
-  google.protobuf.Timestamp timestamp = 11;
-}
-
-enum AuditOutcome {
-  AUDIT_OUTCOME_UNSPECIFIED = 0;
-  AUDIT_OUTCOME_SUCCEEDED = 1;
-  AUDIT_OUTCOME_FAILED = 2;
-  AUDIT_OUTCOME_DENIED = 3;
-}
-
-message AuditLogFilter {
-  string search = 1;
-  repeated string actor_ids = 2 [(buf.validate.field).repeated.items.string.uuid = true];
-  repeated string actor_kinds = 3;
-  repeated string actions = 4;
-  string target = 5;
-  AuditOutcome outcome = 6 [(buf.validate.field).enum = {defined_only: true}];
-  google.protobuf.Timestamp start_date = 7;
-  google.protobuf.Timestamp end_date = 8;
-  // excluded_actions leaves these out, like every sign-in for a view of changes.
-  repeated string excluded_actions = 9;
-}
-
-message ListAuditLogsRequest {
-  int32 limit = 1 [(buf.validate.field).int32 = {
-    gte: 1
-    lte: 100
-  }];
-  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
-  AuditLogFilter filter = 3;
-}
-message ListAuditLogsResponse {
-  repeated EventLog logs = 1;
-  int32 total = 2;
-  int32 retention_days = 3;
-}
-
-message PollAuditLogsRequest {
-  // cursor is the one the last answer gave. Empty starts at the oldest event the log still keeps.
-  string cursor = 1 [(buf.validate.field).string.max_len = 80];
-  int32 limit = 2 [(buf.validate.field).int32 = {
-    gte: 1
-    lte: 1000
-  }];
-}
-message PollAuditLogsResponse {
-  // Oldest first. An event shows up about a minute after it happened.
-  repeated EventLog logs = 1;
-  // cursor goes into the next call, also when no event came.
-  string cursor = 2;
-}
-
-message ExportAuditLogsRequest {
-  enum Format {
-    FORMAT_UNSPECIFIED = 0;
-    FORMAT_CSV = 1;
-    FORMAT_JSON = 2;
-  }
-  Format format = 1 [(buf.validate.field).enum = {defined_only: true}];
-  AuditLogFilter filter = 2;
-}
-message ExportAuditLogsResponse {
-  bytes data = 1;
-  string filename = 2;
-  string content_type = 3;
-}
-
-message ExportAccessReportRequest {
-  ExportAuditLogsRequest.Format format = 1 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
-  }];
-}
-message ExportAccessReportResponse {
-  bytes data = 1;
-  string filename = 2;
-  string content_type = 3;
-}
-
-message ListMyActivityRequest {
-  int32 limit = 1 [(buf.validate.field).int32 = {
-    gte: 1
-    lte: 100
-  }];
-  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
-  // filter narrows your own events, its actor_ids are ignored. Without dates it reads all the log keeps.
-  AuditLogFilter filter = 3;
-}
-message ListMyActivityResponse {
-  repeated EventLog logs = 1;
-  int32 total = 2;
 }

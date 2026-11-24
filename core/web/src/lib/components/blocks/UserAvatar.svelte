@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Avatar from '#lib/components/ui/avatar/index.js';
-	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+	import { type User } from '#lib/gen/nokku/v1/user_pb.js';
 	import type { ComponentProps } from 'svelte';
 	import {
 		avatarColors,

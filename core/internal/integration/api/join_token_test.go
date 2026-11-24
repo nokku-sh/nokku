@@ -33,7 +33,9 @@ func TestCreateJoinTokenWithGrants(t *testing.T) {
 		Tags:      []string{"sandbox"},
 		Ephemeral: new(true),
 		Grants: []*nokkuv1.JoinTokenGrant{
-			{Username: new("dev"), UserIds: []string{member.ID}},
+			{Username: new("dev"), Subjects: []*nokkuv1.Subject{
+				{Id: &member.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
+			}},
 		},
 	})
 	require.NoError(t, err)
@@ -50,10 +52,15 @@ func TestCreateJoinTokenWithGrants(t *testing.T) {
 	assert.Equal(t, []string{"sandbox"}, token.GetTags())
 	require.Len(t, token.GetGrants(), 1)
 	assert.Equal(t, "dev", token.GetGrants()[0].GetUsername())
-	assert.Equal(t, []string{member.ID}, token.GetGrants()[0].GetUserIds())
+	subjects := token.GetGrants()[0].GetSubjects()
+	require.Len(t, subjects, 1)
+	assert.Equal(t, member.ID, subjects[0].GetId())
+	assert.Equal(t, nokkuv1.SubjectKind_SUBJECT_KIND_USER, subjects[0].GetKind())
 
 	_, err = tokens.CreateJoinToken(t.Context(), &nokkuv1.CreateJoinTokenRequest{
-		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("dev"), TeamIds: []string{member.ID}}},
+		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("dev"), Subjects: []*nokkuv1.Subject{
+			{Id: &member.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_TEAM.Enum()},
+		}}},
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a user id is not a team, got %v", err)
 

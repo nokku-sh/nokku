@@ -19,7 +19,7 @@ const (
 	matrixRows    = 50
 )
 
-func (s *targetService) GetAccessMatrix(
+func (s *accessViewService) GetAccessMatrix(
 	ctx context.Context,
 	req *nokkuv1.GetAccessMatrixRequest,
 ) (*nokkuv1.GetAccessMatrixResponse, error) {
@@ -40,7 +40,7 @@ func (s *targetService) GetAccessMatrix(
 		totals := make(map[string]int32, len(tags))
 		for _, t := range tags {
 			totals[t.Tag] = t.Total
-			res.Tags = append(res.Tags, &nokkuv1.AccessGraphTag{Tag: &t.Tag, Total: &t.Total})
+			res.Tags = append(res.Tags, &nokkuv1.AccessTag{Tag: &t.Tag, TargetCount: &t.Total})
 		}
 		columns := req.GetTags()
 		if len(columns) == 0 {
@@ -49,7 +49,7 @@ func (s *targetService) GetAccessMatrix(
 			}
 		}
 		for _, c := range columns {
-			res.Columns = append(res.Columns, &nokkuv1.AccessGraphTag{Tag: new(c), Total: new(totals[c])})
+			res.Columns = append(res.Columns, &nokkuv1.AccessTag{Tag: new(c), TargetCount: new(totals[c])})
 		}
 
 		rows, err := q.ListAccessMatrixRows(ctx, &db.ListAccessMatrixRowsParams{
@@ -66,18 +66,19 @@ func (s *targetService) GetAccessMatrix(
 		ids := make([]string, 0, len(rows))
 		byID := make(map[string]*nokkuv1.AccessMatrixRow, len(rows))
 		for _, r := range rows {
-			row := &nokkuv1.AccessMatrixRow{
-				SubjectId: &r.SubjectID,
-				Kind:      new(subjectKinds[r.SubjectKind]),
-				Name:      &r.Name,
-				Targets:   &r.Targets,
+			subject := &nokkuv1.AccessSubject{
+				Id:          &r.SubjectID,
+				Kind:        db.SubjectKinds[r.SubjectKind].Enum(),
+				Name:        &r.Name,
+				TargetCount: &r.Targets,
 			}
 			switch r.SubjectKind {
 			case db.SubjectKindUser:
-				row.Email = &r.Email
+				subject.Email = &r.Email
 			case db.SubjectKindTeam:
-				row.MemberCount = &r.MemberCount
+				subject.MemberCount = &r.MemberCount
 			}
+			row := &nokkuv1.AccessMatrixRow{Subject: subject}
 			ids = append(ids, r.SubjectID)
 			byID[r.SubjectID] = row
 			res.Rows = append(res.Rows, row)
@@ -96,9 +97,9 @@ func (s *targetService) GetAccessMatrix(
 
 func matrixCell(c *db.ListAccessMatrixCellsRow) *nokkuv1.AccessMatrixCell {
 	cell := &nokkuv1.AccessMatrixCell{
-		Tag:       &c.Tag,
-		Targets:   &c.Targets,
-		Usernames: c.Usernames,
+		Tag:         &c.Tag,
+		TargetCount: &c.Targets,
+		Usernames:   c.Usernames,
 	}
 	if !c.ForGood {
 		cell.ExpiresAt = timestamppb.New(c.ExpiresAt)

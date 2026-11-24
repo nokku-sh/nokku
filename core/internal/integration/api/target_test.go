@@ -29,7 +29,8 @@ type accessFixture struct {
 	web1              string
 	outsider          string
 	client            nokkuv1connect.TargetServiceClient
-	memberClient      nokkuv1connect.TargetServiceClient
+	views             nokkuv1connect.AccessViewServiceClient
+	memberViews       nokkuv1connect.AccessViewServiceClient
 	// as signs in as one of the seeded users.
 	as func(userID string) nokkuv1connect.TargetServiceClient
 }
@@ -235,7 +236,7 @@ func TestOnlyWhoAddedAServerRepinsIt(t *testing.T) {
 	denied(t, report(bobNK, blankID, attacker), "nk replaced a key it had just pinned on someone else's server")
 
 	// Reinstalled, and alice is away: a fresh sign-in forgets the pin and the next sync is a first one again.
-	_, err = bobWeb.ForgetHostKey(t.Context(), &nokkuv1.ForgetHostKeyRequest{Id: &id})
+	_, err = bobWeb.ForgetHostKey(t.Context(), &nokkuv1.ForgetHostKeyRequest{TargetId: &id})
 	require.NoError(t, err)
 	assert.Empty(t, stored(id).GetHostPublicKey(), "the pin was not forgotten")
 	reinstalled := partialHostKey(t)
@@ -519,16 +520,13 @@ func seedAccessGraph(t *testing.T) accessFixture {
 		return nil
 	})
 
-	client := func(role nokkuv1.WorkspaceRole) nokkuv1connect.TargetServiceClient {
-		return nokkuv1connect.NewTargetServiceClient(
-			clientOn(srv, header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role))),
-		)
+	client := func(role nokkuv1.WorkspaceRole) *connect.Client {
+		return clientOn(srv, header("Authorization", "Bearer "+seedMember(t, cfg, f.workspaceID, role)))
 	}
-	f.client, f.memberClient = client(
-		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER,
-	), client(
-		nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
-	)
+	viewer := client(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
+	f.client = nokkuv1connect.NewTargetServiceClient(viewer)
+	f.views = nokkuv1connect.NewAccessViewServiceClient(viewer)
+	f.memberViews = nokkuv1connect.NewAccessViewServiceClient(client(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER))
 	f.as = func(userID string) nokkuv1connect.TargetServiceClient {
 		token := sessionFor(t, cfg, &db.User{ID: userID, Active: true})
 		return nokkuv1connect.NewTargetServiceClient(
@@ -549,8 +547,11 @@ func TestGetSubjectAccess(t *testing.T) {
 		require.NoError(t, err)
 		usernames, accounts := map[string][]string{}, 0
 		for _, target := range res.GetTargets() {
-			usernames[target.GetName()] = target.GetUsernames()
-			accounts += len(target.GetAccounts())
+			name := target.GetTarget().GetName()
+			for _, l := range target.GetLogins() {
+				usernames[name] = append(usernames[name], l.GetUsername())
+			}
+			accounts += len(target.GetTarget().GetAccounts())
 		}
 		return usernames, accounts
 	}
@@ -598,18 +599,27 @@ func TestTargetsCarryPrincipals(t *testing.T) {
 	require.NoError(t, err)
 	web1Accounts := got.GetTarget().GetAccounts()
 	require.Len(t, web1Accounts, 2, "web-1 has deploy and root")
+	granted := func(a *nokkuv1.TargetAccount) map[string]nokkuv1.SubjectKind {
+		out := map[string]nokkuv1.SubjectKind{}
+		for _, g := range a.GetGrants() {
+			out[g.GetSubject().GetId()] = g.GetSubject().GetKind()
+		}
+		return out
+	}
 	assert.Equal(t, "deploy", web1Accounts[0].GetUsername())
-	assert.Equal(t, []string{f.alice}, web1Accounts[0].GetUserIds())
-	assert.Equal(t, []string{f.ci}, web1Accounts[0].GetServiceAccountIds())
+	assert.Equal(t, map[string]nokkuv1.SubjectKind{
+		f.alice: nokkuv1.SubjectKind_SUBJECT_KIND_USER, f.ci: nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT,
+	}, granted(web1Accounts[0]))
 	assert.Equal(t, "root", web1Accounts[1].GetUsername())
-	assert.Equal(t, []string{f.platform}, web1Accounts[1].GetTeamIds())
+	assert.Equal(t, map[string]nokkuv1.SubjectKind{f.platform: nokkuv1.SubjectKind_SUBJECT_KIND_TEAM},
+		granted(web1Accounts[1]))
 }
 
 func TestGetAccessGraph(t *testing.T) {
 	f := seedAccessGraph(t)
 
 	graph := func(filter *nokkuv1.AccessGraphFilter) *nokkuv1.GetAccessGraphResponse {
-		res, err := f.client.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{
+		res, err := f.views.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{
 			Filter: filter,
 		})
 		require.NoError(t, err)
@@ -618,14 +628,14 @@ func TestGetAccessGraph(t *testing.T) {
 	held := func(res *nokkuv1.GetAccessGraphResponse) map[string]int32 {
 		out := map[string]int32{}
 		for _, s := range res.GetSubjects() {
-			out[s.GetId()] = s.GetTargets()
+			out[s.GetId()] = s.GetTargetCount()
 		}
 		return out
 	}
 	accounts := func(res *nokkuv1.GetAccessGraphResponse) map[string]int32 {
 		out := map[string]int32{}
 		for _, a := range res.GetAccounts() {
-			out[a.GetUsername()] = a.GetTargets()
+			out[a.GetUsername()] = a.GetTargetCount()
 		}
 		return out
 	}
@@ -633,27 +643,27 @@ func TestGetAccessGraph(t *testing.T) {
 	tags := func(res *nokkuv1.GetAccessGraphResponse) map[string][2]int32 {
 		out := map[string][2]int32{}
 		for _, tag := range res.GetTags() {
-			out[tag.GetTag()] = [2]int32{tag.GetTargets(), tag.GetTotal()}
+			out[tag.GetTag()] = [2]int32{tag.GetGrantedTargetCount(), tag.GetTargetCount()}
 		}
 		return out
 	}
 	grants := func(res *nokkuv1.GetAccessGraphResponse) map[string]int32 {
 		out := map[string]int32{}
 		for _, g := range res.GetGrants() {
-			out[g.GetSubjectId()+" "+g.GetUsername()] = g.GetTargets()
+			out[g.GetSubjectId()+" "+g.GetUsername()] = g.GetTargetCount()
 		}
 		return out
 	}
 	reach := func(res *nokkuv1.GetAccessGraphResponse) map[string]int32 {
 		out := map[string]int32{}
 		for _, r := range res.GetReach() {
-			out[r.GetUsername()+" "+r.GetTag()] = r.GetTargets()
+			out[r.GetUsername()+" "+r.GetTag()] = r.GetTargetCount()
 		}
 		return out
 	}
 
 	all := graph(nil)
-	assert.EqualValues(t, 3, all.GetTargets(), "idle has no grant and the other workspace is out of scope")
+	assert.EqualValues(t, 3, all.GetTargetCount(), "idle has no grant and the other workspace is out of scope")
 	assert.Equal(t, map[string]int32{f.platform: 2, f.alice: 1, f.bob: 1, f.ci: 1}, held(all))
 	assert.Equal(t, map[string]int32{"root": 3, "deploy": 1}, accounts(all))
 	assert.Equal(t, map[string][2]int32{"prod": {2, 3}, "web": {1, 1}, "": {1, 1}}, tags(all))
@@ -677,17 +687,17 @@ func TestGetAccessGraph(t *testing.T) {
 
 	// alice reaches web-1 twice over, once herself and once through platform.
 	alice := graph(&nokkuv1.AccessGraphFilter{SubjectId: &f.alice})
-	assert.EqualValues(t, 2, alice.GetTargets())
+	assert.EqualValues(t, 2, alice.GetTargetCount())
 	assert.Equal(t, map[string]int32{f.platform: 2, f.alice: 1}, held(alice))
 	assert.Equal(t, map[string]int32{"root": 2, "deploy": 1}, accounts(alice))
 	assert.Equal(t, map[string][2]int32{"prod": {2, 3}, "web": {1, 1}, "": {0, 1}}, tags(alice))
 
 	carol := graph(&nokkuv1.AccessGraphFilter{SubjectId: &f.carol})
-	assert.EqualValues(t, 2, carol.GetTargets(), "team access counts")
+	assert.EqualValues(t, 2, carol.GetTargetCount(), "team access counts")
 	assert.Equal(t, map[string]int32{f.platform: 2, f.carol: 0}, held(carol), "carol is named though she holds nothing")
 
 	untagged := graph(&nokkuv1.AccessGraphFilter{Tag: new("")})
-	assert.EqualValues(t, 1, untagged.GetTargets())
+	assert.EqualValues(t, 1, untagged.GetTargetCount())
 	assert.Equal(t, map[string]int32{f.bob: 1}, held(untagged))
 	assert.Equal(t, map[string]int32{"root ": 1}, reach(untagged))
 
@@ -703,10 +713,10 @@ func TestGetAccessGraph(t *testing.T) {
 	assert.Equal(t, map[string]int32{f.alice: 1, f.ci: 1}, held(deploy))
 
 	outsider := graph(&nokkuv1.AccessGraphFilter{SubjectId: &f.outsider})
-	assert.Zero(t, outsider.GetTargets())
+	assert.Zero(t, outsider.GetTargetCount())
 	assert.Empty(t, outsider.GetSubjects(), "a subject of another workspace is not even named")
 
-	_, err := f.memberClient.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{})
+	_, err := f.memberViews.GetAccessGraph(t.Context(), &nokkuv1.GetAccessGraphRequest{})
 	assert.Equal(
 		t,
 		connect.CodePermissionDenied,
@@ -721,7 +731,7 @@ func TestListAccessGraphTargets(t *testing.T) {
 
 	// list returns "name" for a matched target and "-name" for the rest.
 	list := func(tag string, filter *nokkuv1.AccessGraphFilter, limit int32) ([]string, int32) {
-		res, err := f.client.ListAccessGraphTargets(t.Context(), &nokkuv1.ListAccessGraphTargetsRequest{
+		res, err := f.views.ListAccessGraphTargets(t.Context(), &nokkuv1.ListAccessGraphTargetsRequest{
 			Filter: filter,
 			Tag:    &tag,
 			Limit:  &limit,
@@ -782,7 +792,7 @@ func TestAPagePastTheEndKeepsTheTotal(t *testing.T) {
 	assert.Empty(t, targets.GetTargets())
 	assert.Equal(t, all.GetTotal(), targets.GetTotal())
 
-	graph, err := f.client.ListAccessGraphTargets(t.Context(), &nokkuv1.ListAccessGraphTargetsRequest{
+	graph, err := f.views.ListAccessGraphTargets(t.Context(), &nokkuv1.ListAccessGraphTargetsRequest{
 		Tag:    new("prod"),
 		Limit:  new(int32(10)),
 		Offset: past,
@@ -827,11 +837,12 @@ func TestNewServerSeedsGrants(t *testing.T) {
 		clientOn(srv, editor),
 	)
 
+	user := &nokkuv1.Subject{Id: &member.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}
 	created, err := targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
 		Name: new(uniq("web")),
 		Grants: []*nokkuv1.JoinTokenGrant{
-			{Username: new("root"), UserIds: []string{member.ID}},
-			{Username: new("deploy"), UserIds: []string{member.ID}},
+			{Username: new("root"), Subjects: []*nokkuv1.Subject{user}},
+			{Username: new("deploy"), Subjects: []*nokkuv1.Subject{user}},
 		},
 	})
 	require.NoError(t, err)
@@ -840,14 +851,19 @@ func TestNewServerSeedsGrants(t *testing.T) {
 	require.NoError(t, err)
 	granted := map[string][]string{}
 	for _, a := range got.GetTarget().GetAccounts() {
-		granted[a.GetUsername()] = a.GetUserIds()
+		for _, g := range a.GetGrants() {
+			assert.Equal(t, nokkuv1.SubjectKind_SUBJECT_KIND_USER, g.GetSubject().GetKind())
+			granted[a.GetUsername()] = append(granted[a.GetUsername()], g.GetSubject().GetId())
+		}
 	}
 	assert.Equal(t, map[string][]string{"root": {member.ID}, "deploy": {member.ID}}, granted)
 
 	name := uniq("db")
 	_, err = targets.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{
-		Name:   new(name),
-		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("root"), TeamIds: []string{member.ID}}},
+		Name: new(name),
+		Grants: []*nokkuv1.JoinTokenGrant{{Username: new("root"), Subjects: []*nokkuv1.Subject{
+			{Id: &member.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_TEAM.Enum()},
+		}}},
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "a user id is not a team, got %v", err)
 
@@ -887,7 +903,7 @@ func TestGetAccessMatrix(t *testing.T) {
 	})
 
 	matrix := func(req *nokkuv1.GetAccessMatrixRequest) *nokkuv1.GetAccessMatrixResponse {
-		res, err := f.client.GetAccessMatrix(t.Context(), req)
+		res, err := f.views.GetAccessMatrix(t.Context(), req)
 		require.NoError(t, err)
 		return res
 	}
@@ -898,7 +914,7 @@ func TestGetAccessMatrix(t *testing.T) {
 	cells := func(r *nokkuv1.AccessMatrixRow) map[string]cell {
 		out := map[string]cell{}
 		for _, c := range r.GetCells() {
-			out[c.GetTag()] = cell{c.GetTargets(), strings.Join(c.GetUsernames(), ",")}
+			out[c.GetTag()] = cell{c.GetTargetCount(), strings.Join(c.GetUsernames(), ",")}
 		}
 		return out
 	}
@@ -909,18 +925,18 @@ func TestGetAccessMatrix(t *testing.T) {
 		columns = append(columns, c.GetTag())
 	}
 	assert.Equal(t, []string{"prod", "", "web"}, columns, "the biggest tags first, untagged is the empty one")
-	assert.EqualValues(t, 3, res.GetColumns()[0].GetTotal())
+	assert.EqualValues(t, 3, res.GetColumns()[0].GetTargetCount())
 
 	require.EqualValues(t, 4, res.GetTotal())
 	var names []string
 	for _, r := range res.GetRows() {
-		names = append(names, r.GetName())
+		names = append(names, r.GetSubject().GetName())
 	}
 	assert.Equal(t, "platform", names[0], "teams come first")
 	assert.NotContains(t, names, "carol", "someone in a team has no row without a grant of her own")
 
 	platform := res.GetRows()[0]
-	assert.EqualValues(t, 2, platform.GetMemberCount())
+	assert.EqualValues(t, 2, platform.GetSubject().GetMemberCount())
 	assert.Equal(t, map[string]cell{"prod": {2, "root"}, "web": {1, "root"}}, cells(platform),
 		"only the cells with access")
 	assert.NotNil(t, platform.GetCells()[0].GetLastUsedAt(), "a member's use is the team's")
@@ -936,7 +952,7 @@ func TestGetAccessMatrix(t *testing.T) {
 	assert.Len(t, page.GetRows(), 2)
 	assert.EqualValues(t, 4, page.GetTotal(), "the total counts every row")
 
-	_, err := f.memberClient.GetAccessMatrix(t.Context(), &nokkuv1.GetAccessMatrixRequest{})
+	_, err := f.memberViews.GetAccessMatrix(t.Context(), &nokkuv1.GetAccessMatrixRequest{})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "a member reads only its own access")
 
 	inWorkspace(t, cfg, f.workspaceID, func(q *db.Queries) error {

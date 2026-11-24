@@ -33,8 +33,8 @@ func TestProcedureRoles(t *testing.T) {
 		{nokkuv1connect.DaemonServiceRelayProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER},
 
 		{nokkuv1connect.TargetServiceListTargetsProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
-		{nokkuv1connect.WorkspaceServiceListUsersProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
-		{nokkuv1connect.UtilServiceListAuditLogsProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
+		{nokkuv1connect.UserServiceListUsersProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
+		{nokkuv1connect.AuditLogServiceListAuditLogsProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
 		{nokkuv1connect.RecordingServiceGetRecordingProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER},
 		{
 			nokkuv1connect.ServiceAccountServiceListServiceAccountTokensProcedure,
@@ -56,16 +56,16 @@ func TestProcedureRoles(t *testing.T) {
 			nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR,
 		},
 
-		{nokkuv1connect.WorkspaceServiceUpdateUserRoleProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
-		{nokkuv1connect.WorkspaceServiceDeactivateUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
-		{nokkuv1connect.WorkspaceServiceReactivateUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
-		{nokkuv1connect.WorkspaceServiceDeleteUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.UserServiceSetUserRoleProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.UserServiceDeactivateUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.UserServiceReactivateUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
+		{nokkuv1connect.UserServiceDeleteUserProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 		{nokkuv1connect.JoinTokenServiceCreateJoinTokenProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 		{nokkuv1connect.BillingServiceGetBillingProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN},
 
 		{nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.WorkspaceServiceDeleteWorkspaceProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
-		{nokkuv1connect.WorkspaceServiceTransferOwnershipProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
+		{nokkuv1connect.UserServiceTransferOwnershipProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.BillingServiceActivateLicenseProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.SSOServicePutSSOProviderProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
 		{nokkuv1connect.SSOServiceDeleteSSOProviderProcedure, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER},
@@ -97,8 +97,7 @@ func allProcedures(t *testing.T) []string {
 }
 
 func daemonOnly(a *nokkuv1.Access) bool {
-	return a.GetDaemon() && !a.GetPublic() && !a.GetSelf() &&
-		a.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
+	return a.GetDaemon() && !a.GetPublic() && a.GetRole() == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
 }
 
 // Every procedure must sit in exactly one class, or the interceptor denies it.
@@ -112,9 +111,6 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 		if access.GetPublic() {
 			classes++
 		}
-		if access.GetSelf() {
-			classes++
-		}
 		if access.GetRole() != nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED {
 			assert.Contains(t, nokkuv1.WorkspaceRole_name, int32(access.GetRole()),
 				"%s has an undefined role", procedure)
@@ -124,9 +120,9 @@ func TestEveryProcedureIsClassified(t *testing.T) {
 			classes++
 		}
 		assert.Equal(t, 1, classes, "%s must be in exactly one authorization class", procedure)
-		// The three questions only have an answer where a role or self lets a principal in.
+		// The three questions only have an answer where a role lets a principal in.
 		if access.GetPublic() || daemonOnly(access) {
-			assert.False(t, access.GetNk() || access.GetMachine() || access.GetBrowser() != 0,
+			assert.False(t, access.GetCli() || access.GetServiceAccount() || access.GetFresh(),
 				"%s answers who may call, but no principal reaches it", procedure)
 		}
 	}
@@ -212,7 +208,7 @@ func TestAuthorizeRoleFromPrincipal(t *testing.T) {
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN, nokkuv1connect.SSOServicePutSSOProviderProcedure, false},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER, nokkuv1connect.WorkspaceServiceUpdateWorkspaceProcedure, true},
 		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.TargetServiceListTargetsProcedure, false},
-		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.AccountServiceGetAccountProcedure, true},
+		{nokkuv1.WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED, nokkuv1connect.AccountServiceGetAccountProcedure, false},
 	}
 	for _, tt := range tests {
 		err := a.authorize(as(tt.role), tt.procedure, nil)
@@ -274,20 +270,6 @@ func TestMachinesOnlyReachTheNkSyncCalls(t *testing.T) {
 	}, reached)
 }
 
-// Only nk and a service account report a host, a cookie would move a server without the fresh sign-in.
-func TestABrowserReportsNoHost(t *testing.T) {
-	a := &authorizationInterceptor{}
-	as := func(kind actor.Kind) error {
-		ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{
-			ID: "u1", Kind: kind, Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER,
-		})
-		return a.authorize(ctx, nokkuv1connect.TargetServiceSyncTargetUsersProcedure, nil)
-	}
-	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(as(actor.KindUser)), "a browser session sent a sync")
-	require.NoError(t, as(actor.KindCLI))
-	require.NoError(t, as(actor.KindServiceAccount))
-}
-
 func TestAuthorizeUnknownProcedure(t *testing.T) {
 	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(
@@ -312,7 +294,7 @@ func TestAuthorizeCLIOnlyWhatNkNeeds(t *testing.T) {
 			continue
 		}
 		err := a.authorize(ctx, procedure, nil)
-		if access.GetNk() {
+		if access.GetCli() {
 			allowed++
 			assert.NoError(t, err, "nk needs %s", procedure)
 			continue

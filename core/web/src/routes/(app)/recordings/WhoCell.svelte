@@ -4,7 +4,7 @@
 	import SubjectChip from '#lib/components/access/SubjectChip.svelte';
 	import { fromServiceAccount, fromUser } from '#lib/components/access/subjects.svelte.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 
 	let { subjectId, name }: { subjectId: string; name: string } = $props();
 

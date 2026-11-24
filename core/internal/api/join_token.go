@@ -75,21 +75,14 @@ func (s *joinTokenService) CreateJoinToken(
 
 func addJoinTokenGrants(ctx context.Context, q *db.Queries, tokenID string, grants []*nokkuv1.JoinTokenGrant) error {
 	for _, g := range grants {
-		subjects := map[string][]string{
-			db.SubjectKindUser:           g.GetUserIds(),
-			db.SubjectKindTeam:           g.GetTeamIds(),
-			db.SubjectKindServiceAccount: g.GetServiceAccountIds(),
-		}
-		for kind, ids := range subjects {
-			for _, id := range ids {
-				if err := q.AddJoinTokenGrant(ctx, &db.AddJoinTokenGrantParams{
-					TokenID:     tokenID,
-					Username:    g.GetUsername(),
-					SubjectKind: kind,
-					SubjectID:   id,
-				}); err != nil {
-					return err
-				}
+		for _, subject := range g.GetSubjects() {
+			if err := q.AddJoinTokenGrant(ctx, &db.AddJoinTokenGrantParams{
+				TokenID:     tokenID,
+				Username:    g.GetUsername(),
+				SubjectKind: subjectKind(subject.GetKind()),
+				SubjectID:   subject.GetId(),
+			}); err != nil {
+				return err
 			}
 		}
 	}

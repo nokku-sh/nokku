@@ -10,22 +10,21 @@ service RecordingService {
   rpc GetRecording(GetRecordingRequest) returns (stream GetRecordingResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListRecordings(ListRecordingsRequest) returns (ListRecordingsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-  // A person deletes evidence, never a CI job, and only right after a sign-in.
   rpc DeleteRecording(DeleteRecordingRequest) returns (DeleteRecordingResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
 }
@@ -36,14 +35,13 @@ message Recording {
   string username = 3;
   int64 size_bytes = 4;
   bool complete = 5;
-  google.protobuf.Timestamp started_at = 6;
-  google.protobuf.Timestamp ended_at = 7;
-  string daemon_name = 8;
-  string subject_id = 9;
-  string principal = 10;
-  string subject_name = 11;
-  // live is a session still running as far as the core can tell, ended_at unset behind a connected daemon.
-  bool live = 12;
+  string daemon_name = 6;
+  string subject_id = 7;
+  string principal = 8;
+  string subject_name = 9;
+  bool live = 10;
+  google.protobuf.Timestamp started_at = 11;
+  google.protobuf.Timestamp ended_at = 12;
 }
 
 message UploadRecordingRequest {
@@ -55,7 +53,7 @@ message UploadRecordingRequest {
 }
 
 message RecordingMeta {
-  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+  string id = 1 [(buf.validate.field).string.uuid = true];
   string username = 2 [(buf.validate.field).string.max_len = 32];
   string principal = 3 [(buf.validate.field).string.max_len = 160];
   google.protobuf.Timestamp started_at = 4;
@@ -64,16 +62,13 @@ message RecordingMeta {
 message RecordingFinal {
   int64 size_bytes = 1 [(buf.validate.field).int64.gte = 0];
   string cut_reason = 2 [(buf.validate.field).string.max_len = 200];
-  // ended_at is when the session ended, which a late upload can be long after.
   google.protobuf.Timestamp ended_at = 3;
 }
 
 message UploadRecordingResponse {
-  string recording_id = 1;
-  // size_bytes is what the core holds of the recording.
+  string id = 1;
   int64 size_bytes = 2;
-  // complete says the core takes no more of this recording. Only this answer
-  // lets a daemon delete its file, an error never does.
+  // Only a complete answer lets the daemon delete its file.
   bool complete = 3;
 }
 
@@ -94,7 +89,7 @@ message ListRecordingsResponse {
 }
 
 message GetRecordingRequest {
-  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+  string id = 1 [(buf.validate.field).string.uuid = true];
 }
 message GetRecordingResponse {
   oneof msg {
@@ -104,6 +99,6 @@ message GetRecordingResponse {
 }
 
 message DeleteRecordingRequest {
-  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+  string id = 1 [(buf.validate.field).string.uuid = true];
 }
 message DeleteRecordingResponse {}

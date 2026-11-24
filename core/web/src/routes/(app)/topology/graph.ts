@@ -1,11 +1,11 @@
 import type { AccessGraphFilter } from '#lib/api/targets.svelte.js';
-import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
-import type {
-	AccessGraphSubject,
-	AccessGraphTarget,
-	GetAccessGraphResponse
-} from '#lib/gen/nokku/v1/target_pb.js';
-import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+import {
+	type AccessGraphTarget,
+	type AccessSubject,
+	type GetAccessGraphResponse
+} from '#lib/gen/nokku/v1/access_view_pb.js';
+import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
+import { type User } from '#lib/gen/nokku/v1/user_pb.js';
 import type { Edge, Node } from '@xyflow/svelte';
 
 export type FocusKind = 'user' | 'team' | 'service-account' | 'target' | 'account' | 'tag';
@@ -128,16 +128,16 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 	const reached = new Map<string, number>();
 	if (focused) {
 		for (const s of focused.subjects) {
-			reached.set(`s:${s.id}`, s.targets);
-			if (s.targets > 0) lit.add(`s:${s.id}`);
+			reached.set(`s:${s.id}`, s.targetCount);
+			if (s.targetCount > 0) lit.add(`s:${s.id}`);
 		}
 		for (const a of focused.accounts) {
-			reached.set(`a:${a.username}`, a.targets);
+			reached.set(`a:${a.username}`, a.targetCount);
 			lit.add(`a:${a.username}`);
 		}
 		for (const t of focused.tags) {
-			reached.set(`t:${t.tag}`, t.targets);
-			if (t.targets > 0) lit.add(`t:${t.tag}`);
+			reached.set(`t:${t.tag}`, t.grantedTargetCount);
+			if (t.grantedTargetCount > 0) lit.add(`t:${t.tag}`);
 		}
 	}
 	const focusKey =
@@ -221,7 +221,7 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 	for (const [section, kind, title] of sections) {
 		const all = overview.subjects
 			.filter((s) => s.kind === kind)
-			.sort((a, b) => b.targets - a.targets || a.name.localeCompare(b.name));
+			.sort((a, b) => b.targetCount - a.targetCount || a.name.localeCompare(b.name));
 		if (all.length === 0) continue;
 
 		who.label(`label:${section}`, { text: `${title} · ${all.length}` });
@@ -233,7 +233,7 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 				kind: subjectFocus[kind],
 				label: s.name || s.email,
 				detail: subjectDetail(s),
-				count: ratio(key, s.targets),
+				count: ratio(key, s.targetCount),
 				tone: tone(key),
 				selected: key === focusKey,
 				expanded: isTeam ? view.openTeam === s.id : undefined,
@@ -277,7 +277,7 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 	const as = lane('as');
 	as.label('head:as', { text: 'Logs in as', heading: true });
 	const accounts = [...overview.accounts].sort(
-		(a, b) => b.targets - a.targets || a.username.localeCompare(b.username)
+		(a, b) => b.targetCount - a.targetCount || a.username.localeCompare(b.username)
 	);
 	as.label('label:accounts', { text: `Accounts · ${accounts.length}` });
 	const accountRows = as.fold('accounts', accounts, (a) => `a:${a.username}`);
@@ -286,7 +286,7 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 		as.row(key, {
 			kind: 'account',
 			label: a.username,
-			count: ratio(key, a.targets),
+			count: ratio(key, a.targetCount),
 			tone: tone(key),
 			selected: key === focusKey,
 			onselect: () => actions.focus({ kind: 'account', id: a.username })
@@ -299,17 +299,19 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 	// Untagged sorts last, it is the leftover bucket.
 	const tags = [...overview.tags].sort(
 		(a, b) =>
-			Number(a.tag === '') - Number(b.tag === '') || b.total - a.total || a.tag.localeCompare(b.tag)
+			Number(a.tag === '') - Number(b.tag === '') ||
+			b.targetCount - a.targetCount ||
+			a.tag.localeCompare(b.tag)
 	);
 	where.label('label:tags', { text: `Tags · ${tags.filter((t) => t.tag !== '').length}` });
 	const tagRows = where.fold('tags', tags, (t) => `t:${t.tag}`);
 	for (const t of tagRows.visible) {
 		const key = `t:${t.tag}`;
-		const granted = focused ? (reached.get(key) ?? 0) : t.targets;
+		const granted = focused ? (reached.get(key) ?? 0) : t.grantedTargetCount;
 		where.row(key, {
 			kind: 'tag',
 			label: tagLabel(t.tag),
-			count: granted === t.total ? String(t.total) : `${granted}/${t.total}`,
+			count: granted === t.targetCount ? String(t.targetCount) : `${granted}/${t.targetCount}`,
 			tone: tone(key),
 			selected: key === focusKey,
 			expanded: view.openTag === t.tag,
@@ -358,16 +360,17 @@ export function buildGraph(view: View, actions: Actions): { nodes: Node[]; links
 		link[field] += targets;
 		links.set(id, link);
 	};
-	for (const g of overview.grants) add(`s:${g.subjectId}`, `a:${g.username}`, 'base', g.targets);
-	for (const r of overview.reach) add(`a:${r.username}`, `t:${r.tag}`, 'base', r.targets);
+	for (const g of overview.grants)
+		add(`s:${g.subjectId}`, `a:${g.username}`, 'base', g.targetCount);
+	for (const r of overview.reach) add(`a:${r.username}`, `t:${r.tag}`, 'base', r.targetCount);
 	for (const g of focused?.grants ?? [])
-		add(`s:${g.subjectId}`, `a:${g.username}`, 'lit', g.targets);
-	for (const r of focused?.reach ?? []) add(`a:${r.username}`, `t:${r.tag}`, 'lit', r.targets);
+		add(`s:${g.subjectId}`, `a:${g.username}`, 'lit', g.targetCount);
+	for (const r of focused?.reach ?? []) add(`a:${r.username}`, `t:${r.tag}`, 'lit', r.targetCount);
 
 	return { nodes, links: [...links.values()] };
 }
 
-function subjectDetail(s: AccessGraphSubject) {
+function subjectDetail(s: AccessSubject) {
 	if (s.kind === SubjectKind.TEAM)
 		return `${s.memberCount} ${s.memberCount === 1 ? 'member' : 'members'}`;
 	return s.kind === SubjectKind.USER && s.name ? s.email : undefined;

@@ -43,7 +43,7 @@ type Client struct {
 	certs           nokkuv1connect.CertificateServiceClient
 	targets         nokkuv1connect.TargetServiceClient
 	daemons         nokkuv1connect.DaemonServiceClient
-	users           nokkuv1connect.WorkspaceServiceClient
+	users           nokkuv1connect.UserServiceClient
 	teams           nokkuv1connect.TeamServiceClient
 	serviceAccounts nokkuv1connect.ServiceAccountServiceClient
 	requests        nokkuv1connect.AccessRequestServiceClient
@@ -95,7 +95,7 @@ func (c *Client) dial() error {
 	c.certs = nokkuv1connect.NewCertificateServiceClient(cc)
 	c.targets = nokkuv1connect.NewTargetServiceClient(cc)
 	c.daemons = nokkuv1connect.NewDaemonServiceClient(cc)
-	c.users = nokkuv1connect.NewWorkspaceServiceClient(cc)
+	c.users = nokkuv1connect.NewUserServiceClient(cc)
 	c.teams = nokkuv1connect.NewTeamServiceClient(cc)
 	c.serviceAccounts = nokkuv1connect.NewServiceAccountServiceClient(cc)
 	c.requests = nokkuv1connect.NewAccessRequestServiceClient(cc)
@@ -240,12 +240,16 @@ func (c *Client) CreateTarget(
 		Tags:          tags,
 	}
 	for _, g := range grants {
-		req.Grants = append(req.Grants, &nokkuv1.JoinTokenGrant{
-			Username:          new(g.Account),
-			UserIds:           g.Users,
-			TeamIds:           g.Teams,
-			ServiceAccountIds: g.ServiceAccounts,
-		})
+		grant := &nokkuv1.JoinTokenGrant{Username: new(g.Account)}
+		add := func(kind nokkuv1.SubjectKind, ids []string) {
+			for _, id := range ids {
+				grant.Subjects = append(grant.Subjects, &nokkuv1.Subject{Id: &id, Kind: &kind})
+			}
+		}
+		add(nokkuv1.SubjectKind_SUBJECT_KIND_USER, g.Users)
+		add(nokkuv1.SubjectKind_SUBJECT_KIND_TEAM, g.Teams)
+		add(nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT, g.ServiceAccounts)
+		req.Grants = append(req.Grants, grant)
 	}
 	res, err := c.targets.CreateTarget(ctx, req)
 	if err != nil {

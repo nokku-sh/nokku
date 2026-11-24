@@ -22,57 +22,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Browser int32
-
-const (
-	Browser_BROWSER_UNSPECIFIED Browser = 0
-	// A sign-in from the last 10 minutes.
-	Browser_BROWSER_FRESH Browser = 1
-	// The browser is kept out, the call is for nk and service accounts.
-	Browser_BROWSER_REFUSED Browser = 2
-)
-
-// Enum value maps for Browser.
-var (
-	Browser_name = map[int32]string{
-		0: "BROWSER_UNSPECIFIED",
-		1: "BROWSER_FRESH",
-		2: "BROWSER_REFUSED",
-	}
-	Browser_value = map[string]int32{
-		"BROWSER_UNSPECIFIED": 0,
-		"BROWSER_FRESH":       1,
-		"BROWSER_REFUSED":     2,
-	}
-)
-
-func (x Browser) Enum() *Browser {
-	p := new(Browser)
-	*p = x
-	return p
-}
-
-func (x Browser) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (Browser) Descriptor() protoreflect.EnumDescriptor {
-	return file_nokku_v1_access_proto_enumTypes[0].Descriptor()
-}
-
-func (Browser) Type() protoreflect.EnumType {
-	return &file_nokku_v1_access_proto_enumTypes[0]
-}
-
-func (x Browser) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use Browser.Descriptor instead.
-func (Browser) EnumDescriptor() ([]byte, []int) {
-	return file_nokku_v1_access_proto_rawDescGZIP(), []int{0}
-}
-
 type WorkspaceRole int32
 
 const (
@@ -115,11 +64,11 @@ func (x WorkspaceRole) String() string {
 }
 
 func (WorkspaceRole) Descriptor() protoreflect.EnumDescriptor {
-	return file_nokku_v1_access_proto_enumTypes[1].Descriptor()
+	return file_nokku_v1_access_proto_enumTypes[0].Descriptor()
 }
 
 func (WorkspaceRole) Type() protoreflect.EnumType {
-	return &file_nokku_v1_access_proto_enumTypes[1]
+	return &file_nokku_v1_access_proto_enumTypes[0]
 }
 
 func (x WorkspaceRole) Number() protoreflect.EnumNumber {
@@ -128,30 +77,26 @@ func (x WorkspaceRole) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WorkspaceRole.Descriptor instead.
 func (WorkspaceRole) EnumDescriptor() ([]byte, []int) {
-	return file_nokku_v1_access_proto_rawDescGZIP(), []int{1}
+	return file_nokku_v1_access_proto_rawDescGZIP(), []int{0}
 }
 
-// Access says who may make a call.
+// Access is the rule of one call. A call without it is denied.
 type Access struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Public *bool                  `protobuf:"varint,1,opt,name=public" json:"public,omitempty"`
-	Self   *bool                  `protobuf:"varint,2,opt,name=self" json:"self,omitempty"`
+	Daemon *bool                  `protobuf:"varint,2,opt,name=daemon" json:"daemon,omitempty"`
 	Role   *WorkspaceRole         `protobuf:"varint,3,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
-	Daemon *bool                  `protobuf:"varint,4,opt,name=daemon" json:"daemon,omitempty"`
-	// feature is the plan feature the call needs.
+	// A browser session must be from the last 10 minutes.
+	Fresh *bool `protobuf:"varint,4,opt,name=fresh" json:"fresh,omitempty"`
+	// Lets an nk session call, a browser session needs no such field.
+	Cli            *bool `protobuf:"varint,5,opt,name=cli" json:"cli,omitempty"`
+	ServiceAccount *bool `protobuf:"varint,6,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
+	// The plan feature the call needs.
 	Feature *string `protobuf:"bytes,7,opt,name=feature" json:"feature,omitempty"`
-	// capped counts the create against the plan's resource cap.
+	// A create that counts against the plan's resource cap.
 	Capped *bool `protobuf:"varint,8,opt,name=capped" json:"capped,omitempty"`
-	// signs issues a user certificate, an inactive workspace gets none.
-	Signs *bool `protobuf:"varint,9,opt,name=signs" json:"signs,omitempty"`
-	// quiet changes something, but the handler records what matters, so the audit log skips the call.
-	Quiet *bool `protobuf:"varint,10,opt,name=quiet" json:"quiet,omitempty"`
-	// nk lets a person's nk session make the call.
-	Nk *bool `protobuf:"varint,11,opt,name=nk" json:"nk,omitempty"`
-	// browser is a person in the web app, any session unless this says otherwise.
-	Browser *Browser `protobuf:"varint,12,opt,name=browser,enum=nokku.v1.Browser" json:"browser,omitempty"`
-	// machine lets a service account make the call.
-	Machine       *bool `protobuf:"varint,13,opt,name=machine" json:"machine,omitempty"`
+	// The handler writes its own audit events.
+	Unaudited     *bool `protobuf:"varint,9,opt,name=unaudited" json:"unaudited,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -193,9 +138,9 @@ func (x *Access) GetPublic() bool {
 	return false
 }
 
-func (x *Access) GetSelf() bool {
-	if x != nil && x.Self != nil {
-		return *x.Self
+func (x *Access) GetDaemon() bool {
+	if x != nil && x.Daemon != nil {
+		return *x.Daemon
 	}
 	return false
 }
@@ -207,9 +152,23 @@ func (x *Access) GetRole() WorkspaceRole {
 	return WorkspaceRole_WORKSPACE_ROLE_UNSPECIFIED
 }
 
-func (x *Access) GetDaemon() bool {
-	if x != nil && x.Daemon != nil {
-		return *x.Daemon
+func (x *Access) GetFresh() bool {
+	if x != nil && x.Fresh != nil {
+		return *x.Fresh
+	}
+	return false
+}
+
+func (x *Access) GetCli() bool {
+	if x != nil && x.Cli != nil {
+		return *x.Cli
+	}
+	return false
+}
+
+func (x *Access) GetServiceAccount() bool {
+	if x != nil && x.ServiceAccount != nil {
+		return *x.ServiceAccount
 	}
 	return false
 }
@@ -228,37 +187,9 @@ func (x *Access) GetCapped() bool {
 	return false
 }
 
-func (x *Access) GetSigns() bool {
-	if x != nil && x.Signs != nil {
-		return *x.Signs
-	}
-	return false
-}
-
-func (x *Access) GetQuiet() bool {
-	if x != nil && x.Quiet != nil {
-		return *x.Quiet
-	}
-	return false
-}
-
-func (x *Access) GetNk() bool {
-	if x != nil && x.Nk != nil {
-		return *x.Nk
-	}
-	return false
-}
-
-func (x *Access) GetBrowser() Browser {
-	if x != nil && x.Browser != nil {
-		return *x.Browser
-	}
-	return Browser_BROWSER_UNSPECIFIED
-}
-
-func (x *Access) GetMachine() bool {
-	if x != nil && x.Machine != nil {
-		return *x.Machine
+func (x *Access) GetUnaudited() bool {
+	if x != nil && x.Unaudited != nil {
+		return *x.Unaudited
 	}
 	return false
 }
@@ -284,24 +215,17 @@ var File_nokku_v1_access_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_access_proto_rawDesc = "" +
 	"\n" +
-	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\xae\x02\n" +
+	"\x15nokku/v1/access.proto\x12\bnokku.v1\x1a google/protobuf/descriptor.proto\"\x86\x02\n" +
 	"\x06Access\x12\x16\n" +
-	"\x06public\x18\x01 \x01(\bR\x06public\x12\x12\n" +
-	"\x04self\x18\x02 \x01(\bR\x04self\x12+\n" +
-	"\x04role\x18\x03 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x12\x16\n" +
-	"\x06daemon\x18\x04 \x01(\bR\x06daemon\x12\x18\n" +
+	"\x06public\x18\x01 \x01(\bR\x06public\x12\x16\n" +
+	"\x06daemon\x18\x02 \x01(\bR\x06daemon\x12+\n" +
+	"\x04role\x18\x03 \x01(\x0e2\x17.nokku.v1.WorkspaceRoleR\x04role\x12\x14\n" +
+	"\x05fresh\x18\x04 \x01(\bR\x05fresh\x12\x10\n" +
+	"\x03cli\x18\x05 \x01(\bR\x03cli\x12'\n" +
+	"\x0fservice_account\x18\x06 \x01(\bR\x0eserviceAccount\x12\x18\n" +
 	"\afeature\x18\a \x01(\tR\afeature\x12\x16\n" +
-	"\x06capped\x18\b \x01(\bR\x06capped\x12\x14\n" +
-	"\x05signs\x18\t \x01(\bR\x05signs\x12\x14\n" +
-	"\x05quiet\x18\n" +
-	" \x01(\bR\x05quiet\x12\x0e\n" +
-	"\x02nk\x18\v \x01(\bR\x02nk\x12+\n" +
-	"\abrowser\x18\f \x01(\x0e2\x11.nokku.v1.BrowserR\abrowser\x12\x18\n" +
-	"\amachine\x18\r \x01(\bR\amachine*J\n" +
-	"\aBrowser\x12\x17\n" +
-	"\x13BROWSER_UNSPECIFIED\x10\x00\x12\x11\n" +
-	"\rBROWSER_FRESH\x10\x01\x12\x13\n" +
-	"\x0fBROWSER_REFUSED\x10\x02*\xb4\x01\n" +
+	"\x06capped\x18\b \x01(\bR\x06capped\x12\x1c\n" +
+	"\tunaudited\x18\t \x01(\bR\tunaudited*\xb4\x01\n" +
 	"\rWorkspaceRole\x12\x1e\n" +
 	"\x1aWORKSPACE_ROLE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15WORKSPACE_ROLE_MEMBER\x10\x01\x12\x19\n" +
@@ -324,24 +248,22 @@ func file_nokku_v1_access_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_access_proto_rawDescData
 }
 
-var file_nokku_v1_access_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_nokku_v1_access_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_nokku_v1_access_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_nokku_v1_access_proto_goTypes = []any{
-	(Browser)(0),                       // 0: nokku.v1.Browser
-	(WorkspaceRole)(0),                 // 1: nokku.v1.WorkspaceRole
-	(*Access)(nil),                     // 2: nokku.v1.Access
-	(*descriptorpb.MethodOptions)(nil), // 3: google.protobuf.MethodOptions
+	(WorkspaceRole)(0),                 // 0: nokku.v1.WorkspaceRole
+	(*Access)(nil),                     // 1: nokku.v1.Access
+	(*descriptorpb.MethodOptions)(nil), // 2: google.protobuf.MethodOptions
 }
 var file_nokku_v1_access_proto_depIdxs = []int32{
-	1, // 0: nokku.v1.Access.role:type_name -> nokku.v1.WorkspaceRole
-	0, // 1: nokku.v1.Access.browser:type_name -> nokku.v1.Browser
-	3, // 2: nokku.v1.access:extendee -> google.protobuf.MethodOptions
-	2, // 3: nokku.v1.access:type_name -> nokku.v1.Access
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	3, // [3:4] is the sub-list for extension type_name
-	2, // [2:3] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 0: nokku.v1.Access.role:type_name -> nokku.v1.WorkspaceRole
+	2, // 1: nokku.v1.access:extendee -> google.protobuf.MethodOptions
+	1, // 2: nokku.v1.access:type_name -> nokku.v1.Access
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	2, // [2:3] is the sub-list for extension type_name
+	1, // [1:2] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_nokku_v1_access_proto_init() }
@@ -354,7 +276,7 @@ func file_nokku_v1_access_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_access_proto_rawDesc), len(file_nokku_v1_access_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      1,
 			NumMessages:   1,
 			NumExtensions: 1,
 			NumServices:   0,

@@ -106,6 +106,9 @@ func (s *certificateService) SignSSHCertificate(
 	if caller.Kind == actor.KindUser {
 		return nil, connect.NewError(connect.CodePermissionDenied, "sign certificates with nk or a service account")
 	}
+	if err := s.cfg.Entitlements.CheckSigning(ctx); err != nil {
+		return nil, err
+	}
 	// Someone with this machine's session must not mint a cert for a key they carry off.
 	if caller.Kind == actor.KindCLI {
 		key, err := ssh.NormalizeKey(req.GetPublicKey())

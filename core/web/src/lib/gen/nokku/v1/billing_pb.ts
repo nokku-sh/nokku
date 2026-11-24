@@ -14,15 +14,13 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/billing.proto.
  */
 export const file_nokku_v1_billing: GenFile = /*@__PURE__*/
-  fileDesc("ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSIkChFHZXRCaWxsaW5nUmVxdWVzdBIPCgdyZWZyZXNoGAEgASgIItcDChJHZXRCaWxsaW5nUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIOCgZob3N0ZWQYAiABKAgSPAoIZmVhdHVyZXMYAyADKAsyKi5ub2trdS52MS5HZXRCaWxsaW5nUmVzcG9uc2UuRmVhdHVyZXNFbnRyeRIgCgZxdW90YXMYBCABKAsyEC5ub2trdS52MS5RdW90YXMSEgoKdXNlcl9jb3VudBgFIAEoAxIWCg5yZXNvdXJjZV9jb3VudBgGIAEoAxIlCgtoZWxkX3F1b3RhcxgIIAEoCzIQLm5va2t1LnYxLlF1b3RhcxIuCgpoZWxkX3VudGlsGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIxCg10cmlhbF9lbmRzX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCglkZWxldGVfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi0KB2xpY2Vuc2UYDCABKAsyHC5ub2trdS52MS5HZXRMaWNlbnNlUmVzcG9uc2UaLwoNRmVhdHVyZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAg6AjgBIo4BCgZRdW90YXMSDQoFc2VhdHMYASABKAMSHAoUYXVkaXRfcmV0ZW50aW9uX2RheXMYAiABKAMSHwoXcmVjb3JkaW5nX3N0b3JhZ2VfYnl0ZXMYAyABKAMSFAoMcmVzb3VyY2VfY2FwGAQgASgDEiAKGHJlY29yZGluZ19yZXRlbnRpb25fZGF5cxgFIAEoAyITChFHZXRMaWNlbnNlUmVxdWVzdCJiChJHZXRMaWNlbnNlUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIOCgZhY3RpdmUYAiABKAgSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMQoWQWN0aXZhdGVMaWNlbnNlUmVxdWVzdBIXCgNrZXkYASABKAlCCrpIB3IFEAEYgCAiGQoXQWN0aXZhdGVMaWNlbnNlUmVzcG9uc2UyngIKDkJpbGxpbmdTZXJ2aWNlElQKCkdldEJpbGxpbmcSGy5ub2trdS52MS5HZXRCaWxsaW5nUmVxdWVzdBocLm5va2t1LnYxLkdldEJpbGxpbmdSZXNwb25zZSILkAIBwvMYBBgEaAESVAoKR2V0TGljZW5zZRIbLm5va2t1LnYxLkdldExpY2Vuc2VSZXF1ZXN0Ghwubm9ra3UudjEuR2V0TGljZW5zZVJlc3BvbnNlIguQAgHC8xgEEAFoARJgCg9BY3RpdmF0ZUxpY2Vuc2USIC5ub2trdS52MS5BY3RpdmF0ZUxpY2Vuc2VSZXF1ZXN0GiEubm9ra3UudjEuQWN0aXZhdGVMaWNlbnNlUmVzcG9uc2UiCMLzGAQYBWgBQo0BCgxjb20ubm9ra3UudjFCDEJpbGxpbmdQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChZub2trdS92MS9iaWxsaW5nLnByb3RvEghub2trdS52MSIkChFHZXRCaWxsaW5nUmVxdWVzdBIPCgdyZWZyZXNoGAEgASgIItcDChJHZXRCaWxsaW5nUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIOCgZob3N0ZWQYAiABKAgSPAoIZmVhdHVyZXMYAyADKAsyKi5ub2trdS52MS5HZXRCaWxsaW5nUmVzcG9uc2UuRmVhdHVyZXNFbnRyeRIgCgZxdW90YXMYBCABKAsyEC5ub2trdS52MS5RdW90YXMSEgoKdXNlcl9jb3VudBgFIAEoAxIWCg5yZXNvdXJjZV9jb3VudBgGIAEoAxIlCgtoZWxkX3F1b3RhcxgHIAEoCzIQLm5va2t1LnYxLlF1b3RhcxItCgdsaWNlbnNlGAggASgLMhwubm9ra3UudjEuR2V0TGljZW5zZVJlc3BvbnNlEi4KCmhlbGRfdW50aWwYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjEKDXRyaWFsX2VuZHNfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi0KCWRlbGV0ZV9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAaLwoNRmVhdHVyZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAg6AjgBIo4BCgZRdW90YXMSDQoFc2VhdHMYASABKAMSHAoUYXVkaXRfcmV0ZW50aW9uX2RheXMYAiABKAMSHwoXcmVjb3JkaW5nX3N0b3JhZ2VfYnl0ZXMYAyABKAMSFAoMcmVzb3VyY2VfY2FwGAQgASgDEiAKGHJlY29yZGluZ19yZXRlbnRpb25fZGF5cxgFIAEoAyITChFHZXRMaWNlbnNlUmVxdWVzdCJiChJHZXRMaWNlbnNlUmVzcG9uc2USDAoEcGxhbhgBIAEoCRIOCgZhY3RpdmUYAiABKAgSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiMQoWQWN0aXZhdGVMaWNlbnNlUmVxdWVzdBIXCgNrZXkYASABKAlCCrpIB3IFEAEYgCAiGQoXQWN0aXZhdGVMaWNlbnNlUmVzcG9uc2UyngIKDkJpbGxpbmdTZXJ2aWNlElQKCkdldEJpbGxpbmcSGy5ub2trdS52MS5HZXRCaWxsaW5nUmVxdWVzdBocLm5va2t1LnYxLkdldEJpbGxpbmdSZXNwb25zZSILkAIBwvMYBBgEMAESVAoKR2V0TGljZW5zZRIbLm5va2t1LnYxLkdldExpY2Vuc2VSZXF1ZXN0Ghwubm9ra3UudjEuR2V0TGljZW5zZVJlc3BvbnNlIguQAgHC8xgEGAEwARJgCg9BY3RpdmF0ZUxpY2Vuc2USIC5ub2trdS52MS5BY3RpdmF0ZUxpY2Vuc2VSZXF1ZXN0GiEubm9ra3UudjEuQWN0aXZhdGVMaWNlbnNlUmVzcG9uc2UiCMLzGAQYBTABQo0BCgxjb20ubm9ra3UudjFCDEJpbGxpbmdQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.GetBillingRequest
  */
 export type GetBillingRequest = Message<"nokku.v1.GetBillingRequest"> & {
   /**
-   * Asks the license server for the current key first, so new seats show up. That can take a moment.
-   *
    * @generated from field: bool refresh = 1;
    */
   refresh: boolean;
@@ -70,9 +68,14 @@ export type GetBillingResponse = Message<"nokku.v1.GetBillingResponse"> & {
   resourceCount: bigint;
 
   /**
-   * @generated from field: nokku.v1.Quotas held_quotas = 8;
+   * @generated from field: nokku.v1.Quotas held_quotas = 7;
    */
   heldQuotas?: Quotas | undefined;
+
+  /**
+   * @generated from field: nokku.v1.GetLicenseResponse license = 8;
+   */
+  license?: GetLicenseResponse | undefined;
 
   /**
    * @generated from field: google.protobuf.Timestamp held_until = 9;
@@ -80,25 +83,14 @@ export type GetBillingResponse = Message<"nokku.v1.GetBillingResponse"> & {
   heldUntil?: Timestamp | undefined;
 
   /**
-   * The end of a hosted trial, set until the first key is activated.
-   *
    * @generated from field: google.protobuf.Timestamp trial_ends_at = 10;
    */
   trialEndsAt?: Timestamp | undefined;
 
   /**
-   * When a hosted workspace whose plan ended is deleted.
-   *
    * @generated from field: google.protobuf.Timestamp delete_at = 11;
    */
   deleteAt?: Timestamp | undefined;
-
-  /**
-   * The key this response was resolved from, after the refresh.
-   *
-   * @generated from field: nokku.v1.GetLicenseResponse license = 12;
-   */
-  license?: GetLicenseResponse | undefined;
 };
 
 /**

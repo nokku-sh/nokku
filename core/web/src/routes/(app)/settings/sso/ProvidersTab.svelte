@@ -87,22 +87,22 @@
 				</Empty.Root>
 			{:else}
 				<Item.Group class="divide-y overflow-hidden rounded-lg border">
-					{#each providers.data as p (p.providerId)}
+					{#each providers.data as p (p.id)}
 						<Item.Root size="sm" class="rounded-none">
 							{#snippet child({ props })}
 								<a
 									{...props}
-									href={sheetLink(p.providerId)}
+									href={sheetLink(p.id)}
 									onclick={(e) => {
 										if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
 										e.preventDefault();
-										void sheet.show(p.providerId);
+										void sheet.show(p.id);
 									}}
 								>
 									<Item.Media variant="icon"><OIDCIcon /></Item.Media>
 									<Item.Content class="min-w-0">
 										<Item.Title class="flex flex-wrap items-center gap-2">
-											{p.name || p.providerId}
+											{p.name || p.id}
 											{#if !p.enabled}<Badge variant="muted">Disabled</Badge>{/if}
 											{#if p.jitProvisioning}<Badge variant="outline">Creates accounts</Badge>{/if}
 										</Item.Title>

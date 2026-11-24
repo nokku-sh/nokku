@@ -151,15 +151,10 @@ func TestEnrollDaemon(t *testing.T) {
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err),
 		"an ordinary update turned kill on revoke off: %v", err)
-	// Rejecting stops the server like a delete does, and a delete takes a fresh sign-in.
-	for _, status := range []nokkuv1.DaemonStatus{
-		nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING,
-	} {
-		_, err = daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
-			Id: new(res.GetId()), Status: &status,
-		}))
-		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an ordinary update set %s: %v", status, err)
-	}
+	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
+		Id: new(res.GetId()), UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"status"}},
+	})
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an ordinary update took the status: %v", err)
 	got, err = daemons.GetDaemon(
 		t.Context(),
 		&nokkuv1.GetDaemonRequest{Id: new(res.GetId())},
@@ -172,10 +167,7 @@ func TestEnrollDaemon(t *testing.T) {
 	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, got.GetDaemon().GetStatus(),
 		"a config change leaves the status alone")
 
-	_, err = daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
-		Id:     new(res.GetId()),
-		Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
-	}))
+	_, err = daemons.ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(res.GetId())})
 	require.NoError(t, err)
 	got, err = daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(res.GetId())})
 	require.NoError(t, err)
@@ -312,14 +304,14 @@ func TestCreateSession(t *testing.T) {
 		assert.Equal(t, memberPrincipal.ID, res.GetSession().GetUserId())
 		ws, _, err := websocket.Dial(
 			t.Context(),
-			srv.URL+"/terminal/ws?session_id="+res.GetSession().GetSessionId(),
+			srv.URL+"/terminal/ws?session_id="+res.GetSession().GetId(),
 			&websocket.DialOptions{
 				HTTPClient: srv.Client(),
 				HTTPHeader: http.Header{"Cookie": {sessionCookie + "=" + memberToken}},
 			},
 		)
 		require.NoError(t, err)
-		return res.GetSession().GetSessionId(), ws
+		return res.GetSession().GetId(), ws
 	}
 
 	_, ws := openShell()
@@ -781,11 +773,11 @@ func TestRevokeEverywhereReachesEveryServer(t *testing.T) {
 	}
 
 	gone, err := n.accounts.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: &nokkuv1.RevokeSpec{
-		Subject:    &nokkuv1.GrantSubject{Id: &revoked.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
-		Everywhere: new(true),
+		Subject:    &nokkuv1.Subject{Id: &revoked.ID, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
+		AllTargets: new(true),
 	}})
 	require.NoError(t, err)
-	assert.EqualValues(t, len(servers), gone.GetPlan().GetGrants(), "a grant was left somewhere")
+	assert.EqualValues(t, len(servers), gone.GetPlan().GetGrantCount(), "a grant was left somewhere")
 
 	for i, s := range servers {
 		assert.True(t, woken(t, s.updates), "daemon %d was not told about the revoke", i)

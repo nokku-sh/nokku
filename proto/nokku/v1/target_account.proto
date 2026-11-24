@@ -5,12 +5,13 @@ package nokku.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
+import "nokku/v1/subject.proto";
 
 service TargetAccountService {
   rpc ListTargetAccounts(ListTargetAccountsRequest) returns (ListTargetAccountsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -20,33 +21,33 @@ service TargetAccountService {
   rpc RemoveTargetAccount(RemoveTargetAccountRequest) returns (RemoveTargetAccountResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // Grant gives subjects one account on many servers, in one transaction and one access change.
+  rpc GetGrantScope(GetGrantScopeRequest) returns (GetGrantScopeResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
   rpc Grant(GrantRequest) returns (GrantResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-  // Revoke takes one subject's own grants off many servers, in one transaction and one access change.
   rpc Revoke(RevokeRequest) returns (RevokeResponse) {
     option (access) = {role: WORKSPACE_ROLE_EDITOR};
   }
-}
-
-enum SubjectKind {
-  SUBJECT_KIND_UNSPECIFIED = 0;
-  SUBJECT_KIND_USER = 1;
-  SUBJECT_KIND_TEAM = 2;
-  SUBJECT_KIND_SERVICE_ACCOUNT = 3;
 }
 
 message TargetAccount {
   string id = 1;
   string target_id = 2;
   string username = 3;
-  repeated string user_ids = 4;
-  repeated string team_ids = 5;
-  repeated string service_account_ids = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp seen_at = 8;
-  map<string, google.protobuf.Timestamp> expires_at = 9;
+  repeated Grant grants = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp seen_at = 6;
+}
+
+message Grant {
+  Subject subject = 1;
+  google.protobuf.Timestamp expires_at = 2;
 }
 
 message ListTargetAccountsRequest {
@@ -63,17 +64,37 @@ message ListTargetAccountsResponse {
   int32 total = 2;
 }
 
-message GrantSubject {
-  string id = 1 [(buf.validate.field).string.uuid = true];
-  SubjectKind kind = 2 [(buf.validate.field).enum = {
-    defined_only: true
-    not_in: [0]
+message GetGrantScopeRequest {
+  repeated string target_ids = 1 [(buf.validate.field).repeated = {
+    max_items: 500
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  repeated string tags = 2 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {
+        min_len: 1
+        max_len: 64
+      }
+    }
   }];
 }
+message GetGrantScopeResponse {
+  int32 target_count = 1;
+  // The first five by name.
+  repeated string target_names = 2;
+  repeated GrantAccount accounts = 3;
+}
 
-// Who gets which account where. A server counts when its id is named or it has one of the tags.
+message GrantAccount {
+  string username = 1;
+  int32 target_count = 2;
+}
+
 message GrantSpec {
-  repeated GrantSubject subjects = 1 [(buf.validate.field).repeated.max_items = 50];
+  repeated Subject subjects = 1 [(buf.validate.field).repeated.max_items = 50];
   repeated string target_ids = 2 [(buf.validate.field).repeated = {
     max_items: 500
     items: {
@@ -89,44 +110,30 @@ message GrantSpec {
       }
     }
   }];
-  // Empty asks only which servers these are and what accounts they have.
-  string username = 4 [(buf.validate.field).string.max_len = 32];
-  // Unset is for good.
+  string username = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+  }];
   google.protobuf.Timestamp expires_at = 5 [(buf.validate.field).timestamp = {
     gt_now: true
     within: {seconds: 31622400}
   }];
-  // A grant that stands with another end keeps it, unless this is set.
-  bool change_ends = 6;
-}
-
-message GrantAccount {
-  string username = 1;
-  int32 servers = 2;
+  bool overwrite_expiry = 6;
 }
 
 message GrantOutcome {
   string subject_id = 1;
-  // New grants.
-  int32 added = 2;
-  // Grants that stand already with the same end.
-  int32 same = 3;
-  // Grants that stand with another end.
-  int32 other_end = 4;
+  int32 added_count = 2;
+  int32 unchanged_count = 3;
+  int32 other_expiry_count = 4;
 }
 
 message GrantPlan {
-  // Servers the ids and tags name.
-  int32 servers = 1;
-  // Some of their names, to show which they are.
-  repeated string server_names = 2;
-  // The accounts those servers have, the most common first.
-  repeated GrantAccount accounts = 3;
-  // Servers that have the account asked for.
-  int32 with_account = 4;
-  // Some of the servers that lack it. Nothing happens there.
-  repeated string skipped = 5;
-  repeated GrantOutcome outcomes = 6;
+  int32 target_count = 1;
+  // Targets that have the account. The others are skipped.
+  int32 matched_target_count = 2;
+  repeated string skipped_target_names = 3;
+  repeated GrantOutcome outcomes = 4;
 }
 
 message GrantRequest {
@@ -137,9 +144,8 @@ message GrantResponse {
   GrantPlan plan = 1;
 }
 
-// Only the subject's own grants go, what a team gives its members stays.
 message RevokeSpec {
-  GrantSubject subject = 1 [(buf.validate.field).required = true];
+  Subject subject = 1 [(buf.validate.field).required = true];
   repeated string target_ids = 2 [(buf.validate.field).repeated = {
     max_items: 500
     items: {
@@ -157,28 +163,21 @@ message RevokeSpec {
   }];
   // Empty is every account.
   string username = 4 [(buf.validate.field).string.max_len = 32];
-  bool everywhere = 5;
+  bool all_targets = 5;
 }
 
 message RevokeAccount {
   string username = 1;
-  // Servers the grant on this account goes from.
-  int32 servers = 2;
-  // Some of their names.
-  repeated string server_names = 3;
+  int32 target_count = 2;
+  repeated string target_names = 3;
 }
 
 message RevokePlan {
-  // Grants that go, one per account and server.
-  int32 grants = 1;
-  // Servers they are on.
-  int32 servers = 2;
-  // The accounts, the one on the most servers first.
+  int32 grant_count = 1;
+  int32 target_count = 2;
   repeated RevokeAccount accounts = 3;
-  // Servers among them with more than one tag. The access goes for those tags too.
-  int32 other_tags = 4;
-  // Some of their names.
-  repeated string other_tag_names = 5;
+  int32 multi_tag_target_count = 4;
+  repeated string multi_tag_target_names = 5;
 }
 
 message RevokeRequest {

@@ -1,12 +1,15 @@
 import type { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
-import { MAX_PAGE_SIZE } from '#lib/config.js';
+import { AccessViewService } from '#lib/gen/nokku/v1/access_view_pb.js';
+import { AuditLogFilterSchema, AuditLogService } from '#lib/gen/nokku/v1/audit_log_pb.js';
+import { InvitationService } from '#lib/gen/nokku/v1/invitation_pb.js';
+import { UserService } from '#lib/gen/nokku/v1/user_pb.js';
+import { UtilService } from '#lib/gen/nokku/v1/util_pb.js';
 import { WorkspaceService } from '#lib/gen/nokku/v1/workspace_pb.js';
+import { MAX_PAGE_SIZE } from '#lib/config.js';
 import { toast } from 'svelte-sonner';
 import { plural, useBulkMutation } from './bulk';
 import { leave } from './client';
-import { AuditLogFilterSchema, UtilService } from '#lib/gen/nokku/v1/util_pb.js';
 import type { MessageInitShape } from '@bufbuild/protobuf';
-import { InvitationService } from '#lib/gen/nokku/v1/invitation_pb.js';
 import { extract, type MaybeGetter } from 'runed';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { usePatch } from './mask';
@@ -60,8 +63,8 @@ export const workspace = {
 export const users = {
 	get: (userId: MaybeGetter<string | undefined>) =>
 		useQuery(
-			WorkspaceService.method.getUser,
-			() => ({ userId: extract(userId) }),
+			UserService.method.getUser,
+			() => ({ id: extract(userId) }),
 			() => ({ enabled: !!extract(userId), select: (res) => res.user })
 		),
 	list: (
@@ -74,32 +77,32 @@ export const users = {
 		when?: () => boolean
 	) =>
 		useQuery(
-			WorkspaceService.method.listUsers,
+			UserService.method.listUsers,
 			() => ({ limit: MAX_PAGE_SIZE, offset: 0, ...opts?.() }),
 			() => ({ enabled: when?.() ?? true })
 		),
 
-	updateRole: () => useMutation(WorkspaceService.method.updateUserRole),
+	updateRole: () => useMutation(UserService.method.setUserRole),
 	deactivate: () =>
-		useMutation(WorkspaceService.method.deactivateUser, {
+		useMutation(UserService.method.deactivateUser, {
 			onSuccess: () => toast.success('Account deactivated')
 		}),
 	reactivate: () =>
-		useMutation(WorkspaceService.method.reactivateUser, {
+		useMutation(UserService.method.reactivateUser, {
 			onSuccess: () => toast.success('Account reactivated')
 		}),
 	delete: () =>
-		useMutation(WorkspaceService.method.deleteUser, {
+		useMutation(UserService.method.deleteUser, {
 			onSuccess: () => toast.success('Account deleted')
 		}),
 	clearIdentities: () =>
-		useMutation(WorkspaceService.method.clearUserIdentities, {
+		useMutation(UserService.method.clearUserIdentities, {
 			onSuccess: () => toast.success('Sign-in providers unlinked')
 		}),
 	deleteMany: () =>
-		useBulkMutation(WorkspaceService.method.deleteUser, (n) => `${plural(n, 'account')} deleted`),
+		useBulkMutation(UserService.method.deleteUser, (n) => `${plural(n, 'account')} deleted`),
 	transferOwnership: () =>
-		useMutation(WorkspaceService.method.transferOwnership, {
+		useMutation(UserService.method.transferOwnership, {
 			onSuccess: () => toast.success('Ownership transferred')
 		})
 };
@@ -151,7 +154,7 @@ export const util = {
 	// Each page counts the whole filtered log, too heavy for the poll. Focus and new filters refresh it.
 	getLogs: (opts?: () => AuditQuery, when?: () => boolean) =>
 		useQuery(
-			UtilService.method.listAuditLogs,
+			AuditLogService.method.listAuditLogs,
 			() => {
 				const { filter, limit, offset } = opts?.() ?? {};
 				return {
@@ -164,7 +167,7 @@ export const util = {
 		),
 
 	exportLogs: () =>
-		useMutation(UtilService.method.exportAuditLogs, {
+		useMutation(AuditLogService.method.exportAuditLogs, {
 			onSuccess: (data) => {
 				download(data, 'audit_logs.csv');
 				toast.success('Audit logs exported');
@@ -175,7 +178,7 @@ export const util = {
 		}),
 
 	exportAccessReport: () =>
-		useMutation(UtilService.method.exportAccessReport, {
+		useMutation(AccessViewService.method.exportAccessReport, {
 			onSuccess: (data) => {
 				download(data, 'access-report.csv');
 				toast.success('Access report exported');

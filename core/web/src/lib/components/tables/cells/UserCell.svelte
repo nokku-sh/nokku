@@ -1,7 +1,7 @@
 <script lang="ts">
 	import CopyText from '#lib/components/blocks/CopyText.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
-	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+	import { type User } from '#lib/gen/nokku/v1/user_pb.js';
 	import { displayName } from '#lib/utils.js';
 
 	let { user }: { user: User } = $props();

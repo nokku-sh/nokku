@@ -125,10 +125,9 @@ func accessResponse(caPubKey string) *nokkuv1.GetSubjectAccessResponse {
 		Subject: &nokkuv1.GetSubjectAccessResponse_User{
 			User: &nokkuv1.User{Id: new("user-1"), Name: new("alice")},
 		},
-		Targets: []*nokkuv1.Target{{
-			Id:        new(targetID),
-			Name:      new("prod"),
-			Usernames: []string{"alice"},
+		Targets: []*nokkuv1.TargetAccess{{
+			Target: &nokkuv1.Target{Id: new(targetID), Name: new("prod")},
+			Logins: []*nokkuv1.TargetAccess_Login{{Username: new("alice")}},
 		}},
 		CertificateAuthority: &nokkuv1.CertificateAuthority{UserPublicKey: new(caPubKey)},
 	}

@@ -12,8 +12,8 @@
 	import * as Sheet from '#lib/components/ui/sheet/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import type { AccessMatrixCell, AccessMatrixRow } from '#lib/gen/nokku/v1/target_pb.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { type AccessMatrixCell } from '#lib/gen/nokku/v1/access_view_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import { IsMobile } from '#lib/hooks/index.js';
 	import { cn, formatTs, listNames } from '#lib/utils.js';
 	import { Clock, Server, UserMinus, UserPlus } from '@lucide/svelte';
@@ -21,9 +21,9 @@
 	import { tagLabel } from './graph.js';
 
 	interface Props {
-		row: AccessMatrixRow;
 		cell: AccessMatrixCell;
 		subject: Subject;
+		memberCount: number;
 		/** Every server with the tag. */
 		total: number;
 		/** Not used in 30 days. */
@@ -31,7 +31,7 @@
 		onClose: () => void;
 	}
 
-	let { row, cell, subject, total, stale, onClose }: Props = $props();
+	let { cell, subject, memberCount, total, stale, onClose }: Props = $props();
 
 	const SERVERS = 50;
 	const MISSING = 5;
@@ -39,11 +39,11 @@
 	const can = user.can();
 	const mobile = new IsMobile();
 
-	const team = $derived(row.kind === SubjectKind.TEAM);
-	const person = $derived(row.kind === SubjectKind.USER);
+	const team = $derived(subject.kind === SubjectKind.TEAM);
+	const person = $derived(subject.kind === SubjectKind.USER);
 	const servers = target.accessGraphTargets(() => ({
 		tag: cell.tag,
-		filter: { subjectId: row.subjectId },
+		filter: { subjectId: subject.id },
 		limit: SERVERS
 	}));
 	const reached = $derived((servers.data?.targets ?? []).filter((t) => t.matched));
@@ -77,21 +77,21 @@
 			team &&
 				'Every member loses it too, unless a grant of their own or another team gives it to them.',
 			person && 'What their teams give them stays.',
-			!!plan?.otherTags &&
-				`${listNames(plan.otherTagNames, MISSING, plan.otherTags)} ${plan.otherTags === 1 ? 'has' : 'have'} other tags too, so the access goes there as well.`
+			!!plan?.multiTagTargetCount &&
+				`${listNames(plan.multiTagTargetNames, MISSING, plan.multiTagTargetCount)} ${plan.multiTagTargetCount === 1 ? 'has' : 'have'} other tags too, so the access goes there as well.`
 		].filter((n) => typeof n === 'string')
 	);
 	const revokeTitle = $derived.by(() => {
 		if (!plan) return 'Finding the grants...';
-		if (!plan.grants) return 'Nothing left to revoke here.';
-		return `Removes ${plural(plan.grants, 'grant')} on ${plural(plan.servers, 'server')}`;
+		if (!plan.grantCount) return 'Nothing left to revoke here.';
+		return `Removes ${plural(plan.grantCount, 'grant')} on ${plural(plan.targetCount, 'server')}`;
 	});
 
 	const revoke = targetAccount.revoke();
 
 	async function submit() {
-		if (!plan?.grants) return;
-		const done = `Revoked ${subjectLabel(subject)} on ${plural(plan.servers, 'server')}`;
+		if (!plan?.grantCount) return;
+		const done = `Revoked ${subjectLabel(subject)} on ${plural(plan.targetCount, 'server')}`;
 		try {
 			// One call and one transaction, so it lands whole or not at all.
 			await revoke.mutateAsync({ revoke: revokeSpec });
@@ -114,7 +114,7 @@
 			<Sheet.Title class="flex items-center gap-2 text-lg">
 				<SubjectAvatar {subject} class="size-6" />
 				<a
-					href={`${subjectHref(row.kind, row.subjectId)}&tab=access`}
+					href={`${subjectHref(subject.kind, subject.id)}&tab=access`}
 					class="truncate rounded-sm hover:underline"
 				>
 					{subjectLabel(subject)}
@@ -124,7 +124,7 @@
 			</Sheet.Title>
 			<Sheet.Description>
 				{team
-					? `Every member of the team gets this, ${plural(row.memberCount, 'person', 'people')} today.`
+					? `Every member of the team gets this, ${plural(memberCount, 'person', 'people')} today.`
 					: person
 						? 'A grant of their own. Teams they are in can give them more.'
 						: 'A grant of its own.'}
@@ -138,9 +138,9 @@
 				<dt class="text-muted-foreground">Servers</dt>
 				<dd>
 					{#if cell.tag}
-						{cell.targets} of the {total} tagged <span class="font-mono">{cell.tag}</span>
+						{cell.targetCount} of the {total} tagged <span class="font-mono">{cell.tag}</span>
 					{:else}
-						{cell.targets} of the {total} without a tag
+						{cell.targetCount} of the {total} without a tag
 					{/if}
 				</dd>
 				<dt class="text-muted-foreground">Ends</dt>
@@ -184,13 +184,13 @@
 					</h3>
 					{#if !plan}
 						<Skeleton class="h-12 w-full" />
-					{:else if plan.grants}
+					{:else if plan.grantCount}
 						<ul class="flex flex-col gap-1.5 text-sm">
 							{#each plan.accounts as a (a.username)}
 								<li>
 									<span class="font-mono">{a.username}</span>
 									<span class="text-muted-foreground">
-										on {listNames(a.serverNames, MISSING, a.servers)}
+										on {listNames(a.targetNames, MISSING, a.targetCount)}
 									</span>
 								</li>
 							{/each}
@@ -254,7 +254,7 @@
 					<Button
 						variant="destructive"
 						onclick={submit}
-						disabled={!plan?.grants || planned.isFetching || revoke.isPending}
+						disabled={!plan?.grantCount || planned.isFetching || revoke.isPending}
 					>
 						{#if revoke.isPending}<Spinner data-icon="inline-start" />{/if}
 						Revoke

@@ -6,7 +6,7 @@ import { nkLoginCommand, sshHost } from '#lib/utils.js';
 import { toast } from 'svelte-sonner';
 import { whenFresh } from './auth.svelte';
 import { daemon } from './daemons.svelte';
-import { target } from './targets.svelte';
+import { type SubjectTarget, target } from './targets.svelte';
 import { user } from './user.svelte';
 import { workspace } from './workspaces.svelte';
 
@@ -83,9 +83,9 @@ export function useServers(when: () => boolean = () => true) {
 		};
 		return (access.data?.targets ?? []).toSorted(
 			(a, b) =>
-				rank(a) - rank(b) ||
-				Number(canShell(b)) - Number(canShell(a)) ||
-				a.name.localeCompare(b.name)
+				rank(a.target) - rank(b.target) ||
+				Number(canShell(b.target)) - Number(canShell(a.target)) ||
+				a.target.name.localeCompare(b.target.name)
 		);
 	});
 
@@ -108,13 +108,13 @@ export function useServers(when: () => boolean = () => true) {
 }
 
 /** Whether a server matches a typed filter, by name, host or login account. */
-export function serverMatches(t: Target, query: string): boolean {
+export function serverMatches({ target: t, logins }: SubjectTarget, query: string): boolean {
 	const q = query.trim().toLowerCase();
 	return (
 		!q ||
 		t.name.toLowerCase().includes(q) ||
 		!!t.metadata?.hostname?.toLowerCase().includes(q) ||
 		t.endpoints.some((e) => e.toLowerCase().includes(q)) ||
-		t.usernames.some((a) => a.toLowerCase().includes(q))
+		logins.some((l) => l.username.toLowerCase().includes(q))
 	);
 }

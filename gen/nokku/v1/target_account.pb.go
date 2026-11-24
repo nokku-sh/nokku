@@ -23,71 +23,16 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type SubjectKind int32
-
-const (
-	SubjectKind_SUBJECT_KIND_UNSPECIFIED     SubjectKind = 0
-	SubjectKind_SUBJECT_KIND_USER            SubjectKind = 1
-	SubjectKind_SUBJECT_KIND_TEAM            SubjectKind = 2
-	SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT SubjectKind = 3
-)
-
-// Enum value maps for SubjectKind.
-var (
-	SubjectKind_name = map[int32]string{
-		0: "SUBJECT_KIND_UNSPECIFIED",
-		1: "SUBJECT_KIND_USER",
-		2: "SUBJECT_KIND_TEAM",
-		3: "SUBJECT_KIND_SERVICE_ACCOUNT",
-	}
-	SubjectKind_value = map[string]int32{
-		"SUBJECT_KIND_UNSPECIFIED":     0,
-		"SUBJECT_KIND_USER":            1,
-		"SUBJECT_KIND_TEAM":            2,
-		"SUBJECT_KIND_SERVICE_ACCOUNT": 3,
-	}
-)
-
-func (x SubjectKind) Enum() *SubjectKind {
-	p := new(SubjectKind)
-	*p = x
-	return p
-}
-
-func (x SubjectKind) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (SubjectKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_nokku_v1_target_account_proto_enumTypes[0].Descriptor()
-}
-
-func (SubjectKind) Type() protoreflect.EnumType {
-	return &file_nokku_v1_target_account_proto_enumTypes[0]
-}
-
-func (x SubjectKind) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use SubjectKind.Descriptor instead.
-func (SubjectKind) EnumDescriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{0}
-}
-
 type TargetAccount struct {
-	state             protoimpl.MessageState            `protogen:"open.v1"`
-	Id                *string                           `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	TargetId          *string                           `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
-	Username          *string                           `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
-	UserIds           []string                          `protobuf:"bytes,4,rep,name=user_ids,json=userIds" json:"user_ids,omitempty"`
-	TeamIds           []string                          `protobuf:"bytes,5,rep,name=team_ids,json=teamIds" json:"team_ids,omitempty"`
-	ServiceAccountIds []string                          `protobuf:"bytes,6,rep,name=service_account_ids,json=serviceAccountIds" json:"service_account_ids,omitempty"`
-	CreatedAt         *timestamppb.Timestamp            `protobuf:"bytes,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	SeenAt            *timestamppb.Timestamp            `protobuf:"bytes,8,opt,name=seen_at,json=seenAt" json:"seen_at,omitempty"`
-	ExpiresAt         map[string]*timestamppb.Timestamp `protobuf:"bytes,9,rep,name=expires_at,json=expiresAt" json:"expires_at,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	TargetId      *string                `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
+	Username      *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
+	Grants        []*Grant               `protobuf:"bytes,4,rep,name=grants" json:"grants,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	SeenAt        *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=seen_at,json=seenAt" json:"seen_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TargetAccount) Reset() {
@@ -141,23 +86,9 @@ func (x *TargetAccount) GetUsername() string {
 	return ""
 }
 
-func (x *TargetAccount) GetUserIds() []string {
+func (x *TargetAccount) GetGrants() []*Grant {
 	if x != nil {
-		return x.UserIds
-	}
-	return nil
-}
-
-func (x *TargetAccount) GetTeamIds() []string {
-	if x != nil {
-		return x.TeamIds
-	}
-	return nil
-}
-
-func (x *TargetAccount) GetServiceAccountIds() []string {
-	if x != nil {
-		return x.ServiceAccountIds
+		return x.Grants
 	}
 	return nil
 }
@@ -176,7 +107,52 @@ func (x *TargetAccount) GetSeenAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *TargetAccount) GetExpiresAt() map[string]*timestamppb.Timestamp {
+type Grant struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subject       *Subject               `protobuf:"bytes,1,opt,name=subject" json:"subject,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Grant) Reset() {
+	*x = Grant{}
+	mi := &file_nokku_v1_target_account_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Grant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Grant) ProtoMessage() {}
+
+func (x *Grant) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_account_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Grant.ProtoReflect.Descriptor instead.
+func (*Grant) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Grant) GetSubject() *Subject {
+	if x != nil {
+		return x.Subject
+	}
+	return nil
+}
+
+func (x *Grant) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
 	}
@@ -195,7 +171,7 @@ type ListTargetAccountsRequest struct {
 
 func (x *ListTargetAccountsRequest) Reset() {
 	*x = ListTargetAccountsRequest{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[1]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -207,7 +183,7 @@ func (x *ListTargetAccountsRequest) String() string {
 func (*ListTargetAccountsRequest) ProtoMessage() {}
 
 func (x *ListTargetAccountsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[1]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -220,7 +196,7 @@ func (x *ListTargetAccountsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTargetAccountsRequest.ProtoReflect.Descriptor instead.
 func (*ListTargetAccountsRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{1}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ListTargetAccountsRequest) GetTargetId() string {
@@ -261,7 +237,7 @@ type ListTargetAccountsResponse struct {
 
 func (x *ListTargetAccountsResponse) Reset() {
 	*x = ListTargetAccountsResponse{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[2]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -273,7 +249,7 @@ func (x *ListTargetAccountsResponse) String() string {
 func (*ListTargetAccountsResponse) ProtoMessage() {}
 
 func (x *ListTargetAccountsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[2]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -286,7 +262,7 @@ func (x *ListTargetAccountsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTargetAccountsResponse.ProtoReflect.Descriptor instead.
 func (*ListTargetAccountsResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{2}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListTargetAccountsResponse) GetAccounts() []*TargetAccount {
@@ -303,29 +279,29 @@ func (x *ListTargetAccountsResponse) GetTotal() int32 {
 	return 0
 }
 
-type GrantSubject struct {
+type GetGrantScopeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	Kind          *SubjectKind           `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.SubjectKind" json:"kind,omitempty"`
+	TargetIds     []string               `protobuf:"bytes,1,rep,name=target_ids,json=targetIds" json:"target_ids,omitempty"`
+	Tags          []string               `protobuf:"bytes,2,rep,name=tags" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GrantSubject) Reset() {
-	*x = GrantSubject{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[3]
+func (x *GetGrantScopeRequest) Reset() {
+	*x = GetGrantScopeRequest{}
+	mi := &file_nokku_v1_target_account_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GrantSubject) String() string {
+func (x *GetGrantScopeRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GrantSubject) ProtoMessage() {}
+func (*GetGrantScopeRequest) ProtoMessage() {}
 
-func (x *GrantSubject) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[3]
+func (x *GetGrantScopeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_account_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -336,44 +312,153 @@ func (x *GrantSubject) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GrantSubject.ProtoReflect.Descriptor instead.
-func (*GrantSubject) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{3}
+// Deprecated: Use GetGrantScopeRequest.ProtoReflect.Descriptor instead.
+func (*GetGrantScopeRequest) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GrantSubject) GetId() string {
-	if x != nil && x.Id != nil {
-		return *x.Id
+func (x *GetGrantScopeRequest) GetTargetIds() []string {
+	if x != nil {
+		return x.TargetIds
 	}
-	return ""
+	return nil
 }
 
-func (x *GrantSubject) GetKind() SubjectKind {
-	if x != nil && x.Kind != nil {
-		return *x.Kind
+func (x *GetGrantScopeRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
 	}
-	return SubjectKind_SUBJECT_KIND_UNSPECIFIED
+	return nil
 }
 
-// Who gets which account where. A server counts when its id is named or it has one of the tags.
-type GrantSpec struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Subjects  []*GrantSubject        `protobuf:"bytes,1,rep,name=subjects" json:"subjects,omitempty"`
-	TargetIds []string               `protobuf:"bytes,2,rep,name=target_ids,json=targetIds" json:"target_ids,omitempty"`
-	Tags      []string               `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty"`
-	// Empty asks only which servers these are and what accounts they have.
-	Username *string `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
-	// Unset is for good.
-	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	// A grant that stands with another end keeps it, unless this is set.
-	ChangeEnds    *bool `protobuf:"varint,6,opt,name=change_ends,json=changeEnds" json:"change_ends,omitempty"`
+type GetGrantScopeResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	TargetCount *int32                 `protobuf:"varint,1,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	// The first five by name.
+	TargetNames   []string        `protobuf:"bytes,2,rep,name=target_names,json=targetNames" json:"target_names,omitempty"`
+	Accounts      []*GrantAccount `protobuf:"bytes,3,rep,name=accounts" json:"accounts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *GetGrantScopeResponse) Reset() {
+	*x = GetGrantScopeResponse{}
+	mi := &file_nokku_v1_target_account_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGrantScopeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGrantScopeResponse) ProtoMessage() {}
+
+func (x *GetGrantScopeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_account_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGrantScopeResponse.ProtoReflect.Descriptor instead.
+func (*GetGrantScopeResponse) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetGrantScopeResponse) GetTargetCount() int32 {
+	if x != nil && x.TargetCount != nil {
+		return *x.TargetCount
+	}
+	return 0
+}
+
+func (x *GetGrantScopeResponse) GetTargetNames() []string {
+	if x != nil {
+		return x.TargetNames
+	}
+	return nil
+}
+
+func (x *GetGrantScopeResponse) GetAccounts() []*GrantAccount {
+	if x != nil {
+		return x.Accounts
+	}
+	return nil
+}
+
+type GrantAccount struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      *string                `protobuf:"bytes,1,opt,name=username" json:"username,omitempty"`
+	TargetCount   *int32                 `protobuf:"varint,2,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrantAccount) Reset() {
+	*x = GrantAccount{}
+	mi := &file_nokku_v1_target_account_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrantAccount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrantAccount) ProtoMessage() {}
+
+func (x *GrantAccount) ProtoReflect() protoreflect.Message {
+	mi := &file_nokku_v1_target_account_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrantAccount.ProtoReflect.Descriptor instead.
+func (*GrantAccount) Descriptor() ([]byte, []int) {
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GrantAccount) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+func (x *GrantAccount) GetTargetCount() int32 {
+	if x != nil && x.TargetCount != nil {
+		return *x.TargetCount
+	}
+	return 0
+}
+
+type GrantSpec struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Subjects        []*Subject             `protobuf:"bytes,1,rep,name=subjects" json:"subjects,omitempty"`
+	TargetIds       []string               `protobuf:"bytes,2,rep,name=target_ids,json=targetIds" json:"target_ids,omitempty"`
+	Tags            []string               `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty"`
+	Username        *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
+	ExpiresAt       *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	OverwriteExpiry *bool                  `protobuf:"varint,6,opt,name=overwrite_expiry,json=overwriteExpiry" json:"overwrite_expiry,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
 func (x *GrantSpec) Reset() {
 	*x = GrantSpec{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[4]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -385,7 +470,7 @@ func (x *GrantSpec) String() string {
 func (*GrantSpec) ProtoMessage() {}
 
 func (x *GrantSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[4]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -398,10 +483,10 @@ func (x *GrantSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrantSpec.ProtoReflect.Descriptor instead.
 func (*GrantSpec) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{4}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *GrantSpec) GetSubjects() []*GrantSubject {
+func (x *GrantSpec) GetSubjects() []*Subject {
 	if x != nil {
 		return x.Subjects
 	}
@@ -436,81 +521,26 @@ func (x *GrantSpec) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *GrantSpec) GetChangeEnds() bool {
-	if x != nil && x.ChangeEnds != nil {
-		return *x.ChangeEnds
+func (x *GrantSpec) GetOverwriteExpiry() bool {
+	if x != nil && x.OverwriteExpiry != nil {
+		return *x.OverwriteExpiry
 	}
 	return false
 }
 
-type GrantAccount struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Username      *string                `protobuf:"bytes,1,opt,name=username" json:"username,omitempty"`
-	Servers       *int32                 `protobuf:"varint,2,opt,name=servers" json:"servers,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GrantAccount) Reset() {
-	*x = GrantAccount{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GrantAccount) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GrantAccount) ProtoMessage() {}
-
-func (x *GrantAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GrantAccount.ProtoReflect.Descriptor instead.
-func (*GrantAccount) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *GrantAccount) GetUsername() string {
-	if x != nil && x.Username != nil {
-		return *x.Username
-	}
-	return ""
-}
-
-func (x *GrantAccount) GetServers() int32 {
-	if x != nil && x.Servers != nil {
-		return *x.Servers
-	}
-	return 0
-}
-
 type GrantOutcome struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	SubjectId *string                `protobuf:"bytes,1,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
-	// New grants.
-	Added *int32 `protobuf:"varint,2,opt,name=added" json:"added,omitempty"`
-	// Grants that stand already with the same end.
-	Same *int32 `protobuf:"varint,3,opt,name=same" json:"same,omitempty"`
-	// Grants that stand with another end.
-	OtherEnd      *int32 `protobuf:"varint,4,opt,name=other_end,json=otherEnd" json:"other_end,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	SubjectId        *string                `protobuf:"bytes,1,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
+	AddedCount       *int32                 `protobuf:"varint,2,opt,name=added_count,json=addedCount" json:"added_count,omitempty"`
+	UnchangedCount   *int32                 `protobuf:"varint,3,opt,name=unchanged_count,json=unchangedCount" json:"unchanged_count,omitempty"`
+	OtherExpiryCount *int32                 `protobuf:"varint,4,opt,name=other_expiry_count,json=otherExpiryCount" json:"other_expiry_count,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GrantOutcome) Reset() {
 	*x = GrantOutcome{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[6]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -522,7 +552,7 @@ func (x *GrantOutcome) String() string {
 func (*GrantOutcome) ProtoMessage() {}
 
 func (x *GrantOutcome) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[6]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -535,7 +565,7 @@ func (x *GrantOutcome) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrantOutcome.ProtoReflect.Descriptor instead.
 func (*GrantOutcome) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{6}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GrantOutcome) GetSubjectId() string {
@@ -545,47 +575,41 @@ func (x *GrantOutcome) GetSubjectId() string {
 	return ""
 }
 
-func (x *GrantOutcome) GetAdded() int32 {
-	if x != nil && x.Added != nil {
-		return *x.Added
+func (x *GrantOutcome) GetAddedCount() int32 {
+	if x != nil && x.AddedCount != nil {
+		return *x.AddedCount
 	}
 	return 0
 }
 
-func (x *GrantOutcome) GetSame() int32 {
-	if x != nil && x.Same != nil {
-		return *x.Same
+func (x *GrantOutcome) GetUnchangedCount() int32 {
+	if x != nil && x.UnchangedCount != nil {
+		return *x.UnchangedCount
 	}
 	return 0
 }
 
-func (x *GrantOutcome) GetOtherEnd() int32 {
-	if x != nil && x.OtherEnd != nil {
-		return *x.OtherEnd
+func (x *GrantOutcome) GetOtherExpiryCount() int32 {
+	if x != nil && x.OtherExpiryCount != nil {
+		return *x.OtherExpiryCount
 	}
 	return 0
 }
 
 type GrantPlan struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Servers the ids and tags name.
-	Servers *int32 `protobuf:"varint,1,opt,name=servers" json:"servers,omitempty"`
-	// Some of their names, to show which they are.
-	ServerNames []string `protobuf:"bytes,2,rep,name=server_names,json=serverNames" json:"server_names,omitempty"`
-	// The accounts those servers have, the most common first.
-	Accounts []*GrantAccount `protobuf:"bytes,3,rep,name=accounts" json:"accounts,omitempty"`
-	// Servers that have the account asked for.
-	WithAccount *int32 `protobuf:"varint,4,opt,name=with_account,json=withAccount" json:"with_account,omitempty"`
-	// Some of the servers that lack it. Nothing happens there.
-	Skipped       []string        `protobuf:"bytes,5,rep,name=skipped" json:"skipped,omitempty"`
-	Outcomes      []*GrantOutcome `protobuf:"bytes,6,rep,name=outcomes" json:"outcomes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	TargetCount *int32                 `protobuf:"varint,1,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	// Targets that have the account. The others are skipped.
+	MatchedTargetCount *int32          `protobuf:"varint,2,opt,name=matched_target_count,json=matchedTargetCount" json:"matched_target_count,omitempty"`
+	SkippedTargetNames []string        `protobuf:"bytes,3,rep,name=skipped_target_names,json=skippedTargetNames" json:"skipped_target_names,omitempty"`
+	Outcomes           []*GrantOutcome `protobuf:"bytes,4,rep,name=outcomes" json:"outcomes,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *GrantPlan) Reset() {
 	*x = GrantPlan{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[7]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -597,7 +621,7 @@ func (x *GrantPlan) String() string {
 func (*GrantPlan) ProtoMessage() {}
 
 func (x *GrantPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[7]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -610,40 +634,26 @@ func (x *GrantPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrantPlan.ProtoReflect.Descriptor instead.
 func (*GrantPlan) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{7}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *GrantPlan) GetServers() int32 {
-	if x != nil && x.Servers != nil {
-		return *x.Servers
+func (x *GrantPlan) GetTargetCount() int32 {
+	if x != nil && x.TargetCount != nil {
+		return *x.TargetCount
 	}
 	return 0
 }
 
-func (x *GrantPlan) GetServerNames() []string {
-	if x != nil {
-		return x.ServerNames
-	}
-	return nil
-}
-
-func (x *GrantPlan) GetAccounts() []*GrantAccount {
-	if x != nil {
-		return x.Accounts
-	}
-	return nil
-}
-
-func (x *GrantPlan) GetWithAccount() int32 {
-	if x != nil && x.WithAccount != nil {
-		return *x.WithAccount
+func (x *GrantPlan) GetMatchedTargetCount() int32 {
+	if x != nil && x.MatchedTargetCount != nil {
+		return *x.MatchedTargetCount
 	}
 	return 0
 }
 
-func (x *GrantPlan) GetSkipped() []string {
+func (x *GrantPlan) GetSkippedTargetNames() []string {
 	if x != nil {
-		return x.Skipped
+		return x.SkippedTargetNames
 	}
 	return nil
 }
@@ -665,7 +675,7 @@ type GrantRequest struct {
 
 func (x *GrantRequest) Reset() {
 	*x = GrantRequest{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[8]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -677,7 +687,7 @@ func (x *GrantRequest) String() string {
 func (*GrantRequest) ProtoMessage() {}
 
 func (x *GrantRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[8]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -690,7 +700,7 @@ func (x *GrantRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrantRequest.ProtoReflect.Descriptor instead.
 func (*GrantRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{8}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GrantRequest) GetGrant() *GrantSpec {
@@ -716,7 +726,7 @@ type GrantResponse struct {
 
 func (x *GrantResponse) Reset() {
 	*x = GrantResponse{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[9]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +738,7 @@ func (x *GrantResponse) String() string {
 func (*GrantResponse) ProtoMessage() {}
 
 func (x *GrantResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[9]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +751,7 @@ func (x *GrantResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrantResponse.ProtoReflect.Descriptor instead.
 func (*GrantResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{9}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GrantResponse) GetPlan() *GrantPlan {
@@ -751,22 +761,21 @@ func (x *GrantResponse) GetPlan() *GrantPlan {
 	return nil
 }
 
-// Only the subject's own grants go, what a team gives its members stays.
 type RevokeSpec struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
-	Subject   *GrantSubject          `protobuf:"bytes,1,opt,name=subject" json:"subject,omitempty"`
+	Subject   *Subject               `protobuf:"bytes,1,opt,name=subject" json:"subject,omitempty"`
 	TargetIds []string               `protobuf:"bytes,2,rep,name=target_ids,json=targetIds" json:"target_ids,omitempty"`
 	Tags      []string               `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty"`
 	// Empty is every account.
 	Username      *string `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
-	Everywhere    *bool   `protobuf:"varint,5,opt,name=everywhere" json:"everywhere,omitempty"`
+	AllTargets    *bool   `protobuf:"varint,5,opt,name=all_targets,json=allTargets" json:"all_targets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RevokeSpec) Reset() {
 	*x = RevokeSpec{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[10]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -778,7 +787,7 @@ func (x *RevokeSpec) String() string {
 func (*RevokeSpec) ProtoMessage() {}
 
 func (x *RevokeSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[10]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -791,10 +800,10 @@ func (x *RevokeSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSpec.ProtoReflect.Descriptor instead.
 func (*RevokeSpec) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{10}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *RevokeSpec) GetSubject() *GrantSubject {
+func (x *RevokeSpec) GetSubject() *Subject {
 	if x != nil {
 		return x.Subject
 	}
@@ -822,27 +831,25 @@ func (x *RevokeSpec) GetUsername() string {
 	return ""
 }
 
-func (x *RevokeSpec) GetEverywhere() bool {
-	if x != nil && x.Everywhere != nil {
-		return *x.Everywhere
+func (x *RevokeSpec) GetAllTargets() bool {
+	if x != nil && x.AllTargets != nil {
+		return *x.AllTargets
 	}
 	return false
 }
 
 type RevokeAccount struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Username *string                `protobuf:"bytes,1,opt,name=username" json:"username,omitempty"`
-	// Servers the grant on this account goes from.
-	Servers *int32 `protobuf:"varint,2,opt,name=servers" json:"servers,omitempty"`
-	// Some of their names.
-	ServerNames   []string `protobuf:"bytes,3,rep,name=server_names,json=serverNames" json:"server_names,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      *string                `protobuf:"bytes,1,opt,name=username" json:"username,omitempty"`
+	TargetCount   *int32                 `protobuf:"varint,2,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	TargetNames   []string               `protobuf:"bytes,3,rep,name=target_names,json=targetNames" json:"target_names,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RevokeAccount) Reset() {
 	*x = RevokeAccount{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[11]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -854,7 +861,7 @@ func (x *RevokeAccount) String() string {
 func (*RevokeAccount) ProtoMessage() {}
 
 func (x *RevokeAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[11]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -867,7 +874,7 @@ func (x *RevokeAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeAccount.ProtoReflect.Descriptor instead.
 func (*RevokeAccount) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{11}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RevokeAccount) GetUsername() string {
@@ -877,39 +884,34 @@ func (x *RevokeAccount) GetUsername() string {
 	return ""
 }
 
-func (x *RevokeAccount) GetServers() int32 {
-	if x != nil && x.Servers != nil {
-		return *x.Servers
+func (x *RevokeAccount) GetTargetCount() int32 {
+	if x != nil && x.TargetCount != nil {
+		return *x.TargetCount
 	}
 	return 0
 }
 
-func (x *RevokeAccount) GetServerNames() []string {
+func (x *RevokeAccount) GetTargetNames() []string {
 	if x != nil {
-		return x.ServerNames
+		return x.TargetNames
 	}
 	return nil
 }
 
 type RevokePlan struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Grants that go, one per account and server.
-	Grants *int32 `protobuf:"varint,1,opt,name=grants" json:"grants,omitempty"`
-	// Servers they are on.
-	Servers *int32 `protobuf:"varint,2,opt,name=servers" json:"servers,omitempty"`
-	// The accounts, the one on the most servers first.
-	Accounts []*RevokeAccount `protobuf:"bytes,3,rep,name=accounts" json:"accounts,omitempty"`
-	// Servers among them with more than one tag. The access goes for those tags too.
-	OtherTags *int32 `protobuf:"varint,4,opt,name=other_tags,json=otherTags" json:"other_tags,omitempty"`
-	// Some of their names.
-	OtherTagNames []string `protobuf:"bytes,5,rep,name=other_tag_names,json=otherTagNames" json:"other_tag_names,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	GrantCount          *int32                 `protobuf:"varint,1,opt,name=grant_count,json=grantCount" json:"grant_count,omitempty"`
+	TargetCount         *int32                 `protobuf:"varint,2,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	Accounts            []*RevokeAccount       `protobuf:"bytes,3,rep,name=accounts" json:"accounts,omitempty"`
+	MultiTagTargetCount *int32                 `protobuf:"varint,4,opt,name=multi_tag_target_count,json=multiTagTargetCount" json:"multi_tag_target_count,omitempty"`
+	MultiTagTargetNames []string               `protobuf:"bytes,5,rep,name=multi_tag_target_names,json=multiTagTargetNames" json:"multi_tag_target_names,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *RevokePlan) Reset() {
 	*x = RevokePlan{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[12]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -921,7 +923,7 @@ func (x *RevokePlan) String() string {
 func (*RevokePlan) ProtoMessage() {}
 
 func (x *RevokePlan) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[12]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -934,19 +936,19 @@ func (x *RevokePlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokePlan.ProtoReflect.Descriptor instead.
 func (*RevokePlan) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{12}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *RevokePlan) GetGrants() int32 {
-	if x != nil && x.Grants != nil {
-		return *x.Grants
+func (x *RevokePlan) GetGrantCount() int32 {
+	if x != nil && x.GrantCount != nil {
+		return *x.GrantCount
 	}
 	return 0
 }
 
-func (x *RevokePlan) GetServers() int32 {
-	if x != nil && x.Servers != nil {
-		return *x.Servers
+func (x *RevokePlan) GetTargetCount() int32 {
+	if x != nil && x.TargetCount != nil {
+		return *x.TargetCount
 	}
 	return 0
 }
@@ -958,16 +960,16 @@ func (x *RevokePlan) GetAccounts() []*RevokeAccount {
 	return nil
 }
 
-func (x *RevokePlan) GetOtherTags() int32 {
-	if x != nil && x.OtherTags != nil {
-		return *x.OtherTags
+func (x *RevokePlan) GetMultiTagTargetCount() int32 {
+	if x != nil && x.MultiTagTargetCount != nil {
+		return *x.MultiTagTargetCount
 	}
 	return 0
 }
 
-func (x *RevokePlan) GetOtherTagNames() []string {
+func (x *RevokePlan) GetMultiTagTargetNames() []string {
 	if x != nil {
-		return x.OtherTagNames
+		return x.MultiTagTargetNames
 	}
 	return nil
 }
@@ -982,7 +984,7 @@ type RevokeRequest struct {
 
 func (x *RevokeRequest) Reset() {
 	*x = RevokeRequest{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[13]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -994,7 +996,7 @@ func (x *RevokeRequest) String() string {
 func (*RevokeRequest) ProtoMessage() {}
 
 func (x *RevokeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[13]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1007,7 +1009,7 @@ func (x *RevokeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeRequest.ProtoReflect.Descriptor instead.
 func (*RevokeRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{13}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RevokeRequest) GetRevoke() *RevokeSpec {
@@ -1033,7 +1035,7 @@ type RevokeResponse struct {
 
 func (x *RevokeResponse) Reset() {
 	*x = RevokeResponse{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[14]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1045,7 +1047,7 @@ func (x *RevokeResponse) String() string {
 func (*RevokeResponse) ProtoMessage() {}
 
 func (x *RevokeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[14]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1058,7 +1060,7 @@ func (x *RevokeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeResponse.ProtoReflect.Descriptor instead.
 func (*RevokeResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{14}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RevokeResponse) GetPlan() *RevokePlan {
@@ -1078,7 +1080,7 @@ type AddTargetAccountRequest struct {
 
 func (x *AddTargetAccountRequest) Reset() {
 	*x = AddTargetAccountRequest{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[15]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1090,7 +1092,7 @@ func (x *AddTargetAccountRequest) String() string {
 func (*AddTargetAccountRequest) ProtoMessage() {}
 
 func (x *AddTargetAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[15]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1103,7 +1105,7 @@ func (x *AddTargetAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddTargetAccountRequest.ProtoReflect.Descriptor instead.
 func (*AddTargetAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{15}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AddTargetAccountRequest) GetTargetId() string {
@@ -1129,7 +1131,7 @@ type AddTargetAccountResponse struct {
 
 func (x *AddTargetAccountResponse) Reset() {
 	*x = AddTargetAccountResponse{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[16]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1141,7 +1143,7 @@ func (x *AddTargetAccountResponse) String() string {
 func (*AddTargetAccountResponse) ProtoMessage() {}
 
 func (x *AddTargetAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[16]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1154,7 +1156,7 @@ func (x *AddTargetAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddTargetAccountResponse.ProtoReflect.Descriptor instead.
 func (*AddTargetAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{16}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AddTargetAccountResponse) GetAccount() *TargetAccount {
@@ -1173,7 +1175,7 @@ type RemoveTargetAccountRequest struct {
 
 func (x *RemoveTargetAccountRequest) Reset() {
 	*x = RemoveTargetAccountRequest{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[17]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1185,7 +1187,7 @@ func (x *RemoveTargetAccountRequest) String() string {
 func (*RemoveTargetAccountRequest) ProtoMessage() {}
 
 func (x *RemoveTargetAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[17]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1198,7 +1200,7 @@ func (x *RemoveTargetAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveTargetAccountRequest.ProtoReflect.Descriptor instead.
 func (*RemoveTargetAccountRequest) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{17}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RemoveTargetAccountRequest) GetId() string {
@@ -1216,7 +1218,7 @@ type RemoveTargetAccountResponse struct {
 
 func (x *RemoveTargetAccountResponse) Reset() {
 	*x = RemoveTargetAccountResponse{}
-	mi := &file_nokku_v1_target_account_proto_msgTypes[18]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1228,7 +1230,7 @@ func (x *RemoveTargetAccountResponse) String() string {
 func (*RemoveTargetAccountResponse) ProtoMessage() {}
 
 func (x *RemoveTargetAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nokku_v1_target_account_proto_msgTypes[18]
+	mi := &file_nokku_v1_target_account_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1241,29 +1243,26 @@ func (x *RemoveTargetAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveTargetAccountResponse.ProtoReflect.Descriptor instead.
 func (*RemoveTargetAccountResponse) Descriptor() ([]byte, []int) {
-	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{18}
+	return file_nokku_v1_target_account_proto_rawDescGZIP(), []int{20}
 }
 
 var File_nokku_v1_target_account_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\n" +
-	"\x1dnokku/v1/target_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xcf\x03\n" +
+	"\x1dnokku/v1/target_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/subject.proto\"\xf1\x01\n" +
 	"\rTargetAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x1a\n" +
-	"\busername\x18\x03 \x01(\tR\busername\x12\x19\n" +
-	"\buser_ids\x18\x04 \x03(\tR\auserIds\x12\x19\n" +
-	"\bteam_ids\x18\x05 \x03(\tR\ateamIds\x12.\n" +
-	"\x13service_account_ids\x18\x06 \x03(\tR\x11serviceAccountIds\x129\n" +
+	"\busername\x18\x03 \x01(\tR\busername\x12'\n" +
+	"\x06grants\x18\x04 \x03(\v2\x0f.nokku.v1.GrantR\x06grants\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x123\n" +
-	"\aseen_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x06seenAt\x12E\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x123\n" +
+	"\aseen_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06seenAt\"o\n" +
+	"\x05Grant\x12+\n" +
+	"\asubject\x18\x01 \x01(\v2\x11.nokku.v1.SubjectR\asubject\x129\n" +
 	"\n" +
-	"expires_at\x18\t \x03(\v2&.nokku.v1.TargetAccount.ExpiresAtEntryR\texpiresAt\x1aX\n" +
-	"\x0eExpiresAtEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
-	"\x05value\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05value:\x028\x01\"\x9a\x01\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x9a\x01\n" +
 	"\x19ListTargetAccountsRequest\x12%\n" +
 	"\ttarget_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
@@ -1271,68 +1270,71 @@ const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\x05query\x18\x04 \x01(\tR\x05query\"g\n" +
 	"\x1aListTargetAccountsResponse\x123\n" +
 	"\baccounts\x18\x01 \x03(\v2\x17.nokku.v1.TargetAccountR\baccounts\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"_\n" +
-	"\fGrantSubject\x12\x18\n" +
-	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x125\n" +
-	"\x04kind\x18\x02 \x01(\x0e2\x15.nokku.v1.SubjectKindB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\"\xb2\x02\n" +
-	"\tGrantSpec\x12<\n" +
-	"\bsubjects\x18\x01 \x03(\v2\x16.nokku.v1.GrantSubjectB\b\xbaH\x05\x92\x01\x02\x102R\bsubjects\x12/\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"m\n" +
+	"\x14GetGrantScopeRequest\x12/\n" +
+	"\n" +
+	"target_ids\x18\x01 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\xf4\x03\"\x05r\x03\xb0\x01\x01R\ttargetIds\x12$\n" +
+	"\x04tags\x18\x02 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10 \"\x06r\x04\x10\x01\x18@R\x04tags\"\x91\x01\n" +
+	"\x15GetGrantScopeResponse\x12!\n" +
+	"\ftarget_count\x18\x01 \x01(\x05R\vtargetCount\x12!\n" +
+	"\ftarget_names\x18\x02 \x03(\tR\vtargetNames\x122\n" +
+	"\baccounts\x18\x03 \x03(\v2\x16.nokku.v1.GrantAccountR\baccounts\"M\n" +
+	"\fGrantAccount\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12!\n" +
+	"\ftarget_count\x18\x02 \x01(\x05R\vtargetCount\"\xb9\x02\n" +
+	"\tGrantSpec\x127\n" +
+	"\bsubjects\x18\x01 \x03(\v2\x11.nokku.v1.SubjectB\b\xbaH\x05\x92\x01\x02\x102R\bsubjects\x12/\n" +
 	"\n" +
 	"target_ids\x18\x02 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\xf4\x03\"\x05r\x03\xb0\x01\x01R\ttargetIds\x12$\n" +
 	"\x04tags\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
-	"\x10 \"\x06r\x04\x10\x01\x18@R\x04tags\x12#\n" +
-	"\busername\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18 R\busername\x12J\n" +
+	"\x10 \"\x06r\x04\x10\x01\x18@R\x04tags\x12%\n" +
+	"\busername\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18 R\busername\x12J\n" +
 	"\n" +
-	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x0f\xbaH\f\xb2\x01\tJ\x05\b\x80\x8a\x8a\x0f@\x01R\texpiresAt\x12\x1f\n" +
-	"\vchange_ends\x18\x06 \x01(\bR\n" +
-	"changeEnds\"D\n" +
-	"\fGrantAccount\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername\x12\x18\n" +
-	"\aservers\x18\x02 \x01(\x05R\aservers\"t\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x0f\xbaH\f\xb2\x01\tJ\x05\b\x80\x8a\x8a\x0f@\x01R\texpiresAt\x12)\n" +
+	"\x10overwrite_expiry\x18\x06 \x01(\bR\x0foverwriteExpiry\"\xa5\x01\n" +
 	"\fGrantOutcome\x12\x1d\n" +
 	"\n" +
-	"subject_id\x18\x01 \x01(\tR\tsubjectId\x12\x14\n" +
-	"\x05added\x18\x02 \x01(\x05R\x05added\x12\x12\n" +
-	"\x04same\x18\x03 \x01(\x05R\x04same\x12\x1b\n" +
-	"\tother_end\x18\x04 \x01(\x05R\botherEnd\"\xed\x01\n" +
-	"\tGrantPlan\x12\x18\n" +
-	"\aservers\x18\x01 \x01(\x05R\aservers\x12!\n" +
-	"\fserver_names\x18\x02 \x03(\tR\vserverNames\x122\n" +
-	"\baccounts\x18\x03 \x03(\v2\x16.nokku.v1.GrantAccountR\baccounts\x12!\n" +
-	"\fwith_account\x18\x04 \x01(\x05R\vwithAccount\x12\x18\n" +
-	"\askipped\x18\x05 \x03(\tR\askipped\x122\n" +
-	"\boutcomes\x18\x06 \x03(\v2\x16.nokku.v1.GrantOutcomeR\boutcomes\"Z\n" +
+	"subject_id\x18\x01 \x01(\tR\tsubjectId\x12\x1f\n" +
+	"\vadded_count\x18\x02 \x01(\x05R\n" +
+	"addedCount\x12'\n" +
+	"\x0funchanged_count\x18\x03 \x01(\x05R\x0eunchangedCount\x12,\n" +
+	"\x12other_expiry_count\x18\x04 \x01(\x05R\x10otherExpiryCount\"\xc6\x01\n" +
+	"\tGrantPlan\x12!\n" +
+	"\ftarget_count\x18\x01 \x01(\x05R\vtargetCount\x120\n" +
+	"\x14matched_target_count\x18\x02 \x01(\x05R\x12matchedTargetCount\x120\n" +
+	"\x14skipped_target_names\x18\x03 \x03(\tR\x12skippedTargetNames\x122\n" +
+	"\boutcomes\x18\x04 \x03(\v2\x16.nokku.v1.GrantOutcomeR\boutcomes\"Z\n" +
 	"\fGrantRequest\x121\n" +
 	"\x05grant\x18\x01 \x01(\v2\x13.nokku.v1.GrantSpecB\x06\xbaH\x03\xc8\x01\x01R\x05grant\x12\x17\n" +
 	"\adry_run\x18\x02 \x01(\bR\x06dryRun\"8\n" +
 	"\rGrantResponse\x12'\n" +
-	"\x04plan\x18\x01 \x01(\v2\x13.nokku.v1.GrantPlanR\x04plan\"\xe2\x01\n" +
+	"\x04plan\x18\x01 \x01(\v2\x13.nokku.v1.GrantPlanR\x04plan\"\xde\x01\n" +
 	"\n" +
-	"RevokeSpec\x128\n" +
-	"\asubject\x18\x01 \x01(\v2\x16.nokku.v1.GrantSubjectB\x06\xbaH\x03\xc8\x01\x01R\asubject\x12/\n" +
+	"RevokeSpec\x123\n" +
+	"\asubject\x18\x01 \x01(\v2\x11.nokku.v1.SubjectB\x06\xbaH\x03\xc8\x01\x01R\asubject\x12/\n" +
 	"\n" +
 	"target_ids\x18\x02 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\xf4\x03\"\x05r\x03\xb0\x01\x01R\ttargetIds\x12$\n" +
 	"\x04tags\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10 \"\x06r\x04\x10\x01\x18@R\x04tags\x12#\n" +
-	"\busername\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18 R\busername\x12\x1e\n" +
-	"\n" +
-	"everywhere\x18\x05 \x01(\bR\n" +
-	"everywhere\"h\n" +
+	"\busername\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18 R\busername\x12\x1f\n" +
+	"\vall_targets\x18\x05 \x01(\bR\n" +
+	"allTargets\"q\n" +
 	"\rRevokeAccount\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername\x12\x18\n" +
-	"\aservers\x18\x02 \x01(\x05R\aservers\x12!\n" +
-	"\fserver_names\x18\x03 \x03(\tR\vserverNames\"\xba\x01\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12!\n" +
+	"\ftarget_count\x18\x02 \x01(\x05R\vtargetCount\x12!\n" +
+	"\ftarget_names\x18\x03 \x03(\tR\vtargetNames\"\xef\x01\n" +
 	"\n" +
-	"RevokePlan\x12\x16\n" +
-	"\x06grants\x18\x01 \x01(\x05R\x06grants\x12\x18\n" +
-	"\aservers\x18\x02 \x01(\x05R\aservers\x123\n" +
-	"\baccounts\x18\x03 \x03(\v2\x17.nokku.v1.RevokeAccountR\baccounts\x12\x1d\n" +
-	"\n" +
-	"other_tags\x18\x04 \x01(\x05R\totherTags\x12&\n" +
-	"\x0fother_tag_names\x18\x05 \x03(\tR\rotherTagNames\"^\n" +
+	"RevokePlan\x12\x1f\n" +
+	"\vgrant_count\x18\x01 \x01(\x05R\n" +
+	"grantCount\x12!\n" +
+	"\ftarget_count\x18\x02 \x01(\x05R\vtargetCount\x123\n" +
+	"\baccounts\x18\x03 \x03(\v2\x17.nokku.v1.RevokeAccountR\baccounts\x123\n" +
+	"\x16multi_tag_target_count\x18\x04 \x01(\x05R\x13multiTagTargetCount\x123\n" +
+	"\x16multi_tag_target_names\x18\x05 \x03(\tR\x13multiTagTargetNames\"^\n" +
 	"\rRevokeRequest\x124\n" +
 	"\x06revoke\x18\x01 \x01(\v2\x14.nokku.v1.RevokeSpecB\x06\xbaH\x03\xc8\x01\x01R\x06revoke\x12\x17\n" +
 	"\adry_run\x18\x02 \x01(\bR\x06dryRun\":\n" +
@@ -1345,16 +1347,12 @@ const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\aaccount\x18\x01 \x01(\v2\x17.nokku.v1.TargetAccountR\aaccount\"6\n" +
 	"\x1aRemoveTargetAccountRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"\x1d\n" +
-	"\x1bRemoveTargetAccountResponse*{\n" +
-	"\vSubjectKind\x12\x1c\n" +
-	"\x18SUBJECT_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
-	"\x11SUBJECT_KIND_USER\x10\x01\x12\x15\n" +
-	"\x11SUBJECT_KIND_TEAM\x10\x02\x12 \n" +
-	"\x1cSUBJECT_KIND_SERVICE_ACCOUNT\x10\x032\xda\x03\n" +
+	"\x1bRemoveTargetAccountResponse2\xb9\x04\n" +
 	"\x14TargetAccountService\x12l\n" +
-	"\x12ListTargetAccounts\x12#.nokku.v1.ListTargetAccountsRequest\x1a$.nokku.v1.ListTargetAccountsResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12a\n" +
+	"\x12ListTargetAccounts\x12#.nokku.v1.ListTargetAccountsRequest\x1a$.nokku.v1.ListTargetAccountsResponse\"\v\xc2\xf3\x18\x04\x18\x020\x01\x90\x02\x01\x12a\n" +
 	"\x10AddTargetAccount\x12!.nokku.v1.AddTargetAccountRequest\x1a\".nokku.v1.AddTargetAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12j\n" +
-	"\x13RemoveTargetAccount\x12$.nokku.v1.RemoveTargetAccountRequest\x1a%.nokku.v1.RemoveTargetAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12@\n" +
+	"\x13RemoveTargetAccount\x12$.nokku.v1.RemoveTargetAccountRequest\x1a%.nokku.v1.RemoveTargetAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12]\n" +
+	"\rGetGrantScope\x12\x1e.nokku.v1.GetGrantScopeRequest\x1a\x1f.nokku.v1.GetGrantScopeResponse\"\v\xc2\xf3\x18\x04\x18\x020\x01\x90\x02\x01\x12@\n" +
 	"\x05Grant\x12\x16.nokku.v1.GrantRequest\x1a\x17.nokku.v1.GrantResponse\"\x06\xc2\xf3\x18\x02\x18\x03\x12C\n" +
 	"\x06Revoke\x12\x17.nokku.v1.RevokeRequest\x1a\x18.nokku.v1.RevokeResponse\"\x06\xc2\xf3\x18\x02\x18\x03B\x93\x01\n" +
 	"\fcom.nokku.v1B\x12TargetAccountProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
@@ -1371,62 +1369,64 @@ func file_nokku_v1_target_account_proto_rawDescGZIP() []byte {
 	return file_nokku_v1_target_account_proto_rawDescData
 }
 
-var file_nokku_v1_target_account_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nokku_v1_target_account_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_nokku_v1_target_account_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_nokku_v1_target_account_proto_goTypes = []any{
-	(SubjectKind)(0),                    // 0: nokku.v1.SubjectKind
-	(*TargetAccount)(nil),               // 1: nokku.v1.TargetAccount
+	(*TargetAccount)(nil),               // 0: nokku.v1.TargetAccount
+	(*Grant)(nil),                       // 1: nokku.v1.Grant
 	(*ListTargetAccountsRequest)(nil),   // 2: nokku.v1.ListTargetAccountsRequest
 	(*ListTargetAccountsResponse)(nil),  // 3: nokku.v1.ListTargetAccountsResponse
-	(*GrantSubject)(nil),                // 4: nokku.v1.GrantSubject
-	(*GrantSpec)(nil),                   // 5: nokku.v1.GrantSpec
+	(*GetGrantScopeRequest)(nil),        // 4: nokku.v1.GetGrantScopeRequest
+	(*GetGrantScopeResponse)(nil),       // 5: nokku.v1.GetGrantScopeResponse
 	(*GrantAccount)(nil),                // 6: nokku.v1.GrantAccount
-	(*GrantOutcome)(nil),                // 7: nokku.v1.GrantOutcome
-	(*GrantPlan)(nil),                   // 8: nokku.v1.GrantPlan
-	(*GrantRequest)(nil),                // 9: nokku.v1.GrantRequest
-	(*GrantResponse)(nil),               // 10: nokku.v1.GrantResponse
-	(*RevokeSpec)(nil),                  // 11: nokku.v1.RevokeSpec
-	(*RevokeAccount)(nil),               // 12: nokku.v1.RevokeAccount
-	(*RevokePlan)(nil),                  // 13: nokku.v1.RevokePlan
-	(*RevokeRequest)(nil),               // 14: nokku.v1.RevokeRequest
-	(*RevokeResponse)(nil),              // 15: nokku.v1.RevokeResponse
-	(*AddTargetAccountRequest)(nil),     // 16: nokku.v1.AddTargetAccountRequest
-	(*AddTargetAccountResponse)(nil),    // 17: nokku.v1.AddTargetAccountResponse
-	(*RemoveTargetAccountRequest)(nil),  // 18: nokku.v1.RemoveTargetAccountRequest
-	(*RemoveTargetAccountResponse)(nil), // 19: nokku.v1.RemoveTargetAccountResponse
-	nil,                                 // 20: nokku.v1.TargetAccount.ExpiresAtEntry
+	(*GrantSpec)(nil),                   // 7: nokku.v1.GrantSpec
+	(*GrantOutcome)(nil),                // 8: nokku.v1.GrantOutcome
+	(*GrantPlan)(nil),                   // 9: nokku.v1.GrantPlan
+	(*GrantRequest)(nil),                // 10: nokku.v1.GrantRequest
+	(*GrantResponse)(nil),               // 11: nokku.v1.GrantResponse
+	(*RevokeSpec)(nil),                  // 12: nokku.v1.RevokeSpec
+	(*RevokeAccount)(nil),               // 13: nokku.v1.RevokeAccount
+	(*RevokePlan)(nil),                  // 14: nokku.v1.RevokePlan
+	(*RevokeRequest)(nil),               // 15: nokku.v1.RevokeRequest
+	(*RevokeResponse)(nil),              // 16: nokku.v1.RevokeResponse
+	(*AddTargetAccountRequest)(nil),     // 17: nokku.v1.AddTargetAccountRequest
+	(*AddTargetAccountResponse)(nil),    // 18: nokku.v1.AddTargetAccountResponse
+	(*RemoveTargetAccountRequest)(nil),  // 19: nokku.v1.RemoveTargetAccountRequest
+	(*RemoveTargetAccountResponse)(nil), // 20: nokku.v1.RemoveTargetAccountResponse
 	(*timestamppb.Timestamp)(nil),       // 21: google.protobuf.Timestamp
+	(*Subject)(nil),                     // 22: nokku.v1.Subject
 }
 var file_nokku_v1_target_account_proto_depIdxs = []int32{
-	21, // 0: nokku.v1.TargetAccount.created_at:type_name -> google.protobuf.Timestamp
-	21, // 1: nokku.v1.TargetAccount.seen_at:type_name -> google.protobuf.Timestamp
-	20, // 2: nokku.v1.TargetAccount.expires_at:type_name -> nokku.v1.TargetAccount.ExpiresAtEntry
-	1,  // 3: nokku.v1.ListTargetAccountsResponse.accounts:type_name -> nokku.v1.TargetAccount
-	0,  // 4: nokku.v1.GrantSubject.kind:type_name -> nokku.v1.SubjectKind
-	4,  // 5: nokku.v1.GrantSpec.subjects:type_name -> nokku.v1.GrantSubject
-	21, // 6: nokku.v1.GrantSpec.expires_at:type_name -> google.protobuf.Timestamp
-	6,  // 7: nokku.v1.GrantPlan.accounts:type_name -> nokku.v1.GrantAccount
-	7,  // 8: nokku.v1.GrantPlan.outcomes:type_name -> nokku.v1.GrantOutcome
-	5,  // 9: nokku.v1.GrantRequest.grant:type_name -> nokku.v1.GrantSpec
-	8,  // 10: nokku.v1.GrantResponse.plan:type_name -> nokku.v1.GrantPlan
-	4,  // 11: nokku.v1.RevokeSpec.subject:type_name -> nokku.v1.GrantSubject
-	12, // 12: nokku.v1.RevokePlan.accounts:type_name -> nokku.v1.RevokeAccount
-	11, // 13: nokku.v1.RevokeRequest.revoke:type_name -> nokku.v1.RevokeSpec
-	13, // 14: nokku.v1.RevokeResponse.plan:type_name -> nokku.v1.RevokePlan
-	1,  // 15: nokku.v1.AddTargetAccountResponse.account:type_name -> nokku.v1.TargetAccount
-	21, // 16: nokku.v1.TargetAccount.ExpiresAtEntry.value:type_name -> google.protobuf.Timestamp
+	1,  // 0: nokku.v1.TargetAccount.grants:type_name -> nokku.v1.Grant
+	21, // 1: nokku.v1.TargetAccount.created_at:type_name -> google.protobuf.Timestamp
+	21, // 2: nokku.v1.TargetAccount.seen_at:type_name -> google.protobuf.Timestamp
+	22, // 3: nokku.v1.Grant.subject:type_name -> nokku.v1.Subject
+	21, // 4: nokku.v1.Grant.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 5: nokku.v1.ListTargetAccountsResponse.accounts:type_name -> nokku.v1.TargetAccount
+	6,  // 6: nokku.v1.GetGrantScopeResponse.accounts:type_name -> nokku.v1.GrantAccount
+	22, // 7: nokku.v1.GrantSpec.subjects:type_name -> nokku.v1.Subject
+	21, // 8: nokku.v1.GrantSpec.expires_at:type_name -> google.protobuf.Timestamp
+	8,  // 9: nokku.v1.GrantPlan.outcomes:type_name -> nokku.v1.GrantOutcome
+	7,  // 10: nokku.v1.GrantRequest.grant:type_name -> nokku.v1.GrantSpec
+	9,  // 11: nokku.v1.GrantResponse.plan:type_name -> nokku.v1.GrantPlan
+	22, // 12: nokku.v1.RevokeSpec.subject:type_name -> nokku.v1.Subject
+	13, // 13: nokku.v1.RevokePlan.accounts:type_name -> nokku.v1.RevokeAccount
+	12, // 14: nokku.v1.RevokeRequest.revoke:type_name -> nokku.v1.RevokeSpec
+	14, // 15: nokku.v1.RevokeResponse.plan:type_name -> nokku.v1.RevokePlan
+	0,  // 16: nokku.v1.AddTargetAccountResponse.account:type_name -> nokku.v1.TargetAccount
 	2,  // 17: nokku.v1.TargetAccountService.ListTargetAccounts:input_type -> nokku.v1.ListTargetAccountsRequest
-	16, // 18: nokku.v1.TargetAccountService.AddTargetAccount:input_type -> nokku.v1.AddTargetAccountRequest
-	18, // 19: nokku.v1.TargetAccountService.RemoveTargetAccount:input_type -> nokku.v1.RemoveTargetAccountRequest
-	9,  // 20: nokku.v1.TargetAccountService.Grant:input_type -> nokku.v1.GrantRequest
-	14, // 21: nokku.v1.TargetAccountService.Revoke:input_type -> nokku.v1.RevokeRequest
-	3,  // 22: nokku.v1.TargetAccountService.ListTargetAccounts:output_type -> nokku.v1.ListTargetAccountsResponse
-	17, // 23: nokku.v1.TargetAccountService.AddTargetAccount:output_type -> nokku.v1.AddTargetAccountResponse
-	19, // 24: nokku.v1.TargetAccountService.RemoveTargetAccount:output_type -> nokku.v1.RemoveTargetAccountResponse
-	10, // 25: nokku.v1.TargetAccountService.Grant:output_type -> nokku.v1.GrantResponse
-	15, // 26: nokku.v1.TargetAccountService.Revoke:output_type -> nokku.v1.RevokeResponse
-	22, // [22:27] is the sub-list for method output_type
-	17, // [17:22] is the sub-list for method input_type
+	17, // 18: nokku.v1.TargetAccountService.AddTargetAccount:input_type -> nokku.v1.AddTargetAccountRequest
+	19, // 19: nokku.v1.TargetAccountService.RemoveTargetAccount:input_type -> nokku.v1.RemoveTargetAccountRequest
+	4,  // 20: nokku.v1.TargetAccountService.GetGrantScope:input_type -> nokku.v1.GetGrantScopeRequest
+	10, // 21: nokku.v1.TargetAccountService.Grant:input_type -> nokku.v1.GrantRequest
+	15, // 22: nokku.v1.TargetAccountService.Revoke:input_type -> nokku.v1.RevokeRequest
+	3,  // 23: nokku.v1.TargetAccountService.ListTargetAccounts:output_type -> nokku.v1.ListTargetAccountsResponse
+	18, // 24: nokku.v1.TargetAccountService.AddTargetAccount:output_type -> nokku.v1.AddTargetAccountResponse
+	20, // 25: nokku.v1.TargetAccountService.RemoveTargetAccount:output_type -> nokku.v1.RemoveTargetAccountResponse
+	5,  // 26: nokku.v1.TargetAccountService.GetGrantScope:output_type -> nokku.v1.GetGrantScopeResponse
+	11, // 27: nokku.v1.TargetAccountService.Grant:output_type -> nokku.v1.GrantResponse
+	16, // 28: nokku.v1.TargetAccountService.Revoke:output_type -> nokku.v1.RevokeResponse
+	23, // [23:29] is the sub-list for method output_type
+	17, // [17:23] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
 	17, // [17:17] is the sub-list for extension extendee
 	0,  // [0:17] is the sub-list for field type_name
@@ -1438,19 +1438,19 @@ func file_nokku_v1_target_account_proto_init() {
 		return
 	}
 	file_nokku_v1_access_proto_init()
+	file_nokku_v1_subject_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nokku_v1_target_account_proto_rawDesc), len(file_nokku_v1_target_account_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   20,
+			NumEnums:      0,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_nokku_v1_target_account_proto_goTypes,
 		DependencyIndexes: file_nokku_v1_target_account_proto_depIdxs,
-		EnumInfos:         file_nokku_v1_target_account_proto_enumTypes,
 		MessageInfos:      file_nokku_v1_target_account_proto_msgTypes,
 	}.Build()
 	File_nokku_v1_target_account_proto = out.File

@@ -37,7 +37,7 @@ export function headline(
 
 /** Nothing enrolled yet, so there is nothing to be healthy about. */
 export function isFresh(d: GetDashboardResponse | undefined): boolean {
-	return !!d && d.targets === 0 && d.daemons === 0;
+	return !!d && d.targetCount === 0 && d.daemonCount === 0;
 }
 
 const toneRank: Record<Tone, number> = {
@@ -65,7 +65,7 @@ export function issuesOf(d: GetDashboardResponse): Issue[] {
 	}
 
 	// One row however many are down, so a rack that loses power is one thing to look at, not forty.
-	const offline = d.offlineServers;
+	const offline = d.offlineTargets;
 	const never = offline.filter((s) => !s.daemon?.lastSeenAt).length;
 	if (offline.length === 1) {
 		const seen = offline[0].daemon?.lastSeenAt;
@@ -108,8 +108,8 @@ export function issuesOf(d: GetDashboardResponse): Issue[] {
 	}
 
 	// A spike is at least 10 failures in the last hour and three times the daily rate.
-	const lastHour = d.failures.at(-1) ?? 0;
-	const hourly = d.failures.reduce((a, b) => a + b, 0) / Math.max(1, d.failures.length);
+	const lastHour = d.failuresByHour.at(-1) ?? 0;
+	const hourly = d.failuresByHour.reduce((a, b) => a + b, 0) / Math.max(1, d.failuresByHour.length);
 	if (lastHour >= 10 && lastHour >= 3 * hourly) {
 		issues.push({
 			id: 'failures',

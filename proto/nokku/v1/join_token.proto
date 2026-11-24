@@ -6,25 +6,26 @@ import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
+import "nokku/v1/subject.proto";
 
 service JoinTokenService {
   rpc CreateJoinToken(CreateJoinTokenRequest) returns (CreateJoinTokenResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc ListJoinTokens(ListJoinTokensRequest) returns (ListJoinTokensResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc DeleteJoinToken(DeleteJoinTokenRequest) returns (DeleteJoinTokenResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      machine: true
+      service_account: true
     };
   }
 }
@@ -34,14 +35,14 @@ message JoinToken {
   string label = 2;
   google.protobuf.Timestamp expires_at = 3;
   int32 max_uses = 4;
-  int32 uses = 5;
+  int32 use_count = 5;
   bool auto_approve = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp last_used_at = 8;
-  repeated string tags = 9;
-  repeated JoinTokenGrant grants = 10;
-  bool ephemeral = 11;
-  google.protobuf.Duration retire_after = 12;
+  bool ephemeral = 7;
+  repeated string tags = 8;
+  repeated JoinTokenGrant grants = 9;
+  google.protobuf.Duration retire_after = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp last_used_at = 12;
 }
 
 message JoinTokenGrant {
@@ -50,24 +51,7 @@ message JoinTokenGrant {
     max_len: 32
     pattern: "^[A-Za-z_][A-Za-z0-9._-]*\\$?$"
   }];
-  repeated string user_ids = 2 [(buf.validate.field).repeated = {
-    max_items: 50
-    items: {
-      string: {uuid: true}
-    }
-  }];
-  repeated string team_ids = 3 [(buf.validate.field).repeated = {
-    max_items: 50
-    items: {
-      string: {uuid: true}
-    }
-  }];
-  repeated string service_account_ids = 4 [(buf.validate.field).repeated = {
-    max_items: 50
-    items: {
-      string: {uuid: true}
-    }
-  }];
+  repeated Subject subjects = 2 [(buf.validate.field).repeated.max_items = 150];
 }
 
 message CreateJoinTokenRequest {

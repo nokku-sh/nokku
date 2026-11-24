@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
-	import { kindIcon, kindOf, setParams } from '#lib/components/audit/audit.js';
+	import { type AuditEvent } from '#lib/gen/nokku/v1/audit_log_pb.js';
+	import { kindIcon, kindName, setParams } from '#lib/components/audit/audit.js';
 
-	let { log }: { log: EventLog } = $props();
+	let { log }: { log: AuditEvent } = $props();
 
 	const Icon = $derived(kindIcon(log.actorKind));
 	// The filter only takes UUIDs, SCIM and system actors can't be picked.
@@ -30,6 +30,6 @@
 		{:else}
 			<span class={['truncate', mono ? 'font-mono text-xs' : 'text-sm']}>{name}</span>
 		{/if}
-		<span class="text-xs text-muted-foreground">{kindOf(log.actorKind)?.one ?? log.actorKind}</span>
+		<span class="text-xs text-muted-foreground">{kindName(log.actorKind)}</span>
 	</div>
 </div>

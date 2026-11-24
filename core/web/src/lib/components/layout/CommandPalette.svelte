@@ -69,7 +69,7 @@
 
 	const shells = $derived(
 		servers.list
-			.flatMap((t) => t.usernames.map((username) => ({ t, username })))
+			.flatMap(({ target: t, logins }) => logins.map(({ username }) => ({ t, username })))
 			.filter(({ t, username }) => matches(username, t.name, t.metadata?.hostname))
 			.slice(0, SHELLS)
 	);

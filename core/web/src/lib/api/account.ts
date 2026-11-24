@@ -1,7 +1,10 @@
 import { Code, ConnectError, createClient } from '@connectrpc/connect';
-import { AccountService } from '#lib/gen/nokku/v1/account_pb.js';
-import type { AccountCredential, AccountSession } from '#lib/gen/nokku/v1/account_pb.js';
-import type { User } from '#lib/gen/nokku/v1/account_pb.js';
+import {
+	type AccountCredential,
+	AccountService,
+	type AccountSession
+} from '#lib/gen/nokku/v1/account_pb.js';
+import { type User } from '#lib/gen/nokku/v1/user_pb.js';
 import { authTransport, handleSessionExpired } from './client';
 
 export type { AccountCredential, AccountSession, User };

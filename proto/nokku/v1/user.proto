@@ -1,0 +1,133 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+service UserService {
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      cli: true
+      service_account: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc SetUserRole(SetUserRoleRequest) returns (SetUserRoleResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      fresh: true
+    };
+  }
+  rpc DeactivateUser(DeactivateUserRequest) returns (DeactivateUserResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      service_account: true
+    };
+  }
+  rpc ReactivateUser(ReactivateUserRequest) returns (ReactivateUserResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      fresh: true
+    };
+  }
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      fresh: true
+    };
+  }
+  rpc ClearUserIdentities(ClearUserIdentitiesRequest) returns (ClearUserIdentitiesResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_ADMIN
+      fresh: true
+    };
+  }
+  rpc TransferOwnership(TransferOwnershipRequest) returns (TransferOwnershipResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_OWNER
+      fresh: true
+    };
+  }
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string picture = 4;
+  WorkspaceRole role = 5;
+  bool active = 6;
+  string pending_email = 7;
+  bool scim_managed = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message ListUsersRequest {
+  int32 limit = 1 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+  string query = 3;
+  WorkspaceRole role = 4 [(buf.validate.field).enum.defined_only = true];
+}
+message ListUsersResponse {
+  repeated User users = 1;
+  int32 total = 2;
+}
+
+message GetUserRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetUserResponse {
+  User user = 1;
+}
+
+message SetUserRoleRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  WorkspaceRole role = 2 [(buf.validate.field).enum = {
+    in: [
+      1,
+      2,
+      3,
+      4
+    ]
+  }];
+}
+message SetUserRoleResponse {}
+
+message DeactivateUserRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeactivateUserResponse {}
+
+message ReactivateUserRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ReactivateUserResponse {}
+
+message DeleteUserRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeleteUserResponse {}
+
+message ClearUserIdentitiesRequest {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ClearUserIdentitiesResponse {}
+
+message TransferOwnershipRequest {
+  string new_owner_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message TransferOwnershipResponse {}

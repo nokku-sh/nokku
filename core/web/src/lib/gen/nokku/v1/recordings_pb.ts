@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/recordings.proto.
  */
 export const file_nokku_v1_recordings: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSKgAgoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIQCgh1c2VybmFtZRgDIAEoCRISCgpzaXplX2J5dGVzGAQgASgDEhAKCGNvbXBsZXRlGAUgASgIEi4KCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgtkYWVtb25fbmFtZRgIIAEoCRISCgpzdWJqZWN0X2lkGAkgASgJEhEKCXByaW5jaXBhbBgKIAEoCRIUCgxzdWJqZWN0X25hbWUYCyABKAkSDAoEbGl2ZRgMIAEoCCKEAQoWVXBsb2FkUmVjb3JkaW5nUmVxdWVzdBInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSAASKQoFZmluYWwYAyABKAsyGC5ub2trdS52MS5SZWNvcmRpbmdGaW5hbEgAQgUKA21zZyKXAQoNUmVjb3JkaW5nTWV0YRIeCgxyZWNvcmRpbmdfaWQYASABKAlCCLpIBXIDsAEBEhkKCHVzZXJuYW1lGAIgASgJQge6SARyAhggEhsKCXByaW5jaXBhbBgDIAEoCUIIukgFcgMYoAESLgoKc3RhcnRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAieQoOUmVjb3JkaW5nRmluYWwSGwoKc2l6ZV9ieXRlcxgBIAEoA0IHukgEIgIoABIcCgpjdXRfcmVhc29uGAIgASgJQgi6SAVyAxjIARIsCghlbmRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiVQoXVXBsb2FkUmVjb3JkaW5nUmVzcG9uc2USFAoMcmVjb3JkaW5nX2lkGAEgASgJEhIKCnNpemVfYnl0ZXMYAiABKAMSEAoIY29tcGxldGUYAyABKAgilwEKFUxpc3RSZWNvcmRpbmdzUmVxdWVzdBIbCglkYWVtb25faWQYASABKAlCCLpIBXIDsAEBEhgKBWxpbWl0GAIgASgFQgm6SAYaBBhkKAESFwoGb2Zmc2V0GAMgASgFQge6SAQaAigAEhAKCHVzZXJuYW1lGAQgASgJEhwKCnN1YmplY3RfaWQYBSABKAlCCLpIBXIDsAEBImUKFkxpc3RSZWNvcmRpbmdzUmVzcG9uc2USJwoKcmVjb3JkaW5ncxgBIAMoCzITLm5va2t1LnYxLlJlY29yZGluZxINCgV0b3RhbBgCIAEoBRITCgt0b3RhbF9ieXRlcxgDIAEoAyI1ChNHZXRSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQEiVwoUR2V0UmVjb3JkaW5nUmVzcG9uc2USJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAQgUKA21zZyI4ChZEZWxldGVSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UytAIKEFJlY29yZGluZ1NlcnZpY2USXAoMR2V0UmVjb3JkaW5nEh0ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVxdWVzdBoeLm5va2t1LnYxLkdldFJlY29yZGluZ1Jlc3BvbnNlIguQAgHC8xgEGAJoATABEmAKDkxpc3RSZWNvcmRpbmdzEh8ubm9ra3UudjEuTGlzdFJlY29yZGluZ3NSZXF1ZXN0GiAubm9ra3UudjEuTGlzdFJlY29yZGluZ3NSZXNwb25zZSILkAIBwvMYBBgCaAESYAoPRGVsZXRlUmVjb3JkaW5nEiAubm9ra3UudjEuRGVsZXRlUmVjb3JkaW5nUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZVJlY29yZGluZ1Jlc3BvbnNlIgjC8xgEGANgAUKQAQoMY29tLm5va2t1LnYxQg9SZWNvcmRpbmdzUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9yZWNvcmRpbmdzLnByb3RvEghub2trdS52MSKgAgoJUmVjb3JkaW5nEgoKAmlkGAEgASgJEhEKCWRhZW1vbl9pZBgCIAEoCRIQCgh1c2VybmFtZRgDIAEoCRISCgpzaXplX2J5dGVzGAQgASgDEhAKCGNvbXBsZXRlGAUgASgIEhMKC2RhZW1vbl9uYW1lGAYgASgJEhIKCnN1YmplY3RfaWQYByABKAkSEQoJcHJpbmNpcGFsGAggASgJEhQKDHN1YmplY3RfbmFtZRgJIAEoCRIMCgRsaXZlGAogASgIEi4KCnN0YXJ0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKEAQoWVXBsb2FkUmVjb3JkaW5nUmVxdWVzdBInCgRtZXRhGAEgASgLMhcubm9ra3UudjEuUmVjb3JkaW5nTWV0YUgAEg8KBWNodW5rGAIgASgMSAASKQoFZmluYWwYAyABKAsyGC5ub2trdS52MS5SZWNvcmRpbmdGaW5hbEgAQgUKA21zZyKNAQoNUmVjb3JkaW5nTWV0YRIUCgJpZBgBIAEoCUIIukgFcgOwAQESGQoIdXNlcm5hbWUYAiABKAlCB7pIBHICGCASGwoJcHJpbmNpcGFsGAMgASgJQgi6SAVyAxigARIuCgpzdGFydGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJ5Cg5SZWNvcmRpbmdGaW5hbBIbCgpzaXplX2J5dGVzGAEgASgDQge6SAQiAigAEhwKCmN1dF9yZWFzb24YAiABKAlCCLpIBXIDGMgBEiwKCGVuZGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJLChdVcGxvYWRSZWNvcmRpbmdSZXNwb25zZRIKCgJpZBgBIAEoCRISCgpzaXplX2J5dGVzGAIgASgDEhAKCGNvbXBsZXRlGAMgASgIIpcBChVMaXN0UmVjb3JkaW5nc1JlcXVlc3QSGwoJZGFlbW9uX2lkGAEgASgJQgi6SAVyA7ABARIYCgVsaW1pdBgCIAEoBUIJukgGGgQYZCgBEhcKBm9mZnNldBgDIAEoBUIHukgEGgIoABIQCgh1c2VybmFtZRgEIAEoCRIcCgpzdWJqZWN0X2lkGAUgASgJQgi6SAVyA7ABASJlChZMaXN0UmVjb3JkaW5nc1Jlc3BvbnNlEicKCnJlY29yZGluZ3MYASADKAsyEy5ub2trdS52MS5SZWNvcmRpbmcSDQoFdG90YWwYAiABKAUSEwoLdG90YWxfYnl0ZXMYAyABKAMiKwoTR2V0UmVjb3JkaW5nUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiVwoUR2V0UmVjb3JkaW5nUmVzcG9uc2USJwoEbWV0YRgBIAEoCzIXLm5va2t1LnYxLlJlY29yZGluZ01ldGFIABIPCgVjaHVuaxgCIAEoDEgAQgUKA21zZyIuChZEZWxldGVSZWNvcmRpbmdSZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIZChdEZWxldGVSZWNvcmRpbmdSZXNwb25zZTK0AgoQUmVjb3JkaW5nU2VydmljZRJcCgxHZXRSZWNvcmRpbmcSHS5ub2trdS52MS5HZXRSZWNvcmRpbmdSZXF1ZXN0Gh4ubm9ra3UudjEuR2V0UmVjb3JkaW5nUmVzcG9uc2UiC5ACAcLzGAQYAjABMAESYAoOTGlzdFJlY29yZGluZ3MSHy5ub2trdS52MS5MaXN0UmVjb3JkaW5nc1JlcXVlc3QaIC5ub2trdS52MS5MaXN0UmVjb3JkaW5nc1Jlc3BvbnNlIguQAgHC8xgEGAIwARJgCg9EZWxldGVSZWNvcmRpbmcSIC5ub2trdS52MS5EZWxldGVSZWNvcmRpbmdSZXF1ZXN0GiEubm9ra3UudjEuRGVsZXRlUmVjb3JkaW5nUmVzcG9uc2UiCMLzGAQYAyABQpABCgxjb20ubm9ra3UudjFCD1JlY29yZGluZ3NQcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.Recording
@@ -46,41 +46,39 @@ export type Recording = Message<"nokku.v1.Recording"> & {
   complete: boolean;
 
   /**
-   * @generated from field: google.protobuf.Timestamp started_at = 6;
-   */
-  startedAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp ended_at = 7;
-   */
-  endedAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: string daemon_name = 8;
+   * @generated from field: string daemon_name = 6;
    */
   daemonName: string;
 
   /**
-   * @generated from field: string subject_id = 9;
+   * @generated from field: string subject_id = 7;
    */
   subjectId: string;
 
   /**
-   * @generated from field: string principal = 10;
+   * @generated from field: string principal = 8;
    */
   principal: string;
 
   /**
-   * @generated from field: string subject_name = 11;
+   * @generated from field: string subject_name = 9;
    */
   subjectName: string;
 
   /**
-   * live is a session still running as far as the core can tell, ended_at unset behind a connected daemon.
-   *
-   * @generated from field: bool live = 12;
+   * @generated from field: bool live = 10;
    */
   live: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 11;
+   */
+  startedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp ended_at = 12;
+   */
+  endedAt?: Timestamp | undefined;
 };
 
 /**
@@ -130,9 +128,9 @@ export const UploadRecordingRequestSchema: GenMessage<UploadRecordingRequest> = 
  */
 export type RecordingMeta = Message<"nokku.v1.RecordingMeta"> & {
   /**
-   * @generated from field: string recording_id = 1;
+   * @generated from field: string id = 1;
    */
-  recordingId: string;
+  id: string;
 
   /**
    * @generated from field: string username = 2;
@@ -172,8 +170,6 @@ export type RecordingFinal = Message<"nokku.v1.RecordingFinal"> & {
   cutReason: string;
 
   /**
-   * ended_at is when the session ended, which a late upload can be long after.
-   *
    * @generated from field: google.protobuf.Timestamp ended_at = 3;
    */
   endedAt?: Timestamp | undefined;
@@ -191,20 +187,17 @@ export const RecordingFinalSchema: GenMessage<RecordingFinal> = /*@__PURE__*/
  */
 export type UploadRecordingResponse = Message<"nokku.v1.UploadRecordingResponse"> & {
   /**
-   * @generated from field: string recording_id = 1;
+   * @generated from field: string id = 1;
    */
-  recordingId: string;
+  id: string;
 
   /**
-   * size_bytes is what the core holds of the recording.
-   *
    * @generated from field: int64 size_bytes = 2;
    */
   sizeBytes: bigint;
 
   /**
-   * complete says the core takes no more of this recording. Only this answer
-   * lets a daemon delete its file, an error never does.
+   * Only a complete answer lets the daemon delete its file.
    *
    * @generated from field: bool complete = 3;
    */
@@ -287,9 +280,9 @@ export const ListRecordingsResponseSchema: GenMessage<ListRecordingsResponse> = 
  */
 export type GetRecordingRequest = Message<"nokku.v1.GetRecordingRequest"> & {
   /**
-   * @generated from field: string recording_id = 1;
+   * @generated from field: string id = 1;
    */
-  recordingId: string;
+  id: string;
 };
 
 /**
@@ -333,9 +326,9 @@ export const GetRecordingResponseSchema: GenMessage<GetRecordingResponse> = /*@_
  */
 export type DeleteRecordingRequest = Message<"nokku.v1.DeleteRecordingRequest"> & {
   /**
-   * @generated from field: string recording_id = 1;
+   * @generated from field: string id = 1;
    */
-  recordingId: string;
+  id: string;
 };
 
 /**
@@ -379,8 +372,6 @@ export const RecordingService: GenService<{
     output: typeof ListRecordingsResponseSchema;
   },
   /**
-   * A person deletes evidence, never a CI job, and only right after a sign-in.
-   *
    * @generated from rpc nokku.v1.RecordingService.DeleteRecording
    */
   deleteRecording: {

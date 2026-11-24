@@ -1,0 +1,160 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+import "nokku/v1/audit_log.proto";
+import "nokku/v1/subject.proto";
+
+service AccessViewService {
+  rpc GetAccessGraph(GetAccessGraphRequest) returns (GetAccessGraphResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListAccessGraphTargets(ListAccessGraphTargetsRequest) returns (ListAccessGraphTargetsResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetAccessMatrix(GetAccessMatrixRequest) returns (GetAccessMatrixResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ExportAccessReport(ExportAccessReportRequest) returns (ExportAccessReportResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+      feature: "access_review"
+    };
+  }
+}
+
+message AccessGraphFilter {
+  string subject_id = 1 [(buf.validate.field).string.uuid = true];
+  string target_id = 2 [(buf.validate.field).string.uuid = true];
+  string username = 3 [(buf.validate.field).string.max_len = 32];
+  string tag = 4 [(buf.validate.field).string.max_len = 256];
+}
+
+message GetAccessGraphRequest {
+  AccessGraphFilter filter = 1;
+}
+message GetAccessGraphResponse {
+  repeated AccessSubject subjects = 1;
+  repeated AccessGraphAccount accounts = 2;
+  repeated AccessTag tags = 3;
+  repeated AccessGraphGrant grants = 4;
+  repeated AccessGraphReach reach = 5;
+  int32 target_count = 6;
+}
+
+message AccessSubject {
+  string id = 1;
+  SubjectKind kind = 2;
+  string name = 3;
+  string email = 4;
+  int32 member_count = 5;
+  int32 target_count = 6;
+}
+
+message AccessGraphAccount {
+  string username = 1;
+  int32 target_count = 2;
+}
+
+message AccessTag {
+  // Empty is the targets without a tag.
+  string tag = 1;
+  int32 granted_target_count = 2;
+  int32 target_count = 3;
+}
+
+message AccessGraphGrant {
+  string subject_id = 1;
+  string username = 2;
+  int32 target_count = 3;
+}
+
+message AccessGraphReach {
+  string username = 1;
+  string tag = 2;
+  int32 target_count = 3;
+}
+
+message ListAccessGraphTargetsRequest {
+  AccessGraphFilter filter = 1;
+  string tag = 2 [(buf.validate.field).string.max_len = 256];
+  int32 limit = 3 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 4 [(buf.validate.field).int32.gte = 0];
+}
+message ListAccessGraphTargetsResponse {
+  repeated AccessGraphTarget targets = 1;
+  int32 total = 2;
+}
+
+message AccessGraphTarget {
+  string id = 1;
+  string name = 2;
+  bool matched = 3;
+}
+
+message GetAccessMatrixRequest {
+  string query = 1 [(buf.validate.field).string.max_len = 256];
+  SubjectKind kind = 2 [(buf.validate.field).enum = {defined_only: true}];
+  repeated string tags = 3 [(buf.validate.field).repeated = {
+    max_items: 20
+    items: {
+      string: {max_len: 256}
+    }
+  }];
+  int32 limit = 4 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 5 [(buf.validate.field).int32.gte = 0];
+}
+message GetAccessMatrixResponse {
+  repeated AccessTag columns = 1;
+  repeated AccessMatrixRow rows = 2;
+  int32 total = 3;
+  repeated AccessTag tags = 4;
+}
+
+message AccessMatrixRow {
+  AccessSubject subject = 1;
+  // Only the columns the subject reaches, in no order.
+  repeated AccessMatrixCell cells = 2;
+}
+
+message AccessMatrixCell {
+  string tag = 1;
+  int32 target_count = 2;
+  repeated string usernames = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  google.protobuf.Timestamp last_used_at = 5;
+}
+
+message ExportAccessReportRequest {
+  ExportAuditLogsRequest.Format format = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+message ExportAccessReportResponse {
+  bytes data = 1;
+  string filename = 2;
+  string content_type = 3;
+}

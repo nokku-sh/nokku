@@ -9,7 +9,8 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import { Badge } from '#lib/components/ext/badge/index.js';
-	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
+	import { type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { AccessBlock, type Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import {
@@ -65,7 +66,9 @@
 			.map((p) => ({
 				account: p,
 				direct: subjectIds(p, kind).includes(subjectId),
-				via: p.teamIds.filter((id) => teamNames.has(id)).map((id) => teamNames.get(id)!)
+				via: subjectIds(p, SubjectKind.TEAM)
+					.filter((id) => teamNames.has(id))
+					.map((id) => teamNames.get(id)!)
 			}))
 			.filter((g) => (g.direct || g.via.length) && !revoking.has(g.account.id));
 	}
@@ -86,13 +89,13 @@
 	const targets = $derived(access.data?.targets ?? []);
 	const filtered = $derived(
 		filter
-			? targets.filter((t) => t.name.toLowerCase().includes(filter.trim().toLowerCase()))
+			? targets.filter((a) => a.target.name.toLowerCase().includes(filter.trim().toLowerCase()))
 			: targets
 	);
 	const shown = $derived(showAll ? filtered : filtered.slice(0, PAGE));
 	// A marked target holds grants that let nobody in today, it does not count as a way in.
-	const usable = $derived(targets.filter((t) => !t.blocked));
-	const accountCount = $derived(usable.reduce((n, t) => n + grants(t).length, 0));
+	const usable = $derived(targets.filter((a) => !a.blocked));
+	const accountCount = $derived(usable.reduce((n, a) => n + grants(a.target).length, 0));
 
 	function summary(list: Grant[]) {
 		const direct = list.filter((g) => g.direct).length;
@@ -169,7 +172,7 @@
 			</Empty.Header>
 		</Empty.Root>
 	{:else}
-		{#each shown as t (t.id)}
+		{#each shown as { target: t, logins, blocked: block } (t.id)}
 			{@const list = grants(t)}
 			<div class="overflow-hidden rounded-xl border bg-card">
 				<div class="flex items-center gap-3 py-2.5 pr-2 pl-3">
@@ -186,10 +189,10 @@
 							>
 								{t.name}
 							</a>
-							{#if t.blocked && blocked[t.blocked]}
-								<Badge variant="warning" title={blocked[t.blocked]?.title}>
+							{#if block && blocked[block]}
+								<Badge variant="warning" title={blocked[block]?.title}>
 									<ShieldOff data-icon="inline-start" />
-									{blocked[t.blocked]?.label}
+									{blocked[block]?.label}
 								</Badge>
 							{/if}
 						</div>
@@ -221,7 +224,7 @@
 								<SquareTerminal class="ml-2 size-3 text-muted-foreground" />
 							{/snippet}
 							{#snippet trailing()}
-								{@const end = t.usernameExpiresAt[g.account.username]}
+								{@const end = logins.find((l) => l.username === g.account.username)?.expiresAt}
 								{#if end}
 									<span
 										class="flex items-center gap-1"
@@ -245,7 +248,7 @@
 				Show all {filtered.length} servers
 			</Button>
 		{/if}
-		{#if kind === SubjectKind.USER && targets.some((t) => grants(t).some((g) => !g.direct))}
+		{#if kind === SubjectKind.USER && targets.some((a) => grants(a.target).some((g) => !g.direct))}
 			<p class="flex items-center gap-1.5 text-xs text-muted-foreground">
 				<Users class="size-3" /> Dashed accounts come from a team. Change them on the team.
 			</p>

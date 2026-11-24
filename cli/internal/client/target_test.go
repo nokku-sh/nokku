@@ -88,8 +88,12 @@ func TestCreateTarget(t *testing.T) {
 	assert.Equal(t, []string{"prod"}, svc.got.GetTags())
 	require.Len(t, svc.got.GetGrants(), 1)
 	assert.Equal(t, "deploy", svc.got.GetGrants()[0].GetUsername())
-	assert.Equal(t, []string{"user-1"}, svc.got.GetGrants()[0].GetUserIds())
-	assert.Equal(t, []string{"team-1"}, svc.got.GetGrants()[0].GetTeamIds())
+	subjects := svc.got.GetGrants()[0].GetSubjects()
+	require.Len(t, subjects, 2)
+	assert.Equal(t, "user-1", subjects[0].GetId())
+	assert.Equal(t, nokkuv1.SubjectKind_SUBJECT_KIND_USER, subjects[0].GetKind())
+	assert.Equal(t, "team-1", subjects[1].GetId())
+	assert.Equal(t, nokkuv1.SubjectKind_SUBJECT_KIND_TEAM, subjects[1].GetKind())
 }
 
 func TestDeleteTarget(t *testing.T) {

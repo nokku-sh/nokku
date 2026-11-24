@@ -1,0 +1,20 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+
+enum SubjectKind {
+  SUBJECT_KIND_UNSPECIFIED = 0;
+  SUBJECT_KIND_USER = 1;
+  SUBJECT_KIND_TEAM = 2;
+  SUBJECT_KIND_SERVICE_ACCOUNT = 3;
+}
+
+message Subject {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  SubjectKind kind = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}

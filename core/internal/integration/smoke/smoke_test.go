@@ -86,7 +86,7 @@ type smoke struct {
 	targets        nokkuv1connect.TargetServiceClient
 	targetAccounts nokkuv1connect.TargetAccountServiceClient
 	recordings     nokkuv1connect.RecordingServiceClient
-	util           nokkuv1connect.UtilServiceClient
+	audit          nokkuv1connect.AuditLogServiceClient
 
 	owner      *nokkuv1.User
 	daemon     *nokkuv1.Daemon
@@ -199,7 +199,7 @@ func setUp(t *testing.T) *smoke {
 	s.targets = nokkuv1connect.NewTargetServiceClient(client)
 	s.targetAccounts = nokkuv1connect.NewTargetAccountServiceClient(client)
 	s.recordings = nokkuv1connect.NewRecordingServiceClient(client)
-	s.util = nokkuv1connect.NewUtilServiceClient(client)
+	s.audit = nokkuv1connect.NewAuditLogServiceClient(client)
 	return s
 }
 
@@ -296,12 +296,12 @@ func (s *smoke) grantAccount(t *testing.T) {
 	}, "the daemon never reported its %s account", account)
 
 	granted, err := s.targetAccounts.Grant(t.Context(), &nokkuv1.GrantRequest{Grant: &nokkuv1.GrantSpec{
-		Subjects:  []*nokkuv1.GrantSubject{{Id: s.owner.Id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
+		Subjects:  []*nokkuv1.Subject{{Id: s.owner.Id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()}},
 		TargetIds: []string{s.devAccount.GetTargetId()},
 		Username:  s.devAccount.Username,
 	}})
 	require.NoError(t, err)
-	require.EqualValues(t, 1, granted.GetPlan().GetOutcomes()[0].GetAdded(), "the grant added nothing")
+	require.EqualValues(t, 1, granted.GetPlan().GetOutcomes()[0].GetAddedCount(), "the grant added nothing")
 
 	// ssh checks the host certificate, the daemon gets it after its first sync.
 	waitFor(t, time.Minute, func() bool { return len(s.auditLogs(t, "SignHostCertificate")) > 0 },
@@ -387,7 +387,7 @@ func (s *smoke) webTerminal(t *testing.T) {
 		Username: new(account),
 	})
 	require.NoError(t, err)
-	s.webSession = created.GetSession().GetSessionId()
+	s.webSession = created.GetSession().GetId()
 
 	// As the web app opens it, with the session cookie and its own origin.
 	ws, _, err := websocket.Dial(ctx, s.core.url+"/terminal/ws?session_id="+s.webSession, &websocket.DialOptions{
@@ -537,7 +537,7 @@ func (s *smoke) revokeGrant(t *testing.T) {
 		"the session ended before the revoke: %s", &out)
 
 	_, err := s.targetAccounts.Revoke(t.Context(), &nokkuv1.RevokeRequest{Revoke: &nokkuv1.RevokeSpec{
-		Subject:   &nokkuv1.GrantSubject{Id: s.owner.Id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
+		Subject:   &nokkuv1.Subject{Id: s.owner.Id, Kind: nokkuv1.SubjectKind_SUBJECT_KIND_USER.Enum()},
 		TargetIds: []string{s.devAccount.GetTargetId()},
 		Username:  s.devAccount.Username,
 	}})
@@ -566,7 +566,8 @@ func (s *smoke) checkAuditLog(t *testing.T) {
 	for _, l := range s.auditLogs(t, "Login", "SignSSHCertificate", "CreateSession", "RelayOpen", "RelayClose",
 		"ConnectionOpen", "ConnectionClose") {
 		if l.GetOk() {
-			seen[l.GetAction()+" by "+l.GetActorKind()] = true
+			kind := strings.ToLower(strings.TrimPrefix(l.GetActorKind().String(), "ACTOR_KIND_"))
+			seen[l.GetAction()+" by "+kind] = true
 		}
 	}
 	for _, want := range []string{
@@ -588,18 +589,18 @@ func (s *smoke) relayOpens(t *testing.T) int {
 	return len(s.auditLogs(t, "RelayOpen"))
 }
 
-func (s *smoke) auditLogs(t *testing.T, actions ...string) []*nokkuv1.EventLog {
-	res, err := s.util.ListAuditLogs(t.Context(), &nokkuv1.ListAuditLogsRequest{
+func (s *smoke) auditLogs(t *testing.T, actions ...string) []*nokkuv1.AuditEvent {
+	res, err := s.audit.ListAuditLogs(t.Context(), &nokkuv1.ListAuditLogsRequest{
 		Limit:  new(int32(100)),
 		Filter: &nokkuv1.AuditLogFilter{Actions: actions},
 	})
 	require.NoError(t, err)
-	return res.GetLogs()
+	return res.GetEvents()
 }
 
 // cast fetches a recording like the web player, gzipped asciicast in chunks.
 func (s *smoke) cast(t *testing.T, id string) string {
-	stream, err := s.recordings.GetRecording(t.Context(), &nokkuv1.GetRecordingRequest{RecordingId: &id})
+	stream, err := s.recordings.GetRecording(t.Context(), &nokkuv1.GetRecordingRequest{Id: &id})
 	require.NoError(t, err)
 	defer func() { _ = stream.Close() }()
 	var compressed bytes.Buffer

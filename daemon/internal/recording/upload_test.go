@@ -35,7 +35,7 @@ func TestLiveUploadFollowsTheFile(t *testing.T) {
 
 	uploads := core.waitFinal(t, 1)
 	up := uploads[0]
-	is.Equal(rec.header.SessionID, up.meta.GetRecordingId())
+	is.Equal(rec.header.SessionID, up.meta.GetId())
 	is.Equal("alice", up.meta.GetUsername())
 	is.Equal("principal-of-alice", up.meta.GetPrincipal())
 	is.WithinDuration(time.Now(), up.meta.GetStartedAt().AsTime(), time.Minute)
@@ -77,7 +77,7 @@ func TestDaemonCrashMidSessionSendsTheLeftoverCut(t *testing.T) {
 	uploads := core.waitFinal(t, 2)
 	live, retry := uploads[0], uploads[1]
 	is.Nil(live.final)
-	is.Equal(live.meta.GetRecordingId(), retry.meta.GetRecordingId(), "the retry names the same recording")
+	is.Equal(live.meta.GetId(), retry.meta.GetId(), "the retry names the same recording")
 	is.Equal(leftover, retry.data, "the leftover is sent byte for byte")
 	is.False(retry.complete(), "a crash leftover went up complete")
 	is.Equal(leftoverReason, retry.final.GetCutReason())

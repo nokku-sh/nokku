@@ -5,8 +5,8 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { type AuditEvent } from '#lib/gen/nokku/v1/audit_log_pb.js';
 	import type { GetDashboardResponse } from '#lib/gen/nokku/v1/dashboard_pb.js';
-	import type { EventLog } from '#lib/gen/nokku/v1/util_pb.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { formatTs, listNames } from '#lib/utils.js';
 	import { ArrowRight } from '@lucide/svelte';
@@ -14,23 +14,23 @@
 
 	let { data }: { data?: GetDashboardResponse } = $props();
 
-	const events = $derived(data?.activity.reduce((a, b) => a + b, 0) ?? 0);
-	const failures = $derived(data?.failures.reduce((a, b) => a + b, 0) ?? 0);
-	const peak = $derived(Math.max(1, ...(data?.activity ?? [])));
+	const events = $derived(data?.eventsByHour.reduce((a, b) => a + b, 0) ?? 0);
+	const failures = $derived(data?.failuresByHour.reduce((a, b) => a + b, 0) ?? 0);
+	const peak = $derived(Math.max(1, ...(data?.eventsByHour ?? [])));
 	const label = (i: number) => {
 		const h = 23 - i;
 		return h === 0 ? 'this hour' : `${h}h ago`;
 	};
-	const busiest = $derived(data ? data.activity.indexOf(Math.max(...data.activity)) : -1);
+	const busiest = $derived(data ? data.eventsByHour.indexOf(Math.max(...data.eventsByHour)) : -1);
 	// The bars only speak to eyes, so the chart says its numbers out loud.
 	const summary = $derived(
-		`Audit events per hour over the last 24 hours. ${events} in total${failures ? `, ${failures} failed` : ''}${events && busiest >= 0 ? `. Busiest: ${label(busiest)}, ${data?.activity[busiest]} events` : ''}.`
+		`Audit events per hour over the last 24 hours. ${events} in total${failures ? `, ${failures} failed` : ''}${events && busiest >= 0 ? `. Busiest: ${label(busiest)}, ${data?.eventsByHour[busiest]} events` : ''}.`
 	);
 
-	let selected = $state<EventLog>();
+	let selected = $state<AuditEvent>();
 
-	const by = (log: EventLog) => `by ${log.actorName || 'system'}`;
-	const what = (log: EventLog) => [eventWhat(log), by(log)].filter(Boolean).join(' · ');
+	const by = (log: AuditEvent) => `by ${log.actorName || 'system'}`;
+	const what = (log: AuditEvent) => [eventWhat(log), by(log)].filter(Boolean).join(' · ');
 
 	// A sync that adds ten people is one thing that happened, not ten. Same event, same actor, one row.
 	const changes = $derived(
@@ -47,7 +47,7 @@
 
 <ActivitySheet log={selected} onClose={() => (selected = undefined)} />
 
-{#snippet change(log: EventLog)}
+{#snippet change(log: AuditEvent)}
 	<EventRow
 		{log}
 		onclick={() => (selected = log)}
@@ -77,8 +77,8 @@
 		{:else}
 			<div class="flex flex-col gap-1">
 				<div class="flex h-14 items-end gap-0.5" role="img" aria-label={summary}>
-					{#each data.activity as n, i (i)}
-						{@const failed = data.failures[i] ?? 0}
+					{#each data.eventsByHour as n, i (i)}
+						{@const failed = data.failuresByHour[i] ?? 0}
 						<div
 							class="flex flex-1 flex-col justify-end overflow-hidden rounded-xs bg-primary/15"
 							style:height="{Math.max(4, (n / peak) * 100)}%"

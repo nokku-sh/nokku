@@ -53,8 +53,7 @@
 		bulkDelete<Recording>({
 			noun: 'recording',
 			description: 'This permanently deletes the recordings.',
-			run: (selected) =>
-				deleteRecordings.mutateAsync(selected.map(({ id }) => ({ recordingId: id })))
+			run: (selected) => deleteRecordings.mutateAsync(selected.map(({ id }) => ({ id })))
 		})
 	];
 
@@ -107,7 +106,7 @@
 						? {
 								itemName: `recording of ${row.original.username}`,
 								description: 'This permanently deletes the recording.',
-								onDelete: () => deleteRecording.mutateAsync({ recordingId: row.original.id })
+								onDelete: () => deleteRecording.mutateAsync({ id: row.original.id })
 							}
 						: undefined
 				})

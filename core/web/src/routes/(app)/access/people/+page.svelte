@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
+	import { type User } from '#lib/gen/nokku/v1/user_pb.js';
 	import { page } from '$app/state';
 	import { auth, whenFresh } from '#lib/api/auth.svelte.js';
 	import { userDeleteWarning, users } from '#lib/api/workspaces.svelte.js';
 	import { user } from '#lib/api/user.svelte.js';
-	import { roles } from '#lib/api/roles.svelte.js';
-	import { parseRole, roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
+	import { assignableRoles, parseRole, roleIcon, roleLabel, roleSlug } from '#lib/roles.js';
 	import AccessReportMenu from '#lib/components/access/AccessReportMenu.svelte';
 	import InviteSheet from '#lib/components/sheets/InviteSheet.svelte';
 	import UserSheet from '#lib/components/sheets/UserSheet.svelte';
@@ -26,7 +26,6 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
 	import PageHeader from '#lib/components/layout/PageHeader.svelte';
-	import type { User } from '#lib/gen/nokku/v1/account_pb.js';
 	import { confirm, useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import { CircleUser, PlusIcon, ShieldCheck, UserRoundX } from '@lucide/svelte';
 	import { Debounced } from 'runed';
@@ -64,18 +63,15 @@
 			skip: (u) => u.role === WorkspaceRole.OWNER || u.id === me.data?.id,
 			description: 'Their access ends right away. This cannot be undone.',
 			fresh: true,
-			run: (selected) => removeMany.mutateAsync(selected.map(({ id }) => ({ userId: id })))
+			run: (selected) => removeMany.mutateAsync(selected.map(({ id }) => ({ id })))
 		})
 	];
 
-	const rolesQuery = roles.list();
-	const roleOptions = $derived(
-		(rolesQuery.data ?? []).map((r) => ({
-			label: roleLabel(r.role),
-			value: roleSlug(r.role),
-			icon: roleIcon(r.role)
-		}))
-	);
+	const roleOptions = assignableRoles.map((r) => ({
+		label: roleLabel(r.role),
+		value: roleSlug(r.role),
+		icon: roleIcon(r.role)
+	}));
 
 	const columnHelper = createAppColumnHelper<User>();
 	const columns = columnHelper.columns([
@@ -130,9 +126,9 @@
 														description:
 															'Every session ends right away. You can reactivate them later.',
 														confirmText: 'Deactivate',
-														onConfirm: () => deactivate.mutateAsync({ userId: u.id })
+														onConfirm: () => deactivate.mutateAsync({ id: u.id })
 													})
-												: whenFresh(() => reactivate.mutate({ userId: u.id }))
+												: whenFresh(() => reactivate.mutate({ id: u.id }))
 									}
 								])
 					],
@@ -143,7 +139,7 @@
 								description: () => userDeleteWarning(u.id),
 								confirmText: 'Delete',
 								fresh: true,
-								onDelete: () => remove.mutateAsync({ userId: u.id })
+								onDelete: () => remove.mutateAsync({ id: u.id })
 							}
 				});
 			}

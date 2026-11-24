@@ -26,7 +26,7 @@ const (
 
 // The fakes search by substring like the core, so a lookup must match exactly.
 type fakeUsers struct {
-	nokkuv1connect.UnimplementedWorkspaceServiceHandler
+	nokkuv1connect.UnimplementedUserServiceHandler
 }
 
 type fakeTeams struct {
@@ -66,7 +66,7 @@ func newGrantTestClient(t *testing.T) *Client {
 	t.Helper()
 	mux := http.NewServeMux()
 	srv := connect.NewServer()
-	nokkuv1connect.RegisterWorkspaceServiceHandler(srv, fakeUsers{})
+	nokkuv1connect.RegisterUserServiceHandler(srv, fakeUsers{})
 	nokkuv1connect.RegisterTeamServiceHandler(srv, fakeTeams{})
 	nokkuv1connect.RegisterServiceAccountServiceHandler(srv, fakeServiceAccounts{})
 	connecthttp.Mount(mux, srv)
@@ -76,7 +76,7 @@ func newGrantTestClient(t *testing.T) *Client {
 
 	c := &Client{State: &state.State{APIURL: server.URL}}
 	c.State.User = &state.User{ID: "me-user"}
-	c.users = nokkuv1connect.NewWorkspaceServiceClient(
+	c.users = nokkuv1connect.NewUserServiceClient(
 		connect.NewClient(connecthttp.NewTransport(http.DefaultClient, server.URL)),
 	)
 	c.teams = nokkuv1connect.NewTeamServiceClient(

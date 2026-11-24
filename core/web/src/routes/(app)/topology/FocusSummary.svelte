@@ -5,8 +5,8 @@
 	import Chip from '#lib/components/blocks/Chip.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
-	import type { GetAccessGraphResponse } from '#lib/gen/nokku/v1/target_pb.js';
+	import { type GetAccessGraphResponse } from '#lib/gen/nokku/v1/access_view_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import { useSheet } from '#lib/hooks/index.js';
 	import { listNames } from '#lib/utils.js';
 	import { tagLabel, type Focus } from './graph.js';
@@ -50,7 +50,7 @@
 		// The subjects holding a grant, as "2 teams, 3 members".
 		const holders = [SubjectKind.TEAM, SubjectKind.USER, SubjectKind.SERVICE_ACCOUNT]
 			.map((kind) => {
-				const n = graph.subjects.filter((s) => s.kind === kind && s.targets > 0).length;
+				const n = graph.subjects.filter((s) => s.kind === kind && s.targetCount > 0).length;
 				return n ? plural(n, kindLabels[kind].one, kindLabels[kind].many) : '';
 			})
 			.filter(Boolean)
@@ -59,22 +59,22 @@
 		switch (focus.kind) {
 			case 'account':
 				return holders
-					? `Granted on ${plural(graph.targets, 'server')} to ${holders}`
+					? `Granted on ${plural(graph.targetCount, 'server')} to ${holders}`
 					: 'Granted to nobody';
 			case 'tag': {
-				const total = overview.tags.find((t) => t.tag === focus.id)?.total ?? 0;
-				return `${graph.targets} of ${plural(total, 'server')} have grants`;
+				const total = overview.tags.find((t) => t.tag === focus.id)?.targetCount ?? 0;
+				return `${graph.targetCount} of ${plural(total, 'server')} have grants`;
 			}
 			case 'target':
 				return holders ? `${holders} can log in as ${accounts}` : 'Nobody can log in yet';
 			default: {
-				if (graph.targets === 0) return "Can't log in anywhere yet";
+				if (graph.targetCount === 0) return "Can't log in anywhere yet";
 				const teams =
 					focus.kind === 'user'
 						? graph.subjects.filter((s) => s.kind === SubjectKind.TEAM).map((s) => s.name)
 						: [];
 				const through = teams.length ? `, through ${listNames(teams, MAX_NAMES)}` : '';
-				return `Can log in to ${plural(graph.targets, 'server')} as ${accounts}${through}`;
+				return `Can log in to ${plural(graph.targetCount, 'server')} as ${accounts}${through}`;
 			}
 		}
 	});

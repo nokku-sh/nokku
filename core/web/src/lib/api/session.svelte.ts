@@ -1,6 +1,7 @@
 import { createMutation, createQuery } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
+import { SessionKind, SignInMethod } from '#lib/gen/nokku/v1/account_pb.js';
 import { account, type AccountSession } from './account';
 
 const invalidateSessions = () => queryClient.invalidateQueries({ queryKey: ['account'] });
@@ -35,30 +36,30 @@ export const session = {
 		}))
 };
 
-export function sessionKindLabel(kind: string): string {
+export function sessionKindLabel(kind: SessionKind): string {
 	switch (kind) {
-		case 'user':
+		case SessionKind.BROWSER:
 			return 'Browser';
-		case 'cli':
+		case SessionKind.CLI:
 			return 'CLI';
-		case 'device':
+		case SessionKind.DEVICE:
 			return 'Remembered device';
 		default:
-			return kind;
+			return 'Session';
 	}
 }
 
-export function sessionMethodLabel(method: string): string {
+export function sessionMethodLabel(method: SignInMethod): string {
 	switch (method) {
-		case 'passkey':
+		case SignInMethod.PASSKEY:
 			return 'Passkey';
-		case 'magic_link':
+		case SignInMethod.MAGIC_LINK:
 			return 'Email link';
-		case 'oidc':
+		case SignInMethod.OIDC:
 			return 'Single sign-on';
-		case 'device':
+		case SignInMethod.DEVICE:
 			return 'Device';
 		default:
-			return method;
+			return 'Unknown';
 	}
 }

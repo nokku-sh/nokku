@@ -1,4 +1,4 @@
-import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 import type { Subject } from './subjects.svelte';
 
@@ -9,7 +9,7 @@ export type GrantPrefill = {
 	tags?: string[];
 	account?: string;
 	hours?: number;
-	changeEnds?: boolean;
+	overwriteExpiry?: boolean;
 };
 
 // The form lives here, so every open starts from what its caller passed.
@@ -22,7 +22,7 @@ class GrantSheetState {
 	/** How long the grant lasts, 0 is for good. */
 	hours = $state(0);
 	/** Send grants that stand again, so they take the new end. */
-	changeEnds = $state(false);
+	overwriteExpiry = $state(false);
 
 	show(prefill: GrantPrefill = {}) {
 		this.subjects = prefill.subjects ?? [];
@@ -30,7 +30,7 @@ class GrantSheetState {
 		this.tags = prefill.tags ?? [];
 		this.account = prefill.account ?? '';
 		this.hours = prefill.hours ?? 0;
-		this.changeEnds = prefill.changeEnds ?? false;
+		this.overwriteExpiry = prefill.overwriteExpiry ?? false;
 		this.open = true;
 	}
 }

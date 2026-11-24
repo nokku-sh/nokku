@@ -51,15 +51,6 @@ const (
 	// TargetServiceForgetHostKeyProcedure is the procedure name of the TargetService's ForgetHostKey
 	// RPC.
 	TargetServiceForgetHostKeyProcedure = "/nokku.v1.TargetService/ForgetHostKey"
-	// TargetServiceGetAccessGraphProcedure is the procedure name of the TargetService's GetAccessGraph
-	// RPC.
-	TargetServiceGetAccessGraphProcedure = "/nokku.v1.TargetService/GetAccessGraph"
-	// TargetServiceListAccessGraphTargetsProcedure is the procedure name of the TargetService's
-	// ListAccessGraphTargets RPC.
-	TargetServiceListAccessGraphTargetsProcedure = "/nokku.v1.TargetService/ListAccessGraphTargets"
-	// TargetServiceGetAccessMatrixProcedure is the procedure name of the TargetService's
-	// GetAccessMatrix RPC.
-	TargetServiceGetAccessMatrixProcedure = "/nokku.v1.TargetService/GetAccessMatrix"
 )
 
 var (
@@ -144,30 +135,6 @@ var (
 			Procedure:  TargetServiceForgetHostKeyProcedure,
 		}
 	})
-	targetServiceGetAccessGraphSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetAccessGraph"),
-			Procedure:        TargetServiceGetAccessGraphProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
-	targetServiceListAccessGraphTargetsSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("ListAccessGraphTargets"),
-			Procedure:        TargetServiceListAccessGraphTargetsProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
-	targetServiceGetAccessMatrixSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_target_proto.Services().ByName("TargetService").Methods().ByName("GetAccessMatrix"),
-			Procedure:        TargetServiceGetAccessMatrixProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
 )
 
 // TargetServiceClient is a client for the nokku.v1.TargetService service.
@@ -177,19 +144,12 @@ type TargetServiceClient interface {
 	CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error)
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
 	RenameTarget(context.Context, *v1.RenameTargetRequest) (*v1.RenameTargetResponse, error)
-	// An empty list clears the endpoints.
 	SetTargetEndpoints(context.Context, *v1.SetTargetEndpointsRequest) (*v1.SetTargetEndpointsResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
-	// ForgetHostKey drops the pinned host key of a server without a daemon, for a server that was reinstalled and
-	// whoever added it is not around to pin the new key. Nobody logs in to it until the next nk sync pins one.
 	ForgetHostKey(context.Context, *v1.ForgetHostKeyRequest) (*v1.ForgetHostKeyResponse, error)
-	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
-	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
-	// GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
-	GetAccessMatrix(context.Context, *v1.GetAccessMatrixRequest) (*v1.GetAccessMatrixResponse, error)
 }
 
 // NewTargetServiceClient constructs a client for the nokku.v1.TargetService service. Multiple
@@ -205,19 +165,12 @@ type TargetServiceHandler interface {
 	CreateTarget(context.Context, *v1.CreateTargetRequest) (*v1.CreateTargetResponse, error)
 	UpdateTarget(context.Context, *v1.UpdateTargetRequest) (*v1.UpdateTargetResponse, error)
 	RenameTarget(context.Context, *v1.RenameTargetRequest) (*v1.RenameTargetResponse, error)
-	// An empty list clears the endpoints.
 	SetTargetEndpoints(context.Context, *v1.SetTargetEndpointsRequest) (*v1.SetTargetEndpointsResponse, error)
 	DeleteTarget(context.Context, *v1.DeleteTargetRequest) (*v1.DeleteTargetResponse, error)
 	GetSubjectAccess(context.Context, *v1.GetSubjectAccessRequest) (*v1.GetSubjectAccessResponse, error)
 	GetTargetFilters(context.Context, *v1.GetTargetFiltersRequest) (*v1.GetTargetFiltersResponse, error)
 	SyncTargetUsers(context.Context, *v1.SyncTargetUsersRequest) (*v1.SyncTargetUsersResponse, error)
-	// ForgetHostKey drops the pinned host key of a server without a daemon, for a server that was reinstalled and
-	// whoever added it is not around to pin the new key. Nobody logs in to it until the next nk sync pins one.
 	ForgetHostKey(context.Context, *v1.ForgetHostKeyRequest) (*v1.ForgetHostKeyResponse, error)
-	GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error)
-	ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error)
-	// GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
-	GetAccessMatrix(context.Context, *v1.GetAccessMatrixRequest) (*v1.GetAccessMatrixResponse, error)
 }
 
 // RegisterTargetServiceHandler registers svc as the nokku.v1.TargetService implementation on
@@ -236,9 +189,6 @@ func RegisterTargetServiceHandler(server *connect.Server, svc TargetServiceHandl
 		connect.Method{Spec: targetServiceGetTargetFiltersSpec(), Handler: adapter.getTargetFilters},
 		connect.Method{Spec: targetServiceSyncTargetUsersSpec(), Handler: adapter.syncTargetUsers},
 		connect.Method{Spec: targetServiceForgetHostKeySpec(), Handler: adapter.forgetHostKey},
-		connect.Method{Spec: targetServiceGetAccessGraphSpec(), Handler: adapter.getAccessGraph},
-		connect.Method{Spec: targetServiceListAccessGraphTargetsSpec(), Handler: adapter.listAccessGraphTargets},
-		connect.Method{Spec: targetServiceGetAccessMatrixSpec(), Handler: adapter.getAccessMatrix},
 	)
 }
 
@@ -287,18 +237,6 @@ func (UnimplementedTargetServiceHandler) SyncTargetUsers(context.Context, *v1.Sy
 
 func (UnimplementedTargetServiceHandler) ForgetHostKey(context.Context, *v1.ForgetHostKeyRequest) (*v1.ForgetHostKeyResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.ForgetHostKey is not implemented")
-}
-
-func (UnimplementedTargetServiceHandler) GetAccessGraph(context.Context, *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetAccessGraph is not implemented")
-}
-
-func (UnimplementedTargetServiceHandler) ListAccessGraphTargets(context.Context, *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.ListAccessGraphTargets is not implemented")
-}
-
-func (UnimplementedTargetServiceHandler) GetAccessMatrix(context.Context, *v1.GetAccessMatrixRequest) (*v1.GetAccessMatrixResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.TargetService.GetAccessMatrix is not implemented")
 }
 
 type targetServiceClient struct {
@@ -388,30 +326,6 @@ func (c *targetServiceClient) SyncTargetUsers(ctx context.Context, req *v1.SyncT
 func (c *targetServiceClient) ForgetHostKey(ctx context.Context, req *v1.ForgetHostKeyRequest) (*v1.ForgetHostKeyResponse, error) {
 	var res v1.ForgetHostKeyResponse
 	if err := c.client.CallUnary(ctx, targetServiceForgetHostKeySpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *targetServiceClient) GetAccessGraph(ctx context.Context, req *v1.GetAccessGraphRequest) (*v1.GetAccessGraphResponse, error) {
-	var res v1.GetAccessGraphResponse
-	if err := c.client.CallUnary(ctx, targetServiceGetAccessGraphSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *targetServiceClient) ListAccessGraphTargets(ctx context.Context, req *v1.ListAccessGraphTargetsRequest) (*v1.ListAccessGraphTargetsResponse, error) {
-	var res v1.ListAccessGraphTargetsResponse
-	if err := c.client.CallUnary(ctx, targetServiceListAccessGraphTargetsSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *targetServiceClient) GetAccessMatrix(ctx context.Context, req *v1.GetAccessMatrixRequest) (*v1.GetAccessMatrixResponse, error) {
-	var res v1.GetAccessMatrixResponse
-	if err := c.client.CallUnary(ctx, targetServiceGetAccessMatrixSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -545,42 +459,6 @@ func (h targetServiceHandler) forgetHostKey(ctx context.Context, _ connect.Spec,
 		return err
 	}
 	res, err := h.svc.ForgetHostKey(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h targetServiceHandler) getAccessGraph(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.GetAccessGraphRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.GetAccessGraph(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h targetServiceHandler) listAccessGraphTargets(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.ListAccessGraphTargetsRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.ListAccessGraphTargets(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h targetServiceHandler) getAccessMatrix(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.GetAccessMatrixRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.GetAccessMatrix(ctx, &req)
 	if err != nil {
 		return err
 	}

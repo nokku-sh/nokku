@@ -300,10 +300,9 @@ func (x *AcceptInvitationResponse) GetUser() *User {
 }
 
 type CreateInvitationRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Email *string                `protobuf:"bytes,1,opt,name=email" json:"email,omitempty"`
-	// No role is a member. The owner is never invited.
-	Role          *WorkspaceRole `protobuf:"varint,2,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         *string                `protobuf:"bytes,1,opt,name=email" json:"email,omitempty"`
+	Role          *WorkspaceRole         `protobuf:"varint,2,opt,name=role,enum=nokku.v1.WorkspaceRole" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -568,7 +567,7 @@ var File_nokku_v1_invitation_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_invitation_proto_rawDesc = "" +
 	"\n" +
-	"\x19nokku/v1/invitation.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"\xc5\x01\n" +
+	"\x19nokku/v1/invitation.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x13nokku/v1/user.proto\"\xc5\x01\n" +
 	"\n" +
 	"Invitation\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12+\n" +
@@ -609,9 +608,9 @@ const file_nokku_v1_invitation_proto_rawDesc = "" +
 	"\x11InvitationService\x12[\n" +
 	"\rGetInvitation\x12\x1e.nokku.v1.GetInvitationRequest\x1a\x1f.nokku.v1.GetInvitationResponse\"\t\xc2\xf3\x18\x02\b\x01\x90\x02\x01\x12a\n" +
 	"\x10AcceptInvitation\x12!.nokku.v1.AcceptInvitationRequest\x1a\".nokku.v1.AcceptInvitationResponse\"\x06\xc2\xf3\x18\x02\b\x01\x12c\n" +
-	"\x10CreateInvitation\x12!.nokku.v1.CreateInvitationRequest\x1a\".nokku.v1.CreateInvitationResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12c\n" +
-	"\x0fListInvitations\x12 .nokku.v1.ListInvitationsRequest\x1a!.nokku.v1.ListInvitationsResponse\"\v\xc2\xf3\x18\x04\x18\x04h\x01\x90\x02\x01\x12c\n" +
-	"\x10DeleteInvitation\x12!.nokku.v1.DeleteInvitationRequest\x1a\".nokku.v1.DeleteInvitationResponse\"\b\xc2\xf3\x18\x04\x18\x04h\x01B\x90\x01\n" +
+	"\x10CreateInvitation\x12!.nokku.v1.CreateInvitationRequest\x1a\".nokku.v1.CreateInvitationResponse\"\b\xc2\xf3\x18\x04\x18\x04 \x01\x12c\n" +
+	"\x0fListInvitations\x12 .nokku.v1.ListInvitationsRequest\x1a!.nokku.v1.ListInvitationsResponse\"\v\xc2\xf3\x18\x04\x18\x040\x01\x90\x02\x01\x12c\n" +
+	"\x10DeleteInvitation\x12!.nokku.v1.DeleteInvitationRequest\x1a\".nokku.v1.DeleteInvitationResponse\"\b\xc2\xf3\x18\x04\x18\x040\x01B\x90\x01\n" +
 	"\fcom.nokku.v1B\x0fInvitationProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -676,7 +675,7 @@ func file_nokku_v1_invitation_proto_init() {
 		return
 	}
 	file_nokku_v1_access_proto_init()
-	file_nokku_v1_account_proto_init()
+	file_nokku_v1_user_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

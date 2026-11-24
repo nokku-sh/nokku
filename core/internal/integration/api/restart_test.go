@@ -79,7 +79,7 @@ func TestClientsOutliveACoreRestart(t *testing.T) {
 		stream, err := ctl.UploadRecording(t.Context())
 		require.NoError(t, err)
 		_ = stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
-			Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root")},
+			Meta: &nokkuv1.RecordingMeta{Id: &id, Username: new("root")},
 		}})
 		_, err = stream.CloseAndReceive()
 		return err

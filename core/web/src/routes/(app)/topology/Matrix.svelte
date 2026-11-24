@@ -13,8 +13,8 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
-	import type { AccessMatrixCell, AccessMatrixRow } from '#lib/gen/nokku/v1/target_pb.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { type AccessMatrixCell, type AccessSubject } from '#lib/gen/nokku/v1/access_view_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import { setFilters, usePagination } from '#lib/hooks/index.js';
 	import { cn, formatTs, toDate } from '#lib/utils.js';
 	import {
@@ -66,7 +66,11 @@
 		...pager.args
 	}));
 	const columns = $derived(matrix.data?.columns ?? []);
-	const rows = $derived(matrix.data?.rows ?? []);
+	const rows = $derived(
+		(matrix.data?.rows ?? []).flatMap((r) =>
+			r.subject ? [{ subject: r.subject, cells: r.cells }] : []
+		)
+	);
 	const total = $derived(matrix.data?.total ?? 0);
 	const pageCount = $derived(Math.max(1, Math.ceil(total / pager.pageSize)));
 	const now = Date.now();
@@ -80,22 +84,22 @@
 		setFilters({ tags: next.map((t) => t || UNTAGGED).join(',') || undefined });
 	}
 
-	const subjectOf = (r: AccessMatrixRow): Subject => ({
-		id: r.subjectId,
-		kind: r.kind,
-		name: r.name,
-		detail: r.email
+	const subjectOf = (s: AccessSubject): Subject => ({
+		id: s.id,
+		kind: s.kind,
+		name: s.name,
+		detail: s.email
 	});
-	const rowDetail = (r: AccessMatrixRow) =>
-		r.kind === SubjectKind.TEAM
-			? plural(r.memberCount, 'member')
-			: r.kind === SubjectKind.USER
-				? r.email
+	const rowDetail = (s: AccessSubject) =>
+		s.kind === SubjectKind.TEAM
+			? plural(s.memberCount, 'member')
+			: s.kind === SubjectKind.USER
+				? s.email
 				: 'service account';
-	const cellOf = (r: AccessMatrixRow, tag: string) => r.cells.find((c) => c.tag === tag);
+	const cellOf = (cells: AccessMatrixCell[], tag: string) => cells.find((c) => c.tag === tag);
 	const stale = (c: AccessMatrixCell) =>
 		!c.lastUsedAt || now - toDate(c.lastUsedAt).getTime() > STALE_MS;
-	let why = $state<{ row: AccessMatrixRow; cell: AccessMatrixCell; total: number }>();
+	let why = $state<{ who: AccessSubject; cell: AccessMatrixCell; total: number }>();
 
 	const expanded = new SvelteSet<string>();
 	function toggleTeam(id: string) {
@@ -153,7 +157,7 @@
 									<span class={cn('flex-1 truncate', t.tag ? 'font-mono' : 'italic')}>
 										{tagLabel(t.tag)}
 									</span>
-									<span class="text-xs text-muted-foreground tabular-nums">{t.total}</span>
+									<span class="text-xs text-muted-foreground tabular-nums">{t.targetCount}</span>
 								</Command.Item>
 							{/each}
 						</Command.Group>
@@ -240,7 +244,7 @@
 								<span class="flex flex-col items-center leading-tight">
 									<span class={c.tag ? 'font-mono' : 'italic'}>{tagLabel(c.tag)}</span>
 									<span class="text-2xs font-normal text-muted-foreground">
-										{plural(c.total, 'server')}
+										{plural(c.targetCount, 'server')}
 									</span>
 								</span>
 							</Table.Head>
@@ -248,8 +252,8 @@
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>
-					{#each rows as r (r.subjectId)}
-						{@const subject = subjectOf(r)}
+					{#each rows as r (r.subject.id)}
+						{@const subject = subjectOf(r.subject)}
 						<Table.Row class="hover:bg-transparent has-aria-expanded:bg-transparent">
 							<Table.Head
 								scope="row"
@@ -257,48 +261,45 @@
 							>
 								<div class="flex min-w-0 items-center gap-1">
 									<a
-										href={`${subjectHref(r.kind, r.subjectId)}&tab=access`}
+										href={`${subjectHref(subject.kind, subject.id)}&tab=access`}
 										class="flex min-w-0 flex-1 items-center gap-2 rounded-sm hover:underline"
 									>
 										<SubjectAvatar {subject} class="size-6" />
 										<span class="flex min-w-0 flex-col">
 											<span class="truncate text-sm font-medium">{subjectLabel(subject)}</span>
 											<span class="truncate text-xs text-muted-foreground">
-												{rowDetail(r)} · {plural(r.targets, 'server')}
+												{rowDetail(r.subject)} · {plural(r.subject.targetCount, 'server')}
 											</span>
 										</span>
 									</a>
-									{#if r.kind === SubjectKind.TEAM && r.memberCount > 0}
+									{#if subject.kind === SubjectKind.TEAM && r.subject.memberCount > 0}
 										<Button
 											variant="ghost"
 											size="icon-xs"
 											aria-label={`Members of ${subjectLabel(subject)}`}
-											aria-expanded={expanded.has(r.subjectId)}
-											onclick={() => toggleTeam(r.subjectId)}
+											aria-expanded={expanded.has(subject.id)}
+											onclick={() => toggleTeam(subject.id)}
 										>
 											<ChevronDown
-												class={cn(
-													'transition-transform',
-													expanded.has(r.subjectId) && 'rotate-180'
-												)}
+												class={cn('transition-transform', expanded.has(subject.id) && 'rotate-180')}
 											/>
 										</Button>
 									{/if}
 								</div>
 							</Table.Head>
 							{#each columns as col (col.tag)}
-								{@const cell = cellOf(r, col.tag)}
+								{@const cell = cellOf(r.cells, col.tag)}
 								<Table.Cell class="border-b p-1 text-center">
 									{#if cell}
 										<button
 											type="button"
 											class="flex w-full min-w-24 flex-col items-center rounded-md border border-transparent bg-primary/10 px-2 py-1 text-xs hover:border-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 											aria-label={`Why ${subjectLabel(subject)} reaches ${tagLabel(col.tag)}${stale(cell) ? ', unused for 30 days' : ''}`}
-											onclick={() => (why = { row: r, cell, total: col.total })}
+											onclick={() => (why = { who: r.subject, cell, total: col.targetCount })}
 										>
 											<span class="max-w-32 truncate font-mono">{cell.usernames.join(', ')}</span>
 											<span class="text-2xs text-muted-foreground tabular-nums">
-												{cell.targets}/{col.total}
+												{cell.targetCount}/{col.targetCount}
 												{#if cell.expiresAt}
 													· <span class="text-warning"
 														>ends {formatTs(cell.expiresAt, 'relative-short')}</span
@@ -315,8 +316,12 @@
 								</Table.Cell>
 							{/each}
 						</Table.Row>
-						{#if expanded.has(r.subjectId)}
-							<TeamMemberRows row={r} tags={columns.map((c) => c.tag)} />
+						{#if expanded.has(subject.id)}
+							<TeamMemberRows
+								teamId={subject.id}
+								cells={r.cells}
+								tags={columns.map((c) => c.tag)}
+							/>
 						{/if}
 					{/each}
 				</Table.Body>
@@ -361,8 +366,10 @@
 
 {#if why}
 	<WhySheet
-		{...why}
-		subject={subjectOf(why.row)}
+		cell={why.cell}
+		total={why.total}
+		subject={subjectOf(why.who)}
+		memberCount={why.who.memberCount}
 		stale={stale(why.cell)}
 		onClose={() => (why = undefined)}
 	/>

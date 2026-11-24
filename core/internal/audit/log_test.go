@@ -44,7 +44,7 @@ func TestRequestTarget(t *testing.T) {
 		{&nokkuv1.DeleteTargetRequest{Id: new("t1")}, "t1"},
 		{&nokkuv1.CreateTargetRequest{Name: new("web")}, "web"},
 		{
-			&nokkuv1.UpdateUserRoleRequest{UserId: new("u1"), Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)},
+			&nokkuv1.SetUserRoleRequest{Id: new("u1"), Role: new(nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)},
 			"u1",
 		},
 		{&nokkuv1.DeleteWorkspaceRequest{}, ""},

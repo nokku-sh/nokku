@@ -16,6 +16,24 @@ const colors: Partial<Record<WorkspaceRole, string>> = {
 	[WorkspaceRole.MEMBER]: 'text-muted-foreground'
 };
 
+/** The roles one can hand out. Ownership only moves through a transfer. */
+export const assignableRoles: { role: WorkspaceRole; description: string }[] = [
+	{ role: WorkspaceRole.MEMBER, description: 'Use the access granted to them' },
+	{
+		role: WorkspaceRole.VIEWER,
+		description: 'Read everything in the workspace, including the audit log'
+	},
+	{
+		role: WorkspaceRole.EDITOR,
+		description: 'Manage servers, access, daemons, teams, and service accounts'
+	},
+	{
+		role: WorkspaceRole.ADMIN,
+		description:
+			'Also manage members, invites, tokens, the certificate authority, and daemon defaults'
+	}
+];
+
 /** A service account never manages people or access, the API takes nothing above the editor. */
 export const SERVICE_ACCOUNT_MAX_ROLE = WorkspaceRole.EDITOR;
 

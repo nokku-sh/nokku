@@ -377,7 +377,7 @@ func (x *GetLoginOptionsResponse) GetProviders() []*SSOProviderInfo {
 
 type SSOProviderInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProviderId    *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Name          *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -413,9 +413,9 @@ func (*SSOProviderInfo) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_auth_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *SSOProviderInfo) GetProviderId() string {
-	if x != nil && x.ProviderId != nil {
-		return *x.ProviderId
+func (x *SSOProviderInfo) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
 	}
 	return ""
 }
@@ -588,10 +588,9 @@ func (*CancelEmailChangeResponse) Descriptor() ([]byte, []int) {
 }
 
 type ExchangeWorkloadTokenRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The name of the account, what a job can know without a call.
-	ServiceAccount *string `protobuf:"bytes,1,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
-	Token          *string `protobuf:"bytes,2,opt,name=token" json:"token,omitempty"`
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ServiceAccount *string                `protobuf:"bytes,1,opt,name=service_account,json=serviceAccount" json:"service_account,omitempty"`
+	Token          *string                `protobuf:"bytes,2,opt,name=token" json:"token,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -696,7 +695,7 @@ var File_nokku_v1_auth_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/auth.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/account.proto\"8\n" +
+	"\x13nokku/v1/auth.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x13nokku/v1/user.proto\"8\n" +
 	"\x17RequestMagicLinkRequest\x12\x1d\n" +
 	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"\x1a\n" +
 	"\x18RequestMagicLinkResponse\"8\n" +
@@ -713,10 +712,9 @@ const file_nokku_v1_auth_proto_rawDesc = "" +
 	"magic_link\x18\x02 \x01(\bR\tmagicLink\x12\x18\n" +
 	"\apasskey\x18\x03 \x01(\bR\apasskey\x12)\n" +
 	"\x10email_configured\x18\x04 \x01(\bR\x0femailConfigured\x127\n" +
-	"\tproviders\x18\x05 \x03(\v2\x19.nokku.v1.SSOProviderInfoR\tproviders\"F\n" +
-	"\x0fSSOProviderInfo\x12\x1f\n" +
-	"\vprovider_id\x18\x01 \x01(\tR\n" +
-	"providerId\x12\x12\n" +
+	"\tproviders\x18\x05 \x03(\v2\x19.nokku.v1.SSOProviderInfoR\tproviders\"5\n" +
+	"\x0fSSOProviderInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\":\n" +
 	"\x19ConfirmEmailChangeRequest\x12\x1d\n" +
 	"\x05token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05token\"\x1c\n" +
@@ -804,7 +802,7 @@ func file_nokku_v1_auth_proto_init() {
 		return
 	}
 	file_nokku_v1_access_proto_init()
-	file_nokku_v1_account_proto_init()
+	file_nokku_v1_user_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

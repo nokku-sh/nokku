@@ -49,7 +49,7 @@ func (s *authService) GetLoginOptions(
 	}
 	for _, p := range providers {
 		if p.Enabled {
-			out.Providers = append(out.Providers, &nokkuv1.SSOProviderInfo{ProviderId: &p.ProviderID, Name: &p.Name})
+			out.Providers = append(out.Providers, &nokkuv1.SSOProviderInfo{Id: &p.ProviderID, Name: &p.Name})
 		}
 	}
 	return out, nil

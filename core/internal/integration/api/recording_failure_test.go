@@ -170,7 +170,7 @@ func openUploadAt(
 		UploadRecording(ctx)
 	require.NoError(t, err)
 	require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
-		Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root")},
+		Meta: &nokkuv1.RecordingMeta{Id: &id, Username: new("root")},
 	}}))
 	return stream
 }

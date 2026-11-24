@@ -7,6 +7,7 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Item from '#lib/components/ui/item/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { SessionKind } from '#lib/gen/nokku/v1/account_pb.js';
 	import { formatTs, nkLoginCommand } from '#lib/utils.js';
 	import { LogOut, Monitor, Smartphone, Terminal } from '@lucide/svelte';
 	import { confirm } from '#lib/hooks/index.js';
@@ -19,8 +20,8 @@
 
 	const otherSessions = $derived((sessions.data ?? []).filter((s) => !s.current));
 
-	const kindIcon = (kind: string) =>
-		kind === 'cli' ? Terminal : kind === 'device' ? Smartphone : Monitor;
+	const kindIcon = (kind: SessionKind) =>
+		kind === SessionKind.CLI ? Terminal : kind === SessionKind.DEVICE ? Smartphone : Monitor;
 
 	const login = nkLoginCommand();
 </script>

@@ -11,7 +11,7 @@ service AccessRequestService {
   rpc ListRequestableAccounts(ListRequestableAccountsRequest) returns (ListRequestableAccountsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      machine: true
+      service_account: true
       feature: "access_requests"
     };
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -19,22 +19,22 @@ service AccessRequestService {
   rpc CreateAccessRequest(CreateAccessRequestRequest) returns (CreateAccessRequestResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      nk: true
+      cli: true
       feature: "access_requests"
     };
   }
   rpc GetAccessRequest(GetAccessRequestRequest) returns (GetAccessRequestResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      nk: true
-      machine: true
+      cli: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListAccessRequests(ListAccessRequestsRequest) returns (ListAccessRequestsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_MEMBER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -53,7 +53,7 @@ service AccessRequestService {
   rpc SetRequestableTags(SetRequestableTagsRequest) returns (SetRequestableTagsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      machine: true
+      service_account: true
     };
   }
 }
@@ -80,10 +80,10 @@ message AccessRequest {
   AccessRequestStatus status = 10;
   string decided_by = 11;
   string decider_name = 12;
-  google.protobuf.Timestamp decided_at = 13;
-  google.protobuf.Timestamp created_at = 14;
-  google.protobuf.Timestamp granted_until = 15;
-  string decision_reason = 16;
+  string decision_reason = 13;
+  google.protobuf.Timestamp decided_at = 14;
+  google.protobuf.Timestamp created_at = 15;
+  google.protobuf.Timestamp granted_until = 16;
 }
 
 message RequestableTarget {

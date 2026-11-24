@@ -10,7 +10,8 @@
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
-	import { SubjectKind, type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
+	import { type TargetAccount } from '#lib/gen/nokku/v1/target_account_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import {
 		Ellipsis,

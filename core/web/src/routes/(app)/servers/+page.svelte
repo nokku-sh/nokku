@@ -26,9 +26,9 @@
 	} from '#lib/components/tables/cells/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
+	import { TargetStatus, type Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
-	import { TargetStatus, type Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { useCreate, usePagination, useSheet } from '#lib/hooks/index.js';
 	import {
 		CircleCheckBig,
@@ -208,9 +208,7 @@
 				destructive: false
 			}),
 			onClick: async (selected) => {
-				await approveDaemons.mutateAsync(
-					waiting(selected).map((id) => ({ id, status: DaemonStatus.ACCEPTED }))
-				);
+				await approveDaemons.mutateAsync(waiting(selected).map((id) => ({ id })));
 			}
 		},
 		{

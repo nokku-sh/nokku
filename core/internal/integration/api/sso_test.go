@@ -68,7 +68,7 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	)
 	issuer := fakeIssuer(t).URL + "/evil"
 	provider := &nokkuv1.PutSSOProviderRequest{
-		ProviderId:   new("mine"),
+		Id:           new("mine"),
 		Name:         new("mine"),
 		Enabled:      new(true),
 		IssuerUrl:    new(issuer),
@@ -81,7 +81,7 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 			return err
 		},
 		"drop a provider": func() error {
-			_, err := sso.DeleteSSOProvider(ctx, &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("mine")})
+			_, err := sso.DeleteSSOProvider(ctx, &nokkuv1.DeleteSSOProviderRequest{Id: new("mine")})
 			return err
 		},
 		"issue a SCIM token": func() error {
@@ -110,7 +110,7 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	)
 	stored, err := ownerSSO.PutSSOProvider(ctx, provider)
 	require.NoError(t, err)
-	assert.Equal(t, "mine", stored.GetProvider().GetProviderId())
+	assert.Equal(t, "mine", stored.GetProvider().GetId())
 	assert.Equal(t, issuer, stored.GetProvider().GetIssuerUrl())
 
 	options, err := nokkuv1connect.NewAuthServiceClient(clientOn(srv)).
@@ -118,13 +118,13 @@ func TestIdentitySettingsNeedTheOwner(t *testing.T) {
 	require.NoError(t, err)
 	var ids []string
 	for _, p := range options.GetProviders() {
-		ids = append(ids, p.GetProviderId())
+		ids = append(ids, p.GetId())
 	}
 	assert.Contains(t, ids, "mine")
 
-	_, err = ownerSSO.DeleteSSOProvider(ctx, &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("mine")})
+	_, err = ownerSSO.DeleteSSOProvider(ctx, &nokkuv1.DeleteSSOProviderRequest{Id: new("mine")})
 	require.NoError(t, err)
-	_, err = ownerSSO.DeleteSSOProvider(ctx, &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("mine")})
+	_, err = ownerSSO.DeleteSSOProvider(ctx, &nokkuv1.DeleteSSOProviderRequest{Id: new("mine")})
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "deleting it twice: %v", err)
 }
 
@@ -140,7 +140,7 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 	lab := fakeIssuer(t).URL
 	issuer := lab + "/realms/master"
 	stored, err := sso.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{
-		ProviderId: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new(issuer),
+		Id: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new(issuer),
 		ClientId: new("nokku"), ClientSecret: new("s3cret"),
 	})
 	require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 
 	// The stored secret stays with its issuer.
 	moved := &nokkuv1.PutSSOProviderRequest{
-		ProviderId: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new(lab + "/realms/other"),
+		Id: new("lab"), Name: new("Lab"), Enabled: new(true), IssuerUrl: new(lab + "/realms/other"),
 		ClientId: new("nokku"),
 	}
 	_, err = sso.PutSSOProvider(t.Context(), moved)
@@ -160,7 +160,7 @@ func TestSelfHostTakesAProviderOnPlainHTTP(t *testing.T) {
 	_, err = sso.PutSSOProvider(t.Context(), moved)
 	require.NoError(t, err, "the same issuer keeps the stored secret")
 
-	_, err = sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("lab")})
+	_, err = sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{Id: new("lab")})
 	require.NoError(t, err)
 }
 
@@ -176,7 +176,7 @@ func TestNewIssuerMustAnswer(t *testing.T) {
 	t.Cleanup(idp.Close)
 
 	typo := &nokkuv1.PutSSOProviderRequest{
-		ProviderId: new("typo"), Name: new("Typo"), Enabled: new(true), IssuerUrl: new(idp.URL + "/realms/typo"),
+		Id: new("typo"), Name: new("Typo"), Enabled: new(true), IssuerUrl: new(idp.URL + "/realms/typo"),
 		ClientId: new("nokku"), ClientSecret: new("s3cret"),
 	}
 	_, err := sso.PutSSOProvider(t.Context(), typo)
@@ -184,7 +184,7 @@ func TestNewIssuerMustAnswer(t *testing.T) {
 
 	gone := fakeIssuer(t)
 	down := &nokkuv1.PutSSOProviderRequest{
-		ProviderId: new("down"), Name: new("Down"), Enabled: new(true), IssuerUrl: new(gone.URL + "/realms/down"),
+		Id: new("down"), Name: new("Down"), Enabled: new(true), IssuerUrl: new(gone.URL + "/realms/down"),
 		ClientId: new("nokku"), ClientSecret: new("s3cret"),
 	}
 	_, err = sso.PutSSOProvider(t.Context(), down)
@@ -194,7 +194,7 @@ func TestNewIssuerMustAnswer(t *testing.T) {
 	_, err = sso.PutSSOProvider(t.Context(), down)
 	require.NoError(t, err, "turning off a provider with the same issuer")
 
-	_, err = sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{ProviderId: new("down")})
+	_, err = sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{Id: new("down")})
 	require.NoError(t, err)
 }
 
@@ -293,13 +293,13 @@ func TestEnforcedSSOKeepsAProvider(t *testing.T) {
 	}
 	put := func(id string, enabled bool) error {
 		_, err := sso.PutSSOProvider(t.Context(), &nokkuv1.PutSSOProviderRequest{
-			ProviderId: &id, Name: new("Keep"), Enabled: &enabled, IssuerUrl: new(issuer + "/" + id),
+			Id: &id, Name: new("Keep"), Enabled: &enabled, IssuerUrl: new(issuer + "/" + id),
 			ClientId: new("nokku"), ClientSecret: new("s3cret"),
 		})
 		return err
 	}
 	remove := func(id string) error {
-		_, err := sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{ProviderId: &id})
+		_, err := sso.DeleteSSOProvider(t.Context(), &nokkuv1.DeleteSSOProviderRequest{Id: &id})
 		return err
 	}
 	refused := func(err error, what string) {
@@ -442,9 +442,9 @@ func TestClearUserIdentities(t *testing.T) {
 		return n
 	}
 	unlink := func(age time.Duration, u *db.User) error {
-		_, err := nokkuv1connect.NewWorkspaceServiceClient(clientOn(
+		_, err := nokkuv1connect.NewUserServiceClient(clientOn(
 			srv, signedIn(t, cfg, browserSession(t, cfg, admin, age)),
-		)).ClearUserIdentities(t.Context(), &nokkuv1.ClearUserIdentitiesRequest{UserId: new(u.ID)})
+		)).ClearUserIdentities(t.Context(), &nokkuv1.ClearUserIdentitiesRequest{Id: new(u.ID)})
 		return err
 	}
 	link(member)

@@ -60,7 +60,7 @@
 </PageHeader>
 
 {#if fresh}
-	<GetStarted workspace={ws.data?.name ?? ''} connected={false} users={data.data?.users ?? 0} />
+	<GetStarted workspace={ws.data?.name ?? ''} connected={false} users={data.data?.userCount ?? 0} />
 {:else if can.view}
 	<StatusLine
 		data={data.data}
@@ -70,7 +70,7 @@
 		updatedAt={data.dataUpdatedAt}
 	/>
 	{#if data.data}
-		<GetStarted workspace={ws.data?.name ?? ''} connected users={data.data.users} />
+		<GetStarted workspace={ws.data?.name ?? ''} connected users={data.data.userCount} />
 	{/if}
 	<div class="grid gap-6 lg:grid-cols-3">
 		<div class="min-w-0 lg:col-span-2">
@@ -80,7 +80,7 @@
 			{#if data.data?.endingGrants.length}
 				<EndingSoon
 					grants={data.data.endingGrants}
-					total={data.data.endingGrantsTotal}
+					total={data.data.endingGrantCount}
 					canEdit={can.edit}
 				/>
 			{/if}

@@ -6,34 +6,34 @@ import "buf/validate/validate.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
-import "nokku/v1/account.proto";
 import "nokku/v1/certificates.proto";
 import "nokku/v1/daemon.proto";
 import "nokku/v1/join_token.proto";
 import "nokku/v1/service_account.proto";
 import "nokku/v1/target_account.proto";
+import "nokku/v1/user.proto";
 
 service TargetService {
   rpc GetTarget(GetTargetRequest) returns (GetTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      nk: true
-      machine: true
+      cli: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc CreateTarget(CreateTargetRequest) returns (CreateTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      nk: true
-      machine: true
+      cli: true
+      service_account: true
       capped: true
     };
   }
@@ -43,76 +43,50 @@ service TargetService {
   rpc RenameTarget(RenameTargetRequest) returns (RenameTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
-  // An empty list clears the endpoints.
   rpc SetTargetEndpoints(SetTargetEndpointsRequest) returns (SetTargetEndpointsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc DeleteTarget(DeleteTargetRequest) returns (DeleteTargetResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_FRESH
-      nk: true
-      machine: true
+      fresh: true
+      cli: true
+      service_account: true
     };
   }
   rpc GetSubjectAccess(GetSubjectAccessRequest) returns (GetSubjectAccessResponse) {
     option (access) = {
-      self: true
-      nk: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      cli: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetTargetFilters(GetTargetFiltersRequest) returns (GetTargetFiltersResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc SyncTargetUsers(SyncTargetUsersRequest) returns (SyncTargetUsersResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_REFUSED
-      nk: true
-      machine: true
+      cli: true
+      service_account: true
     };
   }
-  // ForgetHostKey drops the pinned host key of a server without a daemon, for a server that was reinstalled and
-  // whoever added it is not around to pin the new key. Nobody logs in to it until the next nk sync pins one.
   rpc ForgetHostKey(ForgetHostKeyRequest) returns (ForgetHostKeyResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_EDITOR
-      browser: BROWSER_FRESH
+      fresh: true
     };
-  }
-  rpc GetAccessGraph(GetAccessGraphRequest) returns (GetAccessGraphResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      machine: true
-    };
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc ListAccessGraphTargets(ListAccessGraphTargetsRequest) returns (ListAccessGraphTargetsResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      machine: true
-    };
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  // GetAccessMatrix is who reaches which tag, a page of rows at a time and only the cells that hold access.
-  rpc GetAccessMatrix(GetAccessMatrixRequest) returns (GetAccessMatrixResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_VIEWER
-      machine: true
-    };
-    option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
 
@@ -125,7 +99,6 @@ message SyncTargetUsersRequest {
       string: {max_len: 256}
     }
   }];
-  // The CA key nk sync wrote. A report for a key a rollover replaced fails.
   string user_ca_public_key = 4 [(buf.validate.field).string = {
     min_len: 1
     max_len: 1024
@@ -135,7 +108,7 @@ message SyncTargetUsersRequest {
 message SyncTargetUsersResponse {}
 
 message ForgetHostKeyRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  string target_id = 1 [(buf.validate.field).string.uuid = true];
 }
 message ForgetHostKeyResponse {}
 
@@ -144,32 +117,32 @@ message Target {
   string daemon_id = 2;
   string name = 3;
   string description = 4;
-  string host_public_key = 5; // pinned SSH host public key (manual mode)
+  string host_public_key = 5;
   repeated string tags = 6;
   repeated string endpoints = 7;
-  repeated string usernames = 8;
-  repeated TargetAccount accounts = 9;
-  map<string, string> metadata = 10;
-  google.protobuf.Timestamp created_at = 11;
-  google.protobuf.Timestamp updated_at = 12;
-  google.protobuf.Timestamp last_sync_at = 13;
-  // username_expires_at holds the usernames the subject asked about may only use until then. The others are for good.
-  map<string, google.protobuf.Timestamp> username_expires_at = 14;
-  // blocked says why the subject's grants here let nobody in today. Unset when they work.
-  AccessBlock blocked = 15;
-  // daemon is the server's daemon with its live state, from ListTargets and GetTarget. Unset for nk sync servers.
-  Daemon daemon = 16;
-  // created_by is the person or service account that added the server, unset after a daemon's enrollment. Only they
-  // replace its pinned host key with nk sync.
-  string created_by = 17;
+  repeated TargetAccount accounts = 8;
+  map<string, string> metadata = 9;
+  Daemon daemon = 10;
+  string created_by = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  google.protobuf.Timestamp last_sync_at = 14;
 }
 
-// AccessBlock is why grants that stand let nobody in today.
+// TargetAccess is what one subject may log in as on a target.
+message TargetAccess {
+  message Login {
+    string username = 1;
+    google.protobuf.Timestamp expires_at = 2;
+  }
+  Target target = 1;
+  repeated Login logins = 2;
+  AccessBlock blocked = 3;
+}
+
 enum AccessBlock {
   ACCESS_BLOCK_UNSPECIFIED = 0;
-  // The person is deactivated.
   ACCESS_BLOCK_USER_INACTIVE = 1;
-  // The daemon of the server is pending or rejected.
   ACCESS_BLOCK_DAEMON_NOT_APPROVED = 2;
 }
 
@@ -197,11 +170,9 @@ message CreateTargetResponse {
 
 message UpdateTargetRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
-  string description = 3 [(buf.validate.field).string.max_len = 1000];
-  repeated string tags = 5;
-  // update_mask names the fields to change, the rest stay as they are. A named list may be empty, which clears it.
-  // The pinned host key is set by nk sync on the server only.
-  google.protobuf.FieldMask update_mask = 6 [
+  string description = 2 [(buf.validate.field).string.max_len = 1000];
+  repeated string tags = 3;
+  google.protobuf.FieldMask update_mask = 4 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
       in: [
@@ -254,26 +225,20 @@ message ListTargetsRequest {
   repeated string accounts = 5;
   repeated string tags = 6;
   TargetStatus status = 7 [(buf.validate.field).enum = {defined_only: true}];
-  // ids keeps only these servers, like the ones a person picked.
   repeated string ids = 8 [(buf.validate.field).repeated = {
     max_items: 100
     items: {
       string: {uuid: true}
     }
   }];
-  // missed_rollover keeps only the servers set up with nk sync whose last sync is older than the CA's rollover.
   bool missed_rollover = 9;
 }
 
-// TargetStatus is what a server's daemon is up to, or that it has none.
 enum TargetStatus {
   TARGET_STATUS_UNSPECIFIED = 0;
-  // Its daemon waits for approval or was rejected.
   TARGET_STATUS_PENDING = 1;
   TARGET_STATUS_ONLINE = 2;
-  // Its daemon is approved but not connected.
   TARGET_STATUS_OFFLINE = 3;
-  // Set up with nk sync, no daemon.
   TARGET_STATUS_MANUAL = 4;
 }
 
@@ -286,9 +251,8 @@ message GetSubjectAccessRequest {
   string subject_id = 1 [(buf.validate.field).string.uuid = true];
 }
 message GetSubjectAccessResponse {
-  repeated Target targets = 1;
+  repeated TargetAccess targets = 1;
   repeated Daemon daemons = 2;
-  // certificate_authority is the workspace's, for a subject with targets to log in to.
   CertificateAuthority certificate_authority = 3;
   oneof subject {
     User user = 4;
@@ -300,129 +264,4 @@ message GetTargetFiltersRequest {}
 message GetTargetFiltersResponse {
   repeated string tags = 1;
   repeated string accounts = 2;
-}
-
-message AccessGraphFilter {
-  string subject_id = 1 [(buf.validate.field).string.uuid = true];
-  string target_id = 2 [(buf.validate.field).string.uuid = true];
-  string username = 3 [(buf.validate.field).string.max_len = 32];
-  string tag = 4 [(buf.validate.field).string.max_len = 256];
-}
-
-message GetAccessGraphRequest {
-  AccessGraphFilter filter = 1;
-}
-
-message GetAccessGraphResponse {
-  repeated AccessGraphSubject subjects = 1;
-  repeated AccessGraphAccount accounts = 2;
-  repeated AccessGraphTag tags = 3;
-  repeated AccessGraphGrant grants = 4;
-  repeated AccessGraphReach reach = 5;
-  int32 targets = 6;
-}
-
-message AccessGraphSubject {
-  string id = 1;
-  SubjectKind kind = 2;
-  string name = 3;
-  string email = 4; // users only
-  int32 member_count = 5; // teams only
-  int32 targets = 6;
-}
-
-message AccessGraphAccount {
-  string username = 1;
-  int32 targets = 2;
-}
-
-message AccessGraphTag {
-  string tag = 1; // empty is the untagged bucket
-  int32 targets = 2;
-  int32 total = 3; // all targets with the tag, granted or not
-}
-
-// AccessGraphGrant is the edge from a subject to a login account.
-message AccessGraphGrant {
-  string subject_id = 1;
-  string username = 2;
-  int32 targets = 3;
-}
-
-// AccessGraphReach is the edge from a login account to a tag.
-message AccessGraphReach {
-  string username = 1;
-  string tag = 2;
-  int32 targets = 3;
-}
-
-message ListAccessGraphTargetsRequest {
-  AccessGraphFilter filter = 1;
-  string tag = 2 [(buf.validate.field).string.max_len = 256];
-  int32 limit = 3 [(buf.validate.field).int32 = {
-    gte: 1
-    lte: 100
-  }];
-  int32 offset = 4 [(buf.validate.field).int32.gte = 0];
-}
-
-message ListAccessGraphTargetsResponse {
-  repeated AccessGraphTarget targets = 1;
-  int32 total = 2;
-}
-
-message AccessGraphTarget {
-  string id = 1;
-  string name = 2;
-  bool matched = 3;
-}
-
-message GetAccessMatrixRequest {
-  // query matches the name or email of a row.
-  string query = 1 [(buf.validate.field).string.max_len = 256];
-  // kind keeps only people, teams or service accounts.
-  SubjectKind kind = 2 [(buf.validate.field).enum = {defined_only: true}];
-  // tags are the columns, the biggest ones when empty. An empty tag is the servers with none.
-  repeated string tags = 3 [(buf.validate.field).repeated = {
-    max_items: 20
-    items: {
-      string: {max_len: 256}
-    }
-  }];
-  int32 limit = 4 [(buf.validate.field).int32 = {
-    gte: 1
-    lte: 100
-  }];
-  int32 offset = 5 [(buf.validate.field).int32.gte = 0];
-}
-
-message GetAccessMatrixResponse {
-  // columns are the tags the cells are for, in order.
-  repeated AccessGraphTag columns = 1;
-  repeated AccessMatrixRow rows = 2;
-  // total counts every row that matches, not only this page.
-  int32 total = 3;
-  // tags is every tag with its servers, to pick other columns from.
-  repeated AccessGraphTag tags = 4;
-}
-
-// AccessMatrixRow is a person, team or service account holding a grant. A team's members get in through its row.
-message AccessMatrixRow {
-  string subject_id = 1;
-  SubjectKind kind = 2;
-  string name = 3;
-  string email = 4; // people only
-  int32 member_count = 5; // teams only
-  int32 targets = 6; // every server the row reaches, any tag
-  repeated AccessMatrixCell cells = 7; // only the columns it reaches, in no order
-}
-
-message AccessMatrixCell {
-  string tag = 1;
-  int32 targets = 2; // servers with the tag it reaches
-  repeated string usernames = 3;
-  // expires_at is when the last of its grants here ends. Unset when one is for good.
-  google.protobuf.Timestamp expires_at = 4;
-  // last_used_at is the newest certificate for one of these servers, by the row or a member of its team.
-  google.protobuf.Timestamp last_used_at = 5;
 }

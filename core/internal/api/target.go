@@ -190,21 +190,14 @@ func seedTargetGrants(ctx context.Context, q *db.Queries, targetID string, grant
 		if err != nil {
 			return err
 		}
-		subjects := map[string][]string{
-			db.SubjectKindUser:           g.GetUserIds(),
-			db.SubjectKindTeam:           g.GetTeamIds(),
-			db.SubjectKindServiceAccount: g.GetServiceAccountIds(),
-		}
-		for kind, ids := range subjects {
-			for _, id := range ids {
-				if err := q.PutGrants(ctx, &db.PutGrantsParams{
-					AccountIds:  []string{account.ID},
-					SubjectKind: kind,
-					SubjectID:   id,
-					GrantedBy:   callerID(ctx),
-				}); err != nil {
-					return err
-				}
+		for _, subject := range g.GetSubjects() {
+			if err := q.PutGrants(ctx, &db.PutGrantsParams{
+				AccountIds:  []string{account.ID},
+				SubjectKind: subjectKind(subject.GetKind()),
+				SubjectID:   subject.GetId(),
+				GrantedBy:   callerID(ctx),
+			}); err != nil {
+				return err
 			}
 		}
 	}
@@ -404,10 +397,14 @@ func (s *targetService) SyncTargetUsers(
 	ctx context.Context,
 	req *nokkuv1.SyncTargetUsersRequest,
 ) (*nokkuv1.SyncTargetUsersResponse, error) {
+	caller, _ := actor.PrincipalFromContext(ctx)
+	// A cookie would move a server without the fresh sign-in.
+	if caller.Kind == actor.KindUser {
+		return nil, connect.NewError(connect.CodePermissionDenied, "do this with nk")
+	}
 	if err := validateHostPublicKey(req.GetHostPublicKey()); err != nil {
 		return nil, err
 	}
-	caller, _ := actor.PrincipalFromContext(ctx)
 
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		// Locked, or two reports that both saw no pin would both pin.
@@ -463,7 +460,7 @@ func (s *targetService) ForgetHostKey(
 	req *nokkuv1.ForgetHostKeyRequest,
 ) (*nokkuv1.ForgetHostKeyResponse, error) {
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		target, err := q.GetTarget(ctx, req.GetId())
+		target, err := q.GetTarget(ctx, req.GetTargetId())
 		if err != nil {
 			return err
 		}
@@ -494,7 +491,7 @@ func (s *targetService) GetSubjectAccess(
 	}
 
 	res := &nokkuv1.GetSubjectAccessResponse{}
-	var targets []*nokkuv1.Target
+	var targets []*nokkuv1.TargetAccess
 	var daemons []*nokkuv1.Daemon
 
 	uniqueDaemonIDs := make(map[string]struct{})
@@ -538,10 +535,12 @@ func (s *targetService) GetSubjectAccess(
 		for _, r := range rows {
 			target := r.ToProto()
 			target.Accounts = accounts[r.ID]
-			targets = append(targets, target)
+			targets = append(targets, &nokkuv1.TargetAccess{Target: target})
 		}
-		setUsernames(targets, uRows)
-		slices.SortFunc(targets, func(a, b *nokkuv1.Target) int { return strings.Compare(a.GetName(), b.GetName()) })
+		setLogins(targets, uRows)
+		slices.SortFunc(targets, func(a, b *nokkuv1.TargetAccess) int {
+			return strings.Compare(a.GetTarget().GetName(), b.GetTarget().GetName())
+		})
 
 		if len(uniqueDaemonIDs) > 0 {
 			daemonRows, err := q.GetDaemonsByIDs(ctx, slices.Collect(maps.Keys(uniqueDaemonIDs)))
@@ -600,29 +599,27 @@ func setSubject(ctx context.Context, q *db.Queries, res *nokkuv1.GetSubjectAcces
 	return err
 }
 
-// setUsernames also sets when accounts end, and why they let nobody in today.
-func setUsernames(targets []*nokkuv1.Target, rows []*db.ListSubjectUsernamesForTargetsRow) {
-	byID := make(map[string]*nokkuv1.Target, len(targets))
+// setLogins also says why the logins let nobody in today.
+func setLogins(targets []*nokkuv1.TargetAccess, rows []*db.ListSubjectUsernamesForTargetsRow) {
+	byID := make(map[string]*nokkuv1.TargetAccess, len(targets))
 	for _, t := range targets {
-		byID[t.GetId()] = t
+		byID[t.GetTarget().GetId()] = t
 	}
 	for _, r := range rows {
 		target := byID[r.TargetID]
 		if target == nil {
 			continue
 		}
-		target.Usernames = append(target.Usernames, r.Username)
+		login := &nokkuv1.TargetAccess_Login{Username: &r.Username}
+		if until := r.Until(); until != nil {
+			login.ExpiresAt = timestamppb.New(*until)
+		}
+		target.Logins = append(target.Logins, login)
 		switch {
 		case !r.UserOk:
 			target.Blocked = nokkuv1.AccessBlock_ACCESS_BLOCK_USER_INACTIVE.Enum()
 		case !r.DaemonOk:
 			target.Blocked = nokkuv1.AccessBlock_ACCESS_BLOCK_DAEMON_NOT_APPROVED.Enum()
-		}
-		if until := r.Until(); until != nil {
-			if target.UsernameExpiresAt == nil {
-				target.UsernameExpiresAt = make(map[string]*timestamppb.Timestamp)
-			}
-			target.UsernameExpiresAt[r.Username] = timestamppb.New(*until)
 		}
 	}
 }
@@ -650,135 +647,6 @@ func (s *targetService) GetTargetFilters(
 		Tags:     tags,
 		Accounts: accounts,
 	}, nil
-}
-
-// GetAccessGraph counts in one grouped query, so the response stays small.
-func (s *targetService) GetAccessGraph(
-	ctx context.Context,
-	req *nokkuv1.GetAccessGraphRequest,
-) (*nokkuv1.GetAccessGraphResponse, error) {
-	filter := cmp.Or(req.GetFilter(), &nokkuv1.AccessGraphFilter{})
-	resp := &nokkuv1.GetAccessGraphResponse{}
-
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		rows, err := q.GetAccessGraph(ctx, &db.GetAccessGraphParams{
-			SubjectID: filter.SubjectId,
-			TargetID:  filter.TargetId,
-			Username:  filter.Username,
-			Tag:       filter.Tag,
-		})
-		if err != nil {
-			return err
-		}
-
-		held := make(map[string]int32)
-		matched := make(map[string]int32)
-		for _, r := range rows {
-			switch {
-			case r.BySubject && r.ByUsername:
-				resp.Grants = append(resp.Grants, &nokkuv1.AccessGraphGrant{
-					SubjectId: &r.SubjectID,
-					Username:  &r.Username,
-					Targets:   &r.Targets,
-				})
-			case r.ByUsername && r.ByTag:
-				resp.Reach = append(resp.Reach, &nokkuv1.AccessGraphReach{
-					Username: &r.Username,
-					Tag:      &r.Tag,
-					Targets:  &r.Targets,
-				})
-			case r.BySubject:
-				held[r.SubjectID] = r.Targets
-			case r.ByUsername:
-				resp.Accounts = append(resp.Accounts, &nokkuv1.AccessGraphAccount{
-					Username: &r.Username,
-					Targets:  &r.Targets,
-				})
-			case r.ByTag:
-				matched[r.Tag] = r.Targets
-			default:
-				resp.Targets = &r.Targets
-			}
-		}
-
-		// A team-only user holds nothing, the caller still needs the name.
-		if id := filter.GetSubjectId(); id != "" {
-			held[id] += 0
-		}
-		subjects, err := q.GetAccessGraphSubjects(ctx, slices.Collect(maps.Keys(held)))
-		if err != nil {
-			return err
-		}
-		for _, sub := range subjects {
-			resp.Subjects = append(resp.Subjects, &nokkuv1.AccessGraphSubject{
-				Id:          &sub.ID,
-				Kind:        subjectKinds[sub.Kind].Enum(),
-				Name:        &sub.Name,
-				Email:       &sub.Email,
-				MemberCount: &sub.MemberCount,
-				Targets:     new(held[sub.ID]),
-			})
-		}
-
-		tags, err := q.CountTargetsByTag(ctx)
-		if err != nil {
-			return err
-		}
-		for _, t := range tags {
-			resp.Tags = append(resp.Tags, &nokkuv1.AccessGraphTag{
-				Tag:     &t.Tag,
-				Targets: new(matched[t.Tag]),
-				Total:   &t.Total,
-			})
-		}
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return resp, nil
-}
-
-func (s *targetService) ListAccessGraphTargets(
-	ctx context.Context,
-	req *nokkuv1.ListAccessGraphTargetsRequest,
-) (*nokkuv1.ListAccessGraphTargetsResponse, error) {
-	filter := cmp.Or(req.GetFilter(), &nokkuv1.AccessGraphFilter{})
-	q := s.cfg.Conn.Tenant()
-	params := &db.ListAccessGraphTargetsParams{
-		Tag:       req.GetTag(),
-		FilterTag: filter.Tag,
-		SubjectID: filter.SubjectId,
-		TargetID:  filter.TargetId,
-		Username:  filter.Username,
-		Limit:     req.Limit,
-		Offset:    req.Offset,
-	}
-	rows, err := q.ListAccessGraphTargets(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	counted := rows
-	if len(rows) == 0 && req.GetOffset() > 0 {
-		// A page past the end has no row to carry the total, the first row does.
-		params.Limit, params.Offset = new(int32(1)), nil
-		if counted, err = q.ListAccessGraphTargets(ctx, params); err != nil {
-			return nil, err
-		}
-	}
-	var total int32
-	if len(counted) > 0 {
-		total = counted[0].TotalCount
-	}
-
-	targets := make([]*nokkuv1.AccessGraphTarget, 0, len(rows))
-	for _, r := range rows {
-		targets = append(targets, &nokkuv1.AccessGraphTarget{
-			Id:      &r.ID,
-			Name:    &r.Name,
-			Matched: &r.Matched,
-		})
-	}
-	return &nokkuv1.ListAccessGraphTargetsResponse{Targets: targets, Total: &total}, nil
 }
 
 func validateHostPublicKey(key string) error {

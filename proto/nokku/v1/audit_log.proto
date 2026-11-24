@@ -1,0 +1,138 @@
+edition = "2023";
+
+package nokku.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "nokku/v1/access.proto";
+
+service AuditLogService {
+  rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc PollAuditLogs(PollAuditLogsRequest) returns (PollAuditLogsResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+      feature: "audit_streaming"
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ExportAuditLogs(ExportAuditLogsRequest) returns (ExportAuditLogsResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_VIEWER
+      service_account: true
+      feature: "audit_export"
+    };
+  }
+  rpc ListMyActivity(ListMyActivityRequest) returns (ListMyActivityResponse) {
+    option (access) = {
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
+    };
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message AuditEvent {
+  string id = 1;
+  string actor_id = 2;
+  ActorKind actor_kind = 3;
+  string actor_name = 4;
+  string action = 5;
+  string target = 6;
+  bool ok = 7;
+  string ip = 8;
+  string user_agent = 9;
+  google.protobuf.Struct details = 10;
+  google.protobuf.Timestamp timestamp = 11;
+}
+
+enum ActorKind {
+  ACTOR_KIND_UNSPECIFIED = 0;
+  ACTOR_KIND_USER = 1;
+  ACTOR_KIND_CLI = 2;
+  ACTOR_KIND_SERVICE_ACCOUNT = 3;
+  ACTOR_KIND_DAEMON = 4;
+  ACTOR_KIND_SCIM = 5;
+  ACTOR_KIND_SYSTEM = 6;
+}
+
+enum AuditOutcome {
+  AUDIT_OUTCOME_UNSPECIFIED = 0;
+  AUDIT_OUTCOME_SUCCEEDED = 1;
+  AUDIT_OUTCOME_FAILED = 2;
+  AUDIT_OUTCOME_DENIED = 3;
+}
+
+message AuditLogFilter {
+  string search = 1;
+  repeated string actor_ids = 2 [(buf.validate.field).repeated.items.string.uuid = true];
+  repeated ActorKind actor_kinds = 3 [(buf.validate.field).repeated.items.enum.defined_only = true];
+  repeated string actions = 4;
+  string target = 5;
+  AuditOutcome outcome = 6 [(buf.validate.field).enum = {defined_only: true}];
+  google.protobuf.Timestamp start_date = 7;
+  google.protobuf.Timestamp end_date = 8;
+  repeated string excluded_actions = 9;
+}
+
+message ListAuditLogsRequest {
+  int32 limit = 1 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+  AuditLogFilter filter = 3;
+}
+message ListAuditLogsResponse {
+  repeated AuditEvent events = 1;
+  int32 total = 2;
+  int32 retention_days = 3;
+}
+
+message PollAuditLogsRequest {
+  // From the last answer. Empty starts at the oldest event.
+  string cursor = 1 [(buf.validate.field).string.max_len = 80];
+  int32 limit = 2 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 1000
+  }];
+}
+message PollAuditLogsResponse {
+  repeated AuditEvent events = 1;
+  string cursor = 2;
+}
+
+message ExportAuditLogsRequest {
+  enum Format {
+    FORMAT_UNSPECIFIED = 0;
+    FORMAT_CSV = 1;
+    FORMAT_JSON = 2;
+  }
+  Format format = 1 [(buf.validate.field).enum = {defined_only: true}];
+  AuditLogFilter filter = 2;
+}
+message ExportAuditLogsResponse {
+  bytes data = 1;
+  string filename = 2;
+  string content_type = 3;
+}
+
+message ListMyActivityRequest {
+  int32 limit = 1 [(buf.validate.field).int32 = {
+    gte: 1
+    lte: 100
+  }];
+  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+  AuditLogFilter filter = 3;
+}
+message ListMyActivityResponse {
+  repeated AuditEvent events = 1;
+  int32 total = 2;
+}

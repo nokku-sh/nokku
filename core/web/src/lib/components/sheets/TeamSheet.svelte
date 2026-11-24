@@ -18,7 +18,7 @@
 	import SearchPopover from '#lib/components/blocks/SearchPopover.svelte';
 	import SettingRow from '#lib/components/blocks/SettingRow.svelte';
 	import UserAvatar from '#lib/components/blocks/UserAvatar.svelte';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import { TeamSchema } from '#lib/gen/nokku/v1/team_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import {

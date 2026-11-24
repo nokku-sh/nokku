@@ -41,12 +41,12 @@ export const recordings = {
 
 	// Direct stream (connect-query has no server-stream support).
 	stream: async (
-		recordingId: string,
+		id: string,
 		onChunk: RecordingChunkHandler,
 		signal?: AbortSignal
 	): Promise<void> => {
 		const input = create(RecordingService.method.getRecording.input, {
-			recordingId
+			id
 		});
 		async function* single() {
 			yield input;

@@ -10,27 +10,26 @@ service BillingService {
   rpc GetBilling(GetBillingRequest) returns (GetBillingResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc GetLicense(GetLicenseRequest) returns (GetLicenseResponse) {
     option (access) = {
-      self: true
-      machine: true
+      role: WORKSPACE_ROLE_MEMBER
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc ActivateLicense(ActivateLicenseRequest) returns (ActivateLicenseResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      machine: true
+      service_account: true
     };
   }
 }
 
 message GetBillingRequest {
-  // Asks the license server for the current key first, so new seats show up. That can take a moment.
   bool refresh = 1;
 }
 message GetBillingResponse {
@@ -40,14 +39,11 @@ message GetBillingResponse {
   Quotas quotas = 4;
   int64 user_count = 5;
   int64 resource_count = 6;
-  Quotas held_quotas = 8;
+  Quotas held_quotas = 7;
+  GetLicenseResponse license = 8;
   google.protobuf.Timestamp held_until = 9;
-  // The end of a hosted trial, set until the first key is activated.
   google.protobuf.Timestamp trial_ends_at = 10;
-  // When a hosted workspace whose plan ended is deleted.
   google.protobuf.Timestamp delete_at = 11;
-  // The key this response was resolved from, after the refresh.
-  GetLicenseResponse license = 12;
 }
 
 message Quotas {

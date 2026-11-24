@@ -91,33 +91,33 @@ func (s *dashboardService) GetDashboard(
 	}
 
 	res := &nokkuv1.GetDashboardResponse{
-		Targets:             &counts.Targets,
-		TargetsOnline:       &counts.TargetsOnline,
-		TargetsManual:       &counts.TargetsManual,
-		Users:               &counts.Users,
-		Daemons:             &counts.Daemons,
-		DaemonsOnline:       &counts.DaemonsOnline,
-		DaemonsBehind:       new(s.cfg.Pool.BehindIn(wsID)),
+		TargetCount:         &counts.Targets,
+		OnlineTargetCount:   &counts.TargetsOnline,
+		ManualTargetCount:   &counts.TargetsManual,
+		UserCount:           &counts.Users,
+		DaemonCount:         &counts.Daemons,
+		OnlineDaemonCount:   &counts.DaemonsOnline,
+		BehindDaemonCount:   new(s.cfg.Pool.BehindIn(wsID)),
 		RecordingBytes:      &usedBytes,
 		RecordingQuotaBytes: new(s.cfg.Entitlements.Resolve(ctx, wsID).RecordingStorageBytes),
-		Activity:            make([]int32, 24),
-		Failures:            make([]int32, 24),
+		EventsByHour:        make([]int32, 24),
+		FailuresByHour:      make([]int32, 24),
 	}
 	for _, d := range pending {
 		res.PendingDaemons = append(res.PendingDaemons, d.Daemon.ToProto(d.Name, s.cfg.Pool.IsConnected(d.Daemon.ID)))
 	}
-	res.OfflineServers = offline
+	res.OfflineTargets = offline
 
 	for _, h := range hours {
 		i := int(h.Hour.Sub(since) / time.Hour)
 		if i < 0 || i >= 24 {
 			continue
 		}
-		res.Activity[i], res.Failures[i] = h.Events, h.Failures
+		res.EventsByHour[i], res.FailuresByHour[i] = h.Events, h.Failures
 	}
 
 	for _, g := range ending {
-		res.EndingGrantsTotal = &g.Total
+		res.EndingGrantCount = &g.Total
 		res.EndingGrants = append(res.EndingGrants, endingGrant(g))
 	}
 
@@ -128,8 +128,7 @@ func (s *dashboardService) GetDashboard(
 
 func endingGrant(g *db.ListEndingGrantsRow) *nokkuv1.EndingGrant {
 	out := &nokkuv1.EndingGrant{
-		SubjectKind: new(subjectKinds[g.SubjectKind]),
-		SubjectId:   &g.SubjectID,
+		Subject:     &nokkuv1.Subject{Id: &g.SubjectID, Kind: db.SubjectKinds[g.SubjectKind].Enum()},
 		SubjectName: &g.SubjectName,
 		Username:    &g.Username,
 		ExpiresAt:   timestamppb.New(g.ExpiresAt),
@@ -150,7 +149,7 @@ func (s *dashboardService) liveSessions(
 	for _, d := range terminals {
 		for _, ws := range s.cfg.Pool.ListSessions(d.Daemon.ID) {
 			live = append(live, &nokkuv1.LiveSession{
-				Id:         ws.SessionId,
+				Id:         ws.Id,
 				DaemonId:   &d.Daemon.ID,
 				DaemonName: &d.Name,
 				Username:   ws.Username,
@@ -187,7 +186,7 @@ func (s *dashboardService) recentChanges(
 	ctx context.Context,
 	wsID string,
 	since time.Time,
-) []*nokkuv1.EventLog {
+) []*nokkuv1.AuditEvent {
 	events, _, err := s.cfg.Audit.List(ctx, &db.ListAuditLogsParams{
 		ExcludedActions: routineActions,
 		Outcome:         new("succeeded"),

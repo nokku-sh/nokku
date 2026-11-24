@@ -205,7 +205,7 @@ func (s *daemonControlService) UploadRecording(
 		return nil, connect.NewError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 	meta := first.GetMeta()
-	if meta == nil || meta.GetRecordingId() == "" {
+	if meta == nil || meta.GetId() == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "missing recording metadata")
 	}
 
@@ -321,9 +321,9 @@ func sessionEnd(final *nokkuv1.RecordingFinal) *time.Time {
 // A daemon deletes its file on this answer alone, never on an error.
 func uploadAnswer(rec *db.Recording) *nokkuv1.UploadRecordingResponse {
 	return &nokkuv1.UploadRecordingResponse{
-		RecordingId: &rec.ID,
-		SizeBytes:   &rec.SizeBytes,
-		Complete:    &rec.Complete,
+		Id:        &rec.ID,
+		SizeBytes: &rec.SizeBytes,
+		Complete:  &rec.Complete,
 	}
 }
 
@@ -479,12 +479,12 @@ func (s *daemonControlService) resolveUpload(
 	room bool,
 ) (*db.Recording, error) {
 	// The id is in the key's AAD, and Postgres would lowercase a capital one.
-	if !login.ValidID(rm.GetRecordingId()) {
+	if !login.ValidID(rm.GetId()) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "the recording id must be a lowercase UUID")
 	}
 	var rec *db.Recording
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		existing, err := q.GetRecording(ctx, rm.GetRecordingId())
+		existing, err := q.GetRecording(ctx, rm.GetId())
 		if err == nil {
 			if existing.DaemonID == nil || *existing.DaemonID != daemonID {
 				return connect.NewError(connect.CodeInvalidArgument, "recording belongs to another daemon")
@@ -515,13 +515,13 @@ func (s *daemonControlService) resolveUpload(
 			}
 			subjectID = &p.SubjectID
 		}
-		aad := recording.KeyAAD(actor.WorkspaceIDFromContext(ctx), rm.GetRecordingId())
+		aad := recording.KeyAAD(actor.WorkspaceIDFromContext(ctx), rm.GetId())
 		key, err := s.cfg.Keyset.Seal(aad, recording.NewKey())
 		if err != nil {
 			return err
 		}
 		rec, err = q.CreateRecording(ctx, &db.CreateRecordingParams{
-			ID:        rm.GetRecordingId(),
+			ID:        rm.GetId(),
 			DaemonID:  daemonID,
 			Username:  rm.GetUsername(),
 			SubjectID: subjectID,

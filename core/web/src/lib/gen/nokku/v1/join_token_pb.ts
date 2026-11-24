@@ -8,13 +8,15 @@ import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
 import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import { file_nokku_v1_access } from "./access_pb";
+import type { Subject } from "./subject_pb";
+import { file_nokku_v1_subject } from "./subject_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file nokku/v1/join_token.proto.
  */
 export const file_nokku_v1_join_token: GenFile = /*@__PURE__*/
-  fileDesc("Chlub2trdS92MS9qb2luX3Rva2VuLnByb3RvEghub2trdS52MSLqAgoJSm9pblRva2VuEgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCG1heF91c2VzGAQgASgFEgwKBHVzZXMYBSABKAUSFAoMYXV0b19hcHByb3ZlGAYgASgIEi4KCmNyZWF0ZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDAoEdGFncxgJIAMoCRIoCgZncmFudHMYCiADKAsyGC5ub2trdS52MS5Kb2luVG9rZW5HcmFudBIRCgllcGhlbWVyYWwYCyABKAgSLwoMcmV0aXJlX2FmdGVyGAwgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uIsABCg5Kb2luVG9rZW5HcmFudBI6Cgh1c2VybmFtZRgBIAEoCUIoukglciMQARggMh1eW0EtWmEtel9dW0EtWmEtejAtOS5fLV0qXCQ/JBIhCgh1c2VyX2lkcxgCIAMoCUIPukgMkgEJEDIiBXIDsAEBEiEKCHRlYW1faWRzGAMgAygJQg+6SAySAQkQMiIFcgOwAQESLAoTc2VydmljZV9hY2NvdW50X2lkcxgEIAMoCUIPukgMkgEJEDIiBXIDsAEBIrsCChZDcmVhdGVKb2luVG9rZW5SZXF1ZXN0EhYKBWxhYmVsGAEgASgJQge6SARyAhhkEjAKA3R0bBgCIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIIukgFqgECKgASGQoIbWF4X3VzZXMYAyABKAVCB7pIBBoCIAASFAoMYXV0b19hcHByb3ZlGAQgASgIEhwKBHRhZ3MYBSADKAlCDrpIC5IBCBAgIgRyAhhAEjIKBmdyYW50cxgGIAMoCzIYLm5va2t1LnYxLkpvaW5Ub2tlbkdyYW50Qgi6SAWSAQIQIBIRCgllcGhlbWVyYWwYByABKAgSQQoMcmV0aXJlX2FmdGVyGAggASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQhC6SA2qAQoiBAiA9SQyAgg8Ik0KF0NyZWF0ZUpvaW5Ub2tlblJlc3BvbnNlEiIKBXRva2VuGAEgASgLMhMubm9ra3UudjEuSm9pblRva2VuEg4KBnNlY3JldBgCIAEoCSIXChVMaXN0Sm9pblRva2Vuc1JlcXVlc3QiPQoWTGlzdEpvaW5Ub2tlbnNSZXNwb25zZRIjCgZ0b2tlbnMYASADKAsyEy5ub2trdS52MS5Kb2luVG9rZW4iLgoWRGVsZXRlSm9pblRva2VuUmVxdWVzdBIUCgJpZBgBIAEoCUIIukgFcgOwAQEiGQoXRGVsZXRlSm9pblRva2VuUmVzcG9uc2UyuAIKEEpvaW5Ub2tlblNlcnZpY2USYAoPQ3JlYXRlSm9pblRva2VuEiAubm9ra3UudjEuQ3JlYXRlSm9pblRva2VuUmVxdWVzdBohLm5va2t1LnYxLkNyZWF0ZUpvaW5Ub2tlblJlc3BvbnNlIgjC8xgEGARgARJgCg5MaXN0Sm9pblRva2VucxIfLm5va2t1LnYxLkxpc3RKb2luVG9rZW5zUmVxdWVzdBogLm5va2t1LnYxLkxpc3RKb2luVG9rZW5zUmVzcG9uc2UiC5ACAcLzGAQYAmgBEmAKD0RlbGV0ZUpvaW5Ub2tlbhIgLm5va2t1LnYxLkRlbGV0ZUpvaW5Ub2tlblJlcXVlc3QaIS5ub2trdS52MS5EZWxldGVKb2luVG9rZW5SZXNwb25zZSIIwvMYBBgEaAFCjwEKDGNvbS5ub2trdS52MUIOSm9pblRva2VuUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("Chlub2trdS92MS9qb2luX3Rva2VuLnByb3RvEghub2trdS52MSLvAgoJSm9pblRva2VuEgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCG1heF91c2VzGAQgASgFEhEKCXVzZV9jb3VudBgFIAEoBRIUCgxhdXRvX2FwcHJvdmUYBiABKAgSEQoJZXBoZW1lcmFsGAcgASgIEgwKBHRhZ3MYCCADKAkSKAoGZ3JhbnRzGAkgAygLMhgubm9ra3UudjEuSm9pblRva2VuR3JhbnQSLwoMcmV0aXJlX2FmdGVyGAogASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uEi4KCmNyZWF0ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3RfdXNlZF9hdBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAifAoOSm9pblRva2VuR3JhbnQSOgoIdXNlcm5hbWUYASABKAlCKLpIJXIjEAEYIDIdXltBLVphLXpfXVtBLVphLXowLTkuXy1dKlwkPyQSLgoIc3ViamVjdHMYAiADKAsyES5ub2trdS52MS5TdWJqZWN0Qgm6SAaSAQMQlgEiuwIKFkNyZWF0ZUpvaW5Ub2tlblJlcXVlc3QSFgoFbGFiZWwYASABKAlCB7pIBHICGGQSMAoDdHRsGAIgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQgi6SAWqAQIqABIZCghtYXhfdXNlcxgDIAEoBUIHukgEGgIgABIUCgxhdXRvX2FwcHJvdmUYBCABKAgSHAoEdGFncxgFIAMoCUIOukgLkgEIECAiBHICGEASMgoGZ3JhbnRzGAYgAygLMhgubm9ra3UudjEuSm9pblRva2VuR3JhbnRCCLpIBZIBAhAgEhEKCWVwaGVtZXJhbBgHIAEoCBJBCgxyZXRpcmVfYWZ0ZXIYCCABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CELpIDaoBCiIECID1JDICCDwiTQoXQ3JlYXRlSm9pblRva2VuUmVzcG9uc2USIgoFdG9rZW4YASABKAsyEy5ub2trdS52MS5Kb2luVG9rZW4SDgoGc2VjcmV0GAIgASgJIhcKFUxpc3RKb2luVG9rZW5zUmVxdWVzdCI9ChZMaXN0Sm9pblRva2Vuc1Jlc3BvbnNlEiMKBnRva2VucxgBIAMoCzITLm5va2t1LnYxLkpvaW5Ub2tlbiIuChZEZWxldGVKb2luVG9rZW5SZXF1ZXN0EhQKAmlkGAEgASgJQgi6SAVyA7ABASIZChdEZWxldGVKb2luVG9rZW5SZXNwb25zZTK4AgoQSm9pblRva2VuU2VydmljZRJgCg9DcmVhdGVKb2luVG9rZW4SIC5ub2trdS52MS5DcmVhdGVKb2luVG9rZW5SZXF1ZXN0GiEubm9ra3UudjEuQ3JlYXRlSm9pblRva2VuUmVzcG9uc2UiCMLzGAQYBCABEmAKDkxpc3RKb2luVG9rZW5zEh8ubm9ra3UudjEuTGlzdEpvaW5Ub2tlbnNSZXF1ZXN0GiAubm9ra3UudjEuTGlzdEpvaW5Ub2tlbnNSZXNwb25zZSILkAIBwvMYBBgCMAESYAoPRGVsZXRlSm9pblRva2VuEiAubm9ra3UudjEuRGVsZXRlSm9pblRva2VuUmVxdWVzdBohLm5va2t1LnYxLkRlbGV0ZUpvaW5Ub2tlblJlc3BvbnNlIgjC8xgEGAQwAUKPAQoMY29tLm5va2t1LnYxQg5Kb2luVG9rZW5Qcm90b1ABWi5naXRodWIuY29tL25va2t1LXNoL25va2t1L2dlbi9ub2trdS92MTtub2trdXYxogIDTlhYqgIITm9ra3UuVjHKAghOb2trdVxWMeICFE5va2t1XFYxXEdQQk1ldGFkYXRh6gIJTm9ra3U6OlYxYghlZGl0aW9uc3DoBw", [file_buf_validate_validate, file_google_protobuf_duration, file_google_protobuf_timestamp, file_nokku_v1_access, file_nokku_v1_subject]);
 
 /**
  * @generated from message nokku.v1.JoinToken
@@ -41,9 +43,9 @@ export type JoinToken = Message<"nokku.v1.JoinToken"> & {
   maxUses: number;
 
   /**
-   * @generated from field: int32 uses = 5;
+   * @generated from field: int32 use_count = 5;
    */
-  uses: number;
+  useCount: number;
 
   /**
    * @generated from field: bool auto_approve = 6;
@@ -51,34 +53,34 @@ export type JoinToken = Message<"nokku.v1.JoinToken"> & {
   autoApprove: boolean;
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 7;
-   */
-  createdAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: google.protobuf.Timestamp last_used_at = 8;
-   */
-  lastUsedAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: repeated string tags = 9;
-   */
-  tags: string[];
-
-  /**
-   * @generated from field: repeated nokku.v1.JoinTokenGrant grants = 10;
-   */
-  grants: JoinTokenGrant[];
-
-  /**
-   * @generated from field: bool ephemeral = 11;
+   * @generated from field: bool ephemeral = 7;
    */
   ephemeral: boolean;
 
   /**
-   * @generated from field: google.protobuf.Duration retire_after = 12;
+   * @generated from field: repeated string tags = 8;
+   */
+  tags: string[];
+
+  /**
+   * @generated from field: repeated nokku.v1.JoinTokenGrant grants = 9;
+   */
+  grants: JoinTokenGrant[];
+
+  /**
+   * @generated from field: google.protobuf.Duration retire_after = 10;
    */
   retireAfter?: Duration | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 11;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp last_used_at = 12;
+   */
+  lastUsedAt?: Timestamp | undefined;
 };
 
 /**
@@ -98,19 +100,9 @@ export type JoinTokenGrant = Message<"nokku.v1.JoinTokenGrant"> & {
   username: string;
 
   /**
-   * @generated from field: repeated string user_ids = 2;
+   * @generated from field: repeated nokku.v1.Subject subjects = 2;
    */
-  userIds: string[];
-
-  /**
-   * @generated from field: repeated string team_ids = 3;
-   */
-  teamIds: string[];
-
-  /**
-   * @generated from field: repeated string service_account_ids = 4;
-   */
-  serviceAccountIds: string[];
+  subjects: Subject[];
 };
 
 /**

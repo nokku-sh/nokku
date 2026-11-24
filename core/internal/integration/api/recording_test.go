@@ -58,7 +58,7 @@ func openUpload(
 		UploadRecording(ctx)
 	require.NoError(t, err)
 	require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
-		Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root")},
+		Meta: &nokkuv1.RecordingMeta{Id: &id, Username: new("root")},
 	}}))
 	return stream
 }
@@ -236,7 +236,7 @@ func TestLateUploadKeepsItsStartTime(t *testing.T) {
 			UploadRecording(ctx)
 		require.NoError(t, err)
 		require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
-			Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root"), StartedAt: named},
+			Meta: &nokkuv1.RecordingMeta{Id: &id, Username: new("root"), StartedAt: named},
 		}}))
 		_, err = stream.CloseAndReceive()
 		require.NoError(t, err)
@@ -280,7 +280,7 @@ func TestLateUploadKeepsItsEndTime(t *testing.T) {
 			UploadRecording(ctx)
 		require.NoError(t, err)
 		require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Meta{
-			Meta: &nokkuv1.RecordingMeta{RecordingId: &id, Username: new("root"), StartedAt: timestamppb.New(began)},
+			Meta: &nokkuv1.RecordingMeta{Id: &id, Username: new("root"), StartedAt: timestamppb.New(began)},
 		}}))
 		require.NoError(t, sendChunk(stream, []byte("x")))
 		require.NoError(t, stream.Send(&nokkuv1.UploadRecordingRequest{Msg: &nokkuv1.UploadRecordingRequest_Final{
@@ -486,7 +486,7 @@ func deleteRecording(t *testing.T, cfg *app.Config, srv *httptest.Server, worksp
 	editor := clientOn(srv, header("Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR)))
 	_, err := nokkuv1connect.NewRecordingServiceClient(editor).
-		DeleteRecording(t.Context(), &nokkuv1.DeleteRecordingRequest{RecordingId: &id})
+		DeleteRecording(t.Context(), &nokkuv1.DeleteRecordingRequest{Id: &id})
 	require.NoError(t, err)
 }
 
@@ -502,7 +502,7 @@ func TestPlaybackNeedsItsAuditRow(t *testing.T) {
 		ctx, call := connect.NewClientContext(t.Context())
 		call.RequestHeader().Set("Authorization", "Bearer "+viewer)
 		stream, err := nokkuv1connect.NewRecordingServiceClient(clientOn(srv)).
-			GetRecording(ctx, &nokkuv1.GetRecordingRequest{RecordingId: &id})
+			GetRecording(ctx, &nokkuv1.GetRecordingRequest{Id: &id})
 		if err != nil {
 			return err
 		}

@@ -4,34 +4,22 @@ package nokku.v1;
 
 import "google/protobuf/descriptor.proto";
 
-// Access says who may make a call.
+// Access is the rule of one call. A call without it is denied.
 message Access {
   bool public = 1;
-  bool self = 2;
+  bool daemon = 2;
   WorkspaceRole role = 3;
-  bool daemon = 4;
-  // feature is the plan feature the call needs.
+  // A browser session must be from the last 10 minutes.
+  bool fresh = 4;
+  // Lets an nk session call, a browser session needs no such field.
+  bool cli = 5;
+  bool service_account = 6;
+  // The plan feature the call needs.
   string feature = 7;
-  // capped counts the create against the plan's resource cap.
+  // A create that counts against the plan's resource cap.
   bool capped = 8;
-  // signs issues a user certificate, an inactive workspace gets none.
-  bool signs = 9;
-  // quiet changes something, but the handler records what matters, so the audit log skips the call.
-  bool quiet = 10;
-  // nk lets a person's nk session make the call.
-  bool nk = 11;
-  // browser is a person in the web app, any session unless this says otherwise.
-  Browser browser = 12;
-  // machine lets a service account make the call.
-  bool machine = 13;
-}
-
-enum Browser {
-  BROWSER_UNSPECIFIED = 0;
-  // A sign-in from the last 10 minutes.
-  BROWSER_FRESH = 1;
-  // The browser is kept out, the call is for nk and service accounts.
-  BROWSER_REFUSED = 2;
+  // The handler writes its own audit events.
+  bool unaudited = 9;
 }
 
 enum WorkspaceRole {

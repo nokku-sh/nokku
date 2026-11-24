@@ -63,6 +63,7 @@ func (s *Server) SetAccess(sa *state.Access) {
 		policy:     policyFrom(sa.DaemonConfig),
 		syncedAt:   sa.SyncedAt,
 	}
+	a.policy.IdleTimeout = sa.IdleTimeout
 	if sa.UserCA != "" {
 		if pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(sa.UserCA)); err != nil {
 			slog.Warn("unreadable CA public key, trusting no CA", "error", err)

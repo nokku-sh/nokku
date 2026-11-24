@@ -71,7 +71,7 @@
 	// Saved off, so nobody sees it on the sign-in page before the owner turned it on and tried it.
 	async function submit() {
 		await put.mutateAsync({
-			providerId,
+			id: providerId,
 			name: name.trim(),
 			issuerUrl: issuer,
 			clientId: clientId.trim(),

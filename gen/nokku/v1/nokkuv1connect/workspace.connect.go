@@ -42,28 +42,6 @@ const (
 	// WorkspaceServiceDeleteWorkspaceProcedure is the procedure name of the WorkspaceService's
 	// DeleteWorkspace RPC.
 	WorkspaceServiceDeleteWorkspaceProcedure = "/nokku.v1.WorkspaceService/DeleteWorkspace"
-	// WorkspaceServiceListUsersProcedure is the procedure name of the WorkspaceService's ListUsers RPC.
-	WorkspaceServiceListUsersProcedure = "/nokku.v1.WorkspaceService/ListUsers"
-	// WorkspaceServiceGetUserProcedure is the procedure name of the WorkspaceService's GetUser RPC.
-	WorkspaceServiceGetUserProcedure = "/nokku.v1.WorkspaceService/GetUser"
-	// WorkspaceServiceUpdateUserRoleProcedure is the procedure name of the WorkspaceService's
-	// UpdateUserRole RPC.
-	WorkspaceServiceUpdateUserRoleProcedure = "/nokku.v1.WorkspaceService/UpdateUserRole"
-	// WorkspaceServiceDeactivateUserProcedure is the procedure name of the WorkspaceService's
-	// DeactivateUser RPC.
-	WorkspaceServiceDeactivateUserProcedure = "/nokku.v1.WorkspaceService/DeactivateUser"
-	// WorkspaceServiceReactivateUserProcedure is the procedure name of the WorkspaceService's
-	// ReactivateUser RPC.
-	WorkspaceServiceReactivateUserProcedure = "/nokku.v1.WorkspaceService/ReactivateUser"
-	// WorkspaceServiceDeleteUserProcedure is the procedure name of the WorkspaceService's DeleteUser
-	// RPC.
-	WorkspaceServiceDeleteUserProcedure = "/nokku.v1.WorkspaceService/DeleteUser"
-	// WorkspaceServiceClearUserIdentitiesProcedure is the procedure name of the WorkspaceService's
-	// ClearUserIdentities RPC.
-	WorkspaceServiceClearUserIdentitiesProcedure = "/nokku.v1.WorkspaceService/ClearUserIdentities"
-	// WorkspaceServiceTransferOwnershipProcedure is the procedure name of the WorkspaceService's
-	// TransferOwnership RPC.
-	WorkspaceServiceTransferOwnershipProcedure = "/nokku.v1.WorkspaceService/TransferOwnership"
 	// WorkspaceServiceCreateWorkspaceProcedure is the procedure name of the WorkspaceService's
 	// CreateWorkspace RPC.
 	WorkspaceServiceCreateWorkspaceProcedure = "/nokku.v1.WorkspaceService/CreateWorkspace"
@@ -116,64 +94,6 @@ var (
 			Procedure:  WorkspaceServiceDeleteWorkspaceProcedure,
 		}
 	})
-	workspaceServiceListUsersSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("ListUsers"),
-			Procedure:        WorkspaceServiceListUsersProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
-	workspaceServiceGetUserSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType:       connect.StreamTypeUnary,
-			Schema:           v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("GetUser"),
-			Procedure:        WorkspaceServiceGetUserProcedure,
-			IdempotencyLevel: connect.IdempotencyNoSideEffects,
-		}
-	})
-	workspaceServiceUpdateUserRoleSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("UpdateUserRole"),
-			Procedure:  WorkspaceServiceUpdateUserRoleProcedure,
-		}
-	})
-	workspaceServiceDeactivateUserSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("DeactivateUser"),
-			Procedure:  WorkspaceServiceDeactivateUserProcedure,
-		}
-	})
-	workspaceServiceReactivateUserSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("ReactivateUser"),
-			Procedure:  WorkspaceServiceReactivateUserProcedure,
-		}
-	})
-	workspaceServiceDeleteUserSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("DeleteUser"),
-			Procedure:  WorkspaceServiceDeleteUserProcedure,
-		}
-	})
-	workspaceServiceClearUserIdentitiesSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("ClearUserIdentities"),
-			Procedure:  WorkspaceServiceClearUserIdentitiesProcedure,
-		}
-	})
-	workspaceServiceTransferOwnershipSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_workspace_proto.Services().ByName("WorkspaceService").Methods().ByName("TransferOwnership"),
-			Procedure:  WorkspaceServiceTransferOwnershipProcedure,
-		}
-	})
 	workspaceServiceCreateWorkspaceSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType: connect.StreamTypeUnary,
@@ -195,22 +115,10 @@ type WorkspaceServiceClient interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
 	SetEnforceSSO(context.Context, *v1.SetEnforceSSORequest) (*v1.SetEnforceSSOResponse, error)
-	// UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
 	UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error)
 	SetDefaultSafeguards(context.Context, *v1.SetDefaultSafeguardsRequest) (*v1.SetDefaultSafeguardsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
-	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
-	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
-	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
-	DeactivateUser(context.Context, *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error)
-	ReactivateUser(context.Context, *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error)
-	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
-	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
-	// them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
-	ClearUserIdentities(context.Context, *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error)
-	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
-	// Mails an address the workspaces it can sign in to. Always answers OK.
 	FindWorkspaces(context.Context, *v1.FindWorkspacesRequest) (*v1.FindWorkspacesResponse, error)
 }
 
@@ -225,22 +133,10 @@ type WorkspaceServiceHandler interface {
 	GetWorkspace(context.Context, *v1.GetWorkspaceRequest) (*v1.GetWorkspaceResponse, error)
 	UpdateWorkspace(context.Context, *v1.UpdateWorkspaceRequest) (*v1.UpdateWorkspaceResponse, error)
 	SetEnforceSSO(context.Context, *v1.SetEnforceSSORequest) (*v1.SetEnforceSSOResponse, error)
-	// UpdateDaemonDefaults is for admins, who run the servers. The rest of the workspace stays the owner's.
 	UpdateDaemonDefaults(context.Context, *v1.UpdateDaemonDefaultsRequest) (*v1.UpdateDaemonDefaultsResponse, error)
 	SetDefaultSafeguards(context.Context, *v1.SetDefaultSafeguardsRequest) (*v1.SetDefaultSafeguardsResponse, error)
 	DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error)
-	ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error)
-	GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error)
-	UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error)
-	DeactivateUser(context.Context, *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error)
-	ReactivateUser(context.Context, *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error)
-	DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error)
-	// ClearUserIdentities unlinks a person from their sign-in providers and signs them out, for a provider that gave
-	// them a new subject. Their next sign-in links again by a proven address, so a leaver's account is deleted instead.
-	ClearUserIdentities(context.Context, *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error)
-	TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error)
 	CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error)
-	// Mails an address the workspaces it can sign in to. Always answers OK.
 	FindWorkspaces(context.Context, *v1.FindWorkspacesRequest) (*v1.FindWorkspacesResponse, error)
 }
 
@@ -255,14 +151,6 @@ func RegisterWorkspaceServiceHandler(server *connect.Server, svc WorkspaceServic
 		connect.Method{Spec: workspaceServiceUpdateDaemonDefaultsSpec(), Handler: adapter.updateDaemonDefaults},
 		connect.Method{Spec: workspaceServiceSetDefaultSafeguardsSpec(), Handler: adapter.setDefaultSafeguards},
 		connect.Method{Spec: workspaceServiceDeleteWorkspaceSpec(), Handler: adapter.deleteWorkspace},
-		connect.Method{Spec: workspaceServiceListUsersSpec(), Handler: adapter.listUsers},
-		connect.Method{Spec: workspaceServiceGetUserSpec(), Handler: adapter.getUser},
-		connect.Method{Spec: workspaceServiceUpdateUserRoleSpec(), Handler: adapter.updateUserRole},
-		connect.Method{Spec: workspaceServiceDeactivateUserSpec(), Handler: adapter.deactivateUser},
-		connect.Method{Spec: workspaceServiceReactivateUserSpec(), Handler: adapter.reactivateUser},
-		connect.Method{Spec: workspaceServiceDeleteUserSpec(), Handler: adapter.deleteUser},
-		connect.Method{Spec: workspaceServiceClearUserIdentitiesSpec(), Handler: adapter.clearUserIdentities},
-		connect.Method{Spec: workspaceServiceTransferOwnershipSpec(), Handler: adapter.transferOwnership},
 		connect.Method{Spec: workspaceServiceCreateWorkspaceSpec(), Handler: adapter.createWorkspace},
 		connect.Method{Spec: workspaceServiceFindWorkspacesSpec(), Handler: adapter.findWorkspaces},
 	)
@@ -293,38 +181,6 @@ func (UnimplementedWorkspaceServiceHandler) SetDefaultSafeguards(context.Context
 
 func (UnimplementedWorkspaceServiceHandler) DeleteWorkspace(context.Context, *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.DeleteWorkspace is not implemented")
-}
-
-func (UnimplementedWorkspaceServiceHandler) ListUsers(context.Context, *v1.ListUsersRequest) (*v1.ListUsersResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.ListUsers is not implemented")
-}
-
-func (UnimplementedWorkspaceServiceHandler) GetUser(context.Context, *v1.GetUserRequest) (*v1.GetUserResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.GetUser is not implemented")
-}
-
-func (UnimplementedWorkspaceServiceHandler) UpdateUserRole(context.Context, *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.UpdateUserRole is not implemented")
-}
-
-func (UnimplementedWorkspaceServiceHandler) DeactivateUser(context.Context, *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.DeactivateUser is not implemented")
-}
-
-func (UnimplementedWorkspaceServiceHandler) ReactivateUser(context.Context, *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.ReactivateUser is not implemented")
-}
-
-func (UnimplementedWorkspaceServiceHandler) DeleteUser(context.Context, *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.DeleteUser is not implemented")
-}
-
-func (UnimplementedWorkspaceServiceHandler) ClearUserIdentities(context.Context, *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.ClearUserIdentities is not implemented")
-}
-
-func (UnimplementedWorkspaceServiceHandler) TransferOwnership(context.Context, *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.WorkspaceService.TransferOwnership is not implemented")
 }
 
 func (UnimplementedWorkspaceServiceHandler) CreateWorkspace(context.Context, *v1.CreateWorkspaceRequest) (*v1.CreateWorkspaceResponse, error) {
@@ -382,70 +238,6 @@ func (c *workspaceServiceClient) SetDefaultSafeguards(ctx context.Context, req *
 func (c *workspaceServiceClient) DeleteWorkspace(ctx context.Context, req *v1.DeleteWorkspaceRequest) (*v1.DeleteWorkspaceResponse, error) {
 	var res v1.DeleteWorkspaceResponse
 	if err := c.client.CallUnary(ctx, workspaceServiceDeleteWorkspaceSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *workspaceServiceClient) ListUsers(ctx context.Context, req *v1.ListUsersRequest) (*v1.ListUsersResponse, error) {
-	var res v1.ListUsersResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceListUsersSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *workspaceServiceClient) GetUser(ctx context.Context, req *v1.GetUserRequest) (*v1.GetUserResponse, error) {
-	var res v1.GetUserResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceGetUserSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *workspaceServiceClient) UpdateUserRole(ctx context.Context, req *v1.UpdateUserRoleRequest) (*v1.UpdateUserRoleResponse, error) {
-	var res v1.UpdateUserRoleResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceUpdateUserRoleSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *workspaceServiceClient) DeactivateUser(ctx context.Context, req *v1.DeactivateUserRequest) (*v1.DeactivateUserResponse, error) {
-	var res v1.DeactivateUserResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceDeactivateUserSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *workspaceServiceClient) ReactivateUser(ctx context.Context, req *v1.ReactivateUserRequest) (*v1.ReactivateUserResponse, error) {
-	var res v1.ReactivateUserResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceReactivateUserSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *workspaceServiceClient) DeleteUser(ctx context.Context, req *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
-	var res v1.DeleteUserResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceDeleteUserSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *workspaceServiceClient) ClearUserIdentities(ctx context.Context, req *v1.ClearUserIdentitiesRequest) (*v1.ClearUserIdentitiesResponse, error) {
-	var res v1.ClearUserIdentitiesResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceClearUserIdentitiesSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *workspaceServiceClient) TransferOwnership(ctx context.Context, req *v1.TransferOwnershipRequest) (*v1.TransferOwnershipResponse, error) {
-	var res v1.TransferOwnershipResponse
-	if err := c.client.CallUnary(ctx, workspaceServiceTransferOwnershipSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -535,102 +327,6 @@ func (h workspaceServiceHandler) deleteWorkspace(ctx context.Context, _ connect.
 		return err
 	}
 	res, err := h.svc.DeleteWorkspace(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h workspaceServiceHandler) listUsers(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.ListUsersRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.ListUsers(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h workspaceServiceHandler) getUser(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.GetUserRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.GetUser(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h workspaceServiceHandler) updateUserRole(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.UpdateUserRoleRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.UpdateUserRole(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h workspaceServiceHandler) deactivateUser(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.DeactivateUserRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.DeactivateUser(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h workspaceServiceHandler) reactivateUser(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.ReactivateUserRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.ReactivateUser(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h workspaceServiceHandler) deleteUser(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.DeleteUserRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.DeleteUser(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h workspaceServiceHandler) clearUserIdentities(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.ClearUserIdentitiesRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.ClearUserIdentities(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h workspaceServiceHandler) transferOwnership(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.TransferOwnershipRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.TransferOwnership(ctx, &req)
 	if err != nil {
 		return err
 	}

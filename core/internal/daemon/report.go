@@ -106,7 +106,7 @@ func (p *Pool) storeReport(ctx context.Context, daemon *db.GetDaemonRow, report 
 		}
 		events = append(events, event(kind, r.GetConnectionId(), action, parts.SubjectID, details))
 	}
-	if n := report.GetDropped(); n > 0 {
+	if n := report.GetDroppedCount(); n > 0 {
 		events = append(events, event("dropped", reported[0].GetConnectionId(), actionReportsDropped,
 			daemon.Daemon.ID, map[string]any{"name": daemon.Name, "count": n}))
 	}

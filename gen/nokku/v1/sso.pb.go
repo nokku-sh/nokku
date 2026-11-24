@@ -25,16 +25,16 @@ const (
 
 type SSOProvider struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	ProviderId           *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
+	Id                   *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
 	Enabled              *bool                  `protobuf:"varint,3,opt,name=enabled" json:"enabled,omitempty"`
 	IssuerUrl            *string                `protobuf:"bytes,4,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
 	ClientId             *string                `protobuf:"bytes,5,opt,name=client_id,json=clientId" json:"client_id,omitempty"`
 	Scopes               []string               `protobuf:"bytes,6,rep,name=scopes" json:"scopes,omitempty"`
 	JitProvisioning      *bool                  `protobuf:"varint,7,opt,name=jit_provisioning,json=jitProvisioning" json:"jit_provisioning,omitempty"`
-	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	TrustUnverifiedEmail *bool                  `protobuf:"varint,10,opt,name=trust_unverified_email,json=trustUnverifiedEmail" json:"trust_unverified_email,omitempty"`
+	TrustUnverifiedEmail *bool                  `protobuf:"varint,8,opt,name=trust_unverified_email,json=trustUnverifiedEmail" json:"trust_unverified_email,omitempty"`
+	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -69,9 +69,9 @@ func (*SSOProvider) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SSOProvider) GetProviderId() string {
-	if x != nil && x.ProviderId != nil {
-		return *x.ProviderId
+func (x *SSOProvider) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
 	}
 	return ""
 }
@@ -118,6 +118,13 @@ func (x *SSOProvider) GetJitProvisioning() bool {
 	return false
 }
 
+func (x *SSOProvider) GetTrustUnverifiedEmail() bool {
+	if x != nil && x.TrustUnverifiedEmail != nil {
+		return *x.TrustUnverifiedEmail
+	}
+	return false
+}
+
 func (x *SSOProvider) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
@@ -130,13 +137,6 @@ func (x *SSOProvider) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
-}
-
-func (x *SSOProvider) GetTrustUnverifiedEmail() bool {
-	if x != nil && x.TrustUnverifiedEmail != nil {
-		return *x.TrustUnverifiedEmail
-	}
-	return false
 }
 
 type ListSSOProvidersRequest struct {
@@ -229,7 +229,7 @@ func (x *ListSSOProvidersResponse) GetRedirectUri() string {
 
 type PutSSOProviderRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	ProviderId           *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
+	Id                   *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Name                 *string                `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
 	Enabled              *bool                  `protobuf:"varint,3,opt,name=enabled" json:"enabled,omitempty"`
 	IssuerUrl            *string                `protobuf:"bytes,4,opt,name=issuer_url,json=issuerUrl" json:"issuer_url,omitempty"`
@@ -272,9 +272,9 @@ func (*PutSSOProviderRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *PutSSOProviderRequest) GetProviderId() string {
-	if x != nil && x.ProviderId != nil {
-		return *x.ProviderId
+func (x *PutSSOProviderRequest) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
 	}
 	return ""
 }
@@ -381,7 +381,7 @@ func (x *PutSSOProviderResponse) GetProvider() *SSOProvider {
 
 type DeleteSSOProviderRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProviderId    *string                `protobuf:"bytes,1,opt,name=provider_id,json=providerId" json:"provider_id,omitempty"`
+	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -416,9 +416,9 @@ func (*DeleteSSOProviderRequest) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_sso_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *DeleteSSOProviderRequest) GetProviderId() string {
-	if x != nil && x.ProviderId != nil {
-		return *x.ProviderId
+func (x *DeleteSSOProviderRequest) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
 	}
 	return ""
 }
@@ -463,30 +463,28 @@ var File_nokku_v1_sso_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\n" +
-	"\x12nokku/v1/sso.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x87\x03\n" +
-	"\vSSOProvider\x12\x1f\n" +
-	"\vprovider_id\x18\x01 \x01(\tR\n" +
-	"providerId\x12\x12\n" +
+	"\x12nokku/v1/sso.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xf6\x02\n" +
+	"\vSSOProvider\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\aenabled\x18\x03 \x01(\bR\aenabled\x12\x1d\n" +
 	"\n" +
 	"issuer_url\x18\x04 \x01(\tR\tissuerUrl\x12\x1b\n" +
 	"\tclient_id\x18\x05 \x01(\tR\bclientId\x12\x16\n" +
 	"\x06scopes\x18\x06 \x03(\tR\x06scopes\x12)\n" +
-	"\x10jit_provisioning\x18\a \x01(\bR\x0fjitProvisioning\x129\n" +
+	"\x10jit_provisioning\x18\a \x01(\bR\x0fjitProvisioning\x124\n" +
+	"\x16trust_unverified_email\x18\b \x01(\bR\x14trustUnverifiedEmail\x129\n" +
 	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x124\n" +
-	"\x16trust_unverified_email\x18\n" +
-	" \x01(\bR\x14trustUnverifiedEmail\"\x19\n" +
+	"updated_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x19\n" +
 	"\x17ListSSOProvidersRequest\"r\n" +
 	"\x18ListSSOProvidersResponse\x123\n" +
 	"\tproviders\x18\x01 \x03(\v2\x15.nokku.v1.SSOProviderR\tproviders\x12!\n" +
-	"\fredirect_uri\x18\x02 \x01(\tR\vredirectUri\"\x85\x03\n" +
-	"\x15PutSSOProviderRequest\x128\n" +
-	"\vprovider_id\x18\x01 \x01(\tB\x17\xbaH\x14r\x12\x10\x01\x18@2\f^[a-z0-9-]+$R\n" +
-	"providerId\x12\x1e\n" +
+	"\fredirect_uri\x18\x02 \x01(\tR\vredirectUri\"\xf4\x02\n" +
+	"\x15PutSSOProviderRequest\x12'\n" +
+	"\x02id\x18\x01 \x01(\tB\x17\xbaH\x14r\x12\x10\x01\x18@2\f^[a-z0-9-]+$R\x02id\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04name\x12\x18\n" +
 	"\aenabled\x18\x03 \x01(\bR\aenabled\x12'\n" +
@@ -499,16 +497,15 @@ const file_nokku_v1_sso_proto_rawDesc = "" +
 	"\x10jit_provisioning\x18\b \x01(\bR\x0fjitProvisioning\x124\n" +
 	"\x16trust_unverified_email\x18\t \x01(\bR\x14trustUnverifiedEmail\"K\n" +
 	"\x16PutSSOProviderResponse\x121\n" +
-	"\bprovider\x18\x01 \x01(\v2\x15.nokku.v1.SSOProviderR\bprovider\"D\n" +
-	"\x18DeleteSSOProviderRequest\x12(\n" +
-	"\vprovider_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +
-	"providerId\"\x1b\n" +
+	"\bprovider\x18\x01 \x01(\v2\x15.nokku.v1.SSOProviderR\bprovider\"3\n" +
+	"\x18DeleteSSOProviderRequest\x12\x17\n" +
+	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x02id\"\x1b\n" +
 	"\x19DeleteSSOProviderResponse2\xbb\x02\n" +
 	"\n" +
 	"SSOService\x12f\n" +
-	"\x10ListSSOProviders\x12!.nokku.v1.ListSSOProvidersRequest\x1a\".nokku.v1.ListSSOProvidersResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01\x12]\n" +
-	"\x0ePutSSOProvider\x12\x1f.nokku.v1.PutSSOProviderRequest\x1a .nokku.v1.PutSSOProviderResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01\x12f\n" +
-	"\x11DeleteSSOProvider\x12\".nokku.v1.DeleteSSOProviderRequest\x1a#.nokku.v1.DeleteSSOProviderResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01B\x89\x01\n" +
+	"\x10ListSSOProviders\x12!.nokku.v1.ListSSOProvidersRequest\x1a\".nokku.v1.ListSSOProvidersResponse\"\v\xc2\xf3\x18\x04\x18\x020\x01\x90\x02\x01\x12]\n" +
+	"\x0ePutSSOProvider\x12\x1f.nokku.v1.PutSSOProviderRequest\x1a .nokku.v1.PutSSOProviderResponse\"\b\xc2\xf3\x18\x04\x18\x05 \x01\x12f\n" +
+	"\x11DeleteSSOProvider\x12\".nokku.v1.DeleteSSOProviderRequest\x1a#.nokku.v1.DeleteSSOProviderResponse\"\b\xc2\xf3\x18\x04\x18\x05 \x01B\x89\x01\n" +
 	"\fcom.nokku.v1B\bSsoProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

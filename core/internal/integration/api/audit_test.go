@@ -219,14 +219,14 @@ func TestMyActivityFilters(t *testing.T) {
 	_, err := nokkuv1connect.NewTeamServiceClient(conn).CreateTeam(t.Context(), &nokkuv1.CreateTeamRequest{Name: &name})
 	require.NoError(t, err)
 
-	util := nokkuv1connect.NewUtilServiceClient(conn)
+	logs := nokkuv1connect.NewAuditLogServiceClient(conn)
 	actions := func(f *nokkuv1.AuditLogFilter) []string {
-		res, err := util.ListMyActivity(t.Context(), &nokkuv1.ListMyActivityRequest{
+		res, err := logs.ListMyActivity(t.Context(), &nokkuv1.ListMyActivityRequest{
 			Limit: new(int32(100)), Filter: f,
 		})
 		require.NoError(t, err)
 		var out []string
-		for _, l := range res.GetLogs() {
+		for _, l := range res.GetEvents() {
 			assert.Equal(t, editor.ID, l.GetActorId(), "someone else's event")
 			out = append(out, l.GetAction())
 		}
@@ -247,10 +247,7 @@ func TestAuditNamesTheApproval(t *testing.T) {
 	_, enrolled := enrollTestDaemon(t, cfg, srv, testWorkspace.ID, false)
 	daemons := nokkuv1connect.NewDaemonServiceClient(clientOn(srv, header("Authorization",
 		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR))))
-	_, err := daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
-		Id:     new(enrolled.GetId()),
-		Status: nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
-	}))
+	_, err := daemons.ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(enrolled.GetId())})
 	require.NoError(t, err)
 
 	var rows []*db.ListAuditLogsRow
@@ -272,7 +269,7 @@ func TestAuditNamesTheApproval(t *testing.T) {
 func TestPollAuditLogsReadsForwardFromTheCursor(t *testing.T) {
 	cfg, srv := enterprise(t)
 	viewer := seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)
-	util := nokkuv1connect.NewUtilServiceClient(clientOn(srv, header("Authorization", "Bearer "+viewer)))
+	logs := nokkuv1connect.NewAuditLogServiceClient(clientOn(srv, header("Authorization", "Bearer "+viewer)))
 
 	owner, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
@@ -285,28 +282,28 @@ func TestPollAuditLogsReadsForwardFromTheCursor(t *testing.T) {
 	require.NoError(t, err, "seed")
 
 	poll := func(cursor string, limit int32) *nokkuv1.PollAuditLogsResponse {
-		res, err := util.PollAuditLogs(t.Context(), &nokkuv1.PollAuditLogsRequest{Cursor: &cursor, Limit: &limit})
+		res, err := logs.PollAuditLogs(t.Context(), &nokkuv1.PollAuditLogsRequest{Cursor: &cursor, Limit: &limit})
 		require.NoError(t, err, "poll from %q", cursor)
 		return res
 	}
 	before := strconv.FormatInt(base.UnixMicro()-1, 10) + "." + uuid.Nil().String()
 
 	first := poll(before, 1)
-	require.Len(t, first.GetLogs(), 1)
-	assert.Equal(t, "PollFirst", first.GetLogs()[0].GetAction())
+	require.Len(t, first.GetEvents(), 1)
+	assert.Equal(t, "PollFirst", first.GetEvents()[0].GetAction())
 	second := poll(first.GetCursor(), 1)
-	require.Len(t, second.GetLogs(), 1, "the cursor skipped or repeated an event")
-	assert.Equal(t, "PollSecond", second.GetLogs()[0].GetAction())
+	require.Len(t, second.GetEvents(), 1, "the cursor skipped or repeated an event")
+	assert.Equal(t, "PollSecond", second.GetEvents()[0].GetAction())
 
 	rest := poll(second.GetCursor(), 1000)
-	for _, l := range rest.GetLogs() {
+	for _, l := range rest.GetEvents() {
 		assert.NotEqual(t, "PollFresh", l.GetAction(), "an event younger than the settle window went out")
 	}
-	if len(rest.GetLogs()) == 0 {
+	if len(rest.GetEvents()) == 0 {
 		assert.Equal(t, second.GetCursor(), rest.GetCursor(), "an empty answer keeps the cursor")
 	}
 
-	_, err = util.PollAuditLogs(
+	_, err = logs.PollAuditLogs(
 		t.Context(),
 		&nokkuv1.PollAuditLogsRequest{Cursor: new("yesterday"), Limit: new(int32(1))},
 	)

@@ -7,7 +7,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import { displayName } from '#lib/utils.js';
 	import { Server, UserPlus } from '@lucide/svelte';
 	import ServerRow from './ServerRow.svelte';
@@ -29,7 +29,7 @@
 
 	let searchQuery = $state('');
 
-	const filtered = $derived(servers.list.filter((t) => serverMatches(t, searchQuery)));
+	const filtered = $derived(servers.list.filter((s) => serverMatches(s, searchQuery)));
 </script>
 
 <div class="flex h-full flex-col">
@@ -37,7 +37,7 @@
 		<div class="mb-2 flex items-center justify-between">
 			<h2 class="text-sm font-semibold">Your servers</h2>
 			<Badge variant="outline" class="text-xs">
-				{servers.list.filter(servers.online).length} online
+				{servers.list.filter((s) => servers.online(s.target)).length} online
 			</Badge>
 		</div>
 		<InputGroupVariants variant="search" bind:value={searchQuery} searchResults={filtered.length} />
@@ -78,8 +78,13 @@
 			</Empty.Root>
 		{:else}
 			<div class="flex flex-col gap-0.5 p-1.5">
-				{#each filtered as target (target.id)}
-					<ServerRow {target} why={servers.why(target)} records={servers.records(target)} />
+				{#each filtered as { target, logins } (target.id)}
+					<ServerRow
+						{target}
+						usernames={logins.map((l) => l.username)}
+						why={servers.why(target)}
+						records={servers.records(target)}
+					/>
 				{/each}
 			</div>
 		{/if}

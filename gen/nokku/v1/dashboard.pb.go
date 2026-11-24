@@ -124,14 +124,14 @@ func (x *LiveSession) GetStartedAt() *timestamppb.Timestamp {
 
 // EndingGrant is a subject's grants on one account that end at the same time, usually given in one go.
 type EndingGrant struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SubjectKind   *SubjectKind           `protobuf:"varint,1,opt,name=subject_kind,json=subjectKind,enum=nokku.v1.SubjectKind" json:"subject_kind,omitempty"`
-	SubjectId     *string                `protobuf:"bytes,2,opt,name=subject_id,json=subjectId" json:"subject_id,omitempty"`
-	SubjectName   *string                `protobuf:"bytes,3,opt,name=subject_name,json=subjectName" json:"subject_name,omitempty"`
-	Username      *string                `protobuf:"bytes,4,opt,name=username" json:"username,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
-	Targets       []*EndingGrant_Target  `protobuf:"bytes,6,rep,name=targets" json:"targets,omitempty"` // the first 20 by name, target_count has them all
-	TargetCount   *int32                 `protobuf:"varint,7,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Subject     *Subject               `protobuf:"bytes,1,opt,name=subject" json:"subject,omitempty"`
+	SubjectName *string                `protobuf:"bytes,2,opt,name=subject_name,json=subjectName" json:"subject_name,omitempty"`
+	Username    *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
+	ExpiresAt   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt" json:"expires_at,omitempty"`
+	// The first 20 by name.
+	Targets       []*EndingGrant_Target `protobuf:"bytes,5,rep,name=targets" json:"targets,omitempty"`
+	TargetCount   *int32                `protobuf:"varint,6,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -166,18 +166,11 @@ func (*EndingGrant) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *EndingGrant) GetSubjectKind() SubjectKind {
-	if x != nil && x.SubjectKind != nil {
-		return *x.SubjectKind
+func (x *EndingGrant) GetSubject() *Subject {
+	if x != nil {
+		return x.Subject
 	}
-	return SubjectKind_SUBJECT_KIND_UNSPECIFIED
-}
-
-func (x *EndingGrant) GetSubjectId() string {
-	if x != nil && x.SubjectId != nil {
-		return *x.SubjectId
-	}
-	return ""
+	return nil
 }
 
 func (x *EndingGrant) GetSubjectName() string {
@@ -253,25 +246,27 @@ func (*GetDashboardRequest) Descriptor() ([]byte, []int) {
 
 type GetDashboardResponse struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
-	Targets             *int32                 `protobuf:"varint,1,opt,name=targets" json:"targets,omitempty"`
-	TargetsOnline       *int32                 `protobuf:"varint,2,opt,name=targets_online,json=targetsOnline" json:"targets_online,omitempty"`
-	TargetsManual       *int32                 `protobuf:"varint,3,opt,name=targets_manual,json=targetsManual" json:"targets_manual,omitempty"`
-	Daemons             *int32                 `protobuf:"varint,4,opt,name=daemons" json:"daemons,omitempty"`
-	DaemonsOnline       *int32                 `protobuf:"varint,5,opt,name=daemons_online,json=daemonsOnline" json:"daemons_online,omitempty"`
-	PendingDaemons      []*Daemon              `protobuf:"bytes,6,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
-	OfflineServers      []*Target              `protobuf:"bytes,7,rep,name=offline_servers,json=offlineServers" json:"offline_servers,omitempty"` // with their daemons, approved but not connected
-	Users               *int32                 `protobuf:"varint,8,opt,name=users" json:"users,omitempty"`
-	RecordingBytes      *int64                 `protobuf:"varint,9,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
-	RecordingQuotaBytes *int64                 `protobuf:"varint,10,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
-	LiveSessions        []*LiveSession         `protobuf:"bytes,11,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
-	Activity            []int32                `protobuf:"varint,12,rep,packed,name=activity" json:"activity,omitempty"`
-	Failures            []int32                `protobuf:"varint,13,rep,packed,name=failures" json:"failures,omitempty"`
-	RecentChanges       []*EventLog            `protobuf:"bytes,14,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
-	DaemonsBehind       *int32                 `protobuf:"varint,15,opt,name=daemons_behind,json=daemonsBehind" json:"daemons_behind,omitempty"`
-	EndingGrants        []*EndingGrant         `protobuf:"bytes,16,rep,name=ending_grants,json=endingGrants" json:"ending_grants,omitempty"` // the next five to end within a day
-	EndingGrantsTotal   *int32                 `protobuf:"varint,17,opt,name=ending_grants_total,json=endingGrantsTotal" json:"ending_grants_total,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	TargetCount         *int32                 `protobuf:"varint,1,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	OnlineTargetCount   *int32                 `protobuf:"varint,2,opt,name=online_target_count,json=onlineTargetCount" json:"online_target_count,omitempty"`
+	ManualTargetCount   *int32                 `protobuf:"varint,3,opt,name=manual_target_count,json=manualTargetCount" json:"manual_target_count,omitempty"`
+	OfflineTargets      []*Target              `protobuf:"bytes,4,rep,name=offline_targets,json=offlineTargets" json:"offline_targets,omitempty"`
+	DaemonCount         *int32                 `protobuf:"varint,5,opt,name=daemon_count,json=daemonCount" json:"daemon_count,omitempty"`
+	OnlineDaemonCount   *int32                 `protobuf:"varint,6,opt,name=online_daemon_count,json=onlineDaemonCount" json:"online_daemon_count,omitempty"`
+	BehindDaemonCount   *int32                 `protobuf:"varint,7,opt,name=behind_daemon_count,json=behindDaemonCount" json:"behind_daemon_count,omitempty"`
+	PendingDaemons      []*Daemon              `protobuf:"bytes,8,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
+	UserCount           *int32                 `protobuf:"varint,9,opt,name=user_count,json=userCount" json:"user_count,omitempty"`
+	RecordingBytes      *int64                 `protobuf:"varint,10,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
+	RecordingQuotaBytes *int64                 `protobuf:"varint,11,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
+	LiveSessions        []*LiveSession         `protobuf:"bytes,12,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
+	// The last 24 hours, oldest first.
+	EventsByHour   []int32       `protobuf:"varint,13,rep,packed,name=events_by_hour,json=eventsByHour" json:"events_by_hour,omitempty"`
+	FailuresByHour []int32       `protobuf:"varint,14,rep,packed,name=failures_by_hour,json=failuresByHour" json:"failures_by_hour,omitempty"`
+	RecentChanges  []*AuditEvent `protobuf:"bytes,15,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
+	// The next five to end within a day.
+	EndingGrants     []*EndingGrant `protobuf:"bytes,16,rep,name=ending_grants,json=endingGrants" json:"ending_grants,omitempty"`
+	EndingGrantCount *int32         `protobuf:"varint,17,opt,name=ending_grant_count,json=endingGrantCount" json:"ending_grant_count,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetDashboardResponse) Reset() {
@@ -304,37 +299,51 @@ func (*GetDashboardResponse) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_dashboard_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *GetDashboardResponse) GetTargets() int32 {
-	if x != nil && x.Targets != nil {
-		return *x.Targets
+func (x *GetDashboardResponse) GetTargetCount() int32 {
+	if x != nil && x.TargetCount != nil {
+		return *x.TargetCount
 	}
 	return 0
 }
 
-func (x *GetDashboardResponse) GetTargetsOnline() int32 {
-	if x != nil && x.TargetsOnline != nil {
-		return *x.TargetsOnline
+func (x *GetDashboardResponse) GetOnlineTargetCount() int32 {
+	if x != nil && x.OnlineTargetCount != nil {
+		return *x.OnlineTargetCount
 	}
 	return 0
 }
 
-func (x *GetDashboardResponse) GetTargetsManual() int32 {
-	if x != nil && x.TargetsManual != nil {
-		return *x.TargetsManual
+func (x *GetDashboardResponse) GetManualTargetCount() int32 {
+	if x != nil && x.ManualTargetCount != nil {
+		return *x.ManualTargetCount
 	}
 	return 0
 }
 
-func (x *GetDashboardResponse) GetDaemons() int32 {
-	if x != nil && x.Daemons != nil {
-		return *x.Daemons
+func (x *GetDashboardResponse) GetOfflineTargets() []*Target {
+	if x != nil {
+		return x.OfflineTargets
+	}
+	return nil
+}
+
+func (x *GetDashboardResponse) GetDaemonCount() int32 {
+	if x != nil && x.DaemonCount != nil {
+		return *x.DaemonCount
 	}
 	return 0
 }
 
-func (x *GetDashboardResponse) GetDaemonsOnline() int32 {
-	if x != nil && x.DaemonsOnline != nil {
-		return *x.DaemonsOnline
+func (x *GetDashboardResponse) GetOnlineDaemonCount() int32 {
+	if x != nil && x.OnlineDaemonCount != nil {
+		return *x.OnlineDaemonCount
+	}
+	return 0
+}
+
+func (x *GetDashboardResponse) GetBehindDaemonCount() int32 {
+	if x != nil && x.BehindDaemonCount != nil {
+		return *x.BehindDaemonCount
 	}
 	return 0
 }
@@ -346,16 +355,9 @@ func (x *GetDashboardResponse) GetPendingDaemons() []*Daemon {
 	return nil
 }
 
-func (x *GetDashboardResponse) GetOfflineServers() []*Target {
-	if x != nil {
-		return x.OfflineServers
-	}
-	return nil
-}
-
-func (x *GetDashboardResponse) GetUsers() int32 {
-	if x != nil && x.Users != nil {
-		return *x.Users
+func (x *GetDashboardResponse) GetUserCount() int32 {
+	if x != nil && x.UserCount != nil {
+		return *x.UserCount
 	}
 	return 0
 }
@@ -381,32 +383,25 @@ func (x *GetDashboardResponse) GetLiveSessions() []*LiveSession {
 	return nil
 }
 
-func (x *GetDashboardResponse) GetActivity() []int32 {
+func (x *GetDashboardResponse) GetEventsByHour() []int32 {
 	if x != nil {
-		return x.Activity
+		return x.EventsByHour
 	}
 	return nil
 }
 
-func (x *GetDashboardResponse) GetFailures() []int32 {
+func (x *GetDashboardResponse) GetFailuresByHour() []int32 {
 	if x != nil {
-		return x.Failures
+		return x.FailuresByHour
 	}
 	return nil
 }
 
-func (x *GetDashboardResponse) GetRecentChanges() []*EventLog {
+func (x *GetDashboardResponse) GetRecentChanges() []*AuditEvent {
 	if x != nil {
 		return x.RecentChanges
 	}
 	return nil
-}
-
-func (x *GetDashboardResponse) GetDaemonsBehind() int32 {
-	if x != nil && x.DaemonsBehind != nil {
-		return *x.DaemonsBehind
-	}
-	return 0
 }
 
 func (x *GetDashboardResponse) GetEndingGrants() []*EndingGrant {
@@ -416,9 +411,9 @@ func (x *GetDashboardResponse) GetEndingGrants() []*EndingGrant {
 	return nil
 }
 
-func (x *GetDashboardResponse) GetEndingGrantsTotal() int32 {
-	if x != nil && x.EndingGrantsTotal != nil {
-		return *x.EndingGrantsTotal
+func (x *GetDashboardResponse) GetEndingGrantCount() int32 {
+	if x != nil && x.EndingGrantCount != nil {
+		return *x.EndingGrantCount
 	}
 	return 0
 }
@@ -479,7 +474,7 @@ var File_nokku_v1_dashboard_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\n" +
-	"\x18nokku/v1/dashboard.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x15nokku/v1/daemon.proto\x1a\x15nokku/v1/target.proto\x1a\x1dnokku/v1/target_account.proto\x1a\x13nokku/v1/util.proto\"\xfb\x01\n" +
+	"\x18nokku/v1/dashboard.proto\x12\bnokku.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x18nokku/v1/audit_log.proto\x1a\x15nokku/v1/daemon.proto\x1a\x16nokku/v1/subject.proto\x1a\x15nokku/v1/target.proto\"\xfb\x01\n" +
 	"\vLiveSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tdaemon_id\x18\x02 \x01(\tR\bdaemonId\x12\x1f\n" +
@@ -490,42 +485,41 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\trecording\x18\x06 \x01(\bR\trecording\x12\x10\n" +
 	"\x03web\x18\a \x01(\bR\x03web\x129\n" +
 	"\n" +
-	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\"\xe9\x02\n" +
-	"\vEndingGrant\x128\n" +
-	"\fsubject_kind\x18\x01 \x01(\x0e2\x15.nokku.v1.SubjectKindR\vsubjectKind\x12\x1d\n" +
+	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\"\xbd\x02\n" +
+	"\vEndingGrant\x12+\n" +
+	"\asubject\x18\x01 \x01(\v2\x11.nokku.v1.SubjectR\asubject\x12!\n" +
+	"\fsubject_name\x18\x02 \x01(\tR\vsubjectName\x12\x1a\n" +
+	"\busername\x18\x03 \x01(\tR\busername\x129\n" +
 	"\n" +
-	"subject_id\x18\x02 \x01(\tR\tsubjectId\x12!\n" +
-	"\fsubject_name\x18\x03 \x01(\tR\vsubjectName\x12\x1a\n" +
-	"\busername\x18\x04 \x01(\tR\busername\x129\n" +
-	"\n" +
-	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x126\n" +
-	"\atargets\x18\x06 \x03(\v2\x1c.nokku.v1.EndingGrant.TargetR\atargets\x12!\n" +
-	"\ftarget_count\x18\a \x01(\x05R\vtargetCount\x1a,\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x126\n" +
+	"\atargets\x18\x05 \x03(\v2\x1c.nokku.v1.EndingGrant.TargetR\atargets\x12!\n" +
+	"\ftarget_count\x18\x06 \x01(\x05R\vtargetCount\x1a,\n" +
 	"\x06Target\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x15\n" +
-	"\x13GetDashboardRequest\"\xea\x05\n" +
-	"\x14GetDashboardResponse\x12\x18\n" +
-	"\atargets\x18\x01 \x01(\x05R\atargets\x12%\n" +
-	"\x0etargets_online\x18\x02 \x01(\x05R\rtargetsOnline\x12%\n" +
-	"\x0etargets_manual\x18\x03 \x01(\x05R\rtargetsManual\x12\x18\n" +
-	"\adaemons\x18\x04 \x01(\x05R\adaemons\x12%\n" +
-	"\x0edaemons_online\x18\x05 \x01(\x05R\rdaemonsOnline\x129\n" +
-	"\x0fpending_daemons\x18\x06 \x03(\v2\x10.nokku.v1.DaemonR\x0ependingDaemons\x129\n" +
-	"\x0foffline_servers\x18\a \x03(\v2\x10.nokku.v1.TargetR\x0eofflineServers\x12\x14\n" +
-	"\x05users\x18\b \x01(\x05R\x05users\x12'\n" +
-	"\x0frecording_bytes\x18\t \x01(\x03R\x0erecordingBytes\x122\n" +
-	"\x15recording_quota_bytes\x18\n" +
-	" \x01(\x03R\x13recordingQuotaBytes\x12:\n" +
-	"\rlive_sessions\x18\v \x03(\v2\x15.nokku.v1.LiveSessionR\fliveSessions\x12\x1a\n" +
-	"\bactivity\x18\f \x03(\x05R\bactivity\x12\x1a\n" +
-	"\bfailures\x18\r \x03(\x05R\bfailures\x129\n" +
-	"\x0erecent_changes\x18\x0e \x03(\v2\x12.nokku.v1.EventLogR\rrecentChanges\x12%\n" +
-	"\x0edaemons_behind\x18\x0f \x01(\x05R\rdaemonsBehind\x12:\n" +
-	"\rending_grants\x18\x10 \x03(\v2\x15.nokku.v1.EndingGrantR\fendingGrants\x12.\n" +
-	"\x13ending_grants_total\x18\x11 \x01(\x05R\x11endingGrantsTotal2n\n" +
+	"\x13GetDashboardRequest\"\xc1\x06\n" +
+	"\x14GetDashboardResponse\x12!\n" +
+	"\ftarget_count\x18\x01 \x01(\x05R\vtargetCount\x12.\n" +
+	"\x13online_target_count\x18\x02 \x01(\x05R\x11onlineTargetCount\x12.\n" +
+	"\x13manual_target_count\x18\x03 \x01(\x05R\x11manualTargetCount\x129\n" +
+	"\x0foffline_targets\x18\x04 \x03(\v2\x10.nokku.v1.TargetR\x0eofflineTargets\x12!\n" +
+	"\fdaemon_count\x18\x05 \x01(\x05R\vdaemonCount\x12.\n" +
+	"\x13online_daemon_count\x18\x06 \x01(\x05R\x11onlineDaemonCount\x12.\n" +
+	"\x13behind_daemon_count\x18\a \x01(\x05R\x11behindDaemonCount\x129\n" +
+	"\x0fpending_daemons\x18\b \x03(\v2\x10.nokku.v1.DaemonR\x0ependingDaemons\x12\x1d\n" +
+	"\n" +
+	"user_count\x18\t \x01(\x05R\tuserCount\x12'\n" +
+	"\x0frecording_bytes\x18\n" +
+	" \x01(\x03R\x0erecordingBytes\x122\n" +
+	"\x15recording_quota_bytes\x18\v \x01(\x03R\x13recordingQuotaBytes\x12:\n" +
+	"\rlive_sessions\x18\f \x03(\v2\x15.nokku.v1.LiveSessionR\fliveSessions\x12$\n" +
+	"\x0eevents_by_hour\x18\r \x03(\x05R\feventsByHour\x12(\n" +
+	"\x10failures_by_hour\x18\x0e \x03(\x05R\x0efailuresByHour\x12;\n" +
+	"\x0erecent_changes\x18\x0f \x03(\v2\x14.nokku.v1.AuditEventR\rrecentChanges\x12:\n" +
+	"\rending_grants\x18\x10 \x03(\v2\x15.nokku.v1.EndingGrantR\fendingGrants\x12,\n" +
+	"\x12ending_grant_count\x18\x11 \x01(\x05R\x10endingGrantCount2n\n" +
 	"\x10DashboardService\x12Z\n" +
-	"\fGetDashboard\x12\x1d.nokku.v1.GetDashboardRequest\x1a\x1e.nokku.v1.GetDashboardResponse\"\v\xc2\xf3\x18\x04\x18\x02h\x01\x90\x02\x01B\x8f\x01\n" +
+	"\fGetDashboard\x12\x1d.nokku.v1.GetDashboardRequest\x1a\x1e.nokku.v1.GetDashboardResponse\"\v\xc2\xf3\x18\x04\x18\x020\x01\x90\x02\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eDashboardProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -548,20 +542,20 @@ var file_nokku_v1_dashboard_proto_goTypes = []any{
 	(*GetDashboardResponse)(nil),  // 3: nokku.v1.GetDashboardResponse
 	(*EndingGrant_Target)(nil),    // 4: nokku.v1.EndingGrant.Target
 	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
-	(SubjectKind)(0),              // 6: nokku.v1.SubjectKind
-	(*Daemon)(nil),                // 7: nokku.v1.Daemon
-	(*Target)(nil),                // 8: nokku.v1.Target
-	(*EventLog)(nil),              // 9: nokku.v1.EventLog
+	(*Subject)(nil),               // 6: nokku.v1.Subject
+	(*Target)(nil),                // 7: nokku.v1.Target
+	(*Daemon)(nil),                // 8: nokku.v1.Daemon
+	(*AuditEvent)(nil),            // 9: nokku.v1.AuditEvent
 }
 var file_nokku_v1_dashboard_proto_depIdxs = []int32{
 	5,  // 0: nokku.v1.LiveSession.started_at:type_name -> google.protobuf.Timestamp
-	6,  // 1: nokku.v1.EndingGrant.subject_kind:type_name -> nokku.v1.SubjectKind
+	6,  // 1: nokku.v1.EndingGrant.subject:type_name -> nokku.v1.Subject
 	5,  // 2: nokku.v1.EndingGrant.expires_at:type_name -> google.protobuf.Timestamp
 	4,  // 3: nokku.v1.EndingGrant.targets:type_name -> nokku.v1.EndingGrant.Target
-	7,  // 4: nokku.v1.GetDashboardResponse.pending_daemons:type_name -> nokku.v1.Daemon
-	8,  // 5: nokku.v1.GetDashboardResponse.offline_servers:type_name -> nokku.v1.Target
+	7,  // 4: nokku.v1.GetDashboardResponse.offline_targets:type_name -> nokku.v1.Target
+	8,  // 5: nokku.v1.GetDashboardResponse.pending_daemons:type_name -> nokku.v1.Daemon
 	0,  // 6: nokku.v1.GetDashboardResponse.live_sessions:type_name -> nokku.v1.LiveSession
-	9,  // 7: nokku.v1.GetDashboardResponse.recent_changes:type_name -> nokku.v1.EventLog
+	9,  // 7: nokku.v1.GetDashboardResponse.recent_changes:type_name -> nokku.v1.AuditEvent
 	1,  // 8: nokku.v1.GetDashboardResponse.ending_grants:type_name -> nokku.v1.EndingGrant
 	2,  // 9: nokku.v1.DashboardService.GetDashboard:input_type -> nokku.v1.GetDashboardRequest
 	3,  // 10: nokku.v1.DashboardService.GetDashboard:output_type -> nokku.v1.GetDashboardResponse
@@ -578,10 +572,10 @@ func file_nokku_v1_dashboard_proto_init() {
 		return
 	}
 	file_nokku_v1_access_proto_init()
+	file_nokku_v1_audit_log_proto_init()
 	file_nokku_v1_daemon_proto_init()
+	file_nokku_v1_subject_proto_init()
 	file_nokku_v1_target_proto_init()
-	file_nokku_v1_target_account_proto_init()
-	file_nokku_v1_util_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

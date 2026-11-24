@@ -5,20 +5,21 @@
 	import { fromUser, subjectHref } from '#lib/components/access/subjects.svelte.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
-	import type { AccessMatrixRow } from '#lib/gen/nokku/v1/target_pb.js';
-	import { SubjectKind } from '#lib/gen/nokku/v1/target_account_pb.js';
+	import { type AccessMatrixCell } from '#lib/gen/nokku/v1/access_view_pb.js';
+	import { SubjectKind } from '#lib/gen/nokku/v1/subject_pb.js';
 	import { cn } from '#lib/utils.js';
 
-	let { row, tags }: { row: AccessMatrixRow; tags: string[] } = $props();
+	let { teamId, cells, tags }: { teamId: string; cells: AccessMatrixCell[]; tags: string[] } =
+		$props();
 
 	const SHOWN = 20;
 
-	const members = team.members(() => row.subjectId);
+	const members = team.members(() => teamId);
 	// Deactivated people still count as members but can't log in, so they go last and get nothing.
 	const people = $derived(
 		[...(members.data ?? [])].sort((a, b) => Number(b.active) - Number(a.active))
 	);
-	const held = $derived(new Set(row.cells.map((c) => c.tag)));
+	const held = $derived(new Set(cells.map((c) => c.tag)));
 </script>
 
 {#if members.isLoading || !people.length}
@@ -72,7 +73,7 @@
 			<Table.Cell
 				class="sticky left-0 z-10 max-w-40 border-b bg-card py-2 pl-10 text-xs sm:max-w-64"
 			>
-				<a href={subjectHref(SubjectKind.TEAM, row.subjectId)} class="hover:underline">
+				<a href={subjectHref(SubjectKind.TEAM, teamId)} class="hover:underline">
 					{plural(people.length - SHOWN, 'more member')} in the team
 				</a>
 			</Table.Cell>

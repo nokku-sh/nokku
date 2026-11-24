@@ -10,35 +10,35 @@ service SSOService {
   rpc ListSSOProviders(ListSSOProvidersRequest) returns (ListSSOProvidersResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc PutSSOProvider(PutSSOProviderRequest) returns (PutSSOProviderResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc DeleteSSOProvider(DeleteSSOProviderRequest) returns (DeleteSSOProviderResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_OWNER
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
 }
 
 message SSOProvider {
-  string provider_id = 1;
+  string id = 1;
   string name = 2;
   bool enabled = 3;
   string issuer_url = 4;
   string client_id = 5;
   repeated string scopes = 6;
   bool jit_provisioning = 7;
-  google.protobuf.Timestamp created_at = 8;
-  google.protobuf.Timestamp updated_at = 9;
-  bool trust_unverified_email = 10;
+  bool trust_unverified_email = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
 }
 
 message ListSSOProvidersRequest {}
@@ -48,7 +48,7 @@ message ListSSOProvidersResponse {
 }
 
 message PutSSOProviderRequest {
-  string provider_id = 1 [(buf.validate.field).string = {
+  string id = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 64
     pattern: "^[a-z0-9-]+$"
@@ -73,6 +73,6 @@ message PutSSOProviderResponse {
 }
 
 message DeleteSSOProviderRequest {
-  string provider_id = 1 [(buf.validate.field).string.min_len = 1];
+  string id = 1 [(buf.validate.field).string.min_len = 1];
 }
 message DeleteSSOProviderResponse {}

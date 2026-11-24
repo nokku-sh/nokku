@@ -28,12 +28,9 @@ type AuditStreamKind int32
 
 const (
 	AuditStreamKind_AUDIT_STREAM_KIND_UNSPECIFIED AuditStreamKind = 0
-	// WEBHOOK posts a JSON array, signed with an HMAC of the secret in X-Nokku-Signature.
-	AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK AuditStreamKind = 1
-	// SPLUNK posts to an HTTP Event Collector, the secret is the HEC token.
-	AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK AuditStreamKind = 2
-	// DATADOG posts to the logs intake, the secret is the API key.
-	AuditStreamKind_AUDIT_STREAM_KIND_DATADOG AuditStreamKind = 3
+	AuditStreamKind_AUDIT_STREAM_KIND_WEBHOOK     AuditStreamKind = 1
+	AuditStreamKind_AUDIT_STREAM_KIND_SPLUNK      AuditStreamKind = 2
+	AuditStreamKind_AUDIT_STREAM_KIND_DATADOG     AuditStreamKind = 3
 )
 
 // Enum value maps for AuditStreamKind.
@@ -85,8 +82,8 @@ type AuditStream struct {
 	Kind          *AuditStreamKind       `protobuf:"varint,2,opt,name=kind,enum=nokku.v1.AuditStreamKind" json:"kind,omitempty"`
 	Url           *string                `protobuf:"bytes,3,opt,name=url" json:"url,omitempty"`
 	Enabled       *bool                  `protobuf:"varint,4,opt,name=enabled" json:"enabled,omitempty"`
-	LastSentAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_sent_at,json=lastSentAt" json:"last_sent_at,omitempty"`
-	LastError     *string                `protobuf:"bytes,6,opt,name=last_error,json=lastError" json:"last_error,omitempty"`
+	LastError     *string                `protobuf:"bytes,5,opt,name=last_error,json=lastError" json:"last_error,omitempty"`
+	LastSentAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_sent_at,json=lastSentAt" json:"last_sent_at,omitempty"`
 	FailingSince  *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=failing_since,json=failingSince" json:"failing_since,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -151,18 +148,18 @@ func (x *AuditStream) GetEnabled() bool {
 	return false
 }
 
-func (x *AuditStream) GetLastSentAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.LastSentAt
-	}
-	return nil
-}
-
 func (x *AuditStream) GetLastError() string {
 	if x != nil && x.LastError != nil {
 		return *x.LastError
 	}
 	return ""
+}
+
+func (x *AuditStream) GetLastSentAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSentAt
+	}
+	return nil
 }
 
 func (x *AuditStream) GetFailingSince() *timestamppb.Timestamp {
@@ -260,10 +257,11 @@ func (x *ListAuditStreamsResponse) GetStreams() []*AuditStream {
 }
 
 type CreateAuditStreamRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Kind          *AuditStreamKind       `protobuf:"varint,1,opt,name=kind,enum=nokku.v1.AuditStreamKind" json:"kind,omitempty"`
-	Url           *string                `protobuf:"bytes,2,opt,name=url" json:"url,omitempty"`
-	Secret        *string                `protobuf:"bytes,3,opt,name=secret" json:"secret,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Kind  *AuditStreamKind       `protobuf:"varint,1,opt,name=kind,enum=nokku.v1.AuditStreamKind" json:"kind,omitempty"`
+	Url   *string                `protobuf:"bytes,2,opt,name=url" json:"url,omitempty"`
+	// The webhook HMAC key, the Splunk HEC token or the Datadog API key.
+	Secret        *string `protobuf:"bytes,3,opt,name=secret" json:"secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -652,11 +650,11 @@ const file_nokku_v1_audit_stream_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x19.nokku.v1.AuditStreamKindR\x04kind\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x12\x18\n" +
-	"\aenabled\x18\x04 \x01(\bR\aenabled\x12<\n" +
-	"\flast_sent_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastSentAt\x12\x1d\n" +
+	"\aenabled\x18\x04 \x01(\bR\aenabled\x12\x1d\n" +
 	"\n" +
-	"last_error\x18\x06 \x01(\tR\tlastError\x12?\n" +
+	"last_error\x18\x05 \x01(\tR\tlastError\x12<\n" +
+	"\flast_sent_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastSentAt\x12?\n" +
 	"\rfailing_since\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\ffailingSince\x129\n" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x19\n" +
@@ -693,11 +691,11 @@ const file_nokku_v1_audit_stream_proto_rawDesc = "" +
 	"\x18AUDIT_STREAM_KIND_SPLUNK\x10\x02\x12\x1d\n" +
 	"\x19AUDIT_STREAM_KIND_DATADOG\x10\x032\xb8\x04\n" +
 	"\x12AuditStreamService\x12f\n" +
-	"\x10ListAuditStreams\x12!.nokku.v1.ListAuditStreamsRequest\x1a\".nokku.v1.ListAuditStreamsResponse\"\v\xc2\xf3\x18\x04\x18\x05h\x01\x90\x02\x01\x12w\n" +
-	"\x11CreateAuditStream\x12\".nokku.v1.CreateAuditStreamRequest\x1a#.nokku.v1.CreateAuditStreamResponse\"\x19\xc2\xf3\x18\x15\x18\x05:\x0faudit_streaming`\x01\x12f\n" +
-	"\x11UpdateAuditStream\x12\".nokku.v1.UpdateAuditStreamRequest\x1a#.nokku.v1.UpdateAuditStreamResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01\x12f\n" +
-	"\x11DeleteAuditStream\x12\".nokku.v1.DeleteAuditStreamRequest\x1a#.nokku.v1.DeleteAuditStreamResponse\"\b\xc2\xf3\x18\x04\x18\x05`\x01\x12q\n" +
-	"\x0fTestAuditStream\x12 .nokku.v1.TestAuditStreamRequest\x1a!.nokku.v1.TestAuditStreamResponse\"\x19\xc2\xf3\x18\x15\x18\x05:\x0faudit_streamingh\x01B\x91\x01\n" +
+	"\x10ListAuditStreams\x12!.nokku.v1.ListAuditStreamsRequest\x1a\".nokku.v1.ListAuditStreamsResponse\"\v\xc2\xf3\x18\x04\x18\x050\x01\x90\x02\x01\x12w\n" +
+	"\x11CreateAuditStream\x12\".nokku.v1.CreateAuditStreamRequest\x1a#.nokku.v1.CreateAuditStreamResponse\"\x19\xc2\xf3\x18\x15\x18\x05 \x01:\x0faudit_streaming\x12f\n" +
+	"\x11UpdateAuditStream\x12\".nokku.v1.UpdateAuditStreamRequest\x1a#.nokku.v1.UpdateAuditStreamResponse\"\b\xc2\xf3\x18\x04\x18\x05 \x01\x12f\n" +
+	"\x11DeleteAuditStream\x12\".nokku.v1.DeleteAuditStreamRequest\x1a#.nokku.v1.DeleteAuditStreamResponse\"\b\xc2\xf3\x18\x04\x18\x05 \x01\x12q\n" +
+	"\x0fTestAuditStream\x12 .nokku.v1.TestAuditStreamRequest\x1a!.nokku.v1.TestAuditStreamResponse\"\x19\xc2\xf3\x18\x15\x18\x050\x01:\x0faudit_streamingB\x91\x01\n" +
 	"\fcom.nokku.v1B\x10AuditStreamProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (

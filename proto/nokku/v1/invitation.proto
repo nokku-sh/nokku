@@ -5,9 +5,8 @@ package nokku.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "nokku/v1/access.proto";
-import "nokku/v1/account.proto";
+import "nokku/v1/user.proto";
 
-// An invite names one address and one role, and works once. Only Join spends it, opening the link does not.
 service InvitationService {
   rpc GetInvitation(GetInvitationRequest) returns (GetInvitationResponse) {
     option (access) = {public: true};
@@ -19,20 +18,20 @@ service InvitationService {
   rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      browser: BROWSER_FRESH
+      fresh: true
     };
   }
   rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      machine: true
+      service_account: true
     };
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc DeleteInvitation(DeleteInvitationRequest) returns (DeleteInvitationResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_ADMIN
-      machine: true
+      service_account: true
     };
   }
 }
@@ -67,7 +66,6 @@ message AcceptInvitationResponse {
 
 message CreateInvitationRequest {
   string email = 1 [(buf.validate.field).string.email = true];
-  // No role is a member. The owner is never invited.
   WorkspaceRole role = 2 [(buf.validate.field).enum = {
     in: [
       0,

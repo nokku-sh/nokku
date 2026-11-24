@@ -136,7 +136,7 @@ func answer(
 	if daemon != nil && daemon.Status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
 		// Zero is off, which is what an unset field says too.
 		if idle := settings.GetSessionIdleTimeout(); idle.AsDuration() > 0 {
-			res.Config.IdleTimeout = idle
+			res.IdleTimeout = idle
 		}
 		res.UserCaPublicKey = &ca.UserPublicKey
 		res.HostCaPublicKey = &ca.HostPublicKey

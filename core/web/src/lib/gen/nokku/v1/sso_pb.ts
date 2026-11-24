@@ -14,16 +14,16 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file nokku/v1/sso.proto.
  */
 export const file_nokku_v1_sso: GenFile = /*@__PURE__*/
-  fileDesc("ChJub2trdS92MS9zc28ucHJvdG8SCG5va2t1LnYxIpICCgtTU09Qcm92aWRlchITCgtwcm92aWRlcl9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB2VuYWJsZWQYAyABKAgSEgoKaXNzdWVyX3VybBgEIAEoCRIRCgljbGllbnRfaWQYBSABKAkSDgoGc2NvcGVzGAYgAygJEhgKEGppdF9wcm92aXNpb25pbmcYByABKAgSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHgoWdHJ1c3RfdW52ZXJpZmllZF9lbWFpbBgKIAEoCCIZChdMaXN0U1NPUHJvdmlkZXJzUmVxdWVzdCJaChhMaXN0U1NPUHJvdmlkZXJzUmVzcG9uc2USKAoJcHJvdmlkZXJzGAEgAygLMhUubm9ra3UudjEuU1NPUHJvdmlkZXISFAoMcmVkaXJlY3RfdXJpGAIgASgJIpgCChVQdXRTU09Qcm92aWRlclJlcXVlc3QSLAoLcHJvdmlkZXJfaWQYASABKAlCF7pIFHISEAEYQDIMXlthLXowLTktXSskEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISDwoHZW5hYmxlZBgDIAEoCBIcCgppc3N1ZXJfdXJsGAQgASgJQgi6SAVyA4gBARIdCgljbGllbnRfaWQYBSABKAlCCrpIB3IFEAEY6AcSHwoNY2xpZW50X3NlY3JldBgGIAEoCUIIukgFcgMY6AcSDgoGc2NvcGVzGAcgAygJEhgKEGppdF9wcm92aXNpb25pbmcYCCABKAgSHgoWdHJ1c3RfdW52ZXJpZmllZF9lbWFpbBgJIAEoCCJBChZQdXRTU09Qcm92aWRlclJlc3BvbnNlEicKCHByb3ZpZGVyGAEgASgLMhUubm9ra3UudjEuU1NPUHJvdmlkZXIiOAoYRGVsZXRlU1NPUHJvdmlkZXJSZXF1ZXN0EhwKC3Byb3ZpZGVyX2lkGAEgASgJQge6SARyAhABIhsKGURlbGV0ZVNTT1Byb3ZpZGVyUmVzcG9uc2UyuwIKClNTT1NlcnZpY2USZgoQTGlzdFNTT1Byb3ZpZGVycxIhLm5va2t1LnYxLkxpc3RTU09Qcm92aWRlcnNSZXF1ZXN0GiIubm9ra3UudjEuTGlzdFNTT1Byb3ZpZGVyc1Jlc3BvbnNlIguQAgHC8xgEGAJoARJdCg5QdXRTU09Qcm92aWRlchIfLm5va2t1LnYxLlB1dFNTT1Byb3ZpZGVyUmVxdWVzdBogLm5va2t1LnYxLlB1dFNTT1Byb3ZpZGVyUmVzcG9uc2UiCMLzGAQYBWABEmYKEURlbGV0ZVNTT1Byb3ZpZGVyEiIubm9ra3UudjEuRGVsZXRlU1NPUHJvdmlkZXJSZXF1ZXN0GiMubm9ra3UudjEuRGVsZXRlU1NPUHJvdmlkZXJSZXNwb25zZSIIwvMYBBgFYAFCiQEKDGNvbS5ub2trdS52MUIIU3NvUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
+  fileDesc("ChJub2trdS92MS9zc28ucHJvdG8SCG5va2t1LnYxIokCCgtTU09Qcm92aWRlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB2VuYWJsZWQYAyABKAgSEgoKaXNzdWVyX3VybBgEIAEoCRIRCgljbGllbnRfaWQYBSABKAkSDgoGc2NvcGVzGAYgAygJEhgKEGppdF9wcm92aXNpb25pbmcYByABKAgSHgoWdHJ1c3RfdW52ZXJpZmllZF9lbWFpbBgIIAEoCBIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCIZChdMaXN0U1NPUHJvdmlkZXJzUmVxdWVzdCJaChhMaXN0U1NPUHJvdmlkZXJzUmVzcG9uc2USKAoJcHJvdmlkZXJzGAEgAygLMhUubm9ra3UudjEuU1NPUHJvdmlkZXISFAoMcmVkaXJlY3RfdXJpGAIgASgJIo8CChVQdXRTU09Qcm92aWRlclJlcXVlc3QSIwoCaWQYASABKAlCF7pIFHISEAEYQDIMXlthLXowLTktXSskEhgKBG5hbWUYAiABKAlCCrpIB3IFEAEYgAISDwoHZW5hYmxlZBgDIAEoCBIcCgppc3N1ZXJfdXJsGAQgASgJQgi6SAVyA4gBARIdCgljbGllbnRfaWQYBSABKAlCCrpIB3IFEAEY6AcSHwoNY2xpZW50X3NlY3JldBgGIAEoCUIIukgFcgMY6AcSDgoGc2NvcGVzGAcgAygJEhgKEGppdF9wcm92aXNpb25pbmcYCCABKAgSHgoWdHJ1c3RfdW52ZXJpZmllZF9lbWFpbBgJIAEoCCJBChZQdXRTU09Qcm92aWRlclJlc3BvbnNlEicKCHByb3ZpZGVyGAEgASgLMhUubm9ra3UudjEuU1NPUHJvdmlkZXIiLwoYRGVsZXRlU1NPUHJvdmlkZXJSZXF1ZXN0EhMKAmlkGAEgASgJQge6SARyAhABIhsKGURlbGV0ZVNTT1Byb3ZpZGVyUmVzcG9uc2UyuwIKClNTT1NlcnZpY2USZgoQTGlzdFNTT1Byb3ZpZGVycxIhLm5va2t1LnYxLkxpc3RTU09Qcm92aWRlcnNSZXF1ZXN0GiIubm9ra3UudjEuTGlzdFNTT1Byb3ZpZGVyc1Jlc3BvbnNlIguQAgHC8xgEGAIwARJdCg5QdXRTU09Qcm92aWRlchIfLm5va2t1LnYxLlB1dFNTT1Byb3ZpZGVyUmVxdWVzdBogLm5va2t1LnYxLlB1dFNTT1Byb3ZpZGVyUmVzcG9uc2UiCMLzGAQYBSABEmYKEURlbGV0ZVNTT1Byb3ZpZGVyEiIubm9ra3UudjEuRGVsZXRlU1NPUHJvdmlkZXJSZXF1ZXN0GiMubm9ra3UudjEuRGVsZXRlU1NPUHJvdmlkZXJSZXNwb25zZSIIwvMYBBgFIAFCiQEKDGNvbS5ub2trdS52MUIIU3NvUHJvdG9QAVouZ2l0aHViLmNvbS9ub2trdS1zaC9ub2trdS9nZW4vbm9ra3UvdjE7bm9ra3V2MaICA05YWKoCCE5va2t1LlYxygIITm9ra3VcVjHiAhROb2trdVxWMVxHUEJNZXRhZGF0YeoCCU5va2t1OjpWMWIIZWRpdGlvbnNw6Ac", [file_buf_validate_validate, file_google_protobuf_timestamp, file_nokku_v1_access]);
 
 /**
  * @generated from message nokku.v1.SSOProvider
  */
 export type SSOProvider = Message<"nokku.v1.SSOProvider"> & {
   /**
-   * @generated from field: string provider_id = 1;
+   * @generated from field: string id = 1;
    */
-  providerId: string;
+  id: string;
 
   /**
    * @generated from field: string name = 2;
@@ -56,19 +56,19 @@ export type SSOProvider = Message<"nokku.v1.SSOProvider"> & {
   jitProvisioning: boolean;
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 8;
+   * @generated from field: bool trust_unverified_email = 8;
+   */
+  trustUnverifiedEmail: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 9;
    */
   createdAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 9;
+   * @generated from field: google.protobuf.Timestamp updated_at = 10;
    */
   updatedAt?: Timestamp | undefined;
-
-  /**
-   * @generated from field: bool trust_unverified_email = 10;
-   */
-  trustUnverifiedEmail: boolean;
 };
 
 /**
@@ -118,9 +118,9 @@ export const ListSSOProvidersResponseSchema: GenMessage<ListSSOProvidersResponse
  */
 export type PutSSOProviderRequest = Message<"nokku.v1.PutSSOProviderRequest"> & {
   /**
-   * @generated from field: string provider_id = 1;
+   * @generated from field: string id = 1;
    */
-  providerId: string;
+  id: string;
 
   /**
    * @generated from field: string name = 2;
@@ -192,9 +192,9 @@ export const PutSSOProviderResponseSchema: GenMessage<PutSSOProviderResponse> = 
  */
 export type DeleteSSOProviderRequest = Message<"nokku.v1.DeleteSSOProviderRequest"> & {
   /**
-   * @generated from field: string provider_id = 1;
+   * @generated from field: string id = 1;
    */
-  providerId: string;
+  id: string;
 };
 
 /**

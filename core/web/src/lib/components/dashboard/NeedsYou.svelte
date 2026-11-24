@@ -12,7 +12,7 @@
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { lasting, requester, useRequestAnswers } from '#lib/components/access/requests.svelte.js';
 	import type { AccessRequest } from '#lib/gen/nokku/v1/access_request_pb.js';
-	import { DaemonStatus, type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
+	import { type Daemon } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { confirm } from '#lib/hooks/index.js';
 	import { formatTs } from '#lib/utils.js';
 	import { Check, ChevronRight, CircleCheck, Hand } from '@lucide/svelte';
@@ -42,8 +42,7 @@
 			description: 'Check that you expect each host. People can log in to them once approved.',
 			confirmText: 'Approve all',
 			destructive: false,
-			onConfirm: () =>
-				approveMany.mutateAsync(daemons.map((d) => ({ id: d.id, status: DaemonStatus.ACCEPTED })))
+			onConfirm: () => approveMany.mutateAsync(daemons.map((d) => ({ id: d.id })))
 		});
 </script>
 

@@ -162,7 +162,6 @@ func policyFrom(cfg *nokkuv1.DaemonConfig) policy {
 	set(&p.AllowAgentForwarding, cfg.AllowAgentForwarding) //nolint:protogetter // presence check
 	set(&p.GatewayPorts, cfg.GatewayPorts)                 //nolint:protogetter // presence check
 	set(&p.KillOnRevoke, cfg.KillOnRevoke)                 //nolint:protogetter // presence check
-	p.IdleTimeout = cfg.GetIdleTimeout().AsDuration()
 	return p
 }
 

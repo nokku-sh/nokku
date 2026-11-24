@@ -16,6 +16,11 @@ import (
 // MaxTargetAccounts stops a host from reporting accounts without bound.
 const MaxTargetAccounts = 1000
 
+var credentialTypes = map[string]nokkuv1.CredentialType{
+	"passkey": nokkuv1.CredentialType_CREDENTIAL_TYPE_PASSKEY,
+	"oidc":    nokkuv1.CredentialType_CREDENTIAL_TYPE_OIDC,
+}
+
 func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	if w == nil {
 		return nil
@@ -45,7 +50,7 @@ func (c *Credential) ToProto() *nokkuv1.AccountCredential {
 	}
 	return &nokkuv1.AccountCredential{
 		Id:         &c.ID,
-		Type:       &c.Type,
+		Type:       credentialTypes[c.Type].Enum(),
 		Provider:   &c.Provider,
 		Subject:    &c.Subject,
 		Label:      &c.Label,
@@ -198,22 +203,27 @@ func (p *GetTargetAccountsByTargetIDsRow) ToProto() *nokkuv1.TargetAccount {
 	}
 
 	out := p.TargetAccount.ToProto()
-	out.UserIds = p.UserIds
-	out.TeamIds = p.TeamIds
-	out.ServiceAccountIds = p.ServiceAccountIds
-	out.ExpiresAt = expiries(p.ExpiringIds, p.ExpiresAt)
+	out.Grants = accountGrants(p.UserIds, p.TeamIds, p.ServiceAccountIds, p.ExpiringIds, p.ExpiresAt)
 	return out
 }
 
-// expiries pairs the two arrays a grant query returns in the same order.
-func expiries(ids []string, at []time.Time) map[string]*timestamppb.Timestamp {
-	if len(ids) == 0 || len(ids) != len(at) {
-		return nil
+// The expiring ids and their ends come in the same order.
+func accountGrants(userIDs, teamIDs, serviceAccountIDs, expiringIDs []string, at []time.Time) []*nokkuv1.Grant {
+	ends := make(map[string]*timestamppb.Timestamp, len(expiringIDs))
+	if len(expiringIDs) == len(at) {
+		for i, id := range expiringIDs {
+			ends[id] = timestamppb.New(at[i])
+		}
 	}
-	out := make(map[string]*timestamppb.Timestamp, len(ids))
-	for i, id := range ids {
-		out[id] = timestamppb.New(at[i])
+	var out []*nokkuv1.Grant
+	add := func(kind nokkuv1.SubjectKind, ids []string) {
+		for _, id := range ids {
+			out = append(out, &nokkuv1.Grant{Subject: &nokkuv1.Subject{Id: &id, Kind: &kind}, ExpiresAt: ends[id]})
+		}
 	}
+	add(nokkuv1.SubjectKind_SUBJECT_KIND_USER, userIDs)
+	add(nokkuv1.SubjectKind_SUBJECT_KIND_TEAM, teamIDs)
+	add(nokkuv1.SubjectKind_SUBJECT_KIND_SERVICE_ACCOUNT, serviceAccountIDs)
 	return out
 }
 
@@ -262,8 +272,6 @@ func DefaultDaemonConfig() *nokkuv1.DaemonConfig {
 func (d *Daemon) EffectiveConfig() *nokkuv1.DaemonConfig {
 	cfg := ResolveDaemonConfig(d.Config)
 	cfg.Ephemeral = new(d.RetireAfter != nil)
-	// The workspace sets it for every daemon, see daemon.Sync.
-	cfg.IdleTimeout = nil
 	return cfg
 }
 
@@ -334,10 +342,7 @@ func (p *ListTargetAccountsRow) ToProto() *nokkuv1.TargetAccount {
 	}
 
 	out := p.TargetAccount.ToProto()
-	out.UserIds = p.UserIds
-	out.TeamIds = p.TeamIds
-	out.ServiceAccountIds = p.ServiceAccountIds
-	out.ExpiresAt = expiries(p.ExpiringIds, p.ExpiresAt)
+	out.Grants = accountGrants(p.UserIds, p.TeamIds, p.ServiceAccountIds, p.ExpiringIds, p.ExpiresAt)
 	return out
 }
 
@@ -408,7 +413,7 @@ func (t *JoinToken) ToProto() *nokkuv1.JoinToken {
 		Label:       &t.Label,
 		ExpiresAt:   SafeTimestamp(t.ExpiresAt),
 		MaxUses:     t.MaxUses,
-		Uses:        &t.Uses,
+		UseCount:    &t.Uses,
 		AutoApprove: &t.AutoApprove,
 		Tags:        t.Tags,
 		Ephemeral:   new(t.RetireAfter != nil),
@@ -442,16 +447,11 @@ func joinTokenGrantsToProto(rows []*ListJoinTokenGrantsRow) []*nokkuv1.JoinToken
 			out = append(out, &nokkuv1.JoinTokenGrant{Username: new(r.Username)})
 		}
 		g := out[len(out)-1]
-		if r.SubjectKind == nil {
-			continue
-		}
-		switch *r.SubjectKind {
-		case SubjectKindUser:
-			g.UserIds = append(g.UserIds, r.SubjectID)
-		case SubjectKindTeam:
-			g.TeamIds = append(g.TeamIds, r.SubjectID)
-		case SubjectKindServiceAccount:
-			g.ServiceAccountIds = append(g.ServiceAccountIds, r.SubjectID)
+		if r.SubjectKind != nil {
+			g.Subjects = append(
+				g.Subjects,
+				&nokkuv1.Subject{Id: &r.SubjectID, Kind: SubjectKinds[*r.SubjectKind].Enum()},
+			)
 		}
 	}
 	return out

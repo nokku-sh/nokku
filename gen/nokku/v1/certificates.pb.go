@@ -26,21 +26,17 @@ const (
 )
 
 type CertificateAuthority struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	UserPublicKey *string                `protobuf:"bytes,2,opt,name=user_public_key,json=userPublicKey" json:"user_public_key,omitempty"`
-	HostPublicKey *string                `protobuf:"bytes,3,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
-	// Unset until the first rollover.
-	RotatedAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=rotated_at,json=rotatedAt" json:"rotated_at,omitempty"`
-	// What a person's certificate lasts. A machine and a server set up with nk sync get an hour at most.
-	UserTtl   *durationpb.Duration   `protobuf:"bytes,5,opt,name=user_ttl,json=userTtl" json:"user_ttl,omitempty"`
-	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
-	// source_address lists where people log in from. A service account has a list of its own.
-	SourceAddress *string `protobuf:"bytes,10,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
-	// What ssh-keygen -lf prints for each key.
-	UserPublicKeyFingerprint *string `protobuf:"bytes,11,opt,name=user_public_key_fingerprint,json=userPublicKeyFingerprint" json:"user_public_key_fingerprint,omitempty"`
-	HostPublicKeyFingerprint *string `protobuf:"bytes,12,opt,name=host_public_key_fingerprint,json=hostPublicKeyFingerprint" json:"host_public_key_fingerprint,omitempty"`
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Id                       *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
+	UserPublicKey            *string                `protobuf:"bytes,2,opt,name=user_public_key,json=userPublicKey" json:"user_public_key,omitempty"`
+	HostPublicKey            *string                `protobuf:"bytes,3,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
+	SourceAddress            *string                `protobuf:"bytes,4,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
+	UserPublicKeyFingerprint *string                `protobuf:"bytes,5,opt,name=user_public_key_fingerprint,json=userPublicKeyFingerprint" json:"user_public_key_fingerprint,omitempty"`
+	HostPublicKeyFingerprint *string                `protobuf:"bytes,6,opt,name=host_public_key_fingerprint,json=hostPublicKeyFingerprint" json:"host_public_key_fingerprint,omitempty"`
+	UserTtl                  *durationpb.Duration   `protobuf:"bytes,7,opt,name=user_ttl,json=userTtl" json:"user_ttl,omitempty"`
+	RotatedAt                *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=rotated_at,json=rotatedAt" json:"rotated_at,omitempty"`
+	CreatedAt                *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt                *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -96,34 +92,6 @@ func (x *CertificateAuthority) GetHostPublicKey() string {
 	return ""
 }
 
-func (x *CertificateAuthority) GetRotatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.RotatedAt
-	}
-	return nil
-}
-
-func (x *CertificateAuthority) GetUserTtl() *durationpb.Duration {
-	if x != nil {
-		return x.UserTtl
-	}
-	return nil
-}
-
-func (x *CertificateAuthority) GetCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *CertificateAuthority) GetUpdatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.UpdatedAt
-	}
-	return nil
-}
-
 func (x *CertificateAuthority) GetSourceAddress() string {
 	if x != nil && x.SourceAddress != nil {
 		return *x.SourceAddress
@@ -143,6 +111,34 @@ func (x *CertificateAuthority) GetHostPublicKeyFingerprint() string {
 		return *x.HostPublicKeyFingerprint
 	}
 	return ""
+}
+
+func (x *CertificateAuthority) GetUserTtl() *durationpb.Duration {
+	if x != nil {
+		return x.UserTtl
+	}
+	return nil
+}
+
+func (x *CertificateAuthority) GetRotatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RotatedAt
+	}
+	return nil
+}
+
+func (x *CertificateAuthority) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *CertificateAuthority) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
 }
 
 type GetCertificateAuthorityRequest struct {
@@ -226,11 +222,10 @@ func (x *GetCertificateAuthorityResponse) GetCertificateAuthority() *Certificate
 }
 
 type UpdateCertificateAuthorityRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 15 minutes to 7 days. The ceiling is login.MaxCertTTL, a test holds the two together.
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserTtl       *durationpb.Duration   `protobuf:"bytes,1,opt,name=user_ttl,json=userTtl" json:"user_ttl,omitempty"`
-	SourceAddress *string                `protobuf:"bytes,4,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
-	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,5,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
+	SourceAddress *string                `protobuf:"bytes,2,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,3,opt,name=update_mask,json=updateMask" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -330,7 +325,6 @@ func (x *UpdateCertificateAuthorityResponse) GetCertificateAuthority() *Certific
 	return nil
 }
 
-// New keys replace both, and nothing trusts the old ones any more.
 type RolloverCertificateAuthorityRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -411,11 +405,10 @@ func (x *RolloverCertificateAuthorityResponse) GetCertificateAuthority() *Certif
 	return nil
 }
 
-// The core picks the lifetime, a caller never asks for one.
 type SignSSHCertificateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PublicKey     *string                `protobuf:"bytes,1,opt,name=public_key,json=publicKey" json:"public_key,omitempty"`
-	TargetId      *string                `protobuf:"bytes,3,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
+	TargetId      *string                `protobuf:"bytes,2,opt,name=target_id,json=targetId" json:"target_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -524,25 +517,25 @@ const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"\x14CertificateAuthority\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12&\n" +
 	"\x0fuser_public_key\x18\x02 \x01(\tR\ruserPublicKey\x12&\n" +
-	"\x0fhost_public_key\x18\x03 \x01(\tR\rhostPublicKey\x129\n" +
+	"\x0fhost_public_key\x18\x03 \x01(\tR\rhostPublicKey\x12%\n" +
+	"\x0esource_address\x18\x04 \x01(\tR\rsourceAddress\x12=\n" +
+	"\x1buser_public_key_fingerprint\x18\x05 \x01(\tR\x18userPublicKeyFingerprint\x12=\n" +
+	"\x1bhost_public_key_fingerprint\x18\x06 \x01(\tR\x18hostPublicKeyFingerprint\x124\n" +
+	"\buser_ttl\x18\a \x01(\v2\x19.google.protobuf.DurationR\auserTtl\x129\n" +
 	"\n" +
-	"rotated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\trotatedAt\x124\n" +
-	"\buser_ttl\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\auserTtl\x129\n" +
+	"rotated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\trotatedAt\x129\n" +
 	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12%\n" +
-	"\x0esource_address\x18\n" +
-	" \x01(\tR\rsourceAddress\x12=\n" +
-	"\x1buser_public_key_fingerprint\x18\v \x01(\tR\x18userPublicKeyFingerprint\x12=\n" +
-	"\x1bhost_public_key_fingerprint\x18\f \x01(\tR\x18hostPublicKeyFingerprint\" \n" +
+	"updated_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\" \n" +
 	"\x1eGetCertificateAuthorityRequest\"v\n" +
 	"\x1fGetCertificateAuthorityResponse\x12S\n" +
 	"\x15certificate_authority\x18\x01 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\"\xff\x01\n" +
 	"!UpdateCertificateAuthorityRequest\x12G\n" +
 	"\buser_ttl\x18\x01 \x01(\v2\x19.google.protobuf.DurationB\x11\xbaH\x0e\xaa\x01\v\"\x04\b\x80\xf5$2\x03\b\x84\aR\auserTtl\x12/\n" +
-	"\x0esource_address\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\rsourceAddress\x12`\n" +
-	"\vupdate_mask\x18\x05 \x01(\v2\x1a.google.protobuf.FieldMaskB#\xbaH \xc8\x01\x01\xe2\x01\x1a\x12\buser_ttl\x12\x0esource_addressR\n" +
+	"\x0esource_address\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\rsourceAddress\x12`\n" +
+	"\vupdate_mask\x18\x03 \x01(\v2\x1a.google.protobuf.FieldMaskB#\xbaH \xc8\x01\x01\xe2\x01\x1a\x12\buser_ttl\x12\x0esource_addressR\n" +
 	"updateMask\"y\n" +
 	"\"UpdateCertificateAuthorityResponse\x12S\n" +
 	"\x15certificate_authority\x18\x01 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\"%\n" +
@@ -553,16 +546,17 @@ const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"\n" +
 	"public_key\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x90NR\tpublicKey\x12(\n" +
-	"\ttarget_id\x18\x03 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\btargetId\"\x86\x01\n" +
+	"\ttarget_id\x18\x02 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\xb0\x01\x01R\btargetId\"\x86\x01\n" +
 	"\x1aSignSSHCertificateResponse\x12-\n" +
 	"\x12signed_certificate\x18\x01 \x01(\tR\x11signedCertificate\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x90\x04\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x8e\x04\n" +
 	"\x12CertificateService\x12}\n" +
-	"\x17GetCertificateAuthority\x12(.nokku.v1.GetCertificateAuthorityRequest\x1a).nokku.v1.GetCertificateAuthorityResponse\"\r\xc2\xf3\x18\x06\x18\x01X\x01h\x01\x90\x02\x01\x12\x81\x01\n" +
-	"\x1aUpdateCertificateAuthority\x12+.nokku.v1.UpdateCertificateAuthorityRequest\x1a,.nokku.v1.UpdateCertificateAuthorityResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12\x87\x01\n" +
-	"\x1cRolloverCertificateAuthority\x12-.nokku.v1.RolloverCertificateAuthorityRequest\x1a..nokku.v1.RolloverCertificateAuthorityResponse\"\b\xc2\xf3\x18\x04\x18\x04`\x01\x12m\n" +
-	"\x12SignSSHCertificate\x12#.nokku.v1.SignSSHCertificateRequest\x1a$.nokku.v1.SignSSHCertificateResponse\"\f\xc2\xf3\x18\b\x10\x01H\x01X\x01h\x01B\x92\x01\n" +
+	"\x17GetCertificateAuthority\x12(.nokku.v1.GetCertificateAuthorityRequest\x1a).nokku.v1.GetCertificateAuthorityResponse\"\r\xc2\xf3\x18\x06\x18\x01(\x010\x01\x90\x02\x01\x12\x81\x01\n" +
+	"\x1aUpdateCertificateAuthority\x12+.nokku.v1.UpdateCertificateAuthorityRequest\x1a,.nokku.v1.UpdateCertificateAuthorityResponse\"\b\xc2\xf3\x18\x04\x18\x04 \x01\x12\x87\x01\n" +
+	"\x1cRolloverCertificateAuthority\x12-.nokku.v1.RolloverCertificateAuthorityRequest\x1a..nokku.v1.RolloverCertificateAuthorityResponse\"\b\xc2\xf3\x18\x04\x18\x04 \x01\x12k\n" +
+	"\x12SignSSHCertificate\x12#.nokku.v1.SignSSHCertificateRequest\x1a$.nokku.v1.SignSSHCertificateResponse\"\n" +
+	"\xc2\xf3\x18\x06\x18\x01(\x010\x01B\x92\x01\n" +
 	"\fcom.nokku.v1B\x11CertificatesProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 
 var (
@@ -588,21 +582,21 @@ var file_nokku_v1_certificates_proto_goTypes = []any{
 	(*RolloverCertificateAuthorityResponse)(nil), // 6: nokku.v1.RolloverCertificateAuthorityResponse
 	(*SignSSHCertificateRequest)(nil),            // 7: nokku.v1.SignSSHCertificateRequest
 	(*SignSSHCertificateResponse)(nil),           // 8: nokku.v1.SignSSHCertificateResponse
-	(*timestamppb.Timestamp)(nil),                // 9: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),                  // 10: google.protobuf.Duration
+	(*durationpb.Duration)(nil),                  // 9: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil),                // 10: google.protobuf.Timestamp
 	(*fieldmaskpb.FieldMask)(nil),                // 11: google.protobuf.FieldMask
 }
 var file_nokku_v1_certificates_proto_depIdxs = []int32{
-	9,  // 0: nokku.v1.CertificateAuthority.rotated_at:type_name -> google.protobuf.Timestamp
-	10, // 1: nokku.v1.CertificateAuthority.user_ttl:type_name -> google.protobuf.Duration
-	9,  // 2: nokku.v1.CertificateAuthority.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 3: nokku.v1.CertificateAuthority.updated_at:type_name -> google.protobuf.Timestamp
+	9,  // 0: nokku.v1.CertificateAuthority.user_ttl:type_name -> google.protobuf.Duration
+	10, // 1: nokku.v1.CertificateAuthority.rotated_at:type_name -> google.protobuf.Timestamp
+	10, // 2: nokku.v1.CertificateAuthority.created_at:type_name -> google.protobuf.Timestamp
+	10, // 3: nokku.v1.CertificateAuthority.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: nokku.v1.GetCertificateAuthorityResponse.certificate_authority:type_name -> nokku.v1.CertificateAuthority
-	10, // 5: nokku.v1.UpdateCertificateAuthorityRequest.user_ttl:type_name -> google.protobuf.Duration
+	9,  // 5: nokku.v1.UpdateCertificateAuthorityRequest.user_ttl:type_name -> google.protobuf.Duration
 	11, // 6: nokku.v1.UpdateCertificateAuthorityRequest.update_mask:type_name -> google.protobuf.FieldMask
 	0,  // 7: nokku.v1.UpdateCertificateAuthorityResponse.certificate_authority:type_name -> nokku.v1.CertificateAuthority
 	0,  // 8: nokku.v1.RolloverCertificateAuthorityResponse.certificate_authority:type_name -> nokku.v1.CertificateAuthority
-	9,  // 9: nokku.v1.SignSSHCertificateResponse.expires_at:type_name -> google.protobuf.Timestamp
+	10, // 9: nokku.v1.SignSSHCertificateResponse.expires_at:type_name -> google.protobuf.Timestamp
 	1,  // 10: nokku.v1.CertificateService.GetCertificateAuthority:input_type -> nokku.v1.GetCertificateAuthorityRequest
 	3,  // 11: nokku.v1.CertificateService.UpdateCertificateAuthority:input_type -> nokku.v1.UpdateCertificateAuthorityRequest
 	5,  // 12: nokku.v1.CertificateService.RolloverCertificateAuthority:input_type -> nokku.v1.RolloverCertificateAuthorityRequest

@@ -167,9 +167,9 @@ func (p *Pool) ListSessions(daemonID string) []*nokkuv1.DaemonSession {
 	for _, r := range p.relays {
 		if s := r.shell; s != nil && r.daemonID == daemonID {
 			result = append(result, &nokkuv1.DaemonSession{
-				SessionId: new(s.sessionID),
-				Username:  new(s.username),
-				UserId:    new(r.userID),
+				Id:       new(s.sessionID),
+				Username: new(s.username),
+				UserId:   new(r.userID),
 			})
 		}
 	}

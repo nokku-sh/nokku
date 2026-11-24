@@ -18,10 +18,10 @@ func TestFromAccess(t *testing.T) {
 			User: &nokkuv1.User{Id: new("u"), Name: new("alice")},
 		},
 		CertificateAuthority: &nokkuv1.CertificateAuthority{UserPublicKey: new("ssh-ed25519 AAAA")},
-		Targets: []*nokkuv1.Target{
-			{Id: new(targetID), Name: new("web")},
-			{Id: new("../../etc"), Name: new("evil")},
-			{Id: new("{" + targetID + "}"), Name: new("braces")},
+		Targets: []*nokkuv1.TargetAccess{
+			{Target: &nokkuv1.Target{Id: new(targetID), Name: new("web")}},
+			{Target: &nokkuv1.Target{Id: new("../../etc"), Name: new("evil")}},
+			{Target: &nokkuv1.Target{Id: new("{" + targetID + "}"), Name: new("braces")}},
 		},
 	}
 
@@ -41,9 +41,11 @@ func TestFromAccessDropsControlCharacters(t *testing.T) {
 		Subject: &nokkuv1.GetSubjectAccessResponse_User{
 			User: &nokkuv1.User{Id: new("u"), Name: new("al\x1b[2Jice"), Email: new("a@b.example\x07")},
 		},
-		Targets: []*nokkuv1.Target{{
-			Id: new(targetID), Name: new("web\x1b]0;owned\x07"),
-			Usernames: []string{"ro\x1bot", "alice"}, Endpoints: []string{"10.0.0.5\r\n"},
+		Targets: []*nokkuv1.TargetAccess{{
+			Target: &nokkuv1.Target{
+				Id: new(targetID), Name: new("web\x1b]0;owned\x07"), Endpoints: []string{"10.0.0.5\r\n"},
+			},
+			Logins: []*nokkuv1.TargetAccess_Login{{Username: new("ro\x1bot")}, {Username: new("alice")}},
 		}},
 	})
 

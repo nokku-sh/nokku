@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { useConnect, useServers } from '#lib/api/connect.svelte.js';
+	import { type SubjectTarget } from '#lib/api/targets.svelte.js';
 	import { getSessions } from '#lib/api/terminal.svelte.js';
 	import { Badge } from '#lib/components/ext/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -13,15 +14,14 @@
 	const connect = useConnect();
 
 	const session = $derived(getSessions().get(activeSessionID.current));
+	const login = (s: SubjectTarget) => s.logins.find((l) => l.username === session?.username);
 	const server = $derived(
 		session
-			? servers.list.find(
-					(t) => t.daemonId === session.daemonID && t.usernames.includes(session.username)
-				)
+			? servers.list.find((s) => s.target.daemonId === session.daemonID && login(s))
 			: undefined
 	);
 	// Unset when the access is for good.
-	const ends = $derived(session && server?.usernameExpiresAt[session.username]);
+	const ends = $derived(server && login(server)?.expiresAt);
 	const soon = $derived(!!ends && toDate(ends).getTime() - Date.now() < SOON_MS);
 </script>
 
@@ -30,7 +30,7 @@
 		class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-3 py-1.5 text-xs text-muted-foreground"
 	>
 		<span class="font-mono text-foreground">{session.username}@{session.daemonName}</span>
-		{#if server && servers.records(server)}
+		{#if server && servers.records(server.target)}
 			<Badge variant="destructive" title="This server keeps an encrypted recording of the session">
 				REC
 			</Badge>
@@ -47,7 +47,7 @@
 				variant="ghost"
 				size="xs"
 				class="ml-auto"
-				onclick={() => connect.copy(server, session.username)}
+				onclick={() => connect.copy(server.target, session.username)}
 			>
 				<Copy data-icon="inline-start" />
 				Copy the ssh line
