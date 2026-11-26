@@ -67,7 +67,7 @@ services:
     restart: unless-stopped
 
   mailpit:
-    image: docker.io/axllent/mailpit:v1.33.1
+    image: docker.io/axllent/mailpit:v1.34.0
     container_name: mailpit
     ports:
       - "1025:1025"

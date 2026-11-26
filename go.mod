@@ -24,7 +24,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/jackc/tern/v2 v2.4.3
-	github.com/mizuchilabs/inkan/license v0.3.0
+	github.com/mizuchilabs/inkan/license v0.4.0
 	github.com/mizuchilabs/kata v0.2.0
 	github.com/moby/moby/api v1.57.0
 	github.com/pkg/sftp v1.13.12
