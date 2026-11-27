@@ -261,11 +261,6 @@ func linkIdentity(t *testing.T, cfg *app.Config, provider string) {
 	t.Helper()
 	u := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
-		if _, err := cfg.Conn.Pool.Exec(actor.WithWorkspace(t.Context(), actor.Workspace{ID: testWorkspace.ID}),
-			`INSERT INTO sso_providers (provider_id, enabled, config) VALUES ($1, FALSE, '') ON CONFLICT DO NOTHING`,
-			provider); err != nil {
-			return err
-		}
 		_, err := q.LinkOIDCIdentity(t.Context(), &db.LinkOIDCIdentityParams{
 			UserID: u.ID, ProviderID: provider, Subject: u.ID,
 		})
@@ -424,17 +419,21 @@ func TestClearUserIdentities(t *testing.T) {
 	ws := testWorkspace.ID
 	admin := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	// Without a config the row breaks ListSSOProviders, so it goes again.
+	provider := uniq("idp")
+	ctx := wsCtx(t)
+	_, err := cfg.Conn.Pool.Exec(ctx, `INSERT INTO sso_providers (provider_id, enabled, config) VALUES ($1, FALSE, '')`,
+		provider)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := cfg.Conn.Pool.Exec(context.WithoutCancel(ctx), "DELETE FROM sso_providers WHERE provider_id = $1",
+			provider)
+		require.NoError(t, err)
+	})
 	link := func(u *db.User) {
 		inWorkspace(t, cfg, ws, func(q *db.Queries) error {
-			if _, err := cfg.Conn.Pool.Exec(
-				actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws}),
-				`INSERT INTO sso_providers (provider_id, enabled, config) VALUES ($1, FALSE, '') ON CONFLICT DO NOTHING`,
-				"okta",
-			); err != nil {
-				return err
-			}
 			_, err := q.LinkOIDCIdentity(t.Context(), &db.LinkOIDCIdentityParams{
-				UserID: u.ID, ProviderID: "okta", Subject: u.ID,
+				UserID: u.ID, ProviderID: provider, Subject: u.ID,
 			})
 			return err
 		})
@@ -475,6 +474,6 @@ func TestClearUserIdentities(t *testing.T) {
 
 	require.NoError(t, unlink(0, member))
 	assert.Zero(t, links(member), "the link stayed")
-	_, _, err := cfg.IAM.AuthenticateToken(wsCtx(t), session, accessTokens...)
+	_, _, err = cfg.IAM.AuthenticateToken(ctx, session, accessTokens...)
 	assert.Error(t, err, "the session a wrong link gave lives on")
 }
