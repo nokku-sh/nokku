@@ -117,7 +117,8 @@ func HomeKeyFiles(sshdConfig string) []string {
 		}
 		// sshd reads a relative path from the user's home.
 		for f := range strings.FieldsSeq(value) {
-			inHome := !strings.HasPrefix(f, "/") || strings.Contains(f, "%h") || strings.HasPrefix(f, "/home/")
+			inHome := !strings.HasPrefix(f, "/") || strings.Contains(f, "%h") ||
+				strings.HasPrefix(f, "/home/") || strings.HasPrefix(f, "/var/home/")
 			if f != "none" && inHome {
 				files = append(files, f)
 			}

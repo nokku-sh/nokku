@@ -152,6 +152,7 @@ func TestHomeKeyFiles(t *testing.T) {
 		{"root-owned", "authorizedkeysfile /etc/ssh/authorized_keys/%u\n", nil},
 		{"an absolute home path", "authorizedkeysfile %h/.ssh/authorized_keys\n", []string{"%h/.ssh/authorized_keys"}},
 		{"a path under /home", "authorizedkeysfile /home/%u/.ssh/keys\n", []string{"/home/%u/.ssh/keys"}},
+		{"a path under /var/home", "authorizedkeysfile /var/home/%u/.ssh/keys\n", []string{"/var/home/%u/.ssh/keys"}},
 		{
 			"mixed",
 			"authorizedkeysfile /etc/ssh/authorized_keys/%u .ssh/authorized_keys\n",
