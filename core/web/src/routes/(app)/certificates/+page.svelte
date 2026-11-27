@@ -41,7 +41,11 @@
 	const ws = workspace.get();
 	const query = ca.get();
 	const entity = $derived(query.data);
-	const draft = useDraft(CertificateAuthoritySchema, () => query.data);
+	const draft = useDraft(
+		CertificateAuthoritySchema,
+		() => query.data,
+		() => 'ca'
+	);
 	const model = $derived(draft.current);
 
 	const update = ca.update();
