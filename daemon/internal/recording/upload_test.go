@@ -141,6 +141,14 @@ func TestCoreRestartMidSessionEndsWhole(t *testing.T) {
 
 // The recording stops where the disk did and the session hears of it.
 func TestFullDiskMidSessionSendsWhatIsOnDisk(t *testing.T) {
+	// RLIMIT_FSIZE also caps go test's own log, so the limit goes on a child.
+	if os.Getenv("NOKKU_TEST_FSIZE") == "" {
+		child := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$")
+		child.Env = append(os.Environ(), "NOKKU_TEST_FSIZE=1")
+		out, err := child.CombinedOutput()
+		require.NoError(t, err, "%s", out)
+		return
+	}
 	dir := newRecordsDir(t)
 	is := assert.New(t)
 	must := require.New(t)
