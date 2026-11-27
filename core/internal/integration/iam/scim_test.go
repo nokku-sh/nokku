@@ -387,18 +387,14 @@ func TestSCIMLinkIsNoCredential(t *testing.T) {
 	require.NotNil(t, u)
 	ctx := as(t.Context(), o.ws, u)
 	// With a second way in, the last one is not what stops a removal.
-	e.putCredential(t, o.ws, db.UpsertCredentialParams{
-		ID: "pk-" + u.ID, UserID: u.ID, Type: string(iam.MethodPasskey), Data: []byte{},
-	})
+	e.putPasskey(t, o.ws, u.ID, "pk-"+u.ID)
 
-	var creds []*db.Credential
+	var creds []string
 	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
-		creds, err = q.ListUserCredentials(t.Context(), u.ID)
+		creds, err = q.ListUserCredentialIDs(t.Context(), u.ID)
 		return err
 	}))
 	assert.Len(t, creds, 1, "the link is listed as a sign-in method")
-	// The id the link had while it was a row in credentials.
-	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "scim:"+o.ws.ID+":okta-7"), iam.ErrNotFound)
 
 	_, _, err := e.svc.RequestEmailChange(ctx, u, "other@"+testDomain())
 	require.ErrorIs(t, err, iam.ErrManagedAccount)
@@ -764,7 +760,7 @@ func TestSCIMGroupAdoptsAnUnlinkedTeam(t *testing.T) {
 			return err
 		}
 		require.Len(t, members, 1, "the refused group changed the members")
-		_, err = q.UpdateTeam(t.Context(), &db.UpdateTeamParams{TeamID: team.ID, ScimOpen: new(true)})
+		_, err = q.UpdateTeam(t.Context(), &db.UpdateTeamParams{TeamID: team.ID, ScimAdoptable: new(true)})
 		return err
 	}))
 
@@ -777,7 +773,7 @@ func TestSCIMGroupAdoptsAnUnlinkedTeam(t *testing.T) {
 			return err
 		}
 		assert.True(t, taken.ScimManaged)
-		assert.False(t, taken.ScimOpen, "the takeover did not use the opening up")
+		assert.False(t, taken.ScimAdoptable, "the takeover did not use the opening up")
 		return nil
 	}))
 	assert.Equal(t, "pid-1", got.ExternalID)
@@ -836,7 +832,7 @@ func TestSCIMGroupChangesAreAudited(t *testing.T) {
 		// Open for the takeover below.
 		if _, err = q.UpdateTeam(
 			t.Context(),
-			&db.UpdateTeamParams{TeamID: platform.ID, ScimOpen: new(true)},
+			&db.UpdateTeamParams{TeamID: platform.ID, ScimAdoptable: new(true)},
 		); err != nil {
 			return err
 		}

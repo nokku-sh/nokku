@@ -24,12 +24,12 @@ export function useConnect() {
 		},
 		// A shell takes a recent sign-in, so that is settled before the core is asked. It is one click, with no form
 		// to leave time for.
-		shell: (t: Pick<Target, 'id' | 'daemonId'>, username: string) =>
+		shell: (t: Pick<Target, 'id'>, username: string) =>
 			whenFresh(
 				async () => {
 					remember(t.id);
 					try {
-						await createSession.mutateAsync({ daemonId: t.daemonId, username });
+						await createSession.mutateAsync({ daemonId: t.id, username });
 					} catch {
 						// The global mutation handler already toasted it.
 						return;
@@ -59,21 +59,15 @@ export function useServers(when: () => boolean = () => true) {
 	// A workspace without a plan signs no certificates, so a web shell would only fail.
 	const plan = workspace.plan();
 
-	const online = $derived(
-		new Set((access.data?.daemons ?? []).filter((d) => d.online).map((d) => d.id))
-	);
-	const recording = $derived(
-		new Set((access.data?.daemons ?? []).filter((d) => d.config?.recordSessions).map((d) => d.id))
-	);
 	const inactive = $derived(!!plan.data?.inactive);
-	const isOnline = (t: Pick<Target, 'daemonId'>) => !!t.daemonId && online.has(t.daemonId);
+	const isOnline = (t: Pick<Target, 'daemon'>) => !!t.daemon?.online;
 	// Why a server only offers its ssh command, undefined when a web shell works.
-	const why = (t: Pick<Target, 'daemonId'>) => {
+	const why = (t: Pick<Target, 'daemon'>) => {
 		if (inactive) return 'no active plan';
-		if (!t.daemonId) return 'nk sync';
+		if (!t.daemon) return 'nk sync';
 		return isOnline(t) ? undefined : 'daemon offline';
 	};
-	const canShell = (t: Pick<Target, 'daemonId'>) => !why(t);
+	const canShell = (t: Pick<Target, 'daemon'>) => !why(t);
 
 	const list = $derived.by(() => {
 		const recent = recentTargets.current;
@@ -101,7 +95,7 @@ export function useServers(when: () => boolean = () => true) {
 		},
 		online: isOnline,
 		/** Whether its daemon records the sessions it serves. */
-		records: (t: Pick<Target, 'daemonId'>) => !!t.daemonId && recording.has(t.daemonId),
+		records: (t: Pick<Target, 'daemon'>) => !!t.daemon?.config?.recordSessions,
 		canShell,
 		why
 	};

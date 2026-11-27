@@ -293,13 +293,12 @@ func (h *oidcFlow) resolve(ctx context.Context, id oidcIdentity) (*db.User, bool
 
 // follow takes the name and address the provider has now. With SCIM too, an admin's address is a way back in and stays.
 func follow(ctx context.Context, q *db.Queries, u *db.User, id oidcIdentity) (*db.User, error) {
-	creds, err := q.ListUserCredentials(ctx, u.ID)
+	identities, err := q.ListOIDCIdentities(ctx, u.ID)
 	if err != nil {
 		return nil, err
 	}
-	creds = slices.DeleteFunc(creds, func(c *db.Credential) bool { return c.Type != string(MethodOIDC) })
 	// Two providers would each undo the other, and a refused sign-in changes nothing.
-	if !u.Active || len(creds) != 1 {
+	if !u.Active || len(identities) != 1 {
 		return u, nil
 	}
 	if id.Name != "" && id.Name != u.Name {
@@ -316,7 +315,7 @@ func follow(ctx context.Context, q *db.Queries, u *db.User, id oidcIdentity) (*d
 		return u, err
 	}
 	// A link mailed to the old address must not outlive it.
-	if err := q.DeleteAllUserTokens(ctx, &u.ID); err != nil {
+	if err := q.DeleteAllUserTokens(ctx, u.ID); err != nil {
 		return nil, err
 	}
 	return q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: u.ID, Email: email})
@@ -324,9 +323,7 @@ func follow(ctx context.Context, q *db.Queries, u *db.User, id oidcIdentity) (*d
 
 // resolveIn returns the user, whether it created it, and whether it linked it.
 func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity) (*db.User, bool, bool, error) {
-	cred, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
-		Type: string(MethodOIDC), Provider: id.ProviderID, Subject: id.Subject,
-	})
+	cred, err := q.FindOIDCIdentity(ctx, &db.FindOIDCIdentityParams{ProviderID: id.ProviderID, Subject: id.Subject})
 	switch {
 	case err == nil:
 		if id.LinkUserID != "" && cred.UserID != id.LinkUserID {
@@ -336,7 +333,7 @@ func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity
 		if err != nil {
 			return nil, false, false, err
 		}
-		return u, false, false, q.TouchCredential(ctx, cred.ID)
+		return u, false, false, q.TouchOIDCIdentity(ctx, cred.ID)
 	case !errors.Is(err, pgx.ErrNoRows):
 		return nil, false, false, err
 	}
@@ -363,7 +360,7 @@ func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity
 				return nil, false, false, errEmailUnverified
 			}
 			u, err = h.svc.createUser(ctx, q, db.CreateUserWithIDParams{
-				Email: email, Name: id.Name, Picture: nonEmpty(id.Picture),
+				Email: email, Name: id.Name, Picture: id.Picture,
 			})
 			created = err == nil
 		case err == nil && u.Role == nokkuv1.WorkspaceRole_WORKSPACE_ROLE_OWNER:
@@ -383,13 +380,10 @@ func (h *oidcFlow) resolveIn(ctx context.Context, q *db.Queries, id oidcIdentity
 }
 
 func link(ctx context.Context, q *db.Queries, id oidcIdentity, userID string) error {
-	_, err := q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-		ID:       actor.WorkspaceIDFromContext(ctx) + ":" + id.ProviderID + ":" + id.Subject,
-		UserID:   userID,
-		Type:     string(MethodOIDC),
-		Provider: id.ProviderID,
-		Subject:  id.Subject,
-		Data:     []byte{},
+	_, err := q.LinkOIDCIdentity(ctx, &db.LinkOIDCIdentityParams{
+		UserID:     userID,
+		ProviderID: id.ProviderID,
+		Subject:    id.Subject,
 	})
 	if errors.Is(err, pgx.ErrNoRows) || db.IsUniqueViolation(err) {
 		return errIdentityLinked
@@ -428,11 +422,4 @@ func (h *oidcFlow) oauth2Config(ctx context.Context, cfg *OIDCProvider, provider
 
 func RedirectURI(ctx context.Context) string {
 	return baseURL(ctx) + oidcCallbackPath
-}
-
-func nonEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }

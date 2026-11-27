@@ -24,7 +24,7 @@ WHERE
   (
     sqlc.narg('query')::TEXT IS NULL
     OR te.name ILIKE '%' || sqlc.narg('query') || '%'
-    OR COALESCE(te.description, '') ILIKE '%' || sqlc.narg('query') || '%'
+    OR te.description ILIKE '%' || sqlc.narg('query') || '%'
   )
   AND (
     sqlc.narg('tags')::TEXT[] IS NULL
@@ -43,7 +43,7 @@ SET
   name = COALESCE(sqlc.narg('name'), name),
   description = COALESCE(sqlc.narg('description'), description),
   tags = COALESCE(sqlc.narg('tags'), tags),
-  scim_open = COALESCE(sqlc.narg('scim_open'), scim_open),
+  scim_adoptable = COALESCE(sqlc.narg('scim_adoptable'), scim_adoptable),
   updated_at = NOW()
 WHERE
   id = @team_id

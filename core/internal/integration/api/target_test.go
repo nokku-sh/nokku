@@ -122,7 +122,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err), "a stale CA key was reported, got %v", err)
 	stale, err := editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &targetID})
 	require.NoError(t, err)
-	assert.Nil(t, stale.GetTarget().GetLastSyncAt(), "a refused report stamped the sync")
+	assert.Nil(t, stale.GetTarget().GetManualSyncAt(), "a refused report stamped the sync")
 
 	_, err = nk.SyncTargetUsers(t.Context(), &nokkuv1.SyncTargetUsersRequest{
 		TargetId:        &targetID,
@@ -136,7 +136,7 @@ func TestSyncTargetUsers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"10.0.0.1:22"}, got.GetTarget().GetEndpoints(), "a report moved the server")
 	assert.Equal(t, hostKey, got.GetTarget().GetHostPublicKey(), "host key pinned")
-	assert.NotNil(t, got.GetTarget().GetLastSyncAt(), "manual sync stamped")
+	assert.NotNil(t, got.GetTarget().GetManualSyncAt(), "manual sync stamped")
 
 	usernames := func() []string {
 		res, err := accounts.ListTargetAccounts(t.Context(), &nokkuv1.ListTargetAccountsRequest{
@@ -220,12 +220,12 @@ func TestOnlyWhoAddedAServerRepinsIt(t *testing.T) {
 	denied(t, report(bobNK, id, attacker), "nk replaced the host key of a server someone else added")
 	got := stored(id)
 	assert.Equal(t, pinned, got.GetHostPublicKey(), "a refused report changed the pinned host key")
-	assert.Nil(t, got.GetLastSyncAt(), "a refused report stamped the sync")
+	assert.Nil(t, got.GetManualSyncAt(), "a refused report stamped the sync")
 	assert.Equal(t, alice.ID, got.GetCreatedBy(), "nk can't tell who added the server")
 
 	// After a CA rollover anyone syncs every server again, with the key it has.
 	require.NoError(t, report(bobNK, id, pinned), "an unchanged report of someone else's server was refused")
-	assert.NotNil(t, stored(id).GetLastSyncAt(), "the sync was not stamped")
+	assert.NotNil(t, stored(id).GetManualSyncAt(), "the sync was not stamped")
 
 	// A server added in the web app has no key yet, its first sync pins one.
 	blank, err := aliceWeb.CreateTarget(t.Context(), &nokkuv1.CreateTargetRequest{Name: new(uniq("web"))})
@@ -367,20 +367,20 @@ func TestRenameReachesTheDaemon(t *testing.T) {
 		Id: new(first.GetTargetId()), Name: &name,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, name, daemonName(first.GetId()))
+	assert.Equal(t, name, daemonName(first.GetTargetId()))
 
-	before := daemonName(second.GetId())
+	before := daemonName(second.GetTargetId())
 	_, err = editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
 		Id: new(second.GetTargetId()), Description: new("no name in this update"),
 	}))
 	require.NoError(t, err)
-	assert.Equal(t, before, daemonName(second.GetId()), "an update without a name renamed the daemon")
+	assert.Equal(t, before, daemonName(second.GetTargetId()), "an update without a name renamed the daemon")
 
 	_, err = editor.RenameTarget(t.Context(), &nokkuv1.RenameTargetRequest{
 		Id: new(second.GetTargetId()), Name: &name,
 	})
 	require.Error(t, err, "two daemons got one name")
-	assert.Equal(t, before, daemonName(second.GetId()), "a refused rename still reached the daemon")
+	assert.Equal(t, before, daemonName(second.GetTargetId()), "a refused rename still reached the daemon")
 }
 
 func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
@@ -397,30 +397,39 @@ func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 		),
 	)
 
-	updated, err := editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
+	read := func() *nokkuv1.Target {
+		res, err := editor.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &targetID})
+		require.NoError(t, err)
+		return res.GetTarget()
+	}
+
+	_, err := editor.UpdateTarget(t.Context(), masked(&nokkuv1.UpdateTargetRequest{
 		Id:   &targetID,
 		Tags: []string{"prod"},
 	}))
 	require.NoError(t, err)
-	assert.Equal(t, []string{"prod"}, updated.GetTarget().GetTags())
-	name := updated.GetTarget().GetName()
+	got := read()
+	assert.Equal(t, []string{"prod"}, got.GetTags())
+	name := got.GetName()
 
-	moved, err := editor.SetTargetEndpoints(t.Context(), &nokkuv1.SetTargetEndpointsRequest{
+	_, err = editor.SetTargetEndpoints(t.Context(), &nokkuv1.SetTargetEndpointsRequest{
 		Id:        &targetID,
 		Endpoints: []string{"10.0.0.9:22"},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"prod"}, moved.GetTarget().GetTags(), "a list the call does not carry stays")
-	assert.Equal(t, []string{"10.0.0.9:22"}, moved.GetTarget().GetEndpoints())
-	assert.Equal(t, name, moved.GetTarget().GetName(), "unset fields stay as they are")
+	got = read()
+	assert.Equal(t, []string{"prod"}, got.GetTags(), "a list the call does not carry stays")
+	assert.Equal(t, []string{"10.0.0.9:22"}, got.GetEndpoints())
+	assert.Equal(t, name, got.GetName(), "unset fields stay as they are")
 
-	updated, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
+	_, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
 		Id:         &targetID,
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}},
 	})
 	require.NoError(t, err)
-	assert.Empty(t, updated.GetTarget().GetTags(), "naming a list with nothing in it clears it")
-	assert.Equal(t, []string{"10.0.0.9:22"}, updated.GetTarget().GetEndpoints())
+	got = read()
+	assert.Empty(t, got.GetTags(), "naming a list with nothing in it clears it")
+	assert.Equal(t, []string{"10.0.0.9:22"}, got.GetEndpoints())
 
 	_, err = editor.UpdateTarget(t.Context(), &nokkuv1.UpdateTargetRequest{
 		Id:         &targetID,
@@ -433,9 +442,9 @@ func TestUpdateTargetListsChangeOnlyWhenNamed(t *testing.T) {
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an ordinary update renamed a server")
 
-	cleared, err := editor.SetTargetEndpoints(t.Context(), &nokkuv1.SetTargetEndpointsRequest{Id: &targetID})
+	_, err = editor.SetTargetEndpoints(t.Context(), &nokkuv1.SetTargetEndpointsRequest{Id: &targetID})
 	require.NoError(t, err)
-	assert.Empty(t, cleared.GetTarget().GetEndpoints(), "an empty list clears the endpoints")
+	assert.Empty(t, read().GetEndpoints(), "an empty list clears the endpoints")
 }
 
 func (s graphSeed) member(name string) string {
@@ -884,7 +893,7 @@ func TestDeleteTargetTakesItsDaemon(t *testing.T) {
 		&nokkuv1.DeleteTargetRequest{Id: enrolled.TargetId})
 	require.NoError(t, err)
 	_, err = nokkuv1connect.NewDaemonServiceClient(admin).GetDaemon(t.Context(),
-		&nokkuv1.GetDaemonRequest{Id: enrolled.Id})
+		&nokkuv1.GetDaemonRequest{Id: enrolled.TargetId})
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "the daemon was left behind")
 }
 

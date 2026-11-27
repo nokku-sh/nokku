@@ -50,7 +50,7 @@ func readTarget(t *testing.T, f fixture, daemonID string) seededTarget {
 	t.Helper()
 	var out seededTarget
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) (err error) {
-		if out.target, err = q.GetTargetByDaemon(f.ctx, &daemonID); err != nil {
+		if out.target, err = q.GetTarget(f.ctx, daemonID); err != nil {
 			return err
 		}
 		out.accounts, err = q.GetTargetAccountsByTargetIDs(f.ctx, []string{out.target.ID})
@@ -69,7 +69,7 @@ func TestEnrollSeedsTokenGrantsOnce(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.Tags = []string{"sandbox"} })
 	teamID := seedTeamGrant(t, f, "dev")
 
-	in := daemon.EnrollInput{Token: token, Binding: "machine-key", ReqMetadata: hostname("alice")}
+	in := daemon.EnrollInput{Token: token, KeyThumbprint: "machine-key", ReqMetadata: hostname("alice")}
 	out, err := enroll(t, f, in)
 	require.NoError(t, err)
 	assert.Equal(t, "alice", out.Name)
@@ -80,7 +80,7 @@ func TestEnrollSeedsTokenGrantsOnce(t *testing.T) {
 	require.Len(t, seeded.accounts, 1)
 	assert.Equal(t, "dev", seeded.accounts[0].TargetAccount.Username)
 	assert.Equal(t, []string{teamID}, seeded.accounts[0].TeamIds)
-	assert.Nil(t, seeded.accounts[0].TargetAccount.SeenAt, "the host has not reported dev yet")
+	assert.Nil(t, seeded.accounts[0].TargetAccount.FirstSeenAt, "the host has not reported dev yet")
 
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
 		return q.RemoveGrants(f.ctx, &db.RemoveGrantsParams{

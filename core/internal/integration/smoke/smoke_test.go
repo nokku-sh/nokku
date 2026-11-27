@@ -251,8 +251,7 @@ func (s *smoke) enrollDaemon(t *testing.T) {
 		res, err := s.daemons.ListDaemons(t.Context(), &nokkuv1.ListDaemonsRequest{Limit: new(int32(10))})
 		require.NoError(t, err)
 		i := slices.IndexFunc(res.GetDaemons(), func(d *nokkuv1.Daemon) bool {
-			return d.GetName() == serverName && d.GetOnline() &&
-				d.GetStatus() == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
+			return d.GetName() == serverName && d.GetOnline() && d.GetAccepted()
 		})
 		if i >= 0 {
 			s.daemon = res.GetDaemons()[i]
@@ -273,7 +272,7 @@ func (s *smoke) enrollDaemon(t *testing.T) {
 		return d.GetId() == s.daemon.GetId()
 	}), "the offline filter took a connected daemon")
 
-	res, err := s.targets.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{DaemonId: new(s.daemon.GetId())})
+	res, err := s.targets.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{Ids: []string{s.daemon.GetId()}})
 	require.NoError(t, err)
 	require.Len(t, res.GetTargets(), 1, "the daemon has no target of its own")
 	s.target = res.GetTargets()[0]

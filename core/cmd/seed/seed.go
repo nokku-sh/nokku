@@ -136,23 +136,20 @@ func seed(ctx context.Context, q *db.Queries, ws *db.Workspace, n counts) error 
 
 	config := db.ResolveDaemonConfig(ws.Settings.GetDefaultDaemonConfig())
 	for i := range n.daemons {
-		status := nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
-		if i%4 == 3 {
-			status = nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING
+		// A taken name returns no row.
+		targetID, err := q.CreateDaemonTarget(ctx, fresh())
+		if err != nil {
+			return fmt.Errorf("server: %w", err)
 		}
-		d, err := q.CreateDaemon(ctx, &db.CreateDaemonParams{
-			Status:        status,
+		_, err = q.CreateDaemon(ctx, &db.CreateDaemonParams{
+			TargetID:      targetID,
+			Accepted:      i%4 != 3,
 			Config:        config,
 			Version:       "seed",
-			KeyThumbprint: new(crypto.RandomString(43)),
+			KeyThumbprint: crypto.RandomString(43),
 		})
 		if err != nil {
 			return fmt.Errorf("daemon: %w", err)
-		}
-		// A taken name returns no row.
-		targetID, err := q.CreateDaemonTarget(ctx, &db.CreateDaemonTargetParams{DaemonID: &d.ID, Name: fresh()})
-		if err != nil {
-			return fmt.Errorf("server: %w", err)
 		}
 		if err := grant(ctx, q, targetID, who); err != nil {
 			return err

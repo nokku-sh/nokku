@@ -8,7 +8,6 @@ WHERE
   workspace_id = $1;
 
 -- name: ListLicenses :many
--- The stored keys, for the daily refresh.
 SELECT
   workspace_id,
   key
@@ -33,9 +32,9 @@ SET
   key = EXCLUDED.key,
   license_id = EXCLUDED.license_id,
   ends_at = EXCLUDED.ends_at,
-  deletion_warning = CASE
+  deletion_warning_days = CASE
     WHEN workspace_licenses.ends_at IS DISTINCT FROM EXCLUDED.ends_at THEN 0
-    ELSE workspace_licenses.deletion_warning
+    ELSE workspace_licenses.deletion_warning_days
   END,
   deletion_warned_at = CASE
     WHEN workspace_licenses.ends_at IS DISTINCT FROM EXCLUDED.ends_at THEN NULL
@@ -44,7 +43,6 @@ SET
   updated_at = NOW();
 
 -- name: StartTrial :exec
--- A hosted workspace starts on a trial without a key, the first activated key replaces it.
 INSERT INTO
   workspace_licenses (workspace_id, ends_at)
 VALUES
@@ -55,7 +53,6 @@ VALUES
 ON CONFLICT (workspace_id) DO NOTHING;
 
 -- name: CountWorkspaceResources :one
--- A server counts once, its daemon is part of its target.
 SELECT
   (
     (
@@ -83,11 +80,10 @@ SELECT
   )::bigint AS resource_count;
 
 -- name: ListTrialsEnding :many
--- Trials that end within the next days, with the owner to remind. Runs as nokku_system.
 SELECT
   s.workspace_id,
   s.ends_at::timestamptz AS trial_end,
-  s.trial_reminder,
+  s.trial_reminder_days,
   w.slug,
   w.name AS workspace_name,
   u.id AS owner_id,
@@ -106,15 +102,13 @@ WHERE
 -- name: SetTrialReminder :exec
 UPDATE workspace_licenses
 SET
-  trial_reminder = @days,
+  trial_reminder_days = @days,
   updated_at = NOW()
 WHERE
   workspace_id = @workspace_id
   AND key = '';
 
 -- name: ListLapsedWorkspaces :many
--- Hosted workspaces whose trial or key ran out, with the owner to warn. deletionDate in internal/api decides when each
--- goes. Runs as nokku_system.
 SELECT
   sqlc.embed(s),
   w.slug,
@@ -133,7 +127,7 @@ WHERE
 -- name: SetDeletionWarning :exec
 UPDATE workspace_licenses
 SET
-  deletion_warning = @days,
+  deletion_warning_days = @days,
   deletion_warned_at = NOW(),
   updated_at = NOW()
 WHERE

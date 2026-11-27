@@ -169,7 +169,7 @@ func (a *authorizationInterceptor) daemonAccepted(ctx context.Context, daemonID,
 	if err != nil {
 		return err
 	}
-	if daemon.Daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+	if !daemon.Daemon.Accepted {
 		return db.ErrPermissionDenied
 	}
 	return nil
@@ -180,7 +180,7 @@ func callerRole(ctx context.Context) nokkuv1.WorkspaceRole {
 	return p.Role
 }
 
-// callerID is what a created_by or granted_by column stores, nil without a principal.
+// callerID is what a created_by column stores, nil without a principal.
 func callerID(ctx context.Context) *string {
 	if id := actor.SubjectFromContext(ctx); id != "" {
 		return &id

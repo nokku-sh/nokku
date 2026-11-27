@@ -26,7 +26,7 @@ VALUES
     $3
   )
 RETURNING
-  id, workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
+  workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 `
 
 type CreateCAParams struct {
@@ -35,12 +35,10 @@ type CreateCAParams struct {
 	UserTtl       time.Duration `json:"userTtl"`
 }
 
-// Every setting comes from the caller, ssh.NewCA fills in what a new CA starts with. ssh.CreateCA adds the keys.
 func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, createCA, arg.UserPublicKey, arg.HostPublicKey, arg.UserTtl)
 	var i SSHCA
 	err := row.Scan(
-		&i.ID,
 		&i.WorkspaceID,
 		&i.UserPublicKey,
 		&i.HostPublicKey,
@@ -53,65 +51,55 @@ func (q *Queries) CreateCA(ctx context.Context, arg *CreateCAParams) (*SSHCA, er
 	return &i, err
 }
 
-const getCASigningKey = `-- name: GetCASigningKey :one
+const getCASigningKeys = `-- name: GetCASigningKeys :one
 SELECT
-  k.workspace_id,
-  k.ca_id,
-  k.private_key,
-  (
-    CASE
-      WHEN k.kind = 'host' THEN c.host_public_key
-      ELSE c.user_public_key
-    END
-  )::TEXT AS public_key
+  c.workspace_id, c.user_public_key, c.host_public_key, c.rotated_at, c.user_ttl, c.source_address, c.created_at, c.updated_at,
+  k.user_private_key,
+  k.host_private_key
 FROM
   ssh_ca_keys k
-  JOIN ssh_cas c ON c.id = k.ca_id
+  JOIN ssh_cas c ON c.workspace_id = k.workspace_id
 WHERE
-  k.ca_id = $1
-  AND k.kind = $2
+  k.workspace_id = current_workspace_id ()
 `
 
-type GetCASigningKeyParams struct {
-	CaID string `json:"caId"`
-	Kind string `json:"kind"`
+type GetCASigningKeysRow struct {
+	SSHCA          SSHCA         `json:"sshca"`
+	UserPrivateKey crypto.Sealed `json:"userPrivateKey"`
+	HostPrivateKey crypto.Sealed `json:"hostPrivateKey"`
 }
 
-type GetCASigningKeyRow struct {
-	WorkspaceID string        `json:"workspaceId"`
-	CaID        string        `json:"caId"`
-	PrivateKey  crypto.Sealed `json:"privateKey"`
-	PublicKey   string        `json:"publicKey"`
-}
-
-// The one read of a CA private key, with the public key it must match. ssh.CASigner is its only caller.
-func (q *Queries) GetCASigningKey(ctx context.Context, arg *GetCASigningKeyParams) (*GetCASigningKeyRow, error) {
-	row := q.db.QueryRow(ctx, getCASigningKey, arg.CaID, arg.Kind)
-	var i GetCASigningKeyRow
+func (q *Queries) GetCASigningKeys(ctx context.Context) (*GetCASigningKeysRow, error) {
+	row := q.db.QueryRow(ctx, getCASigningKeys)
+	var i GetCASigningKeysRow
 	err := row.Scan(
-		&i.WorkspaceID,
-		&i.CaID,
-		&i.PrivateKey,
-		&i.PublicKey,
+		&i.SSHCA.WorkspaceID,
+		&i.SSHCA.UserPublicKey,
+		&i.SSHCA.HostPublicKey,
+		&i.SSHCA.RotatedAt,
+		&i.SSHCA.UserTtl,
+		&i.SSHCA.SourceAddress,
+		&i.SSHCA.CreatedAt,
+		&i.SSHCA.UpdatedAt,
+		&i.UserPrivateKey,
+		&i.HostPrivateKey,
 	)
 	return &i, err
 }
 
 const getWorkspaceCA = `-- name: GetWorkspaceCA :one
 SELECT
-  id, workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
+  workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
   workspace_id = current_workspace_id ()
 `
 
-// What signs and what is trusted in the workspace. Private keys live in ssh_ca_keys.
 func (q *Queries) GetWorkspaceCA(ctx context.Context) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, getWorkspaceCA)
 	var i SSHCA
 	err := row.Scan(
-		&i.ID,
 		&i.WorkspaceID,
 		&i.UserPublicKey,
 		&i.HostPublicKey,
@@ -126,7 +114,7 @@ func (q *Queries) GetWorkspaceCA(ctx context.Context) (*SSHCA, error) {
 
 const getWorkspaceCAForShare = `-- name: GetWorkspaceCAForShare :one
 SELECT
-  id, workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
+  workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -139,7 +127,6 @@ func (q *Queries) GetWorkspaceCAForShare(ctx context.Context) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, getWorkspaceCAForShare)
 	var i SSHCA
 	err := row.Scan(
-		&i.ID,
 		&i.WorkspaceID,
 		&i.UserPublicKey,
 		&i.HostPublicKey,
@@ -154,7 +141,7 @@ func (q *Queries) GetWorkspaceCAForShare(ctx context.Context) (*SSHCA, error) {
 
 const getWorkspaceCAForUpdate = `-- name: GetWorkspaceCAForUpdate :one
 SELECT
-  id, workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
+  workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 FROM
   ssh_cas
 WHERE
@@ -166,7 +153,6 @@ func (q *Queries) GetWorkspaceCAForUpdate(ctx context.Context) (*SSHCA, error) {
 	row := q.db.QueryRow(ctx, getWorkspaceCAForUpdate)
 	var i SSHCA
 	err := row.Scan(
-		&i.ID,
 		&i.WorkspaceID,
 		&i.UserPublicKey,
 		&i.HostPublicKey,
@@ -179,25 +165,24 @@ func (q *Queries) GetWorkspaceCAForUpdate(ctx context.Context) (*SSHCA, error) {
 	return &i, err
 }
 
-const putCAKey = `-- name: PutCAKey :exec
+const putCAKeys = `-- name: PutCAKeys :exec
 INSERT INTO
-  ssh_ca_keys (ca_id, kind, private_key)
+  ssh_ca_keys (user_private_key, host_private_key)
 VALUES
-  ($1, $2, $3)
-ON CONFLICT (ca_id, kind) DO UPDATE
+  ($1, $2)
+ON CONFLICT (workspace_id) DO UPDATE
 SET
-  private_key = EXCLUDED.private_key
+  user_private_key = EXCLUDED.user_private_key,
+  host_private_key = EXCLUDED.host_private_key
 `
 
-type PutCAKeyParams struct {
-	CaID       string        `json:"caId"`
-	Kind       string        `json:"kind"`
-	PrivateKey crypto.Sealed `json:"privateKey"`
+type PutCAKeysParams struct {
+	UserPrivateKey crypto.Sealed `json:"userPrivateKey"`
+	HostPrivateKey crypto.Sealed `json:"hostPrivateKey"`
 }
 
-// Creating and rolling over a CA write its keys in the transaction that writes their public halves.
-func (q *Queries) PutCAKey(ctx context.Context, arg *PutCAKeyParams) error {
-	_, err := q.db.Exec(ctx, putCAKey, arg.CaID, arg.Kind, arg.PrivateKey)
+func (q *Queries) PutCAKeys(ctx context.Context, arg *PutCAKeysParams) error {
+	_, err := q.db.Exec(ctx, putCAKeys, arg.UserPrivateKey, arg.HostPrivateKey)
 	return err
 }
 
@@ -209,23 +194,21 @@ SET
   rotated_at = clock_timestamp(),
   updated_at = NOW()
 WHERE
-  id = $3
+  workspace_id = current_workspace_id ()
 RETURNING
-  id, workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
+  workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 `
 
 type ReplaceCAParams struct {
 	UserPublicKey string `json:"userPublicKey"`
 	HostPublicKey string `json:"hostPublicKey"`
-	CaID          string `json:"caId"`
 }
 
 // Nothing keeps the old keys. clock_timestamp is after any sync report that held the row.
 func (q *Queries) ReplaceCA(ctx context.Context, arg *ReplaceCAParams) (*SSHCA, error) {
-	row := q.db.QueryRow(ctx, replaceCA, arg.UserPublicKey, arg.HostPublicKey, arg.CaID)
+	row := q.db.QueryRow(ctx, replaceCA, arg.UserPublicKey, arg.HostPublicKey)
 	var i SSHCA
 	err := row.Scan(
-		&i.ID,
 		&i.WorkspaceID,
 		&i.UserPublicKey,
 		&i.HostPublicKey,
@@ -247,7 +230,7 @@ SET
 WHERE
   workspace_id = current_workspace_id ()
 RETURNING
-  id, workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
+  workspace_id, user_public_key, host_public_key, rotated_at, user_ttl, source_address, created_at, updated_at
 `
 
 type UpdateCAParams struct {
@@ -259,7 +242,6 @@ func (q *Queries) UpdateCA(ctx context.Context, arg *UpdateCAParams) (*SSHCA, er
 	row := q.db.QueryRow(ctx, updateCA, arg.UserTtl, arg.SourceAddress)
 	var i SSHCA
 	err := row.Scan(
-		&i.ID,
 		&i.WorkspaceID,
 		&i.UserPublicKey,
 		&i.HostPublicKey,

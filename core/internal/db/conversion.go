@@ -16,11 +16,6 @@ import (
 // MaxTargetAccounts stops a host from reporting accounts without bound.
 const MaxTargetAccounts = 1000
 
-var credentialTypes = map[string]nokkuv1.CredentialType{
-	"passkey": nokkuv1.CredentialType_CREDENTIAL_TYPE_PASSKEY,
-	"oidc":    nokkuv1.CredentialType_CREDENTIAL_TYPE_OIDC,
-}
-
 func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	if w == nil {
 		return nil
@@ -35,7 +30,7 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 		Id:          &w.ID,
 		Slug:        &w.Slug,
 		Name:        &w.Name,
-		Description: w.Description,
+		Description: &w.Description,
 		Settings:    settings,
 		CreatedAt:   SafeTimestamp(&w.CreatedAt),
 		UpdatedAt:   SafeTimestamp(&w.UpdatedAt),
@@ -44,18 +39,27 @@ func (w *Workspace) ToProto() *nokkuv1.Workspace {
 	}
 }
 
-func (c *Credential) ToProto() *nokkuv1.AccountCredential {
-	if c == nil {
+func (p *Passkey) ToProto() *nokkuv1.Passkey {
+	if p == nil {
 		return nil
 	}
-	return &nokkuv1.AccountCredential{
-		Id:         &c.ID,
-		Type:       credentialTypes[c.Type].Enum(),
-		Provider:   &c.Provider,
-		Subject:    &c.Subject,
-		Label:      &c.Label,
-		CreatedAt:  SafeTimestamp(&c.CreatedAt),
-		LastUsedAt: SafeTimestamp(c.LastUsedAt),
+	return &nokkuv1.Passkey{
+		Id:         &p.ID,
+		Label:      &p.Label,
+		CreatedAt:  SafeTimestamp(&p.CreatedAt),
+		LastUsedAt: SafeTimestamp(p.LastUsedAt),
+	}
+}
+
+func (i *OidcIdentity) ToProto() *nokkuv1.OIDCIdentity {
+	if i == nil {
+		return nil
+	}
+	return &nokkuv1.OIDCIdentity{
+		Id:         &i.ID,
+		Provider:   &i.ProviderID,
+		CreatedAt:  SafeTimestamp(&i.CreatedAt),
+		LastUsedAt: SafeTimestamp(i.LastUsedAt),
 	}
 }
 
@@ -83,14 +87,14 @@ func (t *Team) ToProto() *nokkuv1.Team {
 		return nil
 	}
 	return &nokkuv1.Team{
-		Id:          &t.ID,
-		Name:        &t.Name,
-		Description: t.Description,
-		Tags:        t.Tags,
-		CreatedAt:   SafeTimestamp(&t.CreatedAt),
-		UpdatedAt:   SafeTimestamp(&t.UpdatedAt),
-		ScimManaged: &t.ScimManaged,
-		ScimOpen:    &t.ScimOpen,
+		Id:            &t.ID,
+		Name:          &t.Name,
+		Description:   &t.Description,
+		Tags:          t.Tags,
+		CreatedAt:     SafeTimestamp(&t.CreatedAt),
+		UpdatedAt:     SafeTimestamp(&t.UpdatedAt),
+		ScimManaged:   &t.ScimManaged,
+		ScimAdoptable: &t.ScimAdoptable,
 	}
 }
 
@@ -105,7 +109,7 @@ func (s *ServiceAccount) ToProto() *nokkuv1.ServiceAccount {
 	return &nokkuv1.ServiceAccount{
 		Id:            &s.ID,
 		Name:          &s.Name,
-		Description:   s.Description,
+		Description:   &s.Description,
 		Role:          &s.Role,
 		Tags:          s.Tags,
 		ForceCommand:  &s.ForceCommand,
@@ -158,16 +162,15 @@ func (t *Target) ToProto() *nokkuv1.Target {
 	metadata := jsonMap("targets.metadata", t.Metadata)
 	return &nokkuv1.Target{
 		Id:            &t.ID,
-		DaemonId:      t.DaemonID,
-		Description:   t.Description,
+		Description:   &t.Description,
 		Name:          &t.Name,
 		Endpoints:     t.Endpoints,
 		Tags:          t.Tags,
 		Metadata:      metadata,
-		HostPublicKey: t.HostPublicKey,
+		HostPublicKey: &t.HostPublicKey,
 		CreatedAt:     SafeTimestamp(&t.CreatedAt),
 		UpdatedAt:     SafeTimestamp(&t.UpdatedAt),
-		LastSyncAt:    SafeTimestamp(t.LastSyncAt),
+		ManualSyncAt:  SafeTimestamp(t.ManualSyncAt),
 		CreatedBy:     t.CreatedBy,
 	}
 }
@@ -189,11 +192,11 @@ func (a *TargetAccount) ToProto() *nokkuv1.TargetAccount {
 		return nil
 	}
 	return &nokkuv1.TargetAccount{
-		Id:        &a.ID,
-		TargetId:  &a.TargetID,
-		Username:  &a.Username,
-		CreatedAt: SafeTimestamp(&a.CreatedAt),
-		SeenAt:    SafeTimestamp(a.SeenAt),
+		Id:          &a.ID,
+		TargetId:    &a.TargetID,
+		Username:    &a.Username,
+		CreatedAt:   SafeTimestamp(&a.CreatedAt),
+		FirstSeenAt: SafeTimestamp(a.FirstSeenAt),
 	}
 }
 
@@ -242,7 +245,7 @@ func (u *User) ToProto() *nokkuv1.User {
 		Id:          &u.ID,
 		Name:        &u.Name,
 		Email:       &u.Email,
-		Picture:     u.Picture,
+		Picture:     &u.Picture,
 		Role:        &u.Role,
 		Active:      &u.Active,
 		CreatedAt:   SafeTimestamp(&u.CreatedAt),
@@ -290,9 +293,9 @@ func (d *Daemon) ToProto(name string, online bool) *nokkuv1.Daemon {
 		return nil
 	}
 	return &nokkuv1.Daemon{
-		Id:         &d.ID,
+		Id:         &d.TargetID,
 		Name:       &name,
-		Status:     &d.Status,
+		Accepted:   &d.Accepted,
 		Config:     d.EffectiveConfig(),
 		Online:     &online,
 		LastSeenAt: SafeTimestamp(d.LastSeenAt),
@@ -304,7 +307,7 @@ func (d *Daemon) ToProto(name string, online bool) *nokkuv1.Daemon {
 
 func DaemonsToProto(rows []*ListDaemonsRow, online func(daemonID string) bool) []*nokkuv1.Daemon {
 	return mapSlice(rows, func(r *ListDaemonsRow) *nokkuv1.Daemon {
-		return r.Daemon.ToProto(r.Name, online(r.Daemon.ID))
+		return r.Daemon.ToProto(r.Name, online(r.Daemon.TargetID))
 	})
 }
 
@@ -314,7 +317,6 @@ func (r *SSHCA) ToProto() *nokkuv1.CertificateAuthority {
 	}
 
 	return &nokkuv1.CertificateAuthority{
-		Id:                       &r.ID,
 		UserPublicKey:            &r.UserPublicKey,
 		UserPublicKeyFingerprint: new(fingerprint(r.UserPublicKey)),
 		HostPublicKey:            &r.HostPublicKey,
@@ -397,7 +399,7 @@ func TargetAccountsToProto(rows []*ListTargetAccountsRow) []*nokkuv1.TargetAccou
 func (r *ListInvitesRow) ToProto() *nokkuv1.Invitation {
 	return &nokkuv1.Invitation{
 		Email:     &r.Email,
-		Role:      r.Role,
+		Role:      &r.Role,
 		ExpiresAt: SafeTimestamp(&r.ExpiresAt),
 		CreatedAt: SafeTimestamp(&r.CreatedAt),
 	}

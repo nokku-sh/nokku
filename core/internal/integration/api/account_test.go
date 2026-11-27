@@ -3,6 +3,7 @@
 package api_test
 
 import (
+	"context"
 	"testing"
 
 	"connectrpc.com/connect/v2"
@@ -12,6 +13,7 @@ import (
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
 
+	"github.com/nokku-sh/nokku/core/internal/actor"
 	"github.com/nokku-sh/nokku/core/internal/app"
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
@@ -85,6 +87,43 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, u.ID, reverted.ID)
 	})
+}
+
+// Passkeys and linked identities come back as the two lists they are.
+func TestListCredentials(t *testing.T) {
+	cfg, _ := newTestAPI(t)
+	u, account := seedAccount(t, cfg)
+	// Without a config the row breaks ListSSOProviders, so it goes again.
+	provider := uniq("idp")
+	ctx := actor.WithWorkspace(t.Context(), actor.Workspace{ID: testWorkspace.ID})
+	_, err := cfg.Conn.Pool.Exec(ctx, `INSERT INTO sso_providers (provider_id, enabled, config) VALUES ($1, FALSE, '')`,
+		provider)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := cfg.Conn.Pool.Exec(context.WithoutCancel(ctx), "DELETE FROM sso_providers WHERE provider_id = $1",
+			provider)
+		require.NoError(t, err)
+	})
+	var identity string
+	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) (err error) {
+		if _, err = q.SavePasskey(t.Context(), &db.SavePasskeyParams{
+			UserID: u.ID, CredentialID: u.ID, Data: []byte{}, Label: "laptop",
+		}); err != nil {
+			return err
+		}
+		identity, err = q.LinkOIDCIdentity(t.Context(), &db.LinkOIDCIdentityParams{
+			UserID: u.ID, ProviderID: provider, Subject: u.ID,
+		})
+		return err
+	})
+
+	res, err := account.ListCredentials(t.Context(), &nokkuv1.ListCredentialsRequest{})
+	require.NoError(t, err)
+	require.Len(t, res.GetPasskeys(), 1)
+	assert.Equal(t, "laptop", res.GetPasskeys()[0].GetLabel())
+	require.Len(t, res.GetOidcIdentities(), 1)
+	assert.Equal(t, identity, res.GetOidcIdentities()[0].GetId())
+	assert.Equal(t, provider, res.GetOidcIdentities()[0].GetProvider())
 }
 
 // The owner hands the workspace on before leaving, anyone else just goes.

@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -62,14 +61,12 @@ func (s *targetService) GetTarget(
 
 // withDaemons puts each server's daemon on it, live state included.
 func withDaemons(ctx context.Context, q *db.Queries, pool *nokkudaemon.Pool, targets []*nokkuv1.Target) error {
-	var ids []string
-	for _, t := range targets {
-		if t.DaemonId != nil {
-			ids = append(ids, t.GetDaemonId())
-		}
-	}
-	if len(ids) == 0 {
+	if len(targets) == 0 {
 		return nil
+	}
+	ids := make([]string, len(targets))
+	for i, t := range targets {
+		ids[i] = t.GetId()
 	}
 	rows, err := q.GetDaemonsByIDs(ctx, ids)
 	if err != nil {
@@ -77,10 +74,10 @@ func withDaemons(ctx context.Context, q *db.Queries, pool *nokkudaemon.Pool, tar
 	}
 	daemons := make(map[string]*nokkuv1.Daemon, len(rows))
 	for _, d := range rows {
-		daemons[d.Daemon.ID] = liveDaemon(pool, &d.Daemon, d.Name)
+		daemons[d.Daemon.TargetID] = liveDaemon(pool, &d.Daemon, d.Name)
 	}
 	for _, t := range targets {
-		t.Daemon = daemons[t.GetDaemonId()]
+		t.Daemon = daemons[t.GetId()]
 	}
 	return nil
 }
@@ -148,10 +145,10 @@ func (s *targetService) insertTarget(
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		result, err = q.CreateTarget(ctx, &db.CreateTargetParams{
 			Name:          name,
-			Description:   req.Description,
+			Description:   req.GetDescription(),
 			Endpoints:     req.GetEndpoints(),
 			Tags:          req.GetTags(),
-			HostPublicKey: trimmed(req.HostPublicKey),
+			HostPublicKey: strings.TrimSpace(req.GetHostPublicKey()),
 			CreatedBy:     callerID(ctx),
 		})
 		if err != nil {
@@ -195,7 +192,6 @@ func seedTargetGrants(ctx context.Context, q *db.Queries, targetID string, grant
 				AccountIds:  []string{account.ID},
 				SubjectKind: subjectKind(subject.GetKind()),
 				SubjectID:   subject.GetId(),
-				GrantedBy:   callerID(ctx),
 			}); err != nil {
 				return err
 			}
@@ -231,7 +227,7 @@ func sameHostKey(a, b string) bool {
 // repinTarget lets only whoever added a server replace its pinned host key, the first pin stays open.
 func repinTarget(caller actor.Principal, target *db.Target, req *nokkuv1.SyncTargetUsersRequest) error {
 	key, pinned := strings.TrimSpace(req.GetHostPublicKey()), target.HostPublicKey
-	if key == "" || pinned == nil || sameHostKey(key, *pinned) || addedBy(target, caller) {
+	if key == "" || pinned == "" || sameHostKey(key, pinned) || addedBy(target, caller) {
 		return nil
 	}
 	return connect.NewError(
@@ -260,9 +256,7 @@ func (s *targetService) UpdateTarget(
 	}
 	audit.Set(ctx, "name", result.Name)
 
-	return &nokkuv1.UpdateTargetResponse{
-		Target: result.ToProto(),
-	}, nil
+	return &nokkuv1.UpdateTargetResponse{}, nil
 }
 
 func (s *targetService) RenameTarget(
@@ -276,7 +270,7 @@ func (s *targetService) RenameTarget(
 		return nil, err
 	}
 	audit.Set(ctx, "name", result.Name)
-	return &nokkuv1.RenameTargetResponse{Target: result.ToProto()}, nil
+	return &nokkuv1.RenameTargetResponse{}, nil
 }
 
 func (s *targetService) SetTargetEndpoints(
@@ -291,14 +285,13 @@ func (s *targetService) SetTargetEndpoints(
 	}
 	audit.Set(ctx, "name", result.Name)
 	audit.Set(ctx, "endpoints", result.Endpoints)
-	return &nokkuv1.SetTargetEndpointsResponse{Target: result.ToProto()}, nil
+	return &nokkuv1.SetTargetEndpointsResponse{}, nil
 }
 
 func (s *targetService) DeleteTarget(
 	ctx context.Context,
 	req *nokkuv1.DeleteTargetRequest,
 ) (*nokkuv1.DeleteTargetResponse, error) {
-	// A nokkud server goes with its daemon, the delete cascades to it.
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		target, err := q.GetTarget(ctx, req.GetId())
 		if err != nil {
@@ -311,10 +304,6 @@ func (s *targetService) DeleteTarget(
 				connect.CodePermissionDenied,
 				"only whoever added this server deletes it with nk rm. Anyone else deletes it in the web app",
 			)
-		}
-		if target.DaemonID != nil {
-			_, err = q.DeleteDaemon(ctx, *target.DaemonID)
-			return err
 		}
 		_, err = q.DeleteTarget(ctx, target.ID)
 		return err
@@ -339,7 +328,6 @@ func (s *targetService) ListTargets(
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		params := &db.ListTargetsParams{
 			Query:          req.Query,
-			DaemonID:       req.DaemonId,
 			Accounts:       req.GetAccounts(),
 			Tags:           req.GetTags(),
 			Ids:            req.GetIds(),
@@ -412,7 +400,9 @@ func (s *targetService) SyncTargetUsers(
 		if err != nil {
 			return err
 		}
-		if target.DaemonID != nil {
+		if hasDaemon, err := q.HasDaemon(ctx, target.ID); err != nil {
+			return err
+		} else if hasDaemon {
 			return connect.NewError(connect.CodeInvalidArgument, "this server runs the daemon, which reports for it")
 		}
 		if err := ownTarget(caller, target); err != nil {
@@ -442,7 +432,7 @@ func (s *targetService) SyncTargetUsers(
 
 		if err := q.ReportManualSync(ctx, &db.ReportManualSyncParams{
 			TargetID:      req.GetTargetId(),
-			HostPublicKey: trimmed(req.HostPublicKey),
+			HostPublicKey: strings.TrimSpace(req.GetHostPublicKey()),
 		}); err != nil {
 			return err
 		}
@@ -465,7 +455,9 @@ func (s *targetService) ForgetHostKey(
 			return err
 		}
 		audit.Set(ctx, "name", target.Name)
-		if target.DaemonID != nil {
+		if hasDaemon, err := q.HasDaemon(ctx, target.ID); err != nil {
+			return err
+		} else if hasDaemon {
 			return connect.NewError(
 				connect.CodeFailedPrecondition,
 				"a server with the daemon has no pinned host key, the certificate authority vouches for it",
@@ -491,11 +483,6 @@ func (s *targetService) GetSubjectAccess(
 	}
 
 	res := &nokkuv1.GetSubjectAccessResponse{}
-	var targets []*nokkuv1.TargetAccess
-	var daemons []*nokkuv1.Daemon
-
-	uniqueDaemonIDs := make(map[string]struct{})
-
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if err := setSubject(ctx, q, res, subjectID); err != nil {
 			return err
@@ -512,9 +499,6 @@ func (s *targetService) GetSubjectAccess(
 		targetIDs := make([]string, 0, len(rows))
 		for _, r := range rows {
 			targetIDs = append(targetIDs, r.ID)
-			if r.DaemonID != nil {
-				uniqueDaemonIDs[*r.DaemonID] = struct{}{}
-			}
 		}
 
 		uRows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
@@ -532,33 +516,33 @@ func (s *targetService) GetSubjectAccess(
 			}
 		}
 
+		daemonRows, err := q.GetDaemonsByIDs(ctx, targetIDs)
+		if err != nil {
+			return err
+		}
+		daemons := make(map[string]*nokkuv1.Daemon, len(daemonRows))
+		for _, d := range daemonRows {
+			daemons[d.Daemon.TargetID] = &nokkuv1.Daemon{
+				Id:     &d.Daemon.TargetID,
+				Name:   &d.Name,
+				Online: new(s.cfg.Pool.IsConnected(d.Daemon.TargetID)),
+				// Only whether it records, so people know before they log in.
+				Config: &nokkuv1.DaemonConfig{
+					RecordSessions: new(db.ResolveDaemonConfig(d.Daemon.Config).GetRecordSessions()),
+				},
+			}
+		}
+
 		for _, r := range rows {
 			target := r.ToProto()
 			target.Accounts = accounts[r.ID]
-			targets = append(targets, &nokkuv1.TargetAccess{Target: target})
+			target.Daemon = daemons[r.ID]
+			res.Targets = append(res.Targets, &nokkuv1.TargetAccess{Target: target})
 		}
-		setLogins(targets, uRows)
-		slices.SortFunc(targets, func(a, b *nokkuv1.TargetAccess) int {
+		setLogins(res.GetTargets(), uRows)
+		slices.SortFunc(res.GetTargets(), func(a, b *nokkuv1.TargetAccess) int {
 			return strings.Compare(a.GetTarget().GetName(), b.GetTarget().GetName())
 		})
-
-		if len(uniqueDaemonIDs) > 0 {
-			daemonRows, err := q.GetDaemonsByIDs(ctx, slices.Collect(maps.Keys(uniqueDaemonIDs)))
-			if err != nil {
-				return err
-			}
-			for _, d := range daemonRows {
-				daemons = append(daemons, &nokkuv1.Daemon{
-					Id:     &d.Daemon.ID,
-					Name:   &d.Name,
-					Online: new(s.cfg.Pool.IsConnected(d.Daemon.ID)),
-					// Only whether it records, so people know before they log in.
-					Config: &nokkuv1.DaemonConfig{
-						RecordSessions: new(db.ResolveDaemonConfig(d.Daemon.Config).GetRecordSessions()),
-					},
-				})
-			}
-		}
 
 		ca, err := q.GetWorkspaceCA(ctx)
 		if err != nil {
@@ -569,8 +553,6 @@ func (s *targetService) GetSubjectAccess(
 	}); err != nil {
 		return nil, err
 	}
-
-	res.Targets, res.Daemons = targets, daemons
 	return res, nil
 }
 
@@ -657,16 +639,4 @@ func validateHostPublicKey(key string) error {
 		return connect.NewError(connect.CodeInvalidArgument, "invalid host public key")
 	}
 	return nil
-}
-
-// trimmed turns empty into nil so COALESCE keeps the stored value.
-func trimmed(s *string) *string {
-	if s == nil {
-		return nil
-	}
-	v := strings.TrimSpace(*s)
-	if v == "" {
-		return nil
-	}
-	return &v
 }

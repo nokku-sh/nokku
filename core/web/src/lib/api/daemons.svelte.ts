@@ -3,6 +3,7 @@ import { type Daemon, DaemonService } from '#lib/gen/nokku/v1/daemon_pb.js';
 import { confirm } from '#lib/hooks/index.js';
 import { useMutation, useQuery } from '#lib/query/index.js';
 import { whenFresh } from './auth.svelte';
+import { target } from './targets.svelte';
 import { plural, useBulkMutation } from './bulk';
 import { addSession, TerminalSession } from './terminal.svelte';
 import { usePatch } from './mask';
@@ -26,7 +27,6 @@ export const daemon = {
 		}),
 	update: () => usePatch(DaemonService.method.updateDaemon),
 	setSafeguards: () => useMutation(DaemonService.method.setDaemonSafeguards),
-	delete: () => useMutation(DaemonService.method.deleteDaemon),
 	approve: () => useMutation(DaemonService.method.approveDaemon),
 	approveMany: () =>
 		useBulkMutation(DaemonService.method.approveDaemon, (n) => `${plural(n, 'server')} approved`)
@@ -35,7 +35,7 @@ export const daemon = {
 // useDaemonReview approves or rejects an enrolled daemon the same way everywhere. Reject takes its server along.
 export function useDaemonReview() {
 	const approve = daemon.approve();
-	const remove = daemon.delete();
+	const remove = target.delete();
 	return {
 		get pending() {
 			return approve.isPending || remove.isPending;

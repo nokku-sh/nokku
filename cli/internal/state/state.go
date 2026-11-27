@@ -34,7 +34,7 @@ type CA struct {
 
 type Target struct {
 	ID        string   `json:"id"`
-	DaemonID  string   `json:"daemon_id,omitempty"`
+	Daemon    bool     `json:"daemon,omitzero"`
 	Name      string   `json:"name"`
 	Endpoints []string `json:"endpoints,omitempty"`
 	// Usernames are the accounts this subject may log in as on the target.
@@ -43,8 +43,8 @@ type Target struct {
 	Until map[string]time.Time `json:"until,omitempty"`
 	// HostPublicKey pins the host key of a manual target.
 	HostPublicKey string `json:"host_public_key,omitempty"`
-	// LastSyncAt is when nk sync last wrote the CA key to a manual target.
-	LastSyncAt time.Time `json:"last_sync_at,omitzero"`
+	// ManualSyncAt is when nk sync last wrote the CA key to a manual target.
+	ManualSyncAt time.Time `json:"manual_sync_at,omitzero"`
 	// CreatedBy is who added the target, only they pin a new host key with nk sync.
 	CreatedBy string `json:"created_by,omitempty"`
 }
@@ -86,11 +86,11 @@ type State struct {
 	Token string
 }
 
-func (t Target) Manual() bool { return t.DaemonID == "" }
+func (t Target) Manual() bool { return !t.Daemon }
 
 // Behind is a manual target last synced before a rollover, so it still takes only the old key.
 func (t Target) Behind(ca CA) bool {
-	return t.Manual() && !t.LastSyncAt.IsZero() && t.LastSyncAt.Before(ca.RotatedAt)
+	return t.Manual() && !t.ManualSyncAt.IsZero() && t.ManualSyncAt.Before(ca.RotatedAt)
 }
 
 // Load starts empty on a missing or corrupt file.

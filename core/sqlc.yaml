@@ -55,10 +55,6 @@ sql:
               pointer: true
 
           # Enum overrides
-          - column: "daemons.status"
-            go_type:
-              import: "github.com/nokku-sh/nokku/gen/nokku/v1"
-              type: "DaemonStatus"
           - column: "users.role"
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -67,11 +63,10 @@ sql:
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
               type: "WorkspaceRole"
-          - column: "one_time_tokens.role"
+          - column: "invites.role"
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
               type: "WorkspaceRole"
-              pointer: true
           - column: "access_requests.status"
             go_type:
               import: "github.com/nokku-sh/nokku/gen/nokku/v1"
@@ -100,44 +95,25 @@ sql:
               type: "WorkspaceSettings"
               pointer: true
 
-          # Hash (one-way) overrides
-          - column: "access_tokens.token_hash"
+          # A token is stored as its hash, one way
+          - db_type: "hashed_token"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "HashedToken"
-          - column: "one_time_tokens.token_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "HashedToken"
-          - column: "device_grants.device_code_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "HashedToken"
-          - column: "device_grants.loopback_code_hash"
+          - db_type: "hashed_token"
             nullable: true
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "HashedToken"
               pointer: true
-          - column: "join_tokens.token_hash"
-            go_type:
-              import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "HashedToken"
 
-          # Sealed overrides. Plain bytes, only Keyset.Open reads the secret. db/reencrypt.go lists the same columns.
-          - column: "ssh_ca_keys.private_key"
+          # Plain bytes, only Keyset.Open reads the secret. db/reencrypt.go lists the same columns.
+          - db_type: "sealed"
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "Sealed"
-          - column: "sso_providers.config"
-            go_type:
-              import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "Sealed"
-          - column: "recordings.key"
-            go_type:
-              import: "github.com/nokku-sh/nokku/core/internal/crypto"
-              type: "Sealed"
-          - column: "audit_streams.secret"
+          - db_type: "sealed"
+            nullable: true
             go_type:
               import: "github.com/nokku-sh/nokku/core/internal/crypto"
               type: "Sealed"

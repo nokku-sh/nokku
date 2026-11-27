@@ -25,9 +25,9 @@ var ErrEnrollToken = errors.New("invalid or expired enrollment token")
 
 type EnrollInput struct {
 	Token string
-	// Binding is the DPoP key thumbprint.
-	Binding string
-	Version string
+	// KeyThumbprint is of the machine's DPoP key.
+	KeyThumbprint string
+	Version       string
 	// ReqMetadata is the host's own report, its hostname may name the daemon.
 	ReqMetadata map[string]string
 	// CanCreate only runs for new machines, so re-enrolling works at the cap.
@@ -41,8 +41,6 @@ type EnrollInput struct {
 type Enrolled struct {
 	DaemonID string
 	Name     string
-	TargetID string
-	Status   nokkuv1.DaemonStatus
 	Config   *nokkuv1.DaemonConfig
 }
 
@@ -73,7 +71,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		if err != nil {
 			return err
 		}
-		if out, err = enrolledDaemon(ctx, q, in.Binding); err != nil || out != nil {
+		if out, err = enrolledDaemon(ctx, q, in.KeyThumbprint); err != nil || out != nil {
 			return err
 		}
 		oldID, err = offlineNamesake(ctx, q, token, wanted, &in)
@@ -95,10 +93,6 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		}
 	}
 
-	status := nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING
-	if token.AutoApprove {
-		status = nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
-	}
 	config := db.ResolveDaemonConfig(workspace.Settings.GetDefaultDaemonConfig())
 	// The row carries it, see db.Daemon.EffectiveConfig.
 	config.Ephemeral = nil
@@ -113,7 +107,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 		}
 		for attempt := range maxNameAttempts {
 			// A racing enrollment of the same key makes the insert a no-op.
-			if out, err = enrolledDaemon(ctx, q, in.Binding); err != nil || out != nil {
+			if out, err = enrolledDaemon(ctx, q, in.KeyThumbprint); err != nil || out != nil {
 				return err
 			}
 			// A taken name returns no row, then the generator takes over.
@@ -128,11 +122,11 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 					return err
 				}
 			}
-			daemonID, targetID, err := createDaemon(ctx, q, name, &db.CreateDaemonParams{
+			daemonID, err := createDaemon(ctx, q, name, &db.CreateDaemonParams{
 				Version:       in.Version,
-				Status:        status,
+				Accepted:      token.AutoApprove,
 				Config:        config,
-				KeyThumbprint: &in.Binding,
+				KeyThumbprint: in.KeyThumbprint,
 				JoinTokenID:   &token.ID,
 				RetireAfter:   token.RetireAfter,
 			})
@@ -149,7 +143,7 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 				}
 				return err
 			}
-			if err := seedTarget(ctx, q, token, targetID, report); err != nil {
+			if err := seedTarget(ctx, q, token, daemonID, report); err != nil {
 				return err
 			}
 			cfg := db.ResolveDaemonConfig(config)
@@ -157,8 +151,6 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 			out = &Enrolled{
 				DaemonID: daemonID,
 				Name:     name,
-				TargetID: targetID,
-				Status:   status,
 				Config:   cfg,
 			}
 			return nil
@@ -171,28 +163,20 @@ func Enroll(ctx context.Context, conn connection, in EnrollInput) (*Enrolled, er
 	return out, nil
 }
 
-// createDaemon makes the daemon and its server. A taken key or name returns pgx.ErrNoRows and leaves nothing behind.
-func createDaemon(
-	ctx context.Context,
-	q *db.Queries,
-	name string,
-	arg *db.CreateDaemonParams,
-) (daemonID, targetID string, err error) {
-	d, err := q.CreateDaemon(ctx, arg)
+// A taken name or key returns pgx.ErrNoRows and leaves nothing behind.
+func createDaemon(ctx context.Context, q *db.Queries, name string, arg *db.CreateDaemonParams) (id string, err error) {
+	arg.TargetID, err = q.CreateDaemonTarget(ctx, name)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	targetID, err = q.CreateDaemonTarget(ctx, &db.CreateDaemonTargetParams{DaemonID: &d.ID, Name: name})
+	_, err = q.CreateDaemon(ctx, arg)
 	if errors.Is(err, pgx.ErrNoRows) {
-		if _, err := q.DeleteDaemon(ctx, d.ID); err != nil {
-			return "", "", err
+		if _, err := q.DeleteTarget(ctx, arg.TargetID); err != nil {
+			return "", err
 		}
-		return "", "", pgx.ErrNoRows
+		return "", pgx.ErrNoRows
 	}
-	if err != nil {
-		return "", "", err
-	}
-	return d.ID, targetID, nil
+	return arg.TargetID, err
 }
 
 // A token's tags and grants only reach a target here, never on a re-enroll.
@@ -242,7 +226,7 @@ func dropDaemon(ctx context.Context, q *db.Queries, id string) error {
 	if id == "" {
 		return nil
 	}
-	if _, err := q.DeleteDaemon(ctx, id); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := q.DeleteTarget(ctx, id); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
 	return nil
@@ -250,7 +234,7 @@ func dropDaemon(ctx context.Context, q *db.Queries, id string) error {
 
 // enrolledDaemon returns nil for an unknown key, the machine's identity.
 func enrolledDaemon(ctx context.Context, q *db.Queries, binding string) (*Enrolled, error) {
-	row, err := q.GetDaemonByKeyThumbprint(ctx, &binding)
+	row, err := q.GetDaemonByKeyThumbprint(ctx, binding)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -258,10 +242,8 @@ func enrolledDaemon(ctx context.Context, q *db.Queries, binding string) (*Enroll
 		return nil, err
 	}
 	return &Enrolled{
-		DaemonID: row.Daemon.ID,
+		DaemonID: row.Daemon.TargetID,
 		Name:     row.Name,
-		TargetID: row.TargetID,
-		Status:   row.Daemon.Status,
 		Config:   row.Daemon.EffectiveConfig(),
 	}, nil
 }

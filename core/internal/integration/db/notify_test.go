@@ -32,23 +32,21 @@ var fixedColumns = map[string]string{
 	"grants.subject_id":         "generated from the subject columns",
 	"grants.subject_kind":       "generated from the subject columns",
 	"grants.created_at":         "set on insert",
-	"grants.granted_by":         "names who set the end, and it grants nothing",
 	"target_accounts.target_id": "accounts are added and removed, never changed",
 	"target_accounts.username":  "accounts are added and removed, never changed",
-	"targets.daemon_id":         "a target's daemon never changes",
+	"daemons.target_id":         "a daemon never moves to another target",
 	"team_members.team_id":      "members are added and removed, never changed",
 	"team_members.user_id":      "members are added and removed, never changed",
 }
 
 // syncColumns are read by a sync outside the access view.
 var syncColumns = []string{
-	"ssh_cas.user_public_key", "ssh_cas.host_public_key", "workspaces.settings", "daemons.status", "daemons.config",
+	"ssh_cas.user_public_key", "ssh_cas.host_public_key", "workspaces.settings", "daemons.accepted", "daemons.config",
 }
 
 // quietRows are tables of the view whose new or deleted rows need no trigger.
 var quietRows = map[string]string{
 	"users":           "a new person holds no grant, deleting one deletes its grants and memberships",
-	"targets":         "a new target has no accounts, deleting one deletes its accounts",
 	"target_accounts": "a new account holds no grant",
 	"daemons":         "a new daemon's target holds no grant",
 }
@@ -66,8 +64,6 @@ func TestEveryAccessTableNotifies(t *testing.T) {
 
 	tables := viewTables(t, owner, "effective_access")
 	require.Contains(t, tables, "grants", "the walk found nothing, the view moved or was renamed")
-	// A target's daemon never changes, deleting a target deletes its accounts.
-	tables = slices.DeleteFunc(tables, func(name string) bool { return name == "targets" })
 	assert.NotContains(t, tables, "teams", "teams have no trigger, the view must reach them through team_members")
 	assert.NotContains(t, tables, "service_accounts", "service accounts have no trigger")
 	assert.Empty(

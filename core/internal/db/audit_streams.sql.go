@@ -112,8 +112,7 @@ type CreateAuditStreamRow struct {
 	CreatedAt    time.Time             `json:"createdAt"`
 }
 
-// A new stream starts with the events from now on. Never the secret back, it is not shown again. The id comes from
-// the caller, the secret is sealed to it.
+// The id comes from the caller, the secret is sealed to it.
 func (q *Queries) CreateAuditStream(ctx context.Context, arg *CreateAuditStreamParams) (*CreateAuditStreamRow, error) {
 	row := q.db.QueryRow(ctx, createAuditStream,
 		arg.ID,
@@ -224,8 +223,7 @@ type ListAuditLogsAfterParams struct {
 	MaxRows     int32     `json:"maxRows"`
 }
 
-// The events after the cursor in a stable order. A row is stamped when its insert starts and commits a moment
-// later, so the newest minute waits until nothing older can still arrive. Every write gives up long before that.
+// Skips the newest minute, a row may commit after its stamp.
 func (q *Queries) ListAuditLogsAfter(ctx context.Context, arg *ListAuditLogsAfterParams) ([]*AuditAuditLog, error) {
 	rows, err := q.db.Query(ctx, listAuditLogsAfter,
 		arg.WorkspaceID,
@@ -357,7 +355,6 @@ type ListAuditStreamsFailingLongRow struct {
 	OwnerEmail    string                `json:"ownerEmail"`
 }
 
-// Enabled streams that failed for longer than the wait and whose owner has not heard of it. Runs as nokku_system.
 func (q *Queries) ListAuditStreamsFailingLong(ctx context.Context, wait time.Duration) ([]*ListAuditStreamsFailingLongRow, error) {
 	rows, err := q.db.Query(ctx, listAuditStreamsFailingLong, wait)
 	if err != nil {
@@ -404,7 +401,6 @@ ORDER BY
   id
 `
 
-// Every enabled stream whose wait after a failure is over, across workspaces.
 func (q *Queries) ListDueAuditStreams(ctx context.Context) ([]*AuditStream, error) {
 	rows, err := q.db.Query(ctx, listDueAuditStreams)
 	if err != nil {
@@ -457,7 +453,7 @@ const updateAuditStream = `-- name: UpdateAuditStream :one
 UPDATE audit_streams
 SET
   url = COALESCE($1, url),
-  secret = COALESCE($2, secret),
+  secret = COALESCE($2::sealed, secret),
   enabled = COALESCE($3, enabled),
   retry_at = NULL
 WHERE

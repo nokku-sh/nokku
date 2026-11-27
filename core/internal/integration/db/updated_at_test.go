@@ -28,7 +28,14 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 	})
 	updatedAt := func(table, id string) (at time.Time) {
 		t.Helper()
-		err := c.sysPool.QueryRow(t.Context(), `SELECT updated_at FROM `+table+` WHERE id = $1`, id).Scan(&at)
+		key := "id"
+		switch table {
+		case "ssh_cas":
+			key = "workspace_id"
+		case "daemons":
+			key = "target_id"
+		}
+		err := c.sysPool.QueryRow(t.Context(), `SELECT updated_at FROM `+table+` WHERE `+key+` = $1`, id).Scan(&at)
 		require.NoError(t, err, "read %s.updated_at", table)
 		return at
 	}
@@ -45,10 +52,8 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 			_, err := q.UpdateTarget(t.Context(), &db.UpdateTargetParams{TargetID: f.target, Name: new("renamed")})
 			return err
 		}},
-		{"daemons", f.daemon, func(q *db.Queries) error {
-			_, err := q.UpdateDaemon(t.Context(), &db.UpdateDaemonParams{
-				DaemonID: f.daemon, Status: nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED,
-			})
+		{"daemons", f.target, func(q *db.Queries) error {
+			_, err := q.ApproveDaemon(t.Context(), f.target)
 			return err
 		}},
 		{"service_accounts", serviceAccount, func(q *db.Queries) error {
@@ -57,7 +62,7 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 			})
 			return err
 		}},
-		{"ssh_cas", f.ca, func(q *db.Queries) error {
+		{"ssh_cas", f.ws, func(q *db.Queries) error {
 			_, err := q.UpdateCA(t.Context(), &db.UpdateCAParams{SourceAddress: new("10.0.0.0/8")})
 			return err
 		}},
@@ -67,13 +72,13 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 		assert.Greater(t, updatedAt(edit.table, edit.id), before, "an edit of %s left updated_at", edit.table)
 	}
 
-	daemon, target := updatedAt("daemons", f.daemon), updatedAt("targets", f.target)
+	daemon, target := updatedAt("daemons", f.target), updatedAt("targets", f.target)
 	asOwner(t, c, f, func(q *db.Queries) error {
-		if err := q.MarkDaemonSeen(t.Context(), f.daemon); err != nil {
+		if err := q.MarkDaemonSeen(t.Context(), f.target); err != nil {
 			return err
 		}
 		if err := q.UpdateDaemonVersion(t.Context(), &db.UpdateDaemonVersionParams{
-			DaemonID: f.daemon, Version: "1.0.0",
+			TargetID: f.target, Version: "1.0.0",
 		}); err != nil {
 			return err
 		}
@@ -83,12 +88,12 @@ func TestEditsMoveUpdatedAt(t *testing.T) {
 			return err
 		}
 		if err := q.ReportManualSync(t.Context(), &db.ReportManualSyncParams{
-			TargetID: f.target, HostPublicKey: new("ssh-ed25519 AAAA"),
+			TargetID: f.target, HostPublicKey: "ssh-ed25519 AAAA",
 		}); err != nil {
 			return err
 		}
 		return q.TouchTargetSync(t.Context(), f.target)
 	})
-	assert.WithinDuration(t, daemon, updatedAt("daemons", f.daemon), 0, "a report moved the daemon's updated_at")
+	assert.WithinDuration(t, daemon, updatedAt("daemons", f.target), 0, "a report moved the daemon's updated_at")
 	assert.WithinDuration(t, target, updatedAt("targets", f.target), 0, "a report moved the target's updated_at")
 }

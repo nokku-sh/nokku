@@ -8,13 +8,12 @@ import (
 )
 
 // Rollover replaces both keys in the caller's tx. Nothing trusts the old ones.
-func Rollover(ctx context.Context, q *db.Queries, keys *kms.Keyset, ca *db.SSHCA) (*db.SSHCA, error) {
+func Rollover(ctx context.Context, q *db.Queries, keys *kms.Keyset) (*db.SSHCA, error) {
 	user, host, err := newKeys()
 	if err != nil {
 		return nil, err
 	}
 	next, err := q.ReplaceCA(ctx, &db.ReplaceCAParams{
-		CaID:          ca.ID,
 		UserPublicKey: user.public,
 		HostPublicKey: host.public,
 	})

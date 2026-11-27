@@ -31,11 +31,11 @@ func TestDashboardCounts(t *testing.T) {
 
 	got := counts()
 	require.EqualValues(t, 1, got.Targets, "offline daemon")
-	require.Zero(t, got.TargetsOnline, "offline daemon")
-	require.Zero(t, got.TargetsManual, "offline daemon")
+	require.EqualValues(t, 1, got.Daemons, "offline daemon")
+	require.Zero(t, got.DaemonsOnline, "offline daemon")
 	require.EqualValues(t, 2, got.Users, "offline daemon")
 
-	assert.EqualValues(t, 1, counts(f.daemon).TargetsOnline, "online daemon")
+	assert.EqualValues(t, 1, counts(f.target).DaemonsOnline, "online daemon")
 }
 
 func TestListOpenRecordings(t *testing.T) {
@@ -46,7 +46,7 @@ func TestListOpenRecordings(t *testing.T) {
 	asOwner(t, c, f, func(q *db.Queries) error {
 		for _, id := range []string{open, closed} {
 			if _, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
-				ID: id, DaemonID: f.daemon, Username: "deploy", Key: []byte("key"),
+				ID: id, DaemonID: f.target, Username: "deploy", Key: []byte("key"),
 			}); err != nil {
 				return err
 			}
@@ -68,7 +68,7 @@ func TestListOpenRecordings(t *testing.T) {
 	// A daemon that is not connected may have died mid session.
 	require.Empty(t, list(), "offline daemon")
 
-	rows := list(f.daemon)
+	rows := list(f.target)
 	if assert.Len(t, rows, 1, "online daemon") {
 		assert.Equal(t, open, rows[0].ID)
 		assert.Equal(t, "t", rows[0].DaemonName, "the daemon goes by its server's name")
@@ -83,7 +83,7 @@ func TestListRecordingsMarksWhatIsLive(t *testing.T) {
 	asOwner(t, c, f, func(q *db.Queries) error {
 		for _, id := range []string{running, ended, stale} {
 			if _, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
-				ID: id, DaemonID: f.daemon, Username: "deploy", Key: []byte("key"),
+				ID: id, DaemonID: f.target, Username: "deploy", Key: []byte("key"),
 			}); err != nil {
 				return err
 			}
@@ -112,7 +112,7 @@ func TestListRecordingsMarksWhatIsLive(t *testing.T) {
 	}
 
 	assert.Equal(t, map[string]bool{running: false, ended: false, stale: false}, live(), "offline daemon")
-	assert.Equal(t, map[string]bool{running: true, ended: false, stale: false}, live(f.daemon), "online daemon")
+	assert.Equal(t, map[string]bool{running: true, ended: false, stale: false}, live(f.target), "online daemon")
 }
 
 func TestAuditActivityByHour(t *testing.T) {
@@ -151,11 +151,11 @@ func TestRecordingOutlivesDaemon(t *testing.T) {
 	var rec *db.Recording
 	asOwner(t, c, f, func(q *db.Queries) (err error) {
 		if _, err = q.CreateRecording(t.Context(), &db.CreateRecordingParams{
-			ID: id, DaemonID: f.daemon, Username: "deploy", Key: []byte("key"),
+			ID: id, DaemonID: f.target, Username: "deploy", Key: []byte("key"),
 		}); err != nil {
 			return err
 		}
-		if _, err = q.DeleteDaemon(t.Context(), f.daemon); err != nil {
+		if _, err = q.DeleteTarget(t.Context(), f.target); err != nil {
 			return err
 		}
 		// A missing row here means the recording went with its daemon.

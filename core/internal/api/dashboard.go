@@ -92,11 +92,12 @@ func (s *dashboardService) GetDashboard(
 
 	res := &nokkuv1.GetDashboardResponse{
 		TargetCount:         &counts.Targets,
-		OnlineTargetCount:   &counts.TargetsOnline,
-		ManualTargetCount:   &counts.TargetsManual,
+		ManualTargetCount:   new(counts.Targets - counts.Daemons),
+		OfflineTargetCount:  new(counts.Daemons - counts.DaemonsPending - counts.DaemonsOnline),
 		UserCount:           &counts.Users,
 		DaemonCount:         &counts.Daemons,
 		OnlineDaemonCount:   &counts.DaemonsOnline,
+		PendingDaemonCount:  &counts.DaemonsPending,
 		BehindDaemonCount:   new(s.cfg.Pool.BehindIn(wsID)),
 		RecordingBytes:      &usedBytes,
 		RecordingQuotaBytes: new(s.cfg.Entitlements.Resolve(ctx, wsID).RecordingStorageBytes),
@@ -104,7 +105,7 @@ func (s *dashboardService) GetDashboard(
 		FailuresByHour:      make([]int32, 24),
 	}
 	for _, d := range pending {
-		res.PendingDaemons = append(res.PendingDaemons, d.Daemon.ToProto(d.Name, s.cfg.Pool.IsConnected(d.Daemon.ID)))
+		res.PendingDaemons = append(res.PendingDaemons, liveDaemon(s.cfg.Pool, &d.Daemon, d.Name))
 	}
 	res.OfflineTargets = offline
 
@@ -147,10 +148,10 @@ func (s *dashboardService) liveSessions(
 ) []*nokkuv1.LiveSession {
 	var live []*nokkuv1.LiveSession
 	for _, d := range terminals {
-		for _, ws := range s.cfg.Pool.ListSessions(d.Daemon.ID) {
+		for _, ws := range s.cfg.Pool.ListSessions(d.Daemon.TargetID) {
 			live = append(live, &nokkuv1.LiveSession{
 				Id:         ws.Id,
-				DaemonId:   &d.Daemon.ID,
+				DaemonId:   &d.Daemon.TargetID,
 				DaemonName: &d.Name,
 				Username:   ws.Username,
 				UserId:     ws.UserId,

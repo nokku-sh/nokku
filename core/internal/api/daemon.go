@@ -47,7 +47,7 @@ func (s *daemonService) GetDaemon(
 
 // liveDaemon adds what only the pool knows: online and since when it is behind.
 func liveDaemon(pool *nokkudaemon.Pool, d *db.Daemon, name string) *nokkuv1.Daemon {
-	return withBehind(pool, d.ToProto(name, pool.IsConnected(d.ID)))
+	return withBehind(pool, d.ToProto(name, pool.IsConnected(d.TargetID)))
 }
 
 func withBehind(pool *nokkudaemon.Pool, d *nokkuv1.Daemon) *nokkuv1.Daemon {
@@ -72,7 +72,7 @@ func (s *daemonService) UpdateDaemon(
 			config = cmp.Or(stored, &nokkuv1.DaemonConfig{})
 			mergeSet(config.ProtoReflect(), req.GetConfig().ProtoReflect())
 		}
-		name, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{DaemonID: req.GetId(), Config: config})
+		name, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{TargetID: req.GetId(), Config: config})
 		if err != nil {
 			return err
 		}
@@ -89,10 +89,7 @@ func (s *daemonService) ApproveDaemon(
 	ctx context.Context,
 	req *nokkuv1.ApproveDaemonRequest,
 ) (*nokkuv1.ApproveDaemonResponse, error) {
-	name, err := s.cfg.Conn.Tenant().UpdateDaemon(ctx, &db.UpdateDaemonParams{
-		DaemonID: req.GetId(),
-		Status:   nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED,
-	})
+	name, err := s.cfg.Conn.Tenant().ApproveDaemon(ctx, req.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +109,7 @@ func (s *daemonService) SetDaemonSafeguards(
 		}
 		config := cmp.Or(stored, &nokkuv1.DaemonConfig{})
 		setSafeguards(ctx, config, req)
-		name, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{DaemonID: req.GetId(), Config: config})
+		name, err := q.UpdateDaemon(ctx, &db.UpdateDaemonParams{TargetID: req.GetId(), Config: config})
 		if err != nil {
 			return err
 		}
@@ -142,7 +139,6 @@ func (s *daemonService) ListDaemons(
 	q := s.cfg.Conn.Tenant()
 	params := &db.ListDaemonsParams{
 		Query:     req.Query,
-		Status:    req.GetStatus(),
 		Online:    req.Online,
 		Connected: s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
 		Limit:     req.Limit,
@@ -172,19 +168,6 @@ func (s *daemonService) ListDaemons(
 	return &nokkuv1.ListDaemonsResponse{Daemons: daemons, Total: &count}, nil
 }
 
-func (s *daemonService) DeleteDaemon(
-	ctx context.Context,
-	req *nokkuv1.DeleteDaemonRequest,
-) (*nokkuv1.DeleteDaemonResponse, error) {
-	name, err := s.cfg.Conn.Tenant().DeleteDaemon(ctx, req.GetId())
-	if err != nil {
-		return nil, err
-	}
-	audit.Set(ctx, "name", name)
-
-	return &nokkuv1.DeleteDaemonResponse{}, nil
-}
-
 // CreateSession only hands out a ticket, the terminal websocket runs the shell.
 func (s *daemonService) CreateSession(
 	ctx context.Context,
@@ -203,15 +186,15 @@ func (s *daemonService) CreateSession(
 			return err
 		}
 		// Same grant sshd asks for, so no ticket for an account they can't use.
-		accounts, err := grantedAccounts(ctx, q, daemon.Daemon.ID, userID)
+		accounts, err := grantedAccounts(ctx, q, daemon.Daemon.TargetID, userID)
 		if err != nil {
 			return err
 		}
 		if !slices.Contains(accounts, req.GetUsername()) {
 			return db.ErrPermissionDenied
 		}
-		return q.TouchAccessUsageByDaemon(ctx, &db.TouchAccessUsageByDaemonParams{
-			DaemonID:  &daemon.Daemon.ID,
+		return q.TouchAccessUsage(ctx, &db.TouchAccessUsageParams{
+			TargetID:  daemon.Daemon.TargetID,
 			SubjectID: userID,
 		})
 	}); err != nil {
@@ -222,7 +205,7 @@ func (s *daemonService) CreateSession(
 	username := req.GetUsername()
 	s.tickets.Set(sessionID, sessionTicket{
 		WorkspaceID: daemon.Daemon.WorkspaceID,
-		DaemonID:    daemon.Daemon.ID,
+		DaemonID:    daemon.Daemon.TargetID,
 		UserID:      userID,
 		Username:    username,
 	})
@@ -238,12 +221,8 @@ func (s *daemonService) CreateSession(
 
 // grantedAccounts lists the accounts sshd would let subject log in to today.
 func grantedAccounts(ctx context.Context, q *db.Queries, daemonID, subject string) ([]string, error) {
-	target, err := q.GetTargetByDaemon(ctx, &daemonID)
-	if err != nil {
-		return nil, err
-	}
 	rows, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
-		TargetIds: []string{target.ID},
+		TargetIds: []string{daemonID},
 		SubjectID: subject,
 	})
 	if err != nil {
@@ -288,7 +267,7 @@ func (s *daemonService) Relay(
 			return err
 		}
 		d = &row.Daemon
-		accounts, err := grantedAccounts(ctx, q, d.ID, caller.ID)
+		accounts, err := grantedAccounts(ctx, q, d.TargetID, caller.ID)
 		if err != nil {
 			return err
 		}
@@ -301,21 +280,21 @@ func (s *daemonService) Relay(
 	}
 
 	relayID := uuid.NewV7().String()
-	relay, err := s.cfg.Pool.RequestRelay(ctx, d.ID, relayID, caller.ID, clientAddr(ctx))
+	relay, err := s.cfg.Pool.RequestRelay(ctx, d.TargetID, relayID, caller.ID, clientAddr(ctx))
 	if err != nil {
 		if errors.Is(err, nokkudaemon.ErrRelayLimit) {
 			return connect.NewError(connect.CodeResourceExhausted, "too many concurrent relays")
 		}
-		slog.Warn("relay not opened", "daemon_id", d.ID, "error", err)
+		slog.Warn("relay not opened", "daemon_id", d.TargetID, "error", err)
 		return connect.NewError(connect.CodeUnavailable, "daemon did not accept relay")
 	}
 	defer s.cfg.Pool.UnregisterRelay(relayID)
 
 	s.cfg.Audit.Log(ctx, &audit.Event{
-		Action: "RelayOpen", Target: d.ID, Details: map[string]any{"relay_id": relayID},
+		Action: "RelayOpen", Target: d.TargetID, Details: map[string]any{"relay_id": relayID},
 	})
 	defer s.cfg.Audit.Log(ctx, &audit.Event{
-		Action: "RelayClose", Target: d.ID, Details: map[string]any{"relay_id": relayID},
+		Action: "RelayClose", Target: d.TargetID, Details: map[string]any{"relay_id": relayID},
 	})
 
 	if err := stream.Send(&nokkuv1.RelayResponse{

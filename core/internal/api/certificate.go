@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/audit"
 
 	"connectrpc.com/connect/v2"
-	"github.com/jackc/pgx/v5"
 	gossh "golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -67,7 +65,7 @@ func (s *certificateService) UpdateCertificateAuthority(
 	if err != nil {
 		return nil, err
 	}
-	audit.SetTarget(ctx, result.ID)
+	audit.SetTarget(ctx, result.WorkspaceID)
 
 	return &nokkuv1.UpdateCertificateAuthorityResponse{
 		CertificateAuthority: result.ToProto(),
@@ -79,17 +77,16 @@ func (s *certificateService) RolloverCertificateAuthority(
 	_ *nokkuv1.RolloverCertificateAuthorityRequest,
 ) (*nokkuv1.RolloverCertificateAuthorityResponse, error) {
 	var result *db.SSHCA
-	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
-		ca, err := q.GetWorkspaceCAForUpdate(ctx)
-		if err != nil {
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
+		if _, err := q.GetWorkspaceCAForUpdate(ctx); err != nil {
 			return err
 		}
-		result, err = ssh.Rollover(ctx, q, s.cfg.Keyset, ca)
+		result, err = ssh.Rollover(ctx, q, s.cfg.Keyset)
 		return err
 	}); err != nil {
 		return nil, err
 	}
-	audit.SetTarget(ctx, result.ID)
+	audit.SetTarget(ctx, result.WorkspaceID)
 
 	return &nokkuv1.RolloverCertificateAuthorityResponse{
 		CertificateAuthority: result.ToProto(),
@@ -127,20 +124,13 @@ func (s *certificateService) SignSSHCertificate(
 	var principals []string
 	// until is when the first grant ends, nil if none of them do.
 	var until *time.Time
-	var daemonless bool
+	var hasDaemon bool
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		// An unknown id answers like a missing grant, so ids can't be probed.
 		denied := connect.NewError(connect.CodePermissionDenied, "you have no access to this server")
-		target, err := q.GetTarget(ctx, req.GetTargetId())
-		if errors.Is(err, pgx.ErrNoRows) {
-			return denied
-		}
-		if err != nil {
-			return err
-		}
 		// Grant first, so a member without one learns nothing of the server.
 		accounts, err := q.ListSubjectUsernamesForTargets(ctx, &db.ListSubjectUsernamesForTargetsParams{
-			TargetIds: []string{target.ID},
+			TargetIds: []string{req.GetTargetId()},
 			SubjectID: caller.ID,
 		})
 		if err != nil {
@@ -153,21 +143,21 @@ func (s *certificateService) SignSSHCertificate(
 		if !accounts[0].DaemonOk {
 			return connect.NewError(connect.CodeFailedPrecondition, "the daemon of this server is not approved")
 		}
-		daemonless = target.DaemonID == nil
+		targetID := accounts[0].TargetID
+		if hasDaemon, err = q.HasDaemon(ctx, targetID); err != nil {
+			return err
+		}
 		for _, a := range accounts {
-			principals = append(principals, login.Principal(caller.ID, target.ID, a.Username))
+			principals = append(principals, login.Principal(caller.ID, targetID, a.Username))
 			// An nk sync server only takes a cert naming it and the account.
-			if daemonless {
-				principals = append(principals, login.ServerPrincipal(target.ID, a.Username))
+			if !hasDaemon {
+				principals = append(principals, login.ServerPrincipal(targetID, a.Username))
 			}
 			if end := a.Until(); end != nil && (until == nil || end.Before(*until)) {
 				until = end
 			}
 		}
-		if ca, err = q.GetWorkspaceCA(ctx); err != nil {
-			return err
-		}
-		if signer, err = ssh.CASigner(ctx, q, s.cfg.Keyset, ca.ID, gossh.UserCert); err != nil {
+		if ca, signer, err = ssh.CASigner(ctx, q, s.cfg.Keyset, gossh.UserCert); err != nil {
 			return err
 		}
 		limits = ssh.Limits{SourceAddress: ca.SourceAddress}
@@ -179,7 +169,7 @@ func (s *certificateService) SignSSHCertificate(
 			}
 			limits = ssh.Limits{ForceCommand: account.ForceCommand, SourceAddress: account.SourceAddress}
 		}
-		return q.TouchAccessUsage(ctx, &db.TouchAccessUsageParams{TargetID: target.ID, SubjectID: caller.ID})
+		return q.TouchAccessUsage(ctx, &db.TouchAccessUsageParams{TargetID: targetID, SubjectID: caller.ID})
 	}); err != nil {
 		return nil, err
 	}
@@ -201,7 +191,7 @@ func (s *certificateService) SignSSHCertificate(
 			return nil, connect.NewError(connect.CodePermissionDenied, "you have no access to this server")
 		}
 	}
-	if daemonless {
+	if !hasDaemon {
 		// No revoke reaches such a server, only expiry ends the access.
 		ttl = min(ttl, daemonlessCertTTL)
 	}
@@ -221,7 +211,7 @@ func (s *certificateService) SignSSHCertificate(
 	}
 
 	expiry := ssh.TimeFromUnix(cert.ValidBefore)
-	audit.SetTarget(ctx, ca.ID)
+	audit.SetTarget(ctx, ca.WorkspaceID)
 	audit.Set(ctx, "serial", strconv.FormatUint(cert.Serial, 10))
 	audit.Set(ctx, "key_id", cert.KeyId)
 	audit.Set(ctx, "principals", cert.ValidPrincipals)

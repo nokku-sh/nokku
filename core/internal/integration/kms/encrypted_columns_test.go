@@ -14,8 +14,6 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -38,11 +36,6 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/recording"
 	"github.com/nokku-sh/nokku/core/internal/ssh"
 	"github.com/nokku-sh/nokku/core/internal/storage"
-)
-
-// sealedOverride is the sqlc.yaml entry of a sealed column.
-var sealedOverride = regexp.MustCompile(
-	`- column: "([a-z_]+\.[a-z_]+)"\s+go_type:\s+import: "[^"]+"\s+type: "Sealed"`,
 )
 
 // sealedValue is one secret in a sealed column, and how the server reads it.
@@ -71,8 +64,8 @@ func (recordingLimits) RecordingStorageBytes(context.Context, string) (int64, er
 // Each sealed column reads back the same and is rewritten after rotate-secrets
 // to a new secret, Vault and back.
 func TestEverySealedColumnSurvivesRotation(t *testing.T) {
-	columns := sqlcSealedColumns(t)
 	conn := freshDB(t)
+	columns := sealedColumns(t)
 	wipe(t.Context(), t, columns)
 	// t.Context is already canceled when cleanups run.
 	t.Cleanup(func() { wipe(context.WithoutCancel(t.Context()), t, columns) })
@@ -88,7 +81,7 @@ func TestEverySealedColumnSurvivesRotation(t *testing.T) {
 	}
 	slices.Sort(seeded)
 	require.ElementsMatch(t, columns, slices.Compact(seeded),
-		"every column sqlc.yaml seals needs a seed and a read in this test")
+		"every sealed column of the schema needs a seed and a read in this test")
 
 	stored := checkEveryColumn(t, "first boot", keys, values, nil)
 	// One ciphertext per data key ever had, oldest first. Tink lists no keys.
@@ -142,15 +135,18 @@ func TestASealedSecretOpensOnlyInItsRow(t *testing.T) {
 	assert.Empty(t, got, "the thief's stream sent something")
 }
 
-func sqlcSealedColumns(t *testing.T) []string {
+// sealedColumns asks the database, freshDB migrated it.
+func sealedColumns(t *testing.T) []string {
 	t.Helper()
-	raw, err := os.ReadFile("../../../sqlc.yaml")
+	admin, err := pgx.Connect(t.Context(), "")
 	require.NoError(t, err)
-	var columns []string
-	for _, m := range sealedOverride.FindAllStringSubmatch(string(raw), -1) {
-		columns = append(columns, m[1])
-	}
-	require.NotEmpty(t, columns, "sqlc.yaml has no Sealed override")
+	defer func() { _ = admin.Close(t.Context()) }()
+	rows, err := admin.Query(t.Context(),
+		`SELECT table_name || '.' || column_name FROM information_schema.columns WHERE domain_name = 'sealed'`)
+	require.NoError(t, err)
+	columns, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	require.NoError(t, err)
+	require.NotEmpty(t, columns, "the schema has no sealed column")
 	return columns
 }
 
@@ -293,7 +289,7 @@ func seedSSHCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) m
 			t.Helper()
 			var signer gossh.Signer
 			require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) (err error) {
-				signer, err = ssh.CASigner(t.Context(), q, keys, ca.ID, certType)
+				_, signer, err = ssh.CASigner(t.Context(), q, keys, certType)
 				return err
 			}), "the CA does not sign")
 			cert, err := ssh.SignCertificate(
@@ -305,12 +301,12 @@ func seedSSHCA(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws string) m
 		}
 	}
 	return map[string]sealedValue{
-		"ssh_ca_keys.private_key of the user key": {
-			table: "ssh_ca_keys", column: "private_key", where: "kind = 'user'",
+		"ssh_ca_keys.user_private_key": {
+			table: "ssh_ca_keys", column: "user_private_key", where: "TRUE",
 			read: sign(gossh.UserCert, "deploy", ca.UserPublicKey),
 		},
-		"ssh_ca_keys.private_key of the host key": {
-			table: "ssh_ca_keys", column: "private_key", where: "kind = 'host'",
+		"ssh_ca_keys.host_private_key": {
+			table: "ssh_ca_keys", column: "host_private_key", where: "TRUE",
 			read: sign(gossh.HostCert, "web-1.example.com", ca.HostPublicKey),
 		},
 	}
@@ -419,20 +415,21 @@ func seedRecording(t *testing.T, conn *db.Connection, keys *kms.Keyset, ws strin
 	require.NoError(t, err)
 	var rec *db.Recording
 	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ws), func(q *db.Queries) error {
-		d, err := q.CreateDaemon(t.Context(), &db.CreateDaemonParams{
-			Status:        nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED,
+		targetID, err := q.CreateDaemonTarget(t.Context(), "rotation")
+		if err != nil {
+			return err
+		}
+		_, err = q.CreateDaemon(t.Context(), &db.CreateDaemonParams{
+			TargetID:      targetID,
+			Accepted:      true,
 			Config:        &nokkuv1.DaemonConfig{},
-			KeyThumbprint: new(uuid.New().String()),
+			KeyThumbprint: uuid.New().String(),
 		})
 		if err != nil {
 			return err
 		}
-		_, err = q.CreateDaemonTarget(t.Context(), &db.CreateDaemonTargetParams{DaemonID: &d.ID, Name: "rotation"})
-		if err != nil {
-			return err
-		}
 		rec, err = q.CreateRecording(t.Context(), &db.CreateRecordingParams{
-			ID: id, DaemonID: d.ID, Username: "deploy", Key: sealed,
+			ID: id, DaemonID: targetID, Username: "deploy", Key: sealed,
 		})
 		return err
 	}))

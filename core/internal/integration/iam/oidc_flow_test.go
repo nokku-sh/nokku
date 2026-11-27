@@ -442,9 +442,7 @@ func TestOIDCFlowKeepsTheAddressWithTwoProviders(t *testing.T) {
 	first := h.email
 	u := e.userByEmail(t, h.org.ws, first)
 	require.NotNil(t, u, "JIT provisioned user missing")
-	e.putCredential(t, h.org.ws, db.UpsertCredentialParams{
-		ID: "second", UserID: u.ID, Type: string(iam.MethodOIDC), Provider: "other", Subject: "alice", Data: []byte{},
-	})
+	e.linkIdentity(t, h.org.ws, u.ID, "other", "alice")
 
 	h.email = "alice.moved@" + testDomain()
 	wantSSOSuccess(t, h.runOIDCFlow(t, svc, ""))
@@ -457,14 +455,7 @@ func TestOIDCFlowRefusesASecondSubjectOnAnAccount(t *testing.T) {
 	h := newOIDCIdP(t)
 	e, svc := h.setup(t, true)
 	leaver := e.user(t, h.org.ws, h.email, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN)
-	e.putCredential(t, h.org.ws, db.UpsertCredentialParams{
-		ID:       "old",
-		UserID:   leaver.ID,
-		Type:     string(iam.MethodOIDC),
-		Provider: testProviderID,
-		Subject:  "the-leaver",
-		Data:     []byte{},
-	})
+	e.linkIdentity(t, h.org.ws, leaver.ID, testProviderID, "the-leaver")
 
 	rec := h.runOIDCFlow(t, svc, "")
 	wantSSOFailure(t, rec)

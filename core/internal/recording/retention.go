@@ -90,10 +90,7 @@ func (s *Service) DeleteQueued(ctx context.Context) error {
 		} else {
 			failures++
 			slog.Error("delete recording object", "object_id", item.ObjectID, "error", failed)
-			err = s.conn.Sys().DeferRecordingDelete(ctx, &db.DeferRecordingDeleteParams{
-				ObjectID:  item.ObjectID,
-				LastError: new(failed.Error()),
-			})
+			err = s.conn.Sys().DeferRecordingDelete(ctx, item.ObjectID)
 		}
 		if err != nil {
 			return err

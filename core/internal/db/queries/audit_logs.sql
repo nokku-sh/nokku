@@ -69,7 +69,6 @@ WITH
         sqlc.narg('target')::TEXT IS NULL
         OR target = sqlc.narg('target')
       )
-      -- Failed is every failed call, denied only those an auth or permission check stopped.
       AND (
         sqlc.narg('outcome')::TEXT IS NULL
         OR (
@@ -94,7 +93,6 @@ WITH
         OR action ILIKE '%' || sqlc.narg('search') || '%'
         OR actor_name ILIKE '%' || sqlc.narg('search') || '%'
         OR target ILIKE '%' || sqlc.narg('search') || '%'
-        -- The names an event stored, so "web-1" finds the grants on it.
         OR concat_ws(
           ' ',
           details ->> 'name',
@@ -174,7 +172,6 @@ WHERE
 
 -- name: DeleteWorkspaceAuditLogs :execrows
 -- An enabled stream holds what it has not sent yet, a paused one gives that up.
--- DeleteAuditLogsBefore still ends it at the longest retention.
 DELETE FROM audit.audit_logs l
 WHERE
   l.workspace_id = @workspace_id
@@ -191,7 +188,6 @@ WHERE
   );
 
 -- name: DeleteAuditLogsBefore :execrows
--- The longest retention for every row, also the ones whose workspace is gone.
 DELETE FROM audit.audit_logs
 WHERE
   timestamp < @cutoff;
@@ -204,13 +200,12 @@ SELECT
 -- name: GetNames :many
 -- Names for audit events in the order of the ids, an id that names nothing here gets an empty one.
 SELECT
-  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, t.name, dt.name, '')::TEXT AS name
+  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, t.name, '')::TEXT AS name
 FROM
   unnest(@ids::UUID[]) WITH ORDINALITY AS i (id, n)
   LEFT JOIN users u ON u.id = i.id
   LEFT JOIN teams m ON m.id = i.id
   LEFT JOIN service_accounts s ON s.id = i.id
   LEFT JOIN targets t ON t.id = i.id
-  LEFT JOIN targets dt ON dt.daemon_id = i.id -- a daemon goes by its server's name
 ORDER BY
   i.n;

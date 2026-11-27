@@ -1,5 +1,4 @@
 -- name: SeenKnownDevice :one
--- Recognizes a device of the user and notes the visit. No row means the account has not signed in from it.
 UPDATE known_devices
 SET
   last_seen_at = @now
@@ -42,7 +41,6 @@ WHERE
   AND id = @id;
 
 -- name: DeleteExpiredKnownDevices :execrows
--- Every tenant, runs as nokku_system.
 DELETE FROM known_devices
 WHERE
   expires_at < @now;

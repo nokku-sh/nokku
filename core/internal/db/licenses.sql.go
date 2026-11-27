@@ -38,7 +38,6 @@ SELECT
   )::bigint AS resource_count
 `
 
-// A server counts once, its daemon is part of its target.
 func (q *Queries) CountWorkspaceResources(ctx context.Context, workspaceID string) (int64, error) {
 	row := q.db.QueryRow(ctx, countWorkspaceResources, workspaceID)
 	var resource_count int64
@@ -48,7 +47,7 @@ func (q *Queries) CountWorkspaceResources(ctx context.Context, workspaceID strin
 
 const getLicense = `-- name: GetLicense :one
 SELECT
-  workspace_id, key, license_id, ends_at, trial_reminder, deletion_warning, deletion_warned_at, updated_at
+  workspace_id, key, license_id, ends_at, trial_reminder_days, deletion_warning_days, deletion_warned_at, updated_at
 FROM
   workspace_licenses
 WHERE
@@ -64,8 +63,8 @@ func (q *Queries) GetLicense(ctx context.Context, workspaceID string) (*Workspac
 		&i.Key,
 		&i.LicenseID,
 		&i.EndsAt,
-		&i.TrialReminder,
-		&i.DeletionWarning,
+		&i.TrialReminderDays,
+		&i.DeletionWarningDays,
 		&i.DeletionWarnedAt,
 		&i.UpdatedAt,
 	)
@@ -74,7 +73,7 @@ func (q *Queries) GetLicense(ctx context.Context, workspaceID string) (*Workspac
 
 const listLapsedWorkspaces = `-- name: ListLapsedWorkspaces :many
 SELECT
-  s.workspace_id, s.key, s.license_id, s.ends_at, s.trial_reminder, s.deletion_warning, s.deletion_warned_at, s.updated_at,
+  s.workspace_id, s.key, s.license_id, s.ends_at, s.trial_reminder_days, s.deletion_warning_days, s.deletion_warned_at, s.updated_at,
   w.slug,
   w.name AS workspace_name,
   u.id AS owner_id,
@@ -97,8 +96,6 @@ type ListLapsedWorkspacesRow struct {
 	OwnerEmail       *string          `json:"ownerEmail"`
 }
 
-// Hosted workspaces whose trial or key ran out, with the owner to warn. deletionDate in internal/api decides when each
-// goes. Runs as nokku_system.
 func (q *Queries) ListLapsedWorkspaces(ctx context.Context) ([]*ListLapsedWorkspacesRow, error) {
 	rows, err := q.db.Query(ctx, listLapsedWorkspaces)
 	if err != nil {
@@ -113,8 +110,8 @@ func (q *Queries) ListLapsedWorkspaces(ctx context.Context) ([]*ListLapsedWorksp
 			&i.WorkspaceLicense.Key,
 			&i.WorkspaceLicense.LicenseID,
 			&i.WorkspaceLicense.EndsAt,
-			&i.WorkspaceLicense.TrialReminder,
-			&i.WorkspaceLicense.DeletionWarning,
+			&i.WorkspaceLicense.TrialReminderDays,
+			&i.WorkspaceLicense.DeletionWarningDays,
 			&i.WorkspaceLicense.DeletionWarnedAt,
 			&i.WorkspaceLicense.UpdatedAt,
 			&i.Slug,
@@ -147,7 +144,6 @@ type ListLicensesRow struct {
 	Key         string `json:"key"`
 }
 
-// The stored keys, for the daily refresh.
 func (q *Queries) ListLicenses(ctx context.Context) ([]*ListLicensesRow, error) {
 	rows, err := q.db.Query(ctx, listLicenses)
 	if err != nil {
@@ -172,7 +168,7 @@ const listTrialsEnding = `-- name: ListTrialsEnding :many
 SELECT
   s.workspace_id,
   s.ends_at::timestamptz AS trial_end,
-  s.trial_reminder,
+  s.trial_reminder_days,
   w.slug,
   w.name AS workspace_name,
   u.id AS owner_id,
@@ -190,16 +186,15 @@ WHERE
 `
 
 type ListTrialsEndingRow struct {
-	WorkspaceID   string    `json:"workspaceId"`
-	TrialEnd      time.Time `json:"trialEnd"`
-	TrialReminder int32     `json:"trialReminder"`
-	Slug          string    `json:"slug"`
-	WorkspaceName string    `json:"workspaceName"`
-	OwnerID       string    `json:"ownerId"`
-	OwnerEmail    string    `json:"ownerEmail"`
+	WorkspaceID       string    `json:"workspaceId"`
+	TrialEnd          time.Time `json:"trialEnd"`
+	TrialReminderDays int32     `json:"trialReminderDays"`
+	Slug              string    `json:"slug"`
+	WorkspaceName     string    `json:"workspaceName"`
+	OwnerID           string    `json:"ownerId"`
+	OwnerEmail        string    `json:"ownerEmail"`
 }
 
-// Trials that end within the next days, with the owner to remind. Runs as nokku_system.
 func (q *Queries) ListTrialsEnding(ctx context.Context, within int32) ([]*ListTrialsEndingRow, error) {
 	rows, err := q.db.Query(ctx, listTrialsEnding, within)
 	if err != nil {
@@ -212,7 +207,7 @@ func (q *Queries) ListTrialsEnding(ctx context.Context, within int32) ([]*ListTr
 		if err := rows.Scan(
 			&i.WorkspaceID,
 			&i.TrialEnd,
-			&i.TrialReminder,
+			&i.TrialReminderDays,
 			&i.Slug,
 			&i.WorkspaceName,
 			&i.OwnerID,
@@ -231,7 +226,7 @@ func (q *Queries) ListTrialsEnding(ctx context.Context, within int32) ([]*ListTr
 const setDeletionWarning = `-- name: SetDeletionWarning :exec
 UPDATE workspace_licenses
 SET
-  deletion_warning = $1,
+  deletion_warning_days = $1,
   deletion_warned_at = NOW(),
   updated_at = NOW()
 WHERE
@@ -263,9 +258,9 @@ SET
   key = EXCLUDED.key,
   license_id = EXCLUDED.license_id,
   ends_at = EXCLUDED.ends_at,
-  deletion_warning = CASE
+  deletion_warning_days = CASE
     WHEN workspace_licenses.ends_at IS DISTINCT FROM EXCLUDED.ends_at THEN 0
-    ELSE workspace_licenses.deletion_warning
+    ELSE workspace_licenses.deletion_warning_days
   END,
   deletion_warned_at = CASE
     WHEN workspace_licenses.ends_at IS DISTINCT FROM EXCLUDED.ends_at THEN NULL
@@ -295,7 +290,7 @@ func (q *Queries) SetLicense(ctx context.Context, arg *SetLicenseParams) error {
 const setTrialReminder = `-- name: SetTrialReminder :exec
 UPDATE workspace_licenses
 SET
-  trial_reminder = $1,
+  trial_reminder_days = $1,
   updated_at = NOW()
 WHERE
   workspace_id = $2
@@ -328,7 +323,6 @@ type StartTrialParams struct {
 	Days        int32  `json:"days"`
 }
 
-// A hosted workspace starts on a trial without a key, the first activated key replaces it.
 func (q *Queries) StartTrial(ctx context.Context, arg *StartTrialParams) error {
 	_, err := q.db.Exec(ctx, startTrial, arg.WorkspaceID, arg.Days)
 	return err

@@ -225,7 +225,6 @@ func (s *accessRequestService) decide(
 				AccountID: row.AccountID,
 				UserID:    row.RequesterID,
 				ExpiresAt: *until,
-				GrantedBy: &caller,
 			})
 		}
 		return nil

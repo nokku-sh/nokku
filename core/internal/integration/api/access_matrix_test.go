@@ -112,12 +112,10 @@ func seedMatrix(t *testing.T) *matrixFixture {
 	}
 
 	ca := workspaceCA(t, cfg)
-	f.labels[ca.GetId()] = "ca-active"
 	f.labels[strings.TrimSpace(ca.GetUserPublicKey())] = "ca-active.user-key"
 	f.labels[strings.TrimSpace(ca.GetHostPublicKey())] = "ca-active.host-key"
-	f.seedDaemonTarget(t, "accepted", nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED)
-	f.seedDaemonTarget(t, "pending", nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING)
-	f.seedDaemonTarget(t, "rejected", nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)
+	f.seedDaemonTarget(t, "accepted", true)
+	f.seedDaemonTarget(t, "pending", false)
 	f.seedDaemonlessTarget(t, "daemonless")
 
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
@@ -136,26 +134,13 @@ func seedMatrix(t *testing.T) *matrixFixture {
 	return f
 }
 
-func (f *matrixFixture) seedDaemonTarget(
-	t *testing.T,
-	label string,
-	status nokkuv1.DaemonStatus,
-) {
+func (f *matrixFixture) seedDaemonTarget(t *testing.T, label string, accepted bool) {
 	t.Helper()
-	ws := testWorkspace.ID
-	key, enrolled := enrollTestDaemon(t, f.cfg, f.srv, ws, status != nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING)
-	if status == nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED {
-		// No call rejects without taking the server along, so the row is set by hand.
-		inWorkspace(t, f.cfg, ws, func(q *db.Queries) error {
-			_, err := q.UpdateDaemon(t.Context(), &db.UpdateDaemonParams{DaemonID: enrolled.GetId(), Status: status})
-			return err
-		})
-	}
-	f.labels[enrolled.GetId()] = label + "-daemon"
+	key, enrolled := enrollTestDaemon(t, f.cfg, f.srv, testWorkspace.ID, accepted)
 	f.addTarget(t, matrixTarget{
 		label:    label,
 		id:       enrolled.GetTargetId(),
-		daemonID: enrolled.GetId(),
+		daemonID: enrolled.GetTargetId(),
 		key:      key,
 		token:    enrolled.GetAccessToken(),
 	})
@@ -377,7 +362,7 @@ func (f *matrixFixture) syncLines(t *testing.T) []string {
 			continue
 		}
 		lines = append(lines,
-			prefix+": status "+strings.ToLower(strings.TrimPrefix(res.GetStatus().String(), "DAEMON_STATUS_")),
+			fmt.Sprintf("%s: removed %t", prefix, res.GetRemoved()),
 			prefix+": ca key "+f.key(res.GetUserCaPublicKey())+", host ca key "+f.key(res.GetHostCaPublicKey()),
 		)
 		lines = append(lines, f.principalLines(prefix, res.GetPrincipals())...)
@@ -450,9 +435,11 @@ func (f *matrixFixture) subjectAccess(
 	if err != nil {
 		return []string{prefix + ": " + errText(err)}
 	}
-	daemons := make([]string, 0, len(res.GetDaemons()))
-	for _, d := range res.GetDaemons() {
-		daemons = append(daemons, d.GetId())
+	var daemons []string
+	for _, a := range res.GetTargets() {
+		if d := a.GetTarget().GetDaemon(); d != nil {
+			daemons = append(daemons, d.GetId())
+		}
 	}
 	lines := []string{prefix + ": daemons " + f.list(daemons), prefix + ": cas " + f.list(caIDs(res))}
 	return append(lines, f.targetAccessLines(prefix, res.GetTargets())...)
@@ -461,7 +448,7 @@ func (f *matrixFixture) subjectAccess(
 // caIDs is empty for a subject with no targets, the answer carries no CA then.
 func caIDs(res *nokkuv1.GetSubjectAccessResponse) []string {
 	if ca := res.GetCertificateAuthority(); ca != nil {
-		return []string{ca.GetId()}
+		return []string{strings.TrimSpace(ca.GetUserPublicKey())}
 	}
 	return []string{}
 }

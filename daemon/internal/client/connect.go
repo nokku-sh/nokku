@@ -48,7 +48,7 @@ func (c *Client) runControlStream(ctx context.Context) error {
 				continue
 			}
 			err = c.syncDaemon(ctx)
-			if errors.Is(err, errDaemonRejected) {
+			if errors.Is(err, errDaemonRemoved) {
 				return err
 			}
 			if err != nil {

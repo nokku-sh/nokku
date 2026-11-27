@@ -28,7 +28,9 @@ internal/entitlement/limits.go Service.CheckResources Sys CountWorkspaceResource
 internal/entitlement/resolve.go Service.Status Sys GetLicense
 internal/iam/cleanup.go Service.cleanup Sys DeleteExpiredAccessTokens
 internal/iam/cleanup.go Service.cleanup Sys DeleteExpiredDeviceGrants
+internal/iam/cleanup.go Service.cleanup Sys DeleteExpiredInvites
 internal/iam/cleanup.go Service.cleanup Sys DeleteExpiredKnownDevices
+internal/iam/cleanup.go Service.cleanup Sys DeleteExpiredSpentJobTokens
 internal/iam/cleanup.go Service.cleanup Sys DeleteExpiredTokens
 internal/recording/retention.go Service.DeleteQueued Sys DeferRecordingDelete
 internal/recording/retention.go Service.DeleteQueued Sys FinishRecordingDelete

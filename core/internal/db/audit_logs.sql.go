@@ -16,7 +16,6 @@ WHERE
   timestamp < $1
 `
 
-// The longest retention for every row, also the ones whose workspace is gone.
 func (q *Queries) DeleteAuditLogsBefore(ctx context.Context, cutoff time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAuditLogsBefore, cutoff)
 	if err != nil {
@@ -48,7 +47,6 @@ type DeleteWorkspaceAuditLogsParams struct {
 }
 
 // An enabled stream holds what it has not sent yet, a paused one gives that up.
-// DeleteAuditLogsBefore still ends it at the longest retention.
 func (q *Queries) DeleteWorkspaceAuditLogs(ctx context.Context, arg *DeleteWorkspaceAuditLogsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteWorkspaceAuditLogs, arg.WorkspaceID, arg.Cutoff)
 	if err != nil {
@@ -70,14 +68,13 @@ func (q *Queries) EnableAuditRetention(ctx context.Context) error {
 
 const getNames = `-- name: GetNames :many
 SELECT
-  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, t.name, dt.name, '')::TEXT AS name
+  COALESCE(NULLIF(u.name, ''), u.email, m.name, s.name, t.name, '')::TEXT AS name
 FROM
   unnest($1::UUID[]) WITH ORDINALITY AS i (id, n)
   LEFT JOIN users u ON u.id = i.id
   LEFT JOIN teams m ON m.id = i.id
   LEFT JOIN service_accounts s ON s.id = i.id
   LEFT JOIN targets t ON t.id = i.id
-  LEFT JOIN targets dt ON dt.daemon_id = i.id -- a daemon goes by its server's name
 ORDER BY
   i.n
 `
@@ -205,7 +202,6 @@ WITH
         $7::TEXT IS NULL
         OR target = $7
       )
-      -- Failed is every failed call, denied only those an auth or permission check stopped.
       AND (
         $8::TEXT IS NULL
         OR (
@@ -230,7 +226,6 @@ WITH
         OR action ILIKE '%' || $9 || '%'
         OR actor_name ILIKE '%' || $9 || '%'
         OR target ILIKE '%' || $9 || '%'
-        -- The names an event stored, so "web-1" finds the grants on it.
         OR concat_ws(
           ' ',
           details ->> 'name',

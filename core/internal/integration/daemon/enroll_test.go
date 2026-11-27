@@ -67,8 +67,8 @@ func enrollToken(t *testing.T, tweak func(*db.CreateJoinTokenParams)) (fixture, 
 
 func enroll(t *testing.T, f fixture, in daemon.EnrollInput) (*daemon.Enrolled, error) {
 	t.Helper()
-	if in.Binding == "" {
-		in.Binding = uuid.NewV7().String()
+	if in.KeyThumbprint == "" {
+		in.KeyThumbprint = uuid.NewV7().String()
 	}
 	return daemon.Enroll(f.ctx, f.conn, in)
 }
@@ -76,7 +76,7 @@ func enroll(t *testing.T, f fixture, in daemon.EnrollInput) (*daemon.Enrolled, e
 // Parallel enrollments of one machine, a retrying installer, make one daemon.
 func TestEnrollSameKeyConcurrently(t *testing.T) {
 	f, token := enrollToken(t, nil)
-	in := daemon.EnrollInput{Token: token, Binding: uuid.NewV7().String()}
+	in := daemon.EnrollInput{Token: token, KeyThumbprint: uuid.NewV7().String()}
 
 	const n = 8
 	ids := make([]string, n)
@@ -158,8 +158,8 @@ func TestEnrollQuotaOnlyForNewMachines(t *testing.T) {
 	full := errors.New("at cap")
 	calls := 0
 	in := daemon.EnrollInput{
-		Token:   token,
-		Binding: uuid.NewV7().String(),
+		Token:         token,
+		KeyThumbprint: uuid.NewV7().String(),
 		CanCreate: func(context.Context, string) error {
 			calls++
 			return nil
@@ -172,7 +172,7 @@ func TestEnrollQuotaOnlyForNewMachines(t *testing.T) {
 	_, err = enroll(t, f, in)
 	require.NoError(t, err, "re-enroll at cap")
 
-	in.Binding = ""
+	in.KeyThumbprint = ""
 	_, err = enroll(t, f, in)
 	require.ErrorIs(t, err, full, "new machine at cap")
 	require.Equal(t, 1, calls, "quota calls on the first enroll")
@@ -184,7 +184,7 @@ func TestEnrollMaxUses(t *testing.T) {
 	f, token := enrollToken(t, func(p *db.CreateJoinTokenParams) {
 		p.MaxUses = new(int32(1))
 	})
-	first := daemon.EnrollInput{Token: token, Binding: uuid.NewV7().String()}
+	first := daemon.EnrollInput{Token: token, KeyThumbprint: uuid.NewV7().String()}
 	_, err := enroll(t, f, first)
 	require.NoError(t, err, "first enroll")
 	_, err = enroll(t, f, first)
@@ -202,15 +202,19 @@ func TestEnrollExpiredToken(t *testing.T) {
 }
 
 func TestEnrollAutoApprove(t *testing.T) {
-	f, pending := enrollToken(t, nil)
-	out, err := enroll(t, f, daemon.EnrollInput{Token: pending})
-	require.NoError(t, err, "plain token")
-	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, out.Status, "plain token")
-
-	f, approved := enrollToken(t, func(p *db.CreateJoinTokenParams) { p.AutoApprove = true })
-	out, err = enroll(t, f, daemon.EnrollInput{Token: approved})
-	require.NoError(t, err, "auto-approve token")
-	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, out.Status, "auto-approve token")
+	accepted := func(f fixture, token string) bool {
+		out, err := enroll(t, f, daemon.EnrollInput{Token: token})
+		require.NoError(t, err)
+		var row *db.GetDaemonRow
+		require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) (err error) {
+			row, err = q.GetDaemon(f.ctx, out.DaemonID)
+			return err
+		}))
+		return row.Daemon.Accepted
+	}
+	assert.False(t, accepted(enrollToken(t, nil)), "plain token")
+	assert.True(t, accepted(enrollToken(t, func(p *db.CreateJoinTokenParams) { p.AutoApprove = true })),
+		"auto-approve token")
 }
 
 func TestEnrollRejectsBadToken(t *testing.T) {

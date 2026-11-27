@@ -1,5 +1,4 @@
 -- name: CreateCA :one
--- Every setting comes from the caller, ssh.NewCA fills in what a new CA starts with. ssh.CreateCA adds the keys.
 INSERT INTO
   ssh_cas (
     user_public_key,
@@ -15,37 +14,28 @@ VALUES
 RETURNING
   *;
 
--- name: PutCAKey :exec
--- Creating and rolling over a CA write its keys in the transaction that writes their public halves.
+-- name: PutCAKeys :exec
 INSERT INTO
-  ssh_ca_keys (ca_id, kind, private_key)
+  ssh_ca_keys (user_private_key, host_private_key)
 VALUES
-  (@ca_id, @kind, @private_key)
-ON CONFLICT (ca_id, kind) DO UPDATE
+  (@user_private_key, @host_private_key)
+ON CONFLICT (workspace_id) DO UPDATE
 SET
-  private_key = EXCLUDED.private_key;
+  user_private_key = EXCLUDED.user_private_key,
+  host_private_key = EXCLUDED.host_private_key;
 
--- name: GetCASigningKey :one
--- The one read of a CA private key, with the public key it must match. ssh.CASigner is its only caller.
+-- name: GetCASigningKeys :one
 SELECT
-  k.workspace_id,
-  k.ca_id,
-  k.private_key,
-  (
-    CASE
-      WHEN k.kind = 'host' THEN c.host_public_key
-      ELSE c.user_public_key
-    END
-  )::TEXT AS public_key
+  sqlc.embed(c),
+  k.user_private_key,
+  k.host_private_key
 FROM
   ssh_ca_keys k
-  JOIN ssh_cas c ON c.id = k.ca_id
+  JOIN ssh_cas c ON c.workspace_id = k.workspace_id
 WHERE
-  k.ca_id = @ca_id
-  AND k.kind = @kind;
+  k.workspace_id = current_workspace_id ();
 
 -- name: GetWorkspaceCA :one
--- What signs and what is trusted in the workspace. Private keys live in ssh_ca_keys.
 SELECT
   *
 FROM
@@ -92,6 +82,6 @@ SET
   rotated_at = clock_timestamp(),
   updated_at = NOW()
 WHERE
-  id = @ca_id
+  workspace_id = current_workspace_id ()
 RETURNING
   *;

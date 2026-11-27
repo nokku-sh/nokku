@@ -51,7 +51,6 @@
 /nokku.v1.DaemonControlService/UploadRecording public=false daemon=true role=UNSPECIFIED fresh=false cli=false service_account=false feature= capped=false audited=true
 /nokku.v1.DaemonService/ApproveDaemon public=false daemon=false role=EDITOR fresh=false cli=false service_account=false feature= capped=false audited=true
 /nokku.v1.DaemonService/CreateSession public=false daemon=false role=MEMBER fresh=true cli=false service_account=false feature= capped=false audited=true
-/nokku.v1.DaemonService/DeleteDaemon public=false daemon=false role=EDITOR fresh=true cli=false service_account=false feature= capped=false audited=true
 /nokku.v1.DaemonService/GetDaemon public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
 /nokku.v1.DaemonService/ListDaemons public=false daemon=false role=VIEWER fresh=false cli=false service_account=true feature= capped=false audited=false
 /nokku.v1.DaemonService/Relay public=false daemon=false role=MEMBER fresh=false cli=true service_account=true feature= capped=false audited=false

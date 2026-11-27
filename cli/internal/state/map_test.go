@@ -19,7 +19,7 @@ func TestFromAccess(t *testing.T) {
 		},
 		CertificateAuthority: &nokkuv1.CertificateAuthority{UserPublicKey: new("ssh-ed25519 AAAA")},
 		Targets: []*nokkuv1.TargetAccess{
-			{Target: &nokkuv1.Target{Id: new(targetID), Name: new("web")}},
+			{Target: &nokkuv1.Target{Id: new(targetID), Name: new("web"), Daemon: &nokkuv1.Daemon{}}},
 			{Target: &nokkuv1.Target{Id: new("../../etc"), Name: new("evil")}},
 			{Target: &nokkuv1.Target{Id: new("{" + targetID + "}"), Name: new("braces")}},
 		},
@@ -32,6 +32,7 @@ func TestFromAccess(t *testing.T) {
 	assert.Equal(t, "ssh-ed25519 AAAA", c.CA.UserPublicKey)
 	require.Len(t, c.Targets, 1, "non-canonical ids are dropped")
 	assert.Equal(t, "web", c.Targets[0].Name)
+	assert.True(t, c.Targets[0].Daemon, "a target the core sends with a daemon is no manual one")
 }
 
 // Names are printed by nk ls, nk doctor and in warnings.

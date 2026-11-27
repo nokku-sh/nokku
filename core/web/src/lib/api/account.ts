@@ -1,13 +1,13 @@
 import { Code, ConnectError, createClient } from '@connectrpc/connect';
 import {
-	type AccountCredential,
 	AccountService,
-	type AccountSession
+	type AccountSession,
+	type ListCredentialsResponse
 } from '#lib/gen/nokku/v1/account_pb.js';
 import { type User } from '#lib/gen/nokku/v1/user_pb.js';
 import { authTransport, handleSessionExpired } from './client';
 
-export type { AccountCredential, AccountSession, User };
+export type { AccountSession, ListCredentialsResponse, User };
 
 const client = createClient(AccountService, authTransport);
 
@@ -34,8 +34,7 @@ export const account = {
 	requestEmailChange: (newEmail: string): Promise<void> =>
 		guard(client.requestEmailChange({ newEmail })).then(() => undefined),
 
-	credentials: (): Promise<AccountCredential[]> =>
-		guard(client.listCredentials({})).then((r) => r.credentials),
+	credentials: (): Promise<ListCredentialsResponse> => guard(client.listCredentials({})),
 
 	renameCredential: (id: string, label: string): Promise<void> =>
 		guard(client.renameCredential({ id, label })).then(() => undefined),

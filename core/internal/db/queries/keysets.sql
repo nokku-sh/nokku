@@ -14,7 +14,6 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- name: LockKeyset :one
--- The row lock keeps two rotations from running at once.
 SELECT
   data,
   rotated_at

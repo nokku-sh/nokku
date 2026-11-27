@@ -222,7 +222,7 @@ func TestLateUploadKeepsItsStartTime(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = owner.Close(t.Context()) }()
 	_, err = owner.Exec(t.Context(),
-		"UPDATE daemons SET created_at = NOW() - INTERVAL '2 days' WHERE id = $1", enrolled.GetId())
+		"UPDATE daemons SET created_at = NOW() - INTERVAL '2 days' WHERE target_id = $1", enrolled.GetTargetId())
 	require.NoError(t, err)
 
 	startOf := func(named *timestamppb.Timestamp) time.Time {
@@ -265,7 +265,7 @@ func TestLateUploadKeepsItsEndTime(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = owner.Close(t.Context()) }()
 	_, err = owner.Exec(t.Context(),
-		"UPDATE daemons SET created_at = NOW() - INTERVAL '2 days' WHERE id = $1", enrolled.GetId())
+		"UPDATE daemons SET created_at = NOW() - INTERVAL '2 days' WHERE target_id = $1", enrolled.GetTargetId())
 	require.NoError(t, err)
 
 	began := time.Now().Add(-3 * time.Hour).Truncate(time.Second)
@@ -628,13 +628,11 @@ func TestFailedRecordingDeleteHoldsUpNothing(t *testing.T) {
 	assert.False(t, objectExists(workspaceID, next), "the object queued after a failing one stayed")
 
 	var attempts int
-	var lastError *string
 	var due time.Time
 	require.NoError(t, owner.QueryRow(t.Context(),
-		"SELECT attempts, last_error, next_try_at FROM recording_deletes WHERE object_id = $1", stuck,
-	).Scan(&attempts, &lastError, &due))
+		"SELECT attempts, next_try_at FROM recording_deletes WHERE object_id = $1", stuck,
+	).Scan(&attempts, &due))
 	assert.Equal(t, 1, attempts)
-	assert.NotEmpty(t, lastError, "the failure left no error on its row")
 	assert.True(t, due.After(time.Now()), "the failed delete is due again at once")
 }
 

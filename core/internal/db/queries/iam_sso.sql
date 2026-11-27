@@ -39,10 +39,9 @@ SELECT
     SELECT
       1
     FROM
-      credentials c
-      JOIN sso_providers p ON p.workspace_id = c.workspace_id
-      AND p.provider_id = c.provider
+      oidc_identities i
+      JOIN sso_providers p ON p.workspace_id = i.workspace_id
+      AND p.provider_id = i.provider_id
     WHERE
-      c.type = 'oidc'
-      AND p.enabled
+      p.enabled
   );

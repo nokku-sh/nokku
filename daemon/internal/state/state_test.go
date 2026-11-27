@@ -76,7 +76,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 
-	s := New(Config{TargetID: "tgt-1", DaemonID: "daemon-1", APIURL: "https://api.example.com", SessionToken: "tok"})
+	s := New(Config{TargetID: "tgt-1", APIURL: "https://api.example.com", SessionToken: "tok"})
 	s.SetAccess(&Access{
 		Principals:   map[string][]string{"alice": {"uuid-1", "uuid-2"}, "bob": {"uuid-3"}},
 		DaemonConfig: &nokkuv1.DaemonConfig{RecordSessions: new(true)},
@@ -104,7 +104,7 @@ func TestLoadMissingFileStartsEmpty(t *testing.T) {
 
 	s, err := Load()
 	require.NoError(t, err)
-	is.Empty(s.DaemonID)
+	is.Empty(s.TargetID)
 	is.NotNil(s.Access())
 	is.Empty(s.Access().Principals)
 	is.Empty(s.Saved().StateHash)
@@ -215,21 +215,21 @@ func TestStateConcurrentAccess(t *testing.T) {
 // An enroll during a run writes a new enrollment, the service must not undo it.
 func TestSaveKeepsANewerEnrollment(t *testing.T) {
 	newTestDataDir(t)
-	first := New(Config{DaemonID: "daemon-a", SessionToken: "token-a"})
+	first := New(Config{TargetID: "target-a", SessionToken: "token-a"})
 	require.NoError(t, first.Save())
 
 	running, err := Load()
 	require.NoError(t, err)
 	enrolling, err := Load()
 	require.NoError(t, err)
-	enrolling.DaemonID, enrolling.SessionToken = "daemon-b", "token-b"
+	enrolling.TargetID, enrolling.SessionToken = "target-b", "token-b"
 	require.NoError(t, enrolling.Save(), "the enroll writes over the enrollment it read")
 
 	require.ErrorIs(t, running.Save(), errReplaced)
-	require.ErrorIs(t, running.Dropped().Save(), errReplaced, "a rejection of the old one wiped the new one")
+	require.ErrorIs(t, running.Dropped().Save(), errReplaced, "a removal of the old one wiped the new one")
 	onDisk, err := Load()
 	require.NoError(t, err)
-	assert.Equal(t, "daemon-b", onDisk.DaemonID)
+	assert.Equal(t, "target-b", onDisk.TargetID)
 	assert.Equal(t, "token-b", onDisk.SessionToken)
 }
 
@@ -237,16 +237,16 @@ func TestSaveKeepsANewerEnrollment(t *testing.T) {
 func TestLoadRefusesANewerFile(t *testing.T) {
 	newTestDataDir(t)
 
-	require.NoError(t, os.WriteFile(paths.StateFile(), []byte(`{"daemon_id":"d1"}`), 0o600))
+	require.NoError(t, os.WriteFile(paths.StateFile(), []byte(`{"target_id":"t1"}`), 0o600))
 	s, err := Load()
 	require.NoError(t, err, "a file from before the version field")
-	assert.Equal(t, "d1", s.DaemonID)
+	assert.Equal(t, "t1", s.TargetID)
 	require.NoError(t, s.Save())
 	raw, err := os.ReadFile(paths.StateFile())
 	require.NoError(t, err)
 	assert.Contains(t, string(raw), `"version": 1`)
 
-	require.NoError(t, os.WriteFile(paths.StateFile(), []byte(`{"version":2,"daemon_id":"d1"}`), 0o600))
+	require.NoError(t, os.WriteFile(paths.StateFile(), []byte(`{"version":2,"target_id":"t1"}`), 0o600))
 	_, err = Load()
 	require.ErrorContains(t, err, "newer nokkud")
 }

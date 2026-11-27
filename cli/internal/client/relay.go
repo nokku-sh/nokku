@@ -20,7 +20,7 @@ type relayStream struct {
 
 // Relay carries the raw bytes between the local ssh and the daemon's sshd.
 func (c *Client) Relay(ctx context.Context, target *state.Target) (io.ReadWriteCloser, error) {
-	if target.DaemonID == "" {
+	if target.Manual() {
 		return nil, fmt.Errorf("target %s is not backed by a daemon", target.Name)
 	}
 
@@ -38,7 +38,7 @@ func (c *Client) Relay(ctx context.Context, target *state.Target) (io.ReadWriteC
 
 	if err = stream.Send(&nokkuv1.RelayRequest{
 		Msg: &nokkuv1.RelayRequest_Start{Start: &nokkuv1.RelayStart{
-			DaemonId: new(target.DaemonID),
+			DaemonId: new(target.ID),
 		}},
 	}); err != nil {
 		return nil, fmt.Errorf("relay start: %w", err)

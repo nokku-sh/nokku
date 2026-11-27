@@ -66,7 +66,6 @@ func TestRunServesFromCacheWhenCoreIsDown(t *testing.T) {
 
 	must.NoError(os.WriteFile(paths.StateFile(), fmt.Appendf(nil, `{
 		"target_id": "target-1",
-		"daemon_id": "daemon-1",
 		"session_token": "session",
 		"access": {
 			"principals": {%q: ["subject-1"]},

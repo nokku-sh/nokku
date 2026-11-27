@@ -145,10 +145,10 @@ func TestRenderKnownHosts(t *testing.T) {
 	st := &state.State{
 		CA: &state.CA{UserPublicKey: "ssh-ed25519 AAAAUser1==", HostPublicKey: "ssh-ed25519 AAAACa1== production"},
 		Targets: []state.Target{
-			{ID: "t-1", DaemonID: "d-1"},
+			{ID: "t-1", Daemon: true},
 			{ID: "t-3", HostPublicKey: "ssh-ed25519 AAAAhost== host"},
 			{ID: "t-4"},
-			{ID: "t-5", DaemonID: "d-5", HostPublicKey: "ssh-ed25519 AAAAstray"},
+			{ID: "t-5", Daemon: true, HostPublicKey: "ssh-ed25519 AAAAstray"},
 		},
 	}
 	out := string(renderKnownHosts(st))

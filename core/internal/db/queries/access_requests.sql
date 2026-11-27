@@ -1,5 +1,4 @@
 -- name: ListRequestableAccounts :many
--- The targets members may ask for, the ones carrying one of the workspace's requestable tags.
 SELECT
   t.id,
   t.name,
@@ -25,7 +24,6 @@ ORDER BY
   t.name;
 
 -- name: GetRequestableAccount :one
--- The target by id or name, so nk can pass what a person types.
 SELECT
   p.id
 FROM

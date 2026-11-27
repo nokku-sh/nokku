@@ -25,7 +25,7 @@ func TestABrowserReportsNoHost(t *testing.T) {
 func TestRepinIgnoresTheComment(t *testing.T) {
 	t.Parallel()
 	added, other := "a", "b"
-	target := &db.Target{HostPublicKey: new("ssh-ed25519 AAAAkey root@host"), CreatedBy: &added}
+	target := &db.Target{HostPublicKey: "ssh-ed25519 AAAAkey root@host", CreatedBy: &added}
 	sync := func(key string) *nokkuv1.SyncTargetUsersRequest {
 		return &nokkuv1.SyncTargetUsersRequest{HostPublicKey: &key}
 	}

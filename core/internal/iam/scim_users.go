@@ -204,7 +204,7 @@ func (h scimUserHandler) apply(
 				return mapUserError(err)
 			}
 			// A link mailed to the old address must not outlive it.
-			if err := q.DeleteAllUserTokens(ctx, &id); err != nil {
+			if err := q.DeleteAllUserTokens(ctx, id); err != nil {
 				return err
 			}
 		}

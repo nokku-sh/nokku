@@ -19,8 +19,14 @@ func (s *Service) cleanup(ctx context.Context) {
 		if _, err := s.conn.Sys().DeleteExpiredTokens(ctx, now); err != nil {
 			slog.Error("failed to cleanup one-time tokens", "error", err)
 		}
+		if _, err := s.conn.Sys().DeleteExpiredInvites(ctx, now); err != nil {
+			slog.Error("failed to cleanup invites", "error", err)
+		}
 		if _, err := s.conn.Sys().DeleteExpiredAccessTokens(ctx, &now); err != nil {
 			slog.Error("failed to cleanup expired access tokens", "error", err)
+		}
+		if _, err := s.conn.Sys().DeleteExpiredSpentJobTokens(ctx, now); err != nil {
+			slog.Error("failed to cleanup spent job tokens", "error", err)
 		}
 		if _, err := s.conn.Sys().DeleteExpiredKnownDevices(ctx, now); err != nil {
 			slog.Error("failed to cleanup known devices", "error", err)

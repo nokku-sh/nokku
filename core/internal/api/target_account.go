@@ -170,7 +170,6 @@ func (s *targetAccountService) Grant(
 			if err := q.PutGrants(ctx, &db.PutGrantsParams{
 				AccountIds: put, SubjectKind: subjectKind(subject.GetKind()), SubjectID: subject.GetId(),
 				ExpiresAt: expiresAt,
-				GrantedBy: callerID(ctx),
 			}); err != nil {
 				return err
 			}

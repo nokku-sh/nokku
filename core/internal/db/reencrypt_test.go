@@ -13,31 +13,26 @@ import (
 
 // clearBytea are the BYTEA columns that hold no secret, and why.
 var clearBytea = map[string]string{
-	"credentials.data": "the public half of a passkey and its counters",
-	"keysets.data":     "the keyset itself, wrapped by the KMS key or NOKKU_SECRET",
+	"passkeys.data": "the public half of a passkey and its counters",
+	"keysets.data":  "the keyset itself, wrapped by the KMS key or NOKKU_SECRET",
 }
 
 var (
 	createTable = regexp.MustCompile(`^CREATE TABLE ([a-z_.]+) \(`)
 	byteaColumn = regexp.MustCompile(`^\s+([a-z_]+) BYTEA\b`)
+	sealedType  = regexp.MustCompile(`^\s+([a-z_]+) sealed\b`)
 )
 
 // A rotation drops old keys, so a column missing here would lose its data.
-func TestSealedColumnsMatchSqlc(t *testing.T) {
-	raw, err := os.ReadFile("../../sqlc.yaml")
+func TestSealedColumnsMatchSchema(t *testing.T) {
+	schema, err := os.ReadFile("migrations/001_base.sql")
 	require.NoError(t, err)
-	override := regexp.MustCompile(
-		`- column: "([a-z_]+\.[a-z_]+)"\s+go_type:\s+import: "[^"]+"\s+type: "Sealed"`,
-	)
-	var want []string
-	for _, m := range override.FindAllStringSubmatch(string(raw), -1) {
-		want = append(want, m[1])
-	}
-	require.NotEmpty(t, want, "sqlc.yaml maps no column to crypto.Sealed")
-	assert.ElementsMatch(t, want, sealed(), "sealedColumns and the Sealed overrides of sqlc.yaml differ")
+	want := columns(string(schema), sealedType)
+	require.NotEmpty(t, want, "the schema has no sealed column")
+	assert.ElementsMatch(t, want, sealed(), "sealedColumns and the sealed columns of the schema differ")
 }
 
-// A new BYTEA column is sealed, or named in clearBytea with a reason.
+// A new BYTEA column is typed sealed, or named in clearBytea with a reason.
 func TestEveryByteaColumnIsSealed(t *testing.T) {
 	schema, err := os.ReadFile("migrations/001_base.sql")
 	require.NoError(t, err)
@@ -51,8 +46,16 @@ func TestUnsealedFindsAPlantedColumn(t *testing.T) {
 	assert.Equal(t, []string{"webhooks.token"}, unsealed(planted))
 }
 
-// unsealed lists BYTEA columns in neither sealedColumns nor clearBytea.
+// unsealed lists BYTEA columns that clearBytea does not name.
 func unsealed(schema string) []string {
+	return slices.DeleteFunc(columns(schema, byteaColumn), func(column string) bool {
+		_, ok := clearBytea[column]
+		return ok
+	})
+}
+
+// columns lists the table.column of every column line that matches.
+func columns(schema string, column *regexp.Regexp) []string {
 	var table string
 	var out []string
 	for line := range strings.Lines(schema) {
@@ -60,13 +63,8 @@ func unsealed(schema string) []string {
 			table = m[1]
 			continue
 		}
-		m := byteaColumn.FindStringSubmatch(line)
-		if m == nil {
-			continue
-		}
-		column := table + "." + m[1]
-		if _, ok := clearBytea[column]; !ok && !slices.Contains(sealed(), column) {
-			out = append(out, column)
+		if m := column.FindStringSubmatch(line); m != nil {
+			out = append(out, table+"."+m[1])
 		}
 	}
 	return out

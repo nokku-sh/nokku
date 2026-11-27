@@ -78,19 +78,19 @@
 		<dl class="grid grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] gap-x-6 gap-y-3">
 			{@render row(
 				'servers',
-				`${data.targetCount} total · ${data.onlineTargetCount} online${data.manualTargetCount ? ` · ${data.manualTargetCount} via nk sync` : ''}`,
-				data.targetCount && data.onlineTargetCount + data.manualTargetCount < data.targetCount
+				`${data.targetCount} total · ${data.onlineDaemonCount} online${data.manualTargetCount ? ` · ${data.manualTargetCount} via nk sync` : ''}`,
+				data.targetCount && data.onlineDaemonCount + data.manualTargetCount < data.targetCount
 					? 'text-terminal-warn'
 					: '',
 				'/servers'
 			)}
 			{@render row(
 				'daemons',
-				`${data.onlineDaemonCount}/${data.daemonCount - data.pendingDaemons.length} connected${data.pendingDaemons.length ? ` · ${data.pendingDaemons.length} pending` : ''}${data.behindDaemonCount ? ` · ${data.behindDaemonCount} behind` : ''}`,
-				data.offlineTargets.length || data.behindDaemonCount ? 'text-terminal-err' : '',
-				data.pendingDaemons.length
+				`${data.onlineDaemonCount}/${data.daemonCount - data.pendingDaemonCount} connected${data.pendingDaemonCount ? ` · ${data.pendingDaemonCount} pending` : ''}${data.behindDaemonCount ? ` · ${data.behindDaemonCount} behind` : ''}`,
+				data.offlineTargetCount || data.behindDaemonCount ? 'text-terminal-err' : '',
+				data.pendingDaemonCount
 					? '/servers?status=pending'
-					: data.offlineTargets.length
+					: data.offlineTargetCount
 						? '/servers?status=offline'
 						: '/servers?status=online'
 			)}

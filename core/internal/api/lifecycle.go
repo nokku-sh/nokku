@@ -59,7 +59,7 @@ func remindTrials(ctx context.Context, cfg *app.Config) {
 		return
 	}
 	for _, row := range rows {
-		due := reminderDue(time.Until(row.TrialEnd), row.TrialReminder, trialReminders)
+		due := reminderDue(time.Until(row.TrialEnd), row.TrialReminderDays, trialReminders)
 		if due == 0 {
 			continue
 		}
@@ -120,7 +120,7 @@ func lapseStep(lic *db.WorkspaceLicense, mails bool, now time.Time) (lapseAction
 	deleteAt, last := *ends, lastWarning(lic)
 
 	left := deleteAt.Sub(now)
-	if due := reminderDue(left, lic.DeletionWarning, deletionWarnings(lic)); due != 0 && mails {
+	if due := reminderDue(left, lic.DeletionWarningDays, deletionWarnings(lic)); due != 0 && mails {
 		if due == last {
 			deleteAt = later(deleteAt, now.Add(days(last)))
 		}
@@ -143,7 +143,7 @@ func deletionDate(lic *db.WorkspaceLicense) *time.Time {
 	if entitlement.OnTrial(lic) {
 		ends = entitlement.HoldEnd(*ended)
 	}
-	if last := lastWarning(lic); lic.DeletionWarning == last && lic.DeletionWarnedAt != nil {
+	if last := lastWarning(lic); lic.DeletionWarningDays == last && lic.DeletionWarnedAt != nil {
 		ends = later(ends, lic.DeletionWarnedAt.Add(days(last)))
 	}
 	return &ends

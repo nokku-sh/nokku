@@ -63,7 +63,7 @@ func (h scimGroupHandler) Create(r *http.Request, attrs scim.ResourceAttributes)
 		case team.ScimManaged:
 			// Another group holds it, the two would overwrite each other.
 			return scimerrors.ScimErrorUniqueness
-		case !team.ScimOpen:
+		case !team.ScimAdoptable:
 			// The group would get the team's access by using its name. An admin has to say so first.
 			return scimerrors.ScimError{
 				ScimType: scimerrors.ScimTypeUniqueness,

@@ -90,10 +90,7 @@ func (f *passkeyFlow) sessionUser(ctx context.Context, w http.ResponseWriter) (*
 }
 
 func (f *passkeyFlow) webUserFor(ctx context.Context, u *db.User) (*webUser, error) {
-	creds, err := f.svc.conn.Tenant().ListCredentialsByType(ctx, &db.ListCredentialsByTypeParams{
-		UserID: u.ID,
-		Type:   string(MethodPasskey),
-	})
+	creds, err := f.svc.conn.Tenant().ListPasskeys(ctx, u.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,27 +147,12 @@ func savePasskey(ctx context.Context, q *db.Queries, userID string, cred *webaut
 	if err != nil {
 		return "", err
 	}
-	subject := base64.RawURLEncoding.EncodeToString(cred.ID)
-	label := authenticatorName(cred)
-	if existing, err := q.FindCredentialBySubject(ctx, &db.FindCredentialBySubjectParams{
-		Type:    string(MethodPasskey),
-		Subject: subject,
-	}); err == nil && existing.Label != "" {
-		label = existing.Label
-	}
-	_, err = q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-		ID:      passkeyCredentialID(cred),
-		UserID:  userID,
-		Type:    string(MethodPasskey),
-		Subject: subject,
-		Data:    data,
-		Label:   label,
+	return q.SavePasskey(ctx, &db.SavePasskeyParams{
+		UserID:       userID,
+		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),
+		Data:         data,
+		Label:        authenticatorName(cred),
 	})
-	return label, err
-}
-
-func passkeyCredentialID(cred *webauthn.Credential) string {
-	return "passkey:" + base64.RawURLEncoding.EncodeToString(cred.ID)
 }
 
 func (f *passkeyFlow) clearedCeremonyCookie() *http.Cookie {
@@ -227,7 +209,7 @@ func (f *passkeyFlow) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, f.clearedCeremonyCookie())
 	f.svc.spendFlow(flowID)
-	f.svc.touchCredential(ctx, passkeyCredentialID(cred))
+	f.svc.touchPasskey(ctx, base64.RawURLEncoding.EncodeToString(cred.ID))
 	f.signIn(w, r, wu.user)
 }
 

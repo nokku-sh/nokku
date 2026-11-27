@@ -32,20 +32,20 @@ func TestEmailChangeTokens(t *testing.T) {
 	put := func(hash crypto.HashedToken, purpose, email string) {
 		t.Helper()
 		require.NoError(t, q.PutToken(ctx, &db.PutTokenParams{
-			TokenHash: hash, UserID: &id, Purpose: purpose,
-			ExpiresAt: time.Now().Add(time.Hour), Email: &email,
+			TokenHash: hash, UserID: id, Purpose: purpose,
+			ExpiresAt: time.Now().Add(time.Hour), Email: email,
 		}), "put %s token", purpose)
 	}
 	consume := func(hash crypto.HashedToken, purpose string) (*db.ConsumeEmailTokenRow, error) {
 		return q.ConsumeEmailToken(ctx, &db.ConsumeEmailTokenParams{TokenHash: hash, Purpose: purpose})
 	}
-	pendingParams := &db.GetPendingTokenEmailParams{UserID: &id, Purpose: "email_change"}
+	pendingParams := &db.GetPendingTokenEmailParams{UserID: id, Purpose: "email_change"}
 
 	// A second request replaces the first, a stale link confirms nothing.
 	put(stale, "email_change", id+"@typo.test")
 	require.NoError(t, q.DeleteUserTokens(
 		ctx,
-		&db.DeleteUserTokensParams{UserID: &id, Purpose: "email_change"},
+		&db.DeleteUserTokensParams{UserID: id, Purpose: "email_change"},
 	), "delete tokens")
 	put(confirm, "email_change", newEmail)
 	put(revert, "email_revert", oldEmail)

@@ -279,13 +279,16 @@ func TestKeycloakOIDCFlow(t *testing.T) {
 
 	u := e.userByEmail(t, o.ws, keycloakEmail)
 	require.NotNil(t, u, "JIT provisioned user missing after keycloak login")
-	var creds []*db.Credential
+	var identities []*db.OidcIdentity
 	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) (err error) {
-		creds, err = q.ListUserCredentials(t.Context(), u.ID)
+		identities, err = q.ListOIDCIdentities(t.Context(), u.ID)
 		return err
 	}))
-	assert.True(t, slices.ContainsFunc(creds, func(c *db.Credential) bool { return c.Provider == "keycloak" }),
-		"no keycloak credential on the user")
+	assert.True(
+		t,
+		slices.ContainsFunc(identities, func(i *db.OidcIdentity) bool { return i.ProviderID == "keycloak" }),
+		"no keycloak credential on the user",
+	)
 
 	// The consumed state must not survive a replay.
 	wantSSOFailure(t, callback())

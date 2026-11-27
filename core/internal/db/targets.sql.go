@@ -24,23 +24,23 @@ VALUES
   (
     $1,
     $2,
-    $3,
+    COALESCE($3::TEXT[], '{}'),
     COALESCE($4::TEXT[], '{}'),
     COALESCE($5::JSONB, '{}'),
     $6,
     $7
   )
 RETURNING
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
+  id, workspace_id, name, description, endpoints, host_public_key, tags, metadata, manual_sync_at, created_by, created_at, updated_at
 `
 
 type CreateTargetParams struct {
 	Name          string   `json:"name"`
-	Description   *string  `json:"description"`
+	Description   string   `json:"description"`
 	Endpoints     []string `json:"endpoints"`
 	Tags          []string `json:"tags"`
 	Metadata      []byte   `json:"metadata"`
-	HostPublicKey *string  `json:"hostPublicKey"`
+	HostPublicKey string   `json:"hostPublicKey"`
 	CreatedBy     *string  `json:"createdBy"`
 }
 
@@ -58,14 +58,13 @@ func (q *Queries) CreateTarget(ctx context.Context, arg *CreateTargetParams) (*T
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.DaemonID,
 		&i.Name,
 		&i.Description,
 		&i.Endpoints,
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
-		&i.LastSyncAt,
+		&i.ManualSyncAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -78,7 +77,7 @@ DELETE FROM targets
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
+  id, workspace_id, name, description, endpoints, host_public_key, tags, metadata, manual_sync_at, created_by, created_at, updated_at
 `
 
 func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, error) {
@@ -87,14 +86,13 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.DaemonID,
 		&i.Name,
 		&i.Description,
 		&i.Endpoints,
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
-		&i.LastSyncAt,
+		&i.ManualSyncAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -105,7 +103,7 @@ func (q *Queries) DeleteTarget(ctx context.Context, targetID string) (*Target, e
 const forgetHostKey = `-- name: ForgetHostKey :exec
 UPDATE targets
 SET
-  host_public_key = NULL
+  host_public_key = ''
 WHERE
   id = $1
 `
@@ -117,7 +115,7 @@ func (q *Queries) ForgetHostKey(ctx context.Context, targetID string) error {
 
 const getTarget = `-- name: GetTarget :one
 SELECT
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
+  id, workspace_id, name, description, endpoints, host_public_key, tags, metadata, manual_sync_at, created_by, created_at, updated_at
 FROM
   targets
 WHERE
@@ -130,14 +128,13 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.DaemonID,
 		&i.Name,
 		&i.Description,
 		&i.Endpoints,
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
-		&i.LastSyncAt,
+		&i.ManualSyncAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -147,12 +144,11 @@ func (q *Queries) GetTarget(ctx context.Context, targetID string) (*Target, erro
 
 const getTargetsBySubject = `-- name: GetTargetsBySubject :many
 SELECT
-  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_by, t.created_at, t.updated_at
+  t.id, t.workspace_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.manual_sync_at, t.created_by, t.created_at, t.updated_at
 FROM
   targets t
 WHERE
-  t.daemon_id = $1::UUID
-  OR t.id IN (
+  t.id IN (
     SELECT
       e.target_id
     FROM
@@ -171,7 +167,6 @@ WHERE
   )
 `
 
-// The targets a person or service account holds an account on, a team's own for a team, a daemon's for a daemon.
 func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]*Target, error) {
 	rows, err := q.db.Query(ctx, getTargetsBySubject, subjectID)
 	if err != nil {
@@ -184,14 +179,13 @@ func (q *Queries) GetTargetsBySubject(ctx context.Context, subjectID string) ([]
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
-			&i.DaemonID,
 			&i.Name,
 			&i.Description,
 			&i.Endpoints,
 			&i.HostPublicKey,
 			&i.Tags,
 			&i.Metadata,
-			&i.LastSyncAt,
+			&i.ManualSyncAt,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -266,23 +260,19 @@ func (q *Queries) GetWorkspaceTags(ctx context.Context) ([]string, error) {
 
 const listTargets = `-- name: ListTargets :many
 SELECT
-  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_by, t.created_at, t.updated_at,
+  t.id, t.workspace_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.manual_sync_at, t.created_by, t.created_at, t.updated_at,
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
-  LEFT JOIN daemons d ON d.id = t.daemon_id
+  LEFT JOIN daemons d ON d.target_id = t.id
 WHERE
   (
     $1::TEXT IS NULL
     OR t.name ILIKE '%' || $1 || '%'
-    OR COALESCE(t.description, '') ILIKE '%' || $1 || '%'
+    OR t.description ILIKE '%' || $1 || '%'
   )
   AND (
-    $2::UUID IS NULL
-    OR t.daemon_id = $2::UUID
-  )
-  AND (
-    $3::TEXT[] IS NULL
+    $2::TEXT[] IS NULL
     OR EXISTS (
       SELECT
         1
@@ -290,23 +280,23 @@ WHERE
         target_accounts p
       WHERE
         p.target_id = t.id
-        AND p.username = ANY ($3::TEXT[])
+        AND p.username = ANY ($2::TEXT[])
     )
   )
   AND (
-    $4::TEXT[] IS NULL
-    OR t.tags @> $4::TEXT[]
+    $3::TEXT[] IS NULL
+    OR t.tags @> $3::TEXT[]
   )
   AND (
-    $5::UUID[] IS NULL
-    OR t.id = ANY ($5::UUID[])
+    $4::UUID[] IS NULL
+    OR t.id = ANY ($4::UUID[])
   )
   -- A server without a daemon learns a new CA key only from nk sync.
   AND (
-    NOT $6::BOOLEAN
+    NOT $5::BOOLEAN
     OR (
-      t.daemon_id IS NULL
-      AND t.last_sync_at < (
+      d.target_id IS NULL
+      AND t.manual_sync_at < (
         SELECT
           ca.rotated_at
         FROM
@@ -318,37 +308,36 @@ WHERE
   )
   -- Online comes from the pool, the caller passes the daemons connected now.
   AND (
-    $7::TEXT IS NULL
+    $6::TEXT IS NULL
     OR (
-      $7 = 'pending'
-      AND d.status <> 2 -- accepted
+      $6 = 'pending'
+      AND NOT d.accepted
     )
     OR (
-      $7 = 'online'
-      AND d.status = 2
-      AND d.id = ANY ($8::UUID[])
+      $6 = 'online'
+      AND d.accepted
+      AND d.target_id = ANY ($7::UUID[])
     )
     OR (
-      $7 = 'offline'
-      AND d.status = 2
-      AND NOT COALESCE(d.id = ANY ($8::UUID[]), FALSE)
+      $6 = 'offline'
+      AND d.accepted
+      AND NOT COALESCE(d.target_id = ANY ($7::UUID[]), FALSE)
     )
     OR (
-      $7 = 'manual'
-      AND t.daemon_id IS NULL
+      $6 = 'manual'
+      AND d.target_id IS NULL
     )
   )
 ORDER BY
   t.id ASC
 LIMIT
-  $10
-OFFSET
   $9
+OFFSET
+  $8
 `
 
 type ListTargetsParams struct {
 	Query          *string  `json:"query"`
-	DaemonID       *string  `json:"daemonId"`
 	Accounts       []string `json:"accounts"`
 	Tags           []string `json:"tags"`
 	Ids            []string `json:"ids"`
@@ -367,7 +356,6 @@ type ListTargetsRow struct {
 func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*ListTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listTargets,
 		arg.Query,
-		arg.DaemonID,
 		arg.Accounts,
 		arg.Tags,
 		arg.Ids,
@@ -387,14 +375,13 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 		if err := rows.Scan(
 			&i.Target.ID,
 			&i.Target.WorkspaceID,
-			&i.Target.DaemonID,
 			&i.Target.Name,
 			&i.Target.Description,
 			&i.Target.Endpoints,
 			&i.Target.HostPublicKey,
 			&i.Target.Tags,
 			&i.Target.Metadata,
-			&i.Target.LastSyncAt,
+			&i.Target.ManualSyncAt,
 			&i.Target.CreatedBy,
 			&i.Target.CreatedAt,
 			&i.Target.UpdatedAt,
@@ -412,7 +399,7 @@ func (q *Queries) ListTargets(ctx context.Context, arg *ListTargetsParams) ([]*L
 
 const lockTarget = `-- name: LockTarget :one
 SELECT
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
+  id, workspace_id, name, description, endpoints, host_public_key, tags, metadata, manual_sync_at, created_by, created_at, updated_at
 FROM
   targets
 WHERE
@@ -426,14 +413,13 @@ func (q *Queries) LockTarget(ctx context.Context, targetID string) (*Target, err
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.DaemonID,
 		&i.Name,
 		&i.Description,
 		&i.Endpoints,
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
-		&i.LastSyncAt,
+		&i.ManualSyncAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -447,17 +433,16 @@ SET
   host_public_key = $1
 WHERE
   id = $2
-  AND $1::TEXT IS NOT NULL
-  AND host_public_key IS DISTINCT FROM $1
+  AND $1 <> ''
+  AND host_public_key <> $1
 `
 
 type ReportManualSyncParams struct {
-	HostPublicKey *string `json:"hostPublicKey"`
-	TargetID      string  `json:"targetId"`
+	HostPublicKey string `json:"hostPublicKey"`
+	TargetID      string `json:"targetId"`
 }
 
-// The host key nk sync saw on a host without a daemon. No key keeps the one the target has, and an unchanged
-// report writes nothing. It is no edit, so updated_at stays.
+// No key keeps the pinned one. It is no edit, so updated_at stays.
 func (q *Queries) ReportManualSync(ctx context.Context, arg *ReportManualSyncParams) error {
 	_, err := q.db.Exec(ctx, reportManualSync, arg.HostPublicKey, arg.TargetID)
 	return err
@@ -466,7 +451,7 @@ func (q *Queries) ReportManualSync(ctx context.Context, arg *ReportManualSyncPar
 const touchTargetSync = `-- name: TouchTargetSync :exec
 UPDATE targets
 SET
-  last_sync_at = NOW()
+  manual_sync_at = NOW()
 WHERE
   id = $1
 `
@@ -489,7 +474,7 @@ SET
 WHERE
   targets.id = $6
 RETURNING
-  id, workspace_id, daemon_id, name, description, endpoints, host_public_key, tags, metadata, last_sync_at, created_by, created_at, updated_at
+  id, workspace_id, name, description, endpoints, host_public_key, tags, metadata, manual_sync_at, created_by, created_at, updated_at
 `
 
 type UpdateTargetParams struct {
@@ -514,14 +499,13 @@ func (q *Queries) UpdateTarget(ctx context.Context, arg *UpdateTargetParams) (*T
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
-		&i.DaemonID,
 		&i.Name,
 		&i.Description,
 		&i.Endpoints,
 		&i.HostPublicKey,
 		&i.Tags,
 		&i.Metadata,
-		&i.LastSyncAt,
+		&i.ManualSyncAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -548,7 +532,7 @@ type UpdateTargetReportParams struct {
 	TargetID  string   `json:"targetId"`
 }
 
-// What a daemon reports about its host on every sync. Unchanged values must not rewrite the row.
+// Unchanged values must not rewrite the row.
 func (q *Queries) UpdateTargetReport(ctx context.Context, arg *UpdateTargetReportParams) error {
 	_, err := q.db.Exec(ctx, updateTargetReport, arg.Endpoints, arg.Metadata, arg.TargetID)
 	return err

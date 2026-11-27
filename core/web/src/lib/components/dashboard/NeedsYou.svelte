@@ -18,9 +18,6 @@
 	import { Check, ChevronRight, CircleCheck, Hand } from '@lucide/svelte';
 	import type { Issue } from './issues';
 
-	// A row names this many servers, the rest are behind its link.
-	const SERVERS_SHOWN = 8;
-
 	interface Props {
 		issues: Issue[];
 		/** Requests waiting for an answer, only for those who may give one. */
@@ -111,14 +108,14 @@
 							{/if}
 							{#if issue.servers}
 								<div class="mt-2 flex flex-wrap gap-1.5">
-									{#each issue.servers.slice(0, SERVERS_SHOWN) as s (s.id)}
+									{#each issue.servers as s (s.id)}
 										<Button size="xs" variant="outline" href={`/servers?id=${s.id}`}>
 											<span class="font-mono">{s.name}</span>
 										</Button>
 									{/each}
-									{#if issue.servers.length > SERVERS_SHOWN}
+									{#if issue.more}
 										<Button size="xs" variant="ghost" href={issue.href}>
-											{issue.servers.length - SERVERS_SHOWN} more
+											{issue.more} more
 										</Button>
 									{/if}
 								</div>
@@ -141,7 +138,11 @@
 											<span class="font-mono">{d.name}</span>
 										</Button>
 									{/each}
-									{#if waiting.length > 1}
+									{#if issue.more}
+										<Button size="xs" variant="ghost" href={issue.href}>
+											{issue.more} more
+										</Button>
+									{:else if waiting.length > 1}
 										<Button
 											size="xs"
 											disabled={review.pending || approveMany.isPending}

@@ -42,20 +42,18 @@ func (c *Client) syncDaemon(ctx context.Context) error {
 		return err
 	}
 
-	switch res.GetStatus() {
-	case nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED:
+	// The core hashes every answer, one without a hash is not from it.
+	if len(res.GetStateHash()) == 0 {
+		return nil
+	}
+	if res.GetRemoved() {
 		// New logins stop now. Memory keeps the enrollment until the exit.
 		cleared := c.state.Dropped()
 		c.srv.SetAccess(cleared.Access())
 		if err = cleared.Save(); err != nil {
-			slog.Error("persist dropped enrollment on rejection", "error", err)
+			slog.Error("persist dropped enrollment on removal", "error", err)
 		}
-		return errDaemonRejected
-	case nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED:
-	case nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING:
-		// Carries no principals or CA, so it takes an earlier approval back.
-	case nokkuv1.DaemonStatus_DAEMON_STATUS_UNSPECIFIED:
-		return nil
+		return errDaemonRemoved
 	}
 
 	access := state.AccessFrom(res, c.state.TargetID)

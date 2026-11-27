@@ -13,10 +13,10 @@ VALUES
   (
     @name,
     @description,
-    @endpoints,
+    COALESCE(sqlc.narg('endpoints')::TEXT[], '{}'),
     COALESCE(sqlc.narg('tags')::TEXT[], '{}'),
     COALESCE(sqlc.narg('metadata')::JSONB, '{}'),
-    sqlc.narg('host_public_key'),
+    @host_public_key,
     sqlc.narg('created_by')
   )
 RETURNING
@@ -45,16 +45,12 @@ SELECT
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   targets t
-  LEFT JOIN daemons d ON d.id = t.daemon_id
+  LEFT JOIN daemons d ON d.target_id = t.id
 WHERE
   (
     sqlc.narg('query')::TEXT IS NULL
     OR t.name ILIKE '%' || sqlc.narg('query') || '%'
-    OR COALESCE(t.description, '') ILIKE '%' || sqlc.narg('query') || '%'
-  )
-  AND (
-    sqlc.narg('daemon_id')::UUID IS NULL
-    OR t.daemon_id = sqlc.narg('daemon_id')::UUID
+    OR t.description ILIKE '%' || sqlc.narg('query') || '%'
   )
   AND (
     sqlc.narg('accounts')::TEXT[] IS NULL
@@ -80,8 +76,8 @@ WHERE
   AND (
     NOT @missed_rollover::BOOLEAN
     OR (
-      t.daemon_id IS NULL
-      AND t.last_sync_at < (
+      d.target_id IS NULL
+      AND t.manual_sync_at < (
         SELECT
           ca.rotated_at
         FROM
@@ -96,21 +92,21 @@ WHERE
     sqlc.narg('status')::TEXT IS NULL
     OR (
       sqlc.narg('status') = 'pending'
-      AND d.status <> 2 -- accepted
+      AND NOT d.accepted
     )
     OR (
       sqlc.narg('status') = 'online'
-      AND d.status = 2
-      AND d.id = ANY (@connected::UUID[])
+      AND d.accepted
+      AND d.target_id = ANY (@connected::UUID[])
     )
     OR (
       sqlc.narg('status') = 'offline'
-      AND d.status = 2
-      AND NOT COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
+      AND d.accepted
+      AND NOT COALESCE(d.target_id = ANY (@connected::UUID[]), FALSE)
     )
     OR (
       sqlc.narg('status') = 'manual'
-      AND t.daemon_id IS NULL
+      AND d.target_id IS NULL
     )
   )
 ORDER BY
@@ -135,7 +131,7 @@ RETURNING
   *;
 
 -- name: UpdateTargetReport :exec
--- What a daemon reports about its host on every sync. Unchanged values must not rewrite the row.
+-- Unchanged values must not rewrite the row.
 UPDATE targets
 SET
   endpoints = COALESCE(sqlc.narg('endpoints'), endpoints),
@@ -155,14 +151,12 @@ RETURNING
   *;
 
 -- name: GetTargetsBySubject :many
--- The targets a person or service account holds an account on, a team's own for a team, a daemon's for a daemon.
 SELECT
   t.*
 FROM
   targets t
 WHERE
-  t.daemon_id = sqlc.arg('subject_id')::UUID
-  OR t.id IN (
+  t.id IN (
     SELECT
       e.target_id
     FROM
@@ -197,20 +191,19 @@ ORDER BY
   username ASC;
 
 -- name: ReportManualSync :exec
--- The host key nk sync saw on a host without a daemon. No key keeps the one the target has, and an unchanged
--- report writes nothing. It is no edit, so updated_at stays.
+-- No key keeps the pinned one. It is no edit, so updated_at stays.
 UPDATE targets
 SET
-  host_public_key = sqlc.narg('host_public_key')
+  host_public_key = @host_public_key
 WHERE
   id = @target_id
-  AND sqlc.narg('host_public_key')::TEXT IS NOT NULL
-  AND host_public_key IS DISTINCT FROM sqlc.narg('host_public_key');
+  AND @host_public_key <> ''
+  AND host_public_key <> @host_public_key;
 
 -- name: ForgetHostKey :exec
 UPDATE targets
 SET
-  host_public_key = NULL
+  host_public_key = ''
 WHERE
   id = @target_id;
 
@@ -218,6 +211,6 @@ WHERE
 -- On its own, a statement that sets the stamp with another column would tell every console.
 UPDATE targets
 SET
-  last_sync_at = NOW()
+  manual_sync_at = NOW()
 WHERE
   id = @target_id;

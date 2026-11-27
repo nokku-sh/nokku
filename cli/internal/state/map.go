@@ -26,7 +26,7 @@ func FromAccess(res *nokkuv1.GetSubjectAccessResponse) Cache {
 
 	c.CA = MapCA(res.GetCertificateAuthority())
 	for _, access := range res.GetTargets() {
-		if !validTarget(access.GetTarget()) {
+		if !validID(access.GetTarget().GetId()) {
 			continue
 		}
 		target := MapTarget(access.GetTarget())
@@ -50,15 +50,11 @@ func FromAccess(res *nokkuv1.GetSubjectAccessResponse) Cache {
 func Targets(targets []*nokkuv1.Target) []Target {
 	var out []Target
 	for _, t := range targets {
-		if validTarget(t) {
+		if validID(t.GetId()) {
 			out = append(out, MapTarget(t))
 		}
 	}
 	return out
-}
-
-func validTarget(t *nokkuv1.Target) bool {
-	return validIDs(t.GetId()) && (t.GetDaemonId() == "" || validIDs(t.GetDaemonId()))
 }
 
 // MapCA is nil without a CA, a subject with no targets gets none.
@@ -76,11 +72,11 @@ func MapCA(ca *nokkuv1.CertificateAuthority) *CA {
 func MapTarget(t *nokkuv1.Target) Target {
 	return Target{
 		ID:            t.GetId(),
-		DaemonID:      t.GetDaemonId(),
+		Daemon:        t.GetDaemon() != nil,
 		Name:          ui.PlainLine(t.GetName()),
 		Endpoints:     plainAll(t.GetEndpoints()),
 		HostPublicKey: t.GetHostPublicKey(),
-		LastSyncAt:    timeOf(t.GetLastSyncAt()),
+		ManualSyncAt:  timeOf(t.GetManualSyncAt()),
 		CreatedBy:     t.GetCreatedBy(),
 	}
 }
@@ -100,12 +96,10 @@ func plainAll(values []string) []string {
 	return values
 }
 
-func validIDs(ids ...string) bool {
-	for _, id := range ids {
-		if !login.ValidID(id) {
-			slog.Warn("ignoring core entry with an invalid id", "id", id)
-			return false
-		}
+func validID(id string) bool {
+	if login.ValidID(id) {
+		return true
 	}
-	return true
+	slog.Warn("ignoring core entry with an invalid id", "id", id)
+	return false
 }

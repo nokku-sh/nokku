@@ -4,7 +4,7 @@ INSERT INTO
   recordings (id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at)
 SELECT
   @id,
-  d.id,
+  d.target_id,
   t.name,
   @username,
   sqlc.narg('subject_id'),
@@ -22,9 +22,9 @@ SELECT
   END
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
-  d.id = @daemon_id
+  d.target_id = @daemon_id
 RETURNING
   *;
 
@@ -79,7 +79,6 @@ SELECT
     FROM
       filtered
   )::INTEGER AS total_count,
-  -- The same rule as ListOpenRecordings.
   (
     r.ended_at IS NULL
     AND r.started_at > NOW() - INTERVAL '24 hours'
@@ -98,7 +97,6 @@ FROM
   recordings;
 
 -- name: LockRecording :one
--- Uploads of one recording end one at a time, so each sees what the one before it stored.
 SELECT
   *
 FROM
@@ -108,8 +106,7 @@ WHERE
 FOR UPDATE;
 
 -- name: FinishRecordingUpload :one
--- A NULL object leaves the stored copy in place, a NULL end leaves a session running. An end from a wrong clock counts
--- as now.
+-- A NULL object keeps the stored copy. A wrong clock's end counts as now.
 UPDATE recordings
 SET
   object_id = COALESCE(sqlc.narg('object_id')::UUID, object_id),
@@ -199,11 +196,9 @@ WHERE
   object_id = @object_id;
 
 -- name: DeferRecordingDelete :exec
--- Waits 10 minutes after the first failure, doubling up to a day.
 UPDATE recording_deletes
 SET
   attempts = attempts + 1,
-  last_error = @last_error,
   next_try_at = NOW() + LEAST(INTERVAL '1 day', INTERVAL '10 minutes' * POWER(2, LEAST(attempts, 10)))
 WHERE
   object_id = @object_id;

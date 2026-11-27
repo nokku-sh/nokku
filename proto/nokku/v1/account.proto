@@ -69,12 +69,6 @@ service AccountService {
   }
 }
 
-enum CredentialType {
-  CREDENTIAL_TYPE_UNSPECIFIED = 0;
-  CREDENTIAL_TYPE_PASSKEY = 1;
-  CREDENTIAL_TYPE_OIDC = 2;
-}
-
 enum SessionKind {
   SESSION_KIND_UNSPECIFIED = 0;
   SESSION_KIND_BROWSER = 1;
@@ -90,21 +84,25 @@ enum SignInMethod {
   SIGN_IN_METHOD_DEVICE = 4;
 }
 
-message AccountCredential {
+message Passkey {
   string id = 1;
-  CredentialType type = 2;
-  string provider = 3;
-  string subject = 4;
-  string label = 5;
-  google.protobuf.Timestamp created_at = 6;
-  google.protobuf.Timestamp last_used_at = 7;
+  string label = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+}
+
+message OIDCIdentity {
+  string id = 1;
+  string provider = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
 }
 
 message AccountSession {
   string id = 1;
   SessionKind kind = 2;
   SignInMethod method = 3;
-  string binding = 4;
+  string dpop_thumbprint = 4;
   string user_agent = 5;
   string ip = 6;
   bool current = 7;
@@ -138,11 +136,12 @@ message RequestEmailChangeResponse {}
 
 message ListCredentialsRequest {}
 message ListCredentialsResponse {
-  repeated AccountCredential credentials = 1;
+  repeated Passkey passkeys = 1;
+  repeated OIDCIdentity oidc_identities = 2;
 }
 
 message RenameCredentialRequest {
-  string id = 1 [(buf.validate.field).string.min_len = 1];
+  string id = 1 [(buf.validate.field).string.uuid = true];
   string label = 2 [(buf.validate.field).string = {
     min_len: 1
     max_len: 256

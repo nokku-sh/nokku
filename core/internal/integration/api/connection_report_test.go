@@ -92,7 +92,7 @@ func TestConnectionReport(t *testing.T) {
 	closed, opened := rows[0], rows[1]
 	assert.Equal(t, "ConnectionClose", closed.Action)
 	assert.Equal(t, "ConnectionOpen", opened.Action)
-	assert.Equal(t, enrolled.GetId(), opened.ActorID, "the daemon is the one who says so")
+	assert.Equal(t, enrolled.GetTargetId(), opened.ActorID, "the daemon is the one who says so")
 	assert.Equal(t, "daemon", opened.ActorKind)
 	assert.NotEmpty(t, opened.ActorName, "the daemon goes by its server's name")
 	var details struct {

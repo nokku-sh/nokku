@@ -106,9 +106,7 @@ func (s *Service) putSSOProvider(ctx context.Context, q *db.Queries, p SSOProvid
 	}
 	if issuerChanged {
 		// sub is only unique per issuer, so the old identities are stale.
-		if _, err := q.DeleteCredentialsByProvider(ctx, &db.DeleteCredentialsByProviderParams{
-			Type: string(MethodOIDC), Provider: p.ProviderID,
-		}); err != nil {
+		if _, err := q.DeleteOIDCIdentitiesByProvider(ctx, p.ProviderID); err != nil {
 			return nil, err
 		}
 	}
@@ -144,10 +142,7 @@ func (s *Service) DeleteSSOProvider(ctx context.Context, providerID string) erro
 		if n == 0 {
 			return ErrNotFound
 		}
-		_, err = q.DeleteCredentialsByProvider(ctx, &db.DeleteCredentialsByProviderParams{
-			Type: string(MethodOIDC), Provider: providerID,
-		})
-		return err
+		return nil
 	})
 }
 

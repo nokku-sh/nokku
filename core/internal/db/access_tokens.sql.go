@@ -24,7 +24,6 @@ WHERE
   )
 `
 
-// Requiring single sign-on shortens the sessions it leaves, a provider's and the owner's, to what a new one gets.
 func (q *Queries) CapSessions(ctx context.Context, notAfter time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, capSessions, notAfter)
 	if err != nil {
@@ -42,14 +41,13 @@ INSERT INTO
     service_account_id,
     daemon_id,
     method,
-    binding,
+    dpop_thumbprint,
     ssh_key,
     label,
     user_agent,
     ip,
     expires_at,
-    last_seen_at,
-    workload_jti
+    last_seen_at
   )
 VALUES
   (
@@ -71,43 +69,39 @@ VALUES
     $8,
     $9,
     $10,
-    $11,
-    $12
+    $11
   )
 RETURNING
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, dpop_thumbprint, ssh_key, label, ip, user_agent, expires_at, last_seen_at, created_at
 `
 
 type CreateAccessTokenParams struct {
-	TokenHash   crypto.HashedToken `json:"tokenHash"`
-	Kind        string             `json:"kind"`
-	SubjectID   *string            `json:"subjectId"`
-	Method      string             `json:"method"`
-	Binding     string             `json:"binding"`
-	SshKey      string             `json:"sshKey"`
-	Label       string             `json:"label"`
-	UserAgent   string             `json:"userAgent"`
-	Ip          string             `json:"ip"`
-	ExpiresAt   *time.Time         `json:"expiresAt"`
-	LastSeenAt  *time.Time         `json:"lastSeenAt"`
-	WorkloadJti *string            `json:"workloadJti"`
+	TokenHash      crypto.HashedToken `json:"tokenHash"`
+	Kind           string             `json:"kind"`
+	SubjectID      *string            `json:"subjectId"`
+	Method         string             `json:"method"`
+	DpopThumbprint string             `json:"dpopThumbprint"`
+	SshKey         string             `json:"sshKey"`
+	Label          string             `json:"label"`
+	UserAgent      string             `json:"userAgent"`
+	Ip             string             `json:"ip"`
+	ExpiresAt      *time.Time         `json:"expiresAt"`
+	LastSeenAt     *time.Time         `json:"lastSeenAt"`
 }
 
-// One subject parameter, the column it lands in follows the kind. A SCIM token has no subject.
 func (q *Queries) CreateAccessToken(ctx context.Context, arg *CreateAccessTokenParams) (*AccessToken, error) {
 	row := q.db.QueryRow(ctx, createAccessToken,
 		arg.TokenHash,
 		arg.Kind,
 		arg.SubjectID,
 		arg.Method,
-		arg.Binding,
+		arg.DpopThumbprint,
 		arg.SshKey,
 		arg.Label,
 		arg.UserAgent,
 		arg.Ip,
 		arg.ExpiresAt,
 		arg.LastSeenAt,
-		arg.WorkloadJti,
 	)
 	var i AccessToken
 	err := row.Scan(
@@ -120,14 +114,13 @@ func (q *Queries) CreateAccessToken(ctx context.Context, arg *CreateAccessTokenP
 		&i.DaemonID,
 		&i.SubjectID,
 		&i.Method,
-		&i.Binding,
+		&i.DpopThumbprint,
 		&i.SshKey,
 		&i.Label,
 		&i.Ip,
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
-		&i.WorkloadJti,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -151,9 +144,22 @@ WHERE
   AND expires_at < $1
 `
 
-// Every tenant, runs as nokku_system.
 func (q *Queries) DeleteExpiredAccessTokens(ctx context.Context, now *time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredAccessTokens, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteExpiredSpentJobTokens = `-- name: DeleteExpiredSpentJobTokens :execrows
+DELETE FROM spent_job_tokens
+WHERE
+  expires_at < $1
+`
+
+func (q *Queries) DeleteExpiredSpentJobTokens(ctx context.Context, now time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredSpentJobTokens, now)
 	if err != nil {
 		return 0, err
 	}
@@ -175,8 +181,7 @@ WHERE
   )
 `
 
-// Requiring single sign-on ends the sessions a passkey or a mailed link started, in the browser and in nk. The owner
-// keeps theirs, the way in when a provider breaks.
+// The owner keeps theirs, the way in when a provider breaks.
 func (q *Queries) DeleteNonSSOSessions(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteNonSSOSessions)
 	if err != nil {
@@ -202,7 +207,6 @@ DELETE FROM access_tokens
 WHERE
   id = $1
   AND service_account_id = $2::UUID
-  AND workload_jti IS NULL
 `
 
 type DeleteServiceAccountTokenParams struct {
@@ -210,7 +214,6 @@ type DeleteServiceAccountTokenParams struct {
 	ServiceAccountID string `json:"serviceAccountId"`
 }
 
-// A key. The row of an exchange goes through RevokeWorkloadToken.
 func (q *Queries) DeleteServiceAccountToken(ctx context.Context, arg *DeleteServiceAccountTokenParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteServiceAccountToken, arg.ID, arg.ServiceAccountID)
 	if err != nil {
@@ -229,15 +232,14 @@ WITH
   pending AS (
     DELETE FROM device_grants
     WHERE
-      user_id = $1::UUID
+      decided_by = $1::UUID
   )
 DELETE FROM access_tokens
 WHERE
   subject_id = $1::UUID
 `
 
-// Signs the subject out everywhere. A user's devices are forgotten too, so none is waved through quietly again, and a
-// pending nk login is dropped, or an approval from before this would still turn into a token.
+// Drops a pending nk login too, or an old approval still becomes a token.
 func (q *Queries) DeleteSubjectTokens(ctx context.Context, subjectID string) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteSubjectTokens, subjectID)
 	if err != nil {
@@ -248,7 +250,7 @@ func (q *Queries) DeleteSubjectTokens(ctx context.Context, subjectID string) (in
 
 const getAccessToken = `-- name: GetAccessToken :one
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, dpop_thumbprint, ssh_key, label, ip, user_agent, expires_at, last_seen_at, created_at
 FROM
   access_tokens
 WHERE
@@ -268,14 +270,13 @@ func (q *Queries) GetAccessToken(ctx context.Context, tokenHash crypto.HashedTok
 		&i.DaemonID,
 		&i.SubjectID,
 		&i.Method,
-		&i.Binding,
+		&i.DpopThumbprint,
 		&i.SshKey,
 		&i.Label,
 		&i.Ip,
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
-		&i.WorkloadJti,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -283,7 +284,7 @@ func (q *Queries) GetAccessToken(ctx context.Context, tokenHash crypto.HashedTok
 
 const listSCIMTokens = `-- name: ListSCIMTokens :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, dpop_thumbprint, ssh_key, label, ip, user_agent, expires_at, last_seen_at, created_at
 FROM
   access_tokens
 WHERE
@@ -311,14 +312,13 @@ func (q *Queries) ListSCIMTokens(ctx context.Context) ([]*AccessToken, error) {
 			&i.DaemonID,
 			&i.SubjectID,
 			&i.Method,
-			&i.Binding,
+			&i.DpopThumbprint,
 			&i.SshKey,
 			&i.Label,
 			&i.Ip,
 			&i.UserAgent,
 			&i.ExpiresAt,
 			&i.LastSeenAt,
-			&i.WorkloadJti,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -333,17 +333,15 @@ func (q *Queries) ListSCIMTokens(ctx context.Context) ([]*AccessToken, error) {
 
 const listServiceAccountTokens = `-- name: ListServiceAccountTokens :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, dpop_thumbprint, ssh_key, label, ip, user_agent, expires_at, last_seen_at, created_at
 FROM
   access_tokens
 WHERE
   service_account_id = $1::UUID
-  AND token_hash NOT LIKE 'revoked:%'
 ORDER BY
   created_at DESC
 `
 
-// A revoked row of an exchange is no token any more, see RevokeWorkloadToken.
 func (q *Queries) ListServiceAccountTokens(ctx context.Context, serviceAccountID string) ([]*AccessToken, error) {
 	rows, err := q.db.Query(ctx, listServiceAccountTokens, serviceAccountID)
 	if err != nil {
@@ -363,14 +361,13 @@ func (q *Queries) ListServiceAccountTokens(ctx context.Context, serviceAccountID
 			&i.DaemonID,
 			&i.SubjectID,
 			&i.Method,
-			&i.Binding,
+			&i.DpopThumbprint,
 			&i.SshKey,
 			&i.Label,
 			&i.Ip,
 			&i.UserAgent,
 			&i.ExpiresAt,
 			&i.LastSeenAt,
-			&i.WorkloadJti,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -385,7 +382,7 @@ func (q *Queries) ListServiceAccountTokens(ctx context.Context, serviceAccountID
 
 const listUserSessions = `-- name: ListUserSessions :many
 SELECT
-  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, binding, ssh_key, label, ip, user_agent, expires_at, last_seen_at, workload_jti, created_at
+  id, token_hash, workspace_id, kind, user_id, service_account_id, daemon_id, subject_id, method, dpop_thumbprint, ssh_key, label, ip, user_agent, expires_at, last_seen_at, created_at
 FROM
   access_tokens
 WHERE
@@ -394,7 +391,6 @@ ORDER BY
   last_seen_at DESC NULLS LAST
 `
 
-// The browsers and terminals one user is signed in from.
 func (q *Queries) ListUserSessions(ctx context.Context, userID string) ([]*AccessToken, error) {
 	rows, err := q.db.Query(ctx, listUserSessions, userID)
 	if err != nil {
@@ -414,14 +410,13 @@ func (q *Queries) ListUserSessions(ctx context.Context, userID string) ([]*Acces
 			&i.DaemonID,
 			&i.SubjectID,
 			&i.Method,
-			&i.Binding,
+			&i.DpopThumbprint,
 			&i.SshKey,
 			&i.Label,
 			&i.Ip,
 			&i.UserAgent,
 			&i.ExpiresAt,
 			&i.LastSeenAt,
-			&i.WorkloadJti,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -434,29 +429,23 @@ func (q *Queries) ListUserSessions(ctx context.Context, userID string) ([]*Acces
 	return items, nil
 }
 
-const revokeWorkloadToken = `-- name: RevokeWorkloadToken :execrows
-UPDATE access_tokens
-SET
-  token_hash = 'revoked:' || id::TEXT
-WHERE
-  id = $1
-  AND service_account_id = $2::UUID
-  AND workload_jti IS NOT NULL
+const spendJobToken = `-- name: SpendJobToken :exec
+INSERT INTO
+  spent_job_tokens (issuer, jti, expires_at)
+VALUES
+  ($1, $2, $3)
 `
 
-type RevokeWorkloadTokenParams struct {
-	ID               string `json:"id"`
-	ServiceAccountID string `json:"serviceAccountId"`
+type SpendJobTokenParams struct {
+	Issuer    string    `json:"issuer"`
+	Jti       string    `json:"jti"`
+	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// The row of an exchange also says its job token is spent, and that job token can outlive a revoke. So the row stays
-// until it expires, and loses the hash that signs in. No token hashes to this value.
-func (q *Queries) RevokeWorkloadToken(ctx context.Context, arg *RevokeWorkloadTokenParams) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeWorkloadToken, arg.ID, arg.ServiceAccountID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// A job token works once, a second use trips the primary key.
+func (q *Queries) SpendJobToken(ctx context.Context, arg *SpendJobTokenParams) error {
+	_, err := q.db.Exec(ctx, spendJobToken, arg.Issuer, arg.Jti, arg.ExpiresAt)
+	return err
 }
 
 const touchAccessToken = `-- name: TouchAccessToken :exec

@@ -27,16 +27,15 @@ const (
 
 type CertificateAuthority struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
-	Id                       *string                `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	UserPublicKey            *string                `protobuf:"bytes,2,opt,name=user_public_key,json=userPublicKey" json:"user_public_key,omitempty"`
-	HostPublicKey            *string                `protobuf:"bytes,3,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
-	SourceAddress            *string                `protobuf:"bytes,4,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
-	UserPublicKeyFingerprint *string                `protobuf:"bytes,5,opt,name=user_public_key_fingerprint,json=userPublicKeyFingerprint" json:"user_public_key_fingerprint,omitempty"`
-	HostPublicKeyFingerprint *string                `protobuf:"bytes,6,opt,name=host_public_key_fingerprint,json=hostPublicKeyFingerprint" json:"host_public_key_fingerprint,omitempty"`
-	UserTtl                  *durationpb.Duration   `protobuf:"bytes,7,opt,name=user_ttl,json=userTtl" json:"user_ttl,omitempty"`
-	RotatedAt                *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=rotated_at,json=rotatedAt" json:"rotated_at,omitempty"`
-	CreatedAt                *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	UpdatedAt                *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
+	UserPublicKey            *string                `protobuf:"bytes,1,opt,name=user_public_key,json=userPublicKey" json:"user_public_key,omitempty"`
+	HostPublicKey            *string                `protobuf:"bytes,2,opt,name=host_public_key,json=hostPublicKey" json:"host_public_key,omitempty"`
+	SourceAddress            *string                `protobuf:"bytes,3,opt,name=source_address,json=sourceAddress" json:"source_address,omitempty"`
+	UserPublicKeyFingerprint *string                `protobuf:"bytes,4,opt,name=user_public_key_fingerprint,json=userPublicKeyFingerprint" json:"user_public_key_fingerprint,omitempty"`
+	HostPublicKeyFingerprint *string                `protobuf:"bytes,5,opt,name=host_public_key_fingerprint,json=hostPublicKeyFingerprint" json:"host_public_key_fingerprint,omitempty"`
+	UserTtl                  *durationpb.Duration   `protobuf:"bytes,6,opt,name=user_ttl,json=userTtl" json:"user_ttl,omitempty"`
+	RotatedAt                *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=rotated_at,json=rotatedAt" json:"rotated_at,omitempty"`
+	CreatedAt                *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
+	UpdatedAt                *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -69,13 +68,6 @@ func (x *CertificateAuthority) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CertificateAuthority.ProtoReflect.Descriptor instead.
 func (*CertificateAuthority) Descriptor() ([]byte, []int) {
 	return file_nokku_v1_certificates_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *CertificateAuthority) GetId() string {
-	if x != nil && x.Id != nil {
-		return *x.Id
-	}
-	return ""
 }
 
 func (x *CertificateAuthority) GetUserPublicKey() string {
@@ -513,22 +505,20 @@ var File_nokku_v1_certificates_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_certificates_proto_rawDesc = "" +
 	"\n" +
-	"\x1bnokku/v1/certificates.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\x82\x04\n" +
-	"\x14CertificateAuthority\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12&\n" +
-	"\x0fuser_public_key\x18\x02 \x01(\tR\ruserPublicKey\x12&\n" +
-	"\x0fhost_public_key\x18\x03 \x01(\tR\rhostPublicKey\x12%\n" +
-	"\x0esource_address\x18\x04 \x01(\tR\rsourceAddress\x12=\n" +
-	"\x1buser_public_key_fingerprint\x18\x05 \x01(\tR\x18userPublicKeyFingerprint\x12=\n" +
-	"\x1bhost_public_key_fingerprint\x18\x06 \x01(\tR\x18hostPublicKeyFingerprint\x124\n" +
-	"\buser_ttl\x18\a \x01(\v2\x19.google.protobuf.DurationR\auserTtl\x129\n" +
+	"\x1bnokku/v1/certificates.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\"\xf2\x03\n" +
+	"\x14CertificateAuthority\x12&\n" +
+	"\x0fuser_public_key\x18\x01 \x01(\tR\ruserPublicKey\x12&\n" +
+	"\x0fhost_public_key\x18\x02 \x01(\tR\rhostPublicKey\x12%\n" +
+	"\x0esource_address\x18\x03 \x01(\tR\rsourceAddress\x12=\n" +
+	"\x1buser_public_key_fingerprint\x18\x04 \x01(\tR\x18userPublicKeyFingerprint\x12=\n" +
+	"\x1bhost_public_key_fingerprint\x18\x05 \x01(\tR\x18hostPublicKeyFingerprint\x124\n" +
+	"\buser_ttl\x18\x06 \x01(\v2\x19.google.protobuf.DurationR\auserTtl\x129\n" +
 	"\n" +
-	"rotated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\trotatedAt\x129\n" +
+	"rotated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\trotatedAt\x129\n" +
 	"\n" +
-	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\" \n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\" \n" +
 	"\x1eGetCertificateAuthorityRequest\"v\n" +
 	"\x1fGetCertificateAuthorityResponse\x12S\n" +
 	"\x15certificate_authority\x18\x01 \x01(\v2\x1e.nokku.v1.CertificateAuthorityR\x14certificateAuthority\"\xff\x01\n" +

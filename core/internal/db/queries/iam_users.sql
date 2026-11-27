@@ -2,7 +2,7 @@
 INSERT INTO
   users (email, name, role, picture)
 VALUES
-  (@email, @name, @role, sqlc.narg('picture'))
+  (@email, @name, @role, @picture)
 RETURNING
   *;
 
@@ -10,7 +10,7 @@ RETURNING
 INSERT INTO
   users (id, email, name, role, picture)
 VALUES
-  (@id, @email, @name, @role, sqlc.narg('picture'))
+  (@id, @email, @name, @role, @picture)
 RETURNING
   *;
 
@@ -94,7 +94,7 @@ WHERE
   AND role <> 5; -- owner
 
 -- name: SetUserActive :exec
--- An admin's call, so it also takes the account out of SCIM's hands. MarkUserSCIMDeactivated puts it back.
+-- Also takes the account out of SCIM's hands.
 UPDATE users
 SET
   active = @active,
@@ -113,8 +113,7 @@ WHERE
   AND NOT active;
 
 -- name: DemoteOwner :execrows
--- Runs before PromoteOwner. The partial unique index on the owner is checked row by row, so one statement
--- that swaps both can see two owners. See Queries.TransferOwnership.
+-- Runs before PromoteOwner, one statement trips the per-row owner index.
 UPDATE users
 SET
   role = 4, -- admin

@@ -66,29 +66,12 @@ SELECT
     SELECT
       COUNT(*)
     FROM
-      targets t
-      JOIN daemons d ON d.workspace_id = t.workspace_id
-      AND d.id = t.daemon_id
-    WHERE
-      COALESCE(d.id = ANY ($1::UUID[]), FALSE)
-  )::INTEGER AS targets_online,
-  (
-    SELECT
-      COUNT(*)
-    FROM
-      targets t
-    WHERE
-      t.daemon_id IS NULL
-  )::INTEGER AS targets_manual,
-  (
-    SELECT
-      COUNT(*)
-    FROM
       users u
     WHERE
       u.active
   )::INTEGER AS users,
   d.total AS daemons,
+  d.pending AS daemons_pending,
   d.online AS daemons_online
 FROM
   (
@@ -96,8 +79,12 @@ FROM
       COUNT(*)::INTEGER AS total,
       (COUNT(*) FILTER (
         WHERE
-          status <> 1 -- pending
-          AND COALESCE(id = ANY ($1::UUID[]), FALSE)
+          NOT accepted
+      ))::INTEGER AS pending,
+      (COUNT(*) FILTER (
+        WHERE
+          accepted
+          AND COALESCE(target_id = ANY ($1::UUID[]), FALSE)
       ))::INTEGER AS online
     FROM
       daemons
@@ -105,12 +92,11 @@ FROM
 `
 
 type DashboardCountsRow struct {
-	Targets       int32 `json:"targets"`
-	TargetsOnline int32 `json:"targetsOnline"`
-	TargetsManual int32 `json:"targetsManual"`
-	Users         int32 `json:"users"`
-	Daemons       int32 `json:"daemons"`
-	DaemonsOnline int32 `json:"daemonsOnline"`
+	Targets        int32 `json:"targets"`
+	Users          int32 `json:"users"`
+	Daemons        int32 `json:"daemons"`
+	DaemonsPending int32 `json:"daemonsPending"`
+	DaemonsOnline  int32 `json:"daemonsOnline"`
 }
 
 func (q *Queries) DashboardCounts(ctx context.Context, connected []string) (*DashboardCountsRow, error) {
@@ -118,10 +104,9 @@ func (q *Queries) DashboardCounts(ctx context.Context, connected []string) (*Das
 	var i DashboardCountsRow
 	err := row.Scan(
 		&i.Targets,
-		&i.TargetsOnline,
-		&i.TargetsManual,
 		&i.Users,
 		&i.Daemons,
+		&i.DaemonsPending,
 		&i.DaemonsOnline,
 	)
 	return &i, err
@@ -206,15 +191,15 @@ func (q *Queries) ListEndingGrants(ctx context.Context) ([]*ListEndingGrantsRow,
 
 const listOfflineTargets = `-- name: ListOfflineTargets :many
 SELECT
-  t.id, t.workspace_id, t.daemon_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.last_sync_at, t.created_by, t.created_at, t.updated_at
+  t.id, t.workspace_id, t.name, t.description, t.endpoints, t.host_public_key, t.tags, t.metadata, t.manual_sync_at, t.created_by, t.created_at, t.updated_at
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
-  d.status = 2 -- accepted
-  AND NOT COALESCE(d.id = ANY ($1::UUID[]), FALSE)
+  d.accepted
+  AND NOT COALESCE(d.target_id = ANY ($1::UUID[]), FALSE)
 ORDER BY
-  d.id ASC
+  d.target_id ASC
 LIMIT
   5
 `
@@ -235,14 +220,13 @@ func (q *Queries) ListOfflineTargets(ctx context.Context, connected []string) ([
 		if err := rows.Scan(
 			&i.Target.ID,
 			&i.Target.WorkspaceID,
-			&i.Target.DaemonID,
 			&i.Target.Name,
 			&i.Target.Description,
 			&i.Target.Endpoints,
 			&i.Target.HostPublicKey,
 			&i.Target.Tags,
 			&i.Target.Metadata,
-			&i.Target.LastSyncAt,
+			&i.Target.ManualSyncAt,
 			&i.Target.CreatedBy,
 			&i.Target.CreatedAt,
 			&i.Target.UpdatedAt,
@@ -260,18 +244,17 @@ func (q *Queries) ListOfflineTargets(ctx context.Context, connected []string) ([
 const listOpenRecordings = `-- name: ListOpenRecordings :many
 SELECT
   r.id,
-  d.id AS daemon_id,
+  t.id AS daemon_id,
   r.username,
   r.started_at,
   t.name AS daemon_name
 FROM
   recordings r
-  JOIN daemons d ON d.id = r.daemon_id
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = r.daemon_id
 WHERE
   r.ended_at IS NULL
   AND r.started_at > NOW() - INTERVAL '24 hours'
-  AND COALESCE(d.id = ANY ($1::UUID[]), FALSE)
+  AND COALESCE(r.daemon_id = ANY ($1::UUID[]), FALSE)
 ORDER BY
   r.started_at DESC
 LIMIT
@@ -315,15 +298,15 @@ func (q *Queries) ListOpenRecordings(ctx context.Context, connected []string) ([
 
 const listPendingDaemons = `-- name: ListPendingDaemons :many
 SELECT
-  d.id, d.workspace_id, d.join_token_id, d.key_thumbprint, d.version, d.status, d.config, d.retire_after, d.last_seen_at, d.created_at, d.updated_at,
+  d.target_id, d.workspace_id, d.join_token_id, d.key_thumbprint, d.version, d.accepted, d.config, d.retire_after, d.last_seen_at, d.created_at, d.updated_at,
   t.name
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
-  d.status = 1 -- pending
+  NOT d.accepted
 ORDER BY
-  d.id DESC
+  d.target_id DESC
 LIMIT
   5
 `
@@ -344,12 +327,12 @@ func (q *Queries) ListPendingDaemons(ctx context.Context) ([]*ListPendingDaemons
 	for rows.Next() {
 		var i ListPendingDaemonsRow
 		if err := rows.Scan(
-			&i.Daemon.ID,
+			&i.Daemon.TargetID,
 			&i.Daemon.WorkspaceID,
 			&i.Daemon.JoinTokenID,
 			&i.Daemon.KeyThumbprint,
 			&i.Daemon.Version,
-			&i.Daemon.Status,
+			&i.Daemon.Accepted,
 			&i.Daemon.Config,
 			&i.Daemon.RetireAfter,
 			&i.Daemon.LastSeenAt,

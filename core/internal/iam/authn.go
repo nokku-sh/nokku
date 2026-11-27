@@ -29,8 +29,8 @@ func (s *Service) Authenticate(
 	if err != nil {
 		return actor.Principal{}, db.AccessToken{}, err
 	}
-	if tok.Binding != "" {
-		if err := s.verifySessionProof(ctx, header, procedure, token, tok.Binding); err != nil {
+	if tok.DpopThumbprint != "" {
+		if err := s.verifySessionProof(ctx, header, procedure, token, tok.DpopThumbprint); err != nil {
 			return actor.Principal{}, db.AccessToken{}, err
 		}
 	}

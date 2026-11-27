@@ -41,6 +41,7 @@ func TestEveryTokenHashIsUnique(t *testing.T) {
 		"access_tokens.token_hash":         true,
 		"device_grants.device_code_hash":   true,
 		"device_grants.loopback_code_hash": true,
+		"invites.token_hash":               true,
 		"join_tokens.token_hash":           true,
 		"one_time_tokens.token_hash":       true,
 	}, unique, "a hash column without a unique index of its own")
@@ -59,6 +60,11 @@ func TestADuplicateTokenHashFails(t *testing.T) {
 		"one_time_tokens": func(hash string, f stateFixture) error {
 			_, err := c.sysPool.Exec(t.Context(), `INSERT INTO one_time_tokens (token_hash, workspace_id, user_id, purpose,
 				expires_at) VALUES ($1, $2, $3, 'login', NOW() + INTERVAL '1 hour')`, hash, f.ws, f.owner)
+			return err
+		},
+		"invites": func(hash string, f stateFixture) error {
+			_, err := c.sysPool.Exec(t.Context(), `INSERT INTO invites (token_hash, workspace_id, email, role, expires_at)
+				VALUES ($1, $2, 'new@invite.test', 1, NOW() + INTERVAL '1 hour')`, hash, f.ws)
 			return err
 		},
 		"device_grants": func(hash string, f stateFixture) error {

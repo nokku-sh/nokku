@@ -7,7 +7,6 @@ import (
 	"errors"
 	"testing"
 	"time"
-	"uuid"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -114,7 +113,7 @@ func TestExpireDeletesNotifiesAndAudits(t *testing.T) {
 }
 
 // An approval never shortens a grant or ends one for good. An admin's grant
-// sets the end as asked. The grant names whoever set its end last.
+// sets the end as asked.
 func TestGrantWritesKeepOrSetTheEnd(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -128,31 +127,19 @@ func TestGrantWritesKeepOrSetTheEnd(t *testing.T) {
 		require.WithinDuration(t, want, *end, 0, msg)
 	}
 
-	wantBy := func(want, msg string) {
-		t.Helper()
-		var by *string
-		require.NoError(t, c.sysPool.QueryRow(ctx,
-			`SELECT granted_by FROM grants WHERE account_id = $1 AND subject_id = $2`, f.account, f.u,
-		).Scan(&by), "read who granted")
-		require.Equal(t, &want, by, msg)
-	}
-	other := uuid.NewV7().String()
-
 	soleGrant(t, c, f, &soon)
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.ExtendGrant(ctx, &db.ExtendGrantParams{
-			AccountID: f.account, UserID: f.u, ExpiresAt: later, GrantedBy: &f.owner,
+			AccountID: f.account, UserID: f.u, ExpiresAt: later,
 		})
 	})
 	wantEnd(later, "an approval for longer")
-	wantBy(f.owner, "an approval for longer must name the approver")
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.ExtendGrant(ctx, &db.ExtendGrantParams{
-			AccountID: f.account, UserID: f.u, ExpiresAt: soon, GrantedBy: &other,
+			AccountID: f.account, UserID: f.u, ExpiresAt: soon,
 		})
 	})
 	wantEnd(later, "an approval for less shortened the grant")
-	wantBy(f.owner, "an approval that changed nothing took the grant over")
 
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.PutGrants(ctx, &db.PutGrantsParams{
@@ -162,36 +149,22 @@ func TestGrantWritesKeepOrSetTheEnd(t *testing.T) {
 			SubjectKind: db.SubjectKindUser,
 			SubjectID:   f.u,
 			ExpiresAt:   &soon,
-			GrantedBy:   &other,
 		})
 	})
 	wantEnd(soon, "an admin's shorter end")
-	wantBy(other, "an admin's new end must name that admin")
-	asOwner(t, c, f, func(q *db.Queries) error {
-		return q.PutGrants(ctx, &db.PutGrantsParams{
-			AccountIds:  []string{f.account},
-			SubjectKind: db.SubjectKindUser,
-			SubjectID:   f.u,
-			ExpiresAt:   &soon,
-			GrantedBy:   &f.owner,
-		})
-	})
-	wantBy(other, "a grant put again with the same end changed hands")
 
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.PutGrants(ctx, &db.PutGrantsParams{
-			AccountIds: []string{f.account}, SubjectKind: db.SubjectKindUser, SubjectID: f.u, GrantedBy: &f.owner,
+			AccountIds: []string{f.account}, SubjectKind: db.SubjectKindUser, SubjectID: f.u,
 		})
 	})
 	end, _ := grantEnd(t, c, f)
 	require.Nil(t, end, "an admin's grant for good still ends")
-	wantBy(f.owner, "making a grant last for good must name who did it")
 	asOwner(t, c, f, func(q *db.Queries) error {
 		return q.ExtendGrant(ctx, &db.ExtendGrantParams{
-			AccountID: f.account, UserID: f.u, ExpiresAt: soon, GrantedBy: &other,
+			AccountID: f.account, UserID: f.u, ExpiresAt: soon,
 		})
 	})
 	end, _ = grantEnd(t, c, f)
 	require.Nil(t, end, "an approval made a grant for good end")
-	wantBy(f.owner, "an approval took over a grant for good")
 }

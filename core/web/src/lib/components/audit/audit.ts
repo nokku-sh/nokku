@@ -106,7 +106,6 @@ export const areas: Area[] = [
 			'SetDaemonSafeguards',
 			'SetDefaultSafeguards',
 			'DaemonBehind',
-			'DeleteDaemon',
 			'ApproveDaemon',
 			'UpdateDaemonDefaults'
 		]
@@ -254,7 +253,6 @@ const labels: Record<string, string> = {
 	SetDaemonSafeguards: "Changed a daemon's safeguards",
 	SetDefaultSafeguards: 'Changed the default safeguards',
 	ApproveDaemon: 'Approved a server',
-	DeleteDaemon: 'Deleted a daemon',
 	CreateTeam: 'Created a team',
 	UpdateTeam: 'Changed a team',
 	OpenTeamToSCIM: 'Opened a team to SCIM',

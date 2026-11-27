@@ -23,7 +23,7 @@ func TestDeletedRecordingsAreQueued(t *testing.T) {
 		var rec *db.Recording
 		asOwner(t, c, f, func(q *db.Queries) (err error) {
 			rec, err = q.CreateRecording(t.Context(), &db.CreateRecordingParams{
-				ID: uuid.NewV7().String(), DaemonID: f.daemon, Username: "deploy", Key: []byte("k"),
+				ID: uuid.NewV7().String(), DaemonID: f.target, Username: "deploy", Key: []byte("k"),
 			})
 			if err != nil {
 				return err
@@ -77,7 +77,7 @@ func TestDeletedRecordingsAreQueued(t *testing.T) {
 	empty := uuid.NewV7().String()
 	asOwner(t, c, f, func(q *db.Queries) error {
 		if _, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
-			ID: empty, DaemonID: f.daemon, Username: "deploy", Key: []byte("k"),
+			ID: empty, DaemonID: f.target, Username: "deploy", Key: []byte("k"),
 		}); err != nil {
 			return err
 		}

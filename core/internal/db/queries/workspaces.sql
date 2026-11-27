@@ -2,12 +2,11 @@
 INSERT INTO
   workspaces (id, slug, name, description, settings)
 VALUES
-  (@id, @slug, @name, sqlc.narg('description'), @settings)
+  (@id, @slug, @name, @description, @settings)
 RETURNING
   *;
 
 -- name: GetWorkspace :one
--- The workspace the transaction is pinned to.
 SELECT
   *
 FROM
@@ -33,7 +32,6 @@ WHERE
   slug = @slug;
 
 -- name: GetFirstWorkspace :one
--- The one workspace of a self-hosted server.
 SELECT
   *
 FROM
@@ -45,7 +43,6 @@ LIMIT
   1;
 
 -- name: ListWorkspacesByEmail :many
--- Every workspace an address can sign in to. Runs as nokku_system.
 SELECT
   w.slug,
   w.name
@@ -60,7 +57,6 @@ ORDER BY
   w.slug;
 
 -- name: ListUnclaimedWorkspaces :many
--- Signups nobody ever signed in to. Runs as nokku_system.
 SELECT
   *
 FROM
@@ -77,7 +73,6 @@ WHERE
   AND claimed_at IS NULL;
 
 -- name: ClaimWorkspace :exec
--- Stored once, the sessions and devices of a first sign-in all end or get deleted.
 UPDATE workspaces
 SET
   claimed_at = NOW()

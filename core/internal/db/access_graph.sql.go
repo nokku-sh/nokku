@@ -324,7 +324,6 @@ type ListAccessGraphTargetsRow struct {
 	TotalCount int32  `json:"totalCount"`
 }
 
-// The targets of one tag, the ones with a matching grant first. The filter is the one GetAccessGraph takes.
 func (q *Queries) ListAccessGraphTargets(ctx context.Context, arg *ListAccessGraphTargetsParams) ([]*ListAccessGraphTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listAccessGraphTargets,
 		arg.FilterTag,
@@ -446,7 +445,6 @@ type ListAccessMatrixCellsRow struct {
 	LastUsedAt time.Time `json:"lastUsedAt"`
 }
 
-// Last use is per subject and server, so a server with many tags is looked up once, and a team's is its members'.
 func (q *Queries) ListAccessMatrixCells(ctx context.Context, arg *ListAccessMatrixCellsParams) ([]*ListAccessMatrixCellsRow, error) {
 	rows, err := q.db.Query(ctx, listAccessMatrixCells, arg.SubjectIds, arg.Tags)
 	if err != nil {
@@ -573,7 +571,6 @@ type ListAccessMatrixRowsRow struct {
 	Total       int32  `json:"total"`
 }
 
-// Whoever holds a live grant, teams first, then people and service accounts by name. Deactivated people are left out.
 // Pages before it counts, so only the rows shown pay for their server counts.
 func (q *Queries) ListAccessMatrixRows(ctx context.Context, arg *ListAccessMatrixRowsParams) ([]*ListAccessMatrixRowsRow, error) {
 	rows, err := q.db.Query(ctx, listAccessMatrixRows,

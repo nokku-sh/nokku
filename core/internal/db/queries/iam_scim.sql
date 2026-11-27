@@ -26,7 +26,6 @@ WHERE
   id = @id;
 
 -- name: SetUserSCIMManaged :exec
--- Only for an account SCIM creates. One it links by address stays the workspace's to rename.
 UPDATE users
 SET
   scim_managed = TRUE,
@@ -35,7 +34,6 @@ WHERE
   id = @id;
 
 -- name: SetTeamSCIMExternalID :one
--- Like SetUserSCIMExternalID, for a SCIM group.
 UPDATE teams
 SET
   scim_external_id = sqlc.narg('external_id'),
@@ -46,7 +44,6 @@ RETURNING
   *;
 
 -- name: GetTeamByName :one
--- A SCIM create takes over a team of that name that an admin opened for it.
 SELECT
   *
 FROM
@@ -58,7 +55,7 @@ WHERE
 UPDATE teams
 SET
   scim_managed = TRUE,
-  scim_open = FALSE,
+  scim_adoptable = FALSE,
   updated_at = NOW()
 WHERE
   id = @id

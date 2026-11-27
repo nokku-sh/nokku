@@ -20,7 +20,7 @@ ON CONFLICT (target_id, username) DO UPDATE
 SET
   username = EXCLUDED.username
 RETURNING
-  id, workspace_id, target_id, username, seen_at, created_at
+  id, workspace_id, target_id, username, first_seen_at, created_at
 `
 
 type CreateTargetAccountParams struct {
@@ -36,7 +36,7 @@ func (q *Queries) CreateTargetAccount(ctx context.Context, arg *CreateTargetAcco
 		&i.WorkspaceID,
 		&i.TargetID,
 		&i.Username,
-		&i.SeenAt,
+		&i.FirstSeenAt,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -124,13 +124,12 @@ func (q *Queries) DeleteTargetAccount(ctx context.Context, id string) error {
 
 const extendGrant = `-- name: ExtendGrant :exec
 INSERT INTO
-  grants (account_id, user_id, expires_at, granted_by)
+  grants (account_id, user_id, expires_at)
 VALUES
-  ($1, $2::UUID, $3::TIMESTAMPTZ, $4::UUID)
+  ($1, $2::UUID, $3::TIMESTAMPTZ)
 ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
-  expires_at = EXCLUDED.expires_at,
-  granted_by = EXCLUDED.granted_by
+  expires_at = EXCLUDED.expires_at
 WHERE
   grants.expires_at < EXCLUDED.expires_at
 `
@@ -139,17 +138,11 @@ type ExtendGrantParams struct {
 	AccountID string    `json:"accountId"`
 	UserID    string    `json:"userId"`
 	ExpiresAt time.Time `json:"expiresAt"`
-	GrantedBy *string   `json:"grantedBy"`
 }
 
 // An approved request never shortens access the user already has. A grant for good stays one.
 func (q *Queries) ExtendGrant(ctx context.Context, arg *ExtendGrantParams) error {
-	_, err := q.db.Exec(ctx, extendGrant,
-		arg.AccountID,
-		arg.UserID,
-		arg.ExpiresAt,
-		arg.GrantedBy,
-	)
+	_, err := q.db.Exec(ctx, extendGrant, arg.AccountID, arg.UserID, arg.ExpiresAt)
 	return err
 }
 
@@ -169,7 +162,6 @@ type GetTargetAccountLabelRow struct {
 	Username   string `json:"username"`
 }
 
-// What an audit event shows for a login account. An account of another workspace does not exist here.
 func (q *Queries) GetTargetAccountLabel(ctx context.Context, accountID string) (*GetTargetAccountLabelRow, error) {
 	row := q.db.QueryRow(ctx, getTargetAccountLabel, accountID)
 	var i GetTargetAccountLabelRow
@@ -179,7 +171,7 @@ func (q *Queries) GetTargetAccountLabel(ctx context.Context, accountID string) (
 
 const getTargetAccountsByTargetIDs = `-- name: GetTargetAccountsByTargetIDs :many
 SELECT
-  p.id, p.workspace_id, p.target_id, p.username, p.seen_at, p.created_at,
+  p.id, p.workspace_id, p.target_id, p.username, p.first_seen_at, p.created_at,
   COALESCE(
     array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'user'),
     '{}'
@@ -234,7 +226,7 @@ func (q *Queries) GetTargetAccountsByTargetIDs(ctx context.Context, targetIds []
 			&i.TargetAccount.WorkspaceID,
 			&i.TargetAccount.TargetID,
 			&i.TargetAccount.Username,
-			&i.TargetAccount.SeenAt,
+			&i.TargetAccount.FirstSeenAt,
 			&i.TargetAccount.CreatedAt,
 			&i.UserIds,
 			&i.TeamIds,
@@ -280,7 +272,6 @@ type GrantWhereRow struct {
 	AccountID *string `json:"accountId"`
 }
 
-// The servers a batch grant names, by id or by tag, each with the account asked for if it has one.
 func (q *Queries) GrantWhere(ctx context.Context, arg *GrantWhereParams) ([]*GrantWhereRow, error) {
 	rows, err := q.db.Query(ctx, grantWhere, arg.Username, arg.TargetIds, arg.Tags)
 	if err != nil {
@@ -328,7 +319,6 @@ type GrantWhereAccountsRow struct {
 	Servers  int32  `json:"servers"`
 }
 
-// The accounts those servers have, the most common first.
 func (q *Queries) GrantWhereAccounts(ctx context.Context, arg *GrantWhereAccountsParams) ([]*GrantWhereAccountsRow, error) {
 	rows, err := q.db.Query(ctx, grantWhereAccounts, arg.TargetIds, arg.Tags)
 	if err != nil {
@@ -351,7 +341,7 @@ func (q *Queries) GrantWhereAccounts(ctx context.Context, arg *GrantWhereAccount
 
 const insertTargetAccounts = `-- name: InsertTargetAccounts :exec
 INSERT INTO
-  target_accounts (workspace_id, target_id, username, seen_at)
+  target_accounts (workspace_id, target_id, username, first_seen_at)
 SELECT
   t.workspace_id,
   t.id,
@@ -378,9 +368,9 @@ WHERE
   ) < $3::INTEGER
 ON CONFLICT (target_id, username) DO UPDATE
 SET
-  seen_at = NOW()
+  first_seen_at = NOW()
 WHERE
-  target_accounts.seen_at IS NULL
+  target_accounts.first_seen_at IS NULL
 `
 
 type InsertTargetAccountsParams struct {
@@ -389,8 +379,7 @@ type InsertTargetAccountsParams struct {
 	MaxAccounts int32    `json:"maxAccounts"`
 }
 
-// Never deletes, a host's list is a hint. A target that holds max_accounts takes no more. The first report
-// of an account stamps it seen, later ones leave the row alone.
+// The first report of an account stamps it seen, later ones leave the row alone.
 func (q *Queries) InsertTargetAccounts(ctx context.Context, arg *InsertTargetAccountsParams) error {
 	_, err := q.db.Exec(ctx, insertTargetAccounts, arg.Usernames, arg.TargetID, arg.MaxAccounts)
 	return err
@@ -424,7 +413,6 @@ type ListAccountSubjectsRow struct {
 	Ids      []string `json:"ids"`
 }
 
-// ListAccountSubjectsForTarget for every server of the workspace at once, in the same order.
 func (q *Queries) ListAccountSubjects(ctx context.Context) ([]*ListAccountSubjectsRow, error) {
 	rows, err := q.db.Query(ctx, listAccountSubjects)
 	if err != nil {
@@ -471,7 +459,6 @@ type ListAccountSubjectsForTargetRow struct {
 	Ids      []string `json:"ids"`
 }
 
-// Who a server lets in as which account, as the subjects its certificates name.
 func (q *Queries) ListAccountSubjectsForTarget(ctx context.Context, targetID string) ([]*ListAccountSubjectsForTargetRow, error) {
 	rows, err := q.db.Query(ctx, listAccountSubjectsForTarget, targetID)
 	if err != nil {
@@ -513,7 +500,6 @@ type ListGrantEndsRow struct {
 	ExpiresAt *time.Time `json:"expiresAt"`
 }
 
-// What one subject holds on these accounts already. A grant that ran out counts as none.
 func (q *Queries) ListGrantEnds(ctx context.Context, arg *ListGrantEndsParams) ([]*ListGrantEndsRow, error) {
 	rows, err := q.db.Query(ctx, listGrantEnds, arg.AccountIds, arg.SubjectID)
 	if err != nil {
@@ -592,9 +578,7 @@ type ListSubjectUsernamesForTargetsRow struct {
 	DaemonOk  bool      `json:"daemonOk"`
 }
 
-// What a person or a service account holds on each target, a team's own grants for a team. The access lasts until
-// the latest grant that applies ends, or for good when one of them is. user_ok and daemon_ok say whether it lets
-// anyone in today, see effective_access. A team's rows are its grants as given, they carry no mark.
+// A team's rows are its grants as given, user_ok and daemon_ok unmarked.
 func (q *Queries) ListSubjectUsernamesForTargets(ctx context.Context, arg *ListSubjectUsernamesForTargetsParams) ([]*ListSubjectUsernamesForTargetsRow, error) {
 	rows, err := q.db.Query(ctx, listSubjectUsernamesForTargets, arg.SubjectID, arg.TargetIds)
 	if err != nil {
@@ -650,7 +634,7 @@ WITH
       $3
   )
 SELECT
-  p.id, p.workspace_id, p.target_id, p.username, p.seen_at, p.created_at,
+  p.id, p.workspace_id, p.target_id, p.username, p.first_seen_at, p.created_at,
   COALESCE(
     array_agg(DISTINCT g.subject_id) FILTER (WHERE g.subject_kind = 'user'),
     '{}'
@@ -722,7 +706,7 @@ func (q *Queries) ListTargetAccounts(ctx context.Context, arg *ListTargetAccount
 			&i.TargetAccount.WorkspaceID,
 			&i.TargetAccount.TargetID,
 			&i.TargetAccount.Username,
-			&i.TargetAccount.SeenAt,
+			&i.TargetAccount.FirstSeenAt,
 			&i.TargetAccount.CreatedAt,
 			&i.UserIds,
 			&i.TeamIds,
@@ -777,8 +761,7 @@ INSERT INTO
     user_id,
     team_id,
     service_account_id,
-    expires_at,
-    granted_by
+    expires_at
   )
 SELECT
   account_id,
@@ -791,14 +774,12 @@ SELECT
   CASE
     WHEN $1::TEXT = 'service_account' THEN $2::UUID
   END,
-  $3::TIMESTAMPTZ,
-  $4::UUID
+  $3::TIMESTAMPTZ
 FROM
-  unnest($5::UUID[]) AS account_id
+  unnest($4::UUID[]) AS account_id
 ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
-  expires_at = EXCLUDED.expires_at,
-  granted_by = EXCLUDED.granted_by
+  expires_at = EXCLUDED.expires_at
 WHERE
   grants.expires_at IS DISTINCT FROM EXCLUDED.expires_at
 `
@@ -807,17 +788,14 @@ type PutGrantsParams struct {
 	SubjectKind string     `json:"subjectKind"`
 	SubjectID   string     `json:"subjectId"`
 	ExpiresAt   *time.Time `json:"expiresAt"`
-	GrantedBy   *string    `json:"grantedBy"`
 	AccountIds  []string   `json:"accountIds"`
 }
 
-// An admin's grant on each account, the expiry is set exactly as asked. It can extend, shorten or end an expiry.
 func (q *Queries) PutGrants(ctx context.Context, arg *PutGrantsParams) error {
 	_, err := q.db.Exec(ctx, putGrants,
 		arg.SubjectKind,
 		arg.SubjectID,
 		arg.ExpiresAt,
-		arg.GrantedBy,
 		arg.AccountIds,
 	)
 	return err
@@ -837,7 +815,6 @@ type RemoveGrantsParams struct {
 	SubjectID   string   `json:"subjectId"`
 }
 
-// Grant removal is the whole lockout. The next sync drops the subject, so an issued cert matches no account.
 func (q *Queries) RemoveGrants(ctx context.Context, arg *RemoveGrantsParams) error {
 	_, err := q.db.Exec(ctx, removeGrants, arg.AccountIds, arg.SubjectKind, arg.SubjectID)
 	return err
@@ -888,7 +865,6 @@ type RevokeWhereRow struct {
 	OtherTags bool   `json:"otherTags"`
 }
 
-// One subject's own grants on the servers a revoke names. A username keeps it to one account.
 func (q *Queries) RevokeWhere(ctx context.Context, arg *RevokeWhereParams) ([]*RevokeWhereRow, error) {
 	rows, err := q.db.Query(ctx, revokeWhere,
 		arg.SubjectKind,
@@ -962,7 +938,6 @@ type SeedTargetAccountsFromTokenParams struct {
 	TargetID string `json:"targetId"`
 }
 
-// Copies an enroll token's grants onto a fresh target. Runs once, when the daemon is created.
 func (q *Queries) SeedTargetAccountsFromToken(ctx context.Context, arg *SeedTargetAccountsFromTokenParams) error {
 	_, err := q.db.Exec(ctx, seedTargetAccountsFromToken, arg.TokenID, arg.TargetID)
 	return err

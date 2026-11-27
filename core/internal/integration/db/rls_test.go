@@ -44,27 +44,27 @@ func pinnedConn(t *testing.T, c *conn, ws string) *pgx.Conn {
 func seedEveryTable(t *testing.T, c *conn, f stateFixture) {
 	t.Helper()
 	_, err := c.sysPool.Exec(t.Context(), `
-		INSERT INTO credentials (id, workspace_id, user_id, type, data) VALUES ($2 || '-pk', $1, $2, 'passkey', 'x');
+		INSERT INTO passkeys (workspace_id, user_id, credential_id, data) VALUES ($1, $2, 'pk', 'x');
 		INSERT INTO access_tokens (token_hash, workspace_id, user_id, kind, method)
 		VALUES ($2 || '-s', $1, $2, 'user', 'passkey');
+		INSERT INTO spent_job_tokens (workspace_id, issuer, jti, expires_at)
+		VALUES ($1, 'https://ci.test', 'job', NOW() + INTERVAL '1 hour');
 		INSERT INTO known_devices (workspace_id, user_id, key, expires_at)
 		VALUES ($1, $2, 'cookie', NOW() + INTERVAL '1 day');
 		INSERT INTO one_time_tokens (token_hash, workspace_id, user_id, purpose, expires_at)
 		VALUES ($2 || '-ott', $1, $2, 'login', NOW() + INTERVAL '1 hour');
-		INSERT INTO one_time_tokens (token_hash, workspace_id, purpose, email, role, expires_at)
-		VALUES ($2 || '-inv', $1, 'invite', $2 || '@invite.test', 1, NOW() + INTERVAL '1 hour');
+		INSERT INTO invites (token_hash, workspace_id, email, role, expires_at)
+		VALUES ($2 || '-inv', $1, $2 || '@invite.test', 1, NOW() + INTERVAL '1 hour');
 		INSERT INTO device_grants (device_code_hash, workspace_id, user_code, expires_at)
 		VALUES ($2 || '-dg', $1, 'BCDF-GHJK', NOW() + INTERVAL '1 hour');
 		INSERT INTO sso_providers (workspace_id, provider_id, config) VALUES ($1, 'idp', 'sealed');
+		INSERT INTO oidc_identities (workspace_id, user_id, provider_id, subject) VALUES ($1, $2, 'idp', 'sub');
 		WITH sa AS (
 			INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci') RETURNING id
 		)
 		INSERT INTO service_account_federations (workspace_id, service_account_id, issuer, claims)
 		SELECT $1, id, 'https://ci.test', '{"sub": "job"}' FROM sa;
-		WITH ca AS (
-			SELECT id FROM ssh_cas WHERE workspace_id = $1
-		)
-		INSERT INTO ssh_ca_keys (ca_id, workspace_id, kind, private_key) SELECT id, $1, 'user', 'sealed' FROM ca;
+		INSERT INTO ssh_ca_keys (workspace_id, user_private_key, host_private_key) VALUES ($1, 'sealed', 'sealed');
 		WITH t AS (
 			INSERT INTO join_tokens (workspace_id, token_hash) VALUES ($1, $2 || '-jt') RETURNING id
 		)
@@ -264,7 +264,7 @@ func TestQueriesAreScopedByThePin(t *testing.T) {
 		if assert.NoError(t, err, "foreign sessions") {
 			assert.Empty(t, foreign, "read a foreign session")
 		}
-		creds, err := q.ListUserCredentials(ctx, b.u)
+		creds, err := q.ListUserCredentialIDs(ctx, b.u)
 		if assert.NoError(t, err, "foreign credentials") {
 			assert.Empty(t, creds, "read a foreign credential")
 		}

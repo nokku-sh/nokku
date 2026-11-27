@@ -17,7 +17,8 @@ const reencryptBatch = 1000
 // One crypto.Sealed column missing here loses its data on a rotation. row is
 // the SQL for crypto.AAD.Row, it must match the code that seals the column.
 var sealedColumns = []sealedColumn{
-	{"ssh_ca_keys", "private_key", "ca_id::TEXT || '/' || kind"},
+	{"ssh_ca_keys", "user_private_key", "workspace_id::TEXT"},
+	{"ssh_ca_keys", "host_private_key", "workspace_id::TEXT"},
 	{"sso_providers", "config", "provider_id"},
 	{"recordings", "key", "id::TEXT"},
 	{"audit_streams", "secret", "id::TEXT"},

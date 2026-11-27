@@ -164,7 +164,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	}
 	// Only an unenrolled host reads it, so a leftover token can't move a host.
 	token := ""
-	if st.DaemonID == "" {
+	if st.TargetID == "" {
 		if token = os.Getenv("NOKKUD_ENROLL_TOKEN"); token == "" {
 			return errNotEnrolled
 		}

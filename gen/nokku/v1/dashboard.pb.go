@@ -245,26 +245,29 @@ func (*GetDashboardRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetDashboardResponse struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	TargetCount         *int32                 `protobuf:"varint,1,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
-	OnlineTargetCount   *int32                 `protobuf:"varint,2,opt,name=online_target_count,json=onlineTargetCount" json:"online_target_count,omitempty"`
-	ManualTargetCount   *int32                 `protobuf:"varint,3,opt,name=manual_target_count,json=manualTargetCount" json:"manual_target_count,omitempty"`
-	OfflineTargets      []*Target              `protobuf:"bytes,4,rep,name=offline_targets,json=offlineTargets" json:"offline_targets,omitempty"`
-	DaemonCount         *int32                 `protobuf:"varint,5,opt,name=daemon_count,json=daemonCount" json:"daemon_count,omitempty"`
-	OnlineDaemonCount   *int32                 `protobuf:"varint,6,opt,name=online_daemon_count,json=onlineDaemonCount" json:"online_daemon_count,omitempty"`
-	BehindDaemonCount   *int32                 `protobuf:"varint,7,opt,name=behind_daemon_count,json=behindDaemonCount" json:"behind_daemon_count,omitempty"`
-	PendingDaemons      []*Daemon              `protobuf:"bytes,8,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
-	UserCount           *int32                 `protobuf:"varint,9,opt,name=user_count,json=userCount" json:"user_count,omitempty"`
-	RecordingBytes      *int64                 `protobuf:"varint,10,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
-	RecordingQuotaBytes *int64                 `protobuf:"varint,11,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
-	LiveSessions        []*LiveSession         `protobuf:"bytes,12,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TargetCount        *int32                 `protobuf:"varint,1,opt,name=target_count,json=targetCount" json:"target_count,omitempty"`
+	ManualTargetCount  *int32                 `protobuf:"varint,2,opt,name=manual_target_count,json=manualTargetCount" json:"manual_target_count,omitempty"`
+	OfflineTargetCount *int32                 `protobuf:"varint,3,opt,name=offline_target_count,json=offlineTargetCount" json:"offline_target_count,omitempty"`
+	// The first five.
+	OfflineTargets     []*Target `protobuf:"bytes,4,rep,name=offline_targets,json=offlineTargets" json:"offline_targets,omitempty"`
+	DaemonCount        *int32    `protobuf:"varint,5,opt,name=daemon_count,json=daemonCount" json:"daemon_count,omitempty"`
+	OnlineDaemonCount  *int32    `protobuf:"varint,6,opt,name=online_daemon_count,json=onlineDaemonCount" json:"online_daemon_count,omitempty"`
+	BehindDaemonCount  *int32    `protobuf:"varint,7,opt,name=behind_daemon_count,json=behindDaemonCount" json:"behind_daemon_count,omitempty"`
+	PendingDaemonCount *int32    `protobuf:"varint,8,opt,name=pending_daemon_count,json=pendingDaemonCount" json:"pending_daemon_count,omitempty"`
+	// The newest five.
+	PendingDaemons      []*Daemon      `protobuf:"bytes,9,rep,name=pending_daemons,json=pendingDaemons" json:"pending_daemons,omitempty"`
+	UserCount           *int32         `protobuf:"varint,10,opt,name=user_count,json=userCount" json:"user_count,omitempty"`
+	RecordingBytes      *int64         `protobuf:"varint,11,opt,name=recording_bytes,json=recordingBytes" json:"recording_bytes,omitempty"`
+	RecordingQuotaBytes *int64         `protobuf:"varint,12,opt,name=recording_quota_bytes,json=recordingQuotaBytes" json:"recording_quota_bytes,omitempty"`
+	LiveSessions        []*LiveSession `protobuf:"bytes,13,rep,name=live_sessions,json=liveSessions" json:"live_sessions,omitempty"`
 	// The last 24 hours, oldest first.
-	EventsByHour   []int32       `protobuf:"varint,13,rep,packed,name=events_by_hour,json=eventsByHour" json:"events_by_hour,omitempty"`
-	FailuresByHour []int32       `protobuf:"varint,14,rep,packed,name=failures_by_hour,json=failuresByHour" json:"failures_by_hour,omitempty"`
-	RecentChanges  []*AuditEvent `protobuf:"bytes,15,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
+	EventsByHour   []int32       `protobuf:"varint,14,rep,packed,name=events_by_hour,json=eventsByHour" json:"events_by_hour,omitempty"`
+	FailuresByHour []int32       `protobuf:"varint,15,rep,packed,name=failures_by_hour,json=failuresByHour" json:"failures_by_hour,omitempty"`
+	RecentChanges  []*AuditEvent `protobuf:"bytes,16,rep,name=recent_changes,json=recentChanges" json:"recent_changes,omitempty"`
 	// The next five to end within a day.
-	EndingGrants     []*EndingGrant `protobuf:"bytes,16,rep,name=ending_grants,json=endingGrants" json:"ending_grants,omitempty"`
-	EndingGrantCount *int32         `protobuf:"varint,17,opt,name=ending_grant_count,json=endingGrantCount" json:"ending_grant_count,omitempty"`
+	EndingGrants     []*EndingGrant `protobuf:"bytes,17,rep,name=ending_grants,json=endingGrants" json:"ending_grants,omitempty"`
+	EndingGrantCount *int32         `protobuf:"varint,18,opt,name=ending_grant_count,json=endingGrantCount" json:"ending_grant_count,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -306,16 +309,16 @@ func (x *GetDashboardResponse) GetTargetCount() int32 {
 	return 0
 }
 
-func (x *GetDashboardResponse) GetOnlineTargetCount() int32 {
-	if x != nil && x.OnlineTargetCount != nil {
-		return *x.OnlineTargetCount
+func (x *GetDashboardResponse) GetManualTargetCount() int32 {
+	if x != nil && x.ManualTargetCount != nil {
+		return *x.ManualTargetCount
 	}
 	return 0
 }
 
-func (x *GetDashboardResponse) GetManualTargetCount() int32 {
-	if x != nil && x.ManualTargetCount != nil {
-		return *x.ManualTargetCount
+func (x *GetDashboardResponse) GetOfflineTargetCount() int32 {
+	if x != nil && x.OfflineTargetCount != nil {
+		return *x.OfflineTargetCount
 	}
 	return 0
 }
@@ -344,6 +347,13 @@ func (x *GetDashboardResponse) GetOnlineDaemonCount() int32 {
 func (x *GetDashboardResponse) GetBehindDaemonCount() int32 {
 	if x != nil && x.BehindDaemonCount != nil {
 		return *x.BehindDaemonCount
+	}
+	return 0
+}
+
+func (x *GetDashboardResponse) GetPendingDaemonCount() int32 {
+	if x != nil && x.PendingDaemonCount != nil {
+		return *x.PendingDaemonCount
 	}
 	return 0
 }
@@ -497,27 +507,28 @@ const file_nokku_v1_dashboard_proto_rawDesc = "" +
 	"\x06Target\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x15\n" +
-	"\x13GetDashboardRequest\"\xc1\x06\n" +
+	"\x13GetDashboardRequest\"\xf5\x06\n" +
 	"\x14GetDashboardResponse\x12!\n" +
 	"\ftarget_count\x18\x01 \x01(\x05R\vtargetCount\x12.\n" +
-	"\x13online_target_count\x18\x02 \x01(\x05R\x11onlineTargetCount\x12.\n" +
-	"\x13manual_target_count\x18\x03 \x01(\x05R\x11manualTargetCount\x129\n" +
+	"\x13manual_target_count\x18\x02 \x01(\x05R\x11manualTargetCount\x120\n" +
+	"\x14offline_target_count\x18\x03 \x01(\x05R\x12offlineTargetCount\x129\n" +
 	"\x0foffline_targets\x18\x04 \x03(\v2\x10.nokku.v1.TargetR\x0eofflineTargets\x12!\n" +
 	"\fdaemon_count\x18\x05 \x01(\x05R\vdaemonCount\x12.\n" +
 	"\x13online_daemon_count\x18\x06 \x01(\x05R\x11onlineDaemonCount\x12.\n" +
-	"\x13behind_daemon_count\x18\a \x01(\x05R\x11behindDaemonCount\x129\n" +
-	"\x0fpending_daemons\x18\b \x03(\v2\x10.nokku.v1.DaemonR\x0ependingDaemons\x12\x1d\n" +
+	"\x13behind_daemon_count\x18\a \x01(\x05R\x11behindDaemonCount\x120\n" +
+	"\x14pending_daemon_count\x18\b \x01(\x05R\x12pendingDaemonCount\x129\n" +
+	"\x0fpending_daemons\x18\t \x03(\v2\x10.nokku.v1.DaemonR\x0ependingDaemons\x12\x1d\n" +
 	"\n" +
-	"user_count\x18\t \x01(\x05R\tuserCount\x12'\n" +
-	"\x0frecording_bytes\x18\n" +
-	" \x01(\x03R\x0erecordingBytes\x122\n" +
-	"\x15recording_quota_bytes\x18\v \x01(\x03R\x13recordingQuotaBytes\x12:\n" +
-	"\rlive_sessions\x18\f \x03(\v2\x15.nokku.v1.LiveSessionR\fliveSessions\x12$\n" +
-	"\x0eevents_by_hour\x18\r \x03(\x05R\feventsByHour\x12(\n" +
-	"\x10failures_by_hour\x18\x0e \x03(\x05R\x0efailuresByHour\x12;\n" +
-	"\x0erecent_changes\x18\x0f \x03(\v2\x14.nokku.v1.AuditEventR\rrecentChanges\x12:\n" +
-	"\rending_grants\x18\x10 \x03(\v2\x15.nokku.v1.EndingGrantR\fendingGrants\x12,\n" +
-	"\x12ending_grant_count\x18\x11 \x01(\x05R\x10endingGrantCount2n\n" +
+	"user_count\x18\n" +
+	" \x01(\x05R\tuserCount\x12'\n" +
+	"\x0frecording_bytes\x18\v \x01(\x03R\x0erecordingBytes\x122\n" +
+	"\x15recording_quota_bytes\x18\f \x01(\x03R\x13recordingQuotaBytes\x12:\n" +
+	"\rlive_sessions\x18\r \x03(\v2\x15.nokku.v1.LiveSessionR\fliveSessions\x12$\n" +
+	"\x0eevents_by_hour\x18\x0e \x03(\x05R\feventsByHour\x12(\n" +
+	"\x10failures_by_hour\x18\x0f \x03(\x05R\x0efailuresByHour\x12;\n" +
+	"\x0erecent_changes\x18\x10 \x03(\v2\x14.nokku.v1.AuditEventR\rrecentChanges\x12:\n" +
+	"\rending_grants\x18\x11 \x03(\v2\x15.nokku.v1.EndingGrantR\fendingGrants\x12,\n" +
+	"\x12ending_grant_count\x18\x12 \x01(\x05R\x10endingGrantCount2n\n" +
 	"\x10DashboardService\x12Z\n" +
 	"\fGetDashboard\x12\x1d.nokku.v1.GetDashboardRequest\x1a\x1e.nokku.v1.GetDashboardResponse\"\v\xc2\xf3\x18\x04\x18\x020\x01\x90\x02\x01B\x8f\x01\n" +
 	"\fcom.nokku.v1B\x0eDashboardProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"

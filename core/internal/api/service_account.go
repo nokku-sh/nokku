@@ -61,7 +61,7 @@ func (s *serviceAccountService) CreateServiceAccount(
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		saID, err := q.CreateServiceAccount(ctx, &db.CreateServiceAccountParams{
 			Name:          req.GetName(),
-			Description:   req.Description,
+			Description:   req.GetDescription(),
 			Tags:          req.GetTags(),
 			Role:          role,
 			ForceCommand:  strings.TrimSpace(req.GetForceCommand()),
@@ -265,16 +265,6 @@ func (s *serviceAccountService) RevokeServiceAccountToken(
 	})
 	if err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		// The session of a CI job, its row stays to keep the job token spent.
-		n, err = q.RevokeWorkloadToken(ctx, &db.RevokeWorkloadTokenParams{
-			ID:               req.GetId(),
-			ServiceAccountID: req.GetServiceAccountId(),
-		})
-		if err != nil {
-			return nil, err
-		}
 	}
 	if n == 0 {
 		return nil, errNotFound

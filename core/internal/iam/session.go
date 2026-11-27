@@ -51,8 +51,8 @@ type TokenParams struct {
 	SubjectID string
 	Kind      actor.Kind
 	Method    Method
-	// Binding is the DPoP jkt, empty for cookie sessions and keys.
-	Binding string
+	// DPoPThumbprint is empty for cookie sessions and keys.
+	DPoPThumbprint string
 	// SSHKey is the normalized key nk signed in with, required for KindCLI.
 	SSHKey string
 	Label  string
@@ -60,8 +60,6 @@ type TokenParams struct {
 	TTL time.Duration
 	// NotAfter cuts the TTL short when set.
 	NotAfter time.Time
-	// WorkloadJTI is the job token this one came from, see workload_jti.
-	WorkloadJTI string
 }
 
 // IssueToken is for machines, a person's token goes through IssueSignIn.
@@ -124,12 +122,12 @@ func (s *Service) issue(ctx context.Context, q *db.Queries, p TokenParams) (*db.
 	token, tokenHash := crypto.NewToken(kind)
 	now := s.now()
 	params := &db.CreateAccessTokenParams{
-		TokenHash: tokenHash,
-		Kind:      string(p.Kind),
-		Method:    string(p.Method),
-		Binding:   p.Binding,
-		SshKey:    p.SSHKey,
-		Label:     p.Label,
+		TokenHash:      tokenHash,
+		Kind:           string(p.Kind),
+		Method:         string(p.Method),
+		DpopThumbprint: p.DPoPThumbprint,
+		SshKey:         p.SSHKey,
+		Label:          p.Label,
 	}
 	// A login is a use, a key made by hand is not used until a call carries it.
 	if p.Kind != actor.KindServiceAccount && p.Kind != actor.KindSCIM {
@@ -148,7 +146,6 @@ func (s *Service) issue(ctx context.Context, q *db.Queries, p TokenParams) (*db.
 			params.ExpiresAt = &p.NotAfter
 		}
 	}
-	params.WorkloadJti = nonEmpty(p.WorkloadJTI)
 	tok, err := q.CreateAccessToken(ctx, params)
 	if err != nil {
 		return nil, "", err
@@ -179,10 +176,10 @@ func (s *Service) IssueDaemonSession(ctx context.Context, daemonID, binding stri
 		return "", err
 	}
 	_, token, err := s.IssueToken(ctx, TokenParams{
-		SubjectID: daemonID,
-		Kind:      actor.KindDaemon,
-		Method:    MethodDevice,
-		Binding:   binding,
+		SubjectID:      daemonID,
+		Kind:           actor.KindDaemon,
+		Method:         MethodDevice,
+		DPoPThumbprint: binding,
 	})
 	return token, err
 }
@@ -305,11 +302,8 @@ func (s *Service) Logout(ctx context.Context, header http.Header, procedure stri
 	if err != nil {
 		return nil
 	}
-	if tok.WorkloadJti != nil {
-		// Its row stays, it says the job token is spent.
-		_, err := s.conn.Tenant().
-			RevokeWorkloadToken(ctx, &db.RevokeWorkloadTokenParams{ID: tok.ID, ServiceAccountID: p.ID})
-		return err
+	if Method(tok.Method) == MethodFederation {
+		return s.conn.Tenant().DeleteAccessToken(ctx, tok.ID)
 	}
 	if p.Kind != actor.KindUser && p.Kind != actor.KindCLI {
 		return nil
@@ -352,10 +346,10 @@ func truncate(s string, n int) string {
 	return strings.ToValidUTF8(s[:n], "")
 }
 
-func (s *Service) touchCredential(ctx context.Context, id string) {
-	err := s.conn.Tenant().TouchCredential(ctx, id)
+func (s *Service) touchPasskey(ctx context.Context, credentialID string) {
+	err := s.conn.Tenant().TouchPasskey(ctx, credentialID)
 	if err != nil {
-		slog.Warn("failed to mark credential used", "error", err)
+		slog.Warn("failed to mark passkey used", "error", err)
 	}
 }
 

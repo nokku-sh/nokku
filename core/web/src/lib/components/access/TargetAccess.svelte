@@ -161,7 +161,7 @@
 							{#if account.username === 'root'}
 								<Badge variant="warning">Superuser</Badge>
 							{/if}
-							{#if !account.seenAt}
+							{#if !account.firstSeenAt}
 								<Tooltip.Root>
 									<Tooltip.Trigger>
 										{#snippet child({ props })}

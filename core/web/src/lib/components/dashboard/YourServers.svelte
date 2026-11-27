@@ -73,7 +73,7 @@
 						<div class="flex min-w-0 items-center gap-2">
 							<StatusDot tone={shell ? 'success' : 'muted'} />
 							<span class="truncate font-medium">{t.name}</span>
-							{#if !t.daemonId}<Badge variant="muted" class="ml-auto">nk sync</Badge>{/if}
+							{#if !t.daemon}<Badge variant="muted" class="ml-auto">nk sync</Badge>{/if}
 						</div>
 						<span class="truncate font-mono text-xs text-muted-foreground">
 							{t.metadata?.hostname || t.endpoints[0] || 'no address yet'}

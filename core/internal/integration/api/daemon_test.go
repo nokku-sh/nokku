@@ -115,17 +115,16 @@ func TestEnrollDaemon(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, res.GetTargetId(), "enrollment creates the target")
 	assert.NotEmpty(t, res.GetAccessToken())
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, res.GetStatus(), "auto approve token")
 
 	daemons := nokkuv1connect.NewDaemonServiceClient(
 		clientOn(srv, adminAuth),
 	)
 	got, err := daemons.GetDaemon(
 		t.Context(),
-		&nokkuv1.GetDaemonRequest{Id: new(res.GetId())},
+		&nokkuv1.GetDaemonRequest{Id: new(res.GetTargetId())},
 	)
 	require.NoError(t, err)
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, got.GetDaemon().GetStatus())
+	assert.True(t, got.GetDaemon().GetAccepted())
 
 	// With no workspace defaults, daemon and API agree on the built-in ones.
 	assert.True(t, proto.Equal(db.DefaultDaemonConfig(), res.GetConfig()),
@@ -134,42 +133,41 @@ func TestEnrollDaemon(t *testing.T) {
 		"the API reads the same config back, got %v", got.GetDaemon().GetConfig())
 
 	_, err = daemons.SetDaemonSafeguards(t.Context(), &nokkuv1.SetDaemonSafeguardsRequest{
-		Id: new(res.GetId()), RecordSessions: new(false),
+		Id: new(res.GetTargetId()), RecordSessions: new(false),
 	})
 	require.NoError(t, err)
 	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
-		Id:         new(res.GetId()),
+		Id:         new(res.GetTargetId()),
 		Config:     &nokkuv1.DaemonConfig{RecordSessions: new(true)},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"config.record_sessions"}},
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err),
 		"an ordinary update turned recording back on: %v", err)
 	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
-		Id:         new(res.GetId()),
+		Id:         new(res.GetTargetId()),
 		Config:     &nokkuv1.DaemonConfig{KillOnRevoke: new(false)},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"config.kill_on_revoke"}},
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err),
 		"an ordinary update turned kill on revoke off: %v", err)
 	_, err = daemons.UpdateDaemon(t.Context(), &nokkuv1.UpdateDaemonRequest{
-		Id: new(res.GetId()), UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"status"}},
+		Id: new(res.GetTargetId()), UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"status"}},
 	})
 	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err), "an ordinary update took the status: %v", err)
 	got, err = daemons.GetDaemon(
 		t.Context(),
-		&nokkuv1.GetDaemonRequest{Id: new(res.GetId())},
+		&nokkuv1.GetDaemonRequest{Id: new(res.GetTargetId())},
 	)
 	require.NoError(t, err)
 	want := db.DefaultDaemonConfig()
 	want.RecordSessions = new(false)
 	assert.True(t, proto.Equal(want, got.GetDaemon().GetConfig()),
 		"an explicit off survives, unset fields read as the defaults, got %v", got.GetDaemon().GetConfig())
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, got.GetDaemon().GetStatus(),
-		"a config change leaves the status alone")
+	assert.True(t, got.GetDaemon().GetAccepted(), "a config change took the approval back")
 
-	_, err = daemons.ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(res.GetId())})
+	_, err = daemons.ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(res.GetTargetId())})
 	require.NoError(t, err)
-	got, err = daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(res.GetId())})
+	got, err = daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(res.GetTargetId())})
 	require.NoError(t, err)
 	assert.True(t, proto.Equal(want, got.GetDaemon().GetConfig()),
 		"a status change leaves the config alone, got %v", got.GetDaemon().GetConfig())
@@ -177,7 +175,7 @@ func TestEnrollDaemon(t *testing.T) {
 	// The call is public, so the handler writes the audit row itself.
 	require.Eventually(t, func() bool {
 		rows, _ := cfg.Conn.Tenant().ListAuditLogs(wsCtx(t), &db.ListAuditLogsParams{
-			Target: new(res.GetId()), Actions: []string{"EnrollDaemon"}, Limit: 1,
+			Target: new(res.GetTargetId()), Actions: []string{"EnrollDaemon"}, Limit: 1,
 		})
 		return len(rows) == 1
 	}, 5*time.Second, 20*time.Millisecond, "no audit row for the enrollment")
@@ -185,7 +183,7 @@ func TestEnrollDaemon(t *testing.T) {
 	// The same key enrolls into the same daemon, even with the token used up.
 	again, err := enroll(created.GetSecret(), key)
 	require.NoError(t, err)
-	assert.Equal(t, res.GetId(), again.GetId())
+	assert.Equal(t, res.GetTargetId(), again.GetTargetId())
 
 	otherKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -216,7 +214,7 @@ func TestCreateSession(t *testing.T) {
 	require.NoError(t, err)
 
 	req := &nokkuv1.CreateSessionRequest{
-		DaemonId: new(enrolled.GetId()),
+		DaemonId: new(enrolled.GetTargetId()),
 		Username: new("root"),
 	}
 	memberToken := seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
@@ -253,7 +251,7 @@ func TestCreateSession(t *testing.T) {
 			return err
 		}
 		if err := relay.Send(&nokkuv1.RelayRequest{Msg: &nokkuv1.RelayRequest_Start{
-			Start: &nokkuv1.RelayStart{DaemonId: new(enrolled.GetId())},
+			Start: &nokkuv1.RelayStart{DaemonId: new(enrolled.GetTargetId())},
 		}}); err != nil {
 			return err
 		}
@@ -278,22 +276,18 @@ func TestCreateSession(t *testing.T) {
 	// With the grant the relay gets past the check, the daemon is just offline.
 	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(openRelay()), "relay with a grant")
 	_, err = member.CreateSession(t.Context(), &nokkuv1.CreateSessionRequest{
-		DaemonId: new(enrolled.GetId()),
+		DaemonId: new(enrolled.GetTargetId()),
 		Username: new("postgres"),
 	})
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "another account on the host, got %v", err)
 
 	// The workspace CA signs sshtest's host cert and admits the member's.
 	var user, host gossh.Signer
-	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) error {
-		row, err := q.GetWorkspaceCA(t.Context())
-		if err != nil {
+	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
+		if _, user, err = ssh.CASigner(t.Context(), q, cfg.Keyset, gossh.UserCert); err != nil {
 			return err
 		}
-		if user, err = ssh.CASigner(t.Context(), q, cfg.Keyset, row.ID, gossh.UserCert); err != nil {
-			return err
-		}
-		host, err = ssh.CASigner(t.Context(), q, cfg.Keyset, row.ID, gossh.HostCert)
+		_, host, err = ssh.CASigner(t.Context(), q, cfg.Keyset, gossh.HostCert)
 		return err
 	})
 	sshd := sshtest.NewServerSignedBy(t, enrolled.GetTargetId(), memberPrincipal.ID, user, host)
@@ -395,7 +389,7 @@ func TestCreateSession(t *testing.T) {
 	}()
 
 	// The dial fails until the pool has registered the control stream.
-	require.Eventually(t, func() bool { return cfg.Pool.IsConnected(enrolled.GetId()) },
+	require.Eventually(t, func() bool { return cfg.Pool.IsConnected(enrolled.GetTargetId()) },
 		5*time.Second, 20*time.Millisecond, "the control stream never registered")
 	sessionID, ws := openShell()
 	// The test sshd echoes stdin, a failed dial closes the socket instead.
@@ -406,7 +400,7 @@ func TestCreateSession(t *testing.T) {
 	require.NoError(t, err, "shell output never arrived")
 	assert.Equal(t, "root", sshd.ConnUser(), "sshd saw the requested OS user")
 	assert.Equal(t, "nokku:web:session:"+sessionID, sshd.KeyID(), "the session id travels in the certificate")
-	assert.Len(t, cfg.Pool.ListSessions(enrolled.GetId()), 1)
+	assert.Len(t, cfg.Pool.ListSessions(enrolled.GetTargetId()), 1)
 	assert.Contains(
 		t,
 		certificateKeyIDs(t, cfg),
@@ -425,7 +419,7 @@ func TestCreateSession(t *testing.T) {
 	// The shell belongs to the socket, closing it is the whole cleanup.
 	require.NoError(t, ws.CloseNow())
 	assert.Eventually(t, func() bool {
-		return len(cfg.Pool.ListSessions(enrolled.GetId())) == 0
+		return len(cfg.Pool.ListSessions(enrolled.GetTargetId())) == 0
 	}, 5*time.Second, 20*time.Millisecond, "session outlived its socket")
 
 	// No row, no certificate, so the shell never opens.
@@ -433,7 +427,7 @@ func TestCreateSession(t *testing.T) {
 	_, ws = openShell()
 	_, _, err = ws.Read(t.Context())
 	assert.Equal(t, websocket.StatusInternalError, websocket.CloseStatus(err), "a shell opened with no row, %v", err)
-	assert.Empty(t, cfg.Pool.ListSessions(enrolled.GetId()), "a session started with no row in the log")
+	assert.Empty(t, cfg.Pool.ListSessions(enrolled.GetTargetId()), "a session started with no row in the log")
 	restore()
 
 	// Ctrl+D ends the shell, and the socket says so with its own close code.
@@ -446,7 +440,7 @@ func TestCreateSession(t *testing.T) {
 	}
 	assert.Equal(t, wsShellExited, websocket.CloseStatus(err), "shell exit, got %v", err)
 	assert.Eventually(t, func() bool {
-		return len(cfg.Pool.ListSessions(enrolled.GetId())) == 0
+		return len(cfg.Pool.ListSessions(enrolled.GetTargetId())) == 0
 	}, 5*time.Second, 20*time.Millisecond, "session outlived its shell")
 }
 
@@ -494,13 +488,13 @@ func TestPendingDaemonIsDenied(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := testWorkspace.ID
 	key, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, false)
-	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, enrolled.GetStatus())
 	token := enrolled.GetAccessToken()
 
 	synced, err := nokkuv1connect.NewDaemonControlServiceClient(clientOn(srv, daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSyncDaemonProcedure))).
 		SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	require.NoError(t, err)
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, synced.GetStatus())
+	assert.False(t, synced.GetRemoved())
+	assert.Empty(t, synced.GetUserCaPublicKey())
 	assert.Empty(t, synced.GetPrincipals())
 
 	_, err = nokkuv1connect.NewDaemonControlServiceClient(clientOn(srv, daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure))).
@@ -525,8 +519,8 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 		"Authorization",
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
-	_, err := nokkuv1connect.NewDaemonServiceClient(clientOn(srv, adminAuth)).
-		DeleteDaemon(t.Context(), &nokkuv1.DeleteDaemonRequest{Id: new(enrolled.GetId())})
+	_, err := nokkuv1connect.NewTargetServiceClient(clientOn(srv, adminAuth)).
+		DeleteTarget(t.Context(), &nokkuv1.DeleteTargetRequest{Id: new(enrolled.GetTargetId())})
 	require.NoError(t, err)
 
 	sync := func() (*nokkuv1.SyncDaemonResponse, error) {
@@ -535,17 +529,23 @@ func TestDeletedDaemonIsRejected(t *testing.T) {
 	}
 	synced, err := sync()
 	require.NoError(t, err)
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, synced.GetStatus())
+	assert.True(t, synced.GetRemoved())
 
 	// That answer can get lost, a host that misses it keeps serving its cache.
 	synced, err = sync()
 	require.NoError(t, err)
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, synced.GetStatus(), "the answer was only there once")
+	assert.True(t, synced.GetRemoved(), "the answer was only there once")
 
 	_, err = nokkuv1connect.NewDaemonControlServiceClient(clientOn(srv,
 		daemonAuth(t, cfg, key, token, nokkuv1connect.DaemonControlServiceSignHostCertificateProcedure))).
 		SignHostCertificate(t.Context(), &nokkuv1.SignHostCertificateRequest{})
-	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), "the token did more than hear REJECTED: %v", err)
+	assert.Equal(
+		t,
+		connect.CodePermissionDenied,
+		connect.CodeOf(err),
+		"the token did more than hear it was removed: %v",
+		err,
+	)
 }
 
 // A failing sync only shows in the host's log, so the heartbeat must tell.
@@ -583,7 +583,7 @@ func TestDaemonThatFallsBehindShows(t *testing.T) {
 		}))
 	}
 	behind := func() bool {
-		return !cfg.Pool.BehindSince(enrolled.GetId()).IsZero()
+		return !cfg.Pool.BehindSince(enrolled.GetTargetId()).IsZero()
 	}
 
 	// A daemon that holds nothing is told to sync once the core worked out what it should hold.
@@ -598,14 +598,14 @@ func TestDaemonThatFallsBehindShows(t *testing.T) {
 		srv,
 		header("Authorization", "Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER)),
 	))
-	got, err := daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(enrolled.GetId())})
+	got, err := daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(enrolled.GetTargetId())})
 	require.NoError(t, err)
 	assert.NotNil(t, got.GetDaemon().GetBehindSince(), "the console can't see it")
 
 	var events []*db.ListAuditLogsRow
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
 		events, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
-			Actions: []string{"DaemonBehind"}, Target: new(enrolled.GetId()), Limit: 10,
+			Actions: []string{"DaemonBehind"}, Target: new(enrolled.GetTargetId()), Limit: 10,
 		})
 		return err
 	})
@@ -814,7 +814,7 @@ func TestSyncDaemonReport(t *testing.T) {
 
 	var usernames, endpoints []string
 	require.NoError(t, cfg.Conn.SysTx(t.Context(), func(q *db.Queries) error {
-		target, err := q.GetTargetByDaemon(t.Context(), new(enrolled.GetId()))
+		target, err := q.GetTarget(t.Context(), enrolled.GetTargetId())
 		if err != nil {
 			return err
 		}
@@ -822,7 +822,7 @@ func TestSyncDaemonReport(t *testing.T) {
 		rows, err := q.GetTargetAccountsByTargetIDs(t.Context(), []string{target.ID})
 		for _, r := range rows {
 			usernames = append(usernames, r.TargetAccount.Username)
-			assert.NotNil(t, r.TargetAccount.SeenAt, "%s was reported by the host", r.TargetAccount.Username)
+			assert.NotNil(t, r.TargetAccount.FirstSeenAt, "%s was reported by the host", r.TargetAccount.Username)
 		}
 		return err
 	}))
@@ -889,7 +889,7 @@ func TestUnenrollDaemon(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	_, err = nokkuv1connect.NewDaemonServiceClient(clientOn(srv, adminAuth)).
-		GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(enrolled.GetId())})
+		GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: new(enrolled.GetTargetId())})
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "the daemon is still there, got %v", err)
 
 	_, err = control(nokkuv1connect.DaemonControlServiceSyncDaemonProcedure).
@@ -957,18 +957,18 @@ func TestAccessTellsRecording(t *testing.T) {
 
 	records := func(on bool) *nokkuv1.DaemonConfig {
 		_, err := editor.SetDaemonSafeguards(t.Context(), &nokkuv1.SetDaemonSafeguardsRequest{
-			Id: new(enrolled.GetId()), RecordSessions: &on,
+			Id: new(enrolled.GetTargetId()), RecordSessions: &on,
 		})
 		require.NoError(t, err)
 		_, err = editor.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
-			Id:     new(enrolled.GetId()),
+			Id:     new(enrolled.GetTargetId()),
 			Config: &nokkuv1.DaemonConfig{AllowForwarding: new(true)},
 		}))
 		require.NoError(t, err)
 		res, err := self.GetSubjectAccess(t.Context(), &nokkuv1.GetSubjectAccessRequest{SubjectId: &person.ID})
 		require.NoError(t, err)
-		require.Len(t, res.GetDaemons(), 1)
-		return res.GetDaemons()[0].GetConfig()
+		require.Len(t, res.GetTargets(), 1)
+		return res.GetTargets()[0].GetTarget().GetDaemon().GetConfig()
 	}
 
 	assert.True(t, records(true).GetRecordSessions())
@@ -986,18 +986,18 @@ func TestServersCarryTheirDaemon(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_VIEWER))))
 
 	list, err := targets.ListTargets(t.Context(), &nokkuv1.ListTargetsRequest{
-		Limit: new(int32(10)), DaemonId: new(enrolled.GetId()),
+		Limit: new(int32(10)), Ids: []string{enrolled.GetTargetId()},
 	})
 	require.NoError(t, err)
 	require.Len(t, list.GetTargets(), 1)
 	d := list.GetTargets()[0].GetDaemon()
-	assert.Equal(t, enrolled.GetId(), d.GetId())
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, d.GetStatus(), "the list shows it waits for approval")
+	assert.Equal(t, enrolled.GetTargetId(), d.GetId())
+	assert.False(t, d.GetAccepted(), "the list shows it waits for approval")
 	assert.False(t, d.GetOnline())
 
 	got, err := targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: new(enrolled.GetTargetId())})
 	require.NoError(t, err)
-	assert.Equal(t, enrolled.GetId(), got.GetTarget().GetDaemon().GetId())
+	assert.Equal(t, enrolled.GetTargetId(), got.GetTarget().GetDaemon().GetId())
 
 	got, err = targets.GetTarget(t.Context(), &nokkuv1.GetTargetRequest{Id: &manual})
 	require.NoError(t, err)

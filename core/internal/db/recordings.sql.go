@@ -17,7 +17,7 @@ INSERT INTO
   recordings (id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, started_at)
 SELECT
   $1,
-  d.id,
+  d.target_id,
   t.name,
   $2,
   $3,
@@ -35,9 +35,9 @@ SELECT
   END
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
-  d.id = $7
+  d.target_id = $7
 RETURNING
   id, workspace_id, daemon_id, daemon_name, username, subject_id, subject_name, principal, key, object_id, started_at, ended_at, size_bytes, complete
 `
@@ -87,20 +87,13 @@ const deferRecordingDelete = `-- name: DeferRecordingDelete :exec
 UPDATE recording_deletes
 SET
   attempts = attempts + 1,
-  last_error = $1,
   next_try_at = NOW() + LEAST(INTERVAL '1 day', INTERVAL '10 minutes' * POWER(2, LEAST(attempts, 10)))
 WHERE
-  object_id = $2
+  object_id = $1
 `
 
-type DeferRecordingDeleteParams struct {
-	LastError *string `json:"lastError"`
-	ObjectID  string  `json:"objectId"`
-}
-
-// Waits 10 minutes after the first failure, doubling up to a day.
-func (q *Queries) DeferRecordingDelete(ctx context.Context, arg *DeferRecordingDeleteParams) error {
-	_, err := q.db.Exec(ctx, deferRecordingDelete, arg.LastError, arg.ObjectID)
+func (q *Queries) DeferRecordingDelete(ctx context.Context, objectID string) error {
+	_, err := q.db.Exec(ctx, deferRecordingDelete, objectID)
 	return err
 }
 
@@ -171,8 +164,7 @@ type FinishRecordingUploadParams struct {
 	ID        string     `json:"id"`
 }
 
-// A NULL object leaves the stored copy in place, a NULL end leaves a session running. An end from a wrong clock counts
-// as now.
+// A NULL object keeps the stored copy. A wrong clock's end counts as now.
 func (q *Queries) FinishRecordingUpload(ctx context.Context, arg *FinishRecordingUploadParams) (*Recording, error) {
 	row := q.db.QueryRow(ctx, finishRecordingUpload,
 		arg.ObjectID,
@@ -335,7 +327,6 @@ SELECT
     FROM
       filtered
   )::INTEGER AS total_count,
-  -- The same rule as ListOpenRecordings.
   (
     r.ended_at IS NULL
     AND r.started_at > NOW() - INTERVAL '24 hours'
@@ -418,7 +409,6 @@ WHERE
 FOR UPDATE
 `
 
-// Uploads of one recording end one at a time, so each sees what the one before it stored.
 func (q *Queries) LockRecording(ctx context.Context, id string) (*Recording, error) {
 	row := q.db.QueryRow(ctx, lockRecording, id)
 	var i Recording

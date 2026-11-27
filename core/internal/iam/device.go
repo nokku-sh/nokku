@@ -154,8 +154,8 @@ func (h *DeviceFlow) decide(w http.ResponseWriter, r *http.Request, approve bool
 	}
 	port, err := h.svc.conn.Tenant().DecideDeviceGrant(r.Context(), &db.DecideDeviceGrantParams{
 		Status:           status,
-		UserID:           &p.ID,
-		ApprovedMethod:   new(tok.Method),
+		DecidedBy:        &p.ID,
+		ApprovedMethod:   tok.Method,
 		LoopbackCodeHash: codeHash,
 		UserCode:         userCode,
 	})
@@ -227,7 +227,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			event{
 				Action: actionLoginDenied,
 				Method: MethodDevice,
-				UserID: deref(g.UserID),
+				UserID: deref(g.DecidedBy),
 				Detail: "access denied",
 			},
 		)
@@ -246,7 +246,7 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		u, err := h.svc.getUser(ctx, deref(g.UserID))
+		u, err := h.svc.getUser(ctx, deref(g.DecidedBy))
 		if errors.Is(err, ErrNotFound) {
 			writeOAuthError(w, "access_denied")
 			return
@@ -280,12 +280,15 @@ func (h *DeviceFlow) Poll(w http.ResponseWriter, r *http.Request) {
 			}
 			// The rules apply now. SSO may have been enforced since the approval.
 			sess, token, err = h.svc.issueSignIn(ctx, q, u, TokenParams{
-				Kind:    actor.KindCLI,
-				Method:  Method(cmp.Or(deref(g.ApprovedMethod), string(MethodDevice))),
-				Binding: binding,
-				SSHKey:  sshKey,
-				Label:   cmp.Or(truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel), "Terminal"),
-				TTL:     deviceSessionTTL,
+				Kind:           actor.KindCLI,
+				Method:         Method(g.ApprovedMethod),
+				DPoPThumbprint: binding,
+				SSHKey:         sshKey,
+				Label: cmp.Or(
+					truncate(strings.ToValidUTF8(r.Header.Get("User-Agent"), ""), maxLabel),
+					"Terminal",
+				),
+				TTL: deviceSessionTTL,
 			})
 			// A refusal is final, so the grant goes with it.
 			if errors.Is(err, ErrInactive) || errors.Is(err, ErrSSORequired) {
@@ -351,11 +354,11 @@ func (h *DeviceFlow) deviceBinding(ctx context.Context, r *http.Request) (string
 // tooFast widens the interval on every early poll, as RFC 8628 slow_down asks.
 func (h *DeviceFlow) tooFast(ctx context.Context, g *db.DeviceGrant) bool {
 	now := h.svc.now()
-	required := deviceInterval + time.Duration(g.Violations)*slowDownPenalty
-	note := &db.NoteDeviceGrantPollParams{DeviceCodeHash: g.DeviceCodeHash, PolledAt: &now, Violations: g.Violations}
+	required := deviceInterval + time.Duration(g.EarlyPolls)*slowDownPenalty
+	note := &db.NoteDeviceGrantPollParams{DeviceCodeHash: g.DeviceCodeHash, PolledAt: &now, EarlyPolls: g.EarlyPolls}
 	fast := g.PolledAt != nil && now.Sub(*g.PolledAt) < required
 	if fast {
-		note.PolledAt, note.Violations = g.PolledAt, g.Violations+1
+		note.PolledAt, note.EarlyPolls = g.PolledAt, g.EarlyPolls+1
 	}
 	if err := h.svc.conn.Tenant().NoteDeviceGrantPoll(ctx, note); err != nil {
 		slog.Warn("failed to note a device poll", "error", err)

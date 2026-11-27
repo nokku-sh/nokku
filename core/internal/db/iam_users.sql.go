@@ -42,7 +42,7 @@ type CreateUserParams struct {
 	Email   string              `json:"email"`
 	Name    string              `json:"name"`
 	Role    nokku.WorkspaceRole `json:"role"`
-	Picture *string             `json:"picture"`
+	Picture string              `json:"picture"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error) {
@@ -84,7 +84,7 @@ type CreateUserWithIDParams struct {
 	Email   string              `json:"email"`
 	Name    string              `json:"name"`
 	Role    nokku.WorkspaceRole `json:"role"`
-	Picture *string             `json:"picture"`
+	Picture string              `json:"picture"`
 }
 
 func (q *Queries) CreateUserWithID(ctx context.Context, arg *CreateUserWithIDParams) (*User, error) {
@@ -134,8 +134,7 @@ WHERE
   role = 5
 `
 
-// Runs before PromoteOwner. The partial unique index on the owner is checked row by row, so one statement
-// that swaps both can see two owners. See Queries.TransferOwnership.
+// Runs before PromoteOwner, one statement trips the per-row owner index.
 func (q *Queries) DemoteOwner(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, demoteOwner)
 	if err != nil {
@@ -363,7 +362,7 @@ type SetUserActiveParams struct {
 }
 
 // owner
-// An admin's call, so it also takes the account out of SCIM's hands. MarkUserSCIMDeactivated puts it back.
+// Also takes the account out of SCIM's hands.
 func (q *Queries) SetUserActive(ctx context.Context, arg *SetUserActiveParams) error {
 	_, err := q.db.Exec(ctx, setUserActive, arg.Active, arg.ID)
 	return err

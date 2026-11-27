@@ -11,10 +11,17 @@ import (
 )
 
 const deleteCredential = `-- name: DeleteCredential :exec
-DELETE FROM credentials
+WITH
+  gone AS (
+    DELETE FROM passkeys
+    WHERE
+      passkeys.user_id = $1
+      AND passkeys.id = $2
+  )
+DELETE FROM oidc_identities
 WHERE
-  user_id = $1
-  AND id = $2
+  oidc_identities.user_id = $1
+  AND oidc_identities.id = $2
 `
 
 type DeleteCredentialParams struct {
@@ -27,20 +34,14 @@ func (q *Queries) DeleteCredential(ctx context.Context, arg *DeleteCredentialPar
 	return err
 }
 
-const deleteCredentialsByProvider = `-- name: DeleteCredentialsByProvider :execrows
-DELETE FROM credentials
+const deleteOIDCIdentitiesByProvider = `-- name: DeleteOIDCIdentitiesByProvider :execrows
+DELETE FROM oidc_identities
 WHERE
-  type = $1
-  AND provider = $2
+  provider_id = $1
 `
 
-type DeleteCredentialsByProviderParams struct {
-	Type     string `json:"type"`
-	Provider string `json:"provider"`
-}
-
-func (q *Queries) DeleteCredentialsByProvider(ctx context.Context, arg *DeleteCredentialsByProviderParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteCredentialsByProvider, arg.Type, arg.Provider)
+func (q *Queries) DeleteOIDCIdentitiesByProvider(ctx context.Context, providerID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOIDCIdentitiesByProvider, providerID)
 	if err != nil {
 		return 0, err
 	}
@@ -48,9 +49,15 @@ func (q *Queries) DeleteCredentialsByProvider(ctx context.Context, arg *DeleteCr
 }
 
 const deleteUserCredentials = `-- name: DeleteUserCredentials :exec
-DELETE FROM credentials
+WITH
+  gone AS (
+    DELETE FROM passkeys
+    WHERE
+      passkeys.user_id = $1
+  )
+DELETE FROM oidc_identities
 WHERE
-  user_id = $1
+  oidc_identities.user_id = $1
 `
 
 func (q *Queries) DeleteUserCredentials(ctx context.Context, userID string) error {
@@ -59,10 +66,17 @@ func (q *Queries) DeleteUserCredentials(ctx context.Context, userID string) erro
 }
 
 const deleteUserCredentialsSince = `-- name: DeleteUserCredentialsSince :exec
-DELETE FROM credentials
+WITH
+  gone AS (
+    DELETE FROM passkeys
+    WHERE
+      passkeys.user_id = $1
+      AND passkeys.created_at >= $2
+  )
+DELETE FROM oidc_identities
 WHERE
-  user_id = $1
-  AND created_at >= $2
+  oidc_identities.user_id = $1
+  AND oidc_identities.created_at >= $2
 `
 
 type DeleteUserCredentialsSinceParams struct {
@@ -70,240 +84,275 @@ type DeleteUserCredentialsSinceParams struct {
 	Since  time.Time `json:"since"`
 }
 
-// What was added while someone else may have held a session.
 func (q *Queries) DeleteUserCredentialsSince(ctx context.Context, arg *DeleteUserCredentialsSinceParams) error {
 	_, err := q.db.Exec(ctx, deleteUserCredentialsSince, arg.UserID, arg.Since)
 	return err
 }
 
-const deleteUserOIDCCredentials = `-- name: DeleteUserOIDCCredentials :exec
-DELETE FROM credentials
+const deleteUserOIDCIdentities = `-- name: DeleteUserOIDCIdentities :exec
+DELETE FROM oidc_identities
 WHERE
   user_id = $1
-  AND type = 'oidc'
 `
 
-func (q *Queries) DeleteUserOIDCCredentials(ctx context.Context, userID string) error {
-	_, err := q.db.Exec(ctx, deleteUserOIDCCredentials, userID)
+func (q *Queries) DeleteUserOIDCIdentities(ctx context.Context, userID string) error {
+	_, err := q.db.Exec(ctx, deleteUserOIDCIdentities, userID)
 	return err
 }
 
-const findCredentialBySubject = `-- name: FindCredentialBySubject :one
+const findOIDCIdentity = `-- name: FindOIDCIdentity :one
 SELECT
-  id, workspace_id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
+  id, workspace_id, user_id, provider_id, subject, last_used_at, created_at
 FROM
-  credentials
+  oidc_identities
 WHERE
-  type = $1
-  AND provider = $2
-  AND subject = $3
+  provider_id = $1
+  AND subject = $2
 `
 
-type FindCredentialBySubjectParams struct {
-	Type     string `json:"type"`
-	Provider string `json:"provider"`
-	Subject  string `json:"subject"`
+type FindOIDCIdentityParams struct {
+	ProviderID string `json:"providerId"`
+	Subject    string `json:"subject"`
 }
 
-func (q *Queries) FindCredentialBySubject(ctx context.Context, arg *FindCredentialBySubjectParams) (*Credential, error) {
-	row := q.db.QueryRow(ctx, findCredentialBySubject, arg.Type, arg.Provider, arg.Subject)
-	var i Credential
+func (q *Queries) FindOIDCIdentity(ctx context.Context, arg *FindOIDCIdentityParams) (*OidcIdentity, error) {
+	row := q.db.QueryRow(ctx, findOIDCIdentity, arg.ProviderID, arg.Subject)
+	var i OidcIdentity
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
 		&i.UserID,
-		&i.Type,
-		&i.Provider,
+		&i.ProviderID,
 		&i.Subject,
-		&i.Data,
-		&i.Label,
 		&i.LastUsedAt,
 		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return &i, err
 }
 
-const listCredentialsByType = `-- name: ListCredentialsByType :many
-SELECT
-  id, workspace_id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
-FROM
-  credentials
-WHERE
-  user_id = $1
-  AND type = $2
-ORDER BY
-  created_at ASC
-`
-
-type ListCredentialsByTypeParams struct {
-	UserID string `json:"userId"`
-	Type   string `json:"type"`
-}
-
-func (q *Queries) ListCredentialsByType(ctx context.Context, arg *ListCredentialsByTypeParams) ([]*Credential, error) {
-	rows, err := q.db.Query(ctx, listCredentialsByType, arg.UserID, arg.Type)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Credential
-	for rows.Next() {
-		var i Credential
-		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.UserID,
-			&i.Type,
-			&i.Provider,
-			&i.Subject,
-			&i.Data,
-			&i.Label,
-			&i.LastUsedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listUserCredentials = `-- name: ListUserCredentials :many
-SELECT
-  id, workspace_id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
-FROM
-  credentials
-WHERE
-  user_id = $1
-ORDER BY
-  type ASC,
-  created_at ASC
-`
-
-func (q *Queries) ListUserCredentials(ctx context.Context, userID string) ([]*Credential, error) {
-	rows, err := q.db.Query(ctx, listUserCredentials, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Credential
-	for rows.Next() {
-		var i Credential
-		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.UserID,
-			&i.Type,
-			&i.Provider,
-			&i.Subject,
-			&i.Data,
-			&i.Label,
-			&i.LastUsedAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const renameCredential = `-- name: RenameCredential :exec
-UPDATE credentials
+const linkOIDCIdentity = `-- name: LinkOIDCIdentity :one
+INSERT INTO
+  oidc_identities (user_id, provider_id, subject)
+VALUES
+  ($1, $2, $3)
+ON CONFLICT (workspace_id, provider_id, subject) DO UPDATE
 SET
-  label = $1,
-  updated_at = NOW()
+  last_used_at = oidc_identities.last_used_at
+WHERE
+  oidc_identities.user_id = EXCLUDED.user_id
+RETURNING
+  id
+`
+
+type LinkOIDCIdentityParams struct {
+	UserID     string `json:"userId"`
+	ProviderID string `json:"providerId"`
+	Subject    string `json:"subject"`
+}
+
+// An identity never moves accounts, a clash returns no rows.
+func (q *Queries) LinkOIDCIdentity(ctx context.Context, arg *LinkOIDCIdentityParams) (string, error) {
+	row := q.db.QueryRow(ctx, linkOIDCIdentity, arg.UserID, arg.ProviderID, arg.Subject)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const listOIDCIdentities = `-- name: ListOIDCIdentities :many
+SELECT
+  id, workspace_id, user_id, provider_id, subject, last_used_at, created_at
+FROM
+  oidc_identities
+WHERE
+  user_id = $1
+ORDER BY
+  created_at ASC
+`
+
+func (q *Queries) ListOIDCIdentities(ctx context.Context, userID string) ([]*OidcIdentity, error) {
+	rows, err := q.db.Query(ctx, listOIDCIdentities, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*OidcIdentity
+	for rows.Next() {
+		var i OidcIdentity
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.UserID,
+			&i.ProviderID,
+			&i.Subject,
+			&i.LastUsedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPasskeys = `-- name: ListPasskeys :many
+SELECT
+  id, workspace_id, user_id, credential_id, data, label, last_used_at, created_at
+FROM
+  passkeys
+WHERE
+  user_id = $1
+ORDER BY
+  created_at ASC
+`
+
+func (q *Queries) ListPasskeys(ctx context.Context, userID string) ([]*Passkey, error) {
+	rows, err := q.db.Query(ctx, listPasskeys, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Passkey
+	for rows.Next() {
+		var i Passkey
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.UserID,
+			&i.CredentialID,
+			&i.Data,
+			&i.Label,
+			&i.LastUsedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserCredentialIDs = `-- name: ListUserCredentialIDs :many
+SELECT
+  id
+FROM
+  passkeys
+WHERE
+  passkeys.user_id = $1
+UNION ALL
+SELECT
+  id
+FROM
+  oidc_identities
+WHERE
+  oidc_identities.user_id = $1
+`
+
+func (q *Queries) ListUserCredentialIDs(ctx context.Context, userID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listUserCredentialIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const renamePasskey = `-- name: RenamePasskey :execrows
+UPDATE passkeys
+SET
+  label = $1
 WHERE
   user_id = $2
   AND id = $3
 `
 
-type RenameCredentialParams struct {
+type RenamePasskeyParams struct {
 	Label  string `json:"label"`
 	UserID string `json:"userId"`
 	ID     string `json:"id"`
 }
 
-func (q *Queries) RenameCredential(ctx context.Context, arg *RenameCredentialParams) error {
-	_, err := q.db.Exec(ctx, renameCredential, arg.Label, arg.UserID, arg.ID)
-	return err
+func (q *Queries) RenamePasskey(ctx context.Context, arg *RenamePasskeyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, renamePasskey, arg.Label, arg.UserID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const touchCredential = `-- name: TouchCredential :exec
-UPDATE credentials
+const savePasskey = `-- name: SavePasskey :one
+INSERT INTO
+  passkeys (user_id, credential_id, data, label)
+VALUES
+  ($1, $2, $3, $4)
+ON CONFLICT (workspace_id, credential_id) DO UPDATE
+SET
+  data = EXCLUDED.data,
+  label = COALESCE(NULLIF(passkeys.label, ''), EXCLUDED.label)
+WHERE
+  passkeys.user_id = EXCLUDED.user_id
+RETURNING
+  label
+`
+
+type SavePasskeyParams struct {
+	UserID       string `json:"userId"`
+	CredentialID string `json:"credentialId"`
+	Data         []byte `json:"data"`
+	Label        string `json:"label"`
+}
+
+// Keeps a label it has. A passkey never moves accounts, a clash returns no rows.
+func (q *Queries) SavePasskey(ctx context.Context, arg *SavePasskeyParams) (string, error) {
+	row := q.db.QueryRow(ctx, savePasskey,
+		arg.UserID,
+		arg.CredentialID,
+		arg.Data,
+		arg.Label,
+	)
+	var label string
+	err := row.Scan(&label)
+	return label, err
+}
+
+const touchOIDCIdentity = `-- name: TouchOIDCIdentity :exec
+UPDATE oidc_identities
 SET
   last_used_at = NOW()
 WHERE
   id = $1
 `
 
-func (q *Queries) TouchCredential(ctx context.Context, id string) error {
-	_, err := q.db.Exec(ctx, touchCredential, id)
+func (q *Queries) TouchOIDCIdentity(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, touchOIDCIdentity, id)
 	return err
 }
 
-const upsertCredential = `-- name: UpsertCredential :one
-INSERT INTO
-  credentials (id, user_id, type, provider, subject, data, label)
-VALUES
-  ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (id) DO UPDATE
+const touchPasskey = `-- name: TouchPasskey :exec
+UPDATE passkeys
 SET
-  type = EXCLUDED.type,
-  provider = EXCLUDED.provider,
-  subject = EXCLUDED.subject,
-  data = EXCLUDED.data,
-  label = EXCLUDED.label,
-  updated_at = NOW()
+  last_used_at = NOW()
 WHERE
-  credentials.user_id = EXCLUDED.user_id
-RETURNING
-  id, workspace_id, user_id, type, provider, subject, data, label, last_used_at, created_at, updated_at
+  credential_id = $1
 `
 
-type UpsertCredentialParams struct {
-	ID       string `json:"id"`
-	UserID   string `json:"userId"`
-	Type     string `json:"type"`
-	Provider string `json:"provider"`
-	Subject  string `json:"subject"`
-	Data     []byte `json:"data"`
-	Label    string `json:"label"`
-}
-
-// A credential never moves accounts, a clash returns no rows.
-func (q *Queries) UpsertCredential(ctx context.Context, arg *UpsertCredentialParams) (*Credential, error) {
-	row := q.db.QueryRow(ctx, upsertCredential,
-		arg.ID,
-		arg.UserID,
-		arg.Type,
-		arg.Provider,
-		arg.Subject,
-		arg.Data,
-		arg.Label,
-	)
-	var i Credential
-	err := row.Scan(
-		&i.ID,
-		&i.WorkspaceID,
-		&i.UserID,
-		&i.Type,
-		&i.Provider,
-		&i.Subject,
-		&i.Data,
-		&i.Label,
-		&i.LastUsedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return &i, err
+func (q *Queries) TouchPasskey(ctx context.Context, credentialID string) error {
+	_, err := q.db.Exec(ctx, touchPasskey, credentialID)
+	return err
 }

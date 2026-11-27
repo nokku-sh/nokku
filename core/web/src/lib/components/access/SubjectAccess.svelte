@@ -56,8 +56,7 @@
 		},
 		[AccessBlock.DAEMON_NOT_APPROVED]: {
 			label: 'Not approved',
-			title:
-				'The daemon of this server waits for approval or was rejected, nobody gets in until it is approved.'
+			title: 'The daemon of this server waits for approval, nobody gets in until it is approved.'
 		}
 	};
 

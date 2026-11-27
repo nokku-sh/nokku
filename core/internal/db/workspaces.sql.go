@@ -20,7 +20,6 @@ WHERE
   claimed_at IS NULL
 `
 
-// Stored once, the sessions and devices of a first sign-in all end or get deleted.
 func (q *Queries) ClaimWorkspace(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, claimWorkspace)
 	return err
@@ -39,7 +38,7 @@ type CreateWorkspaceParams struct {
 	ID          string                   `json:"id"`
 	Slug        string                   `json:"slug"`
 	Name        string                   `json:"name"`
-	Description *string                  `json:"description"`
+	Description string                   `json:"description"`
 	Settings    *nokku.WorkspaceSettings `json:"settings"`
 }
 
@@ -106,7 +105,6 @@ LIMIT
   1
 `
 
-// The one workspace of a self-hosted server.
 func (q *Queries) GetFirstWorkspace(ctx context.Context) (*Workspace, error) {
 	row := q.db.QueryRow(ctx, getFirstWorkspace)
 	var i Workspace
@@ -133,7 +131,6 @@ WHERE
   id = current_workspace_id ()
 `
 
-// The workspace the transaction is pinned to.
 func (q *Queries) GetWorkspace(ctx context.Context) (*Workspace, error) {
 	row := q.db.QueryRow(ctx, getWorkspace)
 	var i Workspace
@@ -214,7 +211,6 @@ WHERE
   AND claimed_at IS NULL
 `
 
-// Signups nobody ever signed in to. Runs as nokku_system.
 func (q *Queries) ListUnclaimedWorkspaces(ctx context.Context, cutoff time.Time) ([]*Workspace, error) {
 	rows, err := q.db.Query(ctx, listUnclaimedWorkspaces, cutoff)
 	if err != nil {
@@ -265,7 +261,6 @@ type ListWorkspacesByEmailRow struct {
 	Name string `json:"name"`
 }
 
-// Every workspace an address can sign in to. Runs as nokku_system.
 func (q *Queries) ListWorkspacesByEmail(ctx context.Context, email string) ([]*ListWorkspacesByEmailRow, error) {
 	rows, err := q.db.Query(ctx, listWorkspacesByEmail, email)
 	if err != nil {

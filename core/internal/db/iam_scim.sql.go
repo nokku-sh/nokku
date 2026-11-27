@@ -13,12 +13,12 @@ const adoptTeamSCIM = `-- name: AdoptTeamSCIM :one
 UPDATE teams
 SET
   scim_managed = TRUE,
-  scim_open = FALSE,
+  scim_adoptable = FALSE,
   updated_at = NOW()
 WHERE
   id = $1
 RETURNING
-  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_open, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_adoptable, created_at, updated_at
 `
 
 func (q *Queries) AdoptTeamSCIM(ctx context.Context, id string) (*Team, error) {
@@ -32,7 +32,7 @@ func (q *Queries) AdoptTeamSCIM(ctx context.Context, id string) (*Team, error) {
 		&i.Tags,
 		&i.ScimExternalID,
 		&i.ScimManaged,
-		&i.ScimOpen,
+		&i.ScimAdoptable,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -57,7 +57,7 @@ func (q *Queries) DeleteSCIMTeam(ctx context.Context, id string) (string, error)
 
 const getSCIMTeam = `-- name: GetSCIMTeam :one
 SELECT
-  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_open, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_adoptable, created_at, updated_at
 FROM
   teams
 WHERE
@@ -76,7 +76,7 @@ func (q *Queries) GetSCIMTeam(ctx context.Context, id string) (*Team, error) {
 		&i.Tags,
 		&i.ScimExternalID,
 		&i.ScimManaged,
-		&i.ScimOpen,
+		&i.ScimAdoptable,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -85,14 +85,13 @@ func (q *Queries) GetSCIMTeam(ctx context.Context, id string) (*Team, error) {
 
 const getTeamByName = `-- name: GetTeamByName :one
 SELECT
-  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_open, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_adoptable, created_at, updated_at
 FROM
   teams
 WHERE
   name = $1
 `
 
-// A SCIM create takes over a team of that name that an admin opened for it.
 func (q *Queries) GetTeamByName(ctx context.Context, name string) (*Team, error) {
 	row := q.db.QueryRow(ctx, getTeamByName, name)
 	var i Team
@@ -104,7 +103,7 @@ func (q *Queries) GetTeamByName(ctx context.Context, name string) (*Team, error)
 		&i.Tags,
 		&i.ScimExternalID,
 		&i.ScimManaged,
-		&i.ScimOpen,
+		&i.ScimAdoptable,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -113,7 +112,7 @@ func (q *Queries) GetTeamByName(ctx context.Context, name string) (*Team, error)
 
 const listSCIMTeams = `-- name: ListSCIMTeams :many
 SELECT
-  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_open, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_adoptable, created_at, updated_at
 FROM
   teams
 WHERE
@@ -139,7 +138,7 @@ func (q *Queries) ListSCIMTeams(ctx context.Context) ([]*Team, error) {
 			&i.Tags,
 			&i.ScimExternalID,
 			&i.ScimManaged,
-			&i.ScimOpen,
+			&i.ScimAdoptable,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -218,7 +217,7 @@ SET
 WHERE
   id = $2
 RETURNING
-  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_open, created_at, updated_at
+  id, workspace_id, name, description, tags, scim_external_id, scim_managed, scim_adoptable, created_at, updated_at
 `
 
 type SetTeamSCIMExternalIDParams struct {
@@ -226,7 +225,6 @@ type SetTeamSCIMExternalIDParams struct {
 	ID         string  `json:"id"`
 }
 
-// Like SetUserSCIMExternalID, for a SCIM group.
 func (q *Queries) SetTeamSCIMExternalID(ctx context.Context, arg *SetTeamSCIMExternalIDParams) (*Team, error) {
 	row := q.db.QueryRow(ctx, setTeamSCIMExternalID, arg.ExternalID, arg.ID)
 	var i Team
@@ -238,7 +236,7 @@ func (q *Queries) SetTeamSCIMExternalID(ctx context.Context, arg *SetTeamSCIMExt
 		&i.Tags,
 		&i.ScimExternalID,
 		&i.ScimManaged,
-		&i.ScimOpen,
+		&i.ScimAdoptable,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -274,7 +272,6 @@ WHERE
   id = $1
 `
 
-// Only for an account SCIM creates. One it links by address stays the workspace's to rename.
 func (q *Queries) SetUserSCIMManaged(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, setUserSCIMManaged, id)
 	return err

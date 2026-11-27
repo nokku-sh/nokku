@@ -58,9 +58,6 @@ type ListAccessReportRow struct {
 	Stale      bool       `json:"stale"`
 }
 
-// One row per subject, account and the way the subject holds it, a team grant once per member. Every grant is in it,
-// enforced says whether it lets anyone in today. A row is stale when nobody got a certificate for the target in 90
-// days, counted from the grant when there never was one.
 func (q *Queries) ListAccessReport(ctx context.Context) ([]*ListAccessReportRow, error) {
 	rows, err := q.db.Query(ctx, listAccessReport)
 	if err != nil {
@@ -115,33 +112,5 @@ type TouchAccessUsageParams struct {
 
 func (q *Queries) TouchAccessUsage(ctx context.Context, arg *TouchAccessUsageParams) error {
 	_, err := q.db.Exec(ctx, touchAccessUsage, arg.TargetID, arg.SubjectID)
-	return err
-}
-
-const touchAccessUsageByDaemon = `-- name: TouchAccessUsageByDaemon :exec
-INSERT INTO
-  access_usage (target_id, subject_id)
-SELECT
-  t.id,
-  $1
-FROM
-  targets t
-WHERE
-  t.daemon_id = $2
-ON CONFLICT (target_id, subject_id) DO UPDATE
-SET
-  last_cert_at = NOW()
-WHERE
-  -- The review counts in days. Not rewriting the row on every certificate saves a write per login.
-  access_usage.last_cert_at < NOW() - INTERVAL '1 hour'
-`
-
-type TouchAccessUsageByDaemonParams struct {
-	SubjectID string  `json:"subjectId"`
-	DaemonID  *string `json:"daemonId"`
-}
-
-func (q *Queries) TouchAccessUsageByDaemon(ctx context.Context, arg *TouchAccessUsageByDaemonParams) error {
-	_, err := q.db.Exec(ctx, touchAccessUsageByDaemon, arg.SubjectID, arg.DaemonID)
 	return err
 }

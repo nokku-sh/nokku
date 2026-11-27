@@ -46,14 +46,12 @@ func (s *Service) RequestEmailChange(
 		return "", "", ErrManagedAccount
 	}
 	err = s.conn.TenantTx(ctx, func(q *db.Queries) error {
-		creds, err := q.ListUserCredentials(ctx, u.ID)
+		identities, err := q.ListOIDCIdentities(ctx, u.ID)
 		if err != nil {
 			return err
 		}
-		for _, c := range creds {
-			if c.Type == string(MethodOIDC) {
-				return ErrManagedAccount
-			}
+		if len(identities) > 0 {
+			return ErrManagedAccount
 		}
 		if _, err = q.GetUserByEmail(ctx, newEmail); err == nil {
 			return ErrEmailTaken
@@ -61,7 +59,7 @@ func (s *Service) RequestEmailChange(
 			return err
 		}
 		if err := q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
-			UserID: &u.ID, Purpose: tokenEmailChange,
+			UserID: u.ID, Purpose: tokenEmailChange,
 		}); err != nil {
 			return err
 		}
@@ -87,22 +85,22 @@ func (s *Service) putEmailToken(
 	raw, hash := crypto.NewToken(emailTokenKinds[purpose])
 	return raw, q.PutToken(ctx, &db.PutTokenParams{
 		TokenHash: hash,
-		UserID:    &userID,
+		UserID:    userID,
 		Purpose:   purpose,
 		ExpiresAt: s.now().Add(ttl),
-		Email:     &email,
+		Email:     email,
 	})
 }
 
 func (s *Service) DropEmailChange(ctx context.Context, userID string) error {
 	return s.conn.Tenant().DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
-		UserID: &userID, Purpose: tokenEmailChange,
+		UserID: userID, Purpose: tokenEmailChange,
 	})
 }
 
 func (s *Service) PendingEmail(ctx context.Context, userID string) string {
 	email, err := s.conn.Tenant().GetPendingTokenEmail(ctx, &db.GetPendingTokenEmailParams{
-		UserID: &userID, Purpose: tokenEmailChange,
+		UserID: userID, Purpose: tokenEmailChange,
 	})
 	if err != nil {
 		return ""
@@ -121,7 +119,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 			return mapUserError(err)
 		}
 		// A sign-in link mailed to the old address must not outlive the move.
-		return q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{UserID: &u.ID, Purpose: tokenLogin})
+		return q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{UserID: u.ID, Purpose: tokenLogin})
 	})
 	if err != nil {
 		return err
@@ -140,7 +138,7 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 			return err
 		}
 		if err := q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
-			UserID: &row.UserID, Purpose: tokenEmailChange,
+			UserID: row.UserID, Purpose: tokenEmailChange,
 		}); err != nil {
 			return err
 		}
@@ -164,7 +162,7 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 		}
 		reverted = true
 		// Whoever made the change may hold a revert or sign-in link.
-		if err := q.DeleteAllUserTokens(ctx, &u.ID); err != nil {
+		if err := q.DeleteAllUserTokens(ctx, u.ID); err != nil {
 			return err
 		}
 		if err := q.DeleteUserCredentials(ctx, u.ID); err != nil {

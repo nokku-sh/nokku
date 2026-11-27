@@ -102,7 +102,11 @@ func TestBehind(t *testing.T) {
 	ca := CA{RotatedAt: now}
 	assert.False(t, Target{}.Behind(CA{}), "a CA never rolled over leaves no server behind")
 	assert.False(t, Target{}.Behind(ca), "a server never synced has no known key")
-	assert.True(t, Target{LastSyncAt: now.Add(-time.Hour)}.Behind(ca), "synced before the rollover")
-	assert.False(t, Target{LastSyncAt: now.Add(time.Minute)}.Behind(ca), "synced after it")
-	assert.False(t, Target{DaemonID: "d", LastSyncAt: now.Add(-time.Hour)}.Behind(ca), "a daemon learns the key itself")
+	assert.True(t, Target{ManualSyncAt: now.Add(-time.Hour)}.Behind(ca), "synced before the rollover")
+	assert.False(t, Target{ManualSyncAt: now.Add(time.Minute)}.Behind(ca), "synced after it")
+	assert.False(
+		t,
+		Target{Daemon: true, ManualSyncAt: now.Add(-time.Hour)}.Behind(ca),
+		"a daemon learns the key itself",
+	)
 }

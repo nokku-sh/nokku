@@ -54,11 +54,8 @@ func TestRolloverReachesTheNextSync(t *testing.T) {
 
 	var next *db.SSHCA
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
-		current, err := q.GetWorkspaceCA(f.ctx)
-		if err != nil {
-			return err
-		}
-		next, err = ssh.Rollover(f.ctx, q, keys, current)
+		var err error
+		next, err = ssh.Rollover(f.ctx, q, keys)
 		return err
 	}))
 
@@ -139,14 +136,14 @@ func TestSyncAnswer(t *testing.T) {
 		require.NoError(t, q.SetUserActive(f.ctx, &db.SetUserActiveParams{ID: off, Active: false}))
 
 		direct = user("direct")
-		grant(web.TargetID, "root", db.SubjectKindUser, direct, nil)
-		grant(web.TargetID, "root", db.SubjectKindUser, user("ended"), new(time.Now().Add(-time.Minute)))
-		grant(db1.TargetID, "postgres", db.SubjectKindUser, user("elsewhere"), nil)
+		grant(web.DaemonID, "root", db.SubjectKindUser, direct, nil)
+		grant(web.DaemonID, "root", db.SubjectKindUser, user("ended"), new(time.Now().Add(-time.Minute)))
+		grant(db1.DaemonID, "postgres", db.SubjectKindUser, user("elsewhere"), nil)
 		bot, err = q.CreateServiceAccount(f.ctx, &db.CreateServiceAccountParams{
 			Name: "deploy", Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER, Tags: []string{},
 		})
 		require.NoError(t, err)
-		grant(web.TargetID, "root", db.SubjectKindServiceAccount, bot, nil)
+		grant(web.DaemonID, "root", db.SubjectKindServiceAccount, bot, nil)
 
 		if _, err = q.UpdateWorkspace(f.ctx, &db.UpdateWorkspaceParams{
 			Settings: &nokkuv1.WorkspaceSettings{SessionIdleTimeout: durationpb.New(10 * time.Minute)},
@@ -161,7 +158,6 @@ func TestSyncAnswer(t *testing.T) {
 
 	res, err := daemon.Sync(f.ctx, f.conn, daemon.SyncInput{DaemonID: web.DaemonID})
 	require.NoError(t, err)
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, res.GetStatus())
 	assert.Equal(t, "pub", res.GetUserCaPublicKey())
 	assert.Equal(t, "host-pub", res.GetHostCaPublicKey())
 	assert.Equal(t, 10*time.Minute, res.GetIdleTimeout().AsDuration(), "the workspace's idle timeout")
@@ -172,7 +168,7 @@ func TestSyncAnswer(t *testing.T) {
 	principals := func(username string, subjects ...string) []string {
 		out := make([]string, 0, len(subjects))
 		for _, id := range subjects {
-			out = append(out, login.Principal(id, web.TargetID, username))
+			out = append(out, login.Principal(id, web.DaemonID, username))
 		}
 		return slices.Sorted(slices.Values(out))
 	}
@@ -207,21 +203,14 @@ func TestSyncAnswer(t *testing.T) {
 	require.NoError(t, err)
 	res, err = daemon.Sync(f.ctx, f.conn, daemon.SyncInput{DaemonID: waiting.DaemonID})
 	require.NoError(t, err)
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING, res.GetStatus())
 	assert.Empty(t, res.GetPrincipals(), "a pending daemon lets nobody in")
 	assert.Empty(t, res.GetUserCaPublicKey(), "a pending daemon trusts no CA")
-	// The pool cuts the stream of a daemon the pass does not name as accepted.
-	answers, err = daemon.Answers(f.ctx, f.conn)
-	require.NoError(t, err)
-	accepted := nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED
-	assert.NotEqual(t, accepted, answers[waiting.DaemonID].GetStatus(), "a pending daemon may keep a control stream")
-	assert.Equal(t, accepted, answers[web.DaemonID].GetStatus())
 
 	require.NoError(t, f.conn.TenantTx(f.ctx, func(q *db.Queries) error {
-		_, err := q.DeleteDaemon(f.ctx, db1.DaemonID)
+		_, err := q.DeleteTarget(f.ctx, db1.DaemonID)
 		return err
 	}))
 	res, err = daemon.Sync(f.ctx, f.conn, daemon.SyncInput{DaemonID: db1.DaemonID})
 	require.NoError(t, err)
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED, res.GetStatus(), "a deleted daemon is told to stop")
+	assert.True(t, res.GetRemoved(), "a deleted daemon is told to stop")
 }

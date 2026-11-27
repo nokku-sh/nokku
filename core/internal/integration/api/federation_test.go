@@ -385,11 +385,6 @@ func TestExchangeRefusals(t *testing.T) {
 		{"iat too old", f.account.GetName(), claimed(func(c map[string]any) {
 			c["iat"] = time.Now().Add(-2 * time.Hour).Unix()
 		}), "too old"},
-		// A session row lives an hour and an iat may run a minute ahead. Past
-		// 59 minutes the row can be gone, and the job token replays.
-		{"iat older than a session row covers", f.account.GetName(), claimed(func(c map[string]any) {
-			c["iat"] = time.Now().Add(-59*time.Minute - 30*time.Second).Unix()
-		}), "too old"},
 		{"iat in the future", f.account.GetName(), claimed(func(c map[string]any) {
 			c["iat"] = time.Now().Add(5 * time.Minute).Unix()
 		}), "in the future"},
@@ -709,6 +704,21 @@ func TestExchangeFollowsThePlan(t *testing.T) {
 	restore()
 	_, err = f.exchange(t, f.account.GetName(), token, f.proof(t))
 	require.NoError(t, err, "a plan refusal must not spend the job token")
+}
+
+// A job token good for longer than its session stays spent until its own end.
+func TestJobTokenStaysSpentPastItsSession(t *testing.T) {
+	f := newFederation(t)
+	claims := f.issuer.claims()
+	claims["exp"] = time.Now().Add(3 * time.Hour).Unix()
+	token := f.issuer.sign(t, claims)
+	_, err := f.exchange(t, f.account.GetName(), token, f.proof(t))
+	require.NoError(t, err)
+
+	_, err = f.cfg.Conn.Sys().DeleteExpiredSpentJobTokens(t.Context(), time.Now().Add(2*time.Hour))
+	require.NoError(t, err)
+	_, err = f.exchange(t, f.account.GetName(), token, f.proof(t))
+	assert.Equal(t, refusedAs, rpcAnswer(err), "the job token worked again once its session was over")
 }
 
 // nk logout ends a job's session on the core, the job token stays spent.

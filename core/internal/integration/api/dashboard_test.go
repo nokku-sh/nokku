@@ -22,13 +22,25 @@ func TestDashboardDaemons(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	workspaceID := testWorkspace.ID
 	_, accepted := enrollTestDaemon(t, cfg, srv, workspaceID, true)
-	_, pending := enrollTestDaemon(t, cfg, srv, workspaceID, false)
+	var pending *nokkuv1.EnrollDaemonResponse
+	for range 6 {
+		_, pending = enrollTestDaemon(t, cfg, srv, workspaceID, false)
+	}
 
 	var all []*db.ListDaemonsRow
 	inWorkspace(t, cfg, workspaceID, func(q *db.Queries) (err error) {
 		all, err = q.ListDaemons(t.Context(), &db.ListDaemonsParams{})
 		return err
 	})
+	var waiting, offline int32
+	for _, d := range all {
+		switch {
+		case !d.Daemon.Accepted:
+			waiting++
+		case !cfg.Pool.IsConnected(d.Daemon.TargetID):
+			offline++
+		}
+	}
 
 	viewer := nokkuv1connect.NewDashboardServiceClient(
 		clientOn(
@@ -43,18 +55,20 @@ func TestDashboardDaemons(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.EqualValues(t, len(all), res.GetDaemonCount(), "every daemon counts")
+	assert.Equal(t, waiting, res.GetPendingDaemonCount(), "every waiting daemon counts, not only the five listed")
+	assert.Equal(t, offline, res.GetOfflineTargetCount(), "every offline server counts")
 	require.NotEmpty(t, res.GetPendingDaemons())
-	assert.Equal(t, pending.GetId(), res.GetPendingDaemons()[0].GetId(), "the newest pending daemon comes first")
+	assert.Equal(t, pending.GetTargetId(), res.GetPendingDaemons()[0].GetId(), "the newest pending daemon comes first")
 	assert.LessOrEqual(t, len(res.GetPendingDaemons()), 5)
 	assert.LessOrEqual(t, len(res.GetOfflineTargets()), 5)
 	for _, server := range res.GetOfflineTargets() {
 		d := server.GetDaemon()
 		require.NotNil(t, d, "an offline server comes with its daemon")
-		assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, d.GetStatus(), "only accepted daemons are missed")
-		assert.NotEqual(t, pending.GetId(), d.GetId())
+		assert.True(t, d.GetAccepted(), "only accepted daemons are missed")
+		assert.NotEqual(t, pending.GetTargetId(), d.GetId())
 	}
 	assert.False(t, slices.ContainsFunc(res.GetPendingDaemons(), func(d *nokkuv1.Daemon) bool {
-		return d.GetId() == accepted.GetId()
+		return d.GetId() == accepted.GetTargetId()
 	}), "an accepted daemon waits for nobody")
 }
 

@@ -70,7 +70,7 @@ func trust(t *testing.T, s *state.State) {
 func TestVerifyHostDaemon(t *testing.T) {
 	setupSSHDir(t)
 	caSigner := newSigner(t)
-	target := state.Target{ID: verifyTargetID, Name: "prod", DaemonID: "d"}
+	target := state.Target{ID: verifyTargetID, Name: "prod", Daemon: true}
 	trust(t, &state.State{
 		CA:      &state.CA{HostPublicKey: string(ssh.MarshalAuthorizedKey(caSigner.PublicKey()))},
 		Targets: []state.Target{target},
@@ -108,7 +108,7 @@ func TestVerifyHostManual(t *testing.T) {
 
 func TestNeedsVerify(t *testing.T) {
 	t.Parallel()
-	daemon := &state.Target{DaemonID: "d", Endpoints: []string{"10.0.0.5"}}
+	daemon := &state.Target{Daemon: true, Endpoints: []string{"10.0.0.5"}}
 	assert.True(t, needsVerify(daemon, "10.0.0.5:22"), "the relay is the way out")
 	assert.False(t, needsVerify(daemon, "203.0.113.9:22"), "a public address names one machine")
 

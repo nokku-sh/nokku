@@ -36,7 +36,7 @@ RETURNING
 
 type CreateServiceAccountParams struct {
 	Name          string              `json:"name"`
-	Description   *string             `json:"description"`
+	Description   string              `json:"description"`
 	Role          nokku.WorkspaceRole `json:"role"`
 	Tags          []string            `json:"tags"`
 	ForceCommand  string              `json:"forceCommand"`
@@ -221,7 +221,7 @@ WHERE
   (
     $1::TEXT IS NULL
     OR sa.name ILIKE '%' || $1 || '%'
-    OR COALESCE(sa.description, '') ILIKE '%' || $1 || '%'
+    OR sa.description ILIKE '%' || $1 || '%'
   )
   AND (
     $2::TEXT[] IS NULL

@@ -1,14 +1,14 @@
 import { createMutation, createQuery } from '@tanstack/svelte-query';
 import { toast } from 'svelte-sonner';
 import { queryClient } from './client';
-import { account, type AccountCredential } from './account';
+import { account, type ListCredentialsResponse } from './account';
 
 const invalidateCredentials = () => queryClient.invalidateQueries({ queryKey: ['account'] });
 
 // Passkeys and identity provider links, the two ways an account signs in without a mailed link.
 export const credentials = {
 	all: () =>
-		createQuery<AccountCredential[]>(() => ({
+		createQuery<ListCredentialsResponse>(() => ({
 			queryKey: ['account', 'credentials'],
 			queryFn: () => account.credentials()
 		})),

@@ -226,7 +226,6 @@ type GetRequestableAccountParams struct {
 	Username string `json:"username"`
 }
 
-// The target by id or name, so nk can pass what a person types.
 func (q *Queries) GetRequestableAccount(ctx context.Context, arg *GetRequestableAccountParams) (string, error) {
 	row := q.db.QueryRow(ctx, getRequestableAccount, arg.Target, arg.Username)
 	var id string
@@ -385,7 +384,6 @@ type ListRequestableAccountsRow struct {
 	Usernames []string `json:"usernames"`
 }
 
-// The targets members may ask for, the ones carrying one of the workspace's requestable tags.
 func (q *Queries) ListRequestableAccounts(ctx context.Context) ([]*ListRequestableAccountsRow, error) {
 	rows, err := q.db.Query(ctx, listRequestableAccounts)
 	if err != nil {

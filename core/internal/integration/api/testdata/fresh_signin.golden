@@ -73,9 +73,6 @@ TargetService.SetTargetEndpoints | cli | refused | permission_denied: do this in
 TargetService.RenameTarget | browser fresh | accepted | not_found: the requested resource was not found | session kept
 TargetService.RenameTarget | browser old | refused | unauthenticated: sign in again to continue | session ended
 TargetService.RenameTarget | cli | refused | permission_denied: do this in the web app | session kept
-DaemonService.DeleteDaemon | browser fresh | accepted | not_found: the requested resource was not found | session kept
-DaemonService.DeleteDaemon | browser old | refused | unauthenticated: sign in again to continue | session ended
-DaemonService.DeleteDaemon | cli | refused | permission_denied: do this in the web app | session kept
 TargetService.DeleteTarget | browser fresh | accepted | not_found: the requested resource was not found | session kept
 TargetService.DeleteTarget | browser old | refused | unauthenticated: sign in again to continue | session ended
 TargetService.DeleteTarget | cli | accepted | not_found: the requested resource was not found | session kept

@@ -30,7 +30,7 @@ type TargetAccount struct {
 	Username      *string                `protobuf:"bytes,3,opt,name=username" json:"username,omitempty"`
 	Grants        []*Grant               `protobuf:"bytes,4,rep,name=grants" json:"grants,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	SeenAt        *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=seen_at,json=seenAt" json:"seen_at,omitempty"`
+	FirstSeenAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=first_seen_at,json=firstSeenAt" json:"first_seen_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -100,9 +100,9 @@ func (x *TargetAccount) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *TargetAccount) GetSeenAt() *timestamppb.Timestamp {
+func (x *TargetAccount) GetFirstSeenAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.SeenAt
+		return x.FirstSeenAt
 	}
 	return nil
 }
@@ -1250,15 +1250,15 @@ var File_nokku_v1_target_account_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\n" +
-	"\x1dnokku/v1/target_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/subject.proto\"\xf1\x01\n" +
+	"\x1dnokku/v1/target_account.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x16nokku/v1/subject.proto\"\xfc\x01\n" +
 	"\rTargetAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x1a\n" +
 	"\busername\x18\x03 \x01(\tR\busername\x12'\n" +
 	"\x06grants\x18\x04 \x03(\v2\x0f.nokku.v1.GrantR\x06grants\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x123\n" +
-	"\aseen_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06seenAt\"o\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12>\n" +
+	"\rfirst_seen_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\vfirstSeenAt\"o\n" +
 	"\x05Grant\x12+\n" +
 	"\asubject\x18\x01 \x01(\v2\x11.nokku.v1.SubjectR\asubject\x129\n" +
 	"\n" +
@@ -1398,7 +1398,7 @@ var file_nokku_v1_target_account_proto_goTypes = []any{
 var file_nokku_v1_target_account_proto_depIdxs = []int32{
 	1,  // 0: nokku.v1.TargetAccount.grants:type_name -> nokku.v1.Grant
 	21, // 1: nokku.v1.TargetAccount.created_at:type_name -> google.protobuf.Timestamp
-	21, // 2: nokku.v1.TargetAccount.seen_at:type_name -> google.protobuf.Timestamp
+	21, // 2: nokku.v1.TargetAccount.first_seen_at:type_name -> google.protobuf.Timestamp
 	22, // 3: nokku.v1.Grant.subject:type_name -> nokku.v1.Subject
 	21, // 4: nokku.v1.Grant.expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 5: nokku.v1.ListTargetAccountsResponse.accounts:type_name -> nokku.v1.TargetAccount

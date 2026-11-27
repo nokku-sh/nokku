@@ -12,14 +12,14 @@ import (
 func (s *Service) DeleteCredential(ctx context.Context, id string) error {
 	return s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		userID := actor.UserIDFromContext(ctx)
-		creds, err := q.ListUserCredentials(ctx, userID)
+		ids, err := q.ListUserCredentialIDs(ctx, userID)
 		if err != nil {
 			return err
 		}
-		if !slices.ContainsFunc(creds, func(c *db.Credential) bool { return c.ID == id }) {
+		if !slices.Contains(ids, id) {
 			return ErrNotFound
 		}
-		if len(creds) == 1 && !s.MagicLinkEnabled() {
+		if len(ids) == 1 && !s.MagicLinkEnabled() {
 			return ErrLastCredential
 		}
 		return q.DeleteCredential(ctx, &db.DeleteCredentialParams{UserID: userID, ID: id})

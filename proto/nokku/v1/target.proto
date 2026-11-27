@@ -114,19 +114,19 @@ message ForgetHostKeyResponse {}
 
 message Target {
   string id = 1;
-  string daemon_id = 2;
-  string name = 3;
-  string description = 4;
-  string host_public_key = 5;
-  repeated string tags = 6;
-  repeated string endpoints = 7;
-  repeated TargetAccount accounts = 8;
-  map<string, string> metadata = 9;
-  Daemon daemon = 10;
-  string created_by = 11;
-  google.protobuf.Timestamp created_at = 12;
-  google.protobuf.Timestamp updated_at = 13;
-  google.protobuf.Timestamp last_sync_at = 14;
+  string name = 2;
+  string description = 3;
+  string host_public_key = 4;
+  repeated string tags = 5;
+  repeated string endpoints = 6;
+  repeated TargetAccount accounts = 7;
+  map<string, string> metadata = 8;
+  // Unset on a server set up with nk sync.
+  Daemon daemon = 9;
+  string created_by = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp manual_sync_at = 13;
 }
 
 // TargetAccess is what one subject may log in as on a target.
@@ -194,20 +194,14 @@ message RenameTargetRequest {
     }
   ];
 }
-message RenameTargetResponse {
-  Target target = 1;
-}
+message RenameTargetResponse {}
 
 message SetTargetEndpointsRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
   repeated string endpoints = 2;
 }
-message SetTargetEndpointsResponse {
-  Target target = 1;
-}
-message UpdateTargetResponse {
-  Target target = 1;
-}
+message SetTargetEndpointsResponse {}
+message UpdateTargetResponse {}
 
 message DeleteTargetRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
@@ -221,17 +215,16 @@ message ListTargetsRequest {
   }];
   int32 offset = 2 [(buf.validate.field).int32.gte = 0];
   string query = 3;
-  string daemon_id = 4;
-  repeated string accounts = 5;
-  repeated string tags = 6;
-  TargetStatus status = 7 [(buf.validate.field).enum = {defined_only: true}];
-  repeated string ids = 8 [(buf.validate.field).repeated = {
+  repeated string accounts = 4;
+  repeated string tags = 5;
+  TargetStatus status = 6 [(buf.validate.field).enum = {defined_only: true}];
+  repeated string ids = 7 [(buf.validate.field).repeated = {
     max_items: 100
     items: {
       string: {uuid: true}
     }
   }];
-  bool missed_rollover = 9;
+  bool missed_rollover = 8;
 }
 
 enum TargetStatus {
@@ -252,11 +245,10 @@ message GetSubjectAccessRequest {
 }
 message GetSubjectAccessResponse {
   repeated TargetAccess targets = 1;
-  repeated Daemon daemons = 2;
-  CertificateAuthority certificate_authority = 3;
+  CertificateAuthority certificate_authority = 2;
   oneof subject {
-    User user = 4;
-    ServiceAccount service_account = 5;
+    User user = 3;
+    ServiceAccount service_account = 4;
   }
 }
 

@@ -76,7 +76,7 @@ message Team {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   bool scim_managed = 8;
-  bool scim_open = 9;
+  bool scim_adoptable = 9;
 }
 
 message GetTeamRequest {

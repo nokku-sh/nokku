@@ -16,10 +16,10 @@ import (
 	"github.com/nokku-sh/nokku/core/internal/db"
 )
 
-// The kinds of ssh_ca_keys.
+// The sealed columns of ssh_ca_keys.
 const (
-	keyUser = "user"
-	keyHost = "host"
+	userKeyColumn = "user_private_key"
+	hostKeyColumn = "host_private_key"
 )
 
 // caKey is Ed25519: private in PKCS#8, public in authorized_keys form.
@@ -54,28 +54,29 @@ func CreateCA(ctx context.Context, q *db.Queries, keys *kms.Keyset, p *db.Create
 }
 
 // CASigner is the one way to a CA's key, which must match the row's public key.
-func CASigner(ctx context.Context, q *db.Queries, keys *kms.Keyset, caID string, certType uint32) (ssh.Signer, error) {
-	kind := keyUser
+func CASigner(ctx context.Context, q *db.Queries, keys *kms.Keyset, certType uint32) (*db.SSHCA, ssh.Signer, error) {
+	row, err := q.GetCASigningKeys(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	ca := &row.SSHCA
+	column, sealed, public := userKeyColumn, row.UserPrivateKey, ca.UserPublicKey
 	if certType == ssh.HostCert {
-		kind = keyHost
+		column, sealed, public = hostKeyColumn, row.HostPrivateKey, ca.HostPublicKey
 	}
-	row, err := q.GetCASigningKey(ctx, &db.GetCASigningKeyParams{CaID: caID, Kind: kind})
+	// The workspace comes from the row, it is what the key was sealed with.
+	der, err := keys.Open(caKeyAAD(ca.WorkspaceID, column), sealed)
 	if err != nil {
-		return nil, err
-	}
-	// The ids come from the row, they are what the key was sealed with.
-	der, err := keys.Open(caKeyAAD(row.WorkspaceID, row.CaID, kind), row.PrivateKey)
-	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	signer, err := getSigner(der)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CA signer: %w", err)
+		return nil, nil, fmt.Errorf("failed to create CA signer: %w", err)
 	}
-	if MarshalKey(signer.PublicKey()) != row.PublicKey {
-		return nil, errors.New("the private key of the CA does not match its public key")
+	if MarshalKey(signer.PublicKey()) != public {
+		return nil, nil, errors.New("the private key of the CA does not match its public key")
 	}
-	return signer, nil
+	return ca, signer, nil
 }
 
 func newKeys() (user, host caKey, err error) {
@@ -103,19 +104,18 @@ func newKey() (caKey, error) {
 }
 
 func putKeys(ctx context.Context, q *db.Queries, keys *kms.Keyset, ca *db.SSHCA, user, host caKey) error {
-	for kind, key := range map[string]caKey{keyUser: user, keyHost: host} {
-		sealed, err := keys.Seal(caKeyAAD(ca.WorkspaceID, ca.ID, kind), key.private)
-		if err != nil {
-			return err
-		}
-		if err := q.PutCAKey(ctx, &db.PutCAKeyParams{CaID: ca.ID, Kind: kind, PrivateKey: sealed}); err != nil {
-			return err
-		}
+	sealedUser, err := keys.Seal(caKeyAAD(ca.WorkspaceID, userKeyColumn), user.private)
+	if err != nil {
+		return err
 	}
-	return nil
+	sealedHost, err := keys.Seal(caKeyAAD(ca.WorkspaceID, hostKeyColumn), host.private)
+	if err != nil {
+		return err
+	}
+	return q.PutCAKeys(ctx, &db.PutCAKeysParams{UserPrivateKey: sealedUser, HostPrivateKey: sealedHost})
 }
 
-// caKeyAAD includes the kind, so the two keys of a CA cannot trade places.
-func caKeyAAD(workspaceID, caID, kind string) crypto.AAD {
-	return crypto.AAD{Table: "ssh_ca_keys", Column: "private_key", Workspace: workspaceID, Row: caID + "/" + kind}
+// caKeyAAD includes the column, so the two keys of a CA cannot trade places.
+func caKeyAAD(workspaceID, column string) crypto.AAD {
+	return crypto.AAD{Table: "ssh_ca_keys", Column: column, Workspace: workspaceID, Row: workspaceID}
 }

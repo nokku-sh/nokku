@@ -5,7 +5,6 @@ VALUES
   (@device_code_hash, @user_code, @ip, @user_agent, sqlc.narg ('loopback_port'), @expires_at);
 
 -- name: GetPendingDeviceGrant :one
--- For the approval page. It does not spend the code.
 SELECT
   ip,
   user_agent,
@@ -22,7 +21,7 @@ WHERE
 UPDATE device_grants
 SET
   status = @status,
-  user_id = @user_id,
+  decided_by = @decided_by,
   approved_method = @approved_method,
   loopback_code_hash = CASE
     WHEN loopback_port IS NULL THEN NULL
@@ -48,7 +47,7 @@ WHERE
 UPDATE device_grants
 SET
   polled_at = @polled_at,
-  violations = @violations
+  early_polls = @early_polls
 WHERE
   device_code_hash = @device_code_hash;
 

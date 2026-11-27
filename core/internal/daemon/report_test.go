@@ -24,7 +24,7 @@ func TestReportsArePacedPerDaemon(t *testing.T) {
 		took := func(daemonID string) time.Duration {
 			t.Helper()
 			start := time.Now()
-			row := &db.GetDaemonRow{Daemon: db.Daemon{ID: daemonID, WorkspaceID: "w1"}}
+			row := &db.GetDaemonRow{Daemon: db.Daemon{TargetID: daemonID, WorkspaceID: "w1"}}
 			require.NoError(t, p.storeReport(t.Context(), row, report))
 			return time.Since(start)
 		}

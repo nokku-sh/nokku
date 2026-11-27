@@ -355,7 +355,7 @@ func (p *Pool) reconcile(ctx context.Context, workspaceID string) error {
 			res = gone
 		}
 		c.want(res.GetStateHash())
-		if res.GetStatus() != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+		if res.GetRemoved() {
 			time.AfterFunc(dropGrace, c.cancel)
 		}
 	}

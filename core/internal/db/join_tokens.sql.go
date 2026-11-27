@@ -39,7 +39,6 @@ type AddJoinTokenGrantParams struct {
 	SubjectID   string `json:"subjectId"`
 }
 
-// One row per subject, the kind picks the column like AddGrant.
 func (q *Queries) AddJoinTokenGrant(ctx context.Context, arg *AddJoinTokenGrantParams) error {
 	_, err := q.db.Exec(ctx, addJoinTokenGrant,
 		arg.TokenID,

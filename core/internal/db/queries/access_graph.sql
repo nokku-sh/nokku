@@ -124,7 +124,6 @@ GROUP BY
   u.tag;
 
 -- name: ListAccessGraphTargets :many
--- The targets of one tag, the ones with a matching grant first. The filter is the one GetAccessGraph takes.
 SELECT
   t.id,
   t.name,
@@ -184,7 +183,6 @@ OFFSET
   sqlc.narg('offset');
 
 -- name: ListAccessMatrixRows :many
--- Whoever holds a live grant, teams first, then people and service accounts by name. Deactivated people are left out.
 -- Pages before it counts, so only the rows shown pay for their server counts.
 WITH
   page AS (
@@ -265,7 +263,6 @@ ORDER BY
   p.subject_id;
 
 -- name: ListAccessMatrixCells :many
--- Last use is per subject and server, so a server with many tags is looked up once, and a team's is its members'.
 WITH
   cells AS (
     SELECT

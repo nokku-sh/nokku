@@ -52,7 +52,7 @@ func TestClientsOutliveACoreRestart(t *testing.T) {
 	daemon.Learn(oldNonce)
 	sync, err := ctl.SyncDaemon(t.Context(), &nokkuv1.SyncDaemonRequest{})
 	require.NoError(t, err, "a sync with a nonce of the old boot did not retry by itself")
-	assert.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, sync.GetStatus())
+	assert.NotEmpty(t, sync.GetUserCaPublicKey())
 
 	// A stream is signed once, so the first dial fails and teaches the nonce.
 	daemon.Learn(oldNonce)
@@ -70,7 +70,7 @@ func TestClientsOutliveACoreRestart(t *testing.T) {
 	dialed, err := ctl.Connect(ctx)
 	require.NoError(t, err)
 	require.NoError(t, dialed.Send(heartbeat))
-	require.Eventually(t, func() bool { return restarted.Pool.IsConnected(enrolled.GetId()) },
+	require.Eventually(t, func() bool { return restarted.Pool.IsConnected(enrolled.GetTargetId()) },
 		5*time.Second, 20*time.Millisecond, "the daemon's second dial did not connect")
 
 	// An upload is a stream too, so its first try fails the same way.

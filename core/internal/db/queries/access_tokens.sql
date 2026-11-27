@@ -1,5 +1,4 @@
 -- name: CreateAccessToken :one
--- One subject parameter, the column it lands in follows the kind. A SCIM token has no subject.
 INSERT INTO
   access_tokens (
     token_hash,
@@ -8,14 +7,13 @@ INSERT INTO
     service_account_id,
     daemon_id,
     method,
-    binding,
+    dpop_thumbprint,
     ssh_key,
     label,
     user_agent,
     ip,
     expires_at,
-    last_seen_at,
-    workload_jti
+    last_seen_at
   )
 VALUES
   (
@@ -31,14 +29,13 @@ VALUES
       WHEN @kind::TEXT = 'daemon' THEN sqlc.narg('subject_id')::UUID
     END,
     @method,
-    @binding,
+    @dpop_thumbprint,
     @ssh_key,
     @label,
     @user_agent,
     @ip,
     sqlc.narg('expires_at'),
-    sqlc.narg('last_seen_at'),
-    sqlc.narg('workload_jti')
+    sqlc.narg('last_seen_at')
   )
 RETURNING
   *;
@@ -64,8 +61,7 @@ WHERE
   id = @id;
 
 -- name: DeleteSubjectTokens :execrows
--- Signs the subject out everywhere. A user's devices are forgotten too, so none is waved through quietly again, and a
--- pending nk login is dropped, or an approval from before this would still turn into a token.
+-- Drops a pending nk login too, or an old approval still becomes a token.
 WITH
   forgotten AS (
     DELETE FROM known_devices
@@ -75,14 +71,13 @@ WITH
   pending AS (
     DELETE FROM device_grants
     WHERE
-      user_id = @subject_id::UUID
+      decided_by = @subject_id::UUID
   )
 DELETE FROM access_tokens
 WHERE
   subject_id = @subject_id::UUID;
 
 -- name: ListUserSessions :many
--- The browsers and terminals one user is signed in from.
 SELECT
   *
 FROM
@@ -93,42 +88,38 @@ ORDER BY
   last_seen_at DESC NULLS LAST;
 
 -- name: DeleteExpiredAccessTokens :execrows
--- Every tenant, runs as nokku_system.
 DELETE FROM access_tokens
 WHERE
   expires_at IS NOT NULL
   AND expires_at < @now;
 
 -- name: ListServiceAccountTokens :many
--- A revoked row of an exchange is no token any more, see RevokeWorkloadToken.
 SELECT
   *
 FROM
   access_tokens
 WHERE
   service_account_id = @service_account_id::UUID
-  AND token_hash NOT LIKE 'revoked:%'
 ORDER BY
   created_at DESC;
 
 -- name: DeleteServiceAccountToken :execrows
--- A key. The row of an exchange goes through RevokeWorkloadToken.
 DELETE FROM access_tokens
 WHERE
   id = @id
-  AND service_account_id = @service_account_id::UUID
-  AND workload_jti IS NULL;
+  AND service_account_id = @service_account_id::UUID;
 
--- name: RevokeWorkloadToken :execrows
--- The row of an exchange also says its job token is spent, and that job token can outlive a revoke. So the row stays
--- until it expires, and loses the hash that signs in. No token hashes to this value.
-UPDATE access_tokens
-SET
-  token_hash = 'revoked:' || id::TEXT
+-- name: SpendJobToken :exec
+-- A job token works once, a second use trips the primary key.
+INSERT INTO
+  spent_job_tokens (issuer, jti, expires_at)
+VALUES
+  (@issuer, @jti, @expires_at);
+
+-- name: DeleteExpiredSpentJobTokens :execrows
+DELETE FROM spent_job_tokens
 WHERE
-  id = @id
-  AND service_account_id = @service_account_id::UUID
-  AND workload_jti IS NOT NULL;
+  expires_at < @now;
 
 -- name: ListSCIMTokens :many
 SELECT
@@ -147,7 +138,6 @@ WHERE
   AND kind = 'scim';
 
 -- name: CapSessions :execrows
--- Requiring single sign-on shortens the sessions it leaves, a provider's and the owner's, to what a new one gets.
 UPDATE access_tokens
 SET
   expires_at = @not_after::TIMESTAMPTZ
@@ -159,8 +149,7 @@ WHERE
   );
 
 -- name: DeleteNonSSOSessions :execrows
--- Requiring single sign-on ends the sessions a passkey or a mailed link started, in the browser and in nk. The owner
--- keeps theirs, the way in when a provider breaks.
+-- The owner keeps theirs, the way in when a provider breaks.
 DELETE FROM access_tokens
 WHERE
   kind IN ('user', 'cli')

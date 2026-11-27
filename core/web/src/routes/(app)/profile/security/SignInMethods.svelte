@@ -13,7 +13,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
-	import { type AccountCredential, CredentialType } from '#lib/gen/nokku/v1/account_pb.js';
+	import type { OIDCIdentity } from '#lib/gen/nokku/v1/account_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import type { Timestamp } from '@bufbuild/protobuf/wkt';
 	import { KeyRound, Link, Mail, Plus, Trash, Unlink } from '@lucide/svelte';
@@ -26,8 +26,8 @@
 	const options = auth.options();
 	const me = user.self();
 
-	const passkeys = $derived((all.data ?? []).filter((c) => c.type === CredentialType.PASSKEY));
-	const linked = $derived((all.data ?? []).filter((c) => c.type === CredentialType.OIDC));
+	const passkeys = $derived(all.data?.passkeys ?? []);
+	const linked = $derived(all.data?.oidcIdentities ?? []);
 	const scim = $derived(!!me.data?.scimManaged);
 
 	// With email links on, a lost passkey is not a lockout. Otherwise the last method stays.
@@ -37,7 +37,7 @@
 	const usage = (added?: Timestamp, used?: Timestamp) =>
 		`Added ${formatTs(added, 'relative', 'a while ago')} · ${used ? `last used ${formatTs(used, 'relative')}` : 'not used yet'}`;
 
-	const providerName = (c: AccountCredential) =>
+	const providerName = (c: OIDCIdentity) =>
 		options.data?.providers.find((p) => p.id === c.provider)?.name || c.provider;
 
 	// Providers of this workspace the account has not signed in through yet.

@@ -14,7 +14,7 @@ func TestListJSON(t *testing.T) {
 	t.Parallel()
 	s := &state.State{}
 	s.Targets = []state.Target{
-		{ID: "t-1", Name: "web", Usernames: []string{"root"}, DaemonID: "d"},
+		{ID: "t-1", Name: "web", Usernames: []string{"root"}, Daemon: true},
 		{ID: "t-2", Name: "bare"},
 	}
 

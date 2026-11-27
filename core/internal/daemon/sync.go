@@ -29,11 +29,11 @@ type SyncInput struct {
 // Sync saves the report on its own, a failure never costs the principal list.
 func Sync(ctx context.Context, conn connection, in SyncInput) (*nokkuv1.SyncDaemonResponse, error) {
 	var res *nokkuv1.SyncDaemonResponse
-	var targetID string
+	var accepted bool
 	err := conn.TenantTx(ctx, func(q *db.Queries) error {
 		row, err := q.GetDaemon(ctx, in.DaemonID)
-		// A deleted daemon still serves its cached principals, REJECTED makes
-		// the host drop them. Its token stays until it expires, so a lost
+		// A deleted daemon still serves its cached principals, the removed answer
+		// makes the host drop them. Its token stays until it expires, so a lost
 		// answer comes again, and nothing else takes it.
 		if errors.Is(err, pgx.ErrNoRows) {
 			res, err = answer(nil, nil, nil, nil)
@@ -43,8 +43,8 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*nokkuv1.SyncDaem
 			return err
 		}
 		daemon := &row.Daemon
-		// Pending daemons keep retrying, rejected ones are told to stop.
-		if daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+		// A pending daemon keeps retrying.
+		if !daemon.Accepted {
 			res, err = answer(daemon, nil, nil, nil)
 			return err
 		}
@@ -53,22 +53,18 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*nokkuv1.SyncDaem
 		if err != nil {
 			return err
 		}
-		target, err := q.GetTargetByDaemon(ctx, &daemon.ID)
-		if err != nil {
-			return err
-		}
-		targetID = target.ID
+		accepted = true
 		ca, err := q.GetWorkspaceCA(ctx)
 		if err != nil {
 			return err
 		}
-		accounts, err := q.ListAccountSubjectsForTarget(ctx, target.ID)
+		accounts, err := q.ListAccountSubjectsForTarget(ctx, daemon.TargetID)
 		if err != nil {
 			return err
 		}
 		principals := make([]*nokkuv1.AccountPrincipals, 0, len(accounts))
 		for _, a := range accounts {
-			principals = append(principals, accountPrincipals(target.ID, a.Username, a.Ids))
+			principals = append(principals, accountPrincipals(daemon.TargetID, a.Username, a.Ids))
 		}
 		res, err = answer(daemon, workspace.Settings, ca, principals)
 		return err
@@ -76,8 +72,8 @@ func Sync(ctx context.Context, conn connection, in SyncInput) (*nokkuv1.SyncDaem
 	if err != nil {
 		return nil, err
 	}
-	if targetID != "" {
-		if err := saveReport(ctx, conn, in, targetID); err != nil {
+	if accepted {
+		if err := saveReport(ctx, conn, in); err != nil {
 			slog.Warn("server report not saved", "daemon_id", in.DaemonID, "error", err)
 		}
 	}
@@ -109,11 +105,11 @@ func Answers(ctx context.Context, conn connection) (map[string]*nokkuv1.SyncDaem
 			principals[a.TargetID] = append(principals[a.TargetID], accountPrincipals(a.TargetID, a.Username, a.Ids))
 		}
 		for _, d := range daemons {
-			res, err := answer(&d.Daemon, workspace.Settings, ca, principals[d.TargetID])
+			res, err := answer(d, workspace.Settings, ca, principals[d.TargetID])
 			if err != nil {
 				return err
 			}
-			answers[d.Daemon.ID] = res
+			answers[d.TargetID] = res
 		}
 		return nil
 	})
@@ -128,12 +124,13 @@ func answer(
 	ca *db.SSHCA,
 	principals []*nokkuv1.AccountPrincipals,
 ) (*nokkuv1.SyncDaemonResponse, error) {
-	res := &nokkuv1.SyncDaemonResponse{Status: new(nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED)}
-	if daemon != nil {
-		res.Status = &daemon.Status
+	res := &nokkuv1.SyncDaemonResponse{}
+	if daemon == nil {
+		res.Removed = new(true)
+	} else {
 		res.Config = daemon.EffectiveConfig()
 	}
-	if daemon != nil && daemon.Status == nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+	if daemon != nil && daemon.Accepted {
 		// Zero is off, which is what an unset field says too.
 		if idle := settings.GetSessionIdleTimeout(); idle.AsDuration() > 0 {
 			res.IdleTimeout = idle
@@ -162,21 +159,20 @@ func accountPrincipals(targetID, username string, subjects []string) *nokkuv1.Ac
 }
 
 // An account saved here has no grants yet, so the list read before misses none.
-func saveReport(ctx context.Context, conn connection, in SyncInput, targetID string) error {
+func saveReport(ctx context.Context, conn connection, in SyncInput) error {
 	targetMeta, err := json.Marshal(in.ReqMetadata)
 	if err != nil {
 		return err
 	}
 	return conn.TenantTx(ctx, func(q *db.Queries) error {
-		// Never write status here, that would clobber an admin's decision.
 		if err := q.UpdateDaemonVersion(ctx, &db.UpdateDaemonVersionParams{
-			DaemonID: in.DaemonID,
+			TargetID: in.DaemonID,
 			Version:  in.Version,
 		}); err != nil {
 			return err
 		}
 		if err := q.UpdateTargetReport(ctx, &db.UpdateTargetReportParams{
-			TargetID:  targetID,
+			TargetID:  in.DaemonID,
 			Metadata:  targetMeta,
 			Endpoints: validEndpoints(in.PrivateIPs),
 		}); err != nil {
@@ -184,7 +180,7 @@ func saveReport(ctx context.Context, conn connection, in SyncInput, targetID str
 		}
 		// Never deletes, a host that can't list users must not change access.
 		return q.InsertTargetAccounts(ctx, &db.InsertTargetAccountsParams{
-			TargetID:    targetID,
+			TargetID:    in.DaemonID,
 			Usernames:   ValidUsers(in.Users),
 			MaxAccounts: db.MaxTargetAccounts,
 		})

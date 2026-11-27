@@ -29,12 +29,6 @@ service DaemonService {
       fresh: true
     };
   }
-  rpc DeleteDaemon(DeleteDaemonRequest) returns (DeleteDaemonResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_EDITOR
-      fresh: true
-    };
-  }
   rpc ListDaemons(ListDaemonsRequest) returns (ListDaemonsResponse) {
     option (access) = {
       role: WORKSPACE_ROLE_VIEWER
@@ -91,18 +85,11 @@ service DaemonControlService {
   }
 }
 
-enum DaemonStatus {
-  DAEMON_STATUS_UNSPECIFIED = 0;
-  DAEMON_STATUS_PENDING = 1;
-  DAEMON_STATUS_ACCEPTED = 2;
-  DAEMON_STATUS_REJECTED = 3;
-}
-
 message Daemon {
   string id = 1;
   string name = 2;
   bool online = 3;
-  DaemonStatus status = 4;
+  bool accepted = 4;
   DaemonConfig config = 5;
   string version = 6;
   google.protobuf.Timestamp updated_at = 7;
@@ -155,11 +142,6 @@ message SetDaemonSafeguardsRequest {
 }
 message SetDaemonSafeguardsResponse {}
 
-message DeleteDaemonRequest {
-  string id = 1 [(buf.validate.field).string.uuid = true];
-}
-message DeleteDaemonResponse {}
-
 message ListDaemonsRequest {
   int32 limit = 1 [(buf.validate.field).int32 = {
     gte: 1
@@ -168,7 +150,6 @@ message ListDaemonsRequest {
   int32 offset = 2 [(buf.validate.field).int32.gte = 0];
   string query = 3;
   bool online = 4;
-  DaemonStatus status = 5;
 }
 message ListDaemonsResponse {
   repeated Daemon daemons = 1;
@@ -204,11 +185,9 @@ message EnrollDaemonRequest {
   }];
 }
 message EnrollDaemonResponse {
-  string id = 1;
-  string target_id = 2;
-  DaemonStatus status = 3;
-  DaemonConfig config = 4;
-  string access_token = 5;
+  string target_id = 1;
+  DaemonConfig config = 2;
+  string access_token = 3;
 }
 
 message AccountPrincipals {
@@ -241,7 +220,7 @@ message SyncDaemonRequest {
 }
 
 message SyncDaemonResponse {
-  DaemonStatus status = 1;
+  bool removed = 1;
   DaemonConfig config = 2;
   repeated AccountPrincipals principals = 3;
   string user_ca_public_key = 4;

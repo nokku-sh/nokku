@@ -48,22 +48,25 @@ message EndingGrant {
 message GetDashboardRequest {}
 message GetDashboardResponse {
   int32 target_count = 1;
-  int32 online_target_count = 2;
-  int32 manual_target_count = 3;
+  int32 manual_target_count = 2;
+  int32 offline_target_count = 3;
+  // The first five.
   repeated Target offline_targets = 4;
   int32 daemon_count = 5;
   int32 online_daemon_count = 6;
   int32 behind_daemon_count = 7;
-  repeated Daemon pending_daemons = 8;
-  int32 user_count = 9;
-  int64 recording_bytes = 10;
-  int64 recording_quota_bytes = 11;
-  repeated LiveSession live_sessions = 12;
+  int32 pending_daemon_count = 8;
+  // The newest five.
+  repeated Daemon pending_daemons = 9;
+  int32 user_count = 10;
+  int64 recording_bytes = 11;
+  int64 recording_quota_bytes = 12;
+  repeated LiveSession live_sessions = 13;
   // The last 24 hours, oldest first.
-  repeated int32 events_by_hour = 13;
-  repeated int32 failures_by_hour = 14;
-  repeated AuditEvent recent_changes = 15;
+  repeated int32 events_by_hour = 14;
+  repeated int32 failures_by_hour = 15;
+  repeated AuditEvent recent_changes = 16;
   // The next five to end within a day.
-  repeated EndingGrant ending_grants = 16;
-  int32 ending_grant_count = 17;
+  repeated EndingGrant ending_grants = 17;
+  int32 ending_grant_count = 18;
 }

@@ -46,7 +46,7 @@ WHERE
   (
     sqlc.narg('query')::TEXT IS NULL
     OR sa.name ILIKE '%' || sqlc.narg('query') || '%'
-    OR COALESCE(sa.description, '') ILIKE '%' || sqlc.narg('query') || '%'
+    OR sa.description ILIKE '%' || sqlc.narg('query') || '%'
   )
   AND (
     sqlc.narg('tags')::TEXT[] IS NULL

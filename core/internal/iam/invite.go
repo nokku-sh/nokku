@@ -64,16 +64,11 @@ func (s *Service) Invite(ctx context.Context, email string, role nokkuv1.Workspa
 	// The mail is out, so the store must not die with the request's deadline.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
-	err = s.conn.TenantTx(ctx, func(q *db.Queries) error {
-		if _, err := q.DeleteInvite(ctx, email); err != nil {
-			return err
-		}
-		return q.PutInvite(ctx, &db.PutInviteParams{
-			TokenHash: hash,
-			Email:     &email,
-			Role:      &role,
-			ExpiresAt: s.now().Add(InviteTTL),
-		})
+	err = s.conn.Tenant().PutInvite(ctx, &db.PutInviteParams{
+		TokenHash: hash,
+		Email:     email,
+		Role:      role,
+		ExpiresAt: s.now().Add(InviteTTL),
 	})
 	if err != nil {
 		return "", err
@@ -118,7 +113,7 @@ func (s *Service) AcceptInvite(ctx context.Context, raw, name string) (*db.User,
 			return ErrSSORequired
 		}
 		u, err = s.createUser(ctx, q, db.CreateUserWithIDParams{
-			Email: inv.Email, Name: strings.TrimSpace(name), Role: deref(inv.Role),
+			Email: inv.Email, Name: strings.TrimSpace(name), Role: inv.Role,
 		})
 		return err
 	})

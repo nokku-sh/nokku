@@ -45,7 +45,7 @@ func TestInviteCreatesOneAccount(t *testing.T) {
 		inv, err := e.svc.LookupInvite(ctx, token)
 		require.NoError(t, err)
 		assert.Equal(t, email, inv.Email)
-		assert.Equal(t, editor, *inv.Role)
+		assert.Equal(t, editor, inv.Role)
 	}
 	assert.Nil(t, e.userByEmail(t, a.ws, email), "looking at the invite made the account")
 

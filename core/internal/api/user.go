@@ -155,7 +155,7 @@ func (s *userService) ClearUserIdentities(
 		if err := checkCanManageUser(ctx, q, req.GetId()); err != nil {
 			return err
 		}
-		return q.DeleteUserOIDCCredentials(ctx, req.GetId())
+		return q.DeleteUserOIDCIdentities(ctx, req.GetId())
 	}); err != nil {
 		return nil, err
 	}

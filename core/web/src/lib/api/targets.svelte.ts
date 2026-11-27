@@ -28,8 +28,8 @@ const subjectTarget = (a: TargetAccess): SubjectTarget[] =>
 	a.target ? [{ ...a, target: a.target }] : [];
 
 // What a delete takes with it, for the dialogs that ask first.
-export function deleteWarning(t: { name: string; daemonId: string }) {
-	return t.daemonId
+export function deleteWarning(t: Pick<Target, 'name' | 'daemon'>) {
+	return t.daemon
 		? 'Everyone loses access to this server. Its login accounts, grants and daemon are removed.'
 		: `Everyone loses access to this server. Its login accounts and grants are removed. Run nk rm ${t.name} first, it removes what Nokku wrote on the server.`;
 }

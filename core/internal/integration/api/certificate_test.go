@@ -83,7 +83,7 @@ func TestSignSSHCertificate(t *testing.T) {
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err),
 		"a daemon nobody approved got a certificate signed, %v", err)
 	_, err = nokkuv1connect.NewDaemonServiceClient(clientOn(srv, adminAuth)).
-		ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(enrolled.GetId())})
+		ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(enrolled.GetTargetId())})
 	require.NoError(t, err)
 
 	signed, err := sign(targetID)
@@ -147,7 +147,6 @@ func TestServiceAccountCertificateLifetime(t *testing.T) {
 		"Bearer "+seedMember(t, cfg, workspaceID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_ADMIN),
 	)
 	_, enrolled := enrollTestDaemon(t, cfg, srv, workspaceID, true)
-	require.Equal(t, nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED, enrolled.GetStatus())
 	targetID := enrolled.GetTargetId()
 
 	accounts := nokkuv1connect.NewServiceAccountServiceClient(

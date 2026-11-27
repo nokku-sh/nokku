@@ -65,7 +65,6 @@ WHERE
   expires_at < $1
 `
 
-// Every tenant, runs as nokku_system.
 func (q *Queries) DeleteExpiredKnownDevices(ctx context.Context, now time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredKnownDevices, now)
 	if err != nil {
@@ -150,7 +149,6 @@ type SeenKnownDeviceParams struct {
 	Key    string    `json:"key"`
 }
 
-// Recognizes a device of the user and notes the visit. No row means the account has not signed in from it.
 func (q *Queries) SeenKnownDevice(ctx context.Context, arg *SeenKnownDeviceParams) (string, error) {
 	row := q.db.QueryRow(ctx, seenKnownDevice, arg.Now, arg.UserID, arg.Key)
 	var id string

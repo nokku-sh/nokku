@@ -7,11 +7,10 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.js';
-	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import type { Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { formatTs } from '#lib/utils.js';
 	import type { Timestamp } from '@bufbuild/protobuf/wkt';
-	import { Ban, Check, Clock, RefreshCw, TriangleAlert, Wifi, WifiOff, X } from '@lucide/svelte';
+	import { Check, Clock, RefreshCw, TriangleAlert, Wifi, WifiOff, X } from '@lucide/svelte';
 
 	interface Props {
 		target: Target;
@@ -24,18 +23,17 @@
 	const can = user.can();
 	const review = useDaemonReview();
 	const d = $derived(target.daemon);
-	const pending = $derived(d?.status === DaemonStatus.PENDING);
-	const stale = $derived(!d && missedRollover(caRotatedAt, target.lastSyncAt));
+	const stale = $derived(!d && missedRollover(caRotatedAt, target.manualSyncAt));
 
 	// The line under the badge: how fresh the state is, and the daemon's version where there is one.
 	const detail = $derived.by(() => {
 		if (!d) {
 			if (stale) return 'Run nk sync, the CA rolled over since';
-			return target.lastSyncAt
-				? `Synced ${formatTs(target.lastSyncAt, 'relative')}`
+			return target.manualSyncAt
+				? `Synced ${formatTs(target.manualSyncAt, 'relative')}`
 				: 'Not synced yet';
 		}
-		if (d.status !== DaemonStatus.ACCEPTED) return `Enrolled ${formatTs(d.createdAt, 'relative')}`;
+		if (!d.accepted) return `Enrolled ${formatTs(d.createdAt, 'relative')}`;
 		const version = d.version && `nokkud ${d.version}`;
 		if (d.behindSince) return `Since ${formatTs(d.behindSince, 'relative')}`;
 		if (d.online) return version;
@@ -60,7 +58,7 @@
 		{:else}
 			<StateCell label="nk sync" tone="muted" icon={RefreshCw} />
 		{/if}
-	{:else if d.status === DaemonStatus.ACCEPTED}
+	{:else if d.accepted}
 		<div class="flex items-center gap-1">
 			<StateCell
 				label={d.behindSince ? 'Behind' : d.online ? 'Online' : 'Offline'}
@@ -71,13 +69,8 @@
 			{/if}
 		</div>
 	{:else}
-		<!-- Anything but accepted keeps people out, so every such state offers Approve. -->
 		<div class="flex items-center gap-1">
-			{#if pending}
-				<Badge variant="warning"><Clock data-icon="inline-start" />Needs approval</Badge>
-			{:else}
-				<Badge variant="destructive"><Ban data-icon="inline-start" />Rejected</Badge>
-			{/if}
+			<Badge variant="warning"><Clock data-icon="inline-start" />Needs approval</Badge>
 			{#if can.edit}
 				<Button
 					size="xs"
@@ -90,24 +83,22 @@
 						/>{/if}
 					Approve
 				</Button>
-				{#if pending}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									size="icon-xs"
-									variant="ghost"
-									aria-label={`Reject ${d.name}`}
-									onclick={() => review.reject(d)}
-								>
-									<X />
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>Reject</Tooltip.Content>
-					</Tooltip.Root>
-				{/if}
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								size="icon-xs"
+								variant="ghost"
+								aria-label={`Reject ${d.name}`}
+								onclick={() => review.reject(d)}
+							>
+								<X />
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>Reject</Tooltip.Content>
+				</Tooltip.Root>
 			{/if}
 		</div>
 	{/if}

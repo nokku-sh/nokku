@@ -10,27 +10,7 @@ WHERE
   -- The review counts in days. Not rewriting the row on every certificate saves a write per login.
   access_usage.last_cert_at < NOW() - INTERVAL '1 hour';
 
--- name: TouchAccessUsageByDaemon :exec
-INSERT INTO
-  access_usage (target_id, subject_id)
-SELECT
-  t.id,
-  @subject_id
-FROM
-  targets t
-WHERE
-  t.daemon_id = @daemon_id
-ON CONFLICT (target_id, subject_id) DO UPDATE
-SET
-  last_cert_at = NOW()
-WHERE
-  -- The review counts in days. Not rewriting the row on every certificate saves a write per login.
-  access_usage.last_cert_at < NOW() - INTERVAL '1 hour';
-
 -- name: ListAccessReport :many
--- One row per subject, account and the way the subject holds it, a team grant once per member. Every grant is in it,
--- enforced says whether it lets anyone in today. A row is stale when nobody got a certificate for the target in 90
--- days, counted from the grant when there never was one.
 SELECT
   e.subject_kind::TEXT AS kind,
   e.subject_id::UUID AS subject_id,

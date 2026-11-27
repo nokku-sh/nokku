@@ -210,13 +210,10 @@ func seedIDP(ctx context.Context, q *db.Queries, keys *kms.Keyset, workspaceID s
 		); err != nil {
 			return "", nil, err
 		}
-		if _, err := q.UpsertCredential(ctx, &db.UpsertCredentialParams{
-			ID:       workspaceID + ":" + providerID + ":" + sub,
-			UserID:   owner.ID,
-			Type:     string(iam.MethodOIDC),
-			Provider: providerID,
-			Subject:  sub,
-			Data:     []byte{},
+		if _, err := q.LinkOIDCIdentity(ctx, &db.LinkOIDCIdentityParams{
+			UserID:     owner.ID,
+			ProviderID: providerID,
+			Subject:    sub,
 		}); err != nil {
 			return "", nil, fmt.Errorf("owner link: %w", err)
 		}

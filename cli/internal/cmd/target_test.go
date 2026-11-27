@@ -82,7 +82,7 @@ func TestFindTarget(t *testing.T) {
 	t.Parallel()
 	targets := []state.Target{
 		{ID: "t-1", Name: "web", Endpoints: []string{"10.0.0.5:2222"}},
-		{ID: "t-2", Name: "db", DaemonID: "d", Endpoints: []string{"10.0.0.6"}},
+		{ID: "t-2", Name: "db", Daemon: true, Endpoints: []string{"10.0.0.6"}},
 		{ID: "t-3", Name: "dup", Endpoints: []string{"10.0.0.7"}},
 		{ID: "t-4", Name: "other", Endpoints: []string{"10.0.0.7"}},
 		{ID: "t-5", Name: "nat-a", Endpoints: []string{"1.2.3.4:2201"}},

@@ -66,9 +66,7 @@ func (b *fakeCore) EnrollDaemon(
 	}
 	b.enrolled.Store(req)
 	return &nokkuv1.EnrollDaemonResponse{
-		Id:          new("daemon-1"),
 		TargetId:    new(testTarget),
-		Status:      nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
 		Config:      &nokkuv1.DaemonConfig{Ephemeral: new(true)},
 		AccessToken: new("session"),
 	}, nil
@@ -87,7 +85,6 @@ func (b *fakeCore) SyncDaemon(
 
 func (b *fakeCore) accepted() *nokkuv1.SyncDaemonResponse {
 	return &nokkuv1.SyncDaemonResponse{
-		Status:          nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED.Enum(),
 		UserCaPublicKey: &b.ca,
 		HostCaPublicKey: &b.hostCA,
 		StateHash:       []byte("7"),
@@ -219,7 +216,7 @@ func TestSyncPendingDropsTrust(t *testing.T) {
 	require.NoError(t, c.syncDaemon(t.Context()))
 	require.NotEmpty(t, c.state.Access().Principals["deploy"])
 
-	core.answer.Store(&nokkuv1.SyncDaemonResponse{Status: nokkuv1.DaemonStatus_DAEMON_STATUS_PENDING.Enum()})
+	core.answer.Store(&nokkuv1.SyncDaemonResponse{StateHash: []byte("8")})
 	require.NoError(t, c.syncDaemon(t.Context()))
 	assert.Empty(t, c.state.Access().Principals["deploy"], "a pending daemon still honors its old grants")
 	assert.Empty(t, c.state.Access().UserCA, "a pending daemon still trusts its old CA")
@@ -240,7 +237,7 @@ func TestEnrollReportsTheHost(t *testing.T) {
 	require.NotNil(t, req, "no enroll call reached the core")
 	hostname, _ := os.Hostname()
 	assert.Equal(t, hostname, req.GetMetadata()["hostname"])
-	assert.Equal(t, "daemon-1", c.state.DaemonID)
+	assert.Equal(t, "session", c.state.SessionToken)
 	assert.True(t, c.state.Access().DaemonConfig.GetEphemeral(), "the enroll config is what the daemon keeps")
 }
 
@@ -256,7 +253,7 @@ func TestEnrollRetriesABusyCore(t *testing.T) {
 	require.NoError(t, c.enroll(t.Context(), "token"))
 
 	assert.EqualValues(t, 3, core.enrollCalls.Load())
-	assert.Equal(t, "daemon-1", c.state.DaemonID)
+	assert.Equal(t, "session", c.state.SessionToken)
 }
 
 func TestEnrollGivesUpOnARefusedToken(t *testing.T) {
@@ -268,7 +265,7 @@ func TestEnrollGivesUpOnARefusedToken(t *testing.T) {
 	require.Error(t, c.enroll(t.Context(), "token"))
 
 	assert.EqualValues(t, 1, core.enrollCalls.Load(), "a refused token was tried again")
-	assert.Empty(t, c.state.DaemonID)
+	assert.Empty(t, c.state.SessionToken)
 }
 
 // Enrollment and access share a file: a restart finds both, re-enroll resets.
@@ -283,7 +280,6 @@ func TestEnrollRestartReEnroll(t *testing.T) {
 
 	restarted, err := state.Load()
 	must.NoError(err)
-	is.Equal("daemon-1", restarted.DaemonID)
 	is.Equal(testTarget, restarted.TargetID)
 	is.Equal("session", restarted.SessionToken)
 	is.Equal(core.ca, restarted.Access().UserCA)
@@ -294,7 +290,7 @@ func TestEnrollRestartReEnroll(t *testing.T) {
 	reenrolled, err := state.Load()
 	must.NoError(err)
 	for _, s := range []*state.State{c.state, reenrolled} {
-		is.Equal("daemon-1", s.DaemonID)
+		is.Equal(testTarget, s.TargetID)
 		is.Empty(s.Access().UserCA, "a new enrollment still trusts the old CA")
 		is.Empty(s.Access().Principals, "a new enrollment still has the old grants")
 		is.True(s.Access().DaemonConfig.GetEphemeral(), "the new enroll config was lost")
@@ -302,7 +298,7 @@ func TestEnrollRestartReEnroll(t *testing.T) {
 }
 
 // One write drops enrollment and access. Only where the core is stays.
-func TestRejectionDropsEnrollmentAndAccess(t *testing.T) {
+func TestRemovalDropsEnrollmentAndAccess(t *testing.T) {
 	is := assert.New(t)
 	must := require.New(t)
 	core := &fakeCore{ca: newTestCAKey(t)}
@@ -311,8 +307,8 @@ func TestRejectionDropsEnrollmentAndAccess(t *testing.T) {
 	must.NoError(c.enroll(t.Context(), "token"))
 	must.NoError(c.syncDaemon(t.Context()))
 
-	core.answer.Store(&nokkuv1.SyncDaemonResponse{Status: nokkuv1.DaemonStatus_DAEMON_STATUS_REJECTED.Enum()})
-	must.ErrorIs(c.syncDaemon(t.Context()), errDaemonRejected)
+	core.answer.Store(&nokkuv1.SyncDaemonResponse{Removed: new(true), StateHash: []byte("8")})
+	must.ErrorIs(c.syncDaemon(t.Context()), errDaemonRemoved)
 
 	loaded, err := state.Load()
 	must.NoError(err)

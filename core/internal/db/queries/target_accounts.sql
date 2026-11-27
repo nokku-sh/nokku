@@ -74,10 +74,9 @@ ORDER BY
   p.username ASC;
 
 -- name: InsertTargetAccounts :exec
--- Never deletes, a host's list is a hint. A target that holds max_accounts takes no more. The first report
--- of an account stamps it seen, later ones leave the row alone.
+-- The first report of an account stamps it seen, later ones leave the row alone.
 INSERT INTO
-  target_accounts (workspace_id, target_id, username, seen_at)
+  target_accounts (workspace_id, target_id, username, first_seen_at)
 SELECT
   t.workspace_id,
   t.id,
@@ -104,12 +103,11 @@ WHERE
   ) < @max_accounts::INTEGER
 ON CONFLICT (target_id, username) DO UPDATE
 SET
-  seen_at = NOW()
+  first_seen_at = NOW()
 WHERE
-  target_accounts.seen_at IS NULL;
+  target_accounts.first_seen_at IS NULL;
 
 -- name: SeedTargetAccountsFromToken :exec
--- Copies an enroll token's grants onto a fresh target. Runs once, when the daemon is created.
 WITH
   accounts AS (
     INSERT INTO
@@ -144,7 +142,6 @@ WHERE
 ON CONFLICT DO NOTHING;
 
 -- name: GetTargetAccountLabel :one
--- What an audit event shows for a login account. An account of another workspace does not exist here.
 SELECT
   t.name AS target_name,
   p.username
@@ -155,7 +152,6 @@ WHERE
   p.id = @account_id;
 
 -- name: GrantWhere :many
--- The servers a batch grant names, by id or by tag, each with the account asked for if it has one.
 SELECT
   t.id,
   t.name,
@@ -171,7 +167,6 @@ ORDER BY
   t.name;
 
 -- name: GrantWhereAccounts :many
--- The accounts those servers have, the most common first.
 SELECT
   a.username,
   COUNT(*)::INT AS servers
@@ -188,7 +183,6 @@ ORDER BY
   a.username;
 
 -- name: ListGrantEnds :many
--- What one subject holds on these accounts already. A grant that ran out counts as none.
 SELECT
   account_id,
   expires_at
@@ -199,15 +193,13 @@ WHERE
   AND subject_id = @subject_id;
 
 -- name: PutGrants :exec
--- An admin's grant on each account, the expiry is set exactly as asked. It can extend, shorten or end an expiry.
 INSERT INTO
   grants (
     account_id,
     user_id,
     team_id,
     service_account_id,
-    expires_at,
-    granted_by
+    expires_at
   )
 SELECT
   account_id,
@@ -220,27 +212,24 @@ SELECT
   CASE
     WHEN @subject_kind::TEXT = 'service_account' THEN @subject_id::UUID
   END,
-  sqlc.narg('expires_at')::TIMESTAMPTZ,
-  sqlc.narg('granted_by')::UUID
+  sqlc.narg('expires_at')::TIMESTAMPTZ
 FROM
   unnest(@account_ids::UUID[]) AS account_id
 ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
-  expires_at = EXCLUDED.expires_at,
-  granted_by = EXCLUDED.granted_by
+  expires_at = EXCLUDED.expires_at
 WHERE
   grants.expires_at IS DISTINCT FROM EXCLUDED.expires_at;
 
 -- name: ExtendGrant :exec
 -- An approved request never shortens access the user already has. A grant for good stays one.
 INSERT INTO
-  grants (account_id, user_id, expires_at, granted_by)
+  grants (account_id, user_id, expires_at)
 VALUES
-  (@account_id, @user_id::UUID, @expires_at::TIMESTAMPTZ, sqlc.narg('granted_by')::UUID)
+  (@account_id, @user_id::UUID, @expires_at::TIMESTAMPTZ)
 ON CONFLICT (account_id, subject_id) DO UPDATE
 SET
-  expires_at = EXCLUDED.expires_at,
-  granted_by = EXCLUDED.granted_by
+  expires_at = EXCLUDED.expires_at
 WHERE
   grants.expires_at < EXCLUDED.expires_at;
 
@@ -283,7 +272,6 @@ FROM
   LEFT JOIN service_accounts s ON s.id = gone.subject_id;
 
 -- name: RevokeWhere :many
--- One subject's own grants on the servers a revoke names. A username keeps it to one account.
 SELECT
   g.account_id,
   a.username,
@@ -311,7 +299,6 @@ ORDER BY
   a.username;
 
 -- name: RemoveGrants :exec
--- Grant removal is the whole lockout. The next sync drops the subject, so an issued cert matches no account.
 DELETE FROM grants
 WHERE
   account_id = ANY (@account_ids::UUID[])
@@ -352,9 +339,7 @@ ORDER BY
   p.username;
 
 -- name: ListSubjectUsernamesForTargets :many
--- What a person or a service account holds on each target, a team's own grants for a team. The access lasts until
--- the latest grant that applies ends, or for good when one of them is. user_ok and daemon_ok say whether it lets
--- anyone in today, see effective_access. A team's rows are its grants as given, they carry no mark.
+-- A team's rows are its grants as given, user_ok and daemon_ok unmarked.
 SELECT
   a.target_id,
   a.username,
@@ -398,7 +383,6 @@ ORDER BY
   a.username;
 
 -- name: ListAccountSubjectsForTarget :many
--- Who a server lets in as which account, as the subjects its certificates name.
 SELECT
   e.username,
   -- Sorted, the answer to a daemon is hashed.
@@ -419,7 +403,6 @@ ORDER BY
   e.username;
 
 -- name: ListAccountSubjects :many
--- ListAccountSubjectsForTarget for every server of the workspace at once, in the same order.
 SELECT
   e.target_id,
   e.username,

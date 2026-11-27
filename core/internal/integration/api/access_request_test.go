@@ -155,8 +155,6 @@ func TestAccessRequestFlow(t *testing.T) {
 	require.NotNil(t, rows[0].Until(), "the grant must end")
 	assert.WithinDuration(t, until, *rows[0].Until(), time.Second)
 
-	assert.Equal(t, editor.ID, grantedBy(t, cfg, target.ID, member.ID), "the grant must name who approved it")
-
 	answered, err := asAdmin.ListAccessRequests(ctx, &nokkuv1.ListAccessRequestsRequest{
 		Status: nokkuv1.AccessRequestStatus_ACCESS_REQUEST_STATUS_APPROVED.Enum(),
 	})

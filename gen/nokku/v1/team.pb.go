@@ -34,7 +34,7 @@ type Team struct {
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt" json:"updated_at,omitempty"`
 	ScimManaged   *bool                  `protobuf:"varint,8,opt,name=scim_managed,json=scimManaged" json:"scim_managed,omitempty"`
-	ScimOpen      *bool                  `protobuf:"varint,9,opt,name=scim_open,json=scimOpen" json:"scim_open,omitempty"`
+	ScimAdoptable *bool                  `protobuf:"varint,9,opt,name=scim_adoptable,json=scimAdoptable" json:"scim_adoptable,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -125,9 +125,9 @@ func (x *Team) GetScimManaged() bool {
 	return false
 }
 
-func (x *Team) GetScimOpen() bool {
-	if x != nil && x.ScimOpen != nil {
-		return *x.ScimOpen
+func (x *Team) GetScimAdoptable() bool {
+	if x != nil && x.ScimAdoptable != nil {
+		return *x.ScimAdoptable
 	}
 	return false
 }
@@ -1160,7 +1160,7 @@ var File_nokku_v1_team_proto protoreflect.FileDescriptor
 
 const file_nokku_v1_team_proto_rawDesc = "" +
 	"\n" +
-	"\x13nokku/v1/team.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x13nokku/v1/user.proto\"\xb9\x02\n" +
+	"\x13nokku/v1/team.proto\x12\bnokku.v1\x1a\x1bbuf/validate/validate.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15nokku/v1/access.proto\x1a\x13nokku/v1/user.proto\"\xc3\x02\n" +
 	"\x04Team\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1171,8 +1171,8 @@ const file_nokku_v1_team_proto_rawDesc = "" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12!\n" +
-	"\fscim_managed\x18\b \x01(\bR\vscimManaged\x12\x1b\n" +
-	"\tscim_open\x18\t \x01(\bR\bscimOpen\"*\n" +
+	"\fscim_managed\x18\b \x01(\bR\vscimManaged\x12%\n" +
+	"\x0escim_adoptable\x18\t \x01(\bR\rscimAdoptable\"*\n" +
 	"\x0eGetTeamRequest\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"5\n" +
 	"\x0fGetTeamResponse\x12\"\n" +

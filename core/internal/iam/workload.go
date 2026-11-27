@@ -27,9 +27,7 @@ import (
 const (
 	workloadSessionTTL = time.Hour
 	workloadSkew       = time.Minute
-	// workloadMaxAge stays under the session by the skew, so a job token with a
-	// future iat can't work again once its session row is gone.
-	workloadMaxAge = workloadSessionTTL - workloadSkew
+	workloadMaxAge     = time.Hour
 	// A unique index takes about 2 KiB per row, no platform comes near this.
 	maxWorkloadJTI = 256
 	// A provider's error can quote a whole answer, this bounds what is logged.
@@ -184,21 +182,33 @@ func (s *Service) VerifyWorkload(ctx context.Context, name, raw string) (*Worklo
 	return &Workload{Account: account, Rule: rules[i], Subject: token.Subject, JTI: jti, Expiry: token.Expiry}, nil
 }
 
-// IssueWorkloadSession spends the job token, a reuse hits the unique index.
+// IssueWorkloadSession spends the job token, a reuse hits the primary key.
 func (s *Service) IssueWorkloadSession(
 	ctx context.Context,
 	job *Workload,
 	binding string,
 ) (*db.AccessToken, string, error) {
-	tok, secret, err := s.IssueToken(ctx, TokenParams{
-		SubjectID:   job.Account.ID,
-		Kind:        actor.KindServiceAccount,
-		Method:      MethodFederation,
-		Binding:     binding,
-		Label:       truncate(cmp.Or(job.Subject, "CI job"), 100),
-		TTL:         workloadSessionTTL,
-		NotAfter:    job.Expiry,
-		WorkloadJTI: job.Rule.Issuer + " " + job.JTI,
+	var tok *db.AccessToken
+	var secret string
+	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
+		var err error
+		tok, secret, err = s.issue(ctx, q, TokenParams{
+			SubjectID:      job.Account.ID,
+			Kind:           actor.KindServiceAccount,
+			Method:         MethodFederation,
+			DPoPThumbprint: binding,
+			Label:          truncate(cmp.Or(job.Subject, "CI job"), 100),
+			TTL:            workloadSessionTTL,
+			NotAfter:       job.Expiry,
+		})
+		if err != nil {
+			return err
+		}
+		return q.SpendJobToken(ctx, &db.SpendJobTokenParams{
+			Issuer:    job.Rule.Issuer,
+			Jti:       job.JTI,
+			ExpiresAt: job.Expiry,
+		})
 	})
 	if db.IsUniqueViolation(err) {
 		return nil, "", &WorkloadRefusedError{

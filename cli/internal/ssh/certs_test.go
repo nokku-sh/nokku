@@ -105,11 +105,11 @@ func TestCertKeepsTheOldKeyOnAServerThatMissedARollover(t *testing.T) {
 		UserPublicKey: string(ssh.MarshalAuthorizedKey(current.PublicKey())),
 		RotatedAt:     now.Add(-time.Minute),
 	}
-	behind := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003", LastSyncAt: now.Add(-time.Hour)}
+	behind := state.Target{ID: "0199a0a0-0000-7000-8000-000000000003", ManualSyncAt: now.Add(-time.Hour)}
 	withDaemon := behind
-	withDaemon.DaemonID = "0199a0a0-0000-7000-8000-000000000004"
+	withDaemon.Daemon = true
 	synced := behind
-	synced.LastSyncAt = now
+	synced.ManualSyncAt = now
 	require.NoError(t, os.WriteFile(
 		paths.SSHCertificate(behind.ID), signCert(t, old, now.Add(-50*time.Minute), now.Add(10*time.Minute)), 0o600,
 	))

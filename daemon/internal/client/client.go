@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	errDaemonRejected = errors.New("daemon rejected by core")
+	errDaemonRemoved = errors.New("daemon removed from core")
 
 	enrollRetryFirst = 2 * time.Second
 )
@@ -136,14 +136,13 @@ func (c *Client) enroll(ctx context.Context, token string) error {
 		case <-time.After(next):
 		}
 	}
-	if res.GetTargetId() == "" || res.GetId() == "" || res.GetAccessToken() == "" {
+	if res.GetTargetId() == "" || res.GetAccessToken() == "" {
 		return errors.New("enroll: core returned an incomplete enrollment")
 	}
 	if err := sshd.CreateHostKey(); err != nil {
 		return fmt.Errorf("enroll: %w", err)
 	}
 	c.state.TargetID = res.GetTargetId()
-	c.state.DaemonID = res.GetId()
 	c.state.SessionToken = res.GetAccessToken()
 	// Re-enrolling may change Nokku, so nothing the old one trusted survives.
 	c.state.SetAccess(&state.Access{DaemonConfig: res.GetConfig(), SyncedAt: time.Now()})
@@ -166,7 +165,7 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 	defer cancel()
 
 	err := c.syncDaemon(ctx)
-	if errors.Is(err, errDaemonRejected) {
+	if errors.Is(err, errDaemonRemoved) {
 		return err
 	}
 	if err != nil {
@@ -182,7 +181,7 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 	for {
 		start := time.Now()
 		err = c.runControlStream(ctx)
-		if errors.Is(err, errDaemonRejected) {
+		if errors.Is(err, errDaemonRemoved) {
 			return err
 		}
 		if ctx.Err() != nil {
@@ -210,8 +209,8 @@ func (c *Client) Run(ctx context.Context, srv *sshd.Server, sshAddr netip.AddrPo
 		if code := connect.CodeOf(err); code != connect.CodeNotFound && code != connect.CodePermissionDenied {
 			continue
 		}
-		if errors.Is(c.syncDaemon(ctx), errDaemonRejected) {
-			return errDaemonRejected
+		if errors.Is(c.syncDaemon(ctx), errDaemonRemoved) {
+			return errDaemonRemoved
 		}
 	}
 }
@@ -225,7 +224,7 @@ func (c *Client) resync(ctx context.Context, every time.Duration) {
 			return
 		case <-time.After(wait):
 		}
-		// A rejection drops the access here. The control stream ends the daemon on its next sync.
+		// A removal drops the access here. The control stream ends the daemon on its next sync.
 		if err := c.syncDaemon(ctx); err != nil && ctx.Err() == nil {
 			slog.Warn("periodic sync failed", "error", err)
 		}

@@ -23,12 +23,10 @@
 	import DaemonRules from '#lib/components/blocks/DaemonRules.svelte';
 	import Monogram from '#lib/components/blocks/Monogram.svelte';
 	import { daemonRules, differing, ruleValue } from '#lib/daemon-rules.js';
-	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { TargetSchema } from '#lib/gen/nokku/v1/target_pb.js';
 	import { confirm, useAutoSave, useDraft, useSheet } from '#lib/hooks/index.js';
 	import { formatTs, sshHost } from '#lib/utils.js';
 	import {
-		Ban,
 		Bot,
 		ChevronDown,
 		Clock,
@@ -71,15 +69,13 @@
 	);
 	const save = () => autoSave.save();
 
-	const isManual = $derived(!entity?.daemonId);
+	const isManual = $derived(!linkedDaemon);
 	const online = $derived(!!linkedDaemon?.online);
-	// Only an accepted daemon connects. Every other state gets the approve card.
-	const accepted = $derived(linkedDaemon?.status === DaemonStatus.ACCEPTED);
-	const pending = $derived(linkedDaemon?.status === DaemonStatus.PENDING);
+	const pending = $derived(!!linkedDaemon && !linkedDaemon.accepted);
 	const accounts = $derived(entity?.accounts ?? []);
 	const withAccess = $derived(new Set(accounts.flatMap((p) => grantsOf(p).map((g) => g.id))).size);
-	const lastSynced = $derived(formatTs(entity?.lastSyncAt, 'relative-short'));
-	const behind = $derived(missedRollover(authority.data?.rotatedAt, entity?.lastSyncAt));
+	const lastSynced = $derived(formatTs(entity?.manualSyncAt, 'relative-short'));
+	const behind = $derived(missedRollover(authority.data?.rotatedAt, entity?.manualSyncAt));
 	const syncCommand = $derived(`nk sync ${model?.name ?? '<name>'}`);
 	const systemInfo = $derived(
 		Object.entries(entity?.metadata ?? {})
@@ -262,8 +258,6 @@
 			</span>
 			{#if pending}
 				<Badge variant="warning">Waiting for approval</Badge>
-			{:else if !accepted}
-				<Badge variant="destructive">Rejected</Badge>
 			{/if}
 		{/if}
 		{#each model?.tags ?? [] as tag (tag)}
@@ -273,21 +267,17 @@
 
 	{#if model && entity}
 		<Tabs.Content value="overview" class="flex flex-col divide-y">
-			{#if linkedDaemon && !accepted}
+			{#if linkedDaemon && pending}
 				<div class="pb-5">
-					<Alert.Root variant={pending ? 'warning' : 'destructive'}>
-						{#if pending}<Clock />{:else}<Ban />{/if}
-						<Alert.Title>
-							{pending ? 'This server wants to join' : 'This server was rejected'}
-						</Alert.Title>
+					<Alert.Root variant="warning">
+						<Clock />
+						<Alert.Title>This server wants to join</Alert.Title>
 						<Alert.Description>
 							{#if !can.edit}
 								Nobody can log in to it until an editor approves it.
-							{:else if pending}
+							{:else}
 								Its daemon enrolled. Check that you expect this host before you approve it, people
 								can log in once you do.
-							{:else}
-								Nobody can log in to it until you approve it.
 							{/if}
 						</Alert.Description>
 						{#if can.edit}
@@ -405,7 +395,7 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="settings" class="flex flex-col divide-y">
-			{#if linkedDaemon && accepted}
+			{#if linkedDaemon?.accepted}
 				<Section
 					title="Session rules"
 					icon={ShieldCheck}

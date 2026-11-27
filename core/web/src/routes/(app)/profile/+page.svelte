@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { CredentialType } from '#lib/gen/nokku/v1/account_pb.js';
 	import { WorkspaceRole } from '#lib/gen/nokku/v1/access_pb.js';
 	import { UserSchema } from '#lib/gen/nokku/v1/user_pb.js';
 	import { credentials } from '#lib/api/credential.svelte.js';
@@ -34,9 +33,7 @@
 	const requestEmailChange = user.requestEmailChange();
 	const creds = credentials.all();
 	// An identity provider owns the name and address of the accounts it signs in or provisions.
-	const managed = $derived(
-		!!me.data?.scimManaged || (creds.data ?? []).some((c) => c.type === CredentialType.OIDC)
-	);
+	const managed = $derived(!!me.data?.scimManaged || !!creds.data?.oidcIdentities.length);
 	const isOwner = $derived(me.data?.role === WorkspaceRole.OWNER);
 
 	let emailOpen = $state(false);

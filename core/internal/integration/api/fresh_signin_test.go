@@ -227,11 +227,6 @@ func TestFreshSignInMatrix(t *testing.T) {
 				&nokkuv1.RenameTargetRequest{Id: new(uuid.NewV7().String()), Name: new(uniq("renamed"))})
 			return refusedRPC(err)
 		}},
-		{"DaemonService.DeleteDaemon", admin, func(s login) (string, bool) {
-			_, err := nokkuv1connect.NewDaemonServiceClient(rpc(s)).DeleteDaemon(t.Context(),
-				&nokkuv1.DeleteDaemonRequest{Id: new(uuid.NewV7().String())})
-			return refusedRPC(err)
-		}},
 		// nk passes the fresh check and answers for the server itself, it deletes only what its person added.
 		{"TargetService.DeleteTarget", admin, func(s login) (string, bool) {
 			_, err := nokkuv1connect.NewTargetServiceClient(rpc(s)).DeleteTarget(t.Context(),

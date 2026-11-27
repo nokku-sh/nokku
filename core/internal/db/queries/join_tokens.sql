@@ -23,7 +23,6 @@ RETURNING
   *;
 
 -- name: AddJoinTokenGrant :exec
--- One row per subject, the kind picks the column like AddGrant.
 INSERT INTO
   join_token_grants (token_id, username, user_id, team_id, service_account_id)
 VALUES

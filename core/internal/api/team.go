@@ -31,7 +31,7 @@ func (s *teamService) CreateTeam(
 ) (*nokkuv1.CreateTeamResponse, error) {
 	team, err := s.cfg.Conn.Tenant().CreateTeam(ctx, &db.CreateTeamParams{
 		Name:        req.GetName(),
-		Description: req.Description,
+		Description: req.GetDescription(),
 		Tags:        req.GetTags(),
 	})
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *teamService) CloseTeamToSCIM(
 }
 
 func (s *teamService) setSCIMOpen(ctx context.Context, id string, open bool) error {
-	team, err := s.cfg.Conn.Tenant().UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, ScimOpen: &open})
+	team, err := s.cfg.Conn.Tenant().UpdateTeam(ctx, &db.UpdateTeamParams{TeamID: id, ScimAdoptable: &open})
 	if err != nil {
 		return err
 	}

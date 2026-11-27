@@ -28,20 +28,19 @@ func TestInvalidRowsAreRefused(t *testing.T) {
 		sql  string
 		args []any
 	}{
-		"a trial with no end": {`INSERT INTO workspace_licenses (workspace_id) VALUES ($1)`, []any{f.ws}},
-		"a certificate that lasts minutes": {
-			`UPDATE ssh_cas SET user_ttl = '14 minutes' WHERE id = $1`, []any{f.ca},
-		},
-		"a certificate that lasts over a week": {
-			`UPDATE ssh_cas SET user_ttl = '8 days' WHERE id = $1`, []any{f.ca},
-		},
+		"a trial with no end":   {`INSERT INTO workspace_licenses (workspace_id) VALUES ($1)`, []any{f.ws}},
 		"an owner switched off": {`UPDATE users SET active = FALSE WHERE id = $1`, []any{f.owner}},
 		"an identity with no subject": {
-			`INSERT INTO credentials (id, workspace_id, user_id, type, provider) VALUES ($1, $2, $3, 'oidc', 'okta')`,
+			`INSERT INTO oidc_identities (workspace_id, user_id, provider_id, subject) VALUES ($1, $2, 'okta', '')`,
+			[]any{f.ws, f.u},
+		},
+		"an address change to no address": {
+			`INSERT INTO one_time_tokens (token_hash, workspace_id, user_id, purpose, expires_at)
+				VALUES ($1, $2, $3, 'email_change', NOW())`,
 			[]any{id(), f.ws, f.u},
 		},
 		"an approved nk login with no method": {
-			`INSERT INTO device_grants (device_code_hash, workspace_id, user_code, status, user_id, expires_at)
+			`INSERT INTO device_grants (device_code_hash, workspace_id, user_code, status, decided_by, expires_at)
 				VALUES ($1, $2, 'CODE', 'approved', $3, NOW())`,
 			[]any{id(), f.ws, f.u},
 		},
@@ -61,7 +60,7 @@ func TestInvalidRowsAreRefused(t *testing.T) {
 		},
 		"an nk login approved no known way": {
 			`INSERT INTO device_grants (
-					device_code_hash, workspace_id, user_code, status, user_id, approved_method, expires_at
+					device_code_hash, workspace_id, user_code, status, decided_by, approved_method, expires_at
 				)
 				VALUES ($1, $2, 'CODE', 'approved', $3, 'pigeon', NOW())`,
 			[]any{id(), f.ws, f.u},

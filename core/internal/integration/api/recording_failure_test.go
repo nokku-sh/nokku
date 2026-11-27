@@ -350,7 +350,7 @@ func TestRacingFirstUploadIsToldToRetry(t *testing.T) {
 		other <- cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) error {
 			_, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
 				ID:       id,
-				DaemonID: enrolled.GetId(),
+				DaemonID: enrolled.GetTargetId(),
 				Username: "root",
 				Key:      sealed,
 			})

@@ -26,7 +26,6 @@ var errReplaced = errors.New("another enrollment replaced this one on disk, rest
 // Config is the enrollment.
 type Config struct {
 	TargetID string `json:"target_id,omitempty"`
-	DaemonID string `json:"daemon_id,omitempty"`
 	APIURL   string `json:"api_url,omitempty"`
 	// APICA is a private CA's PEM, empty when the system roots know the API.
 	APICA        string `json:"api_ca,omitempty"`
@@ -134,7 +133,7 @@ func Load() (*State, error) {
 		)
 	}
 	s := New(f.Config)
-	s.owner = f.DaemonID
+	s.owner = f.TargetID
 	if f.Access != nil {
 		f.Access.Principals = validAccounts(f.Access.Principals)
 		s.access.Store(f.Access)
@@ -158,8 +157,8 @@ func (s *State) Save() error {
 	defer s.mu.Unlock()
 	if s.owner != "" {
 		var onDisk file
-		if err := fsutil.LoadJSON(paths.StateFile(), &onDisk); err == nil && onDisk.DaemonID != "" &&
-			onDisk.DaemonID != s.owner {
+		if err := fsutil.LoadJSON(paths.StateFile(), &onDisk); err == nil && onDisk.TargetID != "" &&
+			onDisk.TargetID != s.owner {
 			return errReplaced
 		}
 	}
@@ -171,12 +170,12 @@ func (s *State) Save() error {
 	); err != nil {
 		return err
 	}
-	s.owner = s.DaemonID
+	s.owner = s.TargetID
 	s.saved.Store(a)
 	return nil
 }
 
-// Dropped is the state after a rejection. It saves only over this one.
+// Dropped is the state after a removal. It saves only over this one.
 func (s *State) Dropped() *State {
 	d := New(Config{APIURL: s.APIURL, APICA: s.APICA})
 	s.mu.Lock()

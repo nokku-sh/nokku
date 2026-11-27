@@ -191,7 +191,7 @@ func (s *authService) ExchangeWorkloadToken(
 		return nil, err
 	}
 
-	// IssueToken writes no audit row here. An unlogged session must not go out.
+	// IssueWorkloadSession writes no audit row. An unlogged session must not go out.
 	if err := s.cfg.Audit.Confirm(ctx, &audit.Event{
 		Action:    actionExchangeWorkloadToken,
 		ActorID:   job.Account.ID,

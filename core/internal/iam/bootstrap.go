@@ -94,11 +94,11 @@ func (s *Service) Bootstrap(ctx context.Context, ws actor.Workspace) (bool, erro
 	}); err != nil {
 		return false, err
 	}
-	creds, err := s.conn.Tenant().ListUserCredentials(ctx, owner.ID)
+	ids, err := s.conn.Tenant().ListUserCredentialIDs(ctx, owner.ID)
 	if err != nil {
 		return false, err
 	}
-	return len(creds) == 0, nil
+	return len(ids) == 0, nil
 }
 
 // seedProvider keeps what an admin set on a stored provider.

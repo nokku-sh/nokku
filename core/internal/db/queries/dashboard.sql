@@ -10,29 +10,12 @@ SELECT
     SELECT
       COUNT(*)
     FROM
-      targets t
-      JOIN daemons d ON d.workspace_id = t.workspace_id
-      AND d.id = t.daemon_id
-    WHERE
-      COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
-  )::INTEGER AS targets_online,
-  (
-    SELECT
-      COUNT(*)
-    FROM
-      targets t
-    WHERE
-      t.daemon_id IS NULL
-  )::INTEGER AS targets_manual,
-  (
-    SELECT
-      COUNT(*)
-    FROM
       users u
     WHERE
       u.active
   )::INTEGER AS users,
   d.total AS daemons,
+  d.pending AS daemons_pending,
   d.online AS daemons_online
 FROM
   (
@@ -40,8 +23,12 @@ FROM
       COUNT(*)::INTEGER AS total,
       (COUNT(*) FILTER (
         WHERE
-          status <> 1 -- pending
-          AND COALESCE(id = ANY (@connected::UUID[]), FALSE)
+          NOT accepted
+      ))::INTEGER AS pending,
+      (COUNT(*) FILTER (
+        WHERE
+          accepted
+          AND COALESCE(target_id = ANY (@connected::UUID[]), FALSE)
       ))::INTEGER AS online
     FROM
       daemons
@@ -54,11 +41,11 @@ SELECT
   t.name
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
-  d.status = 1 -- pending
+  NOT d.accepted
 ORDER BY
-  d.id DESC
+  d.target_id DESC
 LIMIT
   5;
 
@@ -67,12 +54,12 @@ SELECT
   sqlc.embed(t)
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
-  d.status = 2 -- accepted
-  AND NOT COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
+  d.accepted
+  AND NOT COALESCE(d.target_id = ANY (@connected::UUID[]), FALSE)
 ORDER BY
-  d.id ASC
+  d.target_id ASC
 LIMIT
   5;
 
@@ -80,18 +67,17 @@ LIMIT
 -- A crashed daemon never closes its recordings, so only trust open ones behind a connected daemon.
 SELECT
   r.id,
-  d.id AS daemon_id,
+  t.id AS daemon_id,
   r.username,
   r.started_at,
   t.name AS daemon_name
 FROM
   recordings r
-  JOIN daemons d ON d.id = r.daemon_id
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = r.daemon_id
 WHERE
   r.ended_at IS NULL
   AND r.started_at > NOW() - INTERVAL '24 hours'
-  AND COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
+  AND COALESCE(r.daemon_id = ANY (@connected::UUID[]), FALSE)
 ORDER BY
   r.started_at DESC
 LIMIT

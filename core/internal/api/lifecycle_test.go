@@ -49,7 +49,7 @@ func TestLapseStep(t *testing.T) {
 	day := 24 * time.Hour
 	// A key that ran out this long ago is deleted 180 days after it did.
 	paid := func(endedAgo time.Duration, warned int32, warnedAgo time.Duration) *db.WorkspaceLicense {
-		lic := &db.WorkspaceLicense{Key: "NOKKU-KEY", EndsAt: new(now.Add(-endedAgo)), DeletionWarning: warned}
+		lic := &db.WorkspaceLicense{Key: "NOKKU-KEY", EndsAt: new(now.Add(-endedAgo)), DeletionWarningDays: warned}
 		if warned != 0 {
 			lic.DeletionWarnedAt = new(now.Add(-warnedAgo))
 		}

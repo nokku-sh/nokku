@@ -25,9 +25,7 @@
 
 	const shell = $derived(!why);
 
-	const mine = $derived(
-		[...getSessions().entries()].filter(([, s]) => !!s.daemonID && s.daemonID === target.daemonId)
-	);
+	const mine = $derived([...getSessions().entries()].filter(([, s]) => s.daemonID === target.id));
 
 	const connect = useConnect();
 	const run = (username: string) =>

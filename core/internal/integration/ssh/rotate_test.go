@@ -70,7 +70,7 @@ func signer(t *testing.T, conn *db.Connection, keys *kms.Keyset, ca *db.SSHCA, c
 	t.Helper()
 	var s gossh.Signer
 	err := conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
-		s, err = ssh.CASigner(t.Context(), q, keys, ca.ID, certType)
+		_, s, err = ssh.CASigner(t.Context(), q, keys, certType)
 		return err
 	})
 	return s, err
@@ -92,11 +92,10 @@ func TestRolloverReplacesBothKeys(t *testing.T) {
 
 	var next *db.SSHCA
 	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
-		current, err := q.GetWorkspaceCAForUpdate(t.Context())
-		if err != nil {
+		if _, err := q.GetWorkspaceCAForUpdate(t.Context()); err != nil {
 			return err
 		}
-		next, err = ssh.Rollover(t.Context(), q, keys, current)
+		next, err = ssh.Rollover(t.Context(), q, keys)
 		return err
 	}))
 	assert.NotEqual(t, ca.UserPublicKey, next.UserPublicKey)
@@ -148,35 +147,36 @@ func TestCASignerSignsWithTheKeyOfItsKind(t *testing.T) {
 	}
 }
 
-// A key row that is not its CA's signs nothing, swapped in or replaced.
+// A key that is not its CA's signs nothing, swapped in or replaced.
 func TestCASignerRefusesAKeyThatIsNotTheCAs(t *testing.T) {
 	conn, keys := rotationConn(t)
 	ca := seedCA(t, conn, keys, seedWorkspace(t, conn))
-	put := func(kind string, sealed []byte) {
-		t.Helper()
-		require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) error {
-			return q.PutCAKey(t.Context(), &db.PutCAKeyParams{CaID: ca.ID, Kind: kind, PrivateKey: sealed})
-		}))
-	}
-
-	var host *db.GetCASigningKeyRow
+	var stored *db.GetCASigningKeysRow
 	require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) (err error) {
-		host, err = q.GetCASigningKey(t.Context(), &db.GetCASigningKeyParams{CaID: ca.ID, Kind: "host"})
+		stored, err = q.GetCASigningKeys(t.Context())
 		return err
 	}))
-	put("user", host.PrivateKey)
+	putUser := func(sealed []byte) {
+		t.Helper()
+		require.NoError(t, conn.TenantTx(testenv.Pinned(t, ca.WorkspaceID), func(q *db.Queries) error {
+			return q.PutCAKeys(t.Context(), &db.PutCAKeysParams{
+				UserPrivateKey: sealed, HostPrivateKey: stored.HostPrivateKey,
+			})
+		}))
+	}
+	putUser(stored.HostPrivateKey)
 	_, err := signer(t, conn, keys, ca, gossh.UserCert)
-	require.Error(t, err, "the host key, moved to the user row, opened")
+	require.Error(t, err, "the host key, moved to the user column, opened")
 
 	// Sealed for the right row, but not the key the CA publishes.
 	_, other, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	der, err := x509.MarshalPKCS8PrivateKey(other)
 	require.NoError(t, err)
-	aad := crypto.AAD{Table: "ssh_ca_keys", Column: "private_key", Workspace: ca.WorkspaceID, Row: ca.ID + "/user"}
+	aad := crypto.AAD{Table: "ssh_ca_keys", Column: "user_private_key", Workspace: ca.WorkspaceID, Row: ca.WorkspaceID}
 	sealed, err := keys.Seal(aad, der)
 	require.NoError(t, err)
-	put("user", sealed)
+	putUser(sealed)
 	_, err = signer(t, conn, keys, ca, gossh.UserCert)
 	require.ErrorContains(t, err, "does not match", "a key the CA does not publish signs")
 

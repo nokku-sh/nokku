@@ -41,7 +41,7 @@ func (p *Pool) Connect(
 	if err != nil {
 		return err
 	}
-	if daemon.Daemon.Status != nokkuv1.DaemonStatus_DAEMON_STATUS_ACCEPTED {
+	if !daemon.Daemon.Accepted {
 		return connect.NewError(connect.CodePermissionDenied, "daemon not accepted")
 	}
 

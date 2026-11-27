@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
-	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 	gossh "golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/proto"
@@ -250,14 +249,14 @@ func partialCA(t *testing.T, admin *connect.Client) partialResource {
 	return partialResource{
 		rpc: "CertificateService.UpdateCertificateAuthority",
 		create: func() string {
-			res, err := certs.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
+			_, err := certs.UpdateCertificateAuthority(t.Context(), masked(&nokkuv1.UpdateCertificateAuthorityRequest{
 				UserTtl:       durationpb.New(time.Hour),
 				SourceAddress: new("10.0.0.0/8"),
 			}))
 			require.NoError(t, err)
-			return res.GetCertificateAuthority().GetId()
+			return ""
 		},
-		read: func(string) []partialField { return partialFields(read(), "id") },
+		read: func(string) []partialField { return partialFields(read()) },
 		cases: []partialCase{
 			{"user_ttl", update(&nokkuv1.UpdateCertificateAuthorityRequest{UserTtl: durationpb.New(2 * time.Hour)})},
 			{"source_address", update(&nokkuv1.UpdateCertificateAuthorityRequest{SourceAddress: new("192.0.2.0/24")})},
@@ -283,16 +282,16 @@ func partialDaemon(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *c
 		create: func() string {
 			_, enrolled := enrollTestDaemon(t, cfg, srv, testWorkspace.ID, false)
 			t.Cleanup(func() {
-				_, err := daemons.DeleteDaemon(context.WithoutCancel(t.Context()),
-					&nokkuv1.DeleteDaemonRequest{Id: enrolled.Id})
+				_, err := nokkuv1connect.NewTargetServiceClient(admin).DeleteTarget(context.WithoutCancel(t.Context()),
+					&nokkuv1.DeleteTargetRequest{Id: enrolled.TargetId})
 				require.NoError(t, err)
 			})
 			_, err := daemons.SetDaemonSafeguards(t.Context(), &nokkuv1.SetDaemonSafeguardsRequest{
-				Id: enrolled.Id, RecordSessions: new(false), KillOnRevoke: new(false),
+				Id: enrolled.TargetId, RecordSessions: new(false), KillOnRevoke: new(false),
 			})
 			require.NoError(t, err)
 			_, err = daemons.UpdateDaemon(t.Context(), masked(&nokkuv1.UpdateDaemonRequest{
-				Id: enrolled.Id,
+				Id: enrolled.TargetId,
 				Config: &nokkuv1.DaemonConfig{
 					AllowForwarding:      new(false),
 					AllowAgentForwarding: new(false),
@@ -300,7 +299,7 @@ func partialDaemon(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *c
 				},
 			}))
 			require.NoError(t, err)
-			return enrolled.GetId()
+			return enrolled.GetTargetId()
 		},
 		read: func(id string) []partialField {
 			res, err := daemons.GetDaemon(t.Context(), &nokkuv1.GetDaemonRequest{Id: &id})
@@ -308,7 +307,7 @@ func partialDaemon(t *testing.T, cfg *app.Config, srv *httptest.Server, admin *c
 			return partialFields(res.GetDaemon(), "id")
 		},
 		cases: []partialCase{
-			{"status", func(id string) error {
+			{"accepted", func(id string) error {
 				_, err := daemons.ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: &id})
 				return err
 			}},
@@ -435,22 +434,13 @@ func restoreWorkspace(ctx context.Context, t *testing.T, cfg *app.Config, w *db.
 	require.NoError(t, cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
 		if _, err := q.UpdateWorkspace(ctx, &db.UpdateWorkspaceParams{
 			Name:        &w.Name,
-			Description: w.Description,
+			Description: &w.Description,
 			Settings:    w.Settings,
 		}); err != nil {
 			return err
 		}
 		return q.SetRequestableTags(ctx, w.RequestableTags)
 	}))
-	if w.Description != nil {
-		return
-	}
-	// The query can't set NULL, the owner role can.
-	owner, err := pgx.Connect(ctx, "")
-	require.NoError(t, err)
-	_, err = owner.Exec(ctx, "UPDATE workspaces SET description = NULL WHERE id = $1", w.ID)
-	require.NoError(t, err)
-	require.NoError(t, owner.Close(ctx))
 }
 
 func partialTeam(t *testing.T, cfg *app.Config, admin *connect.Client) partialResource {
@@ -492,7 +482,7 @@ func partialTeam(t *testing.T, cfg *app.Config, admin *connect.Client) partialRe
 				"tags to none",
 				update(&nokkuv1.UpdateTeamRequest{UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"tags"}}}),
 			},
-			{"scim_open", func(id string) error {
+			{"scim_adoptable", func(id string) error {
 				_, err := teams.OpenTeamToSCIM(t.Context(), &nokkuv1.OpenTeamToSCIMRequest{Id: &id})
 				return err
 			}},

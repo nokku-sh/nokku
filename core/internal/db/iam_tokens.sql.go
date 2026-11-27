@@ -18,12 +18,10 @@ DELETE FROM one_time_tokens
 WHERE
   token_hash = $1
   AND purpose = $2
-  AND user_id IS NOT NULL
-  AND email IS NOT NULL
   AND expires_at > NOW()
 RETURNING
-  user_id::UUID AS user_id,
-  email::TEXT AS email,
+  user_id,
+  email,
   created_at
 `
 
@@ -46,19 +44,18 @@ func (q *Queries) ConsumeEmailToken(ctx context.Context, arg *ConsumeEmailTokenP
 }
 
 const consumeInvite = `-- name: ConsumeInvite :one
-DELETE FROM one_time_tokens
+DELETE FROM invites
 WHERE
   token_hash = $1
-  AND purpose = 'invite'
   AND expires_at > NOW()
 RETURNING
-  email::TEXT AS email,
+  email,
   role
 `
 
 type ConsumeInviteRow struct {
-	Email string               `json:"email"`
-	Role  *nokku.WorkspaceRole `json:"role"`
+	Email string              `json:"email"`
+	Role  nokku.WorkspaceRole `json:"role"`
 }
 
 func (q *Queries) ConsumeInvite(ctx context.Context, tokenHash crypto.HashedToken) (*ConsumeInviteRow, error) {
@@ -73,10 +70,9 @@ DELETE FROM one_time_tokens
 WHERE
   token_hash = $1
   AND purpose = $2
-  AND user_id IS NOT NULL
   AND expires_at > NOW()
 RETURNING
-  user_id::UUID AS user_id
+  user_id
 `
 
 type ConsumeTokenParams struct {
@@ -84,7 +80,6 @@ type ConsumeTokenParams struct {
 	Purpose   string             `json:"purpose"`
 }
 
-// Spends a token of a user. An invite has none, see ConsumeInvite.
 func (q *Queries) ConsumeToken(ctx context.Context, arg *ConsumeTokenParams) (string, error) {
 	row := q.db.QueryRow(ctx, consumeToken, arg.TokenHash, arg.Purpose)
 	var user_id string
@@ -98,9 +93,23 @@ WHERE
   user_id = $1
 `
 
-func (q *Queries) DeleteAllUserTokens(ctx context.Context, userID *string) error {
+func (q *Queries) DeleteAllUserTokens(ctx context.Context, userID string) error {
 	_, err := q.db.Exec(ctx, deleteAllUserTokens, userID)
 	return err
+}
+
+const deleteExpiredInvites = `-- name: DeleteExpiredInvites :execrows
+DELETE FROM invites
+WHERE
+  expires_at < $1
+`
+
+func (q *Queries) DeleteExpiredInvites(ctx context.Context, now time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredInvites, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteExpiredTokens = `-- name: DeleteExpiredTokens :execrows
@@ -109,7 +118,6 @@ WHERE
   expires_at < $1
 `
 
-// Every tenant, runs as nokku_system.
 func (q *Queries) DeleteExpiredTokens(ctx context.Context, now time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredTokens, now)
 	if err != nil {
@@ -119,10 +127,9 @@ func (q *Queries) DeleteExpiredTokens(ctx context.Context, now time.Time) (int64
 }
 
 const deleteInvite = `-- name: DeleteInvite :execrows
-DELETE FROM one_time_tokens
+DELETE FROM invites
 WHERE
-  purpose = 'invite'
-  AND email = $1::TEXT
+  email = $1
 `
 
 func (q *Queries) DeleteInvite(ctx context.Context, email string) (int64, error) {
@@ -152,8 +159,8 @@ WHERE
 `
 
 type DeleteUserTokensParams struct {
-	UserID  *string `json:"userId"`
-	Purpose string  `json:"purpose"`
+	UserID  string `json:"userId"`
+	Purpose string `json:"purpose"`
 }
 
 func (q *Queries) DeleteUserTokens(ctx context.Context, arg *DeleteUserTokensParams) error {
@@ -163,21 +170,20 @@ func (q *Queries) DeleteUserTokens(ctx context.Context, arg *DeleteUserTokensPar
 
 const getInvite = `-- name: GetInvite :one
 SELECT
-  email::TEXT AS email,
+  email,
   role,
   expires_at
 FROM
-  one_time_tokens
+  invites
 WHERE
   token_hash = $1
-  AND purpose = 'invite'
   AND expires_at > NOW()
 `
 
 type GetInviteRow struct {
-	Email     string               `json:"email"`
-	Role      *nokku.WorkspaceRole `json:"role"`
-	ExpiresAt time.Time            `json:"expiresAt"`
+	Email     string              `json:"email"`
+	Role      nokku.WorkspaceRole `json:"role"`
+	ExpiresAt time.Time           `json:"expiresAt"`
 }
 
 func (q *Queries) GetInvite(ctx context.Context, tokenHash crypto.HashedToken) (*GetInviteRow, error) {
@@ -189,14 +195,13 @@ func (q *Queries) GetInvite(ctx context.Context, tokenHash crypto.HashedToken) (
 
 const getPendingTokenEmail = `-- name: GetPendingTokenEmail :one
 SELECT
-  email::TEXT AS email
+  email
 FROM
   one_time_tokens
 WHERE
   user_id = $1
   AND purpose = $2
   AND expires_at > NOW()
-  AND email IS NOT NULL
 ORDER BY
   created_at DESC
 LIMIT
@@ -204,8 +209,8 @@ LIMIT
 `
 
 type GetPendingTokenEmailParams struct {
-	UserID  *string `json:"userId"`
-	Purpose string  `json:"purpose"`
+	UserID  string `json:"userId"`
+	Purpose string `json:"purpose"`
 }
 
 func (q *Queries) GetPendingTokenEmail(ctx context.Context, arg *GetPendingTokenEmailParams) (string, error) {
@@ -217,24 +222,23 @@ func (q *Queries) GetPendingTokenEmail(ctx context.Context, arg *GetPendingToken
 
 const listInvites = `-- name: ListInvites :many
 SELECT
-  email::TEXT AS email,
+  email,
   role,
   expires_at,
   created_at
 FROM
-  one_time_tokens
+  invites
 WHERE
-  purpose = 'invite'
-  AND expires_at > NOW()
+  expires_at > NOW()
 ORDER BY
   created_at DESC
 `
 
 type ListInvitesRow struct {
-	Email     string               `json:"email"`
-	Role      *nokku.WorkspaceRole `json:"role"`
-	ExpiresAt time.Time            `json:"expiresAt"`
-	CreatedAt time.Time            `json:"createdAt"`
+	Email     string              `json:"email"`
+	Role      nokku.WorkspaceRole `json:"role"`
+	ExpiresAt time.Time           `json:"expiresAt"`
+	CreatedAt time.Time           `json:"createdAt"`
 }
 
 func (q *Queries) ListInvites(ctx context.Context) ([]*ListInvitesRow, error) {
@@ -264,18 +268,25 @@ func (q *Queries) ListInvites(ctx context.Context) ([]*ListInvitesRow, error) {
 
 const putInvite = `-- name: PutInvite :exec
 INSERT INTO
-  one_time_tokens (token_hash, purpose, email, role, expires_at)
+  invites (token_hash, email, role, expires_at)
 VALUES
-  ($1, 'invite', $2, $3, $4)
+  ($1, $2, $3, $4)
+ON CONFLICT (workspace_id, email) DO UPDATE
+SET
+  token_hash = EXCLUDED.token_hash,
+  role = EXCLUDED.role,
+  expires_at = EXCLUDED.expires_at,
+  created_at = NOW()
 `
 
 type PutInviteParams struct {
-	TokenHash crypto.HashedToken   `json:"tokenHash"`
-	Email     *string              `json:"email"`
-	Role      *nokku.WorkspaceRole `json:"role"`
-	ExpiresAt time.Time            `json:"expiresAt"`
+	TokenHash crypto.HashedToken  `json:"tokenHash"`
+	Email     string              `json:"email"`
+	Role      nokku.WorkspaceRole `json:"role"`
+	ExpiresAt time.Time           `json:"expiresAt"`
 }
 
+// One pending invite per address, a new one replaces it.
 func (q *Queries) PutInvite(ctx context.Context, arg *PutInviteParams) error {
 	_, err := q.db.Exec(ctx, putInvite,
 		arg.TokenHash,
@@ -295,10 +306,10 @@ VALUES
 
 type PutTokenParams struct {
 	TokenHash crypto.HashedToken `json:"tokenHash"`
-	UserID    *string            `json:"userId"`
+	UserID    string             `json:"userId"`
 	Purpose   string             `json:"purpose"`
 	ExpiresAt time.Time          `json:"expiresAt"`
-	Email     *string            `json:"email"`
+	Email     string             `json:"email"`
 }
 
 func (q *Queries) PutToken(ctx context.Context, arg *PutTokenParams) error {

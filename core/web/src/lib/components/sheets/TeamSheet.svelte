@@ -267,7 +267,7 @@
 					>
 						<Switch
 							id="team-scim-open"
-							checked={model.scimOpen}
+							checked={model.scimAdoptable}
 							onCheckedChange={setScimOpen}
 							disabled={!can.edit}
 						/>

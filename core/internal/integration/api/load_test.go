@@ -36,7 +36,6 @@ import (
 type fakeDaemon struct {
 	fleet  *fakeFleet
 	key    *ecdsa.PrivateKey
-	id     string
 	target string
 	token  string
 	source string
@@ -91,7 +90,7 @@ func (d *fakeDaemon) enroll(ctx context.Context, secret string) error {
 	if err != nil {
 		return err
 	}
-	d.id, d.target, d.token = res.GetId(), res.GetTargetId(), res.GetAccessToken()
+	d.target, d.token = res.GetTargetId(), res.GetAccessToken()
 	return nil
 }
 

@@ -53,15 +53,15 @@ func (p *Pool) storeReport(ctx context.Context, daemon *db.GetDaemonRow, report 
 	if len(reported) == 0 {
 		return nil
 	}
-	if err := p.reportLimit(daemon.Daemon.ID).WaitN(ctx, len(reported)); err != nil {
+	if err := p.reportLimit(daemon.Daemon.TargetID).WaitN(ctx, len(reported)); err != nil {
 		return err
 	}
 
 	event := func(kind, connectionID, action, target string, details map[string]any) *audit.Event {
 		e := &audit.Event{
-			ID:          reportID(daemon.Daemon.ID, kind, connectionID),
+			ID:          reportID(daemon.Daemon.TargetID, kind, connectionID),
 			WorkspaceID: daemon.Daemon.WorkspaceID,
-			ActorID:     daemon.Daemon.ID,
+			ActorID:     daemon.Daemon.TargetID,
 			ActorKind:   string(actor.KindDaemon),
 			ActorName:   daemon.Name,
 			Action:      action,
@@ -108,7 +108,7 @@ func (p *Pool) storeReport(ctx context.Context, daemon *db.GetDaemonRow, report 
 	}
 	if n := report.GetDroppedCount(); n > 0 {
 		events = append(events, event("dropped", reported[0].GetConnectionId(), actionReportsDropped,
-			daemon.Daemon.ID, map[string]any{"name": daemon.Name, "count": n}))
+			daemon.Daemon.TargetID, map[string]any{"name": daemon.Name, "count": n}))
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, reportStoreTimeout)

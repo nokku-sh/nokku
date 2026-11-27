@@ -25,7 +25,7 @@ import (
 
 // stateFixture is a workspace where u reaches account directly and via team.
 type stateFixture struct {
-	ws, owner, u, team, daemon, target, account, ca string
+	ws, owner, u, team, target, account string
 }
 
 // conn is a Connection plus a nokku_system pool, for the SQL no query covers.
@@ -48,10 +48,8 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		owner:   uuid.NewV7().String(),
 		u:       uuid.NewV7().String(),
 		team:    uuid.NewV7().String(),
-		daemon:  uuid.NewV7().String(),
 		target:  uuid.NewV7().String(),
 		account: uuid.NewV7().String(),
-		ca:      uuid.NewV7().String(),
 	}
 	// The simple protocol allows several statements in one Exec.
 	_, err := c.sysPool.Exec(t.Context(), `
@@ -60,14 +58,14 @@ func newStateFixture(t *testing.T, c *conn) stateFixture {
 		VALUES ($2, $1, $2 || '@test', 5), ($3, $1, $3 || '@test', 2);
 		INSERT INTO teams (id, workspace_id, name) VALUES ($4, $1, 'team');
 		INSERT INTO team_members (workspace_id, user_id, team_id) VALUES ($1, $3, $4);
-		INSERT INTO ssh_cas (id, workspace_id, user_public_key, host_public_key, user_ttl)
-		VALUES ($8, $1, 'pub', 'host-pub', '1 hour');
-		INSERT INTO daemons (id, workspace_id, status) VALUES ($5, $1, 2);
-		INSERT INTO targets (id, workspace_id, daemon_id, name) VALUES ($6, $1, $5, 't');
-		INSERT INTO target_accounts (id, workspace_id, target_id, username) VALUES ($7, $1, $6, 'deploy');
-		INSERT INTO grants (account_id, workspace_id, user_id) VALUES ($7, $1, $3);
-		INSERT INTO grants (account_id, workspace_id, team_id) VALUES ($7, $1, $4);
-	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.owner, f.u, f.team, f.daemon, f.target, f.account, f.ca)
+		INSERT INTO ssh_cas (workspace_id, user_public_key, host_public_key, user_ttl)
+		VALUES ($1, 'pub', 'host-pub', '1 hour');
+		INSERT INTO targets (id, workspace_id, name) VALUES ($5, $1, 't');
+		INSERT INTO daemons (target_id, workspace_id, accepted, key_thumbprint) VALUES ($5, $1, TRUE, $5);
+		INSERT INTO target_accounts (id, workspace_id, target_id, username) VALUES ($6, $1, $5, 'deploy');
+		INSERT INTO grants (account_id, workspace_id, user_id) VALUES ($6, $1, $3);
+		INSERT INTO grants (account_id, workspace_id, team_id) VALUES ($6, $1, $4);
+	`, pgx.QueryExecModeSimpleProtocol, f.ws, f.owner, f.u, f.team, f.target, f.account)
 	require.NoError(t, err, "seed fixture")
 	return f
 }
@@ -229,7 +227,7 @@ func TestAServersReportNotifiesNobody(t *testing.T) {
 
 	asOwner(t, c, f, func(q *db.Queries) error {
 		if err := q.UpdateDaemonVersion(t.Context(), &db.UpdateDaemonVersionParams{
-			DaemonID: f.daemon,
+			TargetID: f.target,
 			Version:  "1.0.0",
 		}); err != nil {
 			return err
@@ -264,22 +262,12 @@ func TestGrantRejectsForeignTeam(t *testing.T) {
 func TestTargetNeedsNoCA(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
-	_, err := c.sysPool.Exec(t.Context(), `DELETE FROM ssh_cas WHERE id = $1`, f.ca)
+	_, err := c.sysPool.Exec(t.Context(), `DELETE FROM ssh_cas WHERE workspace_id = $1`, f.ws)
 	require.NoError(t, err, "a target held on to the CA")
 	asOwner(t, c, f, func(q *db.Queries) error {
 		_, err := q.CreateTarget(t.Context(), &db.CreateTargetParams{Name: "no-ca"})
 		return err
 	})
-}
-
-// The code reads the target of a daemon as one row.
-func TestDaemonServesOneTarget(t *testing.T) {
-	c := testConnection(t)
-	f := newStateFixture(t, c)
-
-	_, err := c.sysPool.Exec(t.Context(),
-		`INSERT INTO targets (workspace_id, daemon_id, name) VALUES ($1, $2, 'second')`, f.ws, f.daemon)
-	assert.Equal(t, pgerrcode.UniqueViolation, pgCode(err), "a daemon got a second target: %v", err)
 }
 
 func TestRecordingRejectsForeignDaemon(t *testing.T) {
@@ -289,7 +277,7 @@ func TestRecordingRejectsForeignDaemon(t *testing.T) {
 
 	_, err := c.sysPool.Exec(t.Context(), `
 		INSERT INTO recordings (workspace_id, daemon_id, daemon_name, username, key) VALUES ($1, $2, 'd', 'root', 'k')`,
-		a.ws, b.daemon)
+		a.ws, b.target)
 	assert.Equal(
 		t,
 		pgerrcode.ForeignKeyViolation,
@@ -306,7 +294,7 @@ func TestRecordingKeepsTheSubjectsName(t *testing.T) {
 	id := uuid.NewV7().String()
 	asOwner(t, c, f, func(q *db.Queries) error {
 		_, err := q.CreateRecording(t.Context(), &db.CreateRecordingParams{
-			ID: id, DaemonID: f.daemon, Username: "deploy", SubjectID: &f.u, Key: []byte("k"),
+			ID: id, DaemonID: f.target, Username: "deploy", SubjectID: &f.u, Key: []byte("k"),
 		})
 		if err != nil {
 			return err
@@ -345,11 +333,11 @@ func TestAccessTokenTakesTheSubjectOfItsKind(t *testing.T) {
 		user, serviceAccount, daemon *string
 	}{
 		"a user and a service account":   {"user", &f.u, &sa, nil},
-		"a daemon and a service account": {"daemon", nil, &sa, &f.daemon},
+		"a daemon and a service account": {"daemon", nil, &sa, &f.target},
 		"a cli token of nobody":          {"cli", nil, nil, nil},
 		"a scim token of a user":         {"scim", &f.u, nil, nil},
-		"a scim token of a daemon":       {"scim", nil, nil, &f.daemon},
-		"a user token of a daemon":       {"user", nil, nil, &f.daemon},
+		"a scim token of a daemon":       {"scim", nil, nil, &f.target},
+		"a user token of a daemon":       {"user", nil, nil, &f.target},
 	} {
 		assert.Equal(t, pgerrcode.CheckViolation, pgCode(insert(tok.kind, tok.user, tok.serviceAccount, tok.daemon)),
 			"stored %s", name)
@@ -361,7 +349,7 @@ func TestAccessTokenTakesTheSubjectOfItsKind(t *testing.T) {
 		"user":            {"user", &f.u, nil, nil},
 		"cli":             {"cli", &f.u, nil, nil},
 		"service account": {"service_account", nil, &sa, nil},
-		"daemon":          {"daemon", nil, nil, &f.daemon},
+		"daemon":          {"daemon", nil, nil, &f.target},
 		"scim":            {"scim", nil, nil, nil},
 	} {
 		assert.NoError(t, insert(tok.kind, tok.user, tok.serviceAccount, tok.daemon), "a %s token", name)
@@ -389,7 +377,7 @@ func TestOnlyAnNKSessionCarriesAnSSHKey(t *testing.T) {
 	)
 }
 
-// A service account token always ends, only a bound one can spend a job token.
+// A service account token always ends, and the session of a job is bound to a key.
 func TestServiceAccountTokenHasAnEndDate(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
@@ -397,41 +385,54 @@ func TestServiceAccountTokenHasAnEndDate(t *testing.T) {
 	err := c.sysPool.QueryRow(t.Context(),
 		`INSERT INTO service_accounts (workspace_id, name) VALUES ($1, 'ci') RETURNING id`, f.ws).Scan(&sa)
 	require.NoError(t, err, "service account")
-	insert := func(expiresAt *time.Time, binding string, jti *string) error {
+	insert := func(expiresAt *time.Time, method, thumbprint string) error {
 		_, err := c.sysPool.Exec(t.Context(), `
 			INSERT INTO access_tokens (
-				token_hash, workspace_id, kind, method, service_account_id, expires_at, binding, workload_jti
+				token_hash, workspace_id, kind, method, service_account_id, expires_at, dpop_thumbprint
 			)
-			VALUES (uuidv7()::TEXT, $1, 'service_account', 'token', $2, $3, $4, $5)`,
-			f.ws, sa, expiresAt, binding, jti)
+			VALUES (uuidv7()::TEXT, $1, 'service_account', $3, $2, $4, $5)`,
+			f.ws, sa, method, expiresAt, thumbprint)
 		return err
 	}
 	hour := new(time.Now().Add(time.Hour))
-	assert.NoError(t, insert(hour, "", nil), "a dated key")
-	assert.NoError(t, insert(hour, "jkt", new("https://ci.test job")), "the session of a job")
-	err = insert(nil, "", nil)
+	assert.NoError(t, insert(hour, "token", ""), "a dated key")
+	assert.NoError(t, insert(hour, "federation", "jkt"), "the session of a job")
+	err = insert(nil, "token", "")
 	assert.Equal(t, pgerrcode.CheckViolation, pgCode(err), "a key with no end date: %v", err)
-	err = insert(hour, "", new("https://ci.test other"))
+	err = insert(hour, "federation", "")
 	assert.Equal(t, pgerrcode.CheckViolation, pgCode(err), "the session of a job with no key behind it: %v", err)
-	err = insert(hour, "jkt", new("https://ci.test job"))
+}
+
+// A job token is spent once per workspace.
+func TestJobTokenIsSpentOnce(t *testing.T) {
+	c := testConnection(t)
+	f := newStateFixture(t, c)
+	spend := func() error {
+		_, err := c.sysPool.Exec(t.Context(), `
+			INSERT INTO spent_job_tokens (workspace_id, issuer, jti, expires_at)
+			VALUES ($1, 'https://ci.test', 'job', NOW() + INTERVAL '1 hour')`, f.ws)
+		return err
+	}
+	require.NoError(t, spend(), "the first use")
+	err := spend()
 	assert.Equal(t, pgerrcode.UniqueViolation, pgCode(err), "a job token stored twice: %v", err)
 }
 
-// The session of a deleted daemon stays for the REJECTED answer. A host that is
+// The session of a deleted daemon stays for the removed answer. A host that is
 // gone never asks, so it expires.
 func TestDeletedDaemonsTokenExpires(t *testing.T) {
 	c := testConnection(t)
 	f := newStateFixture(t, c)
 	_, err := c.sysPool.Exec(t.Context(), `
 		INSERT INTO access_tokens (token_hash, workspace_id, kind, method, daemon_id)
-		VALUES ($1::TEXT, $2, 'daemon', 'device', $1::UUID)`, f.daemon, f.ws)
+		VALUES ($1::TEXT, $2, 'daemon', 'device', $1::UUID)`, f.target, f.ws)
 	require.NoError(t, err, "daemon session")
 	// A certificate lives a year at most, the host is told for that long.
 	expires := func() (never, afterAYear bool) {
 		t.Helper()
 		err := c.sysPool.QueryRow(t.Context(), `
 			SELECT expires_at IS NULL, COALESCE(expires_at > NOW() + INTERVAL '365 days', FALSE)
-			FROM access_tokens WHERE token_hash = $1`, f.daemon).Scan(&never, &afterAYear)
+			FROM access_tokens WHERE token_hash = $1`, f.target).Scan(&never, &afterAYear)
 		require.NoError(t, err, "read the session")
 		return never, afterAYear
 	}
@@ -439,21 +440,12 @@ func TestDeletedDaemonsTokenExpires(t *testing.T) {
 	require.True(t, never, "the session of a live daemon expires")
 
 	asOwner(t, c, f, func(q *db.Queries) error {
-		_, err := q.DeleteDaemon(t.Context(), f.daemon)
+		_, err := q.DeleteTarget(t.Context(), f.target)
 		return err
 	})
 	never, afterAYear := expires()
 	require.False(t, never, "the session of a deleted daemon never expires")
 	require.True(t, afterAYear, "the session of a deleted daemon ends before a certificate")
-}
-
-// An unspecified status locks a daemon out, so the schema refuses it.
-func TestDaemonStatusRejectsUnspecified(t *testing.T) {
-	c := testConnection(t)
-	f := newStateFixture(t, c)
-
-	_, err := c.sysPool.Exec(t.Context(), `UPDATE daemons SET status = 0 WHERE id = $1`, f.daemon)
-	assert.Equal(t, pgerrcode.CheckViolation, pgCode(err), "stored a daemon with status 0: %v", err)
 }
 
 // Parallel redemptions of a one-use token spend it exactly once.
@@ -494,15 +486,15 @@ func TestSyncReportSkipsUnchangedRows(t *testing.T) {
 	rowVersions := func() (daemon, target string) {
 		t.Helper()
 		err := c.sysPool.QueryRow(t.Context(), `
-			SELECT d.xmin::TEXT, t.xmin::TEXT FROM daemons d JOIN targets t ON t.daemon_id = d.id WHERE d.id = $1
-		`, f.daemon).Scan(&daemon, &target)
+			SELECT d.xmin::TEXT, t.xmin::TEXT FROM daemons d JOIN targets t ON t.id = d.target_id WHERE t.id = $1
+		`, f.target).Scan(&daemon, &target)
 		require.NoError(t, err, "read row versions")
 		return daemon, target
 	}
 	report := func(endpoints []string) {
 		t.Helper()
 		require.NoError(t, c.Sys().UpdateDaemonVersion(t.Context(), &db.UpdateDaemonVersionParams{
-			DaemonID: f.daemon, Version: "1.0.0",
+			TargetID: f.target, Version: "1.0.0",
 		}), "report daemon version")
 		require.NoError(t, c.Sys().UpdateTargetReport(t.Context(), &db.UpdateTargetReportParams{
 			TargetID: f.target, Metadata: []byte(`{"os": "linux"}`), Endpoints: endpoints,

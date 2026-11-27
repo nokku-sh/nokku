@@ -83,21 +83,12 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	}
 	var ca *db.SSHCA
 	var signer gossh.Signer
-	var targetID string
 	if err := t.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		ca, err = q.GetWorkspaceCA(ctx)
-		if err != nil {
+		if ca, signer, err = ssh.CASigner(ctx, q, t.cfg.Keyset, gossh.UserCert); err != nil {
 			return err
 		}
-		if signer, err = ssh.CASigner(ctx, q, t.cfg.Keyset, ca.ID, gossh.UserCert); err != nil {
-			return err
-		}
-		target, err := q.GetTargetByDaemon(ctx, &ticket.DaemonID)
-		if err != nil {
-			return err
-		}
-		targetID = target.ID
-		return nil
+		_, err = q.GetDaemon(ctx, ticket.DaemonID)
+		return err
 	}); err != nil {
 		writeJSONError(w, http.StatusNotFound, "session not found")
 		return
@@ -116,13 +107,13 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 	defer cancel()
 	logger := slog.With("session_id", sessionID, "daemon_id", ticket.DaemonID)
 
-	principal := login.Principal(ticket.UserID, targetID, ticket.Username)
+	principal := login.Principal(ticket.UserID, ticket.DaemonID, ticket.Username)
 	sessionSigner, cert, err := daemon.MintSessionCert(ca, signer, principal, sessionID)
 	if err == nil {
 		// The event is the cert's only record, written before a daemon sees it.
 		err = t.cfg.Audit.Confirm(ctx, &audit.Event{
 			Action: "SignSSHCertificate",
-			Target: ca.ID,
+			Target: ca.WorkspaceID,
 			Details: map[string]any{
 				"serial":     strconv.FormatUint(cert.Serial, 10),
 				"key_id":     cert.KeyId,
@@ -145,7 +136,7 @@ func (t *terminalHandler) handleWebSocket(w http.ResponseWriter, r *http.Request
 		UserID:        ticket.UserID,
 		HostCA:        ca.HostPublicKey,
 		Signer:        sessionSigner,
-		HostPrincipal: targetID,
+		HostPrincipal: ticket.DaemonID,
 		ClientAddr:    realip.Client(r.Header, r.RemoteAddr),
 	})
 	if err != nil {

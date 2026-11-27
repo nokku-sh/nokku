@@ -43,7 +43,7 @@ func TestMiddlewareOnlyTrustsCookieSessions(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	_, cliToken, err := e.svc.IssueSignIn(anon(t.Context(), o.ws), o.owner, iam.TokenParams{
-		Kind: actor.KindCLI, Method: iam.MethodDevice, Binding: "jkt", SSHKey: testSSHKey, TTL: time.Hour,
+		Kind: actor.KindCLI, Method: iam.MethodDevice, DPoPThumbprint: "jkt", SSHKey: testSSHKey, TTL: time.Hour,
 	})
 	require.NoError(t, err)
 	_, userToken := e.session(t, o.ws, o.owner, actor.KindUser)
@@ -112,7 +112,7 @@ func TestLogoutRevokesBoundSession(t *testing.T) {
 	require.NoError(t, err)
 	_, token, err := e.svc.IssueSignIn(ctx, o.owner, iam.TokenParams{
 		Kind: actor.KindCLI, Method: iam.MethodDevice, SSHKey: testSSHKey,
-		Binding: base64.RawURLEncoding.EncodeToString(tp), TTL: time.Hour,
+		DPoPThumbprint: base64.RawURLEncoding.EncodeToString(tp), TTL: time.Hour,
 	})
 	require.NoError(t, err)
 	const procedure = "/nokku.v1.AuthService/Logout"
@@ -234,9 +234,7 @@ func TestEmailChange(t *testing.T) {
 	// The old inbox undoes the change and signs everyone out. A passkey added
 	// meanwhile may be the intruder's.
 	_, session := e.session(t, o.ws, u, actor.KindUser)
-	e.putCredential(t, o.ws, db.UpsertCredentialParams{
-		ID: "pk-" + u.ID, UserID: u.ID, Type: string(iam.MethodPasskey), Subject: "pk-" + u.ID, Data: []byte{},
-	})
+	e.putPasskey(t, o.ws, u.ID, "pk-"+u.ID)
 	// Whoever sits at the new address asks for a change and holds its revert.
 	_, flipBack, err := e.svc.RequestEmailChange(ctx, got, "third@"+testDomain())
 	require.NoError(t, err)
@@ -258,9 +256,7 @@ func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 	u := e.user(t, o.ws, "old@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	ctx := as(t.Context(), o.ws, u)
 	passkey := func(id string) {
-		e.putCredential(t, o.ws, db.UpsertCredentialParams{
-			ID: id, UserID: u.ID, Type: string(iam.MethodPasskey), Subject: id, Data: []byte{},
-		})
+		e.putPasskey(t, o.ws, u.ID, id)
 	}
 	passkey("own-" + u.ID)
 	confirm, cancel, err := e.svc.RequestEmailChange(ctx, u, "new@"+testDomain())
@@ -271,9 +267,9 @@ func TestEmailChangeCancelBeforeConfirm(t *testing.T) {
 	require.NoError(t, e.svc.CancelEmailChange(ctx, cancel))
 	var left []string
 	require.NoError(t, e.in(t, o.ws, func(q *db.Queries) error {
-		rows, listErr := q.ListUserCredentials(t.Context(), u.ID)
-		for _, c := range rows {
-			left = append(left, c.ID)
+		rows, listErr := q.ListPasskeys(t.Context(), u.ID)
+		for _, p := range rows {
+			left = append(left, p.CredentialID)
 		}
 		return listErr
 	}))
@@ -289,9 +285,7 @@ func TestEmailChangeRefusedForManagedAccounts(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	u := e.user(t, o.ws, "managed@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	e.putCredential(t, o.ws, db.UpsertCredentialParams{
-		ID: "okta:sub", UserID: u.ID, Type: string(iam.MethodOIDC), Provider: "okta", Subject: "sub", Data: []byte{},
-	})
+	e.linkIdentity(t, o.ws, u.ID, "okta", "sub")
 	_, _, err := e.svc.RequestEmailChange(as(t.Context(), o.ws, u), u, "other@"+testDomain())
 	require.ErrorIs(t, err, iam.ErrManagedAccount)
 }

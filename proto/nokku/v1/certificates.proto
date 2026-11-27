@@ -39,16 +39,15 @@ service CertificateService {
 }
 
 message CertificateAuthority {
-  string id = 1;
-  string user_public_key = 2;
-  string host_public_key = 3;
-  string source_address = 4;
-  string user_public_key_fingerprint = 5;
-  string host_public_key_fingerprint = 6;
-  google.protobuf.Duration user_ttl = 7;
-  google.protobuf.Timestamp rotated_at = 8;
-  google.protobuf.Timestamp created_at = 9;
-  google.protobuf.Timestamp updated_at = 10;
+  string user_public_key = 1;
+  string host_public_key = 2;
+  string source_address = 3;
+  string user_public_key_fingerprint = 4;
+  string host_public_key_fingerprint = 5;
+  google.protobuf.Duration user_ttl = 6;
+  google.protobuf.Timestamp rotated_at = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
 }
 
 message GetCertificateAuthorityRequest {}

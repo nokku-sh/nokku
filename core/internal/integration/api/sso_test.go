@@ -261,9 +261,13 @@ func linkIdentity(t *testing.T, cfg *app.Config, provider string) {
 	t.Helper()
 	u := seedUser(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
-		_, err := q.UpsertCredential(t.Context(), &db.UpsertCredentialParams{
-			ID: "oidc-" + u.ID, UserID: u.ID, Type: string(iam.MethodOIDC), Provider: provider, Subject: u.ID,
-			Data: []byte{},
+		if _, err := cfg.Conn.Pool.Exec(actor.WithWorkspace(t.Context(), actor.Workspace{ID: testWorkspace.ID}),
+			`INSERT INTO sso_providers (provider_id, enabled, config) VALUES ($1, FALSE, '') ON CONFLICT DO NOTHING`,
+			provider); err != nil {
+			return err
+		}
+		_, err := q.LinkOIDCIdentity(t.Context(), &db.LinkOIDCIdentityParams{
+			UserID: u.ID, ProviderID: provider, Subject: u.ID,
 		})
 		return err
 	})
@@ -422,20 +426,22 @@ func TestClearUserIdentities(t *testing.T) {
 	member := seedUser(t, cfg, ws, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
 	link := func(u *db.User) {
 		inWorkspace(t, cfg, ws, func(q *db.Queries) error {
-			_, err := q.UpsertCredential(t.Context(), &db.UpsertCredentialParams{
-				ID:       "oidc-" + u.ID,
-				UserID:   u.ID,
-				Type:     string(iam.MethodOIDC),
-				Provider: "okta",
-				Subject:  u.ID,
-				Data:     []byte{},
+			if _, err := cfg.Conn.Pool.Exec(
+				actor.WithWorkspace(t.Context(), actor.Workspace{ID: ws}),
+				`INSERT INTO sso_providers (provider_id, enabled, config) VALUES ($1, FALSE, '') ON CONFLICT DO NOTHING`,
+				"okta",
+			); err != nil {
+				return err
+			}
+			_, err := q.LinkOIDCIdentity(t.Context(), &db.LinkOIDCIdentityParams{
+				UserID: u.ID, ProviderID: "okta", Subject: u.ID,
 			})
 			return err
 		})
 	}
 	links := func(u *db.User) (n int) {
 		inWorkspace(t, cfg, ws, func(q *db.Queries) error {
-			rows, err := q.ListUserCredentials(t.Context(), u.ID)
+			rows, err := q.ListOIDCIdentities(t.Context(), u.ID)
 			n = len(rows)
 			return err
 		})

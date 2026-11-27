@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nokku-sh/nokku/core/internal/db"
 	emailverify "github.com/nokku-sh/nokku/core/internal/email"
 	"github.com/nokku-sh/nokku/core/internal/iam"
 )
@@ -195,29 +194,20 @@ func TestLastCredentialStays(t *testing.T) {
 	e := newTestEnv(t)
 	o := e.org(t)
 	ctx := as(t.Context(), o.ws, o.owner)
-	for _, id := range []string{"passkey:a", "passkey:b"} {
-		e.putCredential(t, o.ws, db.UpsertCredentialParams{
-			ID: id, UserID: o.owner.ID, Type: string(iam.MethodPasskey), Subject: id, Data: []byte{},
-		})
-	}
-	require.NoError(t, e.svc.DeleteCredential(ctx, "passkey:a"))
-	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:b"), iam.ErrLastCredential)
-	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:a"), iam.ErrNotFound)
+	a := e.putPasskey(t, o.ws, o.owner.ID, "a")
+	b := e.putPasskey(t, o.ws, o.owner.ID, "b")
+	require.NoError(t, e.svc.DeleteCredential(ctx, a))
+	require.ErrorIs(t, e.svc.DeleteCredential(ctx, b), iam.ErrLastCredential)
+	require.ErrorIs(t, e.svc.DeleteCredential(ctx, a), iam.ErrNotFound)
 
 	// With mail a sign-in link is a way in, so the last passkey may go.
 	e = newTestEnvWith(t, newMailbox().deps())
-	require.NoError(t, e.svc.DeleteCredential(ctx, "passkey:b"))
+	require.NoError(t, e.svc.DeleteCredential(ctx, b))
 	assert.Zero(t, e.passkeys(t, o.ws, o.owner.ID))
 
 	other := e.user(t, o.ws, "other@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	e.putCredential(t, o.ws, db.UpsertCredentialParams{
-		ID:      "passkey:c",
-		UserID:  other.ID,
-		Type:    string(iam.MethodPasskey),
-		Subject: "c",
-		Data:    []byte{},
-	})
-	require.ErrorIs(t, e.svc.DeleteCredential(ctx, "passkey:c"), iam.ErrNotFound, "deleted another user's passkey")
+	c := e.putPasskey(t, o.ws, other.ID, "c")
+	require.ErrorIs(t, e.svc.DeleteCredential(ctx, c), iam.ErrNotFound, "deleted another user's passkey")
 }
 
 // The environment names the issuer and the client. Whether the provider is on
@@ -239,10 +229,8 @@ func TestBootstrapKeepsWhatTheAdminSet(t *testing.T) {
 	seeded.Enabled, seeded.OIDC.JITProvisioning = false, false
 	_, err = e.svc.PutSSOProvider(ctx, *seeded)
 	require.NoError(t, err)
-	e.putCredential(t, ws, db.UpsertCredentialParams{
-		ID: "ms-sub", UserID: e.user(t, ws, "dev@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER).ID,
-		Type: string(iam.MethodOIDC), Provider: "microsoft", Subject: "sub", Data: []byte{},
-	})
+	dev := e.user(t, ws, "dev@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
+	e.linkIdentity(t, ws, dev.ID, "microsoft", "sub")
 
 	_, err = e.svc.Bootstrap(t.Context(), ws)
 	require.NoError(t, err)
@@ -274,14 +262,7 @@ func TestNewIssuerUnlinksIdentities(t *testing.T) {
 	_, err := e.svc.PutSSOProvider(ctx, p)
 	require.NoError(t, err)
 	member := e.user(t, o.ws, "dev@"+testDomain(), nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER)
-	e.putCredential(t, o.ws, db.UpsertCredentialParams{
-		ID:       "corp-sub",
-		UserID:   member.ID,
-		Type:     string(iam.MethodOIDC),
-		Provider: "corp",
-		Subject:  "sub",
-		Data:     []byte{},
-	})
+	e.linkIdentity(t, o.ws, member.ID, "corp", "sub")
 
 	p.Name, p.OIDC.ClientSecret = "Corp SSO", ""
 	_, err = e.svc.PutSSOProvider(ctx, p)

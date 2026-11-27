@@ -68,7 +68,7 @@ func stdinEOF(t *testing.T) {
 func TestProxyDaemonFallsBackToRelay(t *testing.T) {
 	stdinEOF(t)
 	stub := &relayStub{}
-	target := &state.Target{Name: "prod", DaemonID: "d", Endpoints: []string{blackhole}}
+	target := &state.Target{Name: "prod", Daemon: true, Endpoints: []string{blackhole}}
 
 	require.NoError(t, Proxy(t.Context(), target, "22", stub.dial, false), "stdin EOF half-closes the relay")
 	assert.Equal(t, 1, stub.calls)
@@ -79,7 +79,7 @@ func TestProxyRelayDoesNotWaitForSlowEndpoint(t *testing.T) {
 	stdinEOF(t)
 	stub := &relayStub{}
 	// TEST-NET-1 is never routed, so the dial hangs until its timeout.
-	target := &state.Target{Name: "prod", DaemonID: "d", Endpoints: []string{"192.0.2.1:22"}}
+	target := &state.Target{Name: "prod", Daemon: true, Endpoints: []string{"192.0.2.1:22"}}
 
 	start := time.Now()
 	require.NoError(t, Proxy(t.Context(), target, "22", stub.dial, false))
@@ -90,7 +90,7 @@ func TestProxyRelayDoesNotWaitForSlowEndpoint(t *testing.T) {
 func TestProxyReportsDialAndRelayErrors(t *testing.T) {
 	t.Parallel()
 	stub := &relayStub{err: errors.New("relay down")}
-	target := &state.Target{Name: "prod", DaemonID: "d", Endpoints: []string{blackhole}}
+	target := &state.Target{Name: "prod", Daemon: true, Endpoints: []string{blackhole}}
 
 	err := Proxy(t.Context(), target, "22", stub.dial, false)
 	require.Error(t, err)
@@ -132,7 +132,7 @@ func TestProxyDirectAndForcedRelay(t *testing.T) {
 	}()
 
 	stub := &relayStub{}
-	target := &state.Target{Name: "prod", DaemonID: "d", Endpoints: []string{ln.Addr().String()}}
+	target := &state.Target{Name: "prod", Daemon: true, Endpoints: []string{ln.Addr().String()}}
 
 	require.NoError(t, Proxy(t.Context(), target, "22", stub.dial, false))
 	select {

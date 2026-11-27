@@ -36,8 +36,6 @@ const (
 	// DaemonServiceSetDaemonSafeguardsProcedure is the procedure name of the DaemonService's
 	// SetDaemonSafeguards RPC.
 	DaemonServiceSetDaemonSafeguardsProcedure = "/nokku.v1.DaemonService/SetDaemonSafeguards"
-	// DaemonServiceDeleteDaemonProcedure is the procedure name of the DaemonService's DeleteDaemon RPC.
-	DaemonServiceDeleteDaemonProcedure = "/nokku.v1.DaemonService/DeleteDaemon"
 	// DaemonServiceListDaemonsProcedure is the procedure name of the DaemonService's ListDaemons RPC.
 	DaemonServiceListDaemonsProcedure = "/nokku.v1.DaemonService/ListDaemons"
 	// DaemonServiceCreateSessionProcedure is the procedure name of the DaemonService's CreateSession
@@ -98,13 +96,6 @@ var (
 			Procedure:  DaemonServiceSetDaemonSafeguardsProcedure,
 		}
 	})
-	daemonServiceDeleteDaemonSpec = sync.OnceValue(func() connect.Spec {
-		return connect.Spec{
-			StreamType: connect.StreamTypeUnary,
-			Schema:     v1.File_nokku_v1_daemon_proto.Services().ByName("DaemonService").Methods().ByName("DeleteDaemon"),
-			Procedure:  DaemonServiceDeleteDaemonProcedure,
-		}
-	})
 	daemonServiceListDaemonsSpec = sync.OnceValue(func() connect.Spec {
 		return connect.Spec{
 			StreamType:       connect.StreamTypeUnary,
@@ -135,7 +126,6 @@ type DaemonServiceClient interface {
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	ApproveDaemon(context.Context, *v1.ApproveDaemonRequest) (*v1.ApproveDaemonResponse, error)
 	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
-	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	Relay(context.Context) (DaemonServiceRelayClientStream, error)
@@ -189,7 +179,6 @@ type DaemonServiceHandler interface {
 	UpdateDaemon(context.Context, *v1.UpdateDaemonRequest) (*v1.UpdateDaemonResponse, error)
 	ApproveDaemon(context.Context, *v1.ApproveDaemonRequest) (*v1.ApproveDaemonResponse, error)
 	SetDaemonSafeguards(context.Context, *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error)
-	DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error)
 	ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error)
 	CreateSession(context.Context, *v1.CreateSessionRequest) (*v1.CreateSessionResponse, error)
 	Relay(context.Context, DaemonServiceRelayServerStream) error
@@ -204,7 +193,6 @@ func RegisterDaemonServiceHandler(server *connect.Server, svc DaemonServiceHandl
 		connect.Method{Spec: daemonServiceUpdateDaemonSpec(), Handler: adapter.updateDaemon},
 		connect.Method{Spec: daemonServiceApproveDaemonSpec(), Handler: adapter.approveDaemon},
 		connect.Method{Spec: daemonServiceSetDaemonSafeguardsSpec(), Handler: adapter.setDaemonSafeguards},
-		connect.Method{Spec: daemonServiceDeleteDaemonSpec(), Handler: adapter.deleteDaemon},
 		connect.Method{Spec: daemonServiceListDaemonsSpec(), Handler: adapter.listDaemons},
 		connect.Method{Spec: daemonServiceCreateSessionSpec(), Handler: adapter.createSession},
 		connect.Method{Spec: daemonServiceRelaySpec(), Handler: adapter.relay},
@@ -254,10 +242,6 @@ func (UnimplementedDaemonServiceHandler) SetDaemonSafeguards(context.Context, *v
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.SetDaemonSafeguards is not implemented")
 }
 
-func (UnimplementedDaemonServiceHandler) DeleteDaemon(context.Context, *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.DeleteDaemon is not implemented")
-}
-
 func (UnimplementedDaemonServiceHandler) ListDaemons(context.Context, *v1.ListDaemonsRequest) (*v1.ListDaemonsResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, "nokku.v1.DaemonService.ListDaemons is not implemented")
 }
@@ -301,14 +285,6 @@ func (c *daemonServiceClient) ApproveDaemon(ctx context.Context, req *v1.Approve
 func (c *daemonServiceClient) SetDaemonSafeguards(ctx context.Context, req *v1.SetDaemonSafeguardsRequest) (*v1.SetDaemonSafeguardsResponse, error) {
 	var res v1.SetDaemonSafeguardsResponse
 	if err := c.client.CallUnary(ctx, daemonServiceSetDaemonSafeguardsSpec(), req, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
-}
-
-func (c *daemonServiceClient) DeleteDaemon(ctx context.Context, req *v1.DeleteDaemonRequest) (*v1.DeleteDaemonResponse, error) {
-	var res v1.DeleteDaemonResponse
-	if err := c.client.CallUnary(ctx, daemonServiceDeleteDaemonSpec(), req, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -382,18 +358,6 @@ func (h daemonServiceHandler) setDaemonSafeguards(ctx context.Context, _ connect
 		return err
 	}
 	res, err := h.svc.SetDaemonSafeguards(ctx, &req)
-	if err != nil {
-		return err
-	}
-	return stream.Send(res)
-}
-
-func (h daemonServiceHandler) deleteDaemon(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
-	var req v1.DeleteDaemonRequest
-	if err := stream.Receive(&req); err != nil {
-		return err
-	}
-	res, err := h.svc.DeleteDaemon(ctx, &req)
 	if err != nil {
 		return err
 	}

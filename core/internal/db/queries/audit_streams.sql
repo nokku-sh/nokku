@@ -1,6 +1,5 @@
 -- name: CreateAuditStream :one
--- A new stream starts with the events from now on. Never the secret back, it is not shown again. The id comes from
--- the caller, the secret is sealed to it.
+-- The id comes from the caller, the secret is sealed to it.
 INSERT INTO
   audit_streams (id, kind, url, secret)
 VALUES
@@ -49,7 +48,7 @@ WHERE
 UPDATE audit_streams
 SET
   url = COALESCE(sqlc.narg('url'), url),
-  secret = COALESCE(sqlc.narg('secret'), secret),
+  secret = COALESCE(sqlc.narg('secret')::sealed, secret),
   enabled = COALESCE(sqlc.narg('enabled'), enabled),
   retry_at = NULL
 WHERE
@@ -70,7 +69,6 @@ WHERE
   id = @id;
 
 -- name: ListDueAuditStreams :many
--- Every enabled stream whose wait after a failure is over, across workspaces.
 SELECT
   *
 FROM
@@ -85,8 +83,7 @@ ORDER BY
   id;
 
 -- name: ListAuditLogsAfter :many
--- The events after the cursor in a stable order. A row is stamped when its insert starts and commits a moment
--- later, so the newest minute waits until nothing older can still arrive. Every write gives up long before that.
+-- Skips the newest minute, a row may commit after its stamp.
 SELECT
   *
 FROM
@@ -133,7 +130,6 @@ WHERE
   id = @id;
 
 -- name: ListAuditStreamsFailingLong :many
--- Enabled streams that failed for longer than the wait and whose owner has not heard of it. Runs as nokku_system.
 SELECT
   s.id,
   s.workspace_id,

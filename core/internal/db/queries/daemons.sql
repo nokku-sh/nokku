@@ -1,9 +1,20 @@
--- name: CreateDaemon :one
--- Returns no row on a taken key, a racing enrollment of the same machine. CreateDaemonTarget names it.
+-- name: CreateDaemonTarget :one
+-- Returns no row on a taken name, also one a racing enrollment just took.
 INSERT INTO
-  daemons (status, config, version, key_thumbprint, join_token_id, retire_after)
+  targets (name)
+VALUES
+  (@name)
+ON CONFLICT DO NOTHING
+RETURNING
+  id;
+
+-- name: CreateDaemon :one
+-- Returns no row on a taken key, a racing enrollment of the same machine.
+INSERT INTO
+  daemons (target_id, accepted, config, version, key_thumbprint, join_token_id, retire_after)
 SELECT
-  @status AS status,
+  @target_id AS target_id,
+  @accepted AS accepted,
   COALESCE(@config, '{}'::jsonb) AS config,
   @version AS version,
   @key_thumbprint AS key_thumbprint,
@@ -13,24 +24,13 @@ ON CONFLICT DO NOTHING
 RETURNING
   *;
 
--- name: CreateDaemonTarget :one
--- Returns no row on a taken name, also one a racing enrollment just took.
-INSERT INTO
-  targets (daemon_id, name)
-VALUES
-  (@daemon_id, @name)
-ON CONFLICT DO NOTHING
-RETURNING
-  id;
-
 -- name: GetDaemonByKeyThumbprint :one
 SELECT
   sqlc.embed(d),
-  t.id AS target_id,
   t.name
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
   d.key_thumbprint = @key_thumbprint;
 
@@ -40,26 +40,15 @@ SELECT
   t.name
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
-  d.id = @daemon_id;
+  d.target_id = @target_id;
 
 -- name: ListDaemonsForSync :many
--- Every daemon of the workspace with its server, for the pass that works out what each one is told.
-SELECT
-  sqlc.embed(d),
-  t.id AS target_id
-FROM
-  daemons d
-  JOIN targets t ON t.daemon_id = d.id;
-
--- name: GetTargetByDaemon :one
 SELECT
   *
 FROM
-  targets
-WHERE
-  daemon_id = @daemon_id;
+  daemons;
 
 -- name: GetDaemonsByIDs :many
 SELECT
@@ -67,9 +56,9 @@ SELECT
   t.name
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
-  d.id = ANY (sqlc.arg('daemon_ids')::UUID[]);
+  d.target_id = ANY (sqlc.arg('target_ids')::UUID[]);
 
 -- name: GetDaemonConfigForUpdate :one
 SELECT
@@ -77,25 +66,32 @@ SELECT
 FROM
   daemons
 WHERE
-  id = @daemon_id
+  target_id = @target_id
 FOR UPDATE;
+
+-- name: ApproveDaemon :one
+UPDATE daemons d
+SET
+  accepted = TRUE,
+  updated_at = NOW()
+FROM
+  targets t
+WHERE
+  d.target_id = @target_id
+  AND t.id = d.target_id
+RETURNING
+  t.name;
 
 -- name: UpdateDaemon :one
 UPDATE daemons d
 SET
-  -- 0 is unset and keeps the status. The column comes first, sqlc types the parameter by its first use.
-  status = CASE
-    WHEN d.status = @status
-    OR @status = 0 THEN d.status
-    ELSE @status
-  END,
   config = COALESCE(sqlc.narg('config'), d.config),
   updated_at = NOW()
 FROM
   targets t
 WHERE
-  d.id = @daemon_id
-  AND t.daemon_id = d.id
+  d.target_id = @target_id
+  AND t.id = d.target_id
 RETURNING
   t.name;
 
@@ -105,7 +101,7 @@ UPDATE daemons
 SET
   version = @version
 WHERE
-  id = @daemon_id
+  target_id = @target_id
   AND version <> @version;
 
 -- name: MarkDaemonSeen :exec
@@ -113,7 +109,7 @@ UPDATE daemons
 SET
   last_seen_at = NOW()
 WHERE
-  id = @daemon_id;
+  target_id = @target_id;
 
 -- name: ListDaemons :many
 SELECT
@@ -122,56 +118,54 @@ SELECT
   COUNT(*) OVER ()::INTEGER AS total_count
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
   (
     sqlc.narg('query')::TEXT IS NULL
     OR t.name ILIKE '%' || sqlc.narg('query') || '%'
   )
   AND (
-    d.status = @status
-    OR @status = 0 -- every status
-  )
-  AND (
     sqlc.narg('online')::BOOLEAN IS NULL
-    OR COALESCE(d.id = ANY (@connected::UUID[]), FALSE) = sqlc.narg('online')
+    OR COALESCE(d.target_id = ANY (@connected::UUID[]), FALSE) = sqlc.narg('online')
   )
 ORDER BY
-  d.id ASC
+  d.target_id ASC
 LIMIT
   sqlc.narg('limit')
 OFFSET
   sqlc.narg('offset');
 
--- name: DeleteDaemon :one
--- The target goes with it, so the name is read before the cascade.
-DELETE FROM daemons d
-WHERE
-  d.id = @daemon_id
-RETURNING
-  COALESCE((SELECT t.name FROM targets t WHERE t.daemon_id = d.id), '')::TEXT AS name;
-
 -- name: GetOfflineDaemonByTokenAndName :one
--- The one an ephemeral enrollment of the same name may replace. A daemon that is connected keeps its name.
 SELECT
-  d.id
+  d.target_id
 FROM
   daemons d
-  JOIN targets t ON t.daemon_id = d.id
+  JOIN targets t ON t.id = d.target_id
 WHERE
   d.join_token_id = @join_token_id
   AND t.name = @name
-  AND NOT COALESCE(d.id = ANY (@connected::UUID[]), FALSE);
+  AND NOT COALESCE(d.target_id = ANY (@connected::UUID[]), FALSE);
 
 -- name: DeleteRetiredDaemons :many
--- Across workspaces, so it runs as the system. A daemon never seen counts from its creation, a connected one stays.
 -- Nothing counts from before the core started, a crash stamps no daemon as gone.
-DELETE FROM daemons d
+DELETE FROM targets t USING daemons d
 WHERE
-  d.retire_after IS NOT NULL
+  d.target_id = t.id
+  AND d.retire_after IS NOT NULL
   AND GREATEST(COALESCE(d.last_seen_at, d.created_at), @started_at::TIMESTAMPTZ) < NOW() - d.retire_after
-  AND NOT COALESCE(d.id = ANY (@connected::UUID[]), FALSE)
+  AND NOT COALESCE(d.target_id = ANY (@connected::UUID[]), FALSE)
 RETURNING
-  d.id,
-  d.workspace_id,
-  COALESCE((SELECT t.name FROM targets t WHERE t.daemon_id = d.id), '')::TEXT AS name;
+  t.id,
+  t.workspace_id,
+  t.name;
+
+-- name: HasDaemon :one
+SELECT
+  EXISTS (
+    SELECT
+      1
+    FROM
+      daemons
+    WHERE
+      target_id = @target_id
+  );

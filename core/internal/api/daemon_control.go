@@ -84,12 +84,12 @@ func (s *daemonControlService) EnrollDaemon(
 	}
 
 	out, err := nokkudaemon.Enroll(ctx, s.cfg.Conn, nokkudaemon.EnrollInput{
-		Token:       req.GetToken(),
-		Binding:     binding,
-		Version:     daemonVersion(ci.RequestHeader().Get("User-Agent")),
-		ReqMetadata: req.GetMetadata(),
-		Connected:   s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
-		Settled:     s.cfg.Pool.Settled(),
+		Token:         req.GetToken(),
+		KeyThumbprint: binding,
+		Version:       daemonVersion(ci.RequestHeader().Get("User-Agent")),
+		ReqMetadata:   req.GetMetadata(),
+		Connected:     s.cfg.Pool.ConnectedIn(actor.WorkspaceIDFromContext(ctx)),
+		Settled:       s.cfg.Pool.Settled(),
 		// Not in the guard, only a verified token may spend on the cap.
 		CanCreate: func(ctx context.Context, workspaceID string) error {
 			return s.cfg.Entitlements.CheckResources(ctx, workspaceID)
@@ -116,9 +116,7 @@ func (s *daemonControlService) EnrollDaemon(
 	})
 
 	return &nokkuv1.EnrollDaemonResponse{
-		Id:          &out.DaemonID,
-		TargetId:    &out.TargetID,
-		Status:      &out.Status,
+		TargetId:    &out.DaemonID,
 		Config:      out.Config,
 		AccessToken: &token,
 	}, nil
@@ -150,15 +148,8 @@ func (s *daemonControlService) SignHostCertificate(
 	daemonID := actor.DaemonIDFromContext(ctx)
 	var ca *db.SSHCA
 	var signer gossh.Signer
-	var target *db.Target
 	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) (err error) {
-		if ca, err = q.GetWorkspaceCA(ctx); err != nil {
-			return err
-		}
-		if signer, err = ssh.CASigner(ctx, q, s.cfg.Keyset, ca.ID, gossh.HostCert); err != nil {
-			return err
-		}
-		target, err = q.GetTargetByDaemon(ctx, &daemonID)
+		ca, signer, err = ssh.CASigner(ctx, q, s.cfg.Keyset, gossh.HostCert)
 		return err
 	}); err != nil {
 		return nil, err
@@ -167,7 +158,7 @@ func (s *daemonControlService) SignHostCertificate(
 		ca,
 		signer,
 		req.GetPublicKey(),
-		[]string{target.ID},
+		[]string{daemonID},
 		"nokku:provision:daemon:"+daemonID,
 		0,
 		gossh.HostCert,
@@ -177,7 +168,7 @@ func (s *daemonControlService) SignHostCertificate(
 		return nil, err
 	}
 
-	audit.SetTarget(ctx, ca.ID)
+	audit.SetTarget(ctx, ca.WorkspaceID)
 	audit.Set(ctx, "serial", strconv.FormatUint(cert.Serial, 10))
 	audit.Set(ctx, "key_id", cert.KeyId)
 	audit.Set(ctx, "principals", cert.ValidPrincipals)
@@ -505,12 +496,8 @@ func (s *daemonControlService) resolveUpload(
 		// A principal of another target or account misfiles the recording.
 		var subjectID *string
 		if rm.GetPrincipal() != "" {
-			target, err := q.GetTargetByDaemon(ctx, &daemonID)
-			if err != nil {
-				return err
-			}
 			p, ok := login.ParsePrincipal(rm.GetPrincipal())
-			if !ok || p.TargetID != target.ID || p.Username != rm.GetUsername() {
+			if !ok || p.TargetID != daemonID || p.Username != rm.GetUsername() {
 				return connect.NewError(connect.CodeInvalidArgument, "the principal does not match the session")
 			}
 			subjectID = &p.SubjectID
@@ -549,7 +536,7 @@ func (s *daemonControlService) UnenrollDaemon(
 		if err := q.QuietStateChange(ctx); err != nil {
 			return err
 		}
-		if _, err := q.DeleteDaemon(ctx, daemonID); err != nil {
+		if _, err := q.DeleteTarget(ctx, daemonID); err != nil {
 			return err
 		}
 		_, err := q.DeleteSubjectTokens(ctx, daemonID)

@@ -25,7 +25,6 @@
 		TimeCell
 	} from '#lib/components/tables/cells/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
-	import { DaemonStatus } from '#lib/gen/nokku/v1/daemon_pb.js';
 	import { TargetStatus, type Target } from '#lib/gen/nokku/v1/target_pb.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { renderComponent } from '@tanstack/svelte-table';
@@ -105,9 +104,7 @@
 	const approveDaemons = daemon.approveMany();
 	// The daemons of the picked servers that are not approved yet.
 	const waiting = (picked: Target[]) =>
-		picked.flatMap((t) =>
-			t.daemon && t.daemon.status !== DaemonStatus.ACCEPTED ? [t.daemon.id] : []
-		);
+		picked.flatMap((t) => (t.daemon && !t.daemon.accepted ? [t.daemon.id] : []));
 
 	const deleteTarget = target.delete();
 	const deleteTargets = target.deleteMany();

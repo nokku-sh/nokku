@@ -16,9 +16,7 @@
 	const session = $derived(getSessions().get(activeSessionID.current));
 	const login = (s: SubjectTarget) => s.logins.find((l) => l.username === session?.username);
 	const server = $derived(
-		session
-			? servers.list.find((s) => s.target.daemonId === session.daemonID && login(s))
-			: undefined
+		session ? servers.list.find((s) => s.target.id === session.daemonID && login(s)) : undefined
 	);
 	// Unset when the access is for good.
 	const ends = $derived(server && login(server)?.expiresAt);

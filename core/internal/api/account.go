@@ -127,27 +127,44 @@ func (s *accountService) ListCredentials(
 	ctx context.Context,
 	_ *nokkuv1.ListCredentialsRequest,
 ) (*nokkuv1.ListCredentialsResponse, error) {
-	creds, err := s.cfg.Conn.Tenant().ListUserCredentials(ctx, actor.UserIDFromContext(ctx))
-	if err != nil {
+	userID := actor.UserIDFromContext(ctx)
+	res := &nokkuv1.ListCredentialsResponse{}
+	if err := s.cfg.Conn.TenantTx(ctx, func(q *db.Queries) error {
+		passkeys, err := q.ListPasskeys(ctx, userID)
+		if err != nil {
+			return err
+		}
+		identities, err := q.ListOIDCIdentities(ctx, userID)
+		if err != nil {
+			return err
+		}
+		for _, p := range passkeys {
+			res.Passkeys = append(res.Passkeys, p.ToProto())
+		}
+		for _, i := range identities {
+			res.OidcIdentities = append(res.OidcIdentities, i.ToProto())
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	credentials := make([]*nokkuv1.AccountCredential, 0, len(creds))
-	for _, c := range creds {
-		credentials = append(credentials, c.ToProto())
-	}
-	return &nokkuv1.ListCredentialsResponse{Credentials: credentials}, nil
+	return res, nil
 }
 
 func (s *accountService) RenameCredential(
 	ctx context.Context,
 	req *nokkuv1.RenameCredentialRequest,
 ) (*nokkuv1.RenameCredentialResponse, error) {
-	if err := s.cfg.Conn.Tenant().RenameCredential(ctx, &db.RenameCredentialParams{
+	renamed, err := s.cfg.Conn.Tenant().RenamePasskey(ctx, &db.RenamePasskeyParams{
 		UserID: actor.UserIDFromContext(ctx),
 		ID:     req.GetId(),
 		Label:  req.GetLabel(),
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, err
+	}
+	if renamed == 0 {
+		return nil, connect.NewError(connect.CodeNotFound, "no passkey with this id")
 	}
 	return &nokkuv1.RenameCredentialResponse{}, nil
 }
@@ -180,16 +197,16 @@ func (s *accountService) ListAccountSessions(
 	out := make([]*nokkuv1.AccountSession, 0, len(sessions))
 	for _, sess := range sessions {
 		out = append(out, &nokkuv1.AccountSession{
-			Id:         new(sess.ID),
-			Kind:       sessionKinds[sess.Kind].Enum(),
-			Method:     signInMethods[iam.Method(sess.Method)].Enum(),
-			Binding:    new(sess.Binding),
-			Current:    new(sess.ID == current.ID),
-			ExpiresAt:  db.SafeTimestamp(sess.ExpiresAt),
-			LastSeenAt: db.SafeTimestamp(sess.LastSeenAt),
-			FreshFor:   durationpb.New(s.cfg.IAM.FreshFor(sess)),
-			UserAgent:  new(sess.UserAgent),
-			Ip:         new(sess.Ip),
+			Id:             new(sess.ID),
+			Kind:           sessionKinds[sess.Kind].Enum(),
+			Method:         signInMethods[iam.Method(sess.Method)].Enum(),
+			DpopThumbprint: new(sess.DpopThumbprint),
+			Current:        new(sess.ID == current.ID),
+			ExpiresAt:      db.SafeTimestamp(sess.ExpiresAt),
+			LastSeenAt:     db.SafeTimestamp(sess.LastSeenAt),
+			FreshFor:       durationpb.New(s.cfg.IAM.FreshFor(sess)),
+			UserAgent:      new(sess.UserAgent),
+			Ip:             new(sess.Ip),
 		})
 	}
 	// Remembered devices are listed too, those rows are no sessions.
@@ -199,15 +216,15 @@ func (s *accountService) ListAccountSessions(
 	}
 	for _, d := range devices {
 		out = append(out, &nokkuv1.AccountSession{
-			Id:         new(d.ID),
-			Kind:       nokkuv1.SessionKind_SESSION_KIND_DEVICE.Enum(),
-			Method:     nokkuv1.SignInMethod_SIGN_IN_METHOD_DEVICE.Enum(),
-			Binding:    new(""),
-			Current:    new(false),
-			ExpiresAt:  timestamppb.New(d.ExpiresAt),
-			LastSeenAt: timestamppb.New(d.LastSeenAt),
-			UserAgent:  new(d.UserAgent),
-			Ip:         new(d.Ip),
+			Id:             new(d.ID),
+			Kind:           nokkuv1.SessionKind_SESSION_KIND_DEVICE.Enum(),
+			Method:         nokkuv1.SignInMethod_SIGN_IN_METHOD_DEVICE.Enum(),
+			DpopThumbprint: new(""),
+			Current:        new(false),
+			ExpiresAt:      timestamppb.New(d.ExpiresAt),
+			LastSeenAt:     timestamppb.New(d.LastSeenAt),
+			UserAgent:      new(d.UserAgent),
+			Ip:             new(d.Ip),
 		})
 	}
 	return &nokkuv1.ListAccountSessionsResponse{Sessions: out}, nil

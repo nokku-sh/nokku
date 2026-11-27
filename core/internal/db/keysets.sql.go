@@ -58,7 +58,6 @@ type LockKeysetRow struct {
 	RotatedAt time.Time `json:"rotatedAt"`
 }
 
-// The row lock keeps two rotations from running at once.
 func (q *Queries) LockKeyset(ctx context.Context) (*LockKeysetRow, error) {
 	row := q.db.QueryRow(ctx, lockKeyset)
 	var i LockKeysetRow

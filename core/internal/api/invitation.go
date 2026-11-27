@@ -38,7 +38,7 @@ func (s *invitationService) GetInvitation(
 	}
 	return &nokkuv1.GetInvitationResponse{
 		WorkspaceName: &ws.Name,
-		Role:          inv.Role,
+		Role:          &inv.Role,
 		ExpiresAt:     db.SafeTimestamp(&inv.ExpiresAt),
 		Email:         &inv.Email,
 	}, nil

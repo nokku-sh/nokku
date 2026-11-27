@@ -5,6 +5,7 @@ package iam_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -119,12 +120,41 @@ func (e *testEnv) provider(t *testing.T, ws actor.Workspace, p iam.SSOProvider) 
 	require.NoError(t, err, "store provider")
 }
 
-func (e *testEnv) putCredential(t *testing.T, ws actor.Workspace, p db.UpsertCredentialParams) {
+// putPasskey returns the id of the row, the one DeleteCredential takes.
+func (e *testEnv) putPasskey(t *testing.T, ws actor.Workspace, userID, credentialID string) string {
 	t.Helper()
+	var id string
 	require.NoError(t, e.in(t, ws, func(q *db.Queries) error {
-		_, err := q.UpsertCredential(t.Context(), &p)
+		_, err := q.SavePasskey(t.Context(), &db.SavePasskeyParams{
+			UserID: userID, CredentialID: credentialID, Data: []byte{},
+		})
+		if err != nil {
+			return err
+		}
+		rows, err := q.ListPasskeys(t.Context(), userID)
+		i := slices.IndexFunc(rows, func(p *db.Passkey) bool { return p.CredentialID == credentialID })
+		if err == nil && i >= 0 {
+			id = rows[i].ID
+		}
 		return err
-	}), "store credential %s", p.ID)
+	}), "store passkey %s", credentialID)
+	require.NotEmpty(t, id, "passkey %s was not stored", credentialID)
+	return id
+}
+
+// linkIdentity stores a disabled provider of that id when the workspace has none.
+func (e *testEnv) linkIdentity(t *testing.T, ws actor.Workspace, userID, provider, subject string) {
+	t.Helper()
+	_, err := e.conn.Pool.Exec(anon(t.Context(), ws),
+		`INSERT INTO sso_providers (provider_id, enabled, config) VALUES ($1, FALSE, '') ON CONFLICT DO NOTHING`,
+		provider)
+	require.NoError(t, err, "store provider %s", provider)
+	require.NoError(t, e.in(t, ws, func(q *db.Queries) error {
+		_, err := q.LinkOIDCIdentity(t.Context(), &db.LinkOIDCIdentityParams{
+			UserID: userID, ProviderID: provider, Subject: subject,
+		})
+		return err
+	}), "link %s to %s", subject, provider)
 }
 
 func (e *testEnv) setEnforceSSO(t *testing.T, ws actor.Workspace, on bool) {
@@ -158,15 +188,11 @@ func (e *testEnv) oidcCredential(
 	t *testing.T,
 	ws actor.Workspace,
 	provider, subject string,
-) *db.Credential {
+) *db.OidcIdentity {
 	t.Helper()
-	var c *db.Credential
+	var c *db.OidcIdentity
 	err := e.in(t, ws, func(q *db.Queries) (err error) {
-		c, err = q.FindCredentialBySubject(t.Context(), &db.FindCredentialBySubjectParams{
-			Type:     string(iam.MethodOIDC),
-			Provider: provider,
-			Subject:  subject,
-		})
+		c, err = q.FindOIDCIdentity(t.Context(), &db.FindOIDCIdentityParams{ProviderID: provider, Subject: subject})
 		return err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -188,11 +214,9 @@ func (e *testEnv) sessions(t *testing.T, ws actor.Workspace, subjectID string) i
 
 func (e *testEnv) passkeys(t *testing.T, ws actor.Workspace, userID string) int {
 	t.Helper()
-	var rows []*db.Credential
+	var rows []*db.Passkey
 	require.NoError(t, e.in(t, ws, func(q *db.Queries) (err error) {
-		rows, err = q.ListCredentialsByType(t.Context(), &db.ListCredentialsByTypeParams{
-			UserID: userID, Type: string(iam.MethodPasskey),
-		})
+		rows, err = q.ListPasskeys(t.Context(), userID)
 		return err
 	}))
 	return len(rows)

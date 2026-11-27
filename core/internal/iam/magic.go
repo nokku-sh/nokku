@@ -94,7 +94,7 @@ func (s *Service) putLoginToken(
 	raw, hash := crypto.NewToken(crypto.TokenLogin)
 	err := q.PutToken(ctx, &db.PutTokenParams{
 		TokenHash: hash,
-		UserID:    &userID,
+		UserID:    userID,
 		Purpose:   tokenLogin,
 		ExpiresAt: s.now().Add(ttl),
 	})
@@ -109,7 +109,7 @@ func (s *Service) IssueBootstrapLink(ctx context.Context, u *db.User) (string, e
 	var link string
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) (err error) {
 		if err := q.DeleteUserTokens(ctx, &db.DeleteUserTokensParams{
-			UserID: &u.ID, Purpose: tokenLogin,
+			UserID: u.ID, Purpose: tokenLogin,
 		}); err != nil {
 			return err
 		}

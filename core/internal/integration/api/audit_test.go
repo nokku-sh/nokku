@@ -133,7 +133,7 @@ func TestAuditNamesServiceAccount(t *testing.T) {
 func TestAuditNamesDaemon(t *testing.T) {
 	cfg, srv := newTestAPI(t)
 	key, enrolled := enrollTestDaemon(t, cfg, srv, testWorkspace.ID, true)
-	target, err := cfg.Conn.Tenant().GetTargetByDaemon(wsCtx(t), new(enrolled.GetId()))
+	target, err := cfg.Conn.Tenant().GetTarget(wsCtx(t), enrolled.GetTargetId())
 	require.NoError(t, err)
 
 	// Refused for the key, the interceptor still writes the row.
@@ -146,7 +146,7 @@ func TestAuditNamesDaemon(t *testing.T) {
 		var rows []*db.ListAuditLogsRow
 		require.Eventually(t, func() bool {
 			rows, _ = cfg.Conn.Tenant().ListAuditLogs(wsCtx(t), &db.ListAuditLogsParams{
-				ActorIds: []string{enrolled.GetId()}, Actions: []string{action}, Limit: 1,
+				ActorIds: []string{enrolled.GetTargetId()}, Actions: []string{action}, Limit: 1,
 			})
 			return len(rows) == 1
 		}, 5*time.Second, 20*time.Millisecond, "no %s row for the daemon", action)
@@ -247,14 +247,14 @@ func TestAuditNamesTheApproval(t *testing.T) {
 	_, enrolled := enrollTestDaemon(t, cfg, srv, testWorkspace.ID, false)
 	daemons := nokkuv1connect.NewDaemonServiceClient(clientOn(srv, header("Authorization",
 		"Bearer "+seedMember(t, cfg, testWorkspace.ID, nokkuv1.WorkspaceRole_WORKSPACE_ROLE_EDITOR))))
-	_, err := daemons.ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(enrolled.GetId())})
+	_, err := daemons.ApproveDaemon(t.Context(), &nokkuv1.ApproveDaemonRequest{Id: new(enrolled.GetTargetId())})
 	require.NoError(t, err)
 
 	var rows []*db.ListAuditLogsRow
 	require.Eventually(t, func() bool {
 		_ = cfg.Conn.TenantTx(wsCtx(t), func(q *db.Queries) (err error) {
 			rows, err = q.ListAuditLogs(t.Context(), &db.ListAuditLogsParams{
-				Target: new(enrolled.GetId()), Actions: []string{"ApproveDaemon"}, Limit: 1,
+				Target: new(enrolled.GetTargetId()), Actions: []string{"ApproveDaemon"}, Limit: 1,
 			})
 			return err
 		})
