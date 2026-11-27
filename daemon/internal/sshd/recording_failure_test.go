@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -105,6 +106,14 @@ func TestRecordingThatCannotStartLeavesTheSessionRunning(t *testing.T) {
 
 // The session runs on, the file stops with the disk and stays a .part.
 func TestWriteErrorMidSessionIsOnTheAuditTrail(t *testing.T) {
+	// RLIMIT_FSIZE also caps go test's own log, so the limit goes on a child.
+	if os.Getenv("NOKKU_TEST_FSIZE") == "" {
+		child := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$")
+		child.Env = append(os.Environ(), "NOKKU_TEST_FSIZE=1")
+		out, err := child.CombinedOutput()
+		require.NoError(t, err, "%s", out)
+		return
+	}
 	is := assert.New(t)
 	must := require.New(t)
 	ca := newTestCA(t)
