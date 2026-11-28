@@ -44,7 +44,7 @@
 		"@tanstack/svelte-table": "9.3.2",
 		"@types/node": "^26.6.6",
 		"@typescript/native": "npm:typescript@^7.0.2",
-		"@xyflow/svelte": "^1.7.1",
+		"@xyflow/svelte": "^2.0.0",
 		"bits-ui": "^2.21.0",
 		"cn": "^0.5.2",
 		"eslint": "^10.14.0",
