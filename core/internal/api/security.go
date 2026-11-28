@@ -22,17 +22,7 @@ func (s *Server) withCSRF(h http.Handler) http.Handler {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("CSRF check failed"))
 	}))
-	protected := cop.Handler(h)
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// An external sender. SSO has single-use state.
-		if r.URL.Path == "/oidc/callback" {
-			h.ServeHTTP(w, r)
-			return
-		}
-
-		protected.ServeHTTP(w, r)
-	})
+	return cop.Handler(h)
 }
 
 func (s *Server) withHeaders(h http.Handler) http.Handler {

@@ -17,7 +17,6 @@ func registerAuthRoutes(mux *http.ServeMux, svc *iam.Service) {
 	// A route that adds a way in needs a session from the last 10 minutes.
 	fresh := chain(limit, svc.Middleware, svc.RequireLogin, svc.RequireFresh)
 
-	// withCSRF rejects cross-origin posts on every route but the OIDC callback.
 	mux.Handle("POST /passkey/login/begin", public(svc.Passkey.BeginLogin))
 	mux.Handle("POST /passkey/login/finish", public(svc.Passkey.FinishLogin))
 	mux.Handle("POST /passkey/register/begin", fresh(svc.Passkey.BeginRegistration))
@@ -35,7 +34,6 @@ func registerAuthRoutes(mux *http.ServeMux, svc *iam.Service) {
 
 	mux.HandleFunc("GET /oidc/login", svc.OIDC.Login)
 	mux.Handle("GET /oidc/link", fresh(svc.OIDC.Link))
-	mux.Handle("POST /oidc/callback", public(svc.OIDC.Callback))
 	mux.HandleFunc("GET /oidc/callback", svc.OIDC.Callback)
 
 	// SCIM has no session, the workspace-scoped token is the only gate.
