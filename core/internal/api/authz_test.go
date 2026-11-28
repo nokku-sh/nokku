@@ -140,6 +140,22 @@ func TestRequestsCarryNoWorkspace(t *testing.T) {
 	}
 }
 
+// authorize checks a stream before its first message, so it skips the plan gates.
+func TestStreamsCarryNoPlanGate(t *testing.T) {
+	for _, procedure := range allProcedures(t) {
+		name := protoreflect.FullName(strings.ReplaceAll(strings.TrimPrefix(procedure, "/"), "/", "."))
+		desc, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
+		require.NoError(t, err, procedure)
+		md := desc.(protoreflect.MethodDescriptor)
+		if !md.IsStreamingClient() && !md.IsStreamingServer() {
+			continue
+		}
+		access := procedureAccess[procedure]
+		assert.False(t, access.GetFeature() != "" || access.GetCapped(),
+			"%s is a stream with a plan gate, authorize never checks it", procedure)
+	}
+}
+
 func TestAuthorizeDaemon(t *testing.T) {
 	a := &authorizationInterceptor{}
 	ctx := actor.ContextWithPrincipal(t.Context(), actor.Principal{ID: "d1", Kind: actor.KindDaemon})
