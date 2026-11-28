@@ -79,7 +79,7 @@ func main() {
 					"  secret:<value>  a new NOKKU_SECRET (at least 32 characters)\n" +
 					"  kms:<uri>       hcvault:// or scw-kms://\n\n" +
 					"Examples:\n" +
-					"  nokku rotate-secrets --new secret:NEW\n" +
+					"  NOKKU_NEW_SECRET=secret:NEW nokku rotate-secrets\n" +
 					"  nokku rotate-secrets --new kms:hcvault://vault:8200/transit/keys/nokku\n\n" +
 					"Pass the current kms:<uri> again after the KMS rotated its key, before " +
 					"old key versions are retired there.\n\n" +
