@@ -131,7 +131,7 @@ func (s *Service) ConfirmEmailChange(ctx context.Context, raw string) error {
 // CancelEmailChange means someone else asked for the change, so every way in ends.
 func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 	var u *db.User
-	reverted := false
+	reverted, taken := false, false
 	err := s.conn.TenantTx(ctx, func(q *db.Queries) error {
 		row, err := consumeEmailToken(ctx, q, raw, tokenEmailRevert)
 		if err != nil {
@@ -154,13 +154,18 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 			_, err = q.DeleteSubjectTokens(ctx, u.ID)
 			return err
 		}
-		if u, err = q.SetUserEmail(
-			ctx,
-			&db.SetUserEmailParams{ID: u.ID, Email: row.Email},
-		); err != nil {
-			return mapUserError(err)
+		// A taken address fails the update and rolls back the lockout, so it is checked first.
+		_, err = q.GetUserByEmail(ctx, row.Email)
+		taken = err == nil
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
 		}
-		reverted = true
+		if !taken {
+			if u, err = q.SetUserEmail(ctx, &db.SetUserEmailParams{ID: u.ID, Email: row.Email}); err != nil {
+				return mapUserError(err)
+			}
+			reverted = true
+		}
 		// Whoever made the change may hold a revert or sign-in link.
 		if err := q.DeleteAllUserTokens(ctx, u.ID); err != nil {
 			return err
@@ -179,6 +184,9 @@ func (s *Service) CancelEmailChange(ctx context.Context, raw string) error {
 			Action: actionSessionRevoked, Kind: actor.KindUser, UserID: u.ID, Email: u.Email,
 			Detail: "email change canceled",
 		})
+		if taken {
+			return ErrEmailTaken
+		}
 		return nil
 	}
 	s.record(

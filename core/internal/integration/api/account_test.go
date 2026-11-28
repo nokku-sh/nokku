@@ -87,6 +87,25 @@ func TestConfirmAndCancelEmailChange(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, u.ID, reverted.ID)
 	})
+
+	t.Run("revert after the old address was taken", func(t *testing.T) {
+		u, account := seedAccount(t, cfg)
+		confirm, cancel, err := cfg.IAM.RequestEmailChange(wsCtx(t), u, newMailAddress())
+		require.NoError(t, err)
+		_, err = auth.ConfirmEmailChange(t.Context(), &nokkuv1.ConfirmEmailChangeRequest{Token: &confirm})
+		require.NoError(t, err)
+		inWorkspace(t, cfg, testWorkspace.ID, func(q *db.Queries) error {
+			_, err := q.CreateUser(t.Context(), &db.CreateUserParams{
+				Email: u.Email, Name: "other", Role: nokkuv1.WorkspaceRole_WORKSPACE_ROLE_MEMBER,
+			})
+			return err
+		})
+
+		_, err = auth.CancelEmailChange(t.Context(), &nokkuv1.CancelEmailChangeRequest{Token: &cancel})
+		assert.Equal(t, connect.CodeAlreadyExists, connect.CodeOf(err), "got %v", err)
+		_, err = email(account)
+		assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err), "the changer is still signed in: %v", err)
+	})
 }
 
 // Passkeys and linked identities come back as the two lists they are.
