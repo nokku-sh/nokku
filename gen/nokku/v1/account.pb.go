@@ -1204,17 +1204,17 @@ const file_nokku_v1_account_proto_rawDesc = "" +
 	"\x16SIGN_IN_METHOD_PASSKEY\x10\x01\x12\x1d\n" +
 	"\x19SIGN_IN_METHOD_MAGIC_LINK\x10\x02\x12\x17\n" +
 	"\x13SIGN_IN_METHOD_OIDC\x10\x03\x12\x19\n" +
-	"\x15SIGN_IN_METHOD_DEVICE\x10\x042\x85\a\n" +
-	"\x0eAccountService\x12T\n" +
+	"\x15SIGN_IN_METHOD_DEVICE\x10\x042\xf7\x06\n" +
+	"\x0eAccountService\x12R\n" +
 	"\n" +
-	"GetAccount\x12\x1b.nokku.v1.GetAccountRequest\x1a\x1c.nokku.v1.GetAccountResponse\"\v\xc2\xf3\x18\x04\x18\x010\x01\x90\x02\x01\x12Z\n" +
-	"\rUpdateAccount\x12\x1e.nokku.v1.UpdateAccountRequest\x1a\x1f.nokku.v1.UpdateAccountResponse\"\b\xc2\xf3\x18\x04\x18\x010\x01\x12i\n" +
-	"\x12RequestEmailChange\x12#.nokku.v1.RequestEmailChangeRequest\x1a$.nokku.v1.RequestEmailChangeResponse\"\b\xc2\xf3\x18\x04\x18\x01 \x01\x12c\n" +
-	"\x0fListCredentials\x12 .nokku.v1.ListCredentialsRequest\x1a!.nokku.v1.ListCredentialsResponse\"\v\xc2\xf3\x18\x04\x18\x010\x01\x90\x02\x01\x12c\n" +
-	"\x10RenameCredential\x12!.nokku.v1.RenameCredentialRequest\x1a\".nokku.v1.RenameCredentialResponse\"\b\xc2\xf3\x18\x04\x18\x010\x01\x12c\n" +
-	"\x10RemoveCredential\x12!.nokku.v1.RemoveCredentialRequest\x1a\".nokku.v1.RemoveCredentialResponse\"\b\xc2\xf3\x18\x04\x18\x010\x01\x12o\n" +
-	"\x13ListAccountSessions\x12$.nokku.v1.ListAccountSessionsRequest\x1a%.nokku.v1.ListAccountSessionsResponse\"\v\xc2\xf3\x18\x04\x18\x010\x01\x90\x02\x01\x12Z\n" +
-	"\rRemoveSession\x12\x1e.nokku.v1.RemoveSessionRequest\x1a\x1f.nokku.v1.RemoveSessionResponse\"\b\xc2\xf3\x18\x04\x18\x010\x01\x12Z\n" +
+	"GetAccount\x12\x1b.nokku.v1.GetAccountRequest\x1a\x1c.nokku.v1.GetAccountResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12X\n" +
+	"\rUpdateAccount\x12\x1e.nokku.v1.UpdateAccountRequest\x1a\x1f.nokku.v1.UpdateAccountResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12i\n" +
+	"\x12RequestEmailChange\x12#.nokku.v1.RequestEmailChangeRequest\x1a$.nokku.v1.RequestEmailChangeResponse\"\b\xc2\xf3\x18\x04\x18\x01 \x01\x12a\n" +
+	"\x0fListCredentials\x12 .nokku.v1.ListCredentialsRequest\x1a!.nokku.v1.ListCredentialsResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12a\n" +
+	"\x10RenameCredential\x12!.nokku.v1.RenameCredentialRequest\x1a\".nokku.v1.RenameCredentialResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12a\n" +
+	"\x10RemoveCredential\x12!.nokku.v1.RemoveCredentialRequest\x1a\".nokku.v1.RemoveCredentialResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12m\n" +
+	"\x13ListAccountSessions\x12$.nokku.v1.ListAccountSessionsRequest\x1a%.nokku.v1.ListAccountSessionsResponse\"\t\xc2\xf3\x18\x02\x18\x01\x90\x02\x01\x12X\n" +
+	"\rRemoveSession\x12\x1e.nokku.v1.RemoveSessionRequest\x1a\x1f.nokku.v1.RemoveSessionResponse\"\x06\xc2\xf3\x18\x02\x18\x01\x12Z\n" +
 	"\rDeleteAccount\x12\x1e.nokku.v1.DeleteAccountRequest\x1a\x1f.nokku.v1.DeleteAccountResponse\"\b\xc2\xf3\x18\x04\x18\x01 \x01B\x8d\x01\n" +
 	"\fcom.nokku.v1B\fAccountProtoP\x01Z.github.com/nokku-sh/nokku/gen/nokku/v1;nokkuv1\xa2\x02\x03NXX\xaa\x02\bNokku.V1\xca\x02\bNokku\\V1\xe2\x02\x14Nokku\\V1\\GPBMetadata\xea\x02\tNokku::V1b\beditionsp\xe8\a"
 

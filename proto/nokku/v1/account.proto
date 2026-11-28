@@ -11,17 +11,11 @@ import "nokku/v1/user.proto";
 
 service AccountService {
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_MEMBER
-      service_account: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_MEMBER
-      service_account: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
   }
   rpc RequestEmailChange(RequestEmailChangeRequest) returns (RequestEmailChangeResponse) {
     option (access) = {
@@ -30,36 +24,21 @@ service AccountService {
     };
   }
   rpc ListCredentials(ListCredentialsRequest) returns (ListCredentialsResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_MEMBER
-      service_account: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc RenameCredential(RenameCredentialRequest) returns (RenameCredentialResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_MEMBER
-      service_account: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
   }
   rpc RemoveCredential(RemoveCredentialRequest) returns (RemoveCredentialResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_MEMBER
-      service_account: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
   }
   rpc ListAccountSessions(ListAccountSessionsRequest) returns (ListAccountSessionsResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_MEMBER
-      service_account: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc RemoveSession(RemoveSessionRequest) returns (RemoveSessionResponse) {
-    option (access) = {
-      role: WORKSPACE_ROLE_MEMBER
-      service_account: true
-    };
+    option (access) = {role: WORKSPACE_ROLE_MEMBER};
   }
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {
     option (access) = {
