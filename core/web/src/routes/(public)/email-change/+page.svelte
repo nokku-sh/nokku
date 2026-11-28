@@ -5,7 +5,7 @@
 	import AuthCard from '#lib/components/blocks/AuthCard.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { ConnectError } from '@connectrpc/connect';
+	import { Code, ConnectError } from '@connectrpc/connect';
 	import { CircleCheck, CircleX, LogIn, Mail, ShieldAlert, Undo2Icon } from '@lucide/svelte';
 
 	const token = page.url.searchParams.get('token');
@@ -15,9 +15,8 @@
 	const cancelChange = auth.cancelEmailChange();
 	const mutation = cancel ? cancelChange : confirmChange;
 
-	const error = $derived(
-		mutation.error ? formatConnectError(ConnectError.from(mutation.error)).title : undefined
-	);
+	const failure = $derived(mutation.error ? ConnectError.from(mutation.error) : undefined);
+	const error = $derived(failure ? formatConnectError(failure).title : undefined);
 </script>
 
 {#snippet back()}
@@ -52,6 +51,14 @@
 		description="You sign in with the new address from now on."
 		icon={CircleCheck}
 		tone="success"
+		footer={back}
+	/>
+{:else if cancel && failure?.code === Code.AlreadyExists}
+	<AuthCard
+		title="Everyone was signed out"
+		description="Every session ended and every way to sign in was removed. Another account uses your old address by now, so it could not be restored. Ask your administrator for help."
+		icon={ShieldAlert}
+		tone="warning"
 		footer={back}
 	/>
 {:else if mutation.isError}
