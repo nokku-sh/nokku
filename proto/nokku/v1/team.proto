@@ -92,7 +92,12 @@ message CreateTeamRequest {
     max_len: 256
   }];
   string description = 2 [(buf.validate.field).string.max_len = 1000];
-  repeated string tags = 3;
+  repeated string tags = 3 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {max_len: 64}
+    }
+  }];
 }
 message CreateTeamResponse {
   Team team = 1;
@@ -105,7 +110,12 @@ message UpdateTeamRequest {
     max_len: 256
   }];
   string description = 3 [(buf.validate.field).string.max_len = 1000];
-  repeated string tags = 4;
+  repeated string tags = 4 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {max_len: 64}
+    }
+  }];
   google.protobuf.FieldMask update_mask = 5 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
@@ -142,8 +152,13 @@ message ListTeamsRequest {
     lte: 100
   }];
   int32 offset = 2 [(buf.validate.field).int32.gte = 0];
-  string query = 3;
-  repeated string tags = 4;
+  string query = 3 [(buf.validate.field).string.max_len = 256];
+  repeated string tags = 4 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {max_len: 64}
+    }
+  }];
 }
 message ListTeamsResponse {
   repeated Team teams = 1;

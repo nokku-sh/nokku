@@ -1262,12 +1262,12 @@ const file_nokku_v1_target_account_proto_rawDesc = "" +
 	"\x05Grant\x12+\n" +
 	"\asubject\x18\x01 \x01(\v2\x11.nokku.v1.SubjectR\asubject\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x9a\x01\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xa4\x01\n" +
 	"\x19ListTargetAccountsRequest\x12%\n" +
 	"\ttarget_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\btargetId\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x01R\x05limit\x12\x1f\n" +
-	"\x06offset\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x14\n" +
-	"\x05query\x18\x04 \x01(\tR\x05query\"g\n" +
+	"\x06offset\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12\x1e\n" +
+	"\x05query\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x05query\"g\n" +
 	"\x1aListTargetAccountsResponse\x123\n" +
 	"\baccounts\x18\x01 \x03(\v2\x17.nokku.v1.TargetAccountR\baccounts\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\"m\n" +

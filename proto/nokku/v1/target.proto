@@ -160,8 +160,18 @@ message CreateTargetRequest {
   }]; // can be empty
   string description = 2 [(buf.validate.field).string.max_len = 1000];
   string host_public_key = 3;
-  repeated string endpoints = 4;
-  repeated string tags = 5;
+  repeated string endpoints = 4 [(buf.validate.field).repeated = {
+    max_items: 16
+    items: {
+      string: {max_len: 256}
+    }
+  }];
+  repeated string tags = 5 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {max_len: 64}
+    }
+  }];
   repeated JoinTokenGrant grants = 6 [(buf.validate.field).repeated.max_items = 32];
 }
 message CreateTargetResponse {
@@ -171,7 +181,12 @@ message CreateTargetResponse {
 message UpdateTargetRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
   string description = 2 [(buf.validate.field).string.max_len = 1000];
-  repeated string tags = 3;
+  repeated string tags = 3 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {max_len: 64}
+    }
+  }];
   google.protobuf.FieldMask update_mask = 4 [
     (buf.validate.field).required = true,
     (buf.validate.field).field_mask = {
@@ -198,7 +213,12 @@ message RenameTargetResponse {}
 
 message SetTargetEndpointsRequest {
   string id = 1 [(buf.validate.field).string.uuid = true];
-  repeated string endpoints = 2;
+  repeated string endpoints = 2 [(buf.validate.field).repeated = {
+    max_items: 16
+    items: {
+      string: {max_len: 256}
+    }
+  }];
 }
 message SetTargetEndpointsResponse {}
 message UpdateTargetResponse {}
@@ -214,9 +234,19 @@ message ListTargetsRequest {
     lte: 100
   }];
   int32 offset = 2 [(buf.validate.field).int32.gte = 0];
-  string query = 3;
-  repeated string accounts = 4;
-  repeated string tags = 5;
+  string query = 3 [(buf.validate.field).string.max_len = 256];
+  repeated string accounts = 4 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {max_len: 32}
+    }
+  }];
+  repeated string tags = 5 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {max_len: 64}
+    }
+  }];
   TargetStatus status = 6 [(buf.validate.field).enum = {defined_only: true}];
   repeated string ids = 7 [(buf.validate.field).repeated = {
     max_items: 100
