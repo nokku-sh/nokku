@@ -9,6 +9,7 @@ import (
 
 	nokkuv1 "github.com/nokku-sh/nokku/gen/nokku/v1"
 	"github.com/nokku-sh/nokku/gen/nokku/v1/nokkuv1connect"
+	"github.com/nokku-sh/nokku/internal/login"
 )
 
 const (
@@ -22,7 +23,7 @@ func BridgeRelay(
 	stream nokkuv1connect.DaemonServiceRelayServerStream,
 	relay *Relay,
 ) error {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, login.MaxRelayTime)
 	defer cancel()
 
 	// One bucket per direction so heavy traffic one way can't starve the other.
@@ -79,6 +80,7 @@ func BridgeRelay(
 	var retErr error
 	select {
 	case <-relay.done():
+	case <-ctx.Done():
 	case err := <-recvErr:
 		if !errors.Is(err, io.EOF) {
 			retErr = err
